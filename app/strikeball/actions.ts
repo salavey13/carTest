@@ -20,7 +20,7 @@ export async function createStrikeballLobby(
   try {
     const qrHash = uuidv4(); 
     const { data: lobby, error } = await supabaseAdmin
-      .from("strikeball_lobbies")
+      .from("lobbies")
       .insert({
         name,
         owner_id: userId,
@@ -84,7 +84,7 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
     });
 
     // Notify Owner
-    const { data: lobby } = await supabaseAdmin.from("strikeball_lobbies").select("owner_id, name").eq("id", lobbyId).single();
+    const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id, name").eq("id", lobbyId).single();
     if (lobby?.owner_id) {
        const user = await fetchUserData(userId);
        await sendComplexMessage(
@@ -103,7 +103,7 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
 export async function getOpenLobbies() {
   try {
     const { data, error } = await supabaseAdmin
-      .from("strikeball_lobbies")
+      .from("lobbies")
       .select("*")
       .eq("status", "open")
       .order("created_at", { ascending: false })
