@@ -2,39 +2,39 @@
 
 import React from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { FaCrosshairs, FaUsers, FaShieldHalved, FaBookSkull } from "react-icons/fa6";
+import { FaCrosshairs, FaUsers, FaShieldHalved, FaSkull } from "react-icons/fa6";
 
 const navItems = [
   { 
     href: "/strikeball", 
     label: "MAIN", 
-    number: "1",
+    key: "1",
     icon: FaCrosshairs,
-    color: "text-red-500"
+    color: "text-red-500" // Plasma/Rocket Red
   },
   { 
     href: "/strikeball/lobbies", 
     label: "SQUADS", 
-    number: "2",
+    key: "2",
     icon: FaUsers,
-    color: "text-cyan-500"
+    color: "text-cyan-400" // Railgun Blue
   },
   { 
     href: "/strikeball/shop", 
     label: "ARMORY", 
-    number: "3",
+    key: "3",
     icon: FaShieldHalved,
-    color: "text-emerald-500"
+    color: "text-emerald-400" // Health Green
   },
   {
-    href: "/strikeball/history", // Future feature
-    label: "LOGS",
-    number: "4",
-    icon: FaBookSkull,
-    color: "text-amber-500"
+    href: "/strikeball/stats", 
+    label: "FRAGS", 
+    key: "4",
+    icon: FaSkull,
+    color: "text-amber-400" // Armor Yellow
   }
 ];
 
@@ -42,11 +42,12 @@ export default function StrikeballBottomNav() {
   const pathname = usePathname();
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 p-2 pointer-events-none flex justify-center pb-4 sm:pb-6">
-      <motion.div 
-        initial={{ y: 100 }}
-        animate={{ y: 0 }}
-        className="pointer-events-auto flex gap-1 bg-black/80 backdrop-blur-xl border border-zinc-800 p-1 rounded-none shadow-[0_0_50px_rgba(0,0,0,0.8)]"
+    <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-4 px-2 pointer-events-none">
+      <motion.nav
+        initial={{ y: 100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 120, damping: 20 }}
+        className="pointer-events-auto bg-black/90 backdrop-blur-xl border border-zinc-800 rounded-lg shadow-[0_0_40px_rgba(0,0,0,0.8)] overflow-hidden flex"
       >
         {navItems.map((item) => {
           const isActive = pathname === item.href;
@@ -56,28 +57,36 @@ export default function StrikeballBottomNav() {
             <Link 
               key={item.href} 
               href={item.href}
-              className="relative group"
+              className="relative group w-20 sm:w-24 h-16 sm:h-20 border-r border-zinc-800 last:border-r-0"
             >
+              {/* Active Background Glow */}
               <div className={cn(
-                "flex flex-col items-center justify-between w-16 sm:w-20 h-14 sm:h-16 p-1 border-2 transition-all duration-100 ease-out clip-path-slant",
-                isActive 
-                  ? "bg-zinc-800 border-red-500 scale-105 z-10" 
-                  : "bg-zinc-900/80 border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500"
-              )}>
-                
-                {/* Number Key (Classic FPS style) */}
-                <div className="self-start text-[8px] font-mono text-zinc-500 leading-none px-1">
-                  {item.number}
-                </div>
+                "absolute inset-0 bg-gradient-to-t from-white/10 to-transparent transition-opacity duration-200",
+                isActive ? "opacity-100" : "opacity-0 group-hover:opacity-50"
+              )} />
 
-                <Icon className={cn(
-                  "w-5 h-5 sm:w-6 sm:h-6 transition-transform duration-200",
-                  isActive ? `scale-110 ${item.color} drop-shadow-[0_0_5px_currentColor]` : "text-zinc-600"
-                )} />
+              {/* The "Selected Weapon" Indicator Bar */}
+              {isActive && (
+                <motion.div 
+                  layoutId="weapon-select"
+                  className={cn("absolute top-0 left-0 right-0 h-1 shadow-[0_0_10px_currentColor]", item.color.replace('text-', 'bg-'))}
+                />
+              )}
+
+              <div className="flex flex-col items-center justify-between h-full p-2">
+                {/* Hotkey Number */}
+                <span className="self-start text-[8px] font-mono text-zinc-600 font-bold">[{item.key}]</span>
                 
+                {/* Icon */}
+                <Icon className={cn(
+                  "w-6 h-6 transition-all duration-200",
+                  isActive ? `scale-110 ${item.color} drop-shadow-[0_0_8px_currentColor]` : "text-zinc-600 group-hover:text-zinc-400"
+                )} />
+
+                {/* Label */}
                 <span className={cn(
-                  "text-[8px] font-orbitron tracking-tighter font-bold uppercase",
-                  isActive ? "text-zinc-100" : "text-zinc-600"
+                  "text-[9px] font-orbitron font-bold tracking-widest uppercase",
+                  isActive ? "text-white" : "text-zinc-600"
                 )}>
                   {item.label}
                 </span>
@@ -85,7 +94,7 @@ export default function StrikeballBottomNav() {
             </Link>
           );
         })}
-      </motion.div>
+      </motion.nav>
     </div>
   );
 }
