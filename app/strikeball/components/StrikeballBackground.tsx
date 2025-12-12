@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 
-const PARTICLE_COUNT = 15; // Increased for more atmosphere
+const PARTICLE_COUNT = 15;
 
 type Particle = {
   id: number;
@@ -30,14 +30,14 @@ export const StrikeballBackground: React.FC = () => {
   }
 
   const particles = useMemo<Particle[]>(() => {
-    const rnd = mulberry32(1999); // Seed: Year of Q3A release
+    const rnd = mulberry32(1999);
     return new Array(PARTICLE_COUNT).fill(0).map((_, i) => ({
       id: i,
       left: Math.round(rnd() * 100), 
       size: Math.round(2 + rnd() * 4), 
       delay: Math.round(rnd() * 50) / 10,
-      drift: Math.round((rnd() - 0.5) * 100), // Less horizontal drift, more rising smoke
-      duration: Math.round(10 + rnd() * 10), // Slower movement
+      drift: Math.round((rnd() - 0.5) * 100), 
+      duration: Math.round(10 + rnd() * 10), 
       blur: Math.round(1 + rnd() * 3),
     }));
   }, []);
@@ -61,7 +61,6 @@ export const StrikeballBackground: React.FC = () => {
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          {/* Radioactive Bloom */}
           <filter id="q3_bloom" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b1" />
             <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="b2" />
@@ -73,7 +72,6 @@ export const StrikeballBackground: React.FC = () => {
             <feColorMatrix type="matrix" values="1 0 0 0 0  0 0.8 0 0 0  0 0 0.8 0 0  0 0 0 1 0" in="mergedBloom" />
           </filter>
 
-          {/* Chromatic Aberration (The 'Damaged Monitor' Look) */}
           <filter id="q3_chroma">
             <feOffset in="SourceGraphic" dx="-1.5" dy="0" result="offR" />
             <feColorMatrix in="offR" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.7 0" result="r" />
@@ -86,28 +84,23 @@ export const StrikeballBackground: React.FC = () => {
             </feMerge>
           </filter>
 
-          {/* Floor Grid Pattern */}
           <pattern id="q3_grid" x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
             <path d="M0 80 L80 80" stroke="#330000" strokeWidth="1" opacity="0.5" />
             <path d="M80 0 L80 80" stroke="#330000" strokeWidth="1" opacity="0.5" />
           </pattern>
 
-          {/* Tribal Gradient */}
           <linearGradient id="q3_metal" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#ff4444" />
             <stop offset="100%" stopColor="#880000" />
           </linearGradient>
         </defs>
 
-        {/* 1. Perspective Floor */}
         <g transform="translate(600, 600) scale(1.5, 0.8) perspective(500)">
            <rect x="-1000" y="-1000" width="2000" height="2000" fill="url(#q3_grid)" opacity="0.3" transform="rotateX(60)" />
         </g>
 
-        {/* 2. The Rune (Centered) */}
         <g transform="translate(600, 400) scale(1.2)" filter="url(#q3_bloom)">
            <g filter="url(#q3_chroma)">
-              {/* Inner Circle (Pulsing) */}
               <motion.circle 
                 cx="0" cy="0" r="60" 
                 fill="none" stroke="#ff0000" strokeWidth="3" strokeDasharray="10 5"
@@ -115,7 +108,6 @@ export const StrikeballBackground: React.FC = () => {
                 transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
               />
               
-              {/* The "Spike" Logo Shape */}
               <motion.path 
                 d="M0 -90 L20 -40 Q 80 -10 40 40 L 0 100 L -40 40 Q -80 -10 -20 -40 Z" 
                 fill="url(#q3_metal)" 
@@ -127,14 +119,27 @@ export const StrikeballBackground: React.FC = () => {
         </g>
       </svg>
 
-      {/* CSS Noise / Scanlines */}
+      {/* --- FIX: Improved Scanlines --- */}
+      {/* 1. Explicit high-contrast scanlines */}
       <div 
-        className="absolute inset-0 z-10 opacity-10" 
-        style={{ backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 2px, #000 3px)` }} 
+        className="absolute inset-0 z-10 pointer-events-none" 
+        style={{ 
+          backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0) 50%, rgba(0,0,0,0.4) 50%)`,
+          backgroundSize: '100% 4px',
+          opacity: 0.6 // Increased opacity for visibility
+        }} 
       />
-      <div className="absolute inset-0 z-20 bg-gradient-to-t from-black via-transparent to-black opacity-80" />
+      {/* 2. CRT Noise Texture overlay */}
+      <div 
+        className="absolute inset-0 z-20 pointer-events-none opacity-[0.03]" 
+        style={{ 
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
+        }} 
+      />
+      {/* 3. Vignette to darken corners */}
+      <div className="absolute inset-0 z-30 bg-[radial-gradient(circle_at_center,transparent_50%,rgba(0,0,0,0.6)_100%)] pointer-events-none" />
 
-      {/* Particles (Ash) */}
+      {/* Particles */}
       {mounted && particles.map((p) => (
         <motion.div
           key={p.id}
