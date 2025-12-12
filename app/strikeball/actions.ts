@@ -1,165 +1,156 @@
 "use server";
 
-import type { Database } from "@/types/database.types";
-import { supabaseAdmin, fetchUserData as dbFetchUserData, updateUserMetadata as dbUpdateUserMetadata } from "@/hooks/supabase";
+import { supabaseAdmin, fetchUserData, updateUserMetadata } from "@/hooks/supabase";
+import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
+import { sendTelegramInvoice, notifyAdmin } from "@/app/actions"; // Core actions
 import { logger } from "@/lib/logger";
+import { v4 as uuidv4 } from "uuid";
 
-type LobbyRow = Database["public"]["Tables"]["lobbies"]["Row"];
-type LobbyInsert = Database["public"]["Tables"]["lobbies"]["Insert"];
+// --- PATH B: COMMANDER (Lobby Management) ---
 
-/**
- * Create a lightweight lobby record and attach owner as first member.
- * Also writes last_created_lobby to user's metadata (jsonb).
- */
-export async function createLobby(
-  ownerUserId: string,
-  payload: {
-    name: string;
-    mode?: string;
-    max_players?: number;
-    field_id?: string | null;
-    start_at?: string | null; // ISO datetime or null
-    is_public?: boolean;
-  }
-): Promise<{ success: boolean; lobby?: LobbyRow; error?: string }> {
-  if (!ownerUserId) return { success: false, error: "ownerUserId required" };
-  const { name, mode = "tdm", max_players = 10, field_id = null, start_at = null, is_public = true } = payload;
-  if (!name || name.trim().length < 3) return { success: false, error: "Название слишком короткое" };
-
-  if (!supabaseAdmin) return { success: false, error: "DB admin client missing" };
+export async function createStrikeballLobby(
+  userId: string, 
+  name: string, 
+  mode: string
+) {
+  if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
-    // Insert lobby
-    const insert: LobbyInsert = {
-      name: name.trim(),
-      owner_id: ownerUserId,
-      mode,
-      max_players,
-      field_id,
-      start_at,
-      is_public,
-      status: "open", // convention
-      created_at: new Date().toISOString(),
-    } as any;
-
-    const { data: lobby, error: insertErr } = await supabaseAdmin
-      .from("lobbies")
-      .insert(insert)
+    // 1. Create Lobby
+    const qrHash = uuidv4(); // Simple unique string for QR generation
+    const { data: lobby, error } = await supabaseAdmin
+      .from("strikeball_lobbies")
+      .insert({
+        name,
+        owner_id: userId,
+        mode,
+        qr_code_hash: qrHash,
+        status: "open",
+        metadata: { bots_enabled: true }
+      })
       .select()
       .single();
 
-    if (insertErr || !lobby) {
-      throw insertErr || new Error("Lobby insert failed");
-    }
+    if (error) throw error;
 
-    // add owner as member
-    const { error: memberErr } = await supabaseAdmin.from("lobby_members").insert({
+    // 2. Add Owner as Member (Blue Team Leader)
+    await supabaseAdmin.from("strikeball_members").insert({
       lobby_id: lobby.id,
-      user_id: ownerUserId,
-      role: "owner",
-      joined_at: new Date().toISOString(),
+      user_id: userId,
+      team: "blue",
+      is_bot: false,
+      status: "ready"
     });
 
-    if (memberErr) {
-      logger.error("[createLobby] Failed to add owner as member, continuing:", memberErr);
-      // non-fatal: lobby exists, but warn
-    }
+    // 3. Notify via Telegram (Tactical feature)
+    const deepLink = `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobby.id}`;
+    await sendComplexMessage(
+      userId,
+      `🎮 **Lobby Initialized: ${name}**\n\nMode: ${mode.toUpperCase()}\nStatus: WAITING FOR PLAYERS\n\n[Join Link](${deepLink})`,
+      [],
+      { parseMode: "Markdown" }
+    );
 
-    // Update user's metadata: last_created_lobby
-    const dbUser = await dbFetchUserData(ownerUserId);
-    const currentMeta = (dbUser && dbUser.metadata) ? dbUser.metadata : {};
-    const newMeta = {
-      ...currentMeta,
-      last_created_lobby: { id: lobby.id, name: lobby.name, created_at: lobby.created_at },
-    };
-
-    const updateResult = await dbUpdateUserMetadata(ownerUserId, newMeta);
-    if (!updateResult.success) {
-      logger.warn(`[createLobby] Warning: failed to update user metadata for ${ownerUserId}: ${updateResult.error}`);
-    }
-
-    return { success: true, lobby };
+    return { success: true, lobbyId: lobby.id };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    logger.error("[createLobby] Error:", e);
-    return { success: false, error: msg };
+    logger.error("Create Lobby Failed", e);
+    return { success: false, error: "Failed to deploy lobby." };
   }
 }
 
-/**
- * Join a lobby (adds record to lobby_members).
- */
-export async function joinLobby(userId: string, lobbyId: string): Promise<{ success: boolean; error?: string }> {
-  if (!userId || !lobbyId) return { success: false, error: "userId and lobbyId required" };
-  if (!supabaseAdmin) return { success: false, error: "DB admin client missing" };
-
+export async function joinLobby(userId: string, lobbyId: string, team: string = "red") {
   try {
-    // Check membership exists
-    const { data: existing, error: existErr } = await supabaseAdmin
-      .from("lobby_members")
+    // Check if already in
+    const { data: existing } = await supabaseAdmin
+      .from("strikeball_members")
       .select("id")
       .eq("lobby_id", lobbyId)
       .eq("user_id", userId)
       .maybeSingle();
 
-    if (existErr) throw existErr;
-    if (existing) return { success: true }; // already member
+    if (existing) return { success: true, message: "Already deployed." };
 
-    const { error } = await supabaseAdmin.from("lobby_members").insert({
+    await supabaseAdmin.from("strikeball_members").insert({
       lobby_id: lobbyId,
       user_id: userId,
-      role: "member",
-      joined_at: new Date().toISOString(),
+      team,
+      is_bot: false,
+      status: "ready"
     });
 
-    if (error) throw error;
+    // Notify Lobby Owner (Tactical Update)
+    const { data: lobby } = await supabaseAdmin.from("strikeball_lobbies").select("owner_id").eq("id", lobbyId).single();
+    if (lobby?.owner_id) {
+       // Retrieve username for cleaner notification
+       const user = await fetchUserData(userId);
+       await sendComplexMessage(
+         lobby.owner_id, 
+         `⚠️ **New Operator Deployed!**\nUser: ${user?.username || userId}\nTeam: ${team.toUpperCase()}`
+       );
+    }
 
     return { success: true };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    logger.error("[joinLobby] Error:", e);
-    return { success: false, error: msg };
+    return { success: false, error: "Deployment failed." };
   }
 }
 
-/**
- * Read open lobbies (for the client to show).
- */
-export async function getOpenLobbies(): Promise<{ success: boolean; data?: LobbyRow[]; error?: string }> {
-  if (!supabaseAdmin) return { success: false, error: "DB admin client missing" };
+// --- PATH C: TACTICAL (Bots & Status) ---
+
+export async function addNoobBot(lobbyId: string, team: string) {
   try {
-    const { data, error } = await supabaseAdmin
-      .from("lobbies")
-      .select("*")
-      .eq("status", "open")
-      .order("created_at", { ascending: false })
-      .limit(50);
-    if (error) throw error;
+    await supabaseAdmin.from("strikeball_members").insert({
+      lobby_id: lobbyId,
+      user_id: null, // It's a bot
+      is_bot: true,
+      team,
+      status: "ready"
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: "Bot malfunction." };
+  }
+}
+
+export async function togglePlayerStatus(memberId: string, currentStatus: string) {
+    const newStatus = currentStatus === 'alive' ? 'dead' : 'alive';
+    await supabaseAdmin.from("strikeball_members").update({ status: newStatus }).eq("id", memberId);
+    return { success: true, newStatus };
+}
+
+// --- PATH A: ECONOMY (Gear Rental with XTR) ---
+
+export async function rentGear(userId: string, gearId: string) {
+  try {
+    // 1. Get Gear Details
+    const { data: gear } = await supabaseAdmin.from("cars").select("*").eq("id", gearId).single();
+    if (!gear) throw new Error("Item not found");
+
+    if (gear.stock <= 0) return { success: false, error: "Out of stock!" };
+
+    // 2. Send Telegram Invoice (XTR)
+    // We use your core action 'sendTelegramInvoice'
+    const invoicePayload = `gear_rent_${gearId}_${Date.now()}`;
+    const result = await sendTelegramInvoice(
+      userId,
+      `Rental: ${gear.name}`,
+      `Daily rental for ${gear.name}. Pickup at HQ.`,
+      invoicePayload,
+      gear.price_xtr,
+      0, // No subscription ID
+      gear.image_url
+    );
+
+    if (!result.success) throw new Error(result.error);
+
+    return { success: true, message: "Invoice sent to chat!" };
+  } catch (e) {
+    logger.error("Rent Gear Failed", e);
+    return { success: false, error: (e as Error).message };
+  }
+}
+
+export async function getGearList() {
+    const { data } = await supabaseAdmin.from("strikeball_gear").select("*").gt("stock", 0);
     return { success: true, data: data || [] };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    logger.error("[getOpenLobbies] Error:", e);
-    return { success: false, error: msg };
-  }
-}
-
-/**
- * Save arbitrary user preferences into users.metadata (merges client partials).
- * Use this to store preferences like preferred_game_mode, notify_on_invite, preferred_field_id etc.
- */
-export async function updateUserPreferences(userId: string, partialPrefs: Record<string, any>): Promise<{ success: boolean; error?: string }> {
-  if (!userId) return { success: false, error: "userId required" };
-  try {
-    const dbUser = await dbFetchUserData(userId);
-    if (!dbUser) return { success: false, error: "User not found" };
-    const currentMetadata = dbUser.metadata || {};
-    const merged = { ...currentMetadata, ...partialPrefs };
-    const res = await dbUpdateUserMetadata(userId, merged);
-    if (!res.success) return { success: false, error: res.error };
-    return { success: true };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    logger.error("[updateUserPreferences] Error:", e);
-    return { success: false, error: msg };
-  }
 }

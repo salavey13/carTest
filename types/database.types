@@ -9,6 +9,51 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      
+      lobbies: {
+        Row: {
+          id: string
+          name: string
+          owner_id: string
+          mode: string
+          max_players: number
+          field_id: string | null
+          start_at: string | null
+          status: string // 'open', 'active', 'closed'
+          is_public: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          owner_id: string
+          mode?: string
+          max_players?: number
+          field_id?: string | null
+          start_at?: string | null
+          status?: string
+          is_public?: boolean
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['lobbies']['Insert']>
+      }
+      lobby_members: {
+        Row: {
+          id: string
+          lobby_id: string
+          user_id: string
+          role: string // 'owner', 'member', 'bot'
+          joined_at: string
+        }
+        Insert: {
+          id?: string
+          lobby_id: string
+          user_id: string
+          role?: string
+          joined_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['lobby_members']['Insert']>
+      }
       answers: {
         Row: {
           id: number
