@@ -24,35 +24,36 @@ export default function StrikeballDashboard() {
       {/* Main Grid */}
       <div className="grid grid-cols-2 gap-4 mb-8">
         <Link href="/strikeball/shop">
-          <motion.div whileTap={{ scale: 0.95 }} className="bg-neutral-900 border border-neutral-800 p-4 rounded-xl flex flex-col items-center justify-center gap-2 aspect-square">
-            <FaShieldHalved className="text-4xl text-emerald-500" />
-            <span className="font-bold text-sm">ARMORY (XTR)</span>
+          <motion.div whileTap={{ scale: 0.95 }} className="bg-neutral-900 border border-neutral-800 p-4 rounded-xl flex flex-col items-center justify-center gap-2 aspect-square group hover:border-emerald-500/50 transition-colors">
+            <FaShieldHalved className="text-4xl text-emerald-500 group-hover:scale-110 transition-transform" />
+            <span className="font-bold text-sm tracking-widest">ARMORY</span>
           </motion.div>
         </Link>
         <Link href="/strikeball/lobbies">
-          <motion.div whileTap={{ scale: 0.95 }} className="bg-neutral-900 border border-neutral-800 p-4 rounded-xl flex flex-col items-center justify-center gap-2 aspect-square">
-             <FaUsers className="text-4xl text-cyan-500" />
-             <span className="font-bold text-sm">SQUADS</span>
+          <motion.div whileTap={{ scale: 0.95 }} className="bg-neutral-900 border border-neutral-800 p-4 rounded-xl flex flex-col items-center justify-center gap-2 aspect-square group hover:border-cyan-500/50 transition-colors">
+             <FaUsers className="text-4xl text-cyan-500 group-hover:scale-110 transition-transform" />
+             <span className="font-bold text-sm tracking-widest">SQUADS</span>
           </motion.div>
         </Link>
       </div>
 
-      {/* Quick Actions */}
+      {/* Deployment Zone */}
       <div className="space-y-6">
         <section>
-          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <FaCrosshairs className="text-red-500" /> DEPLOYMENT
-          </h2>
+          <div className="flex items-center gap-2 mb-4 text-red-500">
+            <FaCrosshairs className="animate-pulse" />
+            <h2 className="text-lg font-bold font-orbitron">QUICK DEPLOY</h2>
+          </div>
           <CreateLobbyForm />
         </section>
 
-        <section className="bg-neutral-900/50 p-4 rounded-xl border border-dashed border-neutral-700">
+        <section className="bg-neutral-900/50 p-4 rounded-xl border border-dashed border-neutral-800 hover:border-neutral-600 transition-colors">
            <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-bold">QR Fast Join</h3>
-                <p className="text-xs text-neutral-500">Scan field code to join lobby</p>
+                <h3 className="font-bold text-neutral-200">QR Join</h3>
+                <p className="text-xs text-neutral-500">Scan field code to enter lobby</p>
               </div>
-              <button className="bg-white text-black p-3 rounded-full">
+              <button className="bg-white text-black w-10 h-10 rounded-full flex items-center justify-center hover:bg-neutral-200 transition-colors">
                  <FaQrcode />
               </button>
            </div>

@@ -1,10 +1,12 @@
 "use server";
 
-import { supabaseAdmin, fetchUserData, updateUserMetadata } from "@/hooks/supabase";
+import { supabaseAdmin, fetchUserData } from "@/hooks/supabase";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
-import { sendTelegramInvoice, notifyAdmin } from "@/app/actions"; // Core actions
+import { sendTelegramInvoice } from "@/app/actions"; 
 import { logger } from "@/lib/logger";
 import { v4 as uuidv4 } from "uuid";
+
+const BOT_USERNAME = "oneSitePlsBot";
 
 // --- PATH B: COMMANDER (Lobby Management) ---
 
@@ -16,8 +18,7 @@ export async function createStrikeballLobby(
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
-    // 1. Create Lobby
-    const qrHash = uuidv4(); // Simple unique string for QR generation
+    const qrHash = uuidv4(); 
     const { data: lobby, error } = await supabaseAdmin
       .from("strikeball_lobbies")
       .insert({
@@ -33,7 +34,7 @@ export async function createStrikeballLobby(
 
     if (error) throw error;
 
-    // 2. Add Owner as Member (Blue Team Leader)
+    // Auto-join owner to Blue team
     await supabaseAdmin.from("strikeball_members").insert({
       lobby_id: lobby.id,
       user_id: userId,
@@ -42,11 +43,11 @@ export async function createStrikeballLobby(
       status: "ready"
     });
 
-    // 3. Notify via Telegram (Tactical feature)
-    const deepLink = `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobby.id}`;
+    // Notify via Telegram
+    const deepLink = `https://t.me/${BOT_USERNAME}/app?startapp=lobby_${lobby.id}`;
     await sendComplexMessage(
       userId,
-      `🎮 **Lobby Initialized: ${name}**\n\nMode: ${mode.toUpperCase()}\nStatus: WAITING FOR PLAYERS\n\n[Join Link](${deepLink})`,
+      `🎮 **Strikeball Lobby Created: ${name}**\n\nMode: ${mode.toUpperCase()}\n\n[🔗 Click here to Invite Players](${deepLink})`,
       [],
       { parseMode: "Markdown" }
     );
@@ -60,7 +61,6 @@ export async function createStrikeballLobby(
 
 export async function joinLobby(userId: string, lobbyId: string, team: string = "red") {
   try {
-    // Check if already in
     const { data: existing } = await supabaseAdmin
       .from("strikeball_members")
       .select("id")
@@ -78,14 +78,13 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
       status: "ready"
     });
 
-    // Notify Lobby Owner (Tactical Update)
+    // Notify Owner
     const { data: lobby } = await supabaseAdmin.from("strikeball_lobbies").select("owner_id").eq("id", lobbyId).single();
     if (lobby?.owner_id) {
-       // Retrieve username for cleaner notification
        const user = await fetchUserData(userId);
        await sendComplexMessage(
          lobby.owner_id, 
-         `⚠️ **New Operator Deployed!**\nUser: ${user?.username || userId}\nTeam: ${team.toUpperCase()}`
+         `⚠️ **Operator Joined!**\nUser: ${user?.username || userId}\nTeam: ${team.toUpperCase()}`
        );
     }
 
@@ -101,7 +100,7 @@ export async function addNoobBot(lobbyId: string, team: string) {
   try {
     await supabaseAdmin.from("strikeball_members").insert({
       lobby_id: lobbyId,
-      user_id: null, // It's a bot
+      user_id: null,
       is_bot: true,
       team,
       status: "ready"
@@ -118,39 +117,57 @@ export async function togglePlayerStatus(memberId: string, currentStatus: string
     return { success: true, newStatus };
 }
 
-// --- PATH A: ECONOMY (Gear Rental with XTR) ---
+// --- PATH A: ECONOMY (Gear Rental via 'cars' table) ---
+
+export async function getGearList() {
+    // REUSE: Querying 'cars' table for items that are essentially gear.
+    // Assuming 'type' column distinguishes them, or we filter by metadata.
+    // Here we check for type 'gear' or 'weapon'.
+    const { data, error } = await supabaseAdmin
+      .from("cars")
+      .select("*")
+      .in("type", ["gear", "weapon", "consumable"]) 
+      .order("daily_price", { ascending: true });
+
+    if (error) {
+      logger.error("Failed to fetch gear from cars table", error);
+      return { success: false, error: error.message };
+    }
+    return { success: true, data: data || [] };
+}
 
 export async function rentGear(userId: string, gearId: string) {
   try {
-    // 1. Get Gear Details
-    const { data: gear } = await supabaseAdmin.from("cars").select("*").eq("id", gearId).single();
-    if (!gear) throw new Error("Item not found");
+    // REUSE: Fetch from 'cars' table
+    const { data: item } = await supabaseAdmin
+        .from("cars")
+        .select("*")
+        .eq("id", gearId)
+        .single();
 
-    if (gear.stock <= 0) return { success: false, error: "Out of stock!" };
+    if (!item) throw new Error("Gear not found in armory.");
 
-    // 2. Send Telegram Invoice (XTR)
-    // We use your core action 'sendTelegramInvoice'
+    // Logic: If it's gear, we might not track "stock" in the same way as cars, 
+    // but let's assume if it exists, it's rentable.
+
     const invoicePayload = `gear_rent_${gearId}_${Date.now()}`;
+    
+    // Send XTR Invoice
     const result = await sendTelegramInvoice(
       userId,
-      `Rental: ${gear.name}`,
-      `Daily rental for ${gear.name}. Pickup at HQ.`,
+      `Rental: ${item.make} ${item.model}`, // Mapping Make/Model to Name
+      `Tactical gear rental. ${item.description || "No description."}`,
       invoicePayload,
-      gear.price_xtr,
-      0, // No subscription ID
-      gear.image_url
+      item.daily_price,
+      0,
+      item.image_url
     );
 
     if (!result.success) throw new Error(result.error);
 
-    return { success: true, message: "Invoice sent to chat!" };
+    return { success: true, message: "Invoice sent to Telegram!" };
   } catch (e) {
     logger.error("Rent Gear Failed", e);
     return { success: false, error: (e as Error).message };
   }
-}
-
-export async function getGearList() {
-    const { data } = await supabaseAdmin.from("strikeball_gear").select("*").gt("stock", 0);
-    return { success: true, data: data || [] };
 }
