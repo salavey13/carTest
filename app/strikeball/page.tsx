@@ -11,8 +11,9 @@ export default function StrikeballDashboard() {
   const { user } = useAppContext();
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white p-4 pb-24">
-      <header className="mb-8 pt-4">
+    // UPDATED PADDING: pt-24
+    <div className="min-h-screen bg-neutral-950 text-white pt-24 p-4 pb-24">
+      <header className="mb-8">
         <h1 className="text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500 font-orbitron">
           STRIKE<span className="text-white">BALL</span> OPS
         </h1>

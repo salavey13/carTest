@@ -32,10 +32,11 @@ export default function GearShop() {
     });
   };
 
-  if (loading) return <div className="p-10 text-center font-mono text-emerald-500">LOADING ARMORY DATA...</div>;
+  if (loading) return <div className="p-10 text-center font-mono text-emerald-500 pt-24">LOADING ARMORY DATA...</div>;
 
   return (
-    <div className="min-h-screen bg-neutral-950 p-4 pb-20">
+    // UPDATED PADDING: pt-24
+    <div className="min-h-screen bg-neutral-950 pt-24 p-4 pb-20">
       <div className="flex justify-between items-end mb-6">
           <h1 className="text-3xl font-orbitron font-bold text-emerald-400">ARMORY</h1>
           <span className="text-xs font-mono text-neutral-500">{gear.length} ITEMS AVAILABLE</span>

@@ -18,7 +18,7 @@ export default function LobbyRoom() {
     // Initial Load
     loadData();
 
-    // Subscribe to realtime changes for tactical map updates
+    // Subscribe to realtime changes
     const channel = supabaseAnon
       .channel(`lobby_${lobbyId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'strikeball_members', filter: `lobby_id=eq.${lobbyId}` }, 
@@ -82,11 +82,12 @@ export default function LobbyRoom() {
     );
   };
 
-  if (!lobby) return <div className="flex h-screen items-center justify-center text-emerald-500 font-mono animate-pulse">ESTABLISHING UPLINK...</div>;
+  if (!lobby) return <div className="flex h-screen items-center justify-center text-emerald-500 font-mono animate-pulse pt-20">ESTABLISHING UPLINK...</div>;
 
   return (
-    <div className="p-4 min-h-screen bg-black text-white">
-      <div className="mb-6 pt-4 text-center">
+    // UPDATED PADDING: pt-24
+    <div className="pt-24 p-4 min-h-screen bg-black text-white">
+      <div className="mb-6 text-center">
         <h1 className="text-2xl font-orbitron font-bold text-white uppercase tracking-wider">{lobby.name}</h1>
         <div className="text-[10px] font-mono text-neutral-500 bg-neutral-900 inline-block px-2 py-1 rounded mt-2">
           MODE: {lobby.mode} | STATUS: {lobby.status}
@@ -99,7 +100,6 @@ export default function LobbyRoom() {
         <TeamColumn team="red" color="red" />
       </div>
 
-      {/* Join Controls */}
       {!members.find(m => m.user_id === dbUser?.user_id) && (
         <div className="grid grid-cols-2 gap-4 fixed bottom-8 left-4 right-4 max-w-md mx-auto">
             <button onClick={() => joinLobby(dbUser!.user_id, lobby.id, 'blue')} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-blue-900/50">
