@@ -5,28 +5,29 @@ import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 
-// Standard Components
+// --- Standard Components ---
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNavigation from "@/components/layout/BottomNavigation";
 
-// Theme: Bike
+// --- Theme: Bike Rental ---
 import BikeHeader from "@/components/BikeHeader";
 import BikeFooter from "@/components/BikeFooter";
 import BottomNavigationBike from "@/components/layout/BottomNavigationBike";
 
-// Theme: Sauna
+// --- Theme: Sauna ---
 import SaunaHeader from "@/components/SaunaHeader";
 import SaunaFooter from "@/components/SaunaFooter";
 import BottomNavigationSauna from "@/components/layout/BottomNavigationSauna";
 
-// Theme: Bio30
+// --- Theme: Bio30 ---
 import Bio30Header from "@/app/bio30/components/Header";
 import Bio30Footer from "@/app/bio30/components/Footer";
 
-// Theme: Strikeball (NEW STATE OF THE ART)
+// --- Theme: Strikeball (Tactical OS) ---
 import StrikeballHeader from "@/app/strikeball/components/StrikeballHeader";
 import StrikeballBottomNav from "@/app/strikeball/components/StrikeballBottomNav";
+import { StrikeballBackground } from "@/app/strikeball/components/StrikeballBackground";
 
 import StickyChatButton from "@/components/StickyChatButton";
 import { AppProvider, useAppContext } from "@/contexts/AppContext";
@@ -45,7 +46,11 @@ import { useAppToast } from "@/hooks/useAppToast";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { Loading } from "@/components/Loading";
 import { cn } from "@/lib/utils";
+
+// Bio30 specific actions
 import { setReferrer } from "@/app/bio30/ref_actions"; 
+
+// WB Syndicate Actions
 import { applyReferralCode } from "@/app/wblanding/actions_view";
 
 // --- THEME ENGINE ---
@@ -53,9 +58,9 @@ const THEME_CONFIG = {
   strikeball: {
     paths: ["/strikeball"],
     Header: StrikeballHeader,
-    Footer: null, // No standard footer for immersive view
+    Footer: null, // No footer for immersive view
     BottomNav: StrikeballBottomNav, // Custom tactical nav
-    isTransparent: true, // Allow background to bleed through
+    isTransparent: true, // Allows background component to be visible
   },
   bike: {
     paths: ["/vipbikerental", "/rent-bike", "/rent/", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals"],
@@ -103,9 +108,6 @@ const getThemeForPath = (pathname: string) => {
   return THEME_CONFIG.default;
 };
 
-// ... [AppInitializers, START_PARAM_PAGE_MAP, BIO30_PRODUCT_PATHS, useBio30ThemeFix remain unchanged] ...
-
-// Helper function needed for AppInitializers context
 function AppInitializers() {
   const { dbUser, isAuthenticated } = useAppContext();
   const { success: addToast } = useAppToast();
@@ -127,6 +129,9 @@ function AppInitializers() {
       !scrollAchievementUnlockedRef.current
     ) {
       scrollAchievementUnlockedRef.current = true;
+      logger.info(
+        `[ClientLayout ScrollAch] User ${dbUser.user_id} scrolled >1000px. Unlocking 'scrolled_like_a_maniac'.`
+      );
       try {
         const { newAchievements } = await checkAndUnlockFeatureAchievement(
           dbUser.user_id,
@@ -136,6 +141,7 @@ function AppInitializers() {
           addToast(`🏆 Ачивка: ${ach.name}!`, { description: ach.description });
         });
       } catch (error) {
+        logger.error("[ClientLayout] Error unlocking achievement:", error);
         scrollAchievementUnlockedRef.current = false;
       }
     }
@@ -157,6 +163,7 @@ function AppInitializers() {
 }
 
 const START_PARAM_PAGE_MAP: Record<string, string> = {
+  // Legacy / Standard
   elon: "/elon",
   musk_market: "/elon",
   arbitrage_seeker: "/elon",
@@ -166,20 +173,27 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   sauna: "/sauna-rent",
   streamer: "/streamer",
   demo: "/about_en",
+  
+  // Warehouse / Pirate Code Ops
   wb: "/wblanding", 
   wb_dashboard: "/wblanding",
   "audit-tool": "/wblanding",
   "create_crew": "/wblanding",
   reports: "/wblanding",
   crews: "/crews", 
+  
+  // Developer / CyberDev Ops
   "repo-xml": "/repo-xml",
   "style-guide": "/style-guide",
   "start-training": "/selfdev/gamified",
+  
+  // Racing / Legacy
   paddock: "/paddock",
   leaderboard: "/leaderboard",
   "rent-bike": "/rent-bike",
 };
 
+// BIO30 Product mapping for startapp parameters
 const BIO30_PRODUCT_PATHS: Record<string, string> = {
   'cordyceps': '/bio30/categories/cordyceps-sinensis',
   'spirulina': '/bio30/categories/spirulina-chlorella',
@@ -198,10 +212,12 @@ function useBio30ThemeFix() {
     const root = document.documentElement;
     const prevBg = root.style.getPropertyValue("--background");
     const prevFg = root.style.getPropertyValue("--foreground");
+
     root.style.setProperty("--background", "hsl(0 0% 6%)");
     root.style.setProperty("--foreground", "hsl(0 0% 100%)");
     document.body.style.backgroundColor = "hsl(0 0% 6%)";
     document.body.style.color = "hsl(0 0% 100%)";
+
     return () => {
       root.style.setProperty("--background", prevBg || "");
       root.style.setProperty("--foreground", prevFg || "");
@@ -211,17 +227,21 @@ function useBio30ThemeFix() {
   }, [pathname]);
 }
 
+// --- THEME SYNC HOOK ---
 function useThemeSync() {
   const { dbUser, isLoading } = useAppContext();
   const { setTheme, resolvedTheme } = useTheme();
   const [hasSynced, setHasSynced] = useState(false);
+
   useEffect(() => {
     if (!isLoading && dbUser && !hasSynced) {
       const settings = dbUser.metadata?.settings_profile as Record<string, any> | undefined;
       if (settings && typeof settings.dark_mode_enabled === 'boolean') {
         const dbWantsDark = settings.dark_mode_enabled;
         const currentIsDark = resolvedTheme === 'dark';
+        
         if (dbWantsDark !== currentIsDark) {
+            logger.info(`[ThemeSync] Syncing theme from DB. User wants: ${dbWantsDark ? 'DARK' : 'LIGHT'}`);
             setTheme(dbWantsDark ? 'dark' : 'light');
         }
       }
@@ -237,7 +257,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const {
     startParamPayload,
     dbUser,
-    userCrewInfo,
+    userCrewInfo, // Access crew info for smart redirects
     refreshDbUser,
     isLoading: isAppLoading,
     isAuthenticating,
@@ -251,23 +271,44 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const CurrentHeader = theme.Header;
   const CurrentFooter = theme.Footer;
   const CurrentBottomNav = theme.BottomNav;
+  const isStrikeball = theme === THEME_CONFIG.strikeball;
 
   useBio30ThemeFix();
   useThemeSync(); 
 
   useEffect(() => {
+    // Bio30 Referral Helper
     const handleBio30Referral = async (referrerId: string, paramToProcess: string) => {
       if (dbUser && dbUser.user_id && !dbUser.metadata?.referrer_id) {
         try {
-          const result = await setReferrer({ userId: dbUser.user_id, referrerId, referrerCode: paramToProcess });
-          if (result.success) await refreshDbUser();
-        } catch (error) { logger.error(`[ClientLayout] Error setting referrer:`, error); }
+          const result = await setReferrer({
+            userId: dbUser.user_id,
+            referrerId,
+            referrerCode: paramToProcess,
+          });
+          if (result.success) {
+            logger.info(
+              `[ClientLayout] Referral set for user ${dbUser.user_id} to referrer ${referrerId}`
+            );
+            await refreshDbUser();
+          } else {
+            logger.error(
+              `[ClientLayout] Failed to set referrer for user ${dbUser.user_id}: ${result.error}`
+            );
+          }
+        } catch (error) {
+          logger.error(`[ClientLayout] Error setting referrer:`, error);
+        }
       }
     };
 
+    // WB Syndicate Referral Helper
     const handleSyndicateReferral = async (refCode: string) => {
         if (!dbUser?.user_id) return;
+        
+        // Only apply if no referrer exists (First Touch Attribution)
         if (!dbUser.metadata?.referrer) {
+            logger.info(`[Syndicate] Attempting to link referrer: ${refCode}`);
             const res = await applyReferralCode(dbUser.user_id, refCode);
             if (res.success) {
                 await refreshDbUser(); 
@@ -278,12 +319,16 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
 
     const paramToProcess = startParamPayload || searchParams.get("tgWebAppStartParam");
     
+    // Process logic only when auth is done
     if (!isAppLoading && !isAuthenticating && paramToProcess && !startParamHandledRef.current) {
       startParamHandledRef.current = true;
       let targetPath: string | undefined;
 
       logger.info(`[ClientLayout] Processing Start Param: ${paramToProcess}`);
 
+      // ===================== ROUTING & PARSING LOGIC =====================
+
+      // 1. Specific Prefixes Check
       if (paramToProcess === "wb_dashboard") {
          if (userCrewInfo?.slug) targetPath = `/wb/${userCrewInfo.slug}`;
          else targetPath = "/wblanding";
@@ -292,9 +337,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         targetPath = START_PARAM_PAGE_MAP[paramToProcess];
       } 
       else if (paramToProcess.startsWith("crew_")) {
-        const content = paramToProcess.substring(5); 
+        const content = paramToProcess.substring(5); // remove 'crew_'
         if (content.endsWith("_join_crew")) {
-             const slug = content.substring(0, content.length - 10); 
+             const slug = content.substring(0, content.length - 10); // remove '_join_crew'
              targetPath = `/wb/${slug}?join_crew=true`;
         } else {
              targetPath = `/wb/${content}`;
@@ -305,6 +350,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         targetPath = `/god-mode-sandbox?simId=${simId}`;
       }
       else if (paramToProcess.startsWith("bio30_")) {
+        // bio30 logic...
         const parts = paramToProcess.split("_");
         let productId: string | undefined;
         let referrerId: string | undefined;
@@ -317,32 +363,54 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       }
       // === STRIKEBALL STARTAPP HANDLER ===
       else if (paramToProcess.startsWith("lobby_")) {
-          const lobbyId = paramToProcess.substring(6); 
+          const lobbyId = paramToProcess.substring(6); // remove 'lobby_'
           if (lobbyId) targetPath = `/strikeball/lobbies/${lobbyId}`;
       }
       // ===================================
       else if (paramToProcess.startsWith("rental_") || paramToProcess.startsWith("rentals_")) {
+          // rental_ID
           const parts = paramToProcess.split("_");
           if (parts.length === 2) targetPath = `/rentals/${parts[1]}`;
       }
+      
+      // 2. UNIVERSAL REFERRAL CATCHER (Last check to catch ref_I_O_S_NN)
       else if (paramToProcess.startsWith("ref_")) {
           const refCode = paramToProcess.substring(4); 
+          
           handleSyndicateReferral(refCode);
+          
+          // If on main page, redirect to WB landing for conversion
           if (pathname === '/') targetPath = '/wblanding';
-          else targetPath = pathname; 
+          else targetPath = pathname; // Stay where we are
       }
+
+      // 3. Fallback
       else {
         targetPath = `/${paramToProcess}`;
       }
 
+      // ===================== EXECUTE REDIRECT =====================
       if (targetPath && targetPath !== pathname) {
         logger.info(`[ClientLayout] Redirecting to ${targetPath}`);
         router.replace(targetPath);
       }
       
+      // Clear param to prevent loops
       clearStartParam?.();
     }
-  }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, dbUser, userCrewInfo, refreshDbUser, clearStartParam, showToast]);
+  }, [
+    startParamPayload,
+    searchParams,
+    pathname,
+    router,
+    isAppLoading,
+    isAuthenticating,
+    dbUser,
+    userCrewInfo,
+    refreshDbUser,
+    clearStartParam,
+    showToast
+  ]);
 
   const pathsToShowBottomNavForStartsWith = [
     "/selfdev/gamified",
@@ -359,7 +427,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/paddock",
     "/rentals",
     "/vipbikerental",
-    "/strikeball", // ADDED for Strikeball logic
+    // NOTE: Strikeball uses its own Nav logic inside this layout, so we don't necessarily need it here,
+    // but adding it ensures the flag is true if we ever fallback to standard nav.
+    "/strikeball", 
   ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
     pathname?.startsWith(p)
@@ -371,7 +441,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname === "/profile" ||
         pathname === "/repo-xml" ||
         pathname === "/sauna-rent" ||
-        pathname?.startsWith("/wb") || 
+        pathname?.startsWith("/wb") || // Hides standard header/footer for Warehouse pages
         pathname === "/wblanding" || 
         pathname === "/wblanding/referral" ||
         pathname === "/csv-compare" ||
@@ -390,12 +460,25 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      {/* 
+          CONDITIONAL BACKGROUND RENDER 
+          This ensures the Quake 3 Arena styled background is ONLY on Strikeball pages 
+          and sits behind everything else.
+      */}
+      {isStrikeball && <StrikeballBackground />}
+
       {showHeaderAndFooter && CurrentHeader && <CurrentHeader />}
       <main className={cn("flex-1", showBottomNav ? "pb-20 sm:pb-0" : "", !isTransparentPage && "bg-background")}>
         {children}
       </main>
-      {/* Logic Update: Strikeball uses its own Nav independent of showBottomNav check if needed, but keeping it standard for now */}
-      {showBottomNav && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
+      
+      {/* 
+         Standard Bottom Nav Logic:
+         If we are in Strikeball, CurrentBottomNav is StrikeballBottomNav.
+         We show it regardless of 'showBottomNav' logic because Strikeball always needs its nav.
+      */}
+      {(showBottomNav || isStrikeball) && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
+      
       <Suspense fallback={null}>
         <StickyChatButton />
       </Suspense>
@@ -409,6 +492,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
     <ErrorOverlayProvider>
       <AppProvider>
         <AppInitializers />
+        {/* ADDED THEME PROVIDER HERE */}
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <TooltipProvider>
             <ErrorBoundaryForOverlay>

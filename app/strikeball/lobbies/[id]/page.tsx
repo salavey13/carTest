@@ -5,8 +5,7 @@ import { useParams } from "next/navigation";
 import { supabaseAnon } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
 import { joinLobby, addNoobBot, togglePlayerStatus } from "../../actions";
-import { FaRobot, FaSkull, FaHeartPulse, FaUserAstronaut } from "react-icons/fa6";
-import { cn } from "@/lib/utils";
+import { SquadRoster } from "../../components/SquadRoster"; // NEW IMPORT
 
 export default function LobbyRoom() {
   const { id: lobbyId } = useParams(); 
@@ -35,56 +34,60 @@ export default function LobbyRoom() {
   const handleAddBot = async (team: string) => { await addNoobBot(lobbyId as string, team); };
   const handleStatusToggle = async (memberId: string, current: string) => { await togglePlayerStatus(memberId, current); };
 
-  const TeamColumn = ({ team, color }: { team: string, color: string }) => {
-    const teamMembers = members.filter(m => m.team === team);
-    const borderColor = color === 'blue' ? 'border-blue-900' : 'border-red-900';
-    const textColor = color === 'blue' ? 'text-blue-500' : 'text-red-500';
-
-    return (
-      <div className={`flex-1 bg-zinc-900/30 border ${borderColor} p-3`}>
-        <h3 className={`${textColor} font-black mb-4 uppercase text-center font-orbitron tracking-widest`}>{team} TEAM</h3>
-        <div className="space-y-2">
-          {teamMembers.map(m => (
-             <div key={m.id} onClick={() => handleStatusToggle(m.id, m.status)}
-                  className={cn("p-3 border flex items-center justify-between cursor-pointer hover:bg-zinc-800 transition-all select-none",
-                    m.status === 'dead' ? "opacity-50 border-red-900/50 bg-red-950/10" : "border-zinc-800 bg-zinc-900")}>
-                <div className="flex items-center gap-3">
-                   {m.is_bot ? <FaRobot className="text-zinc-600" /> : <FaUserAstronaut className={textColor} />}
-                   <span className={cn("text-sm font-bold font-mono", m.status === 'dead' ? 'line-through text-red-600' : 'text-zinc-200')}>
-                      {m.user_id ? "Operator" : `Bot-${m.id.slice(0,4)}`}
-                   </span>
-                </div>
-                {m.status === 'dead' ? <FaSkull className="text-red-600 animate-pulse"/> : <FaHeartPulse className="text-emerald-600"/>}
-             </div>
-          ))}
-          <button onClick={() => handleAddBot(team)} className="w-full py-3 mt-2 text-[10px] font-mono text-zinc-600 border border-dashed border-zinc-800 hover:bg-zinc-900 hover:text-zinc-400 uppercase tracking-widest">+ Add Bot</button>
-        </div>
-      </div>
-    );
-  };
-
   if (!lobby) return <div className="flex h-screen items-center justify-center text-red-600 font-mono animate-pulse pt-20">ESTABLISHING UPLINK...</div>;
 
+  const blueTeam = members.filter(m => m.team === 'blue');
+  const redTeam = members.filter(m => m.team === 'red');
+
   return (
-    // Added pt-24
-    <div className="pt-24 pb-24 p-4 min-h-screen bg-zinc-950 text-white">
-      <div className="mb-6 text-center">
-        <h1 className="text-2xl font-orbitron font-black text-white uppercase tracking-wider">{lobby.name}</h1>
-        <div className="text-[10px] font-mono text-zinc-500 mt-1 uppercase">
-          MODE: {lobby.mode} // STATUS: {lobby.status}
+    <div className="pt-28 pb-32 px-2 min-h-screen text-white">
+      
+      {/* Lobby Header */}
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-black font-orbitron uppercase tracking-widest">{lobby.name}</h1>
+        <div className="inline-flex gap-4 mt-2 text-[10px] font-mono text-zinc-400 bg-black/50 px-4 py-1 border border-zinc-800 rounded-full">
+          <span>MODE: {lobby.mode.toUpperCase()}</span>
+          <span className="text-red-500">|</span>
+          <span>STATUS: {lobby.status.toUpperCase()}</span>
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 mb-8">
-        <TeamColumn team="blue" color="blue" />
-        <div className="text-center font-black text-zinc-800 py-2 flex items-center justify-center font-orbitron text-3xl italic">VS</div>
-        <TeamColumn team="red" color="red" />
+      {/* Roster Grid */}
+      <div className="flex flex-col md:flex-row gap-6 max-w-4xl mx-auto">
+        <SquadRoster 
+            teamName="BLUE SQUAD" 
+            teamColor="blue" 
+            members={blueTeam} 
+            onToggleStatus={handleStatusToggle}
+            onAddBot={() => handleAddBot('blue')}
+            currentUserId={dbUser?.user_id}
+        />
+        
+        <div className="text-center flex flex-col justify-center">
+            <span className="font-black text-4xl italic text-zinc-700 font-orbitron">VS</span>
+        </div>
+
+        <SquadRoster 
+            teamName="RED SQUAD" 
+            teamColor="red" 
+            members={redTeam} 
+            onToggleStatus={handleStatusToggle}
+            onAddBot={() => handleAddBot('red')}
+            currentUserId={dbUser?.user_id}
+        />
       </div>
 
+      {/* Join Actions */}
       {!members.find(m => m.user_id === dbUser?.user_id) && (
-        <div className="grid grid-cols-2 gap-4 fixed bottom-24 left-4 right-4 max-w-md mx-auto z-20">
-            <button onClick={() => joinLobby(dbUser!.user_id, lobby.id, 'blue')} className="bg-blue-900/80 border border-blue-600 text-blue-100 font-bold py-4 shadow-[0_0_20px_rgba(30,64,175,0.5)]">JOIN BLUE</button>
-            <button onClick={() => joinLobby(dbUser!.user_id, lobby.id, 'red')} className="bg-red-900/80 border border-red-600 text-red-100 font-bold py-4 shadow-[0_0_20px_rgba(220,38,38,0.5)]">JOIN RED</button>
+        <div className="fixed bottom-24 left-4 right-4 max-w-md mx-auto z-30">
+            <div className="grid grid-cols-2 gap-2 bg-black/80 p-2 border border-zinc-700 shadow-2xl backdrop-blur-md">
+                <button onClick={() => joinLobby(dbUser!.user_id, lobby.id, 'blue')} className="bg-blue-900 hover:bg-blue-800 text-blue-100 font-bold py-4 uppercase tracking-widest border border-blue-500/30">
+                    Join Blue
+                </button>
+                <button onClick={() => joinLobby(dbUser!.user_id, lobby.id, 'red')} className="bg-red-900 hover:bg-red-800 text-red-100 font-bold py-4 uppercase tracking-widest border border-red-500/30">
+                    Join Red
+                </button>
+            </div>
         </div>
       )}
     </div>
