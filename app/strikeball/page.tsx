@@ -2,15 +2,42 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppContext } from "@/contexts/AppContext";
 import { CreateLobbyForm } from "./components/CreateLobbyForm";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
-// Q3 Style Menu Item
+// Robust QR Display Component using API (No npm install needed)
+const QRDisplay = ({ value, onClose }: { value: string, onClose: () => void }) => (
+    <motion.div 
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 backdrop-blur-md"
+        onClick={onClose}
+    >
+        <div className="bg-zinc-900 p-6 rounded-none border-4 border-red-600 shadow-[0_0_50px_rgba(220,38,38,0.5)] max-w-sm w-full" onClick={e => e.stopPropagation()}>
+             <h3 className="text-red-500 font-orbitron font-bold text-center text-xl mb-4 tracking-widest">SECURE LINK</h3>
+             <div className="bg-white p-2 mb-4">
+                 {/* Fallback to reliable QR API */}
+                 <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(value)}`} 
+                    alt="QR Code" 
+                    className="w-full h-auto"
+                 />
+             </div>
+             <div className="text-zinc-400 text-center font-mono text-xs mb-6">
+                 СКАНИРУЙ ДЛЯ ПОДКЛЮЧЕНИЯ
+             </div>
+             <button onClick={onClose} className="w-full bg-red-700 hover:bg-red-600 text-white py-3 font-black font-orbitron uppercase tracking-wider transition-colors">
+                 ЗАКРЫТЬ
+             </button>
+        </div>
+    </motion.div>
+);
+
 const Q3MenuItem = ({ label, subLabel, href, onClick, disabled = false, isActive = false }: any) => {
   const [hovered, setHovered] = useState(false);
-  
   const Container = href ? Link : 'div';
   const props = href ? { href } : { onClick };
 
@@ -37,12 +64,54 @@ const Q3MenuItem = ({ label, subLabel, href, onClick, disabled = false, isActive
 };
 
 export default function StrikeballDashboard() {
+  const { tg, dbUser } = useAppContext();
+  const router = useRouter();
   const [menuStep, setMenuStep] = useState<'main' | 'create'>('main');
+  const [showQR, setShowQR] = useState(false);
+
+  // --- QR LOGIC ---
+  const handleQR = () => {
+      // 1. Try to open native scanner if in Telegram
+      if (tg && tg.showScanQrPopup) {
+          tg.showScanQrPopup({
+              text: "СКАНИРУЙ КОД ОПЕРАЦИИ ИЛИ ПРОФИЛЯ"
+          }, (text: string) => {
+              // 2. Handle scan result
+              tg.closeScanQrPopup();
+              if (!text) return true; // Keep open if empty (optional, usually close)
+
+              let param = text;
+              // Extract 'startapp' param if full URL
+              if (text.includes('startapp=')) {
+                  param = text.split('startapp=')[1].split('&')[0];
+              }
+
+              // Route logic
+              if (param.startsWith('lobby_')) {
+                  const lobbyId = param.replace('lobby_', '');
+                  router.push(`/strikeball/lobbies/${lobbyId}`);
+                  toast.success("ОПЕРАЦИЯ ОБНАРУЖЕНА");
+              } else if (param.startsWith('user_')) {
+                  toast.info("ПОЛЬЗОВАТЕЛЬ ОБНАРУЖЕН");
+              } else {
+                  toast.error("НЕИЗВЕСТНЫЙ КОД");
+              }
+              return true; // Return true to close popup in some TG versions
+          });
+      } else {
+          // 3. Desktop/Browser: Show MY QR code instead
+          setShowQR(true);
+      }
+  };
+
+  const myLink = `https://t.me/oneSitePlsBot/app?startapp=user_${dbUser?.user_id || 'unknown'}`;
 
   return (
     <div className="pt-28 pb-32 px-4 relative min-h-screen">
-      
-      {/* Title */}
+      <AnimatePresence>
+        {showQR && <QRDisplay value={myLink} onClose={() => setShowQR(false)} />}
+      </AnimatePresence>
+
       <div className="text-center mb-12">
         <motion.h1 initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-6xl md:text-8xl font-black italic text-zinc-200 tracking-tighter drop-shadow-2xl">
           STRIKE<span className="text-red-600">BALL</span>
@@ -52,7 +121,6 @@ export default function StrikeballDashboard() {
         </p>
       </div>
 
-      {/* Menu Container */}
       <div className="max-w-md mx-auto">
         <div className="bg-zinc-900/80 backdrop-blur-md border-4 border-zinc-800 p-1 shadow-2xl">
           <div className="border border-red-900/30 p-1">
@@ -67,7 +135,8 @@ export default function StrikeballDashboard() {
                   <Q3MenuItem label="СОЗДАТЬ СЕРВЕР" subLabel="НОВАЯ ОПЕРАЦИЯ" onClick={() => setMenuStep('create')} />
                   <Q3MenuItem label="АРСЕНАЛ" subLabel="АРЕНДА СНАРЯЖЕНИЯ" href="/strikeball/shop" />
                   <div className="h-4" />
-                  <Q3MenuItem label="QR КОННЕКТ" subLabel="СКАНИРОВАНИЕ ПОЛЯ" onClick={() => alert("ИНИЦИАЛИЗАЦИЯ СЕНСОРОВ...")} />
+                  {/* Updated QR Button Action */}
+                  <Q3MenuItem label="QR КОННЕКТ" subLabel="СКАНЕР / МОЙ КОД" onClick={handleQR} />
                 </motion.div>
               ) : (
                 <motion.div
