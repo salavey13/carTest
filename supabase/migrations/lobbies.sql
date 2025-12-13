@@ -19,6 +19,13 @@ ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE public.lobbies 
 ADD COLUMN IF NOT EXISTS qr_code_hash text;
 
+-- Link Lobbies to Crews (for "Squad Hosted" games)
+ALTER TABLE public.lobbies 
+ADD COLUMN IF NOT EXISTS crew_id uuid REFERENCES public.crews(id) ON DELETE SET NULL;
+
+-- Enable scanning for Crew Tags in lobbies
+CREATE INDEX IF NOT EXISTS idx_lobbies_crew ON public.lobbies(crew_id);
+
 
 -- lobby_members
 CREATE TABLE public.lobby_members (
