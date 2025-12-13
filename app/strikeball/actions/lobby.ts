@@ -182,19 +182,21 @@ export async function getUserActiveLobbies(userId: string) {
  */
 export async function addNoobBot(lobbyId: string, team: string) {
   try {
+    const botId = uuidv4(); // Generate a unique ID for the bot
     const { error } = await supabaseAdmin.from("lobby_members").insert({
       lobby_id: lobbyId,
-      user_id: null, // Null indicates a bot
+      user_id: botId, // Use the generated UUID instead of null
       is_bot: true,
       team,
-      status: "ready"
+      status: "ready",
+      role: "bot" // Explicit role
     });
     
     if (error) throw error;
     return { success: true };
-  } catch (e) {
+  } catch (e: any) {
     logger.error("addNoobBot Failed", e);
-    return { success: false, error: "Ошибка бота." };
+    return { success: false, error: e.message || "Ошибка бота." };
   }
 }
 
