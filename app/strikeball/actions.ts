@@ -71,33 +71,35 @@ export async function createStrikeballLobby(
   }
 }
 
-/**
- * Joins a lobby or switches teams if already joined.
- */
 export async function joinLobby(userId: string, lobbyId: string, team: string = "red") {
   try {
     // 1. Check if already a member
-    const { data: existing } = await supabaseAdmin
+    const { data: existing, error: checkError } = await supabaseAdmin
       .from("lobby_members")
       .select("id, team")
       .eq("lobby_id", lobbyId)
       .eq("user_id", userId)
       .maybeSingle();
 
+    if (checkError) throw checkError;
+
     if (existing) {
         // Logic: If already member, allow switching teams
         if (existing.team !== team) {
-            await supabaseAdmin
+            const { error: updateError } = await supabaseAdmin
                 .from("lobby_members")
-                .update({ team })
+                .update({ team, status: 'ready' }) // Reset status on switch? Optional.
                 .eq("id", existing.id);
+            
+            if (updateError) throw updateError;
+
             return { success: true, message: `Switched to ${team.toUpperCase()} team.` };
         }
         return { success: true, message: "Already deployed in this team." };
     }
 
     // 2. Insert new member
-    await supabaseAdmin.from("lobby_members").insert({
+    const { error: insertError } = await supabaseAdmin.from("lobby_members").insert({
       lobby_id: lobbyId,
       user_id: userId,
       team,
@@ -105,7 +107,9 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
       status: "ready"
     });
 
-    // 3. Notify Owner (if owner is not the one joining)
+    if (insertError) throw insertError;
+
+    // 3. Notify Owner
     const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id, name").eq("id", lobbyId).single();
     if (lobby?.owner_id && lobby.owner_id !== userId) {
        const user = await fetchUserData(userId);
@@ -121,6 +125,9 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
     return { success: false, error: "Deployment failed." };
   }
 }
+
+
+
 
 /**
  * Fetches active lobbies.
