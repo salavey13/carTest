@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { getOpenLobbies, joinLobby, getUserActiveLobbies } from "../actions/lobby"; // NEW IMPORT
+import { getOpenLobbies, joinLobby, getUserActiveLobbies } from "../actions/lobby"; 
 import { getAllPublicCrews } from "@/app/rentals/actions"; 
 import { toast } from "sonner";
 import Link from "next/link";
@@ -50,9 +50,7 @@ export default function LobbiesPageClient() {
   const handleJoin = async (e: React.MouseEvent, lobbyId: string) => {
     e.preventDefault(); 
     e.stopPropagation();
-    
     if (!userId) return toast.error("ТРЕБУЕТСЯ ВХОД");
-    
     const res = await joinLobby(userId, lobbyId);
     if (!res.success) toast.error(res.error);
     else {
@@ -64,6 +62,7 @@ export default function LobbiesPageClient() {
   return (
     <div className="pt-28 pb-32 px-4 min-h-screen bg-transparent text-white font-orbitron">
       
+      {/* Lobbies Section */}
       <h2 className="text-2xl font-black mb-4 text-red-600 tracking-tighter uppercase border-b-2 border-red-900/50 pb-2 flex items-center gap-2">
         <span className="animate-pulse">●</span> Активные Операции
       </h2>
@@ -106,13 +105,15 @@ export default function LobbiesPageClient() {
         </div>
       )}
 
+      {/* Crews Section */}
       <h2 className="text-2xl font-black mb-4 text-cyan-500 tracking-tighter uppercase border-b-2 border-cyan-900/50 pb-2 flex items-center gap-2">
         <FaUsers /> Постоянные Отряды
       </h2>
 
       <div className="grid grid-cols-1 gap-3">
         {crews.map(crew => (
-           <Link key={crew.id} href={`/wb/${crew.slug}`} className="block group">
+           // FIXED: Link points to /crews/[slug]
+           <Link key={crew.id} href={`/crews/${crew.slug}`} className="block group">
              <div className="bg-zinc-900/80 border border-zinc-800 p-3 flex items-center gap-4 hover:bg-zinc-800 hover:border-cyan-500 transition-all">
                 <div className="w-14 h-14 bg-black border border-zinc-700 flex-shrink-0 relative overflow-hidden">
                    {crew.logo_url ? (
