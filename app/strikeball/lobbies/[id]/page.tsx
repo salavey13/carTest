@@ -7,6 +7,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { joinLobby, addNoobBot, togglePlayerStatus } from "../../actions";
 import { SquadRoster } from "../../components/SquadRoster";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export default function LobbyRoom() {
   const { id: lobbyId } = useParams(); 
