@@ -8,23 +8,30 @@ import { useAppContext } from "@/contexts/AppContext";
 import { CreateLobbyForm } from "./components/CreateLobbyForm";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { QRCodeSVG } from "qrcode.react"; // Standard react lib (or use API fallback)
 
-// Since we cannot install 'qrcode.react' without shell, we use a simple Image API fallback for the generated QR
+// Robust QR Display Component using API (No npm install needed)
 const QRDisplay = ({ value, onClose }: { value: string, onClose: () => void }) => (
     <motion.div 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 backdrop-blur-md"
         onClick={onClose}
     >
-        <div className="bg-white p-4 rounded-lg shadow-[0_0_50px_rgba(255,0,0,0.5)] border-4 border-red-600" onClick={e => e.stopPropagation()}>
-             <img 
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(value)}`} 
-                alt="QR Code" 
-                className="w-64 h-64"
-             />
-             <div className="text-black text-center mt-2 font-mono font-bold">SCAN TO CONNECT</div>
-             <button onClick={onClose} className="w-full mt-4 bg-black text-white py-2 font-black font-orbitron uppercase">CLOSE</button>
+        <div className="bg-zinc-900 p-6 rounded-none border-4 border-red-600 shadow-[0_0_50px_rgba(220,38,38,0.5)] max-w-sm w-full" onClick={e => e.stopPropagation()}>
+             <h3 className="text-red-500 font-orbitron font-bold text-center text-xl mb-4 tracking-widest">SECURE LINK</h3>
+             <div className="bg-white p-2 mb-4">
+                 {/* Fallback to reliable QR API */}
+                 <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(value)}`} 
+                    alt="QR Code" 
+                    className="w-full h-auto"
+                 />
+             </div>
+             <div className="text-zinc-400 text-center font-mono text-xs mb-6">
+                 СКАНИРУЙ ДЛЯ ПОДКЛЮЧЕНИЯ
+             </div>
+             <button onClick={onClose} className="w-full bg-red-700 hover:bg-red-600 text-white py-3 font-black font-orbitron uppercase tracking-wider transition-colors">
+                 ЗАКРЫТЬ
+             </button>
         </div>
     </motion.div>
 );
@@ -63,36 +70,36 @@ export default function StrikeballDashboard() {
   const [showQR, setShowQR] = useState(false);
 
   // --- QR LOGIC ---
-  const handleScan = () => {
+  const handleQR = () => {
+      // 1. Try to open native scanner if in Telegram
       if (tg && tg.showScanQrPopup) {
           tg.showScanQrPopup({
               text: "СКАНИРУЙ КОД ОПЕРАЦИИ ИЛИ ПРОФИЛЯ"
           }, (text: string) => {
-              // Handle QR content
-              // Expected format: https://t.me/bot?startapp=lobby_ID or just lobby_ID
+              // 2. Handle scan result
               tg.closeScanQrPopup();
-              
-              if (!text) return;
-              
-              // Extract param
+              if (!text) return true; // Keep open if empty (optional, usually close)
+
               let param = text;
+              // Extract 'startapp' param if full URL
               if (text.includes('startapp=')) {
                   param = text.split('startapp=')[1].split('&')[0];
               }
 
+              // Route logic
               if (param.startsWith('lobby_')) {
                   const lobbyId = param.replace('lobby_', '');
                   router.push(`/strikeball/lobbies/${lobbyId}`);
-                  toast.success("ОБНАРУЖЕНА ОПЕРАЦИЯ");
+                  toast.success("ОПЕРАЦИЯ ОБНАРУЖЕНА");
               } else if (param.startsWith('user_')) {
-                  // Future: Go to user profile
                   toast.info("ПОЛЬЗОВАТЕЛЬ ОБНАРУЖЕН");
               } else {
                   toast.error("НЕИЗВЕСТНЫЙ КОД");
               }
+              return true; // Return true to close popup in some TG versions
           });
       } else {
-          // Desktop Fallback: Show my QR
+          // 3. Desktop/Browser: Show MY QR code instead
           setShowQR(true);
       }
   };
@@ -128,7 +135,8 @@ export default function StrikeballDashboard() {
                   <Q3MenuItem label="СОЗДАТЬ СЕРВЕР" subLabel="НОВАЯ ОПЕРАЦИЯ" onClick={() => setMenuStep('create')} />
                   <Q3MenuItem label="АРСЕНАЛ" subLabel="АРЕНДА СНАРЯЖЕНИЯ" href="/strikeball/shop" />
                   <div className="h-4" />
-                  <Q3MenuItem label="QR СКАНЕР" subLabel="ПОДКЛЮЧЕНИЕ / ID" onClick={handleScan} />
+                  {/* Updated QR Button Action */}
+                  <Q3MenuItem label="QR КОННЕКТ" subLabel="СКАНЕР / МОЙ КОД" onClick={handleQR} />
                 </motion.div>
               ) : (
                 <motion.div
