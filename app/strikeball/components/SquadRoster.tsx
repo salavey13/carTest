@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { FaSkull, FaHeartPulse, FaRobot, FaUserAstronaut, FaCrown, FaPlus } from "react-icons/fa6";
+import { FaSkull, FaHeartPulse, FaRobot, FaUserAstronaut, FaCrown, FaPlus, FaXmark } from "react-icons/fa6";
 
 interface Member {
   id: string;
@@ -10,7 +10,7 @@ interface Member {
   role: string;
   status: string; // 'alive', 'dead'
   joined_at: string;
-  team: string; // Added team to interface
+  team: string; 
 }
 
 interface SquadRosterProps {
@@ -19,11 +19,21 @@ interface SquadRosterProps {
   members: Member[];
   onToggleStatus: (id: string, current: string) => void;
   onAddBot?: () => void;
-  onInvite?: () => void; // NEW PROP
+  onInvite?: () => void;
+  onKick?: (id: string) => void; // NEW PROP
   currentUserId?: string;
 }
 
-export const SquadRoster = ({ teamName, teamColor, members, onToggleStatus, onAddBot, onInvite, currentUserId }: SquadRosterProps) => {
+export const SquadRoster = ({ 
+  teamName, 
+  teamColor, 
+  members, 
+  onToggleStatus, 
+  onAddBot, 
+  onInvite, 
+  onKick, 
+  currentUserId 
+}: SquadRosterProps) => {
   
   const isRed = teamColor === 'red';
   const accentColor = isRed ? 'text-red-500' : 'text-blue-500';
@@ -41,7 +51,7 @@ export const SquadRoster = ({ teamName, teamColor, members, onToggleStatus, onAd
       </div>
 
       {/* List */}
-      <div className="flex-1 divide-y divide-zinc-800/50">
+      <div className="flex-1 divide-y divide-zinc-800/50 min-h-[200px]">
         {members.length === 0 && (
            <div className="p-6 text-center font-mono text-xs text-zinc-600 animate-pulse">
              AWAITING CONNECTION...
@@ -55,40 +65,56 @@ export const SquadRoster = ({ teamName, teamColor, members, onToggleStatus, onAd
           return (
             <div 
               key={m.id} 
-              onClick={() => onToggleStatus(m.id, m.status)}
               className={cn(
-                "p-3 flex items-center justify-between cursor-pointer transition-colors group",
+                "flex items-center justify-between transition-colors group relative",
                 isDead ? "bg-black/40 opacity-60 grayscale" : "hover:bg-white/5",
                 isMe && "bg-white/5 border-l-2 border-emerald-500"
               )}
             >
-              {/* Left: Icon & Name */}
-              <div className="flex items-center gap-3">
-                <div className={cn("w-2 h-2 rounded-full shadow-[0_0_5px_currentColor]", isDead ? "text-zinc-700 bg-zinc-700" : (isRed ? "text-red-500 bg-red-500" : "text-blue-500 bg-blue-500"))} />
-                
-                {m.role === 'owner' && <FaCrown className="text-amber-500 w-3 h-3" />}
-                {m.is_bot ? <FaRobot className="text-zinc-600" /> : <FaUserAstronaut className="text-zinc-400" />}
-                
-                <div className="flex flex-col">
-                  <span className={cn("font-bold text-sm leading-none", isDead ? "text-zinc-500 line-through" : "text-zinc-200")}>
-                    {m.user_id ? "OPERATOR" : `BOT-${m.id.slice(0,4).toUpperCase()}`}
-                  </span>
-                  <span className="text-[9px] font-mono text-zinc-600">PING: {Math.floor(Math.random() * 50) + 10}ms</span>
-                </div>
+              {/* Main Click Area for Status Toggle */}
+              <div 
+                className="flex-1 p-3 flex items-center justify-between cursor-pointer"
+                onClick={() => onToggleStatus(m.id, m.status)}
+              >
+                  {/* Left: Icon & Name */}
+                  <div className="flex items-center gap-3">
+                    <div className={cn("w-2 h-2 rounded-full shadow-[0_0_5px_currentColor]", isDead ? "text-zinc-700 bg-zinc-700" : (isRed ? "text-red-500 bg-red-500" : "text-blue-500 bg-blue-500"))} />
+                    
+                    {m.role === 'owner' && <FaCrown className="text-amber-500 w-3 h-3" />}
+                    {m.is_bot ? <FaRobot className="text-zinc-600" /> : <FaUserAstronaut className="text-zinc-400" />}
+                    
+                    <div className="flex flex-col">
+                      <span className={cn("font-bold text-sm leading-none", isDead ? "text-zinc-500 line-through" : "text-zinc-200")}>
+                        {m.is_bot ? `BOT-${m.id.slice(0,4).toUpperCase()}` : (m.user_id ? "OPERATOR" : "UNKNOWN")}
+                      </span>
+                      <span className="text-[9px] font-mono text-zinc-600">PING: {Math.floor(Math.random() * 50) + 10}ms</span>
+                    </div>
+                  </div>
+
+                  {/* Right: Status Icon */}
+                  <div className="font-mono font-bold mr-2">
+                    {isDead ? (
+                      <div className="flex items-center gap-1 text-red-700">
+                        <FaSkull /> <span>KIA</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-emerald-600">
+                        <FaHeartPulse className="animate-pulse" /> <span>100%</span>
+                      </div>
+                    )}
+                  </div>
               </div>
 
-              {/* Right: Status Icon */}
-              <div className="font-mono font-bold">
-                {isDead ? (
-                  <div className="flex items-center gap-1 text-red-700">
-                    <FaSkull /> <span>KIA</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1 text-emerald-600">
-                    <FaHeartPulse className="animate-pulse" /> <span>100%</span>
-                  </div>
-                )}
-              </div>
+              {/* Kick Button (Only for bots) */}
+              {m.is_bot && onKick && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onKick(m.id); }}
+                    className="h-full px-3 text-zinc-700 hover:text-red-500 hover:bg-red-900/20 transition-colors border-l border-zinc-800/50"
+                    title="Kick Bot"
+                  >
+                      <FaXmark />
+                  </button>
+              )}
             </div>
           );
         })}
