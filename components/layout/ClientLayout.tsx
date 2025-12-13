@@ -5,23 +5,38 @@ import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 
+// --- Standard Components ---
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import BottomNavigation from "@/components/layout/BottomNavigation";
+
+// --- Theme: Bike Rental ---
 import BikeHeader from "@/components/BikeHeader";
 import BikeFooter from "@/components/BikeFooter";
+import BottomNavigationBike from "@/components/layout/BottomNavigationBike";
+
+// --- Theme: Sauna ---
 import SaunaHeader from "@/components/SaunaHeader";
 import SaunaFooter from "@/components/SaunaFooter";
-import StickyChatButton from "@/components/StickyChatButton";
+import BottomNavigationSauna from "@/components/layout/BottomNavigationSauna";
 
+// --- Theme: Bio30 ---
+import Bio30Header from "@/app/bio30/components/Header";
+import Bio30Footer from "@/app/bio30/components/Footer";
+
+// --- Theme: Strikeball (Tactical OS) ---
+import StrikeballHeader from "@/app/strikeball/components/StrikeballHeader";
+import StrikeballBottomNav from "@/app/strikeball/components/StrikeballBottomNav";
+import { StrikeballBackground } from "@/app/strikeball/components/StrikeballBackground";
+
+import StickyChatButton from "@/components/StickyChatButton";
 import { AppProvider, useAppContext } from "@/contexts/AppContext";
-import { ThemeProvider } from "@/components/theme-provider"; // Imported here
+import { ThemeProvider } from "@/components/theme-provider"; 
 import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
 import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay";
 import DevErrorOverlay from "@/components/DevErrorOverlay";
-import BottomNavigationBike from "@/components/layout/BottomNavigationBike";
-import BottomNavigationSauna from "@/components/layout/BottomNavigationSauna";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useFocusTimeTracker } from "@/hooks/useFocusTimeTracker";
 import { Analytics } from "@vercel/analytics/react";
@@ -32,9 +47,7 @@ import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { Loading } from "@/components/Loading";
 import { cn } from "@/lib/utils";
 
-// Bio30 specific components
-import Bio30Header from "@/app/bio30/components/Header";
-import Bio30Footer from "@/app/bio30/components/Footer";
+// Bio30 specific actions
 import { setReferrer } from "@/app/bio30/ref_actions"; 
 
 // WB Syndicate Actions
@@ -42,6 +55,13 @@ import { applyReferralCode } from "@/app/wblanding/actions_view";
 
 // --- THEME ENGINE ---
 const THEME_CONFIG = {
+  strikeball: {
+    paths: ["/strikeball"],
+    Header: StrikeballHeader,
+    Footer: null, // No footer for immersive view
+    BottomNav: StrikeballBottomNav, // Custom tactical nav
+    isTransparent: true, // Allows background component to be visible
+  },
   bike: {
     paths: ["/vipbikerental", "/rent-bike", "/rent/", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals"],
     Header: BikeHeader,
@@ -67,12 +87,15 @@ const THEME_CONFIG = {
     paths: [],
     Header: Header,
     Footer: Footer,
-    BottomNav: BottomNavigationBike,
+    BottomNav: BottomNavigationBike, // Default fallback
     isTransparent: false,
   },
 };
 
 const getThemeForPath = (pathname: string) => {
+  if (THEME_CONFIG.strikeball.paths.some((p) => pathname.startsWith(p))) {
+    return THEME_CONFIG.strikeball;
+  }
   if (THEME_CONFIG.bike.paths.some((p) => pathname.startsWith(p))) {
     return THEME_CONFIG.bike;
   }
@@ -248,6 +271,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const CurrentHeader = theme.Header;
   const CurrentFooter = theme.Footer;
   const CurrentBottomNav = theme.BottomNav;
+  const isStrikeball = theme === THEME_CONFIG.strikeball;
 
   useBio30ThemeFix();
   useThemeSync(); 
@@ -337,6 +361,12 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         if (referrerId) handleBio30Referral(referrerId, paramToProcess);
         targetPath = (productId && BIO30_PRODUCT_PATHS[productId]) ? BIO30_PRODUCT_PATHS[productId] : '/bio30';
       }
+      // === STRIKEBALL STARTAPP HANDLER ===
+      else if (paramToProcess.startsWith("lobby_")) {
+          const lobbyId = paramToProcess.substring(6); // remove 'lobby_'
+          if (lobbyId) targetPath = `/strikeball/lobbies/${lobbyId}`;
+      }
+      // ===================================
       else if (paramToProcess.startsWith("rental_") || paramToProcess.startsWith("rentals_")) {
           // rental_ID
           const parts = paramToProcess.split("_");
@@ -397,6 +427,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/paddock",
     "/rentals",
     "/vipbikerental",
+    // NOTE: Strikeball uses its own Nav logic inside this layout, so we don't necessarily need it here,
+    // but adding it ensures the flag is true if we ever fallback to standard nav.
+    "/strikeball", 
   ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
     pathname?.startsWith(p)
@@ -421,17 +454,31 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     );
   }, [pathname]);
 
-  const TRANSPARENT_LAYOUT_PAGES = ["/rentals", "/crews", "/paddock", "/admin", "/leaderboard", "/wb", "/wblanding"];
+  const TRANSPARENT_LAYOUT_PAGES = ["/rentals", "/crews", "/paddock", "/admin", "/leaderboard", "/wb", "/wblanding", "/strikeball"];
   const isTransparentPage =
     TRANSPARENT_LAYOUT_PAGES.some((p) => pathname.startsWith(p)) || theme.isTransparent;
 
   return (
     <>
+      {/* 
+          CONDITIONAL BACKGROUND RENDER 
+          This ensures the Quake 3 Arena styled background is ONLY on Strikeball pages 
+          and sits behind everything else.
+      */}
+      {isStrikeball && <StrikeballBackground />}
+
       {showHeaderAndFooter && CurrentHeader && <CurrentHeader />}
       <main className={cn("flex-1", showBottomNav ? "pb-20 sm:pb-0" : "", !isTransparentPage && "bg-background")}>
         {children}
       </main>
-      {showBottomNav && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
+      
+      {/* 
+         Standard Bottom Nav Logic:
+         If we are in Strikeball, CurrentBottomNav is StrikeballBottomNav.
+         We show it regardless of 'showBottomNav' logic because Strikeball always needs its nav.
+      */}
+      {(showBottomNav || isStrikeball) && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
+      
       <Suspense fallback={null}>
         <StickyChatButton />
       </Suspense>
