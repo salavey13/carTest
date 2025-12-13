@@ -41,7 +41,7 @@ export const SquadRoster = ({ teamName, teamColor, members, onToggleStatus, onAd
       </div>
 
       {/* List */}
-      <div className="flex-1 divide-y divide-zinc-800/50 min-h-[200px]">
+      <div className="flex-1 divide-y divide-zinc-800/50">
         {members.length === 0 && (
            <div className="p-6 text-center font-mono text-xs text-zinc-600 animate-pulse">
              AWAITING CONNECTION...
