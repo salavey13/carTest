@@ -7,7 +7,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { CreateLobbyForm } from "./components/CreateLobbyForm";
 import { cn } from "@/lib/utils";
 
-// Q3 Style Menu Item (Keep existing logic, just refined styles)
+// Q3 Style Menu Item
 const Q3MenuItem = ({ label, subLabel, href, onClick, disabled = false, isActive = false }: any) => {
   const [hovered, setHovered] = useState(false);
   
@@ -40,7 +40,6 @@ export default function StrikeballDashboard() {
   const [menuStep, setMenuStep] = useState<'main' | 'create'>('main');
 
   return (
-    // Padding adjusted for new header/nav
     <div className="pt-28 pb-32 px-4 relative min-h-screen">
       
       {/* Title */}
@@ -49,7 +48,7 @@ export default function StrikeballDashboard() {
           STRIKE<span className="text-red-600">BALL</span>
         </motion.h1>
         <p className="text-red-500/80 font-mono text-xs tracking-[0.5em] mt-2 border-t border-red-900/50 inline-block px-8 py-1">
-          SKIRMISH OPERATIONS
+          ТАКТИЧЕСКИЕ ОПЕРАЦИИ
         </p>
       </div>
 
@@ -64,11 +63,11 @@ export default function StrikeballDashboard() {
                   initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}
                   className="space-y-2"
                 >
-                  <Q3MenuItem label="MULTIPLAYER" subLabel="BROWSE ACTIVE SQUADS" href="/strikeball/lobbies" />
-                  <Q3MenuItem label="CREATE SERVER" subLabel="HOST SKIRMISH" onClick={() => setMenuStep('create')} />
-                  <Q3MenuItem label="ARMORY" subLabel="RENTAL GEAR" href="/strikeball/shop" />
+                  <Q3MenuItem label="СЕТЕВАЯ ИГРА" subLabel="ПОИСК АКТИВНЫХ ОТРЯДОВ" href="/strikeball/lobbies" />
+                  <Q3MenuItem label="СОЗДАТЬ СЕРВЕР" subLabel="НОВАЯ ОПЕРАЦИЯ" onClick={() => setMenuStep('create')} />
+                  <Q3MenuItem label="АРСЕНАЛ" subLabel="АРЕНДА СНАРЯЖЕНИЯ" href="/strikeball/shop" />
                   <div className="h-4" />
-                  <Q3MenuItem label="QR CONNECT" subLabel="FIELD SCANNER" onClick={() => alert("SCANNING...")} />
+                  <Q3MenuItem label="QR КОННЕКТ" subLabel="СКАНИРОВАНИЕ ПОЛЯ" onClick={() => alert("ИНИЦИАЛИЗАЦИЯ СЕНСОРОВ...")} />
                 </motion.div>
               ) : (
                 <motion.div
@@ -76,10 +75,10 @@ export default function StrikeballDashboard() {
                   initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 20, opacity: 0 }}
                 >
                   <div className="bg-black/60 p-4 mb-2 border border-zinc-700">
-                    <h3 className="text-red-500 mb-4 font-black uppercase border-b border-red-800 pb-2">Deployment Settings</h3>
+                    <h3 className="text-red-500 mb-4 font-black uppercase border-b border-red-800 pb-2">Параметры Высадки</h3>
                     <CreateLobbyForm />
                   </div>
-                  <Q3MenuItem label="CANCEL" subLabel="RETURN TO MENU" onClick={() => setMenuStep('main')} />
+                  <Q3MenuItem label="ОТМЕНА" subLabel="НАЗАД В МЕНЮ" onClick={() => setMenuStep('main')} />
                 </motion.div>
               )}
             </AnimatePresence>

@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useAppContext } from "@/contexts/AppContext";
 import { motion } from "framer-motion";
-import { FaWifi, FaUserAstronaut, FaSkull } from "react-icons/fa6";
-import { cn } from "@/lib/utils";
+import { FaWifi, FaUserAstronaut } from "react-icons/fa6";
 
 export default function StrikeballHeader() {
   const { user } = useAppContext();
@@ -16,7 +15,6 @@ export default function StrikeballHeader() {
       transition={{ type: "spring", stiffness: 80, damping: 15 }}
       className="fixed top-0 left-0 right-0 z-50 pointer-events-none"
     >
-      {/* 1. Top Bar Background (Glassmorphism + Border) */}
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md border-b-2 border-red-900 pointer-events-auto h-16 shadow-[0_5px_20px_rgba(255,0,0,0.1)]">
         
         {/* Ticker Tape */}
@@ -26,18 +24,14 @@ export default function StrikeballHeader() {
              animate={{ x: ["0%", "-100%"] }}
              transition={{ repeat: Infinity, duration: 30, ease: "linear" }}
            >
-             /// CONNECTED TO STRIKEBALL.NET /// REGION: CIS /// LATENCY: 24ms /// OPERATOR: {user?.username || "GUEST"} /// READY TO FRAG ///
+             /// СВЯЗЬ С ЦЕНТРОМ: СТАБИЛЬНО /// РЕГИОН: РФ /// ПИНГ: 24мс /// ОПЕРАТОР: {user?.username?.toUpperCase() || "ГОСТЬ"} /// ГОТОВНОСТЬ К БОЮ ///
            </motion.div>
         </div>
 
-        {/* Main Content Row */}
         <div className="container mx-auto px-4 h-11 flex items-center justify-between">
-          
-          {/* BRAND */}
           <Link href="/strikeball" className="flex items-center gap-3 group">
             <div className="relative w-8 h-8 flex items-center justify-center bg-zinc-900 border border-red-700 rounded-sm group-hover:bg-red-700 transition-colors duration-300">
               <span className="font-orbitron font-black text-white italic text-sm">SB</span>
-              {/* Tech Bits */}
               <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-red-500 opacity-50" />
               <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 border-red-500 opacity-50" />
             </div>
@@ -48,27 +42,23 @@ export default function StrikeballHeader() {
             </div>
           </Link>
 
-          {/* STATUS MODULE */}
           <div className="flex items-center gap-4">
-            
-            {/* Ping / Net Graph */}
             <div className="hidden sm:flex flex-col items-end">
                <div className="flex gap-0.5 items-end h-3">
                   <div className="w-1 h-1 bg-emerald-600" />
                   <div className="w-1 h-2 bg-emerald-600" />
                   <div className="w-1 h-3 bg-emerald-500 animate-pulse" />
                </div>
-               <span className="text-[8px] font-mono text-emerald-500/80">ONLINE</span>
+               <span className="text-[8px] font-mono text-emerald-500/80">ОНЛАЙН</span>
             </div>
 
-            {/* Profile Badge */}
             <Link href="/profile" className="flex items-center gap-2 pl-4 border-l border-zinc-800">
                <div className="text-right hidden xs:block">
                  <div className="text-[10px] font-bold text-zinc-300 leading-none tracking-wider">
-                   {user?.username?.toUpperCase() || "RECRUIT"}
+                   {user?.username?.toUpperCase() || "РЕКРУТ"}
                  </div>
                  <div className="text-[8px] text-red-500 font-mono leading-none mt-0.5">
-                   TIER 1
+                   УРОВЕНЬ 1
                  </div>
                </div>
                <div className="w-8 h-8 rounded bg-zinc-900 border border-zinc-700 flex items-center justify-center text-zinc-400 group-hover:text-white group-hover:border-red-500 transition-all">
@@ -79,7 +69,6 @@ export default function StrikeballHeader() {
                  )}
                </div>
             </Link>
-
           </div>
         </div>
       </div>

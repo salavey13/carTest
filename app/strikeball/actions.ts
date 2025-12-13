@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin, fetchUserData, updateUserMetadata } from "@/hooks/supabase";
+import { supabaseAdmin, fetchUserData } from "@/hooks/supabase";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { sendTelegramInvoice } from "@/app/actions"; 
 import { logger } from "@/lib/logger";
@@ -18,14 +18,26 @@ export async function createStrikeballLobby(
   userId: string, 
   payload: { name: string; mode: string; start_at?: string | null; max_players?: number }
 ) {
-  if (!userId) return { success: false, error: "Unauthorized" };
+  logger.info(`[createStrikeballLobby] Attempting to create lobby for user: ${userId}`, payload);
+
+  if (!userId) {
+    logger.error("[createStrikeballLobby] User ID missing.");
+    return { success: false, error: "Unauthorized: No User ID" };
+  }
+  
+  if (!supabaseAdmin) {
+    logger.error("[createStrikeballLobby] Supabase Admin client not initialized.");
+    return { success: false, error: "Server Error: DB Client Missing" };
+  }
+
   const { name, mode, start_at, max_players = 20 } = payload;
 
   try {
     const qrHash = uuidv4(); 
     
     // 1. Create the Lobby record
-    const { data: lobby, error } = await supabaseAdmin
+    logger.info("[createStrikeballLobby] Inserting lobby record...");
+    const { data: lobby, error: lobbyError } = await supabaseAdmin
       .from("lobbies")
       .insert({
         name,
@@ -40,38 +52,61 @@ export async function createStrikeballLobby(
       .select()
       .single();
 
-    if (error) throw error;
+    if (lobbyError) {
+        logger.error("[createStrikeballLobby] Failed to insert lobby:", lobbyError);
+        throw new Error(`DB Insert Error: ${lobbyError.message}`);
+    }
+
+    if (!lobby) {
+         logger.error("[createStrikeballLobby] Lobby inserted but no data returned.");
+         throw new Error("Lobby creation failed (no data returned).");
+    }
+
+    logger.info(`[createStrikeballLobby] Lobby created: ${lobby.id}. Joining owner...`);
 
     // 2. Auto-join owner to Blue team
-    await supabaseAdmin.from("lobby_members").insert({
+    const { error: memberError } = await supabaseAdmin.from("lobby_members").insert({
       lobby_id: lobby.id,
       user_id: userId,
+      role: 'owner', // Explicitly set role
       team: "blue",
       is_bot: false,
       status: "ready"
     });
 
-    // 3. Notify via Telegram
+    if (memberError) {
+        logger.error(`[createStrikeballLobby] Failed to add owner to lobby_members:`, memberError);
+        // Optional: Delete the lobby if owner join fails to avoid zombie lobbies? 
+        // For now, just throw.
+        throw new Error(`Failed to join owner: ${memberError.message}`);
+    }
+
+    // 3. Notify via Telegram (Non-blocking)
     const deepLink = `https://t.me/${BOT_USERNAME}/app?startapp=lobby_${lobby.id}`;
-    
-    // Format date for message if exists
     const timeStr = start_at ? new Date(start_at).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : 'ASAP';
 
-    await sendComplexMessage(
+    // We don't await this to keep UI snappy, just log errors if any
+    sendComplexMessage(
       userId,
       `🔴 **ARENA INITIALIZED** 🔴\n\n**Operation:** ${name}\n**Mode:** ${mode.toUpperCase()}\n**Time:** ${timeStr}\n\n[🔗 CLICK TO DEPLOY SQUAD](${deepLink})`,
       [],
       { parseMode: "Markdown" }
-    );
+    ).catch(err => logger.error("[createStrikeballLobby] Failed to send TG notification:", err));
 
     return { success: true, lobbyId: lobby.id };
-  } catch (e) {
-    logger.error("Create Lobby Failed", e);
-    return { success: false, error: "Failed to deploy lobby." };
+  } catch (e: any) {
+    logger.error("[createStrikeballLobby] Exception:", e);
+    return { success: false, error: e.message || "Failed to deploy lobby." };
   }
 }
 
 export async function joinLobby(userId: string, lobbyId: string, team: string = "red") {
+  logger.info(`[joinLobby] User ${userId} attempting to join lobby ${lobbyId} as ${team}`);
+
+  if (!userId || !lobbyId) {
+      return { success: false, error: "Missing User ID or Lobby ID" };
+  }
+
   try {
     // 1. Check if already a member
     const { data: existing, error: checkError } = await supabaseAdmin
@@ -81,14 +116,19 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
       .eq("user_id", userId)
       .maybeSingle();
 
-    if (checkError) throw checkError;
+    if (checkError) {
+        logger.error(`[joinLobby] Error checking membership:`, checkError);
+        throw checkError;
+    }
 
     if (existing) {
+        logger.info(`[joinLobby] User already member of team ${existing.team}.`);
         // Logic: If already member, allow switching teams
         if (existing.team !== team) {
+            logger.info(`[joinLobby] Switching teams from ${existing.team} to ${team}`);
             const { error: updateError } = await supabaseAdmin
                 .from("lobby_members")
-                .update({ team, status: 'ready' }) // Reset status on switch? Optional.
+                .update({ team, status: 'ready' }) 
                 .eq("id", existing.id);
             
             if (updateError) throw updateError;
@@ -99,35 +139,41 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
     }
 
     // 2. Insert new member
+    logger.info(`[joinLobby] Inserting new member record...`);
     const { error: insertError } = await supabaseAdmin.from("lobby_members").insert({
       lobby_id: lobbyId,
       user_id: userId,
+      role: 'member',
       team,
       is_bot: false,
       status: "ready"
     });
 
-    if (insertError) throw insertError;
+    if (insertError) {
+        logger.error(`[joinLobby] Insert failed:`, insertError);
+        throw insertError;
+    }
 
-    // 3. Notify Owner
+    // 3. Notify Owner (Non-blocking)
+    // Fetch lobby owner to notify
     const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id, name").eq("id", lobbyId).single();
+    
     if (lobby?.owner_id && lobby.owner_id !== userId) {
-       const user = await fetchUserData(userId);
-       await sendComplexMessage(
-         lobby.owner_id, 
-         `⚠️ **REINFORCEMENTS ARRIVED**\nUser: ${user?.username || userId} joined ${lobby.name} (${team.toUpperCase()}).`
-       );
+       fetchUserData(userId).then(user => {
+           const userName = user?.username || `User ${userId}`;
+           sendComplexMessage(
+             lobby.owner_id, 
+             `⚠️ **REINFORCEMENTS ARRIVED**\nUser: ${userName} joined ${lobby.name} (${team.toUpperCase()}).`
+           ).catch(err => logger.error("[joinLobby] Failed to notify owner:", err));
+       });
     }
 
     return { success: true, message: "Deployed successfully." };
-  } catch (e) {
-    logger.error("joinLobby failed", e);
-    return { success: false, error: "Deployment failed." };
+  } catch (e: any) {
+    logger.error("[joinLobby] Failed:", e);
+    return { success: false, error: e.message || "Deployment failed." };
   }
 }
-
-
-
 
 /**
  * Fetches active lobbies.
@@ -142,9 +188,10 @@ export async function getOpenLobbies() {
       .limit(20);
 
     if (error) throw error;
+    logger.info(`[getOpenLobbies] Fetched ${data?.length} lobbies.`);
     return { success: true, data: data || [] };
-  } catch (e) {
-    logger.error("getOpenLobbies Failed", e);
+  } catch (e: any) {
+    logger.error("[getOpenLobbies] Failed:", e);
     return { success: false, error: "Connection lost." };
   }
 }
@@ -166,7 +213,7 @@ export async function getUserActiveLobbies(userId: string) {
         
         return { success: true, data: data?.map(d => d.lobby_id) || [] };
     } catch (e) {
-        logger.error("getUserActiveLobbies failed", e);
+        logger.error("[getUserActiveLobbies] Failed:", e);
         return { success: false, data: [] };
     }
 }
@@ -184,7 +231,7 @@ export async function addNoobBot(lobbyId: string, team: string) {
     });
     return { success: true };
   } catch (e) {
-    logger.error("addNoobBot failed", e);
+    logger.error("[addNoobBot] failed", e);
     return { success: false, error: "Bot malfunction." };
   }
 }

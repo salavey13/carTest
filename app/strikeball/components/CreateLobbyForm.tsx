@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { toast } from "sonner";
-import { createStrikeballLobby } from "../actions";
+import { createStrikeballLobby } from "../actions/lobby"; // Updated import
 import { cn } from "@/lib/utils";
 
 const Q3Input = ({ label, value, onChange, type = "text", placeholder }: any) => (
@@ -27,13 +27,13 @@ export const CreateLobbyForm: React.FC = () => {
   const [mode, setMode] = useState("tdm");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("10:00");
-  const [maxPlayers, setMaxPlayers] = useState<number>(10);
+  const [maxPlayers, setMaxPlayers] = useState<number>(20);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!userId) return toast.error("LOGIN REQUIRED");
-    if (name.trim().length < 3) return toast.error("INVALID LOBBY NAME");
+    if (!userId) return toast.error("ТРЕБУЕТСЯ АВТОРИЗАЦИЯ");
+    if (name.trim().length < 3) return toast.error("СЛИШКОМ КОРОТКОЕ НАЗВАНИЕ");
 
     setIsSubmitting(true);
     
@@ -51,40 +51,41 @@ export const CreateLobbyForm: React.FC = () => {
           start_at: startAtISO 
       });
       
-      if (!result.success) throw new Error(result.error || "DEPLOY FAILED");
+      if (!result.success) throw new Error(result.error || "ОШИБКА СОЗДАНИЯ");
       
-      toast.success("LOBBY ESTABLISHED");
+      toast.success("ОПЕРАЦИЯ СОЗДАНА");
       setName("");
     } catch (err) {
-      toast.error("ERROR: " + ((err as Error).message || "UNKNOWN"));
+      toast.error("ОШИБКА: " + ((err as Error).message || "UNKNOWN"));
     } finally { setIsSubmitting(false); }
   };
 
   return (
     <form onSubmit={submit} className="space-y-1">
       <Q3Input 
-        label="Operation Name" 
+        label="Название Операции" 
         value={name} 
         onChange={(e: any) => setName(e.target.value)} 
-        placeholder="Op: Red Storm" 
+        placeholder="Напр: Штурм Форта" 
       />
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block mb-3">
-            <div className="text-[10px] text-red-500 font-bold mb-1 uppercase tracking-wider">Mode</div>
+            <div className="text-[10px] text-red-500 font-bold mb-1 uppercase tracking-wider">Режим</div>
             <select 
                 value={mode} 
                 onChange={e => setMode(e.target.value)} 
                 className="w-full p-3 bg-zinc-950 border border-zinc-700 text-zinc-300 font-mono text-sm focus:border-red-500 focus:outline-none rounded-none"
             >
                 <option value="tdm">Team Deathmatch</option>
-                <option value="ctf">Capture The Flag</option>
-                <option value="mil">Milsim</option>
+                <option value="ctf">Захват Флага</option>
+                <option value="mil">Мильсим</option>
+                <option value="cqb">CQB (Помещение)</option>
             </select>
         </label>
 
         <Q3Input 
-            label="Slots" 
+            label="Мест" 
             type="number" 
             value={maxPlayers} 
             onChange={(e: any) => setMaxPlayers(Number(e.target.value))} 
@@ -93,13 +94,13 @@ export const CreateLobbyForm: React.FC = () => {
 
       <div className="grid grid-cols-2 gap-3">
          <Q3Input 
-            label="Date" 
+            label="Дата" 
             type="date" 
             value={date} 
             onChange={(e: any) => setDate(e.target.value)} 
          />
          <Q3Input 
-            label="Time" 
+            label="Время" 
             type="time" 
             value={time} 
             onChange={(e: any) => setTime(e.target.value)} 
@@ -114,7 +115,7 @@ export const CreateLobbyForm: React.FC = () => {
             isSubmitting ? "bg-zinc-800 border-zinc-600 text-zinc-500" : "bg-red-700 border-red-500 text-black hover:bg-red-600 hover:text-white"
         )}
       >
-        {isSubmitting ? "INITIALIZING..." : "INITIATE"}
+        {isSubmitting ? "ЗАГРУЗКА..." : "СОЗДАТЬ"}
       </button>
     </form>
   );
