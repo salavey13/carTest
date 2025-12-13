@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabaseAnon } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
-import { joinLobby, addNoobBot, togglePlayerStatus } from "../../actions/lobby"; // Updated path
+import { joinLobby, addNoobBot, togglePlayerStatus, removeMember } from "../../actions/lobby";
 import { SquadRoster } from "../../components/SquadRoster";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,15 @@ export default function LobbyRoom() {
   const [lobby, setLobby] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Load Data Function
+  const loadData = async () => {
+    const { data: l, error: lobbyError } = await supabaseAnon.from("lobbies").select("*").eq("id", lobbyId).single();
+    if (lobbyError) { setError("Лобби не найдено"); return; }
+    const { data: m } = await supabaseAnon.from("lobby_members").select("*").eq("lobby_id", lobbyId);
+    setLobby(l);
+    setMembers(m || []);
+  };
+
   useEffect(() => {
     loadData();
     const channel = supabaseAnon
@@ -28,21 +37,25 @@ export default function LobbyRoom() {
     return () => { supabaseAnon.removeChannel(channel); };
   }, [lobbyId]);
 
-  const loadData = async () => {
-    const { data: l, error: lobbyError } = await supabaseAnon.from("lobbies").select("*").eq("id", lobbyId).single();
-    if (lobbyError) { setError("Лобби не найдено"); return; }
-    const { data: m } = await supabaseAnon.from("lobby_members").select("*").eq("lobby_id", lobbyId);
-    setLobby(l);
-    setMembers(m || []);
-  };
-
+  // Actions
   const handleAddBot = async (team: string) => { 
       const res = await addNoobBot(lobbyId as string, team);
       if (!res.success) toast.error(res.error);
+      else loadData(); // Force immediate refresh to show bot instantly
+  };
+
+  const handleKickBot = async (memberId: string) => {
+      const res = await removeMember(memberId);
+      if (!res.success) toast.error(res.error);
+      else {
+          toast.success("Bot kicked");
+          loadData(); // Force refresh
+      }
   };
 
   const handleStatusToggle = async (memberId: string, current: string) => { 
       await togglePlayerStatus(memberId, current); 
+      // No explicit refresh needed here usually, but harmless to add if laggy
   };
 
   const handleJoinTeam = async (team: string) => {
@@ -56,7 +69,6 @@ export default function LobbyRoom() {
       }
   };
 
-  // --- PREPLANNING FEATURE: Share Intel ---
   const shareIntel = () => {
     if (!lobby) return;
     const timeStr = lobby.start_at ? new Date(lobby.start_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "СЕЙЧАС";
@@ -77,7 +89,6 @@ export default function LobbyRoom() {
   return (
     <div className="pt-28 pb-32 px-2 min-h-screen text-white">
       
-      {/* Lobby Header */}
       <div className="text-center mb-6 relative">
         <div className="absolute top-0 right-0">
              <button onClick={shareIntel} className="p-2 bg-zinc-800 rounded-full text-cyan-500 hover:text-cyan-300 transition-colors">
@@ -92,20 +103,34 @@ export default function LobbyRoom() {
         </div>
       </div>
 
-      {/* Rosters */}
-      <div className="flex flex-col md:flex-row gap-6 max-w-4xl mx-auto mb-20">
+      <div className="flex flex-col md:flex-row gap-6 max-w-4xl mx-auto">
         <SquadRoster 
-            teamName="СИНИЕ" teamColor="blue" members={blueTeam} 
-            onToggleStatus={handleStatusToggle} onAddBot={() => handleAddBot('blue')} currentUserId={dbUser?.user_id}
+            teamName="СИНИЕ" 
+            teamColor="blue" 
+            members={blueTeam} 
+            onToggleStatus={handleStatusToggle}
+            onAddBot={() => handleAddBot('blue')}
+            onKick={handleKickBot} // Pass kick handler
+            onInvite={() => shareIntel()}
+            currentUserId={dbUser?.user_id}
         />
-        <div className="text-center flex flex-col justify-center"><span className="font-black text-4xl italic text-zinc-700 font-orbitron">VS</span></div>
+        
+        <div className="text-center flex flex-col justify-center">
+            <span className="font-black text-4xl italic text-zinc-700 font-orbitron">VS</span>
+        </div>
+
         <SquadRoster 
-            teamName="КРАСНЫЕ" teamColor="red" members={redTeam} 
-            onToggleStatus={handleStatusToggle} onAddBot={() => handleAddBot('red')} currentUserId={dbUser?.user_id}
+            teamName="КРАСНЫЕ" 
+            teamColor="red" 
+            members={redTeam} 
+            onToggleStatus={handleStatusToggle}
+            onAddBot={() => handleAddBot('red')}
+            onKick={handleKickBot} // Pass kick handler
+            onInvite={() => shareIntel()}
+            currentUserId={dbUser?.user_id}
         />
       </div>
 
-      {/* Team Selection Footer (ALWAYS VISIBLE for Switching/Joining) */}
       <div className="fixed bottom-24 left-4 right-4 max-w-md mx-auto z-30">
           <div className="grid grid-cols-2 gap-2 bg-black/80 p-2 border border-zinc-700 shadow-2xl backdrop-blur-md">
               <button 
