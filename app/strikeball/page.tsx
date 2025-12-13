@@ -38,6 +38,21 @@ const Q3MenuItem = ({ label, subLabel, href, onClick, disabled = false, isActive
 
 export default function StrikeballDashboard() {
   const [menuStep, setMenuStep] = useState<'main' | 'create'>('main');
+  const { tg } = useAppContext();
+
+  const handleQR = () => {
+      // Generate a deep link to the bot's scanner or main app
+      const link = "https://t.me/oneSitePlsBot/app";
+      if (tg && tg.showPopup) {
+          tg.showPopup({
+              title: "QR КОННЕКТ",
+              message: "Покажите этот код оператору или сканируйте поле.",
+              buttons: [{ type: "ok" }]
+          });
+      } else {
+          window.open(link, "_blank");
+      }
+  };
 
   return (
     <div className="pt-28 pb-32 px-4 relative min-h-screen">
@@ -67,7 +82,7 @@ export default function StrikeballDashboard() {
                   <Q3MenuItem label="СОЗДАТЬ СЕРВЕР" subLabel="НОВАЯ ОПЕРАЦИЯ" onClick={() => setMenuStep('create')} />
                   <Q3MenuItem label="АРСЕНАЛ" subLabel="АРЕНДА СНАРЯЖЕНИЯ" href="/strikeball/shop" />
                   <div className="h-4" />
-                  <Q3MenuItem label="QR КОННЕКТ" subLabel="СКАНИРОВАНИЕ ПОЛЯ" onClick={() => alert("ИНИЦИАЛИЗАЦИЯ СЕНСОРОВ...")} />
+                  <Q3MenuItem label="QR КОННЕКТ" subLabel="СКАНИРОВАНИЕ ПОЛЯ" onClick={handleQR} />
                 </motion.div>
               ) : (
                 <motion.div

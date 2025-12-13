@@ -1,19 +1,17 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { motion } from "framer-motion";
-import { FaSkull, FaCrosshairs, FaMedal, FaPersonRifle, FaClock } from "react-icons/fa6";
+import { FaSkull, FaCrosshairs, FaMedal, FaClock } from "react-icons/fa6";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-// Mock Data for "Fake" stats until we have a match history table
 const MOCK_STATS = {
     matches: 0,
     wins: 0,
     kd: "0.0",
-    accuracy: "N/A",
-    favoriteWeapon: "NOT ASSIGNED"
+    accuracy: "N/A"
 };
 
 const StatCard = ({ label, value, icon: Icon, color, delay }: any) => (
@@ -35,10 +33,8 @@ const StatCard = ({ label, value, icon: Icon, color, delay }: any) => (
 
 export default function StatsPage() {
     const { user, userCrewInfo } = useAppContext();
-    const [stats, setStats] = useState(MOCK_STATS);
+    const [stats] = useState(MOCK_STATS);
 
-    // In a real app, you'd fetch stats from `lobby_members` history here
-    
     return (
         <div className="pt-28 pb-32 px-4 min-h-screen text-white font-orbitron">
             
@@ -58,7 +54,6 @@ export default function StatsPage() {
                 animate={{ scale: 1, opacity: 1 }}
                 className="max-w-2xl mx-auto bg-black/60 backdrop-blur-md border-2 border-zinc-800 p-6 mb-8 relative overflow-hidden"
             >
-                {/* Decorative scanning line */}
                 <motion.div 
                     className="absolute top-0 left-0 right-0 h-1 bg-red-500/50 blur-sm z-0"
                     animate={{ top: ["0%", "100%"] }}
@@ -78,11 +73,11 @@ export default function StatsPage() {
                     <div className="text-center sm:text-left">
                         <h2 className="text-2xl font-bold text-zinc-100">{user?.username || "OPERATOR"}</h2>
                         <div className="text-sm font-mono text-red-400 mt-1">
-                            {userCrewInfo ? `SQUAD: ${userCrewInfo.name.toUpperCase()}` : "NO SQUAD AFFILIATION"}
+                            {userCrewInfo ? `ОТРЯД: ${userCrewInfo.name.toUpperCase()}` : "БЕЗ ОТРЯДА"}
                         </div>
                         <div className="flex gap-2 mt-3 justify-center sm:justify-start">
-                            <span className="px-2 py-0.5 bg-zinc-800 text-[10px] text-zinc-400 border border-zinc-700">ASSAULT</span>
-                            <span className="px-2 py-0.5 bg-zinc-800 text-[10px] text-zinc-400 border border-zinc-700">RECON</span>
+                            <span className="px-2 py-0.5 bg-zinc-800 text-[10px] text-zinc-400 border border-zinc-700">ШТУРМОВИК</span>
+                            <span className="px-2 py-0.5 bg-zinc-800 text-[10px] text-zinc-400 border border-zinc-700">РАЗВЕДКА</span>
                         </div>
                     </div>
                 </div>
@@ -92,7 +87,7 @@ export default function StatsPage() {
             <div className="max-w-2xl mx-auto grid grid-cols-2 gap-3 mb-8">
                 <StatCard label="МАТЧЕЙ" value={stats.matches} icon={FaClock} color="text-zinc-300" delay={0.1} />
                 <StatCard label="ПОБЕД" value={stats.wins} icon={FaMedal} color="text-amber-500" delay={0.2} />
-                <StatCard label="K/D RATIO" value={stats.kd} icon={FaSkull} color="text-red-500" delay={0.3} />
+                <StatCard label="K/D" value={stats.kd} icon={FaSkull} color="text-red-500" delay={0.3} />
                 <StatCard label="ТОЧНОСТЬ" value={stats.accuracy} icon={FaCrosshairs} color="text-cyan-500" delay={0.4} />
             </div>
 
@@ -115,15 +110,12 @@ export default function StatsPage() {
                             )
                         })}
                     </div>
-                    
-                    {/* Grid lines */}
                     <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:100%_20px]" />
                 </div>
                 <p className="text-[10px] text-zinc-600 font-mono mt-2 text-center">
-                    * Данные обновляются после подтверждения результатов командиром лобби.
+                    * Данные обновляются после подтверждения результатов.
                 </p>
             </div>
-
         </div>
     );
 }
