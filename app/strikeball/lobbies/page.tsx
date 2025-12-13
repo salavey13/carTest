@@ -2,11 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { getOpenLobbies, joinLobby, getUserActiveLobbies } from "../actions/lobby"; 
+import { getOpenLobbies, joinLobby, getUserActiveLobbies } from "../actions/lobby";
 import { getAllPublicCrews } from "@/app/rentals/actions"; 
 import { toast } from "sonner";
 import Link from "next/link";
-import { FaUsers, FaSkull, FaDoorOpen } from "react-icons/fa6";
+import { FaUsers, FaSkull, FaDoorOpen, FaShieldHalved } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 
 type Lobby = {
@@ -16,6 +16,7 @@ type Lobby = {
   max_players?: number;
   created_at?: string;
   start_at?: string;
+  host_crew?: { id: string, name: string, logo_url: string, slug: string } | null;
 };
 
 export default function LobbiesPageClient() {
@@ -62,7 +63,7 @@ export default function LobbiesPageClient() {
   return (
     <div className="pt-28 pb-32 px-4 min-h-screen bg-transparent text-white font-orbitron">
       
-      {/* Lobbies Section */}
+      {/* SECTION 1: LIVE OPERATIONS */}
       <h2 className="text-2xl font-black mb-4 text-red-600 tracking-tighter uppercase border-b-2 border-red-900/50 pb-2 flex items-center gap-2">
         <span className="animate-pulse">●</span> Активные Операции
       </h2>
@@ -75,27 +76,42 @@ export default function LobbiesPageClient() {
           
           {lobbies.map(l => {
             const isMember = myLobbies.includes(l.id);
+            const isCrewHosted = !!l.host_crew;
+            
             return (
             <Link key={l.id} href={`/strikeball/lobbies/${l.id}`} className="block group">
               <div className={cn(
                   "bg-zinc-900/90 border border-zinc-700 p-4 flex justify-between items-center transition-colors shadow-lg relative overflow-hidden",
                   isMember ? "hover:border-emerald-500" : "hover:border-red-500 hover:bg-zinc-800"
               )}>
+                {/* Crew Hosted Badge */}
+                {isCrewHosted && (
+                    <div className="absolute top-0 right-0 bg-cyan-900/80 text-cyan-200 text-[9px] font-bold px-2 py-0.5 flex items-center gap-1 z-10 border-l border-b border-cyan-700">
+                        <FaShieldHalved size={8} /> {l.host_crew?.name}
+                    </div>
+                )}
+
                 <div className={cn("absolute left-0 top-0 bottom-0 w-1 opacity-0 group-hover:opacity-100 transition-opacity", isMember ? "bg-emerald-500" : "bg-red-600")} />
-                <div>
-                  <div className={cn("font-bold text-lg leading-none transition-colors", isMember ? "text-emerald-400 group-hover:text-emerald-300" : "text-white group-hover:text-red-400")}>
+                
+                <div className="flex-1">
+                  <div className={cn("font-bold text-lg leading-none transition-colors mb-1", isMember ? "text-emerald-400 group-hover:text-emerald-300" : "text-white group-hover:text-red-400")}>
                     {l.name}
                   </div>
-                  <div className="text-[10px] text-zinc-400 font-mono mt-1">
-                    {l.mode?.toUpperCase()} // {l.max_players} МЕСТ // {l.start_at ? new Date(l.start_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'СЕЙЧАС'}
+                  <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-2">
+                     <span className="bg-zinc-800 px-1.5 py-0.5 rounded">{l.mode?.toUpperCase()}</span>
+                     <span>{l.max_players} МЕСТ</span>
+                     <span className={cn(l.start_at ? "text-amber-500" : "text-green-500")}>
+                        {l.start_at ? new Date(l.start_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'СЕЙЧАС'}
+                     </span>
                   </div>
                 </div>
+                
                 {isMember ? (
-                    <div className="bg-emerald-900/50 text-emerald-100 px-5 py-2 text-sm font-black border border-emerald-600 flex items-center gap-2">
+                    <div className="bg-emerald-900/50 text-emerald-100 px-4 py-2 text-xs font-black border border-emerald-600 flex items-center gap-2">
                         ВХОД <FaDoorOpen />
                     </div>
                 ) : (
-                    <button onClick={(e) => handleJoin(e, l.id)} className="bg-red-900/50 text-red-100 px-5 py-2 text-sm font-black border border-red-600 hover:bg-red-600 transition-all active:scale-95 z-10">
+                    <button onClick={(e) => handleJoin(e, l.id)} className="bg-red-900/50 text-red-100 px-4 py-2 text-xs font-black border border-red-600 hover:bg-red-600 transition-all active:scale-95 z-10">
                     ВСТУПИТЬ
                     </button>
                 )}
@@ -105,19 +121,18 @@ export default function LobbiesPageClient() {
         </div>
       )}
 
-      {/* Crews Section */}
+      {/* SECTION 2: REGISTERED SQUADS */}
       <h2 className="text-2xl font-black mb-4 text-cyan-500 tracking-tighter uppercase border-b-2 border-cyan-900/50 pb-2 flex items-center gap-2">
         <FaUsers /> Постоянные Отряды
       </h2>
 
       <div className="grid grid-cols-1 gap-3">
         {crews.map(crew => (
-           // FIXED: Link points to /crews/[slug]
            <Link key={crew.id} href={`/crews/${crew.slug}`} className="block group">
              <div className="bg-zinc-900/80 border border-zinc-800 p-3 flex items-center gap-4 hover:bg-zinc-800 hover:border-cyan-500 transition-all">
                 <div className="w-14 h-14 bg-black border border-zinc-700 flex-shrink-0 relative overflow-hidden">
                    {crew.logo_url ? (
-                       <img src={crew.logo_url} alt={crew.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0" />
+                       <img src={crew.logo_url} alt={crew.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 grayscale group-hover:grayscale-0 transition-all" />
                    ) : (
                        <div className="w-full h-full flex items-center justify-center text-zinc-700 font-black text-2xl">?</div>
                    )}
