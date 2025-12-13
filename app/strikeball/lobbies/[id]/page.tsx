@@ -11,42 +11,27 @@ import { cn } from "@/lib/utils";
 
 export default function LobbyRoom() {
   const { id: lobbyId } = useParams(); 
-  const { dbUser } = useAppContext();
+  const { dbUser, tg } = useAppContext(); // Get TG object
   const [members, setMembers] = useState<any[]>([]);
   const [lobby, setLobby] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // ... (useEffect and loadData remain same) ...
   useEffect(() => {
     loadData();
-
-    // Subscribe to realtime changes on 'lobby_members'
     const channel = supabaseAnon
       .channel(`lobby_${lobbyId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members', filter: `lobby_id=eq.${lobbyId}` }, 
         () => loadData()
       )
       .subscribe();
-
     return () => { supabaseAnon.removeChannel(channel); };
   }, [lobbyId]);
 
   const loadData = async () => {
-    const { data: l, error: lobbyError } = await supabaseAnon
-        .from("lobbies")
-        .select("*")
-        .eq("id", lobbyId)
-        .single();
-    
-    if (lobbyError) {
-        setError("LOBBY NOT FOUND");
-        return;
-    }
-
-    const { data: m } = await supabaseAnon
-        .from("lobby_members")
-        .select("*")
-        .eq("lobby_id", lobbyId);
-
+    const { data: l, error: lobbyError } = await supabaseAnon.from("lobbies").select("*").eq("id", lobbyId).single();
+    if (lobbyError) { setError("LOBBY NOT FOUND"); return; }
+    const { data: m } = await supabaseAnon.from("lobby_members").select("*").eq("lobby_id", lobbyId);
     setLobby(l);
     setMembers(m || []);
   };
@@ -60,7 +45,6 @@ export default function LobbyRoom() {
       await togglePlayerStatus(memberId, current); 
   };
 
-  // NEW: Handle Team Joining / Switching
   const handleJoinTeam = async (team: string) => {
       if (!dbUser) { toast.error("Log in first"); return; }
       
@@ -70,6 +54,19 @@ export default function LobbyRoom() {
           loadData(); // Force refresh to see change immediately
       } else {
           toast.error(res.error || "Failed");
+      }
+  };
+
+  // NEW: Invite Handler
+  const handleInvite = (team: string) => {
+      const inviteLink = `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobbyId}`;
+      const text = `Join my ${team.toUpperCase()} squad in Strikeball Ops!`;
+      const url = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`;
+      
+      if (tg && tg.openTelegramLink) {
+          tg.openTelegramLink(url);
+      } else {
+          window.open(url, '_blank');
       }
   };
 
@@ -83,6 +80,7 @@ export default function LobbyRoom() {
   return (
     <div className="pt-28 pb-32 px-2 min-h-screen text-white">
       
+      {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-black font-orbitron uppercase tracking-widest">{lobby.name}</h1>
         <div className="inline-flex gap-4 mt-2 text-[10px] font-mono text-zinc-400 bg-black/50 px-4 py-1 border border-zinc-800 rounded-full">
@@ -92,6 +90,7 @@ export default function LobbyRoom() {
         </div>
       </div>
 
+      {/* Roster Grid */}
       <div className="flex flex-col md:flex-row gap-6 max-w-4xl mx-auto">
         <SquadRoster 
             teamName="BLUE SQUAD" 
@@ -99,6 +98,7 @@ export default function LobbyRoom() {
             members={blueTeam} 
             onToggleStatus={handleStatusToggle}
             onAddBot={() => handleAddBot('blue')}
+            onInvite={() => handleInvite('blue')} // Pass invite handler
             currentUserId={dbUser?.user_id}
         />
         
@@ -112,11 +112,12 @@ export default function LobbyRoom() {
             members={redTeam} 
             onToggleStatus={handleStatusToggle}
             onAddBot={() => handleAddBot('red')}
+            onInvite={() => handleInvite('red')} // Pass invite handler
             currentUserId={dbUser?.user_id}
         />
       </div>
 
-      {/* TEAM SELECTION: Show if not member OR allow switching */}
+      {/* Team Selection Footer (Fixed) */}
       <div className="fixed bottom-24 left-4 right-4 max-w-md mx-auto z-30">
           <div className="grid grid-cols-2 gap-2 bg-black/80 p-2 border border-zinc-700 shadow-2xl backdrop-blur-md">
               <button 

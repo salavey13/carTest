@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { FaSkull, FaHeartPulse, FaRobot, FaUserAstronaut, FaCrown } from "react-icons/fa6";
+import { FaSkull, FaHeartPulse, FaRobot, FaUserAstronaut, FaCrown, FaPlus } from "react-icons/fa6";
 
 interface Member {
   id: string;
@@ -10,6 +10,7 @@ interface Member {
   role: string;
   status: string; // 'alive', 'dead'
   joined_at: string;
+  team: string; // Added team to interface
 }
 
 interface SquadRosterProps {
@@ -18,10 +19,11 @@ interface SquadRosterProps {
   members: Member[];
   onToggleStatus: (id: string, current: string) => void;
   onAddBot?: () => void;
+  onInvite?: () => void; // NEW PROP
   currentUserId?: string;
 }
 
-export const SquadRoster = ({ teamName, teamColor, members, onToggleStatus, onAddBot, currentUserId }: SquadRosterProps) => {
+export const SquadRoster = ({ teamName, teamColor, members, onToggleStatus, onAddBot, onInvite, currentUserId }: SquadRosterProps) => {
   
   const isRed = teamColor === 'red';
   const accentColor = isRed ? 'text-red-500' : 'text-blue-500';
@@ -31,7 +33,7 @@ export const SquadRoster = ({ teamName, teamColor, members, onToggleStatus, onAd
     : 'bg-gradient-to-b from-blue-950/40 to-transparent';
 
   return (
-    <div className={cn("flex-1 border-2 rounded-sm overflow-hidden", borderColor, bgGradient)}>
+    <div className={cn("flex-1 border-2 rounded-sm overflow-hidden flex flex-col", borderColor, bgGradient)}>
       {/* Header */}
       <div className={cn("px-4 py-2 font-black italic text-xl uppercase tracking-widest flex justify-between items-center border-b", borderColor, isRed ? "bg-red-900/20" : "bg-blue-900/20")}>
         <span className={accentColor}>{teamName}</span>
@@ -39,7 +41,7 @@ export const SquadRoster = ({ teamName, teamColor, members, onToggleStatus, onAd
       </div>
 
       {/* List */}
-      <div className="divide-y divide-zinc-800/50">
+      <div className="flex-1 divide-y divide-zinc-800/50 min-h-[200px]">
         {members.length === 0 && (
            <div className="p-6 text-center font-mono text-xs text-zinc-600 animate-pulse">
              AWAITING CONNECTION...
@@ -92,15 +94,25 @@ export const SquadRoster = ({ teamName, teamColor, members, onToggleStatus, onAd
         })}
       </div>
 
-      {/* Footer Add Button */}
-      {onAddBot && (
-        <button 
-          onClick={onAddBot}
-          className={cn("w-full py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-colors border-t border-zinc-800 text-zinc-500 hover:text-zinc-300")}
-        >
-          + Deploy Reinforcement Unit
-        </button>
-      )}
+      {/* Footer Buttons */}
+      <div className="flex text-[10px] font-bold uppercase tracking-widest border-t border-zinc-800 divide-x divide-zinc-800">
+          {onAddBot && (
+            <button 
+              onClick={onAddBot}
+              className="flex-1 py-3 hover:bg-white/10 transition-colors text-zinc-500 hover:text-zinc-300 flex items-center justify-center gap-2"
+            >
+              <FaRobot /> Add Bot
+            </button>
+          )}
+          {onInvite && (
+            <button 
+              onClick={onInvite}
+              className="flex-1 py-3 hover:bg-white/10 transition-colors text-zinc-500 hover:text-zinc-300 flex items-center justify-center gap-2"
+            >
+              <FaPlus /> Invite
+            </button>
+          )}
+      </div>
     </div>
   );
 };
