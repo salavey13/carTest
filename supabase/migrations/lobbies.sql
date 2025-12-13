@@ -28,3 +28,12 @@ CREATE TABLE public.lobby_members (
   role text,
   joined_at timestamptz DEFAULT now()
 );
+
+-- Add missing columns to lobby_members
+ALTER TABLE public.lobby_members 
+ADD COLUMN IF NOT EXISTS team text DEFAULT 'spectator',
+ADD COLUMN IF NOT EXISTS status text DEFAULT 'ready',
+ADD COLUMN IF NOT EXISTS is_bot boolean DEFAULT false;
+
+-- Optional: Create an index for faster team lookups
+CREATE INDEX IF NOT EXISTS idx_lobby_members_team ON public.lobby_members(lobby_id, team);
