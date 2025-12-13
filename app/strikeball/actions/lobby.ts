@@ -177,44 +177,47 @@ export async function getUserActiveLobbies(userId: string) {
     }
 }
 
-/**
- * Добавить бота (Tactical Feature)
- */
 export async function addNoobBot(lobbyId: string, team: string) {
   try {
-    const botId = uuidv4(); // Generate a unique ID for the bot
+    const botId = uuidv4(); // Generate ID to satisfy DB constraints
     const { error } = await supabaseAdmin.from("lobby_members").insert({
       lobby_id: lobbyId,
-      user_id: botId, // Use the generated UUID instead of null
+      user_id: botId,
       is_bot: true,
       team,
       status: "ready",
-      role: "bot" // Explicit role
+      role: "bot"
     });
     
     if (error) throw error;
     return { success: true };
   } catch (e: any) {
     logger.error("addNoobBot Failed", e);
-    return { success: false, error: e.message || "Ошибка бота." };
+    return { success: false, error: "Ошибка бота." };
   }
 }
 
-/**
- * Переключить статус (Жив/Мертв)
- */
+export async function removeMember(memberId: string) {
+  try {
+    const { error } = await supabaseAdmin
+      .from("lobby_members")
+      .delete()
+      .eq("id", memberId);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (e: any) {
+    logger.error("removeMember Failed", e);
+    return { success: false, error: "Не удалось удалить бойца." };
+  }
+}
+
 export async function togglePlayerStatus(memberId: string, currentStatus: string) {
     try {
         const newStatus = currentStatus === 'alive' ? 'dead' : 'alive';
-        const { error } = await supabaseAdmin
-            .from("lobby_members")
-            .update({ status: newStatus })
-            .eq("id", memberId);
-            
-        if (error) throw error;
+        await supabaseAdmin.from("lobby_members").update({ status: newStatus }).eq("id", memberId);
         return { success: true, newStatus };
     } catch (e) {
-        logger.error("togglePlayerStatus Failed", e);
         return { success: false, error: "Ошибка статуса" };
     }
 }
