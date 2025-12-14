@@ -32,7 +32,6 @@ export default function GearShop() {
   if (loading) return <div className="p-10 text-center font-mono text-red-500 pt-24 animate-pulse">ЗАГРУЗКА АРСЕНАЛА...</div>;
 
   return (
-    // FIX: Changed bg-zinc-950 to bg-transparent so the Quake background shows through
     <div className="min-h-screen bg-transparent pt-28 p-4 pb-32 text-white font-orbitron">
       
       <div className="flex justify-between items-end mb-8 border-b-2 border-red-900/50 pb-2">
@@ -55,23 +54,24 @@ export default function GearShop() {
                 {item.daily_price} XTR
             </div>
 
-            {/* Image Container */}
-            <div className="relative h-32 w-full bg-zinc-900/50 border-b border-zinc-800">
+            {/* Image Container - White Background & Contain Fit */}
+            <div className="relative h-32 w-full bg-white border-b border-zinc-800">
                {item.image_url ? (
                    <Image 
                      src={item.image_url} 
                      alt={item.make} 
                      fill 
-                     className="object-cover opacity-80 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0" 
+                     // UPDATED: object-contain, padding, no opacity fade on bg
+                     className="object-contain p-2 group-hover:scale-105 transition-transform duration-300" 
                    />
                ) : (
-                   <div className="absolute inset-0 flex items-center justify-center text-zinc-700 font-bold font-mono text-2xl">
+                   <div className="absolute inset-0 flex items-center justify-center text-zinc-400 font-bold font-mono text-2xl">
                      [Н/Д]
                    </div>
                )}
                
-               {/* Tech Overlay (Scanlines on image) */}
-               <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0)_50%,rgba(0,0,0,0.4)_50%)] bg-[length:100%_4px] pointer-events-none opacity-50" />
+               {/* Tech Overlay (Scanlines on image - reduced opacity for white bg) */}
+               <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0)_50%,rgba(0,0,0,0.1)_50%)] bg-[length:100%_4px] pointer-events-none" />
             </div>
             
             <div className="p-3 flex-1 flex flex-col">
