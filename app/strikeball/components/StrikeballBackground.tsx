@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 
-const PARTICLE_COUNT = 8; // Optimized for mobile
+const PARTICLE_COUNT = 13; // Optimized for mobile
 
 export const StrikeballBackground: React.FC = () => {
   const [mounted, setMounted] = useState(false);
