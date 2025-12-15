@@ -7,6 +7,8 @@ import { v4 as uuidv4 } from "uuid";
 
 const BOT_USERNAME = "oneSitePlsBot";
 
+
+
 /**
  * Создание нового лобби (Create Lobby)
  * Supports optional hosting by a Crew and Location.
@@ -18,14 +20,17 @@ export async function createStrikeballLobby(
     mode: string; 
     start_at?: string | null; 
     max_players?: number;
-    crew_id?: string | null; // <--- NEW PARAM
+    crew_id?: string | null;
+    location?: string; // GPS Coordinates string
   }
 ) {
   if (!userId) return { success: false, error: "Требуется авторизация" };
-  const { name, mode, start_at, max_players = 20, crew_id } = payload;
+  const { name, mode, start_at, max_players = 20, crew_id, location } = payload;
 
   try {
     const qrHash = uuidv4(); 
+    
+    // 1. Create Lobby Record
     const { data: lobby, error } = await supabaseAdmin
       .from("lobbies")
       .insert({
@@ -36,7 +41,8 @@ export async function createStrikeballLobby(
         status: "open",
         start_at: start_at || null,
         max_players,
-        crew_id: crew_id || null, // <--- Link to Crew
+        crew_id: crew_id || null,
+        field_id: location || null, // FIX: Explicitly mapping location -> field_id
         metadata: { bots_enabled: true }
       })
       .select()
@@ -44,7 +50,7 @@ export async function createStrikeballLobby(
 
     if (error) throw error;
 
-    // Авто-вход создателя
+    // 2. Auto-join owner as Blue Team Leader
     await supabaseAdmin.from("lobby_members").insert({
       lobby_id: lobby.id,
       user_id: userId,
@@ -54,14 +60,15 @@ export async function createStrikeballLobby(
       status: "ready"
     });
 
-    // Deep Link generation
+    // 3. Generate Links & Notify
     const deepLink = `https://t.me/${BOT_USERNAME}/app?startapp=lobby_${lobby.id}`;
     const timeStr = start_at ? new Date(start_at).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : 'СКОРО';
+    const squadTag = crew_id ? `\n**Отряд:** OFFICIAL SQUAD RAID` : '';
+    const locationTag = location ? `\n**GPS:** ${location}` : '';
 
-    // Notify
     await sendComplexMessage(
       userId,
-      `🔴 **ОПЕРАЦИЯ НАЧАТА** 🔴\n\n**Цель:** ${name}\n**Режим:** ${mode.toUpperCase()}\n**Сбор:** ${timeStr}\n${crew_id ? `**Отряд:** OFFICIAL SQUAD RAID` : ''}\n\n[🔗 ПРИГЛАСИТЬ БОЙЦОВ](${deepLink})`,
+      `🔴 **ОПЕРАЦИЯ НАЧАТА** 🔴\n\n**Цель:** ${name}\n**Режим:** ${mode.toUpperCase()}\n**Сбор:** ${timeStr}${locationTag}${squadTag}\n\n[🔗 ПРИГЛАСИТЬ БОЙЦОВ](${deepLink})`,
       [],
       { parseMode: "Markdown" }
     );
