@@ -89,3 +89,61 @@ export async function updateScore(lobbyId: string, userId: string, team: 'red' |
     return { success: false, error: e.message };
   }
 }
+
+/**
+ * Handles "I'M HIT" logic:
+ * 1. Mark player as 'dead'.
+ * 2. Increment opposing team's score.
+ */
+export async function playerHit(lobbyId: string, memberId: string) {
+    try {
+        // 1. Get Member Info
+        const { data: member } = await supabaseAdmin
+            .from("lobby_members")
+            .select("team, status")
+            .eq("id", memberId)
+            .single();
+
+        if (!member || member.status === 'dead') return { success: false, error: "Invalid state" };
+
+        // 2. Mark Dead
+        await supabaseAdmin
+            .from("lobby_members")
+            .update({ status: 'dead', death_time: new Date().toISOString() })
+            .eq("id", memberId);
+
+        // 3. Update Score (Opposing team gets point)
+        const { data: lobby } = await supabaseAdmin.from("lobbies").select("metadata").eq("id", lobbyId).single();
+        const currentScore = lobby?.metadata?.score || { red: 0, blue: 0 };
+        const enemyTeam = member.team === 'blue' ? 'red' : 'blue';
+        
+        const newScore = {
+            ...currentScore,
+            [enemyTeam]: (currentScore[enemyTeam] || 0) + 1
+        };
+
+        await supabaseAdmin
+            .from("lobbies")
+            .update({ metadata: { ...lobby.metadata, score: newScore } })
+            .eq("id", lobbyId);
+
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+/**
+ * Revive Player (via QR Scan)
+ */
+export async function playerRespawn(lobbyId: string, memberId: string) {
+    try {
+        await supabaseAdmin
+            .from("lobby_members")
+            .update({ status: 'alive' })
+            .eq("id", memberId);
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}

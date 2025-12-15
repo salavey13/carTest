@@ -1,18 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
+import { getUserCombatStats } from "../actions/stats"; // New Import
 import { motion } from "framer-motion";
 import { FaSkull, FaCrosshairs, FaMedal, FaClock } from "react-icons/fa6";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-const MOCK_STATS = {
-    matches: 0,
-    wins: 0,
-    kd: "0.0",
-    accuracy: "N/A"
-};
+// Placeholder removed, state starts empty
+const DEFAULT_STATS = { matches: 0, wins: 0, kd: "-", accuracy: "-" };
 
 const StatCard = ({ label, value, icon: Icon, color, delay }: any) => (
     <motion.div 
@@ -32,8 +29,23 @@ const StatCard = ({ label, value, icon: Icon, color, delay }: any) => (
 );
 
 export default function StatsPage() {
-    const { user, userCrewInfo } = useAppContext();
-    const [stats] = useState(MOCK_STATS);
+    const { user, userCrewInfo, dbUser } = useAppContext();
+    const [stats, setStats] = useState(DEFAULT_STATS);
+
+    useEffect(() => {
+        if(dbUser?.user_id) {
+            getUserCombatStats(dbUser.user_id).then(res => {
+                if(res.success && res.data) {
+                    setStats({
+                        matches: res.data.matches,
+                        wins: res.data.wins,
+                        kd: res.data.kd,
+                        accuracy: res.data.accuracy
+                    });
+                }
+            });
+        }
+    }, [dbUser?.user_id]);
 
     return (
         <div className="pt-28 pb-32 px-4 min-h-screen text-white font-orbitron">
@@ -113,7 +125,7 @@ export default function StatsPage() {
                     <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:100%_20px]" />
                 </div>
                 <p className="text-[10px] text-zinc-600 font-mono mt-2 text-center">
-                    * Данные обновляются после подтверждения результатов.
+                    * Данные обновляются после подтверждения результатов командиром лобби.
                 </p>
             </div>
         </div>
