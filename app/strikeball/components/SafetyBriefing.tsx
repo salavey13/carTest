@@ -63,7 +63,6 @@ export const SafetyBriefing = ({ onComplete, isSigned }: { onComplete: () => voi
         setTimeout(() => setStep(step + 1), 1000);
       } else {
         setPassed(true);
-        // Do not auto-complete, let user click the sign button for explicit consent
       }
     } else {
       toast.error(response);
