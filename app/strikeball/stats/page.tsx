@@ -2,13 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { getUserCombatStats } from "../actions/stats"; // New Import
+import { getUserCombatStats } from "../actions/stats"; // Make sure this file exists
 import { motion } from "framer-motion";
 import { FaSkull, FaCrosshairs, FaMedal, FaClock } from "react-icons/fa6";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-// Placeholder removed, state starts empty
 const DEFAULT_STATS = { matches: 0, wins: 0, kd: "-", accuracy: "-" };
 
 const StatCard = ({ label, value, icon: Icon, color, delay }: any) => (

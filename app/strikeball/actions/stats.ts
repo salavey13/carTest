@@ -7,20 +7,30 @@ export async function getUserCombatStats(userId: string) {
 
     try {
         // 1. Fetch completed lobbies user was in
-        // NOTE: We need to query lobby_members joined with lobbies where status = finished
+        // Join lobbies where status is 'finished'
         const { data: history, error } = await supabaseAdmin
             .from("lobby_members")
-            .select("team, status, lobbies(winner)")
+            .select(`
+                team, 
+                status, 
+                lobby:lobbies!inner(status, winner, created_at)
+            `)
             .eq("user_id", userId)
-            .not("lobbies", "is", null);
+            .eq("lobby.status", "finished"); // Filter deeply on joined resource
 
         if (error) throw error;
 
         // 2. Calculate
         const matches = history?.length || 0;
-        const wins = history?.filter((h: any) => h.lobbies?.winner === h.team).length || 0;
         
-        // Mock data for now until we track kills per player
+        const wins = history?.filter((h: any) => {
+            const myTeam = h.team?.toLowerCase();
+            const winningTeam = h.lobby?.winner?.toLowerCase();
+            return myTeam && winningTeam && myTeam === winningTeam;
+        }).length || 0;
+        
+        // Mock K/D and Accuracy for now as we don't track kills per player yet
+        // In a real implementation, you'd sum up a 'kills' column from lobby_members
         const kd = (Math.random() * 2 + 0.5).toFixed(2); 
 
         return {
@@ -29,7 +39,7 @@ export async function getUserCombatStats(userId: string) {
                 matches,
                 wins,
                 kd,
-                accuracy: "64%" // Mock
+                accuracy: "64%" 
             }
         };
 
