@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import path from 'path'; 
 import fs from 'fs';   
-import { sendTelegramDocument } from "@/app/topdf/actions"; // Reuse existing helper
+import { sendTelegramDocument } from "@/app/actions"; // Reuse existing helper
 
 const pdfLibModule = require('pdf-lib');
 const fontkitModule = require('@pdf-lib/fontkit');
