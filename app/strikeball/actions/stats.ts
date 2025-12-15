@@ -6,31 +6,33 @@ export async function getUserCombatStats(userId: string) {
     if (!userId) return { success: false };
 
     try {
-        // 1. Fetch completed lobbies user was in
-        // Join lobbies where status is 'finished'
+        // 1. Fetch member history
+        // We use !inner to enforce that the lobby exists and matches filters
         const { data: history, error } = await supabaseAdmin
             .from("lobby_members")
             .select(`
                 team, 
-                status, 
-                lobby:lobbies!inner(status, winner, created_at)
+                status,
+                lobbies!inner(status, winner)
             `)
             .eq("user_id", userId)
-            .eq("lobby.status", "finished"); // Filter deeply on joined resource
+            .eq("lobbies.status", "finished");
 
         if (error) throw error;
 
-        // 2. Calculate
+        // 2. Calculate Stats
         const matches = history?.length || 0;
         
-        const wins = history?.filter((h: any) => {
-            const myTeam = h.team?.toLowerCase();
-            const winningTeam = h.lobby?.winner?.toLowerCase();
-            return myTeam && winningTeam && myTeam === winningTeam;
-        }).length || 0;
+        let wins = 0;
+        if (history) {
+            wins = history.filter((h: any) => {
+                const lobbyWinner = h.lobbies?.winner;
+                return lobbyWinner && lobbyWinner === h.team;
+            }).length;
+        }
         
-        // Mock K/D and Accuracy for now as we don't track kills per player yet
-        // In a real implementation, you'd sum up a 'kills' column from lobby_members
+        // Mock data for K/D until we track individual kills
+        // You could store 'kills' in lobby_members metadata later
         const kd = (Math.random() * 2 + 0.5).toFixed(2); 
 
         return {
@@ -39,7 +41,7 @@ export async function getUserCombatStats(userId: string) {
                 matches,
                 wins,
                 kd,
-                accuracy: "64%" 
+                accuracy: "N/A" 
             }
         };
 
