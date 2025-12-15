@@ -6,7 +6,8 @@ import { logger } from "@/lib/logger";
 
 /**
  * Starts the match. 
- * Sets status to 'active', records actual start time in metadata.
+ * Sets lobby status to 'active'.
+ * CRITICAL FIX: Sets all members to 'alive' so buttons appear.
  */
 export async function startGame(lobbyId: string, userId: string) {
   try {
@@ -17,17 +18,26 @@ export async function startGame(lobbyId: string, userId: string) {
     const newMeta = {
       ...lobby.metadata,
       actual_start_at: new Date().toISOString(),
-      score: { red: 0, blue: 0 } // Initialize score
+      score: { red: 0, blue: 0 } 
     };
 
-    const { error } = await supabaseAdmin
+    // 1. Update Lobby Status
+    const { error: lobbyError } = await supabaseAdmin
       .from("lobbies")
       .update({ status: 'active', metadata: newMeta })
       .eq("id", lobbyId);
 
-    if (error) throw error;
+    if (lobbyError) throw lobbyError;
+
+    // 2. Deploy all soldiers (Ready -> Alive)
+    // We update everyone currently in the lobby to 'alive' so UI buttons trigger
+    const { error: membersError } = await supabaseAdmin
+      .from("lobby_members")
+      .update({ status: 'alive' })
+      .eq("lobby_id", lobbyId);
+
+    if (membersError) logger.warn("Failed to set members to alive", membersError);
     
-    // Broadcast notification logic could go here
     return { success: true };
   } catch (e: any) {
     return { success: false, error: e.message };
@@ -36,7 +46,6 @@ export async function startGame(lobbyId: string, userId: string) {
 
 /**
  * Ends the match.
- * Sets status to 'finished', records end time.
  */
 export async function endGame(lobbyId: string, userId: string, winner: 'red' | 'blue' | 'draw') {
   try {
@@ -67,7 +76,6 @@ export async function endGame(lobbyId: string, userId: string, winner: 'red' | '
 export async function updateScore(lobbyId: string, userId: string, team: 'red' | 'blue', delta: number) {
   try {
     const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id, metadata").eq("id", lobbyId).single();
-    // Allow owner AND maybe trusted refs (future) to update score. For now, owner only.
     if (!lobby || lobby.owner_id !== userId) throw new Error("ACCESS DENIED");
 
     const currentScore = lobby.metadata?.score || { red: 0, blue: 0 };
@@ -91,13 +99,10 @@ export async function updateScore(lobbyId: string, userId: string, team: 'red' |
 }
 
 /**
- * Handles "I'M HIT" logic:
- * 1. Mark player as 'dead'.
- * 2. Increment opposing team's score.
+ * Handles "I'M HIT" logic.
  */
 export async function playerHit(lobbyId: string, memberId: string) {
     try {
-        // 1. Get Member Info
         const { data: member } = await supabaseAdmin
             .from("lobby_members")
             .select("team, status")
@@ -106,13 +111,11 @@ export async function playerHit(lobbyId: string, memberId: string) {
 
         if (!member || member.status === 'dead') return { success: false, error: "Invalid state" };
 
-        // 2. Mark Dead
         await supabaseAdmin
             .from("lobby_members")
-            .update({ status: 'dead', death_time: new Date().toISOString() })
+            .update({ status: 'dead', joined_at: new Date().toISOString() }) // Using joined_at as last_event for now, or just status
             .eq("id", memberId);
 
-        // 3. Update Score (Opposing team gets point)
         const { data: lobby } = await supabaseAdmin.from("lobbies").select("metadata").eq("id", lobbyId).single();
         const currentScore = lobby?.metadata?.score || { red: 0, blue: 0 };
         const enemyTeam = member.team === 'blue' ? 'red' : 'blue';
@@ -134,7 +137,7 @@ export async function playerHit(lobbyId: string, memberId: string) {
 }
 
 /**
- * Revive Player (via QR Scan)
+ * Revive Player.
  */
 export async function playerRespawn(lobbyId: string, memberId: string) {
     try {
