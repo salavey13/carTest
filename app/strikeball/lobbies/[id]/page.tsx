@@ -22,15 +22,13 @@ export default function LobbyRoom() {
   const { id: lobbyId } = useParams(); 
   const { dbUser, tg } = useAppContext();
   
-  // State
   const [members, setMembers] = useState<any[]>([]);
   const [lobby, setLobby] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'roster' | 'map' | 'logistics' | 'safety' | 'game'>('roster'); 
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [driverSeats, setDriverSeats] = useState(3); // Local state for driver seat input
+  const [driverSeats, setDriverSeats] = useState(3);
 
-  // Robust Data Loader
   const loadData = useCallback(async () => {
     try {
         const { data: l, error: lobbyError } = await supabaseAnon
@@ -42,21 +40,16 @@ export default function LobbyRoom() {
         if (lobbyError) throw lobbyError;
         setLobby(l);
 
-        // Fetch members with user details
-        const { data: m, error: membersError } = await supabaseAdmin // Use admin to ensure we get everything if RLS is tricky, or anon if public
+        const { data: m, error: membersError } = await supabaseAnon
             .from("lobby_members")
-            .select(`
-                *,
-                user:users(username, full_name, avatar_url)
-            `)
+            .select("*, user:users(username, full_name, avatar_url)")
             .eq("lobby_id", lobbyId);
 
         if (membersError) throw membersError;
         setMembers(m || []);
         
-        // Auto-switch tab if game active
         if (l.status === 'active' && activeTab === 'roster') {
-             // Optional: setActiveTab('game');
+             // setActiveTab('game'); // Optional auto-switch
         }
 
     } catch (e: any) {
@@ -67,8 +60,6 @@ export default function LobbyRoom() {
 
   useEffect(() => {
     loadData();
-    
-    // Realtime Subscriptions
     const channel = supabaseAnon
       .channel(`lobby_room_${lobbyId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members', filter: `lobby_id=eq.${lobbyId}` }, () => loadData())
@@ -76,14 +67,12 @@ export default function LobbyRoom() {
           setLobby(prev => ({ ...prev, ...payload.new })); 
       })
       .subscribe();
-
     return () => { supabaseAnon.removeChannel(channel); };
   }, [lobbyId, loadData]);
 
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
   const isOwner = userMember?.role === 'owner';
 
-  // --- ACTIONS ---
   const handleAddBot = async (team: string) => { const res = await addNoobBot(lobbyId as string, team); if (!res.success) toast.error(res.error); else loadData(); };
   const handleKickBot = async (memberId: string) => { const res = await removeMember(memberId); if (!res.success) toast.error(res.error); else { toast.success("Kicked"); loadData(); } };
   const handleStatusToggle = async (memberId: string, current: string) => { await togglePlayerStatus(memberId, current); };
@@ -104,23 +93,21 @@ export default function LobbyRoom() {
       if (res.success) toast.success("Отправлено в Telegram"); else toast.error(res.error);
   };
 
-  // Logistics Handlers
-  const toggleDriver = async () => {
+  const handleTransportUpdate = async (role: string, seats: number = 0) => {
       if (!userMember) return;
-      const isDriver = userMember.metadata?.transport?.role === 'driver';
-      const newRole = isDriver ? 'none' : 'driver';
-      await updateTransportStatus(userMember.id, { role: newRole, seats: driverSeats });
-      toast.success(newRole === 'driver' ? "Вы водитель" : "Статус водителя снят");
+      await updateTransportStatus(userMember.id, { role, seats });
+      toast.success("Транспорт обновлен");
       loadData();
   };
 
-  const togglePassenger = async () => {
-      if (!userMember) return;
-      const isPassenger = userMember.metadata?.transport?.role === 'passenger';
-      const newRole = isPassenger ? 'none' : 'passenger';
-      await updateTransportStatus(userMember.id, { role: newRole });
-      toast.success(newRole === 'passenger' ? "Вы пассажир" : "Статус пассажира снят");
-      loadData();
+  const toggleDriver = () => {
+      const isDriver = userMember?.metadata?.transport?.role === 'driver';
+      handleTransportUpdate(isDriver ? 'none' : 'driver', driverSeats);
+  };
+
+  const togglePassenger = () => {
+      const isPassenger = userMember?.metadata?.transport?.role === 'passenger';
+      handleTransportUpdate(isPassenger ? 'none' : 'passenger');
   };
 
   const handleSafetySign = async () => {
@@ -228,13 +215,12 @@ export default function LobbyRoom() {
               </div>
           )}
 
-          {/* LOGISTICS TAB (Polished) */}
+          {/* LOGISTICS TAB */}
           {activeTab === 'logistics' && (
               <div className="space-y-4">
                   <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700">
                       <h3 className="font-bold text-lg mb-6 text-cyan-400 font-orbitron flex items-center gap-2"><FaCar /> LOGISTICS NETWORK</h3>
                       
-                      {/* Controls */}
                       <div className="grid grid-cols-2 gap-4 mb-8">
                           <div className={cn("p-4 rounded-lg border-2 transition-all cursor-pointer", userMember?.metadata?.transport?.role === 'driver' ? "bg-green-900/20 border-green-500" : "bg-zinc-950 border-zinc-800 hover:border-zinc-600")}>
                               <div onClick={toggleDriver} className="text-center">
@@ -261,7 +247,6 @@ export default function LobbyRoom() {
                           </button>
                       </div>
 
-                      {/* Lists */}
                       <div className="space-y-6">
                           <div>
                               <div className="text-xs font-mono text-zinc-500 uppercase mb-2 border-b border-zinc-800 pb-1">Активные Водители</div>
