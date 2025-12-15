@@ -4,17 +4,17 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { supabaseAnon } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
-import { joinLobby, addNoobBot, togglePlayerStatus, removeMember, fetchLobbyData } from "../../actions/lobby";
+import { joinLobby, addNoobBot, removeMember, fetchLobbyData } from "../../actions/lobby";
+import { playerHit, playerRespawn } from "../../actions/game"; // NEW ACTIONS
 import { updateTransportStatus, signSafetyBriefing } from "../../actions/logistics";
 import { generateAndSendLobbyPdf } from "../../actions/service";
 import { SquadRoster } from "../../components/SquadRoster";
 import { CommandConsole } from "../../components/CommandConsole"; 
 import { LiveHUD } from "../../components/LiveHUD"; 
 import { SafetyBriefing } from "../../components/SafetyBriefing";
-import { playerHit, playerRespawn } from "../../actions/game"; // New imports for game logic
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { FaShareNodes, FaMapLocationDot, FaSkullCrossbones, FaFilePdf, FaCar, FaClipboardCheck, FaUsers, FaGamepad, FaPlus, FaMinus, FaShieldHalved } from "react-icons/fa6";
+import { FaShareNodes, FaMapLocationDot, FaSkullCrossbones, FaFilePdf, FaCar, FaClipboardCheck, FaUsers, FaGamepad, FaPlus, FaMinus, FaShieldHalved, FaRecycle } from "react-icons/fa6";
 import { VibeMap, MapBounds, PointOfInterest } from "@/components/VibeMap";
 
 const DEFAULT_MAP_URL = 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg';
@@ -42,7 +42,7 @@ export default function LobbyRoom() {
         setMembers(result.members || []);
 
         if (result.lobby.status === 'active' && activeTab === 'roster') {
-            // setActiveTab('game'); // Optional auto-switch
+            // setActiveTab('game');
         }
 
     } catch (e: any) {
@@ -53,6 +53,7 @@ export default function LobbyRoom() {
 
   useEffect(() => {
     loadData();
+    
     const channel = supabaseAnon
       .channel(`lobby_room_${lobbyId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members', filter: `lobby_id=eq.${lobbyId}` }, () => loadData())
@@ -60,39 +61,42 @@ export default function LobbyRoom() {
           setLobby(prev => ({ ...prev, ...payload.new })); 
       })
       .subscribe();
+
     return () => { supabaseAnon.removeChannel(channel); };
   }, [lobbyId, loadData]);
 
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
-  const isOwner = userMember?.role === 'owner';
+  // Robust Ownership Check
+  const isOwner = (lobby?.owner_id === dbUser?.user_id) || (userMember?.role === 'owner');
 
-  // --- ACTIONS ---
   const handleAddBot = async (team: string) => { const res = await addNoobBot(lobbyId as string, team); if (!res.success) toast.error(res.error); else loadData(); };
   const handleKickBot = async (memberId: string) => { const res = await removeMember(memberId); if (!res.success) toast.error(res.error); else { toast.success("Kicked"); loadData(); } };
-  const handleStatusToggle = async (memberId: string, current: string) => { await togglePlayerStatus(memberId, current); loadData(); };
+  const handleStatusToggle = async (memberId: string, current: string) => { 
+      // Manual admin toggle, uses game actions if game is active, else standard toggle
+      if (lobby?.status === 'active') {
+          if (current === 'alive') await playerHit(lobbyId as string, memberId);
+          else await playerRespawn(lobbyId as string, memberId);
+      } else {
+          // pre-game toggle
+          // await togglePlayerStatus(memberId, current); 
+      }
+      loadData(); 
+  };
   const handleJoinTeam = async (team: string) => { if (!dbUser) { toast.error("Auth required"); return; } const res = await joinLobby(dbUser.user_id, lobbyId as string, team); if (res.success) { toast.success(res.message); loadData(); } else { toast.error(res.error); } };
 
-  // --- NEW GAME ACTIONS ---
+  // --- GAME ACTIONS ---
   const handleImHit = async () => {
       if (!userMember || userMember.status === 'dead') return;
-      const res = await playerHit(lobbyId as string, userMember.id); // Use new score updating action
-      if (res.success) { 
-          toast.warning("ВЫ УБИТЫ. ОЖИДАЙТЕ ВОЗРОЖДЕНИЯ."); 
-          loadData(); 
-      } else {
-          toast.error(res.error);
-      }
+      const res = await playerHit(lobbyId as string, userMember.id);
+      if (res.success) { toast.warning("ВЫ УБИТЫ. СЧЕТ ОБНОВЛЕН."); loadData(); }
+      else toast.error(res.error);
   };
 
-  const handleRespawn = async () => {
-      if (!userMember || userMember.status !== 'dead') return;
+  const handleSelfRespawn = async () => {
+      if (!userMember || userMember.status === 'alive') return;
       const res = await playerRespawn(lobbyId as string, userMember.id);
-      if (res.success) {
-          toast.success("ВЫ ВОЗРОЖДЕНЫ!");
-          loadData();
-      } else {
-          toast.error(res.error);
-      }
+      if (res.success) { toast.success("ВЫ ВОЗРОЖДЕНЫ! В БОЙ!"); loadData(); }
+      else toast.error(res.error);
   };
 
   const handlePdfGen = async () => {
@@ -162,7 +166,6 @@ export default function LobbyRoom() {
         <h1 className="text-2xl font-black font-orbitron uppercase">{lobby.name}</h1>
         <div className="text-xs font-mono text-zinc-500">{lobby.mode?.toUpperCase()} // {lobby.status?.toUpperCase()}</div>
         
-        {/* Crew Host Badge */}
         {lobby.host_crew && (
             <div className="mt-1 inline-flex items-center gap-1.5 text-[10px] font-bold text-cyan-400 border border-cyan-900 bg-cyan-950/30 px-2 py-0.5 rounded">
                 <FaShieldHalved /> {lobby.host_crew.name.toUpperCase()}
@@ -176,7 +179,7 @@ export default function LobbyRoom() {
         )}
       </div>
 
-      {/* Tabs */}
+      {/* Navigation Tabs */}
       <div className="flex justify-center gap-2 mb-6 flex-wrap">
           {[
               { id: 'roster', icon: FaUsers, label: 'SQUADS' },
@@ -292,26 +295,27 @@ export default function LobbyRoom() {
           )}
       </div>
 
-      {/* Footer Actions */}
+      {/* Footer Actions (HIT / RESPAWN / JOIN) */}
       <div className="fixed bottom-24 left-4 right-4 max-w-md mx-auto z-30 flex flex-col gap-2 pointer-events-none">
-          
-          {/* I'M HIT / RESPAWN TOGGLE */}
-          {userMember && lobby.status === 'active' && (
+          {/* Active Game Controls */}
+          {lobby.status === 'active' && userMember && (
               <>
-                {userMember.status === 'alive' ? (
-                  <button 
-                    onClick={handleImHit}
-                    className="pointer-events-auto w-full bg-red-600/90 hover:bg-red-500 text-white font-black py-4 uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(220,38,38,0.6)] border-2 border-red-400 animate-pulse text-xl font-orbitron"
-                  >
-                      <FaSkullCrossbones className="inline mr-3 mb-1"/> Я УБИТ!
-                  </button>
-                ) : (
-                  <button 
-                    onClick={handleRespawn}
-                    className="pointer-events-auto w-full bg-green-600/90 hover:bg-green-500 text-white font-black py-4 uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(34,197,94,0.6)] border-2 border-green-400 animate-pulse text-xl font-orbitron"
-                  >
-                      ♻️ ВОЗРОЖДЕНИЕ (QR TEST)
-                  </button>
+                {userMember.status === 'alive' && (
+                    <button 
+                        onClick={handleImHit}
+                        className="pointer-events-auto w-full bg-red-600/90 hover:bg-red-500 text-white font-black py-4 uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(220,38,38,0.6)] border-2 border-red-400 animate-pulse text-xl font-orbitron"
+                    >
+                        <FaSkullCrossbones className="inline mr-3 mb-1"/> Я УБИТ!
+                    </button>
+                )}
+                
+                {userMember.status === 'dead' && (
+                    <button 
+                        onClick={handleSelfRespawn}
+                        className="pointer-events-auto w-full bg-emerald-600/90 hover:bg-emerald-500 text-white font-black py-4 uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(16,185,129,0.6)] border-2 border-emerald-400 animate-pulse text-xl font-orbitron"
+                    >
+                        <FaRecycle className="inline mr-3 mb-1"/> ВОЗРОЖДЕНИЕ (QR)
+                    </button>
                 )}
               </>
           )}
