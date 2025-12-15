@@ -8,175 +8,217 @@ import { sendTelegramDocument } from "@/app/actions";
 
 const pdfLibModule = require('pdf-lib');
 const fontkitModule = require('@pdf-lib/fontkit');
-const { PDFDocument, rgb } = pdfLibModule;
+const { PDFDocument, rgb, grayscale } = pdfLibModule;
 
 /**
- * Generates a Tactical Briefing PDF for the lobby and sends it to the user via Telegram.
- * FIX: Decoupled User join to ensure bots and members always load.
+ * Generates a "Stylish as F*ck" Tactical Briefing PDF.
  */
 export async function generateAndSendLobbyPdf(userId: string, lobbyId: string) {
   try {
-    // 1. Fetch Lobby
-    const { data: lobby, error: lobbyError } = await supabaseAdmin
-        .from("lobbies")
-        .select("*")
-        .eq("id", lobbyId)
-        .single();
-
-    if (lobbyError || !lobby) throw new Error("Lobby not found");
-
-    // 2. Fetch Members (Raw, no Join yet to prevent FK issues with bots)
-    const { data: rawMembers, error: membersError } = await supabaseAdmin
-        .from("lobby_members")
-        .select("*")
-        .eq("lobby_id", lobbyId);
-
-    if (membersError) throw new Error("Failed to fetch members");
-
-    // 3. Resolve Human Names manually
-    // Filter out bots to get real user IDs
-    const humanIds = rawMembers
-        ?.filter((m: any) => !m.is_bot && m.user_id)
-        .map((m: any) => m.user_id) || [];
-
-    let userMap: Record<string, any> = {};
+    // 1. Fetch Data
+    const { data: lobby } = await supabaseAdmin.from("lobbies").select("*").eq("id", lobbyId).single();
     
-    if (humanIds.length > 0) {
-        const { data: users } = await supabaseAdmin
-            .from("users")
-            .select("user_id, username, full_name")
-            .in("user_id", humanIds);
-        
-        users?.forEach((u: any) => {
-            userMap[u.user_id] = u;
-        });
-    }
+    // We need members linked to users to get names
+    // NOTE: If your DB schema for lobby_members doesn't have a direct FK to users that Supabase detects automatically,
+    // you might need to fetch users manually. Assuming your previous setup worked or we fetch raw and map.
+    const { data: rawMembers } = await supabaseAdmin.from("lobby_members").select("*").eq("lobby_id", lobbyId);
+    
+    if (!lobby) throw new Error("Lobby not found");
 
-    // 4. Merge Data
-    const members = rawMembers?.map((m: any) => {
-        const user = userMap[m.user_id];
-        return {
-            ...m,
-            displayName: m.is_bot 
-                ? `[БОТ] T-${m.id.split('-')[0].toUpperCase()}` 
-                : (user?.username ? `@${user.username}` : (user?.full_name || 'Неизвестный'))
-        };
-    }) || [];
+    // Manual User Fetch to ensure names appear even if FK is loose
+    const userIds = rawMembers?.map((m: any) => m.user_id).filter((id: string) => id && id.length > 10) || [];
+    const { data: users } = await supabaseAdmin.from("users").select("user_id, username, full_name").in("user_id", userIds);
+    
+    const userMap = new Map();
+    users?.forEach((u: any) => userMap.set(u.user_id, u));
 
-    // --- PDF GENERATION ---
+    // 2. Initialize PDF
     const pdfDoc = await PDFDocument.create();
     pdfDoc.registerFontkit(fontkitModule);
 
-    let customFont;
-    try {
-        const fontPath = path.join(process.cwd(), 'server-assets', 'fonts', 'DejaVuSans.ttf');
-        if (fs.existsSync(fontPath)) {
-            const fontBytes = fs.readFileSync(fontPath);
-            customFont = await pdfDoc.embedFont(fontBytes);
-        } else {
-            logger.warn("Cyrillic font not found, falling back to Standard.");
-            customFont = await pdfDoc.embedFont(pdfLibModule.StandardFonts.Helvetica);
-        }
-    } catch (e) {
-        customFont = await pdfDoc.embedFont(pdfLibModule.StandardFonts.Helvetica);
+    // 3. Load Fonts
+    const fontPath = path.join(process.cwd(), 'server-assets', 'fonts', 'DejaVuSans.ttf');
+    const fontBytes = fs.readFileSync(fontPath);
+    const customFont = await pdfDoc.embedFont(fontBytes); // Regular
+    
+    // 4. Setup Page (A4)
+    const page = pdfDoc.addPage([595.28, 841.89]); 
+    const { width, height } = page.getSize();
+    
+    // --- COLORS ---
+    const COLOR_BG = rgb(0.97, 0.97, 0.97);
+    const COLOR_DARK = rgb(0.1, 0.1, 0.1);
+    const COLOR_RED = rgb(0.7, 0.1, 0.1);
+    const COLOR_BLUE = rgb(0.1, 0.2, 0.6);
+    const COLOR_GREY = rgb(0.5, 0.5, 0.5);
+    const COLOR_LIGHT_GREY = rgb(0.9, 0.9, 0.9);
+
+    // --- BACKGROUND ---
+    page.drawRectangle({ x: 0, y: 0, width, height, color: COLOR_BG });
+    
+    // Draw Tactical Grid
+    for (let i = 0; i < width; i += 40) {
+        page.drawLine({ start: { x: i, y: 0 }, end: { x: i, y: height }, thickness: 0.5, color: rgb(0.9, 0.9, 0.9) });
+    }
+    for (let i = 0; i < height; i += 40) {
+        page.drawLine({ start: { x: 0, y: i }, end: { x: width, y: i }, thickness: 0.5, color: rgb(0.9, 0.9, 0.9) });
     }
 
-    const page = pdfDoc.addPage([595.28, 841.89]); // A4
-    const { width, height } = page.getSize();
-    let y = height - 50;
-    const fontSize = 10; // Smaller font to fit more
+    // --- HEADER ---
+    const headerHeight = 80;
+    page.drawRectangle({ x: 0, y: height - headerHeight, width, height: headerHeight, color: COLOR_DARK });
+    
+    page.drawText("TACTICAL OPERATIONS // BRIEFING", {
+        x: 40,
+        y: height - 50,
+        size: 24,
+        font: customFont,
+        color: rgb(1, 1, 1)
+    });
 
-    const drawText = (text: string, size: number = fontSize, color = rgb(0, 0, 0)) => {
-        // Fallback for non-cyrillic font environment
-        const safeText = customFont.name === 'Helvetica' ? text.replace(/[а-яА-ЯёЁ]/g, '?') : text;
-        page.drawText(safeText, { x: 50, y, size, font: customFont, color });
-        y -= (size + 5);
+    page.drawText(`REF_ID: ${lobby.id.split('-')[0].toUpperCase()}`, {
+        x: width - 150,
+        y: height - 50,
+        size: 10,
+        font: customFont,
+        color: COLOR_RED
+    });
+
+    // --- INFO CARD ---
+    let y = height - 120;
+    
+    // QR Code Generation
+    let qrImage;
+    try {
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://t.me/oneSitePlsBot/app?startapp=lobby_${lobby.id}`;
+        const qrBytes = await fetch(qrUrl).then(res => res.arrayBuffer());
+        qrImage = await pdfDoc.embedPng(qrBytes);
+    } catch (e) { logger.error("QR Gen failed", e); }
+
+    // Info Box
+    page.drawRectangle({ x: 40, y: y - 100, width: width - 80, height: 100, color: rgb(1, 1, 1), borderColor: COLOR_DARK, borderWidth: 2 });
+    
+    // Text inside Info Box
+    const startX = 60;
+    let infoY = y - 30;
+    
+    const drawLabelValue = (label: string, value: string, xPos: number, yPos: number, colorVal = COLOR_DARK) => {
+        page.drawText(label, { x: xPos, y: yPos, size: 8, font: customFont, color: COLOR_GREY });
+        page.drawText(value, { x: xPos, y: yPos - 14, size: 12, font: customFont, color: colorVal });
     };
 
-    // Header
-    drawText(`ОПЕРАТИВНАЯ СВОДКА / TACTICAL REPORT`, 16, rgb(0.7, 0, 0));
+    drawLabelValue("ОПЕРАЦИЯ / OPERATION", lobby.name, startX, infoY);
+    drawLabelValue("РЕЖИМ / MODE", lobby.mode?.toUpperCase() || "TDM", startX + 200, infoY);
+    
+    infoY -= 40;
+    const timeStr = lobby.start_at ? new Date(lobby.start_at).toLocaleString('ru-RU') : "ПО ГОТОВНОСТИ";
+    drawLabelValue("ВРЕМЯ СБОРА / T-MINUS", timeStr, startX, infoY);
+    drawLabelValue("ЛОКАЦИЯ / GPS", lobby.field_id || "НЕ УКАЗАНЫ", startX + 200, infoY);
+
+    // Place QR Code inside the box (Right side)
+    if (qrImage) {
+        page.drawImage(qrImage, { x: width - 130, y: y - 90, width: 80, height: 80 });
+        page.drawRectangle({ x: width - 130, y: y - 90, width: 80, height: 80, borderColor: COLOR_RED, borderWidth: 1 });
+    }
+
+    y -= 140;
+
+    // --- TEAMS LAYOUT ---
+    const colWidth = (width - 100) / 2;
+    const blueX = 40;
+    const redX = 40 + colWidth + 20;
+    
+    // Sort members
+    const members = rawMembers?.map((m: any) => {
+        const u = userMap.get(m.user_id);
+        const name = m.is_bot 
+            ? `BOT-${m.id.split('-')[0].toUpperCase()}` 
+            : (u?.username ? `@${u.username}` : (u?.full_name || 'OPERATOR'));
+        return { ...m, name };
+    }) || [];
+
+    const blueTeam = members.filter((m: any) => m.team === 'blue');
+    const redTeam = members.filter((m: any) => m.team === 'red');
+
+    // Headers
+    page.drawRectangle({ x: blueX, y: y, width: colWidth, height: 30, color: COLOR_BLUE });
+    page.drawText(`BLUE SQUAD [${blueTeam.length}]`, { x: blueX + 10, y: y + 8, size: 14, font: customFont, color: rgb(1,1,1) });
+
+    page.drawRectangle({ x: redX, y: y, width: colWidth, height: 30, color: COLOR_RED });
+    page.drawText(`RED SQUAD [${redTeam.length}]`, { x: redX + 10, y: y + 8, size: 14, font: customFont, color: rgb(1,1,1) });
+
     y -= 10;
-    drawText(`ОПЕРАЦИЯ: ${lobby.name}`, 12);
-    drawText(`РЕЖИМ: ${lobby.mode?.toUpperCase()}`, 10);
-    drawText(`ID: ${lobby.id.slice(0, 8)}`, 10);
-    drawText(`ВРЕМЯ: ${lobby.start_at ? new Date(lobby.start_at).toLocaleString('ru-RU') : 'ПО ГОТОВНОСТИ'}`, 10);
-    
-    if (lobby.field_id) {
-        drawText(`КООРДИНАТЫ: ${lobby.field_id}`, 10);
-    }
-    
-    y -= 15;
 
-    // Insert QR Code for Joining
-    try {
-        // Safe deep link
-        const qrData = `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobby.id}`;
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-        const qrArrayBuffer = await fetch(qrUrl).then(res => res.arrayBuffer());
-        const qrImage = await pdfDoc.embedPng(qrArrayBuffer);
-        
-        page.drawImage(qrImage, {
-            x: width - 130,
-            y: height - 130,
-            width: 80,
-            height: 80
-        });
-        
-        // Add label under QR
-        page.drawText("SCAN TO JOIN", {
-            x: width - 130, 
-            y: height - 145, 
-            size: 8, 
-            font: customFont, 
-            color: rgb(0.5, 0.5, 0.5)
-        });
-    } catch (qrError) {
-        logger.error("QR Gen Error", qrError);
-    }
+    // Draw Lists
+    let blueY = y;
+    let redY = y;
 
-    // Teams Logic (Case-insensitive check)
-    const blueTeam = members.filter((m: any) => m.team?.toLowerCase() === 'blue');
-    const redTeam = members.filter((m: any) => m.team?.toLowerCase() === 'red');
-
-    // Blue Team Table
-    drawText(`--- СИНИЕ (BLUE) [${blueTeam.length}] ---`, 12, rgb(0, 0, 0.6));
+    // Render Blue
     blueTeam.forEach((m: any, i: number) => {
-        drawText(`${i + 1}. ${m.displayName} (${m.status})`);
-        // If driver info exists in metadata
+        blueY -= 25;
+        // Zebra striping
+        if (i % 2 === 0) page.drawRectangle({ x: blueX, y: blueY - 5, width: colWidth, height: 25, color: rgb(0.95, 0.95, 1) });
+        
+        page.drawText(`${i + 1}. ${m.name}`, { x: blueX + 10, y: blueY, size: 10, font: customFont, color: COLOR_DARK });
+        
+        // Status indicator
+        const statusColor = m.status === 'alive' ? rgb(0, 0.6, 0) : rgb(0.6, 0, 0);
+        page.drawCircle({ x: blueX + colWidth - 20, y: blueY + 4, size: 4, color: statusColor });
+        
+        // Driver badge
         if (m.metadata?.transport?.role === 'driver') {
-             drawText(`   [ВОДИТЕЛЬ: ${m.metadata.transport.car_name} | Мест: ${m.metadata.transport.seats}]`, 8, rgb(0.3, 0.3, 0.3));
+            page.drawText(`[CAR: ${m.metadata.transport.seats}]`, { x: blueX + 10, y: blueY - 8, size: 6, font: customFont, color: COLOR_GREY });
         }
     });
 
-    y -= 15;
-
-    // Red Team Table
-    drawText(`--- КРАСНЫЕ (RED) [${redTeam.length}] ---`, 12, rgb(0.6, 0, 0));
+    // Render Red
     redTeam.forEach((m: any, i: number) => {
-        drawText(`${i + 1}. ${m.displayName} (${m.status})`);
+        redY -= 25;
+        if (i % 2 === 0) page.drawRectangle({ x: redX, y: redY - 5, width: colWidth, height: 25, color: rgb(1, 0.95, 0.95) });
+        
+        page.drawText(`${i + 1}. ${m.name}`, { x: redX + 10, y: redY, size: 10, font: customFont, color: COLOR_DARK });
+        
+        const statusColor = m.status === 'alive' ? rgb(0, 0.6, 0) : rgb(0.6, 0, 0);
+        page.drawCircle({ x: redX + colWidth - 20, y: redY + 4, size: 4, color: statusColor });
+
         if (m.metadata?.transport?.role === 'driver') {
-             drawText(`   [ВОДИТЕЛЬ: ${m.metadata.transport.car_name} | Мест: ${m.metadata.transport.seats}]`, 8, rgb(0.3, 0.3, 0.3));
+            page.drawText(`[CAR: ${m.metadata.transport.seats}]`, { x: redX + 10, y: redY - 8, size: 6, font: customFont, color: COLOR_GREY });
         }
     });
 
-    y -= 30;
+    // --- FOOTER WARNING ---
+    const bottomY = 50;
+    page.drawLine({ start: { x: 40, y: bottomY + 20 }, end: { x: width - 40, y: bottomY + 20 }, thickness: 2, color: COLOR_RED });
+    
+    page.drawText("WARNING: LIVE FIRE ZONE // EYE PROTECTION MANDATORY // OBEY GAME MARSHALS", {
+        x: 40,
+        y: bottomY,
+        size: 8,
+        font: customFont,
+        color: COLOR_RED
+    });
 
-    // Instructions
-    drawText(`ИНСТРУКЦИИ:`, 10, rgb(0.4, 0.4, 0.4));
-    drawText(`1. Сканируйте QR для входа в лобби.`, 8);
-    drawText(`2. Используйте кнопку "Я УБИТ" в приложении для статуса.`, 8);
-    drawText(`3. Соблюдайте правила страйкбола.`, 8);
+    page.drawText(`GENERATED VIA STRIKEBALL OPS // ${new Date().toISOString().split('T')[0]}`, {
+        x: width - 250,
+        y: bottomY,
+        size: 8,
+        font: customFont,
+        color: COLOR_GREY
+    });
 
-    // Save & Send
+
+    // 9. Save & Send
     const pdfBytes = await pdfDoc.save();
-    const fileName = `BRIEFING_${lobby.id.slice(0,6)}.pdf`;
+    const fileName = `INTEL_${lobby.name.replace(/\s+/g, '_').toUpperCase()}_${new Date().getTime().toString().slice(-4)}.pdf`;
+    
     const fileBlob = new Blob([pdfBytes], { type: 'application/pdf' });
-
-    const sendRes = await sendTelegramDocument(userId, fileBlob, fileName, "🖨️ **Файл готов к печати**");
-
+    
+    // Reuse generic sender
+    const sendRes = await sendTelegramDocument(userId, fileBlob, fileName, "📄 **TACTICAL DOSSIER**");
+    
     if (!sendRes.success) throw new Error(sendRes.error);
 
-    return { success: true, message: "PDF отправлен!" };
+    return { success: true, message: "PDF Dossier transmitted." };
 
   } catch (error: any) {
     logger.error("generateAndSendLobbyPdf Error", error);
