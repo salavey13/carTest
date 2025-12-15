@@ -4,8 +4,8 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { supabaseAnon } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
-import { joinLobby, addNoobBot, removeMember, fetchLobbyData } from "../../actions/lobby";
-import { playerHit, playerRespawn } from "../../actions/game"; // NEW ACTIONS
+import { joinLobby, addNoobBot, togglePlayerStatus, removeMember, fetchLobbyData } from "../../actions/lobby";
+import { playerHit, playerRespawn } from "../../actions/game";
 import { updateTransportStatus, signSafetyBriefing } from "../../actions/logistics";
 import { generateAndSendLobbyPdf } from "../../actions/service";
 import { SquadRoster } from "../../components/SquadRoster";
@@ -41,15 +41,11 @@ export default function LobbyRoom() {
         setLobby(result.lobby);
         setMembers(result.members || []);
 
-        if (result.lobby.status === 'active' && activeTab === 'roster') {
-            // setActiveTab('game');
-        }
-
     } catch (e: any) {
         console.error("Lobby Load Error:", e);
         setError("Failed to load lobby data.");
     }
-  }, [lobbyId, activeTab]);
+  }, [lobbyId]);
 
   useEffect(() => {
     loadData();
@@ -66,25 +62,29 @@ export default function LobbyRoom() {
   }, [lobbyId, loadData]);
 
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
-  // Robust Ownership Check
-  const isOwner = (lobby?.owner_id === dbUser?.user_id) || (userMember?.role === 'owner');
+  const isOwner = userMember?.role === 'owner' || lobby?.owner_id === dbUser?.user_id;
 
   const handleAddBot = async (team: string) => { const res = await addNoobBot(lobbyId as string, team); if (!res.success) toast.error(res.error); else loadData(); };
   const handleKickBot = async (memberId: string) => { const res = await removeMember(memberId); if (!res.success) toast.error(res.error); else { toast.success("Kicked"); loadData(); } };
+  
+  // Admin Manual Toggle
   const handleStatusToggle = async (memberId: string, current: string) => { 
-      // Manual admin toggle, uses game actions if game is active, else standard toggle
       if (lobby?.status === 'active') {
           if (current === 'alive') await playerHit(lobbyId as string, memberId);
           else await playerRespawn(lobbyId as string, memberId);
       } else {
-          // pre-game toggle
-          // await togglePlayerStatus(memberId, current); 
+          // pre-game toggle disabled or use standard toggle
       }
       loadData(); 
   };
-  const handleJoinTeam = async (team: string) => { if (!dbUser) { toast.error("Auth required"); return; } const res = await joinLobby(dbUser.user_id, lobbyId as string, team); if (res.success) { toast.success(res.message); loadData(); } else { toast.error(res.error); } };
+  
+  const handleJoinTeam = async (team: string) => { 
+      if (!dbUser) { toast.error("Auth required"); return; } 
+      const res = await joinLobby(dbUser.user_id, lobbyId as string, team); 
+      if (res.success) { toast.success(res.message); loadData(); } 
+      else { toast.error(res.error); } 
+  };
 
-  // --- GAME ACTIONS ---
   const handleImHit = async () => {
       if (!userMember || userMember.status === 'dead') return;
       const res = await playerHit(lobbyId as string, userMember.id);
@@ -179,7 +179,7 @@ export default function LobbyRoom() {
         )}
       </div>
 
-      {/* Navigation Tabs */}
+      {/* Tabs */}
       <div className="flex justify-center gap-2 mb-6 flex-wrap">
           {[
               { id: 'roster', icon: FaUsers, label: 'SQUADS' },
@@ -300,7 +300,7 @@ export default function LobbyRoom() {
           {/* Active Game Controls */}
           {lobby.status === 'active' && userMember && (
               <>
-                {userMember.status === 'alive' && (
+                {(userMember.status === 'alive' || userMember.status === 'ready') && (
                     <button 
                         onClick={handleImHit}
                         className="pointer-events-auto w-full bg-red-600/90 hover:bg-red-500 text-white font-black py-4 uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(220,38,38,0.6)] border-2 border-red-400 animate-pulse text-xl font-orbitron"
@@ -320,12 +320,29 @@ export default function LobbyRoom() {
               </>
           )}
 
-          {!userMember && (
-            <div className="pointer-events-auto grid grid-cols-2 gap-2 bg-black/80 p-2 border border-zinc-700 shadow-2xl backdrop-blur-md">
-                <button onClick={() => handleJoinTeam('blue')} className="bg-blue-900/40 hover:bg-blue-800 text-blue-200 font-bold py-3 uppercase border border-blue-500/30">ЗА СИНИХ</button>
-                <button onClick={() => handleJoinTeam('red')} className="bg-red-900/40 hover:bg-red-800 text-red-200 font-bold py-3 uppercase border border-red-500/30">ЗА КРАСНЫХ</button>
-            </div>
-          )}
+          {/* Show Join Buttons if not member OR allow switching even during game (with penalty if needed) */}
+          <div className="pointer-events-auto grid grid-cols-2 gap-2 bg-black/80 p-2 border border-zinc-700 shadow-2xl backdrop-blur-md">
+                <button 
+                    onClick={() => handleJoinTeam('blue')} 
+                    className={cn(
+                        "bg-blue-900/40 hover:bg-blue-800 text-blue-200 font-bold py-3 uppercase border border-blue-500/30",
+                        userMember?.team === 'blue' && "bg-blue-600 text-white"
+                    )}
+                    disabled={userMember?.team === 'blue'}
+                >
+                    {userMember?.team === 'blue' ? "ВЫ ЗА СИНИХ" : "ЗА СИНИХ"}
+                </button>
+                <button 
+                    onClick={() => handleJoinTeam('red')} 
+                    className={cn(
+                        "bg-red-900/40 hover:bg-red-800 text-red-200 font-bold py-3 uppercase border border-red-500/30",
+                        userMember?.team === 'red' && "bg-red-600 text-white"
+                    )}
+                    disabled={userMember?.team === 'red'}
+                >
+                    {userMember?.team === 'red' ? "ВЫ ЗА КРАСНЫХ" : "ЗА КРАСНЫХ"}
+                </button>
+          </div>
       </div>
     </div>
   );
