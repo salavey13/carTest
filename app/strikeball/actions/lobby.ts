@@ -18,27 +18,15 @@ export async function createStrikeballLobby(
     mode: string; 
     start_at?: string | null; 
     max_players?: number;
-    crew_id?: string | null;
-    location?: string; // NEW: GPS or Address string
+    crew_id?: string | null; // <--- NEW PARAM
   }
 ) {
-  logger.info(`[createStrikeballLobby] Attempting to create lobby for user: ${userId}`, payload);
-
-  if (!userId) {
-    return { success: false, error: "Unauthorized: No User ID" };
-  }
-  
-  if (!supabaseAdmin) {
-    return { success: false, error: "Server Error: DB Client Missing" };
-  }
-
-  const { name, mode, start_at, max_players = 20, crew_id, location } = payload;
+  if (!userId) return { success: false, error: "Требуется авторизация" };
+  const { name, mode, start_at, max_players = 20, crew_id } = payload;
 
   try {
     const qrHash = uuidv4(); 
-    
-    // 1. Create the Lobby record
-    const { data: lobby, error: lobbyError } = await supabaseAdmin
+    const { data: lobby, error } = await supabaseAdmin
       .from("lobbies")
       .insert({
         name,
@@ -48,51 +36,40 @@ export async function createStrikeballLobby(
         status: "open",
         start_at: start_at || null,
         max_players,
-        crew_id: crew_id || null,
-        field_id: location || null, // Storing location string in field_id
+        crew_id: crew_id || null, // <--- Link to Crew
         metadata: { bots_enabled: true }
       })
       .select()
       .single();
 
-    if (lobbyError) {
-        throw new Error(`DB Insert Error: ${lobbyError.message}`);
-    }
+    if (error) throw error;
 
-    if (!lobby) {
-         throw new Error("Lobby creation failed (no data returned).");
-    }
-
-    // 2. Auto-join owner as Blue Team Leader
-    const { error: memberError } = await supabaseAdmin.from("lobby_members").insert({
+    // Авто-вход создателя
+    await supabaseAdmin.from("lobby_members").insert({
       lobby_id: lobby.id,
       user_id: userId,
-      role: 'owner', 
       team: "blue",
+      role: "owner",
       is_bot: false,
       status: "ready"
     });
 
-    if (memberError) {
-        throw new Error(`Failed to join owner: ${memberError.message}`);
-    }
-
-    // 3. Notify via Telegram (Non-blocking)
+    // Deep Link generation
     const deepLink = `https://t.me/${BOT_USERNAME}/app?startapp=lobby_${lobby.id}`;
     const timeStr = start_at ? new Date(start_at).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : 'СКОРО';
-    const locStr = location ? `\n**Координаты:** ${location}` : '';
 
-    sendComplexMessage(
+    // Notify
+    await sendComplexMessage(
       userId,
-      `🔴 **АРЕНА СОЗДАНА** 🔴\n\n**Операция:** ${name}\n**Режим:** ${mode.toUpperCase()}\n**Сбор:** ${timeStr}${locStr}\n\n[🔗 ПРИГЛАСИТЬ БОЙЦОВ](${deepLink})`,
+      `🔴 **ОПЕРАЦИЯ НАЧАТА** 🔴\n\n**Цель:** ${name}\n**Режим:** ${mode.toUpperCase()}\n**Сбор:** ${timeStr}\n${crew_id ? `**Отряд:** OFFICIAL SQUAD RAID` : ''}\n\n[🔗 ПРИГЛАСИТЬ БОЙЦОВ](${deepLink})`,
       [],
       { parseMode: "Markdown" }
-    ).catch(err => logger.error("[createStrikeballLobby] Failed to send TG notification:", err));
+    );
 
     return { success: true, lobbyId: lobby.id };
   } catch (e: any) {
-    logger.error("[createStrikeballLobby] Exception:", e);
-    return { success: false, error: e.message || "Failed to deploy lobby." };
+    logger.error("Create Lobby Failed", e);
+    return { success: false, error: e.message || "Ошибка создания лобби" };
   }
 }
 
@@ -146,9 +123,13 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
 
 export async function getOpenLobbies() {
   try {
+    // Fetch lobbies AND their host crew details
     const { data, error } = await supabaseAdmin
       .from("lobbies")
-      .select(`*, host_crew:crews(id, name, slug, logo_url)`)
+      .select(`
+        *,
+        host_crew:crews(id, name, slug, logo_url)
+      `)
       .eq("status", "open")
       .order("created_at", { ascending: false })
       .limit(20);
@@ -156,7 +137,7 @@ export async function getOpenLobbies() {
     if (error) throw error;
     return { success: true, data: data || [] };
   } catch (e) {
-    return { success: false, error: "Connection lost." };
+    return { success: false, error: "Ошибка соединения." };
   }
 }
 
