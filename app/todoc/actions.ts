@@ -41,7 +41,7 @@ function transliterate(text: string): string {
     return text.toLowerCase().split('').map(char => translitMap[char] || char).join('');
 }
 
-async function sendTelegramDocument( 
+export async function sendTelegramDocument( 
   chatId: string,
   fileBlob: Blob,
   fileName: string,
@@ -130,7 +130,6 @@ export async function processAndSendDocumentAction(
         return { success: false, error: error.message || 'Unexpected server error.' };
     }
 }
-
 
 export async function generateAndReturnDocxAction(
     formData: FormData
