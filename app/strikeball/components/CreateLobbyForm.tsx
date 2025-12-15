@@ -5,14 +5,11 @@ import { useAppContext } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { createStrikeballLobby } from "../actions/lobby";
 import { cn } from "@/lib/utils";
-import { FaUsers, FaCheck, FaLocationDot } from "react-icons/fa6";
+import { FaUsers, FaCheck } from "react-icons/fa6";
 
-const Q3Input = ({ label, value, onChange, type = "text", placeholder, icon }: any) => (
+const Q3Input = ({ label, value, onChange, type = "text", placeholder }: any) => (
   <label className="block mb-3">
-    <div className="flex items-center gap-2 mb-1">
-        <div className="text-[10px] text-red-500 font-bold uppercase tracking-wider">{label}</div>
-        {icon && <div className="text-red-500 text-xs">{icon}</div>}
-    </div>
+    <div className="text-[10px] text-red-500 font-bold mb-1 uppercase tracking-wider">{label}</div>
     <input 
       type={type}
       value={value} 
@@ -31,7 +28,6 @@ export const CreateLobbyForm: React.FC = () => {
   const [mode, setMode] = useState("tdm");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("10:00");
-  const [location, setLocation] = useState("56.3269,44.0059");
   const [maxPlayers, setMaxPlayers] = useState<number>(20);
   const [hostAsCrew, setHostAsCrew] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,8 +51,8 @@ export const CreateLobbyForm: React.FC = () => {
           mode, 
           max_players: maxPlayers,
           start_at: startAtISO,
-          crew_id: (hostAsCrew && userCrewInfo) ? userCrewInfo.id : undefined,
-          location: location // Pass GPS string
+          // Only pass crew_id if toggle is ON and user has a crew
+          crew_id: (hostAsCrew && userCrewInfo) ? userCrewInfo.id : undefined 
       });
       
       if (!result.success) throw new Error(result.error || "ОШИБКА СОЗДАНИЯ");
@@ -100,19 +96,12 @@ export const CreateLobbyForm: React.FC = () => {
         />
       </div>
 
-      <Q3Input 
-        label="Координаты (GPS)" 
-        value={location} 
-        onChange={(e: any) => setLocation(e.target.value)} 
-        placeholder="56.3269, 44.0059" 
-        icon={<FaLocationDot />}
-      />
-
+      {/* Crew Host Toggle */}
       {userCrewInfo && userCrewInfo.is_owner && (
           <div 
             onClick={() => setHostAsCrew(!hostAsCrew)}
             className={cn(
-                "border p-3 cursor-pointer transition-all flex items-center justify-between mb-3 mt-2",
+                "border p-3 cursor-pointer transition-all flex items-center justify-between mb-3",
                 hostAsCrew ? "bg-cyan-950/30 border-cyan-500" : "bg-zinc-950 border-zinc-800 hover:border-zinc-600"
             )}
           >
@@ -129,8 +118,18 @@ export const CreateLobbyForm: React.FC = () => {
       )}
 
       <div className="grid grid-cols-2 gap-3">
-         <Q3Input label="Дата" type="date" value={date} onChange={(e: any) => setDate(e.target.value)} />
-         <Q3Input label="Время" type="time" value={time} onChange={(e: any) => setTime(e.target.value)} />
+         <Q3Input 
+            label="Дата" 
+            type="date" 
+            value={date} 
+            onChange={(e: any) => setDate(e.target.value)} 
+         />
+         <Q3Input 
+            label="Время" 
+            type="time" 
+            value={time} 
+            onChange={(e: any) => setTime(e.target.value)} 
+         />
       </div>
 
       <button 
