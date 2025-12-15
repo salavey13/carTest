@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { supabaseAnon } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
 import { joinLobby, addNoobBot, togglePlayerStatus, removeMember } from "../../actions/lobby";
 import { updateTransportStatus, signSafetyBriefing } from "../../actions/logistics";
@@ -31,7 +31,7 @@ export default function LobbyRoom() {
 
   const loadData = useCallback(async () => {
     try {
-        const { data: l, error: lobbyError } = await supabaseAnon
+        const { data: l, error: lobbyError } = await supabaseAdmin
             .from("lobbies")
             .select("*")
             .eq("id", lobbyId)
@@ -40,7 +40,7 @@ export default function LobbyRoom() {
         if (lobbyError) throw lobbyError;
         setLobby(l);
 
-        const { data: m, error: membersError } = await supabaseAnon
+        const { data: m, error: membersError } = await supabaseAdmin
             .from("lobby_members")
             .select("*, user:users(username, full_name, avatar_url)")
             .eq("lobby_id", lobbyId);
@@ -60,14 +60,14 @@ export default function LobbyRoom() {
 
   useEffect(() => {
     loadData();
-    const channel = supabaseAnon
+    const channel = supabaseAdmin
       .channel(`lobby_room_${lobbyId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members', filter: `lobby_id=eq.${lobbyId}` }, () => loadData())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobbies', filter: `id=eq.${lobbyId}` }, (payload) => {
           setLobby(prev => ({ ...prev, ...payload.new })); 
       })
       .subscribe();
-    return () => { supabaseAnon.removeChannel(channel); };
+    return () => { supabaseAdmin.removeChannel(channel); };
   }, [lobbyId, loadData]);
 
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
