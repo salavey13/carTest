@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { getUserCombatStats } from "../actions/stats"; // Make sure this file exists
+import { getUserCombatStats } from "../actions/stats";
 import { motion } from "framer-motion";
 import { FaSkull, FaCrosshairs, FaMedal, FaClock } from "react-icons/fa6";
 import Image from "next/image";
