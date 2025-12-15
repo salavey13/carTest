@@ -4,13 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { supabaseAnon } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
-import { 
-  joinLobby, 
-  addNoobBot, 
-  togglePlayerStatus, 
-  removeMember, 
-  fetchLobbyData // NEW IMPORT
-} from "../../actions/lobby";
+import { joinLobby, addNoobBot, togglePlayerStatus, removeMember, fetchLobbyData } from "../../actions/lobby";
 import { updateTransportStatus, signSafetyBriefing } from "../../actions/logistics";
 import { generateAndSendLobbyPdf } from "../../actions/service";
 import { SquadRoster } from "../../components/SquadRoster";
@@ -19,7 +13,7 @@ import { LiveHUD } from "../../components/LiveHUD";
 import { SafetyBriefing } from "../../components/SafetyBriefing";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { FaShareNodes, FaMapLocationDot, FaSkullCrossbones, FaFilePdf, FaCar, FaClipboardCheck, FaUsers, FaGamepad, FaPlus, FaMinus } from "react-icons/fa6";
+import { FaShareNodes, FaMapLocationDot, FaSkullCrossbones, FaFilePdf, FaCar, FaClipboardCheck, FaUsers, FaGamepad, FaPlus, FaMinus, FaShieldHalved } from "react-icons/fa6";
 import { VibeMap, MapBounds, PointOfInterest } from "@/components/VibeMap";
 
 const DEFAULT_MAP_URL = 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg';
@@ -35,12 +29,9 @@ export default function LobbyRoom() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [driverSeats, setDriverSeats] = useState(3);
 
-  // --- UPDATED LOAD DATA FUNCTION ---
-  // Calls the Server Action 'fetchLobbyData' instead of client-side chaining
   const loadData = useCallback(async () => {
     try {
         const result = await fetchLobbyData(lobbyId as string);
-        
         if (!result.success || !result.lobby) {
             setError("Lobby data fetch failed.");
             return;
@@ -49,9 +40,8 @@ export default function LobbyRoom() {
         setLobby(result.lobby);
         setMembers(result.members || []);
 
-        // Optional: Auto-switch tab if game just started
         if (result.lobby.status === 'active' && activeTab === 'roster') {
-             // setActiveTab('game');
+            // setActiveTab('game'); // Optional auto-switch
         }
 
     } catch (e: any) {
@@ -60,47 +50,25 @@ export default function LobbyRoom() {
     }
   }, [lobbyId, activeTab]);
 
-  // Initial Load & Realtime Subscriptions
   useEffect(() => {
     loadData();
-    
-    // We still use supabaseAnon for events, but on event, we call the SERVER action to get fresh data
     const channel = supabaseAnon
       .channel(`lobby_room_${lobbyId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members', filter: `lobby_id=eq.${lobbyId}` }, () => loadData())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobbies', filter: `id=eq.${lobbyId}` }, () => loadData())
       .subscribe();
-
     return () => { supabaseAnon.removeChannel(channel); };
   }, [lobbyId, loadData]);
 
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
-  const isOwner = userMember?.role === 'owner';
+  
+  // FIX: Robust Ownership Check (Trusts Lobby Table, not just Member Role)
+  const isOwner = (lobby?.owner_id === dbUser?.user_id) || (userMember?.role === 'owner');
 
-  // --- ACTIONS ---
-  const handleAddBot = async (team: string) => { 
-      const res = await addNoobBot(lobbyId as string, team); 
-      if (!res.success) toast.error(res.error); 
-      else loadData(); 
-  };
-  
-  const handleKickBot = async (memberId: string) => { 
-      const res = await removeMember(memberId); 
-      if (!res.success) toast.error(res.error); 
-      else { toast.success("Kicked"); loadData(); } 
-  };
-  
-  const handleStatusToggle = async (memberId: string, current: string) => { 
-      await togglePlayerStatus(memberId, current); 
-      loadData(); 
-  };
-  
-  const handleJoinTeam = async (team: string) => { 
-      if (!dbUser) { toast.error("Auth required"); return; } 
-      const res = await joinLobby(dbUser.user_id, lobbyId as string, team); 
-      if (res.success) { toast.success(res.message); loadData(); } 
-      else { toast.error(res.error); } 
-  };
+  const handleAddBot = async (team: string) => { const res = await addNoobBot(lobbyId as string, team); if (!res.success) toast.error(res.error); else loadData(); };
+  const handleKickBot = async (memberId: string) => { const res = await removeMember(memberId); if (!res.success) toast.error(res.error); else { toast.success("Kicked"); loadData(); } };
+  const handleStatusToggle = async (memberId: string, current: string) => { await togglePlayerStatus(memberId, current); loadData(); };
+  const handleJoinTeam = async (team: string) => { if (!dbUser) { toast.error("Auth required"); return; } const res = await joinLobby(dbUser.user_id, lobbyId as string, team); if (res.success) { toast.success(res.message); loadData(); } else { toast.error(res.error); } };
 
   const handleImHit = async () => {
       if (!userMember || userMember.status === 'dead') return;
@@ -175,6 +143,13 @@ export default function LobbyRoom() {
         <h1 className="text-2xl font-black font-orbitron uppercase">{lobby.name}</h1>
         <div className="text-xs font-mono text-zinc-500">{lobby.mode?.toUpperCase()} // {lobby.status?.toUpperCase()}</div>
         
+        {/* Crew Host Badge */}
+        {lobby.host_crew && (
+            <div className="mt-1 inline-flex items-center gap-1.5 text-[10px] font-bold text-cyan-400 border border-cyan-900 bg-cyan-950/30 px-2 py-0.5 rounded">
+                <FaShieldHalved /> {lobby.host_crew.name.toUpperCase()}
+            </div>
+        )}
+
         {lobby.status === 'active' && (
              <div className="mt-2 text-red-500 font-bold font-mono animate-pulse bg-red-900/20 inline-block px-4 py-1 rounded border border-red-900">
                  ⚠️ COMBAT IN PROGRESS ⚠️
@@ -182,7 +157,7 @@ export default function LobbyRoom() {
         )}
       </div>
 
-      {/* Navigation Tabs */}
+      {/* Tabs */}
       <div className="flex justify-center gap-2 mb-6 flex-wrap">
           {[
               { id: 'roster', icon: FaUsers, label: 'SQUADS' },
@@ -213,12 +188,14 @@ export default function LobbyRoom() {
           {activeTab === 'game' && (
              <div className="space-y-6">
                  {lobby.status === 'active' && <LiveHUD startTime={lobby.metadata?.actual_start_at} score={score} />}
+                 
                  {isOwner && (
                      <div className="border-t border-zinc-800 pt-6">
                          <h3 className="text-center font-orbitron text-zinc-500 mb-4 text-xs tracking-widest">COMMANDER OVERRIDE</h3>
                          <CommandConsole lobbyId={lobby.id} userId={dbUser!.user_id} status={lobby.status} score={score} />
                      </div>
                  )}
+
                  {lobby.status === 'open' && !isOwner && <div className="text-center py-10 bg-zinc-900/50 rounded border border-zinc-800 border-dashed text-zinc-500 font-mono">WAITING FOR COMMANDER...</div>}
              </div>
           )}
@@ -244,7 +221,6 @@ export default function LobbyRoom() {
               <div className="space-y-4">
                   <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700">
                       <h3 className="font-bold text-lg mb-6 text-cyan-400 font-orbitron flex items-center gap-2"><FaCar /> LOGISTICS NETWORK</h3>
-                      
                       <div className="grid grid-cols-2 gap-4 mb-8">
                           <div className={cn("p-4 rounded-lg border-2 transition-all cursor-pointer", userMember?.metadata?.transport?.role === 'driver' ? "bg-green-900/20 border-green-500" : "bg-zinc-950 border-zinc-800 hover:border-zinc-600")}>
                               <div onClick={toggleDriver} className="text-center">
@@ -260,45 +236,30 @@ export default function LobbyRoom() {
                                   </div>
                               )}
                           </div>
-                          
-                          <button 
-                            onClick={togglePassenger}
-                            className={cn("p-4 rounded-lg border-2 transition-all", userMember?.metadata?.transport?.role === 'passenger' ? "bg-amber-900/20 border-amber-500" : "bg-zinc-950 border-zinc-800 hover:border-zinc-600")}
-                          >
+                          <button onClick={togglePassenger} className={cn("p-4 rounded-lg border-2 transition-all", userMember?.metadata?.transport?.role === 'passenger' ? "bg-amber-900/20 border-amber-500" : "bg-zinc-950 border-zinc-800 hover:border-zinc-600")}>
                               <div className="text-2xl mb-2">🙋‍♂️</div>
                               <div className="font-bold text-sm">МНЕ НУЖНО МЕСТО</div>
                               <div className="text-xs text-zinc-500 mt-1">Passenger</div>
                           </button>
                       </div>
-
                       <div className="space-y-6">
                           <div>
                               <div className="text-xs font-mono text-zinc-500 uppercase mb-2 border-b border-zinc-800 pb-1">Активные Водители</div>
                               <div className="space-y-2">
                                 {members.filter(m => m.metadata?.transport?.role === 'driver').map(m => (
                                     <div key={m.id} className="bg-black/40 p-3 rounded flex justify-between items-center border border-zinc-800">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                            <span className="font-bold text-sm">{m.user?.username || 'Unknown'}</span>
-                                        </div>
-                                        <div className="text-xs text-zinc-400 bg-zinc-900 px-2 py-1 rounded border border-zinc-700">
-                                            СВОБОДНО: <span className="text-white font-mono">{m.metadata.transport.seats}</span>
-                                        </div>
+                                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-500"></div><span className="font-bold text-sm">{m.user?.username || 'Unknown'}</span></div>
+                                        <div className="text-xs text-zinc-400 bg-zinc-900 px-2 py-1 rounded border border-zinc-700">СВОБОДНО: <span className="text-white font-mono">{m.metadata.transport.seats}</span></div>
                                     </div>
                                 ))}
-                                {members.filter(m => m.metadata?.transport?.role === 'driver').length === 0 && <div className="text-zinc-600 italic text-xs p-2">Нет активных водителей.</div>}
                               </div>
                           </div>
-
                           <div>
                               <div className="text-xs font-mono text-zinc-500 uppercase mb-2 border-b border-zinc-800 pb-1">Пассажиры</div>
                               <div className="flex flex-wrap gap-2">
                                   {members.filter(m => m.metadata?.transport?.role === 'passenger').map(m => (
-                                      <span key={m.id} className="bg-amber-900/20 text-amber-500 px-3 py-1 rounded text-xs border border-amber-900/50 flex items-center gap-2">
-                                          {m.user?.username} <span>👋</span>
-                                      </span>
+                                      <span key={m.id} className="bg-amber-900/20 text-amber-500 px-3 py-1 rounded text-xs border border-amber-900/50 flex items-center gap-2">{m.user?.username} <span>👋</span></span>
                                   ))}
-                                  {members.filter(m => m.metadata?.transport?.role === 'passenger').length === 0 && <div className="text-zinc-600 italic text-xs p-2">Все на колесах.</div>}
                               </div>
                           </div>
                       </div>
@@ -315,12 +276,7 @@ export default function LobbyRoom() {
       {/* Footer Actions */}
       <div className="fixed bottom-24 left-4 right-4 max-w-md mx-auto z-30 flex flex-col gap-2 pointer-events-none">
           {userMember && userMember.status === 'alive' && lobby.status === 'active' && (
-              <button 
-                onClick={handleImHit}
-                className="pointer-events-auto w-full bg-red-600/90 hover:bg-red-500 text-white font-black py-4 uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(220,38,38,0.6)] border-2 border-red-400 animate-pulse text-xl font-orbitron"
-              >
-                  <FaSkullCrossbones className="inline mr-3 mb-1"/> Я УБИТ!
-              </button>
+              <button onClick={handleImHit} className="pointer-events-auto w-full bg-red-600/90 hover:bg-red-500 text-white font-black py-4 uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(220,38,38,0.6)] border-2 border-red-400 animate-pulse text-xl font-orbitron"><FaSkullCrossbones className="inline mr-3 mb-1"/> Я УБИТ!</button>
           )}
 
           {!userMember && (
