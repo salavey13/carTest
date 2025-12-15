@@ -2,9 +2,15 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
-import { joinLobby, addNoobBot, togglePlayerStatus, removeMember } from "../../actions/lobby";
+import { 
+  joinLobby, 
+  addNoobBot, 
+  togglePlayerStatus, 
+  removeMember, 
+  fetchLobbyData // NEW IMPORT
+} from "../../actions/lobby";
 import { updateTransportStatus, signSafetyBriefing } from "../../actions/logistics";
 import { generateAndSendLobbyPdf } from "../../actions/service";
 import { SquadRoster } from "../../components/SquadRoster";
@@ -29,27 +35,23 @@ export default function LobbyRoom() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [driverSeats, setDriverSeats] = useState(3);
 
+  // --- UPDATED LOAD DATA FUNCTION ---
+  // Calls the Server Action 'fetchLobbyData' instead of client-side chaining
   const loadData = useCallback(async () => {
     try {
-        const { data: l, error: lobbyError } = await supabaseAdmin
-            .from("lobbies")
-            .select("*")
-            .eq("id", lobbyId)
-            .single();
-
-        if (lobbyError) throw lobbyError;
-        setLobby(l);
-
-        const { data: m, error: membersError } = await supabaseAdmin
-            .from("lobby_members")
-            .select("*, user:users(username, full_name, avatar_url)")
-            .eq("lobby_id", lobbyId);
-
-        if (membersError) throw membersError;
-        setMembers(m || []);
+        const result = await fetchLobbyData(lobbyId as string);
         
-        if (l.status === 'active' && activeTab === 'roster') {
-             // setActiveTab('game'); // Optional auto-switch
+        if (!result.success || !result.lobby) {
+            setError("Lobby data fetch failed.");
+            return;
+        }
+
+        setLobby(result.lobby);
+        setMembers(result.members || []);
+
+        // Optional: Auto-switch tab if game just started
+        if (result.lobby.status === 'active' && activeTab === 'roster') {
+             // setActiveTab('game');
         }
 
     } catch (e: any) {
@@ -58,30 +60,52 @@ export default function LobbyRoom() {
     }
   }, [lobbyId, activeTab]);
 
+  // Initial Load & Realtime Subscriptions
   useEffect(() => {
     loadData();
-    const channel = supabaseAdmin
+    
+    // We still use supabaseAnon for events, but on event, we call the SERVER action to get fresh data
+    const channel = supabaseAnon
       .channel(`lobby_room_${lobbyId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members', filter: `lobby_id=eq.${lobbyId}` }, () => loadData())
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobbies', filter: `id=eq.${lobbyId}` }, (payload) => {
-          setLobby(prev => ({ ...prev, ...payload.new })); 
-      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobbies', filter: `id=eq.${lobbyId}` }, () => loadData())
       .subscribe();
-    return () => { supabaseAdmin.removeChannel(channel); };
+
+    return () => { supabaseAnon.removeChannel(channel); };
   }, [lobbyId, loadData]);
 
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
   const isOwner = userMember?.role === 'owner';
 
-  const handleAddBot = async (team: string) => { const res = await addNoobBot(lobbyId as string, team); if (!res.success) toast.error(res.error); else loadData(); };
-  const handleKickBot = async (memberId: string) => { const res = await removeMember(memberId); if (!res.success) toast.error(res.error); else { toast.success("Kicked"); loadData(); } };
-  const handleStatusToggle = async (memberId: string, current: string) => { await togglePlayerStatus(memberId, current); };
-  const handleJoinTeam = async (team: string) => { if (!dbUser) { toast.error("Auth required"); return; } const res = await joinLobby(dbUser.user_id, lobbyId as string, team); if (res.success) { toast.success(res.message); loadData(); } else { toast.error(res.error); } };
+  // --- ACTIONS ---
+  const handleAddBot = async (team: string) => { 
+      const res = await addNoobBot(lobbyId as string, team); 
+      if (!res.success) toast.error(res.error); 
+      else loadData(); 
+  };
+  
+  const handleKickBot = async (memberId: string) => { 
+      const res = await removeMember(memberId); 
+      if (!res.success) toast.error(res.error); 
+      else { toast.success("Kicked"); loadData(); } 
+  };
+  
+  const handleStatusToggle = async (memberId: string, current: string) => { 
+      await togglePlayerStatus(memberId, current); 
+      loadData(); 
+  };
+  
+  const handleJoinTeam = async (team: string) => { 
+      if (!dbUser) { toast.error("Auth required"); return; } 
+      const res = await joinLobby(dbUser.user_id, lobbyId as string, team); 
+      if (res.success) { toast.success(res.message); loadData(); } 
+      else { toast.error(res.error); } 
+  };
 
   const handleImHit = async () => {
       if (!userMember || userMember.status === 'dead') return;
       const res = await togglePlayerStatus(userMember.id, 'alive');
-      if (res.success) toast.warning("СТАТУС: РАНЕН");
+      if (res.success) { toast.warning("СТАТУС: РАНЕН"); loadData(); }
   };
 
   const handlePdfGen = async () => {
@@ -288,7 +312,7 @@ export default function LobbyRoom() {
           )}
       </div>
 
-      {/* Footer */}
+      {/* Footer Actions */}
       <div className="fixed bottom-24 left-4 right-4 max-w-md mx-auto z-30 flex flex-col gap-2 pointer-events-none">
           {userMember && userMember.status === 'alive' && lobby.status === 'active' && (
               <button 
