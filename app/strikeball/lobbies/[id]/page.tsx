@@ -8,6 +8,7 @@ import { joinLobby, addNoobBot, togglePlayerStatus, removeMember } from "../../a
 import { updateTransportStatus, signSafetyBriefing } from "../../actions/logistics";
 import { generateAndSendLobbyPdf } from "../../actions/service";
 import { SquadRoster } from "../../components/SquadRoster";
+import { SafetyBriefing } from "../../components/SafetyBriefing"; // NEW IMPORT
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { FaShareNodes, FaMapLocationDot, FaSkullCrossbones, FaFilePdf, FaCar, FaClipboardCheck, FaUsers, FaCircleCheck } from "react-icons/fa6";
@@ -70,9 +71,10 @@ export default function LobbyRoom() {
       toast.success("Транспорт обновлен");
   };
 
-  const handleSafetySign = async () => {
+  const handleSafetyComplete = async () => {
       if (!userMember) return;
       await signSafetyBriefing(userMember.id);
+      loadData();
       toast.success("Инструктаж подписан");
   };
 
@@ -154,7 +156,7 @@ export default function LobbyRoom() {
               </div>
           )}
 
-          {/* LOGISTICS TAB (Carpooling) */}
+          {/* LOGISTICS TAB */}
           {activeTab === 'logistics' && (
               <div className="space-y-4">
                   <div className="bg-zinc-900 p-4 rounded border border-zinc-700">
@@ -178,7 +180,6 @@ export default function LobbyRoom() {
                                   <span className="text-green-500 font-mono">{m.metadata.transport.seats} мест</span>
                               </div>
                           ))}
-                          {members.filter(m => m.metadata?.transport?.role === 'driver').length === 0 && <div className="text-zinc-600 italic text-sm">Нет водителей.</div>}
                       </div>
 
                       <div className="space-y-2 mt-4">
@@ -193,27 +194,12 @@ export default function LobbyRoom() {
               </div>
           )}
 
-          {/* SAFETY TAB */}
+          {/* SAFETY TAB - NEW COMPONENT */}
           {activeTab === 'safety' && (
-              <div className="bg-zinc-900 p-6 rounded border-l-4 border-red-600">
-                  <h3 className="text-xl font-bold mb-4 text-red-500">ИНСТРУКТАЖ ПО ТЕХНИКЕ БЕЗОПАСНОСТИ</h3>
-                  <ul className="list-disc pl-5 space-y-2 text-sm text-zinc-300 mb-6">
-                      <li>Защита глаз (очки/маска) обязательна во всей игровой зоне. Снимать запрещено.</li>
-                      <li>При попадании громко крикнуть "УБИТ" и поднять красную тряпку/руку.</li>
-                      <li>Запрещена стрельба в "мертвяке" и в упор (правило "пиф-паф").</li>
-                      <li>Пиротехника только сертифицированная.</li>
-                  </ul>
-                  
-                  {userMember?.metadata?.safety_signed ? (
-                      <div className="flex items-center gap-2 text-green-500 bg-green-900/20 p-3 rounded justify-center font-bold">
-                          <FaCircleCheck /> ВЫ ПОДПИСАЛИ ИНСТРУКТАЖ
-                      </div>
-                  ) : (
-                      <button onClick={handleSafetySign} className="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-4 rounded uppercase tracking-wider">
-                          Я ПРОЧИТАЛ И СОГЛАСЕН
-                      </button>
-                  )}
-              </div>
+              <SafetyBriefing 
+                 onComplete={handleSafetyComplete} 
+                 isSigned={!!userMember?.metadata?.safety_signed} 
+              />
           )}
       </div>
 
