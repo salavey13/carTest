@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { supabaseAnon } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
@@ -8,12 +8,12 @@ import { joinLobby, addNoobBot, togglePlayerStatus, removeMember } from "../../a
 import { updateTransportStatus, signSafetyBriefing } from "../../actions/logistics";
 import { generateAndSendLobbyPdf } from "../../actions/service";
 import { SquadRoster } from "../../components/SquadRoster";
-import { CommandConsole } from "../../components/CommandConsole"; // NEW
-import { LiveHUD } from "../../components/LiveHUD"; // NEW
+import { CommandConsole } from "../../components/CommandConsole"; 
+import { LiveHUD } from "../../components/LiveHUD"; 
 import { SafetyBriefing } from "../../components/SafetyBriefing";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { FaShareNodes, FaMapLocationDot, FaSkullCrossbones, FaFilePdf, FaCar, FaClipboardCheck, FaUsers, FaGamepad } from "react-icons/fa6";
+import { FaShareNodes, FaMapLocationDot, FaSkullCrossbones, FaFilePdf, FaCar, FaClipboardCheck, FaUsers, FaGamepad, FaPlus, FaMinus } from "react-icons/fa6";
 import { VibeMap, MapBounds, PointOfInterest } from "@/components/VibeMap";
 
 const DEFAULT_MAP_URL = 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg';
@@ -21,44 +21,69 @@ const DEFAULT_MAP_URL = 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/obj
 export default function LobbyRoom() {
   const { id: lobbyId } = useParams(); 
   const { dbUser, tg } = useAppContext();
+  
+  // State
   const [members, setMembers] = useState<any[]>([]);
   const [lobby, setLobby] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  // Default tab depends on status: if active, show 'game', else 'roster'
   const [activeTab, setActiveTab] = useState<'roster' | 'map' | 'logistics' | 'safety' | 'game'>('roster'); 
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [driverSeats, setDriverSeats] = useState(3); // Local state for driver seat input
+
+  // Robust Data Loader
+  const loadData = useCallback(async () => {
+    try {
+        const { data: l, error: lobbyError } = await supabaseAnon
+            .from("lobbies")
+            .select("*")
+            .eq("id", lobbyId)
+            .single();
+
+        if (lobbyError) throw lobbyError;
+        setLobby(l);
+
+        // Fetch members with user details
+        const { data: m, error: membersError } = await supabaseAdmin // Use admin to ensure we get everything if RLS is tricky, or anon if public
+            .from("lobby_members")
+            .select(`
+                *,
+                user:users(username, full_name, avatar_url)
+            `)
+            .eq("lobby_id", lobbyId);
+
+        if (membersError) throw membersError;
+        setMembers(m || []);
+        
+        // Auto-switch tab if game active
+        if (l.status === 'active' && activeTab === 'roster') {
+             // Optional: setActiveTab('game');
+        }
+
+    } catch (e: any) {
+        console.error("Lobby Load Error:", e);
+        setError("Failed to load lobby data.");
+    }
+  }, [lobbyId, activeTab]);
 
   useEffect(() => {
     loadData();
-    // Subscribe to both members AND lobby changes (for score/status updates)
+    
+    // Realtime Subscriptions
     const channel = supabaseAnon
       .channel(`lobby_room_${lobbyId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members', filter: `lobby_id=eq.${lobbyId}` }, () => loadData())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobbies', filter: `id=eq.${lobbyId}` }, (payload) => {
-          setLobby(payload.new); // Immediate update for timer/status
+          setLobby(prev => ({ ...prev, ...payload.new })); 
       })
       .subscribe();
-    return () => { supabaseAnon.removeChannel(channel); };
-  }, [lobbyId]);
 
-  const loadData = async () => {
-    const { data: l, error: lobbyError } = await supabaseAnon.from("lobbies").select("*").eq("id", lobbyId).single();
-    if (lobbyError) { setError("Лобби не найдено"); return; }
-    const { data: m } = await supabaseAnon.from("lobby_members").select("*, user:users(username)").eq("lobby_id", lobbyId);
-    setLobby(l);
-    setMembers(m || []);
-    
-    // Auto-switch tab if game starts
-    if (l.status === 'active' && activeTab !== 'game') {
-        // Optional: force switch or just let user decide. Let's force it for immersion.
-        // setActiveTab('game'); // Commented out to be less intrusive
-    }
-  };
+    return () => { supabaseAnon.removeChannel(channel); };
+  }, [lobbyId, loadData]);
 
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
   const isOwner = userMember?.role === 'owner';
 
-  // --- ACTIONS (Same as before) ---
+  // --- ACTIONS ---
   const handleAddBot = async (team: string) => { const res = await addNoobBot(lobbyId as string, team); if (!res.success) toast.error(res.error); else loadData(); };
   const handleKickBot = async (memberId: string) => { const res = await removeMember(memberId); if (!res.success) toast.error(res.error); else { toast.success("Kicked"); loadData(); } };
   const handleStatusToggle = async (memberId: string, current: string) => { await togglePlayerStatus(memberId, current); };
@@ -71,17 +96,31 @@ export default function LobbyRoom() {
   };
 
   const handlePdfGen = async () => {
+      if (!dbUser) return;
       setIsGeneratingPdf(true);
       toast.loading("Создание PDF...");
-      const res = await generateAndSendLobbyPdf(dbUser!.user_id, lobbyId as string);
+      const res = await generateAndSendLobbyPdf(dbUser.user_id, lobbyId as string);
       toast.dismiss(); setIsGeneratingPdf(false);
       if (res.success) toast.success("Отправлено в Telegram"); else toast.error(res.error);
   };
 
-  const handleTransportUpdate = async (role: string, seats: number = 0) => {
+  // Logistics Handlers
+  const toggleDriver = async () => {
       if (!userMember) return;
-      await updateTransportStatus(userMember.id, { role, seats });
-      toast.success("Транспорт обновлен");
+      const isDriver = userMember.metadata?.transport?.role === 'driver';
+      const newRole = isDriver ? 'none' : 'driver';
+      await updateTransportStatus(userMember.id, { role: newRole, seats: driverSeats });
+      toast.success(newRole === 'driver' ? "Вы водитель" : "Статус водителя снят");
+      loadData();
+  };
+
+  const togglePassenger = async () => {
+      if (!userMember) return;
+      const isPassenger = userMember.metadata?.transport?.role === 'passenger';
+      const newRole = isPassenger ? 'none' : 'passenger';
+      await updateTransportStatus(userMember.id, { role: newRole });
+      toast.success(newRole === 'passenger' ? "Вы пассажир" : "Статус пассажира снят");
+      loadData();
   };
 
   const handleSafetySign = async () => {
@@ -94,14 +133,13 @@ export default function LobbyRoom() {
   const shareIntel = () => {
     if (!lobby) return;
     const inviteLink = `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobbyId}`;
-    const url = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(`Op: ${lobby.name}`)}`;
+    const url = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(`Op: ${lobby.name}\nJoin Squad!`)}`;
     if (tg && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank');
   };
 
   if (error) return <div className="text-center pt-32 text-red-600 font-mono">{error}</div>;
   if (!lobby) return <div className="text-center pt-32 text-red-600 font-mono animate-pulse">CONNECTING...</div>;
 
-  // Map Data Logic
   const mapPoints: PointOfInterest[] = [];
   let mapBounds: MapBounds = { top: 56.4, bottom: 56.2, left: 43.7, right: 44.1 };
   if (lobby.field_id && lobby.field_id.includes(',')) {
@@ -126,7 +164,6 @@ export default function LobbyRoom() {
         <h1 className="text-2xl font-black font-orbitron uppercase">{lobby.name}</h1>
         <div className="text-xs font-mono text-zinc-500">{lobby.mode?.toUpperCase()} // {lobby.status?.toUpperCase()}</div>
         
-        {/* LIVE INDICATOR */}
         {lobby.status === 'active' && (
              <div className="mt-2 text-red-500 font-bold font-mono animate-pulse bg-red-900/20 inline-block px-4 py-1 rounded border border-red-900">
                  ⚠️ COMBAT IN PROGRESS ⚠️
@@ -134,11 +171,11 @@ export default function LobbyRoom() {
         )}
       </div>
 
-      {/* Tabs */}
+      {/* Navigation Tabs */}
       <div className="flex justify-center gap-2 mb-6 flex-wrap">
           {[
               { id: 'roster', icon: FaUsers, label: 'SQUADS' },
-              { id: 'game', icon: FaGamepad, label: 'OPS' }, // RENAMED/NEW TAB
+              { id: 'game', icon: FaGamepad, label: 'OPS' },
               { id: 'map', icon: FaMapLocationDot, label: 'MAP' },
               { id: 'logistics', icon: FaCar, label: 'LOGI' },
               { id: 'safety', icon: FaClipboardCheck, label: 'BRIEF' }
@@ -161,33 +198,17 @@ export default function LobbyRoom() {
 
       <div className="max-w-4xl mx-auto min-h-[50vh]">
           
-          {/* --- GAME TAB (NEW) --- */}
+          {/* GAME TAB */}
           {activeTab === 'game' && (
              <div className="space-y-6">
-                 {/* Live HUD for Everyone */}
-                 {lobby.status === 'active' && (
-                     <LiveHUD startTime={lobby.metadata?.actual_start_at} score={score} />
-                 )}
-
-                 {/* Admin Console (Owner Only) */}
+                 {lobby.status === 'active' && <LiveHUD startTime={lobby.metadata?.actual_start_at} score={score} />}
                  {isOwner && (
                      <div className="border-t border-zinc-800 pt-6">
                          <h3 className="text-center font-orbitron text-zinc-500 mb-4 text-xs tracking-widest">COMMANDER OVERRIDE</h3>
-                         <CommandConsole 
-                            lobbyId={lobby.id} 
-                            userId={dbUser!.user_id} 
-                            status={lobby.status} 
-                            score={score}
-                         />
+                         <CommandConsole lobbyId={lobby.id} userId={dbUser!.user_id} status={lobby.status} score={score} />
                      </div>
                  )}
-
-                 {/* Placeholder for Non-Owners if game not started */}
-                 {lobby.status === 'open' && !isOwner && (
-                     <div className="text-center py-10 bg-zinc-900/50 rounded border border-zinc-800 border-dashed text-zinc-500 font-mono">
-                         WAITING FOR COMMANDER TO START OPERATION...
-                     </div>
-                 )}
+                 {lobby.status === 'open' && !isOwner && <div className="text-center py-10 bg-zinc-900/50 rounded border border-zinc-800 border-dashed text-zinc-500 font-mono">WAITING FOR COMMANDER...</div>}
              </div>
           )}
 
@@ -207,36 +228,82 @@ export default function LobbyRoom() {
               </div>
           )}
 
-          {/* LOGISTICS & SAFETY TABS (Same as before) */}
+          {/* LOGISTICS TAB (Polished) */}
           {activeTab === 'logistics' && (
-             /* ... existing logistics UI ... */
-             <div className="space-y-4">
-                  <div className="bg-zinc-900 p-4 rounded border border-zinc-700">
-                      <h3 className="font-bold text-lg mb-4 text-cyan-400">Транспорт</h3>
-                      <div className="flex gap-4 mb-6">
-                          <button onClick={() => handleTransportUpdate('driver', 3)} className="flex-1 bg-zinc-800 p-3 rounded hover:bg-zinc-700 border border-zinc-600">
-                              <div className="text-center font-bold">Я ВОДИТЕЛЬ</div>
-                          </button>
-                          <button onClick={() => handleTransportUpdate('passenger')} className="flex-1 bg-zinc-800 p-3 rounded hover:bg-zinc-700 border border-zinc-600">
-                              <div className="text-center font-bold">ПЕШЕХОД</div>
+              <div className="space-y-4">
+                  <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700">
+                      <h3 className="font-bold text-lg mb-6 text-cyan-400 font-orbitron flex items-center gap-2"><FaCar /> LOGISTICS NETWORK</h3>
+                      
+                      {/* Controls */}
+                      <div className="grid grid-cols-2 gap-4 mb-8">
+                          <div className={cn("p-4 rounded-lg border-2 transition-all cursor-pointer", userMember?.metadata?.transport?.role === 'driver' ? "bg-green-900/20 border-green-500" : "bg-zinc-950 border-zinc-800 hover:border-zinc-600")}>
+                              <div onClick={toggleDriver} className="text-center">
+                                  <div className="text-2xl mb-2">🚗</div>
+                                  <div className="font-bold text-sm">Я ВОДИТЕЛЬ</div>
+                              </div>
+                              {userMember?.metadata?.transport?.role === 'driver' && (
+                                  <div className="mt-3 flex items-center justify-center gap-2">
+                                      <button onClick={() => setDriverSeats(Math.max(1, driverSeats - 1))} className="p-1 bg-zinc-800 rounded hover:bg-zinc-700"><FaMinus size={10}/></button>
+                                      <span className="font-mono text-lg font-bold">{driverSeats}</span>
+                                      <button onClick={() => setDriverSeats(Math.min(8, driverSeats + 1))} className="p-1 bg-zinc-800 rounded hover:bg-zinc-700"><FaPlus size={10}/></button>
+                                      <button onClick={toggleDriver} className="ml-2 text-[10px] text-green-400 border border-green-500 px-2 py-1 rounded">SAVE</button>
+                                  </div>
+                              )}
+                          </div>
+                          
+                          <button 
+                            onClick={togglePassenger}
+                            className={cn("p-4 rounded-lg border-2 transition-all", userMember?.metadata?.transport?.role === 'passenger' ? "bg-amber-900/20 border-amber-500" : "bg-zinc-950 border-zinc-800 hover:border-zinc-600")}
+                          >
+                              <div className="text-2xl mb-2">🙋‍♂️</div>
+                              <div className="font-bold text-sm">МНЕ НУЖНО МЕСТО</div>
+                              <div className="text-xs text-zinc-500 mt-1">Passenger</div>
                           </button>
                       </div>
-                      <div className="space-y-2">
-                          {members.filter(m => m.metadata?.transport?.role === 'driver').map(m => (
-                              <div key={m.id} className="bg-black/40 p-2 rounded flex justify-between items-center border border-zinc-800">
-                                  <span>{m.user?.username || 'Unknown'}</span><span className="text-green-500 font-mono">{m.metadata.transport.seats} мест</span>
+
+                      {/* Lists */}
+                      <div className="space-y-6">
+                          <div>
+                              <div className="text-xs font-mono text-zinc-500 uppercase mb-2 border-b border-zinc-800 pb-1">Активные Водители</div>
+                              <div className="space-y-2">
+                                {members.filter(m => m.metadata?.transport?.role === 'driver').map(m => (
+                                    <div key={m.id} className="bg-black/40 p-3 rounded flex justify-between items-center border border-zinc-800">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                            <span className="font-bold text-sm">{m.user?.username || 'Unknown'}</span>
+                                        </div>
+                                        <div className="text-xs text-zinc-400 bg-zinc-900 px-2 py-1 rounded border border-zinc-700">
+                                            СВОБОДНО: <span className="text-white font-mono">{m.metadata.transport.seats}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                                {members.filter(m => m.metadata?.transport?.role === 'driver').length === 0 && <div className="text-zinc-600 italic text-xs p-2">Нет активных водителей.</div>}
                               </div>
-                          ))}
+                          </div>
+
+                          <div>
+                              <div className="text-xs font-mono text-zinc-500 uppercase mb-2 border-b border-zinc-800 pb-1">Пассажиры</div>
+                              <div className="flex flex-wrap gap-2">
+                                  {members.filter(m => m.metadata?.transport?.role === 'passenger').map(m => (
+                                      <span key={m.id} className="bg-amber-900/20 text-amber-500 px-3 py-1 rounded text-xs border border-amber-900/50 flex items-center gap-2">
+                                          {m.user?.username} <span>👋</span>
+                                      </span>
+                                  ))}
+                                  {members.filter(m => m.metadata?.transport?.role === 'passenger').length === 0 && <div className="text-zinc-600 italic text-xs p-2">Все на колесах.</div>}
+                              </div>
+                          </div>
                       </div>
                   </div>
-             </div>
+              </div>
           )}
+
+          {/* SAFETY TAB */}
           {activeTab === 'safety' && (
               <SafetyBriefing onComplete={handleSafetySign} isSigned={!!userMember?.metadata?.safety_signed} />
           )}
       </div>
 
-      {/* Footer Actions (HIT / JOIN) */}
+      {/* Footer */}
       <div className="fixed bottom-24 left-4 right-4 max-w-md mx-auto z-30 flex flex-col gap-2 pointer-events-none">
           {userMember && userMember.status === 'alive' && lobby.status === 'active' && (
               <button 
