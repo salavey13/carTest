@@ -14,7 +14,7 @@ import { LiveHUD } from "../../components/LiveHUD";
 import { SafetyBriefing } from "../../components/SafetyBriefing";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { FaShareNodes, FaMapLocationDot, FaSkullCrossbones, FaFilePdf, FaCar, FaClipboardCheck, FaUsers, FaGamepad, FaPlus, FaMinus, FaShieldHalved, FaRecycle } from "react-icons/fa6";
+import { FaShareNodes, FaMapLocationDot, FaSkullCrossbones, FaFilePdf, FaCar, FaClipboardCheck, FaUsers, FaGamepad, FaRecycle } from "react-icons/fa6";
 import { VibeMap, MapBounds, PointOfInterest } from "@/components/VibeMap";
 
 const DEFAULT_MAP_URL = 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg';
@@ -41,11 +41,16 @@ export default function LobbyRoom() {
         setLobby(result.lobby);
         setMembers(result.members || []);
 
+        // Auto-switch to GAME tab if active and we are still on roster
+        if (result.lobby.status === 'active' && activeTab === 'roster') {
+             // setActiveTab('game');
+        }
+
     } catch (e: any) {
         console.error("Lobby Load Error:", e);
         setError("Failed to load lobby data.");
     }
-  }, [lobbyId]);
+  }, [lobbyId, activeTab]);
 
   useEffect(() => {
     loadData();
@@ -72,8 +77,6 @@ export default function LobbyRoom() {
       if (lobby?.status === 'active') {
           if (current === 'alive') await playerHit(lobbyId as string, memberId);
           else await playerRespawn(lobbyId as string, memberId);
-      } else {
-          // pre-game toggle disabled or use standard toggle
       }
       loadData(); 
   };
@@ -142,10 +145,16 @@ export default function LobbyRoom() {
   if (error) return <div className="text-center pt-32 text-red-600 font-mono">{error}</div>;
   if (!lobby) return <div className="text-center pt-32 text-red-600 font-mono animate-pulse">CONNECTING...</div>;
 
+  // --- ROBUST MAP PARSING ---
   const mapPoints: PointOfInterest[] = [];
   let mapBounds: MapBounds = { top: 56.4, bottom: 56.2, left: 43.7, right: 44.1 };
-  if (lobby.field_id && lobby.field_id.includes(',')) {
-      const [lat, lon] = lobby.field_id.split(',').map(Number);
+  
+  if (lobby.field_id && typeof lobby.field_id === 'string' && lobby.field_id.includes(',')) {
+      // Remove spaces and split
+      const parts = lobby.field_id.replace(/\s/g, '').split(',');
+      const lat = parseFloat(parts[0]);
+      const lon = parseFloat(parts[1]);
+
       if (!isNaN(lat) && !isNaN(lon)) {
           mapPoints.push({ id: 'obj', name: 'TARGET', type: 'point', coords: [[lat, lon]], icon: '::FaFlag::', color: 'bg-red-500' });
           mapBounds = { top: lat + 0.005, bottom: lat - 0.005, left: lon - 0.005, right: lon + 0.005 };
@@ -153,6 +162,7 @@ export default function LobbyRoom() {
   }
 
   const score = lobby.metadata?.score || { red: 0, blue: 0 };
+  const isFinished = lobby.status === 'finished';
 
   return (
     <div className="pt-28 pb-32 px-2 min-h-screen text-white font-sans">
@@ -166,15 +176,14 @@ export default function LobbyRoom() {
         <h1 className="text-2xl font-black font-orbitron uppercase">{lobby.name}</h1>
         <div className="text-xs font-mono text-zinc-500">{lobby.mode?.toUpperCase()} // {lobby.status?.toUpperCase()}</div>
         
-        {lobby.host_crew && (
-            <div className="mt-1 inline-flex items-center gap-1.5 text-[10px] font-bold text-cyan-400 border border-cyan-900 bg-cyan-950/30 px-2 py-0.5 rounded">
-                <FaShieldHalved /> {lobby.host_crew.name.toUpperCase()}
-            </div>
-        )}
-
         {lobby.status === 'active' && (
              <div className="mt-2 text-red-500 font-bold font-mono animate-pulse bg-red-900/20 inline-block px-4 py-1 rounded border border-red-900">
                  ⚠️ COMBAT IN PROGRESS ⚠️
+             </div>
+        )}
+        {isFinished && (
+             <div className="mt-2 text-zinc-400 font-bold font-mono bg-zinc-900 inline-block px-4 py-1 rounded border border-zinc-700">
+                 🏁 MISSION COMPLETE 🏁
              </div>
         )}
       </div>
@@ -209,7 +218,7 @@ export default function LobbyRoom() {
           {/* GAME TAB */}
           {activeTab === 'game' && (
              <div className="space-y-6">
-                 {lobby.status === 'active' && <LiveHUD startTime={lobby.metadata?.actual_start_at} score={score} />}
+                 {(lobby.status === 'active' || isFinished) && <LiveHUD startTime={lobby.metadata?.actual_start_at} score={score} />}
                  
                  {isOwner && (
                      <div className="border-t border-zinc-800 pt-6">
@@ -234,7 +243,9 @@ export default function LobbyRoom() {
           {activeTab === 'map' && (
               <div className="h-[60vh] w-full border-2 border-zinc-700 rounded-lg overflow-hidden relative">
                   <VibeMap points={mapPoints} bounds={mapBounds} imageUrl={DEFAULT_MAP_URL} />
-                  <div className="absolute bottom-4 left-4 bg-black/70 p-2 rounded text-xs font-mono border border-zinc-600">GPS: {lobby.field_id || "NOT SET"}</div>
+                  <div className="absolute bottom-4 left-4 bg-black/70 p-2 rounded text-xs font-mono border border-zinc-600">
+                      GPS: {lobby.field_id || "NOT SET"}
+                  </div>
               </div>
           )}
 
@@ -295,38 +306,34 @@ export default function LobbyRoom() {
           )}
       </div>
 
-      {/* Footer Actions (HIT / RESPAWN / JOIN) */}
+      {/* Footer Actions */}
       <div className="fixed bottom-24 left-4 right-4 max-w-md mx-auto z-30 flex flex-col gap-2 pointer-events-none">
-          {/* Active Game Controls */}
-          {lobby.status === 'active' && userMember && (
-              <>
-                {(userMember.status === 'alive' || userMember.status === 'ready') && (
-                    <button 
-                        onClick={handleImHit}
-                        className="pointer-events-auto w-full bg-red-600/90 hover:bg-red-500 text-white font-black py-4 uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(220,38,38,0.6)] border-2 border-red-400 animate-pulse text-xl font-orbitron"
-                    >
-                        <FaSkullCrossbones className="inline mr-3 mb-1"/> Я УБИТ!
-                    </button>
-                )}
-                
-                {userMember.status === 'dead' && (
-                    <button 
-                        onClick={handleSelfRespawn}
-                        className="pointer-events-auto w-full bg-emerald-600/90 hover:bg-emerald-500 text-white font-black py-4 uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(16,185,129,0.6)] border-2 border-emerald-400 animate-pulse text-xl font-orbitron"
-                    >
-                        <FaRecycle className="inline mr-3 mb-1"/> ВОЗРОЖДЕНИЕ (QR)
-                    </button>
-                )}
-              </>
+          {/* HIT / RESPAWN - Only if active */}
+          {userMember && userMember.status === 'alive' && lobby.status === 'active' && (
+              <button 
+                onClick={handleImHit}
+                className="pointer-events-auto w-full bg-red-600/90 hover:bg-red-500 text-white font-black py-4 uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(220,38,38,0.6)] border-2 border-red-400 animate-pulse text-xl font-orbitron"
+              >
+                  <FaSkullCrossbones className="inline mr-3 mb-1"/> Я УБИТ!
+              </button>
+          )}
+          {userMember && userMember.status === 'dead' && lobby.status === 'active' && (
+              <button 
+                onClick={handleSelfRespawn}
+                className="pointer-events-auto w-full bg-emerald-600/90 hover:bg-emerald-500 text-white font-black py-4 uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(16,185,129,0.6)] border-2 border-emerald-400 animate-pulse text-xl font-orbitron"
+              >
+                  <FaRecycle className="inline mr-3 mb-1"/> ВОЗРОЖДЕНИЕ (QR)
+              </button>
           )}
 
-          {/* Show Join Buttons if not member OR allow switching even during game (with penalty if needed) */}
-          <div className="pointer-events-auto grid grid-cols-2 gap-2 bg-black/80 p-2 border border-zinc-700 shadow-2xl backdrop-blur-md">
+          {/* JOIN BUTTONS - Hidden if match is finished */}
+          {!isFinished && (
+            <div className="pointer-events-auto grid grid-cols-2 gap-2 bg-black/80 p-2 border border-zinc-700 shadow-2xl backdrop-blur-md">
                 <button 
                     onClick={() => handleJoinTeam('blue')} 
                     className={cn(
-                        "bg-blue-900/40 hover:bg-blue-800 text-blue-200 font-bold py-3 uppercase border border-blue-500/30",
-                        userMember?.team === 'blue' && "bg-blue-600 text-white"
+                        "font-bold py-3 uppercase border transition-all text-xs sm:text-sm",
+                        userMember?.team === 'blue' ? "bg-blue-600 border-blue-400 text-white shadow-[0_0_15px_blue]" : "bg-blue-900/40 text-blue-200 border-blue-500/30 hover:bg-blue-800"
                     )}
                     disabled={userMember?.team === 'blue'}
                 >
@@ -335,14 +342,15 @@ export default function LobbyRoom() {
                 <button 
                     onClick={() => handleJoinTeam('red')} 
                     className={cn(
-                        "bg-red-900/40 hover:bg-red-800 text-red-200 font-bold py-3 uppercase border border-red-500/30",
-                        userMember?.team === 'red' && "bg-red-600 text-white"
+                        "font-bold py-3 uppercase border transition-all text-xs sm:text-sm",
+                        userMember?.team === 'red' ? "bg-red-600 border-red-400 text-white shadow-[0_0_15px_red]" : "bg-red-900/40 text-red-200 border-red-500/30 hover:bg-red-800"
                     )}
                     disabled={userMember?.team === 'red'}
                 >
                     {userMember?.team === 'red' ? "ВЫ ЗА КРАСНЫХ" : "ЗА КРАСНЫХ"}
                 </button>
-          </div>
+            </div>
+          )}
       </div>
     </div>
   );
