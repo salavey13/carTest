@@ -8,8 +8,9 @@ import { useAppContext } from "@/contexts/AppContext";
 import { CreateLobbyForm } from "./components/CreateLobbyForm";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { QRCodeSVG } from "qrcode.react"; // Standard react lib (or use API fallback)
 
-// Robust QR Display Component using API (No npm install needed)
+// Since we cannot install 'qrcode.react' without shell, we use a simple Image API fallback for the generated QR
 const QRDisplay = ({ value, onClose }: { value: string, onClose: () => void }) => (
     <motion.div 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}

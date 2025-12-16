@@ -8,8 +8,60 @@ import { v4 as uuidv4 } from "uuid";
 const BOT_USERNAME = "oneSitePlsBot";
 
 /**
+ * FETCH LOBBY DATA (Server-Side "Manual Join")
+ */
+export async function fetchLobbyData(lobbyId: string) {
+  try {
+    // 1. Fetch Lobby
+    const { data: lobby, error: lobbyError } = await supabaseAdmin
+      .from("lobbies")
+      .select(`*, host_crew:crews(id, name, logo_url)`) // Join crew details here
+      .eq("id", lobbyId)
+      .single();
+
+    if (lobbyError || !lobby) {
+      return { success: false, error: "Lobby not found" };
+    }
+
+    // 2. Fetch Members
+    const { data: members, error: membersError } = await supabaseAdmin
+      .from("lobby_members")
+      .select("*")
+      .eq("lobby_id", lobbyId);
+
+    if (membersError) return { success: false, error: "Members fetch failed" };
+
+    // 3. Populate Usernames manually
+    // FIX: Removed .length > 10 check to support Telegram IDs (9 digits)
+    const userIds = members
+      .filter((m) => !m.is_bot && m.user_id) 
+      .map((m) => m.user_id);
+
+    let userMap: Record<string, any> = {};
+    if (userIds.length > 0) {
+      const { data: users } = await supabaseAdmin
+        .from("users")
+        .select("user_id, username, full_name, avatar_url")
+        .in("user_id", userIds);
+      
+      users?.forEach((u) => { userMap[u.user_id] = u; });
+    }
+
+    const enrichedMembers = members.map((m) => ({
+      ...m,
+      user: userMap[m.user_id] || null
+    }));
+
+    return { success: true, lobby, members: enrichedMembers };
+  } catch (e: any) {
+    logger.error("fetchLobbyData Failed", e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
  * Создание нового лобби (Create Lobby)
- * Supports optional hosting by a Crew.
+ * Supports optional hosting by a Crew and Location.
  */
 export async function createStrikeballLobby(
   userId: string, 
@@ -19,16 +71,18 @@ export async function createStrikeballLobby(
     start_at?: string | null; 
     max_players?: number;
     crew_id?: string | null;
+    location?: string; // NEW: GPS or Address string
   }
 ) {
-  if (!userId) return { success: false, error: "Требуется авторизация" };
-  const { name, mode, start_at, max_players = 20, crew_id } = payload;
+  if (!userId) return { success: false, error: "Unauthorized: No User ID" };
+  
+  const { name, mode, start_at, max_players = 20, crew_id, location } = payload;
 
   try {
     const qrHash = uuidv4(); 
     
-    // 1. Create Lobby Record
-    const { data: lobby, error } = await supabaseAdmin
+    // 1. Create the Lobby record
+    const { data: lobby, error: lobbyError } = await supabaseAdmin
       .from("lobbies")
       .insert({
         name,
@@ -39,106 +93,112 @@ export async function createStrikeballLobby(
         start_at: start_at || null,
         max_players,
         crew_id: crew_id || null,
+        field_id: location || null, // Storing location string in field_id
         metadata: { bots_enabled: true }
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (lobbyError) {
+        throw new Error(`DB Insert Error: ${lobbyError.message}`);
+    }
+
+    if (!lobby) {
+         throw new Error("Lobby creation failed (no data returned).");
+    }
 
     // 2. Auto-join owner as Blue Team Leader
-    await supabaseAdmin.from("lobby_members").insert({
+    const { error: memberError } = await supabaseAdmin.from("lobby_members").insert({
       lobby_id: lobby.id,
       user_id: userId,
+      role: 'owner', 
       team: "blue",
-      role: "owner",
       is_bot: false,
       status: "ready"
     });
 
-    // 3. Generate Links & Notify
+    if (memberError) {
+        throw new Error(`Failed to join owner: ${memberError.message}`);
+    }
+
+    // 3. Notify via Telegram (Non-blocking)
     const deepLink = `https://t.me/${BOT_USERNAME}/app?startapp=lobby_${lobby.id}`;
     const timeStr = start_at ? new Date(start_at).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : 'СКОРО';
+    const locStr = location ? `\n**Координаты:** ${location}` : '';
     const squadTag = crew_id ? `\n**Отряд:** OFFICIAL SQUAD RAID` : '';
 
-    await sendComplexMessage(
+    sendComplexMessage(
       userId,
-      `🔴 **АРЕНА СОЗДАНА** 🔴\n\n**Операция:** ${name}\n**Режим:** ${mode.toUpperCase()}\n**Сбор:** ${timeStr}${squadTag}\n\n[🔗 ПРИГЛАСИТЬ БОЙЦОВ](${deepLink})`,
+      `🔴 **ОПЕРАЦИЯ НАЧАТА** 🔴\n\n**Цель:** ${name}\n**Режим:** ${mode.toUpperCase()}\n**Сбор:** ${timeStr}${locStr}${squadTag}\n\n[🔗 ПРИГЛАСИТЬ БОЙЦОВ](${deepLink})`,
       [],
       { parseMode: "Markdown" }
-    );
+    ).catch(err => logger.error("[createStrikeballLobby] Failed to send TG notification:", err));
 
     return { success: true, lobbyId: lobby.id };
   } catch (e: any) {
-    logger.error("Create Lobby Failed", e);
-    return { success: false, error: e.message || "Ошибка создания лобби" };
+    logger.error("[createStrikeballLobby] Exception:", e);
+    return { success: false, error: e.message || "Failed to deploy lobby." };
   }
 }
 
-/**
- * Вход в лобби или смена команды (Join/Switch)
- */
 export async function joinLobby(userId: string, lobbyId: string, team: string = "red") {
+  if (!userId || !lobbyId) return { success: false, error: "Missing IDs" };
+
   try {
-    // 1. Check current status
-    const { data: existing, error: checkError } = await supabaseAdmin
+    // 0. CHECK OWNERSHIP FIRST
+    const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id, name").eq("id", lobbyId).single();
+    const isOwner = lobby?.owner_id === userId;
+    const role = isOwner ? 'owner' : 'member';
+
+    // 1. Check existing member
+    const { data: existing } = await supabaseAdmin
       .from("lobby_members")
-      .select("id, team")
+      .select("id, team, role")
       .eq("lobby_id", lobbyId)
       .eq("user_id", userId)
       .maybeSingle();
 
-    if (checkError) throw checkError;
-
     if (existing) {
-        // Switch team if different
-        if (existing.team !== team) {
-            const { error: updateError } = await supabaseAdmin
+        // Update team AND ensure role is correct (restore owner rank if lost)
+        if (existing.team !== team || existing.role !== role) {
+            await supabaseAdmin
                 .from("lobby_members")
-                .update({ team, status: 'ready' })
+                .update({ team, role, status: 'ready' }) 
                 .eq("id", existing.id);
-            
-            if (updateError) throw updateError;
-
-            return { success: true, message: `Смена команды: ${team.toUpperCase()}` };
+            return { success: true, message: `Команда: ${team.toUpperCase()}` };
         }
         return { success: true, message: "Вы уже в этой команде." };
     }
 
     // 2. Insert new member
-    const { error: insertError } = await supabaseAdmin.from("lobby_members").insert({
+    await supabaseAdmin.from("lobby_members").insert({
       lobby_id: lobbyId,
       user_id: userId,
+      role: role, // Use calculated role
       team,
-      role: 'member',
       is_bot: false,
       status: "ready"
     });
 
-    if (insertError) throw insertError;
-
-    // 3. Notify Owner
-    const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id, name").eq("id", lobbyId).single();
-    if (lobby?.owner_id && lobby.owner_id !== userId) {
-       const user = await fetchUserData(userId);
-       await sendComplexMessage(
-         lobby.owner_id, 
-         `⚠️ **ПОДКРЕПЛЕНИЕ ПРИБЫЛО**\nБоец: ${user?.username || userId} вступил в ${lobby.name} (${team.toUpperCase()}).`
-       );
+    // 3. Notify Owner (only if joiner != owner)
+    if (lobby?.owner_id && !isOwner) {
+       fetchUserData(userId).then(user => {
+           sendComplexMessage(
+             lobby.owner_id, 
+             `⚠️ **ПОДКРЕПЛЕНИЕ**\nБоец: ${user?.username || userId} -> ${lobby.name} (${team.toUpperCase()}).`
+           ).catch(console.error);
+       });
     }
 
-    return { success: true, message: "Вы успешно вступили в отряд." };
-  } catch (e) {
-    logger.error("joinLobby failed", e);
-    return { success: false, error: "Ошибка входа." };
+    return { success: true, message: "Успешная высадка." };
+  } catch (e: any) {
+    return { success: false, error: e.message };
   }
 }
 
-/**
- * Получить список открытых игр (Lobbies + Host Crew info)
- */
 export async function getOpenLobbies() {
   try {
+    // Fetch lobbies AND their host crew details
     const { data, error } = await supabaseAdmin
       .from("lobbies")
       .select(`
@@ -152,34 +212,19 @@ export async function getOpenLobbies() {
     if (error) throw error;
     return { success: true, data: data || [] };
   } catch (e) {
-    logger.error("getOpenLobbies Failed", e);
     return { success: false, error: "Ошибка соединения." };
   }
 }
 
-/**
- * Получить список лобби, где пользователь уже участвует (для UI индикации)
- */
 export async function getUserActiveLobbies(userId: string) {
     if (!userId) return { success: false, data: [] };
-    
-    try {
-        const { data, error } = await supabaseAdmin
-            .from("lobby_members")
-            .select("lobby_id")
-            .eq("user_id", userId);
-            
-        if (error) throw error;
-        return { success: true, data: data?.map(d => d.lobby_id) || [] };
-    } catch (e) {
-        logger.error("getUserActiveLobbies Failed", e);
-        return { success: false, data: [] };
-    }
+    const { data } = await supabaseAdmin.from("lobby_members").select("lobby_id").eq("user_id", userId);
+    return { success: true, data: data?.map(d => d.lobby_id) || [] };
 }
 
 export async function addNoobBot(lobbyId: string, team: string) {
   try {
-    const botId = uuidv4(); // Generate ID to satisfy DB constraints
+    const botId = uuidv4(); 
     const { error } = await supabaseAdmin.from("lobby_members").insert({
       lobby_id: lobbyId,
       user_id: botId,
@@ -188,27 +233,20 @@ export async function addNoobBot(lobbyId: string, team: string) {
       status: "ready",
       role: "bot"
     });
-    
     if (error) throw error;
     return { success: true };
   } catch (e: any) {
-    logger.error("addNoobBot Failed", e);
     return { success: false, error: "Ошибка бота." };
   }
 }
 
 export async function removeMember(memberId: string) {
   try {
-    const { error } = await supabaseAdmin
-      .from("lobby_members")
-      .delete()
-      .eq("id", memberId);
-
+    const { error } = await supabaseAdmin.from("lobby_members").delete().eq("id", memberId);
     if (error) throw error;
     return { success: true };
   } catch (e: any) {
-    logger.error("removeMember Failed", e);
-    return { success: false, error: "Не удалось удалить бойца." };
+    return { success: false, error: "Ошибка удаления." };
   }
 }
 

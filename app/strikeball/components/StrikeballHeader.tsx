@@ -3,10 +3,39 @@
 import Link from "next/link";
 import { useAppContext } from "@/contexts/AppContext";
 import { motion } from "framer-motion";
-import { FaWifi, FaUserAstronaut } from "react-icons/fa6";
+import { FaWifi, FaUserAstronaut, FaStopwatch } from "react-icons/fa6";
+import { useEffect, useState } from "react";
+import { supabaseAnon } from "@/hooks/supabase";
 
 export default function StrikeballHeader() {
-  const { user } = useAppContext();
+  const { user, dbUser } = useAppContext();
+  const [activeLobby, setActiveLobby] = useState<any>(null);
+
+  // Poll for active lobby if user is logged in
+  useEffect(() => {
+    if (!dbUser?.user_id) return;
+    
+    const checkActive = async () => {
+        // Simple query: find a lobby where I am a member that is "active"
+        const { data } = await supabaseAnon
+            .from('lobby_members')
+            .select('lobby_id, lobbies(status, start_at, name)')
+            .eq('user_id', dbUser.user_id)
+            .eq('lobbies.status', 'active') // Only fetch if lobby is officially started
+            .maybeSingle();
+        
+        if (data && data.lobbies) {
+            setActiveLobby(data.lobbies);
+        } else {
+            setActiveLobby(null);
+        }
+    };
+
+    checkActive();
+    // Poll every 30s
+    const interval = setInterval(checkActive, 30000);
+    return () => clearInterval(interval);
+  }, [dbUser]);
 
   return (
     <motion.header
@@ -15,58 +44,51 @@ export default function StrikeballHeader() {
       transition={{ type: "spring", stiffness: 80, damping: 15 }}
       className="fixed top-0 left-0 right-0 z-50 pointer-events-none"
     >
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-md border-b-2 border-red-900 pointer-events-auto h-16 shadow-[0_5px_20px_rgba(255,0,0,0.1)]">
+      <div className="absolute inset-0 bg-black/90 backdrop-blur-md border-b-2 border-red-900 pointer-events-auto h-16 shadow-[0_5px_20px_rgba(255,0,0,0.1)]">
         
-        {/* Ticker Tape */}
-        <div className="h-5 bg-red-950/40 border-b border-red-900/30 overflow-hidden flex items-center">
-           <motion.div 
-             className="whitespace-nowrap text-[9px] font-mono text-red-400/80 uppercase tracking-widest pl-4"
-             animate={{ x: ["0%", "-100%"] }}
-             transition={{ repeat: Infinity, duration: 30, ease: "linear" }}
-           >
-             /// СВЯЗЬ С ЦЕНТРОМ: СТАБИЛЬНО /// РЕГИОН: РФ /// ПИНГ: 24мс /// ОПЕРАТОР: {user?.username?.toUpperCase() || "ГОСТЬ"} /// ГОТОВНОСТЬ К БОЮ ///
-           </motion.div>
+        {/* Ticker / Status Line */}
+        <div className="h-5 bg-red-950/40 border-b border-red-900/30 overflow-hidden flex items-center justify-between px-2">
+           {activeLobby ? (
+               <div className="flex items-center gap-2 w-full justify-center animate-pulse text-red-500 font-bold font-mono text-[10px]">
+                   <FaStopwatch />
+                   <span>LIVE OPERATION: {activeLobby.name.toUpperCase()}</span>
+               </div>
+           ) : (
+               <motion.div 
+                 className="whitespace-nowrap text-[9px] font-mono text-red-400/80 uppercase tracking-widest"
+                 animate={{ x: ["100%", "-100%"] }}
+                 transition={{ repeat: Infinity, duration: 40, ease: "linear" }}
+               >
+                 /// SYSTEM ONLINE /// WAITING FOR ORDERS ///
+               </motion.div>
+           )}
         </div>
 
         <div className="container mx-auto px-4 h-11 flex items-center justify-between">
           <Link href="/strikeball" className="flex items-center gap-3 group">
             <div className="relative w-8 h-8 flex items-center justify-center bg-zinc-900 border border-red-700 rounded-sm group-hover:bg-red-700 transition-colors duration-300">
               <span className="font-orbitron font-black text-white italic text-sm">SB</span>
-              <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-red-500 opacity-50" />
-              <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 border-red-500 opacity-50" />
             </div>
-            <div>
-              <h1 className="font-orbitron font-black text-lg leading-none text-zinc-100 italic tracking-tighter shadow-black drop-shadow-md">
-                STRIKE<span className="text-red-600">BALL</span>
-              </h1>
-            </div>
+            <h1 className="font-orbitron font-black text-lg leading-none text-zinc-100 italic tracking-tighter">
+              STRIKE<span className="text-red-600">BALL</span>
+            </h1>
           </Link>
 
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex flex-col items-end">
-               <div className="flex gap-0.5 items-end h-3">
-                  <div className="w-1 h-1 bg-emerald-600" />
-                  <div className="w-1 h-2 bg-emerald-600" />
-                  <div className="w-1 h-3 bg-emerald-500 animate-pulse" />
-               </div>
-               <span className="text-[8px] font-mono text-emerald-500/80">ОНЛАЙН</span>
-            </div>
-
+             {activeLobby && (
+                 <Link href={`/strikeball/lobbies/${activeLobby.id}`} className="bg-red-600 text-white text-[10px] px-2 py-1 rounded animate-pulse font-bold">
+                     RETURN TO GAME
+                 </Link>
+             )}
+             
             <Link href="/profile" className="flex items-center gap-2 pl-4 border-l border-zinc-800">
                <div className="text-right hidden xs:block">
                  <div className="text-[10px] font-bold text-zinc-300 leading-none tracking-wider">
-                   {user?.username?.toUpperCase() || "РЕКРУТ"}
-                 </div>
-                 <div className="text-[8px] text-red-500 font-mono leading-none mt-0.5">
-                   УРОВЕНЬ 1
+                   {user?.username?.toUpperCase() || "RECRUIT"}
                  </div>
                </div>
-               <div className="w-8 h-8 rounded bg-zinc-900 border border-zinc-700 flex items-center justify-center text-zinc-400 group-hover:text-white group-hover:border-red-500 transition-all">
-                 {user?.photo_url ? (
-                   <img src={user.photo_url} alt="Profile" className="w-full h-full object-cover opacity-80" />
-                 ) : (
-                   <FaUserAstronaut />
-                 )}
+               <div className="w-8 h-8 rounded bg-zinc-900 border border-zinc-700 flex items-center justify-center text-zinc-400 group-hover:text-white transition-all">
+                 <FaUserAstronaut />
                </div>
             </Link>
           </div>
