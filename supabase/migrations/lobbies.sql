@@ -42,5 +42,9 @@ ADD COLUMN IF NOT EXISTS team text DEFAULT 'spectator',
 ADD COLUMN IF NOT EXISTS status text DEFAULT 'ready',
 ADD COLUMN IF NOT EXISTS is_bot boolean DEFAULT false;
 
+-- Enable storage of extra data (transport, check-ins) for members
+ALTER TABLE public.lobby_members 
+ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+
 -- Optional: Create an index for faster team lookups
 CREATE INDEX IF NOT EXISTS idx_lobby_members_team ON public.lobby_members(lobby_id, team);
