@@ -18,17 +18,22 @@ export async function getGearList() {
     return { success: true, data: data || [] };
 }
 
+/**
+ * Sends a Telegram Invoice for purchasing/renting gear.
+ * Uses 'gear_buy' type for the webhook to detect.
+ */
 export async function rentGear(userId: string, gearId: string) {
   try {
     const { data: item } = await supabaseAdmin.from("cars").select("*").eq("id", gearId).single();
     if (!item) throw new Error("Снаряжение не найдено.");
 
-    const invoicePayload = `gear_rent_${gearId}_${Date.now()}`;
+    // Payload format: gear_buy_{ID}_{TIMESTAMP}
+    const invoicePayload = `gear_buy_${gearId}_${Date.now()}`;
     
     const result = await sendTelegramInvoice(
       userId,
-      `АРСЕНАЛ: ${item.make} ${item.model}`,
-      `Аренда: ${item.description || "Секретное оборудование"}`,
+      `ПОКУПКА/АРЕНДА: ${item.make} ${item.model}`,
+      `Товар: ${item.description || "Тактическое снаряжение"}`,
       invoicePayload,
       item.daily_price,
       0,

@@ -206,7 +206,6 @@ export async function generateAndSendLobbyPdf(userId: string, lobbyId: string) {
         color: COLOR_GREY
     });
 
-
     // 9. Save & Send
     const pdfBytes = await pdfDoc.save();
     const fileName = `INTEL_${lobby.name.replace(/\s+/g, '_').toUpperCase()}_${new Date().getTime().toString().slice(-4)}.pdf`;
@@ -224,4 +223,23 @@ export async function generateAndSendLobbyPdf(userId: string, lobbyId: string) {
     logger.error("generateAndSendLobbyPdf Error", error);
     return { success: false, error: error.message };
   }
+}
+
+/**
+ * Generates a "Quartermaster Catalog" PDF with QR codes for all items.
+ */
+export async function generateGearCatalogPdf(userId: string) {
+    // 1. Fetch Gear
+    const { data: gear } = await supabaseAdmin
+      .from("cars")
+      .select("*")
+      .in("type", ["gear", "weapon", "consumable"]);
+
+    // ... PDF Gen logic similar to Lobby Briefing ...
+    // Loop through gear items:
+    // - Draw Name
+    // - Draw Price
+    // - Generate QR for `https://t.me/oneSitePlsBot/app?startapp=gear_${item.id}`
+    // - Draw QR
+    // This allows the organizer to print stickers.
 }

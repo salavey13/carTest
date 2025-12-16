@@ -8,8 +8,8 @@ import { inventoryScriptAccessHandler } from "./inventory-script-access";
 import { selfDevBoostHandler } from "./selfdev-boost";
 import { disableDummyModeHandler } from "./disable-dummy-mode";
 import { protocardPurchaseHandler } from "./protocard-purchase-handler";
-// IMPORT THE NEW HANDLER
 import { wbReferralServiceHandler } from "./wb-referral-service";
+import { qrMerchantHandler } from "./qr-merchant"; // NEW IMPORT
 
 import { logger } from "@/lib/logger";
 import { getBaseUrl } from "@/lib/utils";
@@ -19,7 +19,8 @@ const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID!;
 
 // Register all handlers here
 const handlers: WebhookHandler[] = [
-  wbReferralServiceHandler, // <--- PRIORITY HANDLER FOR SYNDICATE
+  wbReferralServiceHandler,
+  qrMerchantHandler, // NEW HANDLER
   subscriptionHandler,
   carRentalHandler, 
   supportHandler,
