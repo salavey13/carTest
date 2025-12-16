@@ -7,7 +7,57 @@ import { v4 as uuidv4 } from "uuid";
 
 const BOT_USERNAME = "oneSitePlsBot";
 
+/**
+ * FETCH LOBBY DATA (Server-Side "Manual Join")
+ */
+export async function fetchLobbyData(lobbyId: string) {
+  try {
+    // 1. Fetch Lobby
+    const { data: lobby, error: lobbyError } = await supabaseAdmin
+      .from("lobbies")
+      .select(`*, host_crew:crews(id, name, logo_url)`) // Join crew details here
+      .eq("id", lobbyId)
+      .single();
 
+    if (lobbyError || !lobby) {
+      return { success: false, error: "Lobby not found" };
+    }
+
+    // 2. Fetch Members
+    const { data: members, error: membersError } = await supabaseAdmin
+      .from("lobby_members")
+      .select("*")
+      .eq("lobby_id", lobbyId);
+
+    if (membersError) return { success: false, error: "Members fetch failed" };
+
+    // 3. Populate Usernames manually
+    // FIX: Removed .length > 10 check to support Telegram IDs (9 digits)
+    const userIds = members
+      .filter((m) => !m.is_bot && m.user_id) 
+      .map((m) => m.user_id);
+
+    let userMap: Record<string, any> = {};
+    if (userIds.length > 0) {
+      const { data: users } = await supabaseAdmin
+        .from("users")
+        .select("user_id, username, full_name, avatar_url")
+        .in("user_id", userIds);
+      
+      users?.forEach((u) => { userMap[u.user_id] = u; });
+    }
+
+    const enrichedMembers = members.map((m) => ({
+      ...m,
+      user: userMap[m.user_id] || null
+    }));
+
+    return { success: true, lobby, members: enrichedMembers };
+  } catch (e: any) {
+    logger.error("fetchLobbyData Failed", e);
+    return { success: false, error: e.message };
+  }
+}
 
 /**
  * Создание нового лобби (Create Lobby)
@@ -21,17 +71,18 @@ export async function createStrikeballLobby(
     start_at?: string | null; 
     max_players?: number;
     crew_id?: string | null;
-    location?: string; // GPS Coordinates string
+    location?: string; // NEW: GPS or Address string
   }
 ) {
-  if (!userId) return { success: false, error: "Требуется авторизация" };
+  if (!userId) return { success: false, error: "Unauthorized: No User ID" };
+  
   const { name, mode, start_at, max_players = 20, crew_id, location } = payload;
 
   try {
     const qrHash = uuidv4(); 
     
-    // 1. Create Lobby Record
-    const { data: lobby, error } = await supabaseAdmin
+    // 1. Create the Lobby record
+    const { data: lobby, error: lobbyError } = await supabaseAdmin
       .from("lobbies")
       .insert({
         name,
@@ -42,41 +93,51 @@ export async function createStrikeballLobby(
         start_at: start_at || null,
         max_players,
         crew_id: crew_id || null,
-        field_id: location || null, // FIX: Explicitly mapping location -> field_id
+        field_id: location || null, // Storing location string in field_id
         metadata: { bots_enabled: true }
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (lobbyError) {
+        throw new Error(`DB Insert Error: ${lobbyError.message}`);
+    }
+
+    if (!lobby) {
+         throw new Error("Lobby creation failed (no data returned).");
+    }
 
     // 2. Auto-join owner as Blue Team Leader
-    await supabaseAdmin.from("lobby_members").insert({
+    const { error: memberError } = await supabaseAdmin.from("lobby_members").insert({
       lobby_id: lobby.id,
       user_id: userId,
+      role: 'owner', 
       team: "blue",
-      role: "owner",
       is_bot: false,
       status: "ready"
     });
 
-    // 3. Generate Links & Notify
+    if (memberError) {
+        throw new Error(`Failed to join owner: ${memberError.message}`);
+    }
+
+    // 3. Notify via Telegram (Non-blocking)
     const deepLink = `https://t.me/${BOT_USERNAME}/app?startapp=lobby_${lobby.id}`;
     const timeStr = start_at ? new Date(start_at).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : 'СКОРО';
+    const locStr = location ? `\n**Координаты:** ${location}` : '';
     const squadTag = crew_id ? `\n**Отряд:** OFFICIAL SQUAD RAID` : '';
-    const locationTag = location ? `\n**GPS:** ${location}` : '';
 
-    await sendComplexMessage(
+    sendComplexMessage(
       userId,
-      `🔴 **ОПЕРАЦИЯ НАЧАТА** 🔴\n\n**Цель:** ${name}\n**Режим:** ${mode.toUpperCase()}\n**Сбор:** ${timeStr}${locationTag}${squadTag}\n\n[🔗 ПРИГЛАСИТЬ БОЙЦОВ](${deepLink})`,
+      `🔴 **ОПЕРАЦИЯ НАЧАТА** 🔴\n\n**Цель:** ${name}\n**Режим:** ${mode.toUpperCase()}\n**Сбор:** ${timeStr}${locStr}${squadTag}\n\n[🔗 ПРИГЛАСИТЬ БОЙЦОВ](${deepLink})`,
       [],
       { parseMode: "Markdown" }
-    );
+    ).catch(err => logger.error("[createStrikeballLobby] Failed to send TG notification:", err));
 
     return { success: true, lobbyId: lobby.id };
   } catch (e: any) {
-    logger.error("Create Lobby Failed", e);
-    return { success: false, error: e.message || "Ошибка создания лобби" };
+    logger.error("[createStrikeballLobby] Exception:", e);
+    return { success: false, error: e.message || "Failed to deploy lobby." };
   }
 }
 
@@ -197,55 +258,4 @@ export async function togglePlayerStatus(memberId: string, currentStatus: string
     } catch (e) {
         return { success: false, error: "Ошибка статуса" };
     }
-}
-
-/**
- * FETCH LOBBY DATA (Server-Side "Manual Join")
- */
-export async function fetchLobbyData(lobbyId: string) {
-  try {
-    // 1. Fetch Lobby
-    const { data: lobby, error: lobbyError } = await supabaseAdmin
-      .from("lobbies")
-      .select(`*, host_crew:crews(id, name, logo_url)`) // Join crew details here
-      .eq("id", lobbyId)
-      .single();
-
-    if (lobbyError || !lobby) {
-      return { success: false, error: "Lobby not found" };
-    }
-
-    // 2. Fetch Members
-    const { data: members, error: membersError } = await supabaseAdmin
-      .from("lobby_members")
-      .select("*")
-      .eq("lobby_id", lobbyId);
-
-    if (membersError) return { success: false, error: "Members fetch failed" };
-
-    // 3. Populate Usernames manually
-    const userIds = members
-      .filter((m) => !m.is_bot && m.user_id && m.user_id.length > 10)
-      .map((m) => m.user_id);
-
-    let userMap: Record<string, any> = {};
-    if (userIds.length > 0) {
-      const { data: users } = await supabaseAdmin
-        .from("users")
-        .select("user_id, username, full_name, avatar_url")
-        .in("user_id", userIds);
-      
-      users?.forEach((u) => { userMap[u.user_id] = u; });
-    }
-
-    const enrichedMembers = members.map((m) => ({
-      ...m,
-      user: userMap[m.user_id] || null
-    }));
-
-    return { success: true, lobby, members: enrichedMembers };
-  } catch (e: any) {
-    logger.error("fetchLobbyData Failed", e);
-    return { success: false, error: e.message };
-  }
 }
