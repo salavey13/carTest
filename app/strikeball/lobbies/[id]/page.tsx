@@ -28,14 +28,14 @@ export default function LobbyRoom() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'roster' | 'map' | 'logistics' | 'safety' | 'game'>('roster'); 
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  
-  // Local state for driver inputs
   const [driverSeats, setDriverSeats] = useState(3);
   const [carName, setCarName] = useState("");
 
+  // USE SERVER ACTION FOR DATA LOADING (Manual Joins)
   const loadData = useCallback(async () => {
     try {
         const result = await fetchLobbyData(lobbyId as string);
+        
         if (!result.success || !result.lobby) {
             setError("Lobby data fetch failed.");
             return;
@@ -45,11 +45,10 @@ export default function LobbyRoom() {
         setMembers(result.members || []);
 
         // Sync local inputs if user is a driver
+        // We use the freshly fetched member data which has 'user' object manually merged
         const me = result.members?.find((m: any) => m.user_id === dbUser?.user_id);
         if (me?.metadata?.transport?.role === 'driver') {
              if (!carName) setCarName(me.metadata.transport.car_name || "");
-             // Only set seats if not already set to avoid jumpiness, or force it? 
-             // Let's rely on user input, but init if 0
              if (driverSeats === 3 && me.metadata.transport.seats) setDriverSeats(me.metadata.transport.seats);
         }
 
@@ -59,22 +58,24 @@ export default function LobbyRoom() {
     }
   }, [lobbyId, dbUser?.user_id]);
 
+  // Initial Load & Realtime Subscriptions
   useEffect(() => {
     loadData();
+    
+    // Subscribe to changes, but call SERVER ACTION on change to ensure we get joined data
     const channel = supabaseAnon
       .channel(`lobby_room_${lobbyId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members', filter: `lobby_id=eq.${lobbyId}` }, () => loadData())
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobbies', filter: `id=eq.${lobbyId}` }, (payload) => {
-          setLobby(prev => ({ ...prev, ...payload.new })); 
-      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobbies', filter: `id=eq.${lobbyId}` }, () => loadData())
       .subscribe();
+
     return () => { supabaseAnon.removeChannel(channel); };
   }, [lobbyId, loadData]);
 
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
   const isOwner = userMember?.role === 'owner' || lobby?.owner_id === dbUser?.user_id;
 
-  // Actions
+  // --- ACTIONS ---
   const handleAddBot = async (team: string) => { const res = await addNoobBot(lobbyId as string, team); if (!res.success) toast.error(res.error); else loadData(); };
   const handleKickBot = async (memberId: string) => { const res = await removeMember(memberId); if (!res.success) toast.error(res.error); else { toast.success("Kicked"); loadData(); } };
   const handleStatusToggle = async (memberId: string, current: string) => { 
@@ -145,7 +146,7 @@ export default function LobbyRoom() {
   const score = lobby.metadata?.score || { red: 0, blue: 0 };
   const isFinished = lobby.status === 'finished';
 
-  // Logistics Data
+  // Logistics Data - Filter and map correctly using the manually joined 'user' object
   const drivers = members.filter(m => m.metadata?.transport?.role === 'driver');
   const pedestrians = members.filter(m => m.metadata?.transport?.role === 'passenger' && !m.metadata.transport?.driver_id);
 
@@ -265,13 +266,14 @@ export default function LobbyRoom() {
                           const seatsTaken = passengers.length;
                           const seatsTotal = driver.metadata.transport.seats || 3;
                           const isFull = seatsTaken >= seatsTotal;
+                          const driverName = driver.user?.username || driver.user?.full_name || 'Неизвестный';
                           
                           return (
                               <div key={driver.id} className="bg-zinc-900/80 border border-zinc-700 p-4 rounded-lg flex flex-col gap-3">
                                   <div className="flex justify-between items-start">
                                       <div>
                                           <div className="font-bold text-white text-sm">{driver.metadata.transport.car_name || "Авто"}</div>
-                                          <div className="text-xs text-zinc-500">Водитель: {driver.user?.username || 'Unknown'}</div>
+                                          <div className="text-xs text-zinc-500">Водитель: {driverName}</div>
                                       </div>
                                       <div className={cn("px-2 py-1 rounded text-[10px] font-bold border", isFull ? "bg-red-900/30 border-red-800 text-red-500" : "bg-green-900/30 border-green-800 text-green-500")}>
                                           {seatsTaken} / {seatsTotal}
@@ -281,7 +283,7 @@ export default function LobbyRoom() {
                                   <div className="flex flex-wrap gap-2 items-center">
                                       {passengers.map(p => (
                                           <div key={p.id} className="bg-zinc-950 px-2 py-0.5 rounded text-[10px] text-zinc-400 border border-zinc-800">
-                                              {p.user?.username}
+                                              {p.user?.username || p.user?.full_name || 'Спутник'}
                                           </div>
                                       ))}
                                       {/* Join Button */}
@@ -306,7 +308,7 @@ export default function LobbyRoom() {
                           <div className="flex flex-wrap gap-2">
                               {pedestrians.map(p => (
                                   <div key={p.id} className="flex items-center gap-1 bg-amber-900/10 text-amber-600 px-2 py-1 rounded text-xs border border-amber-900/20">
-                                      <FaPersonWalking /> {p.user?.username}
+                                      <FaPersonWalking /> {p.user?.username || p.user?.full_name || 'Спутник'}
                                   </div>
                               ))}
                           </div>
@@ -315,13 +317,15 @@ export default function LobbyRoom() {
               </div>
           )}
 
+          {/* SAFETY TAB */}
           {activeTab === 'safety' && (
               <SafetyBriefing onComplete={handleSafetySign} isSigned={!!userMember?.metadata?.safety_signed} />
           )}
       </div>
 
-      {/* Footer Actions (Fixed Logic) */}
+      {/* Footer Actions */}
       <div className="fixed bottom-24 left-4 right-4 max-w-md mx-auto z-30 flex flex-col gap-2 pointer-events-none">
+          {/* HIT / RESPAWN - Only if active */}
           {userMember && userMember.status === 'alive' && lobby.status === 'active' && (
               <button onClick={handleImHit} className="pointer-events-auto w-full bg-red-600/90 hover:bg-red-500 text-white font-black py-4 uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(220,38,38,0.6)] border-2 border-red-400 animate-pulse text-xl font-orbitron"><FaSkullCrossbones className="inline mr-3 mb-1"/> Я УБИТ!</button>
           )}
