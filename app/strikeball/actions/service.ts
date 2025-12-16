@@ -206,7 +206,6 @@ export async function generateAndSendLobbyPdf(userId: string, lobbyId: string) {
         color: COLOR_GREY
     });
 
-
     // 9. Save & Send
     const pdfBytes = await pdfDoc.save();
     const fileName = `INTEL_${lobby.name.replace(/\s+/g, '_').toUpperCase()}_${new Date().getTime().toString().slice(-4)}.pdf`;
@@ -223,5 +222,114 @@ export async function generateAndSendLobbyPdf(userId: string, lobbyId: string) {
   } catch (error: any) {
     logger.error("generateAndSendLobbyPdf Error", error);
     return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Generates a Printable Gear Catalog (Stickers)
+ * Layout: Grid of QR Codes + Item Name + Price.
+ */
+export async function generateGearCatalogPdf(userId: string) {
+  try {
+    // 1. Fetch Gear
+    const { data: gear } = await supabaseAdmin
+      .from("cars")
+      .select("*")
+      .in("type", ["gear", "weapon", "consumable"]);
+      
+    if (!gear || gear.length === 0) throw new Error("No gear found in armory.");
+
+    // 2. Initialize PDF
+    const pdfDoc = await PDFDocument.create();
+    pdfDoc.registerFontkit(fontkitModule);
+
+    // 3. Load Fonts
+    const fontPath = path.join(process.cwd(), 'server-assets', 'fonts', 'DejaVuSans.ttf');
+    const fontBytes = fs.readFileSync(fontPath);
+    const customFont = await pdfDoc.embedFont(fontBytes);
+
+    // 4. Setup Grid (A4)
+    let page = pdfDoc.addPage([595.28, 841.89]);
+    const { width, height } = page.getSize();
+    
+    const MARGIN = 30;
+    const COLS = 2;
+    const ROWS = 3;
+    const CELL_WIDTH = (width - MARGIN * 2) / COLS;
+    const CELL_HEIGHT = (height - MARGIN * 2) / ROWS;
+
+    let col = 0;
+    let row = 0;
+
+    for (const item of gear) {
+        // Calculate position
+        const x = MARGIN + col * CELL_WIDTH;
+        const y = height - MARGIN - (row + 1) * CELL_HEIGHT;
+
+        // Draw Card Border
+        page.drawRectangle({
+            x: x + 10, y: y + 10, 
+            width: CELL_WIDTH - 20, height: CELL_HEIGHT - 20,
+            borderColor: rgb(0, 0, 0), borderWidth: 2
+        });
+
+        // Generate QR
+        try {
+            const qrData = `gear_buy_${item.id}`; // Matches webhook handler
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+            const qrBytes = await fetch(qrUrl).then(res => res.arrayBuffer());
+            const qrImage = await pdfDoc.embedPng(qrBytes);
+            
+            // Draw QR centered
+            const qrSize = 120;
+            page.drawImage(qrImage, {
+                x: x + (CELL_WIDTH - qrSize) / 2,
+                y: y + 80,
+                width: qrSize,
+                height: qrSize
+            });
+        } catch (e) {
+            console.error("QR Gen Error", e);
+        }
+
+        // Draw Text
+        const textY = y + 60;
+        
+        // Name
+        const name = item.model.length > 20 ? item.model.substring(0, 20) + '...' : item.model;
+        page.drawText(item.make, { x: x + 20, y: textY, size: 10, font: customFont, color: rgb(0.5, 0.5, 0.5) });
+        page.drawText(name, { x: x + 20, y: textY - 15, size: 14, font: customFont, color: rgb(0, 0, 0) });
+        
+        // Price
+        page.drawText(`${item.daily_price} XTR`, { x: x + 20, y: textY - 35, size: 18, font: customFont, color: rgb(0.8, 0, 0) });
+        
+        // Footer ID
+        page.drawText(`ID: ${item.id}`, { x: x + 20, y: y + 20, size: 8, font: customFont, color: rgb(0.7, 0.7, 0.7) });
+
+        // Move Grid
+        col++;
+        if (col >= COLS) {
+            col = 0;
+            row++;
+            if (row >= ROWS) {
+                page = pdfDoc.addPage([595.28, 841.89]);
+                row = 0;
+            }
+        }
+    }
+
+    // 5. Send
+    const pdfBytes = await pdfDoc.save();
+    const fileName = `CATALOG_${new Date().toISOString().split('T')[0]}.pdf`;
+    const fileBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+    
+    const sendRes = await sendTelegramDocument(userId, fileBlob, fileName, "📦 **КАТАЛОГ СНАРЯЖЕНИЯ (QR)**");
+    if (!sendRes.success) throw new Error(sendRes.error);
+
+    return { success: true, message: "Каталог отправлен!" };
+    
+  } catch (e: any) {
+    logger.error("generateGearCatalogPdf Error", e);
+    return { success: false, error: e.message };
   }
 }

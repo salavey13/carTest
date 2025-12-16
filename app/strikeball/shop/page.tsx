@@ -4,14 +4,16 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { useAppContext } from "@/contexts/AppContext";
 import { getGearList, rentGear } from "../actions/market";
+import { generateGearCatalogPdf } from "../actions/service"; // New Import
 import { toast } from "sonner";
-import { FaCartPlus } from "react-icons/fa6";
+import { FaCartPlus, FaPrint } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 
 export default function GearShop() {
   const { dbUser } = useAppContext();
   const [gear, setGear] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
     getGearList().then(res => {
@@ -29,18 +31,43 @@ export default function GearShop() {
     });
   };
 
+  const handlePrint = async () => {
+      if (!dbUser?.user_id) return;
+      setIsPrinting(true);
+      toast.loading("Генерация каталога...");
+      const res = await generateGearCatalogPdf(dbUser.user_id);
+      toast.dismiss();
+      setIsPrinting(false);
+      if(res.success) toast.success(res.message);
+      else toast.error(res.error);
+  };
+
   if (loading) return <div className="p-10 text-center font-mono text-red-500 pt-24 animate-pulse">ЗАГРУЗКА АРСЕНАЛА...</div>;
 
   return (
     <div className="min-h-screen bg-transparent pt-28 p-4 pb-32 text-white font-orbitron">
       
       <div className="flex justify-between items-end mb-8 border-b-2 border-red-900/50 pb-2">
-          <h1 className="text-4xl font-black text-zinc-100 italic tracking-tighter drop-shadow-lg">
-            АРСЕНАЛ
-          </h1>
-          <div className="text-[10px] font-mono text-red-500 bg-red-900/20 px-2 py-1 border border-red-900/50">
-             {gear.length} ЕД.
+          <div className="flex flex-col">
+              <h1 className="text-4xl font-black text-zinc-100 italic tracking-tighter drop-shadow-lg">
+                АРСЕНАЛ
+              </h1>
+              <div className="text-[10px] font-mono text-red-500 bg-red-900/20 px-2 py-1 border border-red-900/50 w-fit mt-1">
+                 {gear.length} ЕД.
+              </div>
           </div>
+
+          {/* Admin Print Button */}
+          {dbUser?.role === 'admin' || dbUser?.role === 'vprAdmin' ? ( // Basic check, refine as needed
+              <button 
+                onClick={handlePrint} 
+                disabled={isPrinting}
+                className="bg-zinc-800 text-zinc-400 p-3 rounded-full hover:text-white hover:bg-zinc-700 transition-colors"
+                title="Печать QR-кодов"
+              >
+                  <FaPrint />
+              </button>
+          ) : null}
       </div>
       
       <div className="grid grid-cols-2 gap-4">
@@ -61,7 +88,6 @@ export default function GearShop() {
                      src={item.image_url} 
                      alt={item.make} 
                      fill 
-                     // UPDATED: object-contain, padding, no opacity fade on bg
                      className="object-contain p-2 group-hover:scale-105 transition-transform duration-300" 
                    />
                ) : (
@@ -70,7 +96,6 @@ export default function GearShop() {
                    </div>
                )}
                
-               {/* Tech Overlay (Scanlines on image - reduced opacity for white bg) */}
                <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0)_50%,rgba(0,0,0,0.1)_50%)] bg-[length:100%_4px] pointer-events-none" />
             </div>
             

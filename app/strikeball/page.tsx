@@ -72,35 +72,48 @@ export default function StrikeballDashboard() {
 
   // --- QR LOGIC ---
   const handleQR = () => {
-      // 1. Try to open native scanner if in Telegram
       if (tg && tg.showScanQrPopup) {
           tg.showScanQrPopup({
-              text: "СКАНИРУЙ КОД ОПЕРАЦИИ ИЛИ ПРОФИЛЯ"
-          }, (text: string) => {
-              // 2. Handle scan result
+              text: "СКАНИРУЙ КОД ОПЕРАЦИИ, ПРОФИЛЯ ИЛИ ТОВАРА"
+          }, async (text: string) => { // Async for API calls
               tg.closeScanQrPopup();
-              if (!text) return true; // Keep open if empty (optional, usually close)
+              if (!text) return true;
 
               let param = text;
-              // Extract 'startapp' param if full URL
               if (text.includes('startapp=')) {
                   param = text.split('startapp=')[1].split('&')[0];
               }
 
-              // Route logic
+              // 1. Lobby Join
               if (param.startsWith('lobby_')) {
                   const lobbyId = param.replace('lobby_', '');
                   router.push(`/strikeball/lobbies/${lobbyId}`);
                   toast.success("ОПЕРАЦИЯ ОБНАРУЖЕНА");
-              } else if (param.startsWith('user_')) {
+              } 
+              // 2. Instant Gear Buy (New!)
+              else if (param.startsWith('gear_')) {
+                  const gearId = param.replace('gear_', '');
+                  toast.loading("Обработка товара...");
+                  // Import the action dynamically or assume it's available
+                  // Note: Since this is client-side, we call the server action wrapper
+                  try {
+                      const { rentGear } = await import("./actions/market"); // Dynamic import for action
+                      const res = await rentGear(dbUser?.user_id!, gearId);
+                      if(res.success) toast.success("Счет на оплату отправлен!");
+                      else toast.error(res.error);
+                  } catch(e) {
+                      toast.error("Ошибка магазина");
+                  }
+              }
+              // 3. User Profile
+              else if (param.startsWith('user_')) {
                   toast.info("ПОЛЬЗОВАТЕЛЬ ОБНАРУЖЕН");
               } else {
                   toast.error("НЕИЗВЕСТНЫЙ КОД");
               }
-              return true; // Return true to close popup in some TG versions
+              return true;
           });
       } else {
-          // 3. Desktop/Browser: Show MY QR code instead
           setShowQR(true);
       }
   };
