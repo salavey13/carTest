@@ -18,22 +18,17 @@ export async function getGearList() {
     return { success: true, data: data || [] };
 }
 
-/**
- * Sends a Telegram Invoice for purchasing/renting gear.
- * Uses 'gear_buy' type for the webhook to detect.
- */
 export async function rentGear(userId: string, gearId: string) {
   try {
     const { data: item } = await supabaseAdmin.from("cars").select("*").eq("id", gearId).single();
     if (!item) throw new Error("Снаряжение не найдено.");
 
-    // Payload format: gear_buy_{ID}_{TIMESTAMP}
-    const invoicePayload = `gear_buy_${gearId}_${Date.now()}`;
+    const invoicePayload = `gear_rent_${gearId}_${Date.now()}`;
     
     const result = await sendTelegramInvoice(
       userId,
-      `ПОКУПКА/АРЕНДА: ${item.make} ${item.model}`,
-      `Товар: ${item.description || "Тактическое снаряжение"}`,
+      `АРСЕНАЛ: ${item.make} ${item.model}`,
+      `Аренда: ${item.description || "Секретное оборудование"}`,
       invoicePayload,
       item.daily_price,
       0,
@@ -46,4 +41,24 @@ export async function rentGear(userId: string, gearId: string) {
     logger.error("Rent Gear Failed", e);
     return { success: false, error: e.message };
   }
+}
+
+// NEW: Fetch User Inventory
+export async function getUserPurchases(userId: string) {
+    if (!userId) return { success: false, data: [] };
+    
+    try {
+        const { data, error } = await supabaseAdmin
+            .from("user_purchases")
+            .select("*")
+            .eq("user_id", userId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        
+        return { success: true, data: data || [] };
+    } catch (e: any) {
+        logger.error("getUserPurchases Failed", e);
+        return { success: false, error: e.message };
+    }
 }
