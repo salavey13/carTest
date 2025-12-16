@@ -42,3 +42,23 @@ export async function rentGear(userId: string, gearId: string) {
     return { success: false, error: e.message };
   }
 }
+
+// NEW: Fetch User Inventory
+export async function getUserPurchases(userId: string) {
+    if (!userId) return { success: false, data: [] };
+    
+    try {
+        const { data, error } = await supabaseAdmin
+            .from("user_purchases")
+            .select("*")
+            .eq("user_id", userId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        
+        return { success: true, data: data || [] };
+    } catch (e: any) {
+        logger.error("getUserPurchases Failed", e);
+        return { success: false, error: e.message };
+    }
+}

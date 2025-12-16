@@ -3,8 +3,9 @@
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { getUserCombatStats } from "../actions/stats";
+import { getUserPurchases } from "../actions/market"; // New Import
 import { motion } from "framer-motion";
-import { FaSkull, FaCrosshairs, FaMedal, FaClock } from "react-icons/fa6";
+import { FaSkull, FaCrosshairs, FaMedal, FaClock, FaBoxOpen } from "react-icons/fa6";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
@@ -30,9 +31,11 @@ const StatCard = ({ label, value, icon: Icon, color, delay }: any) => (
 export default function StatsPage() {
     const { user, userCrewInfo, dbUser } = useAppContext();
     const [stats, setStats] = useState(DEFAULT_STATS);
+    const [purchases, setPurchases] = useState<any[]>([]);
 
     useEffect(() => {
         if(dbUser?.user_id) {
+            // Fetch Combat Stats
             getUserCombatStats(dbUser.user_id).then(res => {
                 if(res.success && res.data) {
                     setStats({
@@ -42,6 +45,11 @@ export default function StatsPage() {
                         accuracy: res.data.accuracy
                     });
                 }
+            });
+
+            // Fetch Inventory (Stash)
+            getUserPurchases(dbUser.user_id).then(res => {
+                if(res.success) setPurchases(res.data || []);
             });
         }
     }, [dbUser?.user_id]);
@@ -100,6 +108,50 @@ export default function StatsPage() {
                 <StatCard label="ПОБЕД" value={stats.wins} icon={FaMedal} color="text-amber-500" delay={0.2} />
                 <StatCard label="K/D" value={stats.kd} icon={FaSkull} color="text-red-500" delay={0.3} />
                 <StatCard label="ТОЧНОСТЬ" value={stats.accuracy} icon={FaCrosshairs} color="text-cyan-500" delay={0.4} />
+            </div>
+
+            {/* MY STASH (Inventory) */}
+            <div className="max-w-2xl mx-auto mb-8">
+                <h3 className="text-sm font-bold text-zinc-500 mb-4 uppercase tracking-widest flex items-center gap-2">
+                    <FaBoxOpen /> МОЙ ИНВЕНТАРЬ ({purchases.length})
+                </h3>
+                
+                <div className="space-y-2">
+                    {purchases.length === 0 && (
+                        <div className="p-4 border border-dashed border-zinc-800 text-center text-zinc-600 font-mono text-xs">
+                            ПУСТО. ПОСЕТИТЕ АРСЕНАЛ.
+                        </div>
+                    )}
+                    
+                    {purchases.map((p, i) => (
+                        <motion.div 
+                            key={p.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.1 }}
+                            className="bg-zinc-900/60 border border-zinc-800 p-3 flex justify-between items-center"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-black relative border border-zinc-700">
+                                    {p.metadata?.image_url ? (
+                                        <Image src={p.metadata.image_url} alt="Item" fill className="object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-zinc-700 font-bold">?</div>
+                                    )}
+                                </div>
+                                <div>
+                                    <div className="font-bold text-zinc-200 text-sm">{p.metadata?.item_name || "Unknown Item"}</div>
+                                    <div className="text-[10px] text-zinc-500 font-mono">
+                                        {new Date(p.created_at).toLocaleDateString()} // {p.status.toUpperCase()}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-xs font-mono text-emerald-500">{p.total_price} XTR</div>
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
             </div>
 
             {/* Performance Graph Placeholder */}
