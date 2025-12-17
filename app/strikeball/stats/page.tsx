@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { getUserCombatStats } from "../actions/stats";
-import { getUserPurchases } from "../actions/market"; // New Import
-import { motion } from "framer-motion";
-import { FaSkull, FaCrosshairs, FaMedal, FaClock, FaBoxOpen } from "react-icons/fa6";
+import { getUserPurchases } from "../actions/market";
+import { motion, AnimatePresence } from "framer-motion";
+import { FaSkull, FaCrosshairs, FaMedal, FaClock, FaBoxOpen, FaQrcode } from "react-icons/fa6";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
@@ -28,14 +28,29 @@ const StatCard = ({ label, value, icon: Icon, color, delay }: any) => (
     </motion.div>
 );
 
+// Helper for QR Modal
+const QRModal = ({ value, onClose }: { value: string, onClose: () => void }) => (
+    <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 backdrop-blur-md" onClick={onClose}>
+        <div className="bg-white p-4 rounded-lg shadow-2xl max-w-sm w-full text-center" onClick={e => e.stopPropagation()}>
+            <img 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(value)}`} 
+                alt="My QR" 
+                className="w-full h-auto"
+            />
+            <p className="text-black font-mono font-bold mt-4 uppercase">Покажите администратору</p>
+            <button onClick={onClose} className="mt-4 w-full bg-black text-white py-3 font-bold uppercase">Закрыть</button>
+        </div>
+    </div>
+);
+
 export default function StatsPage() {
     const { user, userCrewInfo, dbUser } = useAppContext();
     const [stats, setStats] = useState(DEFAULT_STATS);
     const [purchases, setPurchases] = useState<any[]>([]);
+    const [showQR, setShowQR] = useState(false);
 
     useEffect(() => {
         if(dbUser?.user_id) {
-            // Fetch Combat Stats
             getUserCombatStats(dbUser.user_id).then(res => {
                 if(res.success && res.data) {
                     setStats({
@@ -47,18 +62,29 @@ export default function StatsPage() {
                 }
             });
 
-            // Fetch Inventory (Stash)
             getUserPurchases(dbUser.user_id).then(res => {
                 if(res.success) setPurchases(res.data || []);
             });
         }
     }, [dbUser?.user_id]);
 
+    const myQrLink = `user_${dbUser?.user_id}`; // Format expected by admin scanner
+
     return (
         <div className="pt-28 pb-32 px-4 min-h-screen text-white font-orbitron">
-            
+            <AnimatePresence>
+                {showQR && <QRModal value={myQrLink} onClose={() => setShowQR(false)} />}
+            </AnimatePresence>
+
             {/* Header */}
-            <div className="text-center mb-10">
+            <div className="text-center mb-10 relative">
+                <button 
+                    onClick={() => setShowQR(true)}
+                    className="absolute top-0 right-0 p-3 bg-zinc-800 rounded-full text-white hover:bg-zinc-700 transition-colors border border-zinc-600 shadow-lg"
+                >
+                    <FaQrcode />
+                </button>
+
                 <h1 className="text-4xl font-black text-red-600 tracking-tighter uppercase drop-shadow-lg">
                     ЛИЧНОЕ ДЕЛО
                 </h1>
@@ -152,32 +178,6 @@ export default function StatsPage() {
                         </motion.div>
                     ))}
                 </div>
-            </div>
-
-            {/* Performance Graph Placeholder */}
-            <div className="max-w-2xl mx-auto">
-                <div className="bg-zinc-900/40 border border-zinc-800 p-4 relative">
-                    <h3 className="text-xs font-mono text-zinc-500 mb-4 uppercase">Боевая Эффективность (Симуляция)</h3>
-                    
-                    <div className="h-32 flex items-end gap-1">
-                        {[...Array(20)].map((_, i) => {
-                            const height = Math.floor(Math.random() * 80) + 10;
-                            return (
-                                <motion.div 
-                                    key={i}
-                                    initial={{ height: 0 }}
-                                    animate={{ height: `${height}%` }}
-                                    transition={{ delay: i * 0.05, duration: 0.5 }}
-                                    className="flex-1 bg-red-900/50 hover:bg-red-500 transition-colors border-t border-red-500/30"
-                                />
-                            )
-                        })}
-                    </div>
-                    <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:100%_20px]" />
-                </div>
-                <p className="text-[10px] text-zinc-600 font-mono mt-2 text-center">
-                    * Данные обновляются после подтверждения результатов командиром лобби.
-                </p>
             </div>
         </div>
     );
