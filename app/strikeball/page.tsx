@@ -8,9 +8,10 @@ import { useAppContext } from "@/contexts/AppContext";
 import { CreateLobbyForm } from "./components/CreateLobbyForm";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { QRCodeSVG } from "qrcode.react"; // Standard react lib (or use API fallback)
+import { FaQrcode, FaShieldHalved, FaUsers, FaPlus, FaTrophy } from "react-icons/fa6";
 
-// Since we cannot install 'qrcode.react' without shell, we use a simple Image API fallback for the generated QR
+// ... [QRDisplay component remains the same] ...
+
 const QRDisplay = ({ value, onClose }: { value: string, onClose: () => void }) => (
     <motion.div 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -20,7 +21,6 @@ const QRDisplay = ({ value, onClose }: { value: string, onClose: () => void }) =
         <div className="bg-zinc-900 p-6 rounded-none border-4 border-red-600 shadow-[0_0_50px_rgba(220,38,38,0.5)] max-w-sm w-full" onClick={e => e.stopPropagation()}>
              <h3 className="text-red-500 font-orbitron font-bold text-center text-xl mb-4 tracking-widest">SECURE LINK</h3>
              <div className="bg-white p-2 mb-4">
-                 {/* Fallback to reliable QR API */}
                  <img 
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(value)}`} 
                     alt="QR Code" 
@@ -37,7 +37,8 @@ const QRDisplay = ({ value, onClose }: { value: string, onClose: () => void }) =
     </motion.div>
 );
 
-const Q3MenuItem = ({ label, subLabel, href, onClick, disabled = false, isActive = false }: any) => {
+// --- NEW STATE-OF-THE-ART BUTTON ---
+const Q3MenuItem = ({ label, subLabel, href, onClick, icon: Icon, color = "text-zinc-500" }: any) => {
   const [hovered, setHovered] = useState(false);
   const Container = href ? Link : 'div';
   const props = href ? { href } : { onClick };
@@ -45,20 +46,45 @@ const Q3MenuItem = ({ label, subLabel, href, onClick, disabled = false, isActive
   return (
     <Container 
         {...props}
-        className={cn(
-        "relative group flex items-center justify-between w-full py-4 px-6 border-b-2 transition-all duration-75 uppercase cursor-pointer select-none",
-        disabled ? "opacity-50 cursor-not-allowed border-zinc-900" : 
-        hovered || isActive ? "bg-red-950/60 border-red-600 pl-8" : "bg-black/60 border-zinc-800"
-      )}
-      onMouseEnter={() => !disabled && setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+        className="relative block group cursor-pointer w-full mb-3"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
     >
-      {(hovered || isActive) && (
-        <motion.div layoutId="q3-selector" className="absolute left-2 top-1/2 -translate-y-1/2 text-red-500 text-2xl font-black">►</motion.div>
-      )}
-      <div className="flex flex-col">
-        <span className={cn("font-orbitron font-black text-2xl tracking-widest transition-colors shadow-black drop-shadow-md", hovered || isActive ? "text-red-500" : "text-zinc-400")}>{label}</span>
-        {subLabel && <span className="text-[10px] font-mono text-zinc-500 tracking-[0.2em]">{subLabel}</span>}
+      {/* Background with skew */}
+      <div className={cn(
+          "absolute inset-0 bg-zinc-900/80 border-l-4 transition-all duration-200 skew-x-[-10deg]",
+          hovered ? "border-red-500 bg-zinc-800 translate-x-2" : "border-zinc-700"
+      )} />
+
+      {/* Content Container (Un-skewed for text) */}
+      <div className="relative flex items-center justify-between p-4 pl-6 z-10">
+          <div className="flex items-center gap-4">
+              {/* Icon Box */}
+              <div className={cn(
+                  "w-10 h-10 flex items-center justify-center bg-black/50 border border-zinc-700 transition-colors",
+                  hovered ? "border-red-500 text-white" : "text-zinc-500"
+              )}>
+                  {Icon && <Icon className={cn("w-5 h-5", hovered && "text-red-500")} />}
+              </div>
+
+              {/* Text */}
+              <div className="flex flex-col">
+                  <span className={cn(
+                      "font-black font-orbitron text-xl tracking-widest leading-none transition-colors",
+                      hovered ? "text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" : "text-zinc-400"
+                  )}>
+                      {label}
+                  </span>
+                  <span className={cn("text-[10px] font-mono tracking-[0.2em] uppercase transition-colors", hovered ? "text-red-400" : "text-zinc-600")}>
+                      {subLabel}
+                  </span>
+              </div>
+          </div>
+
+          {/* Right Arrow / Deco */}
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 font-black text-2xl pr-4">
+              &gt;&gt;
+          </div>
       </div>
     </Container>
   );
@@ -73,41 +99,23 @@ export default function StrikeballDashboard() {
   // --- QR LOGIC ---
   const handleQR = () => {
       if (tg && tg.showScanQrPopup) {
-          tg.showScanQrPopup({
-              text: "СКАНИРУЙ КОД ОПЕРАЦИИ, ПРОФИЛЯ ИЛИ ТОВАРА"
-          }, async (text: string) => { // Async for API calls
+          tg.showScanQrPopup({ text: "СКАНИРУЙ КОД ОПЕРАЦИИ ИЛИ ПРОФИЛЯ" }, async (text: string) => { 
               tg.closeScanQrPopup();
               if (!text) return true;
-
               let param = text;
-              if (text.includes('startapp=')) {
-                  param = text.split('startapp=')[1].split('&')[0];
-              }
+              if (text.includes('startapp=')) param = text.split('startapp=')[1].split('&')[0];
 
-              // 1. Lobby Join
               if (param.startsWith('lobby_')) {
-                  const lobbyId = param.replace('lobby_', '');
-                  router.push(`/strikeball/lobbies/${lobbyId}`);
+                  router.push(`/strikeball/lobbies/${param.replace('lobby_', '')}`);
                   toast.success("ОПЕРАЦИЯ ОБНАРУЖЕНА");
-              } 
-              // 2. Instant Gear Buy (New!)
-              else if (param.startsWith('gear_')) {
+              } else if (param.startsWith('gear_')) {
                   const gearId = param.replace('gear_', '');
                   toast.loading("Обработка товара...");
-                  // Import the action dynamically or assume it's available
-                  // Note: Since this is client-side, we call the server action wrapper
                   try {
-                      const { rentGear } = await import("./actions/market"); // Dynamic import for action
+                      const { rentGear } = await import("./actions/market"); 
                       const res = await rentGear(dbUser?.user_id!, gearId);
-                      if(res.success) toast.success("Счет на оплату отправлен!");
-                      else toast.error(res.error);
-                  } catch(e) {
-                      toast.error("Ошибка магазина");
-                  }
-              }
-              // 3. User Profile
-              else if (param.startsWith('user_')) {
-                  toast.info("ПОЛЬЗОВАТЕЛЬ ОБНАРУЖЕН");
+                      if(res.success) toast.success("Счет отправлен!"); else toast.error(res.error);
+                  } catch(e) { toast.error("Ошибка магазина"); }
               } else {
                   toast.error("НЕИЗВЕСТНЫЙ КОД");
               }
@@ -136,28 +144,29 @@ export default function StrikeballDashboard() {
       </div>
 
       <div className="max-w-md mx-auto">
-        <div className="bg-zinc-900/80 backdrop-blur-md border-4 border-zinc-800 p-1 shadow-2xl">
-          <div className="border border-red-900/30 p-1">
+        <div className="relative z-10">
             <AnimatePresence mode="wait">
               {menuStep === 'main' ? (
                 <motion.div 
                   key="main"
                   initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}
-                  className="space-y-2"
+                  className="space-y-1"
                 >
-                  <Q3MenuItem label="СЕТЕВАЯ ИГРА" subLabel="ПОИСК АКТИВНЫХ ОТРЯДОВ" href="/strikeball/lobbies" />
-                  <Q3MenuItem label="СОЗДАТЬ СЕРВЕР" subLabel="НОВАЯ ОПЕРАЦИЯ" onClick={() => setMenuStep('create')} />
-                  <Q3MenuItem label="АРСЕНАЛ" subLabel="АРЕНДА СНАРЯЖЕНИЯ" href="/strikeball/shop" />
+                  <Q3MenuItem label="ПАТИ" subLabel="ПОИСК АКТИВНЫХ ОТРЯДОВ" href="/strikeball/lobbies" icon={FaUsers} />
+                  <Q3MenuItem label="ТУРНИРЫ" subLabel="4x4 LEAGUE" href="/strikeball/tournaments" icon={FaTrophy} />
+                  <Q3MenuItem label="СОЗДАТЬ СЕРВЕР" subLabel="НОВАЯ ОПЕРАЦИЯ" onClick={() => setMenuStep('create')} icon={FaPlus} />
+                  <Q3MenuItem label="АРСЕНАЛ" subLabel="АРЕНДА СНАРЯЖЕНИЯ" href="/strikeball/shop" icon={FaShieldHalved} />
+                  
                   <div className="h-4" />
-                  {/* Updated QR Button Action */}
-                  <Q3MenuItem label="QR КОННЕКТ" subLabel="СКАНЕР / МОЙ КОД" onClick={handleQR} />
+                  
+                  <Q3MenuItem label="QR КОННЕКТ" subLabel="СКАНЕР / МОЙ КОД" onClick={handleQR} icon={FaQrcode} />
                 </motion.div>
               ) : (
                 <motion.div
                   key="create"
                   initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 20, opacity: 0 }}
                 >
-                  <div className="bg-black/60 p-4 mb-2 border border-zinc-700">
+                  <div className="bg-black/80 p-6 mb-4 border-2 border-zinc-700 skew-x-[-2deg]">
                     <h3 className="text-red-500 mb-4 font-black uppercase border-b border-red-800 pb-2">Параметры Высадки</h3>
                     <CreateLobbyForm />
                   </div>
@@ -165,7 +174,6 @@ export default function StrikeballDashboard() {
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
         </div>
       </div>
     </div>
