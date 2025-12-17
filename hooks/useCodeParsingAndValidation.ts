@@ -174,7 +174,7 @@ export function useCodeParsingAndValidation() {
         }
   
         // Add description text before this block
-        const blockStartIndex = lines.slice(0, i - contentLines.length - 1).join('\n').length;
+        const blockStartIndex = lines.slice(0, i - contentLines.length - 2).join('\n').length;
         if (blockStartIndex > lastContentIndex) {
           descriptionParts.push(text.substring(lastContentIndex, blockStartIndex).trim());
         }
