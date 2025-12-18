@@ -108,7 +108,23 @@ export default function StrikeballDashboard() {
               if (param.startsWith('lobby_')) {
                   router.push(`/strikeball/lobbies/${param.replace('lobby_', '')}`);
                   toast.success("ОПЕРАЦИЯ ОБНАРУЖЕНА");
-              } else if (param.startsWith('gear_')) {
+              } else if (param.startsWith('respawn_')) {
+    // Expected: respawn_{lobbyId}_{team}
+    // Actually, just respawn_{lobbyId} is enough if we know user, but let's parse safely
+    const parts = param.split('_');
+    const lobbyId = parts[1];
+    
+    // We trigger the respawn action
+    toast.loading("REVIVING...");
+    try {
+        const { playerRespawn } = await import("./actions/game");
+        const res = await playerRespawn(lobbyId, dbUser?.user_id!);
+        if (res.success) toast.success("ВЫ ВОЗРОЖДЕНЫ! В БОЙ!");
+        else toast.error(res.error);
+    } catch(e) {
+        toast.error("Ошибка возрождения");
+    }
+} else if (param.startsWith('gear_')) {
                   const gearId = param.replace('gear_', '');
                   toast.loading("Обработка товара...");
                   try {
