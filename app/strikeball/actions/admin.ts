@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger";
 export async function validateScannedCode(adminUserId: string, rawCode: string) {
   // ... [Admin check logic remains same] ...
   const { data: user } = await supabaseAdmin.from("users").select("role").eq("user_id", adminUserId).single();
-  const isAdmin = user?.role === 'admin' || user?.role === 'vprAdmin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'strikeAdmin';
   if (!isAdmin) return { success: false, error: "ACCESS DENIED" };
 
   try {
