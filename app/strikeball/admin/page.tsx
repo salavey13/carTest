@@ -2,9 +2,9 @@
 
 import React, { useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { validateScannedCode, adminResurrectPlayer } from "../actions/admin"; // Import resurrect
+import { validateScannedCode, adminResurrectPlayer, returnItemToArmory } from "../actions/admin";
 import { toast } from "sonner";
-import { FaQrcode, FaBoxOpen, FaUsers, FaShieldHalved, FaUser, FaHeartPulse } from "react-icons/fa6";
+import { FaQrcode, FaBoxOpen, FaUsers, FaShieldHalved, FaUser, FaHeartPulse, FaArrowRotateLeft } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -16,7 +16,7 @@ export default function AdminDashboard() {
 
   const handleScan = () => {
     if (!tg?.showScanQrPopup) {
-        const mockCode = prompt("DEV: Enter code (e.g. user_413553377)");
+        const mockCode = prompt("DEV: Enter code (e.g. user_413553377 or purchase_ID)");
         if (mockCode) processCode(mockCode);
         return;
     }
@@ -53,6 +53,21 @@ export default function AdminDashboard() {
       else toast.error(res.error);
   };
 
+  const handleReturnItem = async () => {
+      if(!lastScan || lastScan.type !== 'purchase_info') return;
+      
+      setLoading(true);
+      const res = await returnItemToArmory(dbUser?.user_id!, lastScan.data.id);
+      setLoading(false);
+      
+      if(res.success) {
+          toast.success("ITEM RETURNED TO STOCK");
+          setLastScan((prev: any) => ({ ...prev, data: { ...prev.data, status: 'returned' } })); // Optimistic update
+      } else {
+          toast.error(res.error);
+      }
+  };
+
   return (
     <div className="min-h-screen bg-black text-white pt-24 px-4 font-mono pb-24">
         <div className="border-b-2 border-red-600 pb-4 mb-8">
@@ -74,11 +89,11 @@ export default function AdminDashboard() {
             <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-zinc-900 border border-zinc-700 p-6 rounded-xl mb-8"
+                className="bg-zinc-900 border border-zinc-700 p-6 rounded-xl mb-8 shadow-2xl"
             >
                 <div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-2 border-b border-zinc-800 pb-2">DATA RECEIVED</div>
                 
-                {/* USER PROFILE SCAN */}
+                {/* --- 1. USER PROFILE --- */}
                 {lastScan.type === 'user_profile' && (
                     <div className="space-y-4">
                         <div className="flex items-center gap-4">
@@ -104,19 +119,19 @@ export default function AdminDashboard() {
                         
                         {/* Action: Resurrect */}
                         {lastScan.data.active_status === 'dead' && (
-                            <button onClick={handleResurrect} className="w-full bg-emerald-900/50 text-emerald-400 border border-emerald-600 py-3 font-bold uppercase hover:bg-emerald-800 flex items-center justify-center gap-2">
+                            <button onClick={handleResurrect} className="w-full bg-emerald-900/50 text-emerald-400 border border-emerald-600 py-3 font-bold uppercase hover:bg-emerald-800 flex items-center justify-center gap-2 rounded">
                                 <FaHeartPulse /> RESURRECT PLAYER
                             </button>
                         )}
 
-                        {/* Purchases */}
-                        <div>
-                            <div className="text-[10px] text-zinc-500 uppercase mb-1">LAST PURCHASES</div>
+                        {/* Purchases History */}
+                        <div className="mt-4">
+                            <div className="text-[10px] text-zinc-500 uppercase mb-1">RECENT ITEMS</div>
                             <div className="space-y-1">
                                 {lastScan.data.purchases.length > 0 ? lastScan.data.purchases.map((p: any) => (
-                                    <div key={p.id} className="text-xs flex justify-between bg-black/30 p-1.5 rounded">
-                                        <span>{p.metadata.item_name}</span>
-                                        <span className="text-emerald-600">{p.status.toUpperCase()}</span>
+                                    <div key={p.id} className="text-xs flex justify-between bg-black/30 p-2 rounded border border-zinc-800">
+                                        <span className="text-zinc-300">{p.metadata.item_name}</span>
+                                        <span className={cn("font-bold", p.status === 'returned' ? "text-zinc-600" : "text-emerald-500")}>{p.status.toUpperCase()}</span>
                                     </div>
                                 )) : <div className="text-xs text-zinc-600 italic">No recent purchases</div>}
                             </div>
@@ -124,25 +139,46 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
-                {/* GEAR ISSUE SCAN */}
+                {/* --- 2. GEAR ISSUE (Catalog Scan) --- */}
                 {lastScan.type === 'gear_issue' && (
                     <div className="text-center">
                         <FaBoxOpen className="text-emerald-500 text-4xl mx-auto mb-2" />
                         <h2 className="text-2xl font-bold text-white">{lastScan.data.name}</h2>
-                        <div className="text-emerald-400 font-bold mt-2">STOCK: {lastScan.data.remaining}</div>
-                        <div className="mt-4 p-2 bg-emerald-900/20 text-emerald-500 border border-emerald-900 rounded">
-                            ITEM ISSUED / STOCK DEDUCTED
+                        <div className="text-emerald-400 font-bold mt-2">STOCK REMAINING: {lastScan.data.remaining}</div>
+                        <div className="mt-4 p-2 bg-emerald-900/20 text-emerald-500 border border-emerald-900 rounded text-xs">
+                            ITEM ISSUED FROM STOCK
                         </div>
                     </div>
                 )}
 
-                {/* LOBBY SCAN */}
+                {/* --- 3. LOBBY INFO --- */}
                 {lastScan.type === 'lobby_info' && (
                     <div className="text-center">
                         <FaUsers className="text-cyan-500 text-4xl mx-auto mb-2" />
                         <h2 className="text-2xl font-bold text-white">{lastScan.data.name}</h2>
                         <div className="text-zinc-400 mt-1">STATUS: {lastScan.data.status?.toUpperCase()}</div>
                         <div className="text-cyan-400 font-bold mt-2">PLAYERS: {lastScan.data.count}</div>
+                    </div>
+                )}
+
+                {/* --- 4. PURCHASE INFO (Item Return/Confiscate) --- */}
+                {lastScan.type === 'purchase_info' && (
+                    <div className="text-center">
+                        <FaBoxOpen className={cn("text-4xl mx-auto mb-2", lastScan.data.status === 'returned' ? "text-zinc-600" : "text-amber-500")} />
+                        <h2 className="text-xl font-bold text-white mb-1">{lastScan.data.item}</h2>
+                        <div className="text-xs text-zinc-500 font-mono mb-4">OWNER: {lastScan.data.owner}</div>
+                        
+                        <div className={cn("text-lg font-bold mb-6 border p-2 rounded", lastScan.data.status === 'returned' ? "border-zinc-700 text-zinc-500 bg-zinc-900" : "border-emerald-600 text-emerald-400 bg-emerald-900/20")}>
+                            STATUS: {lastScan.data.status.toUpperCase()}
+                        </div>
+                        
+                        {lastScan.data.status !== 'returned' ? (
+                            <button onClick={handleReturnItem} className="w-full bg-red-900/50 border border-red-600 text-red-200 py-3 font-bold uppercase hover:bg-red-800 rounded flex items-center justify-center gap-2">
+                                <FaArrowRotateLeft /> RETURN TO ARMORY
+                            </button>
+                        ) : (
+                            <div className="text-xs text-zinc-600 font-mono">This item has already been returned to inventory.</div>
+                        )}
                     </div>
                 )}
             </motion.div>
