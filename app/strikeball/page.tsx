@@ -101,16 +101,22 @@ export default function StrikeballDashboard() {
                       else toast.error(res.error);
                   } catch(e) { toast.error("Ошибка захвата"); }
               } else if (param.startsWith('respawn_')) {
-                  // Standard Respawn (Base)
-                  const lobbyId = param.split('_')[1];
-                  toast.loading("Возрождение...");
-                  try {
-                      const { playerRespawn } = await import("./actions/game");
-                      const res = await playerRespawn(lobbyId, dbUser?.user_id!);
-                      if (res.success) toast.success("ВЫ ВОЗРОЖДЕНЫ! В БОЙ!");
-                      else toast.error(res.error);
-                  } catch(e) { toast.error("Ошибка возрождения"); }
-              } else {
+      // Format: respawn_{lobbyId}_{team}
+      const parts = param.split('_');
+      // parts[0] = 'respawn', parts[1] = lobbyId, parts[2] = team ('red' or 'blue')
+      
+      const lobbyId = parts[1];
+      const targetTeam = parts[2] || 'neutral'; // Fallback if old code
+
+      toast.loading("Обработка кода базы...");
+      try {
+          const { handleBaseInteraction } = await import("./actions/game");
+          const res = await handleBaseInteraction(lobbyId, dbUser?.user_id!, targetTeam);
+          
+          if (res.success) toast.success(res.message);
+          else toast.error(res.error);
+      } catch(e) { toast.error("Ошибка базы"); }
+  } else {
                   toast.error("НЕИЗВЕСТНЫЙ КОД");
               }
               return true;
