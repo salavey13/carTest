@@ -32,13 +32,15 @@ const StatCard = ({ label, value, icon: Icon, color, delay }: any) => (
 const QRModal = ({ value, onClose }: { value: string, onClose: () => void }) => (
     <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 backdrop-blur-md" onClick={onClose}>
         <div className="bg-white p-4 rounded-lg shadow-2xl max-w-sm w-full text-center" onClick={e => e.stopPropagation()}>
+            {/* Fallback to API since qrcode.react might need install, but if installed prefer <QRCodeSVG value={value} /> */}
             <img 
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(value)}`} 
-                alt="My QR" 
+                alt="QR Code" 
                 className="w-full h-auto"
             />
-            <p className="text-black font-mono font-bold mt-4 uppercase">Покажите администратору</p>
-            <button onClick={onClose} className="mt-4 w-full bg-black text-white py-3 font-bold uppercase">Закрыть</button>
+            <p className="text-black font-mono font-bold mt-4 uppercase text-xs">Покажите администратору</p>
+            <div className="text-gray-500 text-[10px] mt-1 break-all">{value}</div>
+            <button onClick={onClose} className="mt-4 w-full bg-black text-white py-3 font-bold uppercase font-orbitron hover:bg-zinc-800 transition-colors">Закрыть</button>
         </div>
     </div>
 );
@@ -47,10 +49,12 @@ export default function StatsPage() {
     const { user, userCrewInfo, dbUser } = useAppContext();
     const [stats, setStats] = useState(DEFAULT_STATS);
     const [purchases, setPurchases] = useState<any[]>([]);
-    const [showQR, setShowQR] = useState(false);
+    const [showProfileQR, setShowProfileQR] = useState(false);
+    const [itemQrValue, setItemQrValue] = useState<string | null>(null);
 
     useEffect(() => {
         if(dbUser?.user_id) {
+            // Fetch Combat Stats
             getUserCombatStats(dbUser.user_id).then(res => {
                 if(res.success && res.data) {
                     setStats({
@@ -62,25 +66,31 @@ export default function StatsPage() {
                 }
             });
 
+            // Fetch Inventory (Stash)
             getUserPurchases(dbUser.user_id).then(res => {
                 if(res.success) setPurchases(res.data || []);
             });
         }
     }, [dbUser?.user_id]);
 
-    const myQrLink = `user_${dbUser?.user_id}`; // Format expected by admin scanner
+    const myProfileQr = `user_${dbUser?.user_id}`;
 
     return (
         <div className="pt-28 pb-32 px-4 min-h-screen text-white font-orbitron">
             <AnimatePresence>
-                {showQR && <QRModal value={myQrLink} onClose={() => setShowQR(false)} />}
+                {/* Generic Profile QR */}
+                {showProfileQR && <QRModal value={myProfileQr} onClose={() => setShowProfileQR(false)} />}
+                
+                {/* Specific Item QR */}
+                {itemQrValue && <QRModal value={itemQrValue} onClose={() => setItemQrValue(null)} />}
             </AnimatePresence>
 
             {/* Header */}
             <div className="text-center mb-10 relative">
                 <button 
-                    onClick={() => setShowQR(true)}
+                    onClick={() => setShowProfileQR(true)}
                     className="absolute top-0 right-0 p-3 bg-zinc-800 rounded-full text-white hover:bg-zinc-700 transition-colors border border-zinc-600 shadow-lg"
+                    title="Show Profile QR"
                 >
                     <FaQrcode />
                 </button>
@@ -138,13 +148,13 @@ export default function StatsPage() {
 
             {/* MY STASH (Inventory) */}
             <div className="max-w-2xl mx-auto mb-8">
-                <h3 className="text-sm font-bold text-zinc-500 mb-4 uppercase tracking-widest flex items-center gap-2">
-                    <FaBoxOpen /> МОЙ ИНВЕНТАРЬ ({purchases.length})
+                <h3 className="text-sm font-bold text-zinc-500 mb-4 uppercase tracking-widest flex items-center gap-2 border-b border-zinc-800 pb-2">
+                    <FaBoxOpen className="text-emerald-500" /> МОЙ ИНВЕНТАРЬ ({purchases.length})
                 </h3>
                 
-                <div className="space-y-2">
+                <div className="space-y-3">
                     {purchases.length === 0 && (
-                        <div className="p-4 border border-dashed border-zinc-800 text-center text-zinc-600 font-mono text-xs">
+                        <div className="p-4 border border-dashed border-zinc-800 text-center text-zinc-600 font-mono text-xs rounded">
                             ПУСТО. ПОСЕТИТЕ АРСЕНАЛ.
                         </div>
                     )}
@@ -155,29 +165,72 @@ export default function StatsPage() {
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: i * 0.1 }}
-                            className="bg-zinc-900/60 border border-zinc-800 p-3 flex justify-between items-center"
+                            className="bg-zinc-900/60 border border-zinc-800 p-3 flex justify-between items-center rounded-lg hover:border-emerald-500/30 transition-colors"
                         >
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-black relative border border-zinc-700">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-black relative border border-zinc-700 rounded-sm overflow-hidden">
                                     {p.metadata?.image_url ? (
-                                        <Image src={p.metadata.image_url} alt="Item" fill className="object-cover" />
+                                        <Image src={p.metadata.image_url} alt="Item" fill className="object-cover opacity-80" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-zinc-700 font-bold">?</div>
                                     )}
                                 </div>
                                 <div>
                                     <div className="font-bold text-zinc-200 text-sm">{p.metadata?.item_name || "Unknown Item"}</div>
-                                    <div className="text-[10px] text-zinc-500 font-mono">
-                                        {new Date(p.created_at).toLocaleDateString()} // {p.status.toUpperCase()}
+                                    <div className="text-[10px] text-zinc-500 font-mono flex gap-2 mt-0.5">
+                                       <span className={cn(
+                                           "uppercase font-bold",
+                                           p.status === 'paid' ? "text-emerald-500" :
+                                           p.status === 'returned' ? "text-zinc-600" : "text-amber-500"
+                                       )}>
+                                           {p.status}
+                                       </span>
+                                       <span className="text-zinc-700">|</span>
+                                       <span>{new Date(p.created_at).toLocaleDateString()}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <div className="text-xs font-mono text-emerald-500">{p.total_price} XTR</div>
+                            
+                            <div className="flex flex-col items-end gap-2">
+                                <div className="text-xs font-mono text-emerald-500 font-bold">{p.total_price} XTR</div>
+                                {p.status === 'paid' && (
+                                    <button 
+                                        onClick={() => setItemQrValue(`purchase_${p.id}`)}
+                                        className="bg-zinc-100 text-black px-3 py-1 rounded text-[10px] font-bold font-orbitron hover:bg-white hover:scale-105 transition-all flex items-center gap-1"
+                                    >
+                                        <FaQrcode size={10} /> QR
+                                    </button>
+                                )}
                             </div>
                         </motion.div>
                     ))}
                 </div>
+            </div>
+
+            {/* Performance Graph Placeholder */}
+            <div className="max-w-2xl mx-auto">
+                <div className="bg-zinc-900/40 border border-zinc-800 p-4 relative rounded-lg">
+                    <h3 className="text-xs font-mono text-zinc-500 mb-4 uppercase">Боевая Эффективность (Симуляция)</h3>
+                    
+                    <div className="h-32 flex items-end gap-1">
+                        {[...Array(20)].map((_, i) => {
+                            const height = Math.floor(Math.random() * 80) + 10;
+                            return (
+                                <motion.div 
+                                    key={i}
+                                    initial={{ height: 0 }}
+                                    animate={{ height: `${height}%` }}
+                                    transition={{ delay: i * 0.05, duration: 0.5 }}
+                                    className="flex-1 bg-red-900/50 hover:bg-red-500 transition-colors border-t border-red-500/30 rounded-t-sm"
+                                />
+                            )
+                        })}
+                    </div>
+                    <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:100%_20px]" />
+                </div>
+                <p className="text-[10px] text-zinc-600 font-mono mt-2 text-center">
+                    * Данные обновляются после подтверждения результатов командиром лобби.
+                </p>
             </div>
         </div>
     );
