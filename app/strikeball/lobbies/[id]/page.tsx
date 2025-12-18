@@ -173,24 +173,28 @@ export default function LobbyRoom() {
   const shareIntel = () => { if (!lobby) return; const inviteLink = `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobbyId}`; const url = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(`Op: ${lobby.name}\nJoin Squad!`)}`; if (tg && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank'); };
 
   // Logistics
-  const handleBecomeDriver = async () => {
+  const handleTransportUpdate = async (role: string, seats: number = 0) => {
       if (!userMember) return;
-      await updateTransportStatus(userMember.id, { role: 'driver', seats: driverSeats, car_name: carName || "Авто" });
-      toast.success("Статус: Водитель");
+      await updateTransportStatus(userMember.id, { role, seats, car_name: carName || "Авто" });
+      toast.success("Транспорт обновлен");
       loadData();
+  };
+
+  const toggleDriver = () => {
+      const isDriver = userMember?.metadata?.transport?.role === 'driver';
+      handleTransportUpdate(isDriver ? 'none' : 'driver', driverSeats);
+  };
+
+  const togglePassenger = () => {
+      const isPassenger = userMember?.metadata?.transport?.role === 'passenger';
+      handleTransportUpdate(isPassenger ? 'none' : 'passenger');
   };
 
   const handleUpdateCarDetails = async () => {
       if (!userMember) return;
+      // This forces the current input values to be saved
       await updateTransportStatus(userMember.id, { role: 'driver', seats: driverSeats, car_name: carName || "Авто" });
       toast.success("Данные авто обновлены");
-      loadData();
-  };
-
-  const handleBecomePedestrian = async () => {
-      if (!userMember) return;
-      await updateTransportStatus(userMember.id, { role: 'passenger' }); 
-      toast.info("Статус: Пешеход");
       loadData();
   };
 
@@ -217,7 +221,7 @@ export default function LobbyRoom() {
   const score = lobby.metadata?.score || { red: 0, blue: 0 };
   const isFinished = lobby.status === 'finished';
 
-  // Logistics Data
+  // Logistics Data - Filter and map correctly using the manually joined 'user' object
   const drivers = members.filter(m => m.metadata?.transport?.role === 'driver');
   const pedestrians = members.filter(m => m.metadata?.transport?.role === 'passenger' && !m.metadata.transport?.driver_id);
 
@@ -354,7 +358,7 @@ export default function LobbyRoom() {
                                       <button onClick={() => setDriverSeats(Math.max(1, driverSeats - 1))} className="p-1 bg-zinc-800 rounded hover:bg-zinc-700"><FaMinus size={10}/></button>
                                       <span className="font-mono text-lg font-bold">{driverSeats}</span>
                                       <button onClick={() => setDriverSeats(Math.min(8, driverSeats + 1))} className="p-1 bg-zinc-800 rounded hover:bg-zinc-700"><FaPlus size={10}/></button>
-                                      <button onClick={toggleDriver} className="ml-2 text-[10px] text-green-400 border border-green-500 px-2 py-1 rounded">SAVE</button>
+                                      <button onClick={handleUpdateCarDetails} className="ml-2 text-[10px] text-green-400 border border-green-500 px-2 py-1 rounded">SAVE</button>
                                   </div>
                               )}
                           </div>
