@@ -22,3 +22,7 @@ CREATE TABLE public.tournament_matches (
   winner_crew_id uuid REFERENCES public.crews(id),
   status text DEFAULT 'pending' -- pending, active, completed
 );
+
+-- Add slot info to know where the winner propagates
+ALTER TABLE public.tournament_matches 
+ADD COLUMN IF NOT EXISTS next_match_slot integer; -- 1 for Crew1, 2 for Crew2
