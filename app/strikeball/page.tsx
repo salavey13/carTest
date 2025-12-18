@@ -10,8 +10,6 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { FaQrcode, FaShieldHalved, FaUsers, FaPlus, FaTrophy } from "react-icons/fa6";
 
-// ... [QRDisplay component remains the same] ...
-
 const QRDisplay = ({ value, onClose }: { value: string, onClose: () => void }) => (
     <motion.div 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -37,7 +35,6 @@ const QRDisplay = ({ value, onClose }: { value: string, onClose: () => void }) =
     </motion.div>
 );
 
-// --- NEW STATE-OF-THE-ART BUTTON ---
 const Q3MenuItem = ({ label, subLabel, href, onClick, icon: Icon, color = "text-zinc-500" }: any) => {
   const [hovered, setHovered] = useState(false);
   const Container = href ? Link : 'div';
@@ -50,41 +47,18 @@ const Q3MenuItem = ({ label, subLabel, href, onClick, icon: Icon, color = "text-
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
     >
-      {/* Background with skew */}
-      <div className={cn(
-          "absolute inset-0 bg-zinc-900/80 border-l-4 transition-all duration-200 skew-x-[-10deg]",
-          hovered ? "border-red-500 bg-zinc-800 translate-x-2" : "border-zinc-700"
-      )} />
-
-      {/* Content Container (Un-skewed for text) */}
+      <div className={cn("absolute inset-0 bg-zinc-900/80 border-l-4 transition-all duration-200 skew-x-[-10deg]", hovered ? "border-red-500 bg-zinc-800 translate-x-2" : "border-zinc-700")} />
       <div className="relative flex items-center justify-between p-4 pl-6 z-10">
           <div className="flex items-center gap-4">
-              {/* Icon Box */}
-              <div className={cn(
-                  "w-10 h-10 flex items-center justify-center bg-black/50 border border-zinc-700 transition-colors",
-                  hovered ? "border-red-500 text-white" : "text-zinc-500"
-              )}>
+              <div className={cn("w-10 h-10 flex items-center justify-center bg-black/50 border border-zinc-700 transition-colors", hovered ? "border-red-500 text-white" : "text-zinc-500")}>
                   {Icon && <Icon className={cn("w-5 h-5", hovered && "text-red-500")} />}
               </div>
-
-              {/* Text */}
               <div className="flex flex-col">
-                  <span className={cn(
-                      "font-black font-orbitron text-xl tracking-widest leading-none transition-colors",
-                      hovered ? "text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" : "text-zinc-400"
-                  )}>
-                      {label}
-                  </span>
-                  <span className={cn("text-[10px] font-mono tracking-[0.2em] uppercase transition-colors", hovered ? "text-red-400" : "text-zinc-600")}>
-                      {subLabel}
-                  </span>
+                  <span className={cn("font-black font-orbitron text-xl tracking-widest leading-none transition-colors", hovered ? "text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" : "text-zinc-400")}>{label}</span>
+                  <span className={cn("text-[10px] font-mono tracking-[0.2em] uppercase transition-colors", hovered ? "text-red-400" : "text-zinc-600")}>{subLabel}</span>
               </div>
           </div>
-
-          {/* Right Arrow / Deco */}
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 font-black text-2xl pr-4">
-              &gt;&gt;
-          </div>
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 font-black text-2xl pr-4">&gt;&gt;</div>
       </div>
     </Container>
   );
@@ -108,23 +82,7 @@ export default function StrikeballDashboard() {
               if (param.startsWith('lobby_')) {
                   router.push(`/strikeball/lobbies/${param.replace('lobby_', '')}`);
                   toast.success("ОПЕРАЦИЯ ОБНАРУЖЕНА");
-              } else if (param.startsWith('respawn_')) {
-    // Expected: respawn_{lobbyId}_{team}
-    // Actually, just respawn_{lobbyId} is enough if we know user, but let's parse safely
-    const parts = param.split('_');
-    const lobbyId = parts[1];
-    
-    // We trigger the respawn action
-    toast.loading("REVIVING...");
-    try {
-        const { playerRespawn } = await import("./actions/game");
-        const res = await playerRespawn(lobbyId, dbUser?.user_id!);
-        if (res.success) toast.success("ВЫ ВОЗРОЖДЕНЫ! В БОЙ!");
-        else toast.error(res.error);
-    } catch(e) {
-        toast.error("Ошибка возрождения");
-    }
-} else if (param.startsWith('gear_')) {
+              } else if (param.startsWith('gear_')) {
                   const gearId = param.replace('gear_', '');
                   toast.loading("Обработка товара...");
                   try {
@@ -133,17 +91,26 @@ export default function StrikeballDashboard() {
                       if(res.success) toast.success("Счет отправлен!"); else toast.error(res.error);
                   } catch(e) { toast.error("Ошибка магазина"); }
               } else if (param.startsWith('capture_')) {
-    const checkpointId = param.replace('capture_', '');
-    toast.loading("Capturing...");
-    try {
-        const { captureCheckpoint } = await import("./actions/domination");
-        const res = await captureCheckpoint(dbUser?.user_id!, checkpointId);
-        if (res.success) toast.success(res.message);
-        else toast.error(res.error);
-    } catch(e) {
-        toast.error("Capture Error");
-    }
-} else {
+                  // NEW: Capture Logic (which handles Respawn too)
+                  const checkpointId = param.replace('capture_', '');
+                  toast.loading("Обработка цели...");
+                  try {
+                      const { captureCheckpoint } = await import("./actions/domination");
+                      const res = await captureCheckpoint(dbUser?.user_id!, checkpointId);
+                      if (res.success) toast.success(res.message);
+                      else toast.error(res.error);
+                  } catch(e) { toast.error("Ошибка захвата"); }
+              } else if (param.startsWith('respawn_')) {
+                  // Standard Respawn (Base)
+                  const lobbyId = param.split('_')[1];
+                  toast.loading("Возрождение...");
+                  try {
+                      const { playerRespawn } = await import("./actions/game");
+                      const res = await playerRespawn(lobbyId, dbUser?.user_id!);
+                      if (res.success) toast.success("ВЫ ВОЗРОЖДЕНЫ! В БОЙ!");
+                      else toast.error(res.error);
+                  } catch(e) { toast.error("Ошибка возрождения"); }
+              } else {
                   toast.error("НЕИЗВЕСТНЫЙ КОД");
               }
               return true;
@@ -179,13 +146,11 @@ export default function StrikeballDashboard() {
                   initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}
                   className="space-y-1"
                 >
-                  <Q3MenuItem label="ПАТИ" subLabel="ПОИСК АКТИВНЫХ ОТРЯДОВ" href="/strikeball/lobbies" icon={FaUsers} />
+                  <Q3MenuItem label="СЕТЕВАЯ ИГРА" subLabel="ПОИСК АКТИВНЫХ ОТРЯДОВ" href="/strikeball/lobbies" icon={FaUsers} />
                   <Q3MenuItem label="ТУРНИРЫ" subLabel="4x4 LEAGUE" href="/strikeball/tournaments" icon={FaTrophy} />
                   <Q3MenuItem label="СОЗДАТЬ СЕРВЕР" subLabel="НОВАЯ ОПЕРАЦИЯ" onClick={() => setMenuStep('create')} icon={FaPlus} />
                   <Q3MenuItem label="АРСЕНАЛ" subLabel="АРЕНДА СНАРЯЖЕНИЯ" href="/strikeball/shop" icon={FaShieldHalved} />
-                  
                   <div className="h-4" />
-                  
                   <Q3MenuItem label="QR КОННЕКТ" subLabel="СКАНЕР / МОЙ КОД" onClick={handleQR} icon={FaQrcode} />
                 </motion.div>
               ) : (

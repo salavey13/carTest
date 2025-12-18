@@ -8,40 +8,52 @@ import { sendTelegramDocument } from "@/app/actions";
 
 const pdfLibModule = require('pdf-lib');
 const fontkitModule = require('@pdf-lib/fontkit');
-const { PDFDocument, rgb, grayscale } = pdfLibModule;
+const { PDFDocument, rgb } = pdfLibModule;
 
+/**
+ * Generates a "Stylish as F*ck" Tactical Briefing PDF.
+ * Includes Rosters, Game Info, and Checkpoint QR Codes.
+ */
 export async function generateAndSendLobbyPdf(userId: string, lobbyId: string) {
   try {
+    // 1. Fetch Data
     const { data: lobby } = await supabaseAdmin.from("lobbies").select("*").eq("id", lobbyId).single();
     const { data: rawMembers } = await supabaseAdmin.from("lobby_members").select("*").eq("lobby_id", lobbyId);
+    const { data: checkpoints } = await supabaseAdmin.from("lobby_checkpoints").select("*").eq("lobby_id", lobbyId);
     
     if (!lobby) throw new Error("Lobby not found");
 
+    // We need members linked to users to get names
     const userIds = rawMembers?.map((m: any) => m.user_id).filter((id: string) => id && id.length > 10) || [];
     const { data: users } = await supabaseAdmin.from("users").select("user_id, username, full_name").in("user_id", userIds);
     
     const userMap = new Map();
     users?.forEach((u: any) => userMap.set(u.user_id, u));
 
+    // 2. Initialize PDF
     const pdfDoc = await PDFDocument.create();
     pdfDoc.registerFontkit(fontkitModule);
 
+    // 3. Load Fonts
     const fontPath = path.join(process.cwd(), 'server-assets', 'fonts', 'DejaVuSans.ttf');
     const fontBytes = fs.readFileSync(fontPath);
     const customFont = await pdfDoc.embedFont(fontBytes); 
     
-    const page = pdfDoc.addPage([595.28, 841.89]); 
+    // 4. Setup Page (A4)
+    let page = pdfDoc.addPage([595.28, 841.89]); 
     const { width, height } = page.getSize();
     
+    // --- COLORS ---
     const COLOR_BG = rgb(0.97, 0.97, 0.97);
     const COLOR_DARK = rgb(0.1, 0.1, 0.1);
     const COLOR_RED = rgb(0.7, 0.1, 0.1);
     const COLOR_BLUE = rgb(0.1, 0.2, 0.6);
     const COLOR_GREY = rgb(0.5, 0.5, 0.5);
 
+    // --- BACKGROUND ---
     page.drawRectangle({ x: 0, y: 0, width, height, color: COLOR_BG });
     
-    // Grid
+    // Draw Tactical Grid
     for (let i = 0; i < width; i += 40) {
         page.drawLine({ start: { x: i, y: 0 }, end: { x: i, y: height }, thickness: 0.5, color: rgb(0.9, 0.9, 0.9) });
     }
@@ -49,16 +61,30 @@ export async function generateAndSendLobbyPdf(userId: string, lobbyId: string) {
         page.drawLine({ start: { x: 0, y: i }, end: { x: width, y: i }, thickness: 0.5, color: rgb(0.9, 0.9, 0.9) });
     }
 
-    // Header
+    // --- HEADER ---
     const headerHeight = 80;
     page.drawRectangle({ x: 0, y: height - headerHeight, width, height: headerHeight, color: COLOR_DARK });
     
-    page.drawText("TACTICAL OPERATIONS // BRIEFING", { x: 40, y: height - 50, size: 24, font: customFont, color: rgb(1, 1, 1) });
-    page.drawText(`REF_ID: ${lobby.id.split('-')[0].toUpperCase()}`, { x: width - 150, y: height - 50, size: 10, font: customFont, color: COLOR_RED });
+    page.drawText("TACTICAL OPERATIONS // BRIEFING", {
+        x: 40,
+        y: height - 50,
+        size: 24,
+        font: customFont,
+        color: rgb(1, 1, 1)
+    });
 
+    page.drawText(`REF_ID: ${lobby.id.split('-')[0].toUpperCase()}`, {
+        x: width - 150,
+        y: height - 50,
+        size: 10,
+        font: customFont,
+        color: COLOR_RED
+    });
+
+    // --- INFO CARD ---
     let y = height - 120;
     
-    // Main Join QR
+    // QR Code Generation (Join Link)
     let qrImage;
     try {
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://t.me/oneSitePlsBot/app?startapp=lobby_${lobby.id}`;
@@ -66,6 +92,7 @@ export async function generateAndSendLobbyPdf(userId: string, lobbyId: string) {
         qrImage = await pdfDoc.embedPng(qrBytes);
     } catch (e) { logger.error("QR Gen failed", e); }
 
+    // Info Box
     page.drawRectangle({ x: 40, y: y - 100, width: width - 80, height: 100, color: rgb(1, 1, 1), borderColor: COLOR_DARK, borderWidth: 2 });
     
     const startX = 60;
@@ -91,6 +118,7 @@ export async function generateAndSendLobbyPdf(userId: string, lobbyId: string) {
 
     y -= 140;
 
+    // --- TEAMS LAYOUT ---
     const colWidth = (width - 100) / 2;
     const blueX = 40;
     const redX = 40 + colWidth + 20;
@@ -118,60 +146,114 @@ export async function generateAndSendLobbyPdf(userId: string, lobbyId: string) {
     let blueY = y;
     let redY = y;
 
+    // Render Blue Roster
     blueTeam.forEach((m: any, i: number) => {
         blueY -= 25;
         if (i % 2 === 0) page.drawRectangle({ x: blueX, y: blueY - 5, width: colWidth, height: 25, color: rgb(0.95, 0.95, 1) });
         page.drawText(`${i + 1}. ${m.name}`, { x: blueX + 10, y: blueY, size: 10, font: customFont, color: COLOR_DARK });
+        
+        const statusColor = m.status === 'alive' ? rgb(0, 0.6, 0) : rgb(0.6, 0, 0);
+        page.drawCircle({ x: blueX + colWidth - 20, y: blueY + 4, size: 4, color: statusColor });
     });
 
+    // Render Red Roster
     redTeam.forEach((m: any, i: number) => {
         redY -= 25;
         if (i % 2 === 0) page.drawRectangle({ x: redX, y: redY - 5, width: colWidth, height: 25, color: rgb(1, 0.95, 0.95) });
         page.drawText(`${i + 1}. ${m.name}`, { x: redX + 10, y: redY, size: 10, font: customFont, color: COLOR_DARK });
+
+        const statusColor = m.status === 'alive' ? rgb(0, 0.6, 0) : rgb(0.6, 0, 0);
+        page.drawCircle({ x: redX + colWidth - 20, y: redY + 4, size: 4, color: statusColor });
     });
 
-    // --- RESPAWN CODES ---
-    const respawnY = 150;
+    // Adjust Y to be below the longest list
+    y = Math.min(blueY, redY) - 50;
+
+    // --- CHECKPOINT QR CODES ---
+    if (checkpoints && checkpoints.length > 0) {
+        
+        // Check for page break
+        if (y < 200) {
+             page = pdfDoc.addPage([595.28, 841.89]);
+             y = height - 50;
+        }
+
+        page.drawText("TACTICAL OBJECTIVES (PRINT & DEPLOY)", { x: 40, y: y, size: 14, font: customFont, color: COLOR_DARK });
+        page.drawLine({ start: { x: 40, y: y - 5 }, end: { x: width - 40, y: y - 5 }, thickness: 2, color: COLOR_RED });
+        y -= 30;
+
+        let qrX = 40;
+        const qrSize = 100;
+        const gap = 30;
+
+        for (const cp of checkpoints) {
+            // New row if needed
+            if (qrX + qrSize > width - 40) {
+                qrX = 40;
+                y -= (qrSize + 50);
+                if (y < 100) { page = pdfDoc.addPage([595.28, 841.89]); y = height - 50; }
+            }
+
+            try {
+                // Generate Capture/Respawn QR
+                const qrData = `capture_${cp.id}`; 
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+                const qrBytes = await fetch(qrUrl).then(res => res.arrayBuffer());
+                const qrImg = await pdfDoc.embedPng(qrBytes);
+
+                // Draw QR
+                page.drawImage(qrImg, { x: qrX, y: y - qrSize, width: qrSize, height: qrSize });
+                page.drawRectangle({ x: qrX, y: y - qrSize, width: qrSize, height: qrSize, borderColor: COLOR_DARK, borderWidth: 1 });
+                
+                // Label
+                page.drawText(cp.name, { x: qrX, y: y - qrSize - 15, size: 10, font: customFont, color: COLOR_DARK });
+                page.drawText(`ID: ${cp.id.slice(0,4).toUpperCase()}`, { x: qrX, y: y - qrSize - 25, size: 8, font: customFont, color: COLOR_GREY });
+                
+                qrX += qrSize + gap;
+            } catch(e) {
+                console.error("CP QR Error", e);
+            }
+        }
+    }
+
+    // --- FOOTER WARNING ---
+    const bottomY = 40;
+    page.drawLine({ start: { x: 40, y: bottomY + 20 }, end: { x: width - 40, y: bottomY + 20 }, thickness: 1, color: COLOR_GREY });
     
-    // Blue Respawn QR
-    try {
-        const qrData = `respawn_${lobby.id}_blue`; // Custom payload for webhook or scanner
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-        const qrBytes = await fetch(qrUrl).then(res => res.arrayBuffer());
-        const qrImg = await pdfDoc.embedPng(qrBytes);
-        
-        page.drawRectangle({ x: blueX, y: respawnY, width: 100, height: 100, borderColor: COLOR_BLUE, borderWidth: 2 });
-        page.drawImage(qrImg, { x: blueX + 10, y: respawnY + 10, width: 80, height: 80 });
-        page.drawText("BLUE RESPAWN", { x: blueX + 10, y: respawnY - 15, size: 10, font: customFont, color: COLOR_BLUE });
-    } catch(e) {}
+    page.drawText("WARNING: LIVE FIRE ZONE // EYE PROTECTION MANDATORY // OBEY GAME MARSHALS", {
+        x: 40,
+        y: bottomY,
+        size: 8,
+        font: customFont,
+        color: COLOR_RED
+    });
 
-    // Red Respawn QR
-    try {
-        const qrData = `respawn_${lobby.id}_red`;
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-        const qrBytes = await fetch(qrUrl).then(res => res.arrayBuffer());
-        const qrImg = await pdfDoc.embedPng(qrBytes);
-        
-        page.drawRectangle({ x: redX, y: respawnY, width: 100, height: 100, borderColor: COLOR_RED, borderWidth: 2 });
-        page.drawImage(qrImg, { x: redX + 10, y: respawnY + 10, width: 80, height: 80 });
-        page.drawText("RED RESPAWN", { x: redX + 10, y: respawnY - 15, size: 10, font: customFont, color: COLOR_RED });
-    } catch(e) {}
+    page.drawText(`GENERATED VIA STRIKEBALL OPS // ${new Date().toISOString().split('T')[0]}`, {
+        x: width - 250,
+        y: bottomY,
+        size: 8,
+        font: customFont,
+        color: COLOR_GREY
+    });
 
+    // Save & Send
     const pdfBytes = await pdfDoc.save();
-    const fileName = `BRIEF_${lobby.id.slice(0,6)}.pdf`;
+    const fileName = `INTEL_${lobby.name.replace(/\s+/g, '_').toUpperCase()}.pdf`;
     const fileBlob = new Blob([pdfBytes], { type: 'application/pdf' });
     
     const sendRes = await sendTelegramDocument(userId, fileBlob, fileName, "📄 **TACTICAL DOSSIER**");
+    
     if (!sendRes.success) throw new Error(sendRes.error);
 
     return { success: true, message: "PDF Dossier transmitted." };
+
   } catch (error: any) {
     logger.error("generateAndSendLobbyPdf Error", error);
     return { success: false, error: error.message };
   }
 }
 
-// ... [generateGearCatalogPdf remains same] ...
+// ... [generateGearCatalogPdf remains unchanged] ...
 export async function generateGearCatalogPdf(userId: string) {
   try {
     const { data: gear } = await supabaseAdmin.from("cars").select("*").in("type", ["gear", "weapon", "consumable"]);
