@@ -116,7 +116,18 @@ export default function StrikeballDashboard() {
                       const res = await rentGear(dbUser?.user_id!, gearId);
                       if(res.success) toast.success("Счет отправлен!"); else toast.error(res.error);
                   } catch(e) { toast.error("Ошибка магазина"); }
-              } else {
+              } else if (param.startsWith('capture_')) {
+    const checkpointId = param.replace('capture_', '');
+    toast.loading("Capturing...");
+    try {
+        const { captureCheckpoint } = await import("./actions/domination");
+        const res = await captureCheckpoint(dbUser?.user_id!, checkpointId);
+        if (res.success) toast.success(res.message);
+        else toast.error(res.error);
+    } catch(e) {
+        toast.error("Capture Error");
+    }
+} else {
                   toast.error("НЕИЗВЕСТНЫЙ КОД");
               }
               return true;
