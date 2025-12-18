@@ -15,13 +15,11 @@ export async function fetchLobbyData(lobbyId: string) {
     // 1. Fetch Lobby
     const { data: lobby, error: lobbyError } = await supabaseAdmin
       .from("lobbies")
-      .select(`*, host_crew:crews(id, name, logo_url)`) // Join crew details here
+      .select(`*, host_crew:crews(id, name, logo_url)`)
       .eq("id", lobbyId)
       .single();
 
-    if (lobbyError || !lobby) {
-      return { success: false, error: "Lobby not found" };
-    }
+    if (lobbyError || !lobby) return { success: false, error: "Lobby not found" };
 
     // 2. Fetch Members
     const { data: members, error: membersError } = await supabaseAdmin
@@ -31,30 +29,41 @@ export async function fetchLobbyData(lobbyId: string) {
 
     if (membersError) return { success: false, error: "Members fetch failed" };
 
-    // 3. Populate Usernames manually
-    // FIX: Removed .length > 10 check to support Telegram IDs (9 digits)
-    const userIds = members
-      .filter((m) => !m.is_bot && m.user_id) 
-      .map((m) => m.user_id);
-
+    // 3. Populate Users & GEAR
+    const userIds = members.filter((m) => !m.is_bot && m.user_id).map((m) => m.user_id);
+    
     let userMap: Record<string, any> = {};
+    let gearMap: Record<string, any[]> = {};
+
     if (userIds.length > 0) {
+      // Users
       const { data: users } = await supabaseAdmin
         .from("users")
         .select("user_id, username, full_name, avatar_url")
         .in("user_id", userIds);
-      
       users?.forEach((u) => { userMap[u.user_id] = u; });
+
+      // Gear (Active/Paid items only)
+      const { data: purchases } = await supabaseAdmin
+        .from("user_purchases")
+        .select("user_id, metadata")
+        .in("user_id", userIds)
+        .eq("status", "paid"); // Only show active items
+      
+      purchases?.forEach(p => {
+          if (!gearMap[p.user_id]) gearMap[p.user_id] = [];
+          gearMap[p.user_id].push(p.metadata);
+      });
     }
 
     const enrichedMembers = members.map((m) => ({
       ...m,
-      user: userMap[m.user_id] || null
+      user: userMap[m.user_id] || null,
+      gear: gearMap[m.user_id] || []
     }));
 
     return { success: true, lobby, members: enrichedMembers };
   } catch (e: any) {
-    logger.error("fetchLobbyData Failed", e);
     return { success: false, error: e.message };
   }
 }
