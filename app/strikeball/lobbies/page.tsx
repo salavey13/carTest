@@ -6,8 +6,9 @@ import { getOpenLobbies, joinLobby, getUserActiveLobbies } from "../actions/lobb
 import { getAllPublicCrews } from "@/app/rentals/actions"; 
 import { toast } from "sonner";
 import Link from "next/link";
-import { FaUsers, FaSkull, FaDoorOpen, FaShieldHalved } from "react-icons/fa6";
+import { FaUsers, FaSkull, FaDoorOpen, FaShieldHalved, FaPlus } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
+import { CreateSquadForm } from "../components/CreateSquadForm"; // NEW COMPONENT IMPORT
 
 type Lobby = {
   id: string;
@@ -27,6 +28,7 @@ export default function LobbiesPageClient() {
   const [crews, setCrews] = useState<any[]>([]); 
   const [myLobbies, setMyLobbies] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCreatingSquad, setIsCreatingSquad] = useState(false); // Toggle state
 
   const load = async () => {
     setLoading(true);
@@ -42,7 +44,7 @@ export default function LobbiesPageClient() {
       if (myLobbiesRes.success) setMyLobbies(myLobbiesRes.data || []);
       
     } catch (e) {
-      toast.error("Связь потеряна: " + ((e as Error).message));
+      toast.error("Signal Lost: " + ((e as Error).message));
     } finally { setLoading(false); }
   };
 
@@ -84,15 +86,12 @@ export default function LobbiesPageClient() {
                   "bg-zinc-900/90 border border-zinc-700 p-4 flex justify-between items-center transition-colors shadow-lg relative overflow-hidden",
                   isMember ? "hover:border-emerald-500" : "hover:border-red-500 hover:bg-zinc-800"
               )}>
-                {/* Crew Hosted Badge */}
                 {isCrewHosted && (
                     <div className="absolute top-0 right-0 bg-cyan-900/80 text-cyan-200 text-[9px] font-bold px-2 py-0.5 flex items-center gap-1 z-10 border-l border-b border-cyan-700">
                         <FaShieldHalved size={8} /> {l.host_crew?.name}
                     </div>
                 )}
-
                 <div className={cn("absolute left-0 top-0 bottom-0 w-1 opacity-0 group-hover:opacity-100 transition-opacity", isMember ? "bg-emerald-500" : "bg-red-600")} />
-                
                 <div className="flex-1">
                   <div className={cn("font-bold text-lg leading-none transition-colors mb-1", isMember ? "text-emerald-400 group-hover:text-emerald-300" : "text-white group-hover:text-red-400")}>
                     {l.name}
@@ -105,7 +104,6 @@ export default function LobbiesPageClient() {
                      </span>
                   </div>
                 </div>
-                
                 {isMember ? (
                     <div className="bg-emerald-900/50 text-emerald-100 px-4 py-2 text-xs font-black border border-emerald-600 flex items-center gap-2">
                         ВХОД <FaDoorOpen />
@@ -150,6 +148,22 @@ export default function LobbiesPageClient() {
              </div>
            </Link>
         ))}
+      </div>
+
+      {/* CREATE SQUAD BUTTON (New) */}
+      <div className="mt-8 pt-8 border-t border-zinc-800">
+          <button 
+             onClick={() => setIsCreatingSquad(!isCreatingSquad)}
+             className="w-full py-4 border-2 border-dashed border-cyan-800 text-cyan-600 hover:text-cyan-400 hover:border-cyan-500 transition-colors uppercase font-bold flex items-center justify-center gap-2 font-orbitron"
+          >
+              <FaPlus /> REGISTER NEW SQUAD
+          </button>
+
+          {isCreatingSquad && (
+              <div className="mt-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                  <CreateSquadForm onSuccess={() => { setIsCreatingSquad(false); load(); }} />
+              </div>
+          )}
       </div>
     </div>
   );
