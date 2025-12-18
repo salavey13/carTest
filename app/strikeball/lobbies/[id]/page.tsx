@@ -10,7 +10,10 @@ import { updateTransportStatus, signSafetyBriefing, joinCar } from "../../action
 import { generateAndSendLobbyPdf } from "../../actions/service";
 import { SquadRoster } from "../../components/SquadRoster";
 import { CommandConsole } from "../../components/CommandConsole"; 
-import { LiveHUD } from "../../components/LiveHUD"; 
+import { LiveHUD } from "../../components/LiveHUD";
+import { DominationHUD } from "../../components/DominationHUD";
+import { AdminCheckpointPanel } from "../../components/AdminCheckpointPanel";
+import { getLobbyCheckpoints } from "../../actions/domination"; 
 import { SafetyBriefing } from "../../components/SafetyBriefing";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -30,6 +33,8 @@ export default function LobbyRoom() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [driverSeats, setDriverSeats] = useState(3);
   const [carName, setCarName] = useState("");
+  const [checkpoints, setCheckpoints] = useState<any[]>([]);
+
 
   // USE SERVER ACTION FOR DATA LOADING (Manual Joins)
   const loadData = useCallback(async () => {
@@ -51,6 +56,10 @@ export default function LobbyRoom() {
              if (!carName) setCarName(me.metadata.transport.car_name || "");
              if (driverSeats === 3 && me.metadata.transport.seats) setDriverSeats(me.metadata.transport.seats);
         }
+
+      const { data: cps } = await getLobbyCheckpoints(lobbyId);
+setCheckpoints(cps || []);
+
 
     } catch (e: any) {
         console.error("Lobby Load Error:", e);
@@ -209,8 +218,28 @@ export default function LobbyRoom() {
           {/* GAME TAB */}
           {activeTab === 'game' && (
              <div className="space-y-6">
+                        {/* SHOW DOMINATION HUD IF POINTS EXIST */}
+                    {checkpoints.length > 0 && <DominationHUD lobbyId={lobby.id} />}
                  {(lobby.status === 'active' || isFinished) && <LiveHUD startTime={lobby.metadata?.actual_start_at} score={score} />}
                  {isOwner && <div className="border-t border-zinc-800 pt-6"><h3 className="text-center font-orbitron text-zinc-500 mb-4 text-xs tracking-widest">COMMANDER OVERRIDE</h3><CommandConsole lobbyId={lobby.id} userId={dbUser!.user_id} status={lobby.status} score={score} /></div>}
+       {isOwner && (
+           <AdminCheckpointPanel lobbyId={lobby.id} onLoad={loadData} />
+       )}
+       
+       {isOwner && checkpoints.length > 0 && (
+           <div className="grid grid-cols-2 gap-2">
+               {checkpoints.map(cp => (
+                   <button 
+                      key={cp.id}
+                      // Hacky way to view QR again if needed
+                      onClick={() => toast.info(`Code: capture_${cp.id}`)} 
+                      className="text-[10px] bg-zinc-800 p-2 rounded text-zinc-400 border border-zinc-700"
+                   >
+                       PRINT {cp.name}
+                   </button>
+               ))}
+           </div>
+       )}
                  {lobby.status === 'open' && !isOwner && <div className="text-center py-10 bg-zinc-900/50 rounded border border-zinc-800 border-dashed text-zinc-500 font-mono">WAITING FOR COMMANDER...</div>}
              </div>
           )}
