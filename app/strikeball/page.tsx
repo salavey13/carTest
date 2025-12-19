@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { FaQrcode, FaShieldHalved, FaUsers, FaPlus, FaTrophy } from "react-icons/fa6";
 
+// ... [QRDisplay component remains same] ...
 const QRDisplay = ({ value, onClose }: { value: string, onClose: () => void }) => (
     <motion.div 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -35,7 +36,7 @@ const QRDisplay = ({ value, onClose }: { value: string, onClose: () => void }) =
     </motion.div>
 );
 
-const Q3MenuItem = ({ label, subLabel, href, onClick, icon: Icon, color = "text-zinc-500" }: any) => {
+const Q3MenuItem = ({ label, subLabel, href, onClick, icon: Icon, className }: any) => {
   const [hovered, setHovered] = useState(false);
   const Container = href ? Link : 'div';
   const props = href ? { href } : { onClick };
@@ -43,7 +44,7 @@ const Q3MenuItem = ({ label, subLabel, href, onClick, icon: Icon, color = "text-
   return (
     <Container 
         {...props}
-        className="relative block group cursor-pointer w-full mb-3"
+        className={cn("relative block group cursor-pointer w-full mb-3", className)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
     >
@@ -65,12 +66,14 @@ const Q3MenuItem = ({ label, subLabel, href, onClick, icon: Icon, color = "text-
 };
 
 export default function StrikeballDashboard() {
-  const { tg, dbUser } = useAppContext();
+  const { tg, dbUser, activeLobby } = useAppContext(); // Get active combat status
   const router = useRouter();
   const [menuStep, setMenuStep] = useState<'main' | 'create'>('main');
   const [showQR, setShowQR] = useState(false);
 
-  // --- QR LOGIC ---
+  // --- GHOST VIS LOGIC ---
+  const isLive = !!activeLobby;
+
   const handleQR = () => {
       if (tg && tg.showScanQrPopup) {
           tg.showScanQrPopup({ text: "СКАНИРУЙ КОД ОПЕРАЦИИ ИЛИ ПРОФИЛЯ" }, async (text: string) => { 
@@ -91,32 +94,24 @@ export default function StrikeballDashboard() {
                       if(res.success) toast.success("Счет отправлен!"); else toast.error(res.error);
                   } catch(e) { toast.error("Ошибка магазина"); }
               } else if (param.startsWith('capture_')) {
-                  // NEW: Capture Logic (which handles Respawn too)
                   const checkpointId = param.replace('capture_', '');
-                  toast.loading("Обработка цели...");
+                  toast.loading("Capturing...");
                   try {
                       const { captureCheckpoint } = await import("./actions/domination");
                       const res = await captureCheckpoint(dbUser?.user_id!, checkpointId);
-                      if (res.success) toast.success(res.message);
-                      else toast.error(res.error);
-                  } catch(e) { toast.error("Ошибка захвата"); }
+                      if (res.success) toast.success(res.message); else toast.error(res.error);
+                  } catch(e) { toast.error("Capture Error"); }
               } else if (param.startsWith('respawn_')) {
-      // Format: respawn_{lobbyId}_{team}
-      const parts = param.split('_');
-      // parts[0] = 'respawn', parts[1] = lobbyId, parts[2] = team ('red' or 'blue')
-      
-      const lobbyId = parts[1];
-      const targetTeam = parts[2] || 'neutral'; // Fallback if old code
-
-      toast.loading("Обработка кода базы...");
-      try {
-          const { handleBaseInteraction } = await import("./actions/game");
-          const res = await handleBaseInteraction(lobbyId, dbUser?.user_id!, targetTeam);
-          
-          if (res.success) toast.success(res.message);
-          else toast.error(res.error);
-      } catch(e) { toast.error("Ошибка базы"); }
-  } else {
+                  const parts = param.split('_');
+                  const lobbyId = parts[1];
+                  const targetTeam = parts[2] || 'neutral';
+                  toast.loading("Обработка кода базы...");
+                  try {
+                      const { handleBaseInteraction } = await import("./actions/game");
+                      const res = await handleBaseInteraction(lobbyId, dbUser?.user_id!, targetTeam);
+                      if (res.success) toast.success(res.message); else toast.error(res.error);
+                  } catch(e) { toast.error("Ошибка базы"); }
+              } else {
                   toast.error("НЕИЗВЕСТНЫЙ КОД");
               }
               return true;
@@ -129,18 +124,31 @@ export default function StrikeballDashboard() {
   const myLink = `https://t.me/oneSitePlsBot/app?startapp=user_${dbUser?.user_id || 'unknown'}`;
 
   return (
-    <div className="pt-28 pb-32 px-4 relative min-h-screen">
+    <div className={cn(
+        "pt-28 pb-32 px-4 relative min-h-screen",
+        isLive ? "bg-black" : "" // Force black in Ghost Mode
+    )}>
       <AnimatePresence>
         {showQR && <QRDisplay value={myLink} onClose={() => setShowQR(false)} />}
       </AnimatePresence>
 
       <div className="text-center mb-12">
-        <motion.h1 initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-6xl md:text-8xl font-black italic text-zinc-200 tracking-tighter drop-shadow-2xl">
-          STRIKE<span className="text-red-600">BALL</span>
+        <motion.h1 
+            initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} 
+            className={cn("font-black italic tracking-tighter", isLive ? "text-4xl text-white font-mono" : "text-6xl md:text-8xl text-zinc-200 drop-shadow-2xl")}
+        >
+          {isLive ? "GHOST_OS v2.4" : <>STRIKE<span className="text-red-600">BALL</span></>}
         </motion.h1>
-        <p className="text-red-500/80 font-mono text-xs tracking-[0.5em] mt-2 border-t border-red-900/50 inline-block px-8 py-1">
-          ТАКТИЧЕСКИЕ ОПЕРАЦИИ
-        </p>
+        {!isLive && (
+            <p className="text-red-500/80 font-mono text-xs tracking-[0.5em] mt-2 border-t border-red-900/50 inline-block px-8 py-1">
+            ТАКТИЧЕСКИЕ ОПЕРАЦИИ
+            </p>
+        )}
+        {isLive && (
+            <div className="text-red-500 font-bold animate-pulse mt-2 text-xs font-mono">
+                ● LIVE OPERATION: {activeLobby.name.toUpperCase()}
+            </div>
+        )}
       </div>
 
       <div className="max-w-md mx-auto">
@@ -152,12 +160,35 @@ export default function StrikeballDashboard() {
                   initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}
                   className="space-y-1"
                 >
-                  <Q3MenuItem label="ПАТИ" subLabel="ПОИСК АКТИВНЫХ ОТРЯДОВ" href="/strikeball/lobbies" icon={FaUsers} />
-                  <Q3MenuItem label="ТУРНИРЫ" subLabel="4x4 LEAGUE" href="/strikeball/tournaments" icon={FaTrophy} />
-                  <Q3MenuItem label="СОЗДАТЬ СЕРВЕР" subLabel="НОВАЯ ОПЕРАЦИЯ" onClick={() => setMenuStep('create')} icon={FaPlus} />
-                  <Q3MenuItem label="АРСЕНАЛ" subLabel="АРЕНДА СНАРЯЖЕНИЯ" href="/strikeball/shop" icon={FaShieldHalved} />
-                  <div className="h-4" />
-                  <Q3MenuItem label="QR КОННЕКТ" subLabel="СКАНЕР / МОЙ КОД" onClick={handleQR} icon={FaQrcode} />
+                  {/* PRIMARY OBJECTIVE IF LIVE */}
+                  <Q3MenuItem 
+                        label="СКАНЕР (QR)" 
+                        subLabel={isLive ? "ЗАХВАТ / ВОЗРОЖДЕНИЕ / ИНВЕНТАРЬ" : "ПОДКЛЮЧЕНИЕ"}
+                        onClick={handleQR} 
+                        icon={FaQrcode}
+                        // Highlight if live
+                        className={isLive ? "border-red-600 bg-red-950/20 animate-pulse" : ""}
+                   />
+
+                  {/* RETURN TO FRONT */}
+                  {isLive && (
+                      <Q3MenuItem 
+                        label="ЦЕНТР УПРАВЛЕНИЯ" 
+                        subLabel="HUD / КАРТА / СТАТУС"
+                        href={`/strikeball/lobbies/${activeLobby.id}`}
+                        icon={FaShieldHalved}
+                        className="border-l-4 border-emerald-500 bg-emerald-950/20"
+                      />
+                  )}
+
+                  {/* Standard Links (Faded if live) */}
+                  <div className={isLive ? "opacity-40 grayscale transition-opacity hover:opacity-100 hover:grayscale-0 mt-8" : ""}>
+                      <Q3MenuItem label="ПАТИ" subLabel="ПОИСК АКТИВНЫХ ОТРЯДОВ" href="/strikeball/lobbies" icon={FaUsers} />
+                      {!isLive && <Q3MenuItem label="ТУРНИРЫ" subLabel="4x4 LEAGUE" href="/strikeball/tournaments" icon={FaTrophy} />}
+                      <Q3MenuItem label="СОЗДАТЬ СЕРВЕР" subLabel="НОВАЯ ОПЕРАЦИЯ" onClick={() => setMenuStep('create')} icon={FaPlus} />
+                      <Q3MenuItem label="АРСЕНАЛ" subLabel="АРЕНДА СНАРЯЖЕНИЯ" href="/strikeball/shop" icon={FaShieldHalved} />
+                  </div>
+
                 </motion.div>
               ) : (
                 <motion.div

@@ -109,57 +109,57 @@ const getThemeForPath = (pathname: string) => {
 };
 
 function AppInitializers() {
-  const { dbUser, isAuthenticated } = useAppContext();
-  const { success: addToast } = useAppToast();
-  const scrollAchievementUnlockedRef = useRef(false);
+    const { dbUser, isAuthenticated } = useAppContext();
+    const { success: addToast } = useAppToast();
+    const scrollAchievementUnlockedRef = useRef(false);
 
-  useTelegramBackButton();
+    useTelegramBackButton();
 
-  useFocusTimeTracker({
-    inactiveTimeout: 60 * 1000,
-    componentName: "GlobalAppFocusTracker",
-    enabled: !!(isAuthenticated && dbUser?.user_id),
-  });
+    useFocusTimeTracker({
+        inactiveTimeout: 60 * 1000,
+        componentName: "GlobalAppFocusTracker",
+        enabled: !!(isAuthenticated && dbUser?.user_id),
+    });
 
-  const handleScrollForAchievement = useCallback(async () => {
-    if (
-      window.scrollY > 1000 &&
-      isAuthenticated &&
-      dbUser?.user_id &&
-      !scrollAchievementUnlockedRef.current
-    ) {
-      scrollAchievementUnlockedRef.current = true;
-      logger.info(
-        `[ClientLayout ScrollAch] User ${dbUser.user_id} scrolled >1000px. Unlocking 'scrolled_like_a_maniac'.`
-      );
-      try {
-        const { newAchievements } = await checkAndUnlockFeatureAchievement(
-          dbUser.user_id,
-          "scrolled_like_a_maniac"
+    const handleScrollForAchievement = useCallback(async () => {
+        if (
+        window.scrollY > 1000 &&
+        isAuthenticated &&
+        dbUser?.user_id &&
+        !scrollAchievementUnlockedRef.current
+        ) {
+        scrollAchievementUnlockedRef.current = true;
+        logger.info(
+            `[ClientLayout ScrollAch] User ${dbUser.user_id} scrolled >1000px. Unlocking 'scrolled_like_a_maniac'.`
         );
-        newAchievements?.forEach((ach) => {
-          addToast(`🏆 Ачивка: ${ach.name}!`, { description: ach.description });
-        });
-      } catch (error) {
-        logger.error("[ClientLayout] Error unlocking achievement:", error);
-        scrollAchievementUnlockedRef.current = false;
-      }
-    }
-  }, [isAuthenticated, dbUser, addToast]);
+        try {
+            const { newAchievements } = await checkAndUnlockFeatureAchievement(
+            dbUser.user_id,
+            "scrolled_like_a_maniac"
+            );
+            newAchievements?.forEach((ach) => {
+            addToast(`🏆 Ачивка: ${ach.name}!`, { description: ach.description });
+            });
+        } catch (error) {
+            logger.error("[ClientLayout] Error unlocking achievement:", error);
+            scrollAchievementUnlockedRef.current = false;
+        }
+        }
+    }, [isAuthenticated, dbUser, addToast]);
 
-  useEffect(() => {
-    const currentScrollHandler = handleScrollForAchievement;
-    if (isAuthenticated && dbUser?.user_id && !scrollAchievementUnlockedRef.current) {
-      window.addEventListener("scroll", currentScrollHandler, { passive: true });
-    } else {
-      window.removeEventListener("scroll", currentScrollHandler);
-    }
-    return () => {
-      window.removeEventListener("scroll", currentScrollHandler);
-    };
-  }, [isAuthenticated, dbUser, handleScrollForAchievement]);
+    useEffect(() => {
+        const currentScrollHandler = handleScrollForAchievement;
+        if (isAuthenticated && dbUser?.user_id && !scrollAchievementUnlockedRef.current) {
+        window.addEventListener("scroll", currentScrollHandler, { passive: true });
+        } else {
+        window.removeEventListener("scroll", currentScrollHandler);
+        }
+        return () => {
+        window.removeEventListener("scroll", currentScrollHandler);
+        };
+    }, [isAuthenticated, dbUser, handleScrollForAchievement]);
 
-  return null;
+    return null;
 }
 
 const START_PARAM_PAGE_MAP: Record<string, string> = {
@@ -262,7 +262,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     isLoading: isAppLoading,
     isAuthenticating,
     clearStartParam,
+    activeLobby // NEW: Get global game state
   } = useAppContext();
+  
   const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
   const startParamHandledRef = useRef(false);
   const { success: showToast } = useAppToast();
@@ -271,7 +273,12 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const CurrentHeader = theme.Header;
   const CurrentFooter = theme.Footer;
   const CurrentBottomNav = theme.BottomNav;
-  const isStrikeball = theme === THEME_CONFIG.strikeball;
+
+  // --- GHOST-VIS LOGIC ---
+  const isStrikeballTheme = theme === THEME_CONFIG.strikeball;
+  // If we have an active lobby AND we are in the strikeball section -> Activate Tactical Mode
+  // Or if we are navigating to a lobby via start param
+  const isTacticalMode = isStrikeballTheme && (!!activeLobby || startParamPayload?.startsWith('lobby_'));
 
   useBio30ThemeFix();
   useThemeSync(); 
@@ -427,9 +434,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/paddock",
     "/rentals",
     "/vipbikerental",
-    // NOTE: Strikeball uses its own Nav logic inside this layout, so we don't necessarily need it here,
-    // but adding it ensures the flag is true if we ever fallback to standard nav.
-    "/strikeball", 
+    "/strikeball", // ADDED: Show bottom nav in Strikeball module
   ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
     pathname?.startsWith(p)
@@ -461,23 +466,28 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   return (
     <>
       {/* 
-          CONDITIONAL BACKGROUND RENDER 
-          This ensures the Quake 3 Arena styled background is ONLY on Strikeball pages 
-          and sits behind everything else.
+          GHOST-VIS PROTOCOL: 
+          If TacticalMode is active, we suppress the background particles entirely.
+          Otherwise, if it's strikeball theme, show the fancy background.
       */}
-      {isStrikeball && <StrikeballBackground />}
+      {isStrikeballTheme && !isTacticalMode && <StrikeballBackground />}
 
       {showHeaderAndFooter && CurrentHeader && <CurrentHeader />}
-      <main className={cn("flex-1", showBottomNav ? "pb-20 sm:pb-0" : "", !isTransparentPage && "bg-background")}>
+      
+      <main className={cn(
+        "flex-1", 
+        showBottomNav ? "pb-20 sm:pb-0" : "", 
+        
+        // GHOST-VIS: Force True Black if tactical.
+        isTacticalMode ? "bg-black text-white" : (!isTransparentPage && "bg-background")
+      )}>
         {children}
       </main>
       
       {/* 
-         Standard Bottom Nav Logic:
-         If we are in Strikeball, CurrentBottomNav is StrikeballBottomNav.
-         We show it regardless of 'showBottomNav' logic because Strikeball always needs its nav.
+         Show Strikeball Nav regardless of showBottomNav check if we are in that module.
       */}
-      {(showBottomNav || isStrikeball) && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
+      {(showBottomNav || isStrikeballTheme) && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
       
       <Suspense fallback={null}>
         <StickyChatButton />
