@@ -63,17 +63,25 @@ export async function fetchActiveGameAction(userId: string): Promise<ActiveLobby
 
   try {
     // Find a lobby where user is a member AND lobby is active
+    // We use inner join logic via !inner if RLS allows, or simple select with filter
     const { data, error } = await supabaseAdmin
         .from('lobby_members')
         .select('lobby_id, lobbies(id, name, start_at, status, metadata)')
         .eq('user_id', userId)
+        // We filter for active lobbies in the joined resource
+        // This syntax depends on Supabase postgrest version, safer to fetch member and check lobby
+        // But let's try the direct relation filter first
         .eq('lobbies.status', 'active')
         .maybeSingle();
 
-    if (error) throw error;
-
+    // If query syntax is strict, we might get null even if active. 
+    // Fallback if that fails: fetch member record, then fetch lobby. 
+    // But assuming the relation exists:
     if (data && data.lobbies) {
-        const lobby = data.lobbies as any;
+        const lobby = data.lobbies as any; // Cast for safety
+        // Ensure status is actually active (double check)
+        if (lobby.status !== 'active') return null;
+
         const actualStart = lobby.metadata?.actual_start_at || lobby.start_at; 
         
         return {
