@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useAppContext } from "@/contexts/AppContext";
 import { motion } from "framer-motion";
-import { FaWifi, FaUserAstronaut, FaStopwatch } from "react-icons/fa6";
+import { FaWifi, FaUserAstronaut, FaStopwatch, FaCrosshairs } from "react-icons/fa6";
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 
 export default function StrikeballHeader() {
-  const { user, activeLobby } = useAppContext(); // Data comes from global context now
+  const { user, activeLobby } = useAppContext(); // Consuming global context
   const [elapsed, setElapsed] = useState("00:00");
 
   // Local UI Timer (Ticks every second based on context data)
@@ -19,7 +20,6 @@ export default function StrikeballHeader() {
       
       const start = new Date(activeLobby.actual_start_at).getTime();
       
-      // Update immediately
       const updateTimer = () => {
           const now = new Date().getTime();
           const diff = now - start;
@@ -33,7 +33,6 @@ export default function StrikeballHeader() {
           const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
           const s = Math.floor((diff % (1000 * 60)) / 1000);
 
-          // Format: HH:MM:SS or MM:SS depending on duration
           if (h > 0) {
               setElapsed(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
           } else {
@@ -41,7 +40,7 @@ export default function StrikeballHeader() {
           }
       };
 
-      updateTimer(); // Initial call
+      updateTimer(); 
       const interval = setInterval(updateTimer, 1000);
 
       return () => clearInterval(interval);
@@ -52,19 +51,25 @@ export default function StrikeballHeader() {
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ type: "spring", stiffness: 80, damping: 15 }}
-      className="fixed top-0 left-0 right-0 z-50 pointer-events-none"
+      className={cn(
+          "fixed top-0 left-0 right-0 z-50 pointer-events-none transition-colors duration-500",
+          // Ghost Vis: More intense header if active
+          activeLobby ? "bg-black/95 border-b-2 border-red-600" : "bg-black/80 border-b-2 border-red-900"
+      )}
     >
-      <div className="absolute inset-0 bg-black/90 backdrop-blur-md border-b-2 border-red-900 pointer-events-auto h-16 shadow-[0_5px_20px_rgba(255,0,0,0.1)]">
-        
-        {/* Ticker / Status Line */}
-        <div className="h-5 bg-red-950/40 border-b border-red-900/30 overflow-hidden flex items-center justify-between px-2">
+      <div className="absolute inset-0 backdrop-blur-md pointer-events-none" />
+
+      {/* Ticker / Status Line */}
+      <div className="relative z-10 h-6 bg-red-950/40 border-b border-red-900/30 overflow-hidden flex items-center justify-between px-2">
            {activeLobby ? (
+               // ACTIVE COMBAT LINK
                <Link 
                  href={`/strikeball/lobbies/${activeLobby.id}`} 
-                 className="flex items-center gap-2 w-full justify-center animate-pulse text-red-500 font-bold font-mono text-[10px] hover:text-white cursor-pointer transition-colors"
+                 className="pointer-events-auto flex items-center gap-3 w-full justify-center text-red-500 font-bold font-mono text-[11px] hover:text-white hover:bg-red-900/50 transition-colors h-full"
                >
-                   <FaStopwatch />
-                   <span>IN COMBAT: {activeLobby.name.toUpperCase()} [{elapsed}]</span>
+                   <FaStopwatch className="animate-pulse" />
+                   <span className="tracking-widest animate-pulse">ОПЕРАЦИЯ: {activeLobby.name.toUpperCase()} [{elapsed}]</span>
+                   <FaCrosshairs className="animate-spin-slow" />
                </Link>
            ) : (
                <motion.div 
@@ -75,14 +80,14 @@ export default function StrikeballHeader() {
                  /// SYSTEM ONLINE /// WAITING FOR ORDERS /// NO ACTIVE SIGNALS ///
                </motion.div>
            )}
-        </div>
+      </div>
 
-        <div className="container mx-auto px-4 h-11 flex items-center justify-between">
+      <div className="relative z-10 container mx-auto px-4 h-12 flex items-center justify-between">
           
           {/* Brand */}
-          <Link href="/strikeball" className="flex items-center gap-3 group">
-            <div className="relative w-8 h-8 flex items-center justify-center bg-zinc-900 border border-red-700 rounded-sm group-hover:bg-red-700 transition-colors duration-300">
-              <span className="font-orbitron font-black text-white italic text-sm">SB</span>
+          <Link href="/strikeball" className="pointer-events-auto flex items-center gap-3 group">
+            <div className={cn("relative w-8 h-8 flex items-center justify-center border rounded-sm transition-colors duration-300", activeLobby ? "bg-red-600 border-white text-white" : "bg-zinc-900 border-red-700 text-white group-hover:bg-red-700")}>
+              <span className="font-orbitron font-black italic text-sm">SB</span>
               {/* Tech Decorations */}
               <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-red-500 opacity-50" />
               <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 border-red-500 opacity-50" />
@@ -95,7 +100,7 @@ export default function StrikeballHeader() {
           </Link>
 
           {/* Right Controls */}
-          <div className="flex items-center gap-4">
+          <div className="pointer-events-auto flex items-center gap-4">
              {/* If game is active, show quick return button if not clicking ticker */}
              {activeLobby && (
                  <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-mono text-red-500 animate-pulse">
@@ -122,7 +127,6 @@ export default function StrikeballHeader() {
                </div>
             </Link>
           </div>
-        </div>
       </div>
     </motion.header>
   );
