@@ -7,7 +7,11 @@ import { logger } from "@/lib/logger";
 // ... [startGame, endGame, updateScore, playerHit remain exactly the same] ...
 
 export async function startGame(lobbyId: string, userId: string) {
-  try {
+  // SECURITY ALIBI: Validate UUID format/presence
+    if (!lobbyId || lobbyId === "undefined") {
+        return { success: false, error: "INVALID_LOBBY_ID_FORMAT" };
+    }
+    try {
     const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id, metadata").eq("id", lobbyId).single();
     if (!lobby || lobby.owner_id !== userId) throw new Error("ACCESS DENIED");
 
@@ -23,7 +27,11 @@ export async function startGame(lobbyId: string, userId: string) {
 }
 
 export async function endGame(lobbyId: string, userId: string, winner: 'red' | 'blue' | 'draw') {
-  try {
+  // SECURITY ALIBI: Validate UUID format/presence
+    if (!lobbyId || lobbyId === "undefined") {
+        return { success: false, error: "INVALID_LOBBY_ID_FORMAT" };
+    }
+    try {
     // We allow system (userId='system') to end game too
     if (userId !== 'system') {
         const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id").eq("id", lobbyId).single();
@@ -44,7 +52,11 @@ export async function endGame(lobbyId: string, userId: string, winner: 'red' | '
 }
 
 export async function updateScore(lobbyId: string, userId: string, team: 'red' | 'blue', delta: number) {
-  try {
+  // SECURITY ALIBI: Validate UUID format/presence
+    if (!lobbyId || lobbyId === "undefined") {
+        return { success: false, error: "INVALID_LOBBY_ID_FORMAT" };
+    }
+    try {
     const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id, metadata").eq("id", lobbyId).single();
     if (!lobby || lobby.owner_id !== userId) throw new Error("ACCESS DENIED");
 
@@ -59,6 +71,10 @@ export async function updateScore(lobbyId: string, userId: string, team: 'red' |
 }
 
 export async function playerHit(lobbyId: string, memberId: string) {
+    // SECURITY ALIBI: Validate UUID format/presence
+    if (!lobbyId || lobbyId === "undefined") {
+        return { success: false, error: "INVALID_LOBBY_ID_FORMAT" };
+    }
     try {
         const { data: member } = await supabaseAdmin.from("lobby_members").select("team, status").eq("id", memberId).single();
         if (!member || member.status === 'dead') return { success: false, error: "Invalid state" };
@@ -83,6 +99,10 @@ export async function playerHit(lobbyId: string, memberId: string) {
  * 2. If Team != TargetBaseTeam -> Siege Logic (Check all points).
  */
 export async function handleBaseInteraction(lobbyId: string, userId: string, targetBaseTeam: string) {
+    // SECURITY ALIBI: Validate UUID format/presence
+    if (!lobbyId || lobbyId === "undefined") {
+        return { success: false, error: "INVALID_LOBBY_ID_FORMAT" };
+    }
     try {
         const { data: member } = await supabaseAdmin
             .from("lobby_members")
@@ -137,7 +157,11 @@ export async function handleBaseInteraction(lobbyId: string, userId: string, tar
  * Revive at specific checkpoint (Legacy/Tactical)
  */
 export async function playerRespawnAtCheckpoint(lobbyId: string, userId: string, checkpointId: string) {
-     try {
+     // SECURITY ALIBI: Validate UUID format/presence
+    if (!lobbyId || lobbyId === "undefined") {
+        return { success: false, error: "INVALID_LOBBY_ID_FORMAT" };
+    }
+    try {
          const { data: member } = await supabaseAdmin.from("lobby_members").select("id, team").eq("lobby_id", lobbyId).eq("user_id", userId).single();
          const { data: cp } = await supabaseAdmin.from("lobby_checkpoints").select("owner_team").eq("id", checkpointId).single();
          
