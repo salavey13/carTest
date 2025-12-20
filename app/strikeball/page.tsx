@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { FaQrcode, FaShieldHalved, FaUsers, FaPlus, FaTrophy } from "react-icons/fa6";
 
-// ... [QRDisplay component remains same] ...
 const QRDisplay = ({ value, onClose }: { value: string, onClose: () => void }) => (
     <motion.div 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -66,7 +65,7 @@ const Q3MenuItem = ({ label, subLabel, href, onClick, icon: Icon, className }: a
 };
 
 export default function StrikeballDashboard() {
-  const { tg, dbUser, activeLobby } = useAppContext(); // Get active combat status
+  const { tg, dbUser, activeLobby } = useAppContext(); 
   const router = useRouter();
   const [menuStep, setMenuStep] = useState<'main' | 'create'>('main');
   const [showQR, setShowQR] = useState(false);
@@ -125,8 +124,8 @@ export default function StrikeballDashboard() {
 
   return (
     <div className={cn(
-        "pt-28 pb-32 px-4 relative min-h-screen",
-        isLive ? "bg-black" : "" // Force black in Ghost Mode
+        "pt-28 pb-32 px-4 relative min-h-screen transition-all duration-700",
+        isLive ? "bg-[#000000]" : "" 
     )}>
       <AnimatePresence>
         {showQR && <QRDisplay value={myLink} onClose={() => setShowQR(false)} />}
@@ -135,9 +134,9 @@ export default function StrikeballDashboard() {
       <div className="text-center mb-12">
         <motion.h1 
             initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} 
-            className={cn("font-black italic tracking-tighter", isLive ? "text-4xl text-white font-mono" : "text-6xl md:text-8xl text-zinc-200 drop-shadow-2xl")}
+            className={cn("font-black font-orbitron italic tracking-tighter uppercase", isLive ? "text-4xl text-white" : "text-6xl md:text-8xl text-zinc-200 drop-shadow-2xl")}
         >
-          {isLive ? "GHOST_OS v2.4" : <>STRIKE<span className="text-red-600">BALL</span></>}
+          {isLive ? "GHOST_OS // v2.4" : <>STRIKE<span className="text-red-600">BALL</span></>}
         </motion.h1>
         {!isLive && (
             <p className="text-red-500/80 font-mono text-xs tracking-[0.5em] mt-2 border-t border-red-900/50 inline-block px-8 py-1">
@@ -145,8 +144,10 @@ export default function StrikeballDashboard() {
             </p>
         )}
         {isLive && (
-            <div className="text-red-500 font-bold animate-pulse mt-2 text-xs font-mono">
-                ● LIVE OPERATION: {activeLobby.name.toUpperCase()}
+            <div className="mt-4 px-4 py-1 border border-red-600 bg-red-950/20 inline-block">
+                <span className="text-red-500 font-bold animate-pulse text-[10px] font-mono tracking-[0.3em]">
+                    ● SIGNAL_ACTIVE: {activeLobby.name.toUpperCase()}
+                </span>
             </div>
         )}
       </div>
@@ -160,29 +161,34 @@ export default function StrikeballDashboard() {
                   initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}
                   className="space-y-1"
                 >
-                  {/* PRIMARY OBJECTIVE IF LIVE */}
+                  {/* PRIMARY COMBAT SCANNER (Highlighted in Live Mode) */}
                   <Q3MenuItem 
                         label="СКАНЕР (QR)" 
-                        subLabel={isLive ? "ЗАХВАТ / ВОЗРОЖДЕНИЕ / ИНВЕНТАРЬ" : "ПОДКЛЮЧЕНИЕ"}
+                        subLabel={isLive ? "ЗАХВАТ / ВОЗРОЖДЕНИЕ / ЦЕЛЬ" : "ПОДКЛЮЧЕНИЕ"}
                         onClick={handleQR} 
                         icon={FaQrcode}
-                        // Highlight if live
-                        className={isLive ? "border-red-600 bg-red-950/20 animate-pulse" : ""}
+                        className={cn(
+                            "border-2 transition-all duration-500",
+                            isLive ? "border-red-600 bg-red-950/20 animate-pulse scale-105 shadow-[0_0_30px_rgba(220,38,38,0.3)]" : "border-zinc-800"
+                        )}
                    />
 
-                  {/* RETURN TO FRONT */}
+                  {/* RETURN TO OPS FRONT */}
                   {isLive && (
                       <Q3MenuItem 
                         label="ЦЕНТР УПРАВЛЕНИЯ" 
-                        subLabel="HUD / КАРТА / СТАТУС"
+                        subLabel="HUD / КАРТА / ТЕЛЕМЕТРИЯ"
                         href={`/strikeball/lobbies/${activeLobby.id}`}
                         icon={FaShieldHalved}
-                        className="border-l-4 border-emerald-500 bg-emerald-950/20"
+                        className="border-l-4 border-emerald-500 bg-emerald-950/20 mt-4"
                       />
                   )}
 
-                  {/* Standard Links (Faded if live) */}
-                  <div className={isLive ? "opacity-40 grayscale transition-opacity hover:opacity-100 hover:grayscale-0 mt-8" : ""}>
+                  {/* Operational Noise (Faded during active combat) */}
+                  <div className={cn(
+                      "transition-all duration-1000",
+                      isLive ? "opacity-30 grayscale blur-[0.5px] pointer-events-none mt-12" : "mt-6"
+                  )}>
                       <Q3MenuItem label="ПАТИ" subLabel="ПОИСК АКТИВНЫХ ОТРЯДОВ" href="/strikeball/lobbies" icon={FaUsers} />
                       {!isLive && <Q3MenuItem label="ТУРНИРЫ" subLabel="4x4 LEAGUE" href="/strikeball/tournaments" icon={FaTrophy} />}
                       <Q3MenuItem label="СОЗДАТЬ СЕРВЕР" subLabel="НОВАЯ ОПЕРАЦИЯ" onClick={() => setMenuStep('create')} icon={FaPlus} />
