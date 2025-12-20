@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils"
 import Image from "next/image";
+import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { debugLogger } from "@/lib/debugLogger";
