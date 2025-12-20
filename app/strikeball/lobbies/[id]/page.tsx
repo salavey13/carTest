@@ -10,6 +10,7 @@ import { updateTransportStatus, signSafetyBriefing, joinCar } from "../../action
 import { generateAndSendLobbyPdf } from "../../actions/service";
 import { getLobbyCheckpoints, captureCheckpoint } from "../../actions/domination";
 
+// --- Tactical Modules ---
 import { SquadRoster } from "../../components/SquadRoster";
 import { CommandConsole } from "../../components/CommandConsole"; 
 import { LiveHUD } from "../../components/LiveHUD";
@@ -40,6 +41,7 @@ export default function LobbyRoom() {
   const [driverSeats, setDriverSeats] = useState(3);
   const [carName, setCarName] = useState("");
 
+  // Tactical Uplink Logic
   const processUplink = useCallback(async (action: any) => {
       if (action.type === 'HIT') return await playerHit(lobbyId as string, action.payload.memberId);
       if (action.type === 'RESPAWN') return await playerRespawn(lobbyId as string, action.payload.memberId);
@@ -47,24 +49,31 @@ export default function LobbyRoom() {
       return { success: true };
   }, [lobbyId, dbUser]);
 
-  // WATCHDOG
+  // WATCHDOG: Immediate burst on any queue change
   useEffect(() => {
-      if (queue.length > 0) burstSync(processUplink);
+      if (queue.length > 0) {
+          console.log(`[WATCHDOG] Обнаружено пакетов в очереди: ${queue.length}. Запуск burstSync.`);
+          burstSync(processUplink);
+      }
   }, [queue.length, burstSync, processUplink]);
 
   const loadData = useCallback(async () => {
     try {
         const result = await fetchLobbyData(lobbyId as string);
-        if (!result.success || !result.lobby) { setError("ОШИБКА_СВЯЗИ"); return; }
+        if (!result.success || !result.lobby) { setError("ОШИБКА_УСТАНОВКИ_СВЯЗИ"); return; }
+
         setLobby(result.lobby);
         setMembers(result.members || []);
+
         const me = result.members?.find((m: any) => m.user_id === dbUser?.user_id);
         if (me?.metadata?.transport?.role === 'driver') {
              if (!carName) setCarName(me.metadata.transport.car_name || "");
              setDriverSeats(me.metadata.transport.seats || 3);
         }
+
         const { data: cps } = await getLobbyCheckpoints(lobbyId as string);
         setCheckpoints(cps || []);
+
         if (result.lobby.status === 'finished' && activeTab !== 'game') setActiveTab('game');
     } catch (e) { setError("СИГНАЛ_ПОТЕРЯН"); }
   }, [lobbyId, dbUser?.user_id, activeTab, carName]);
@@ -89,7 +98,7 @@ export default function LobbyRoom() {
     setMembers(prev => prev.map(m => m.id === userMember.id ? { ...m, status: 'dead' } : m));
     setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 150);
     addToOutbox('HIT', { memberId: userMember.id });
-    toast.warning("УБИТ_В_БОЮ // ПАКЕТ_В_ОЧЕРЕДИ");
+    toast.warning("KIA_ЗАПИСАНО // ПАКЕТ_В_ОЧЕРЕДИ");
   };
 
   const handleSelfRespawn = () => { 
@@ -109,9 +118,13 @@ export default function LobbyRoom() {
   if (error) return <div className="text-center pt-40 text-red-600 font-mono">КРИТИЧЕСКАЯ_ОШИБКА: {error}</div>;
   if (!lobby) return <div className="text-center pt-40 text-white font-mono animate-pulse">РЕКОНСТРУКЦИЯ_ОПЕРАЦИИ...</div>;
 
+  // FIXED: isFinished is now properly scoped within the component logic
+  const isFinished = lobby.status === 'finished';
+
   return (
     <div className={cn("pt-28 pb-48 px-2 min-h-screen text-white font-mono transition-colors duration-200", whiteFlash ? "bg-white/10" : "bg-black")}>
       
+      {/* SYNC INDICATOR */}
       {queue.length > 0 && (
           <div className="fixed top-20 left-4 z-[70] flex items-center gap-2 bg-red-950/80 border border-red-600 px-3 py-1 animate-pulse">
               <FaWifi className="text-red-500 text-xs" />
@@ -119,11 +132,20 @@ export default function LobbyRoom() {
           </div>
       )}
 
-      <div className="text-center mb-10">
+      {/* HEADER SITREP */}
+      <div className="text-center mb-10 relative">
+        <div className="absolute top-0 right-0 flex gap-2">
+             <button onClick={() => generateAndSendLobbyPdf(dbUser!.user_id, lobbyId as string)} className="p-2 border border-zinc-900 text-zinc-700 hover:text-white"><FaFilePdf /></button>
+             <button onClick={() => {
+                 const link = `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobbyId}`;
+                 if (tg?.openTelegramLink) tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}`);
+             }} className="p-2 border border-zinc-900 text-zinc-700 hover:text-white"><FaShareNodes /></button>
+        </div>
         <h1 className="text-2xl font-black uppercase tracking-[0.2em]">{lobby.name}</h1>
         <div className="text-[9px] text-zinc-600 mt-1 uppercase tracking-widest">{lobby.mode} // {lobby.status}</div>
       </div>
 
+      {/* HARDWIRE TABS */}
       <div className="flex justify-center gap-px bg-zinc-900 border border-zinc-900 mb-8">
           {[
               { id: 'roster', icon: FaUsers, label: 'ОТРЯД' },
@@ -142,14 +164,14 @@ export default function LobbyRoom() {
 
       <div className="max-w-4xl mx-auto min-h-[40vh]">
           {activeTab === 'game' && (
-             lobby.status === 'finished' ? (
+             isFinished ? (
                  <BattleReportView lobby={lobby} members={members} checkpoints={checkpoints} />
              ) : (
                  <div className="space-y-4">
-                     {/* 1. DOMINATION HUD (Pagers) */}
+                     {/* 1. DOMINATION HUD */}
                      <DominationHUD lobbyId={lobby.id} />
                      
-                     {/* 2. OBJECTIVES LOG (The missing list) */}
+                     {/* 2. OBJECTIVES LOG */}
                      <div className="bg-[#000000] border border-zinc-800 p-4 mb-6">
                         <h4 className="text-[9px] text-zinc-600 font-mono mb-3 uppercase tracking-widest flex items-center gap-2">
                            <FaFlag className="text-zinc-500" /> Активные_Сектора
@@ -186,8 +208,22 @@ export default function LobbyRoom() {
 
           {activeTab === 'roster' && (
              <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-zinc-900 border border-zinc-900">
-                <SquadRoster teamName="СИНИЕ_СИЛЫ" teamColor="blue" members={members.filter(m => m.team === 'blue')} onAddBot={isOwner ? () => addNoobBot(lobby.id, 'blue').then(loadData) : undefined} onKick={isOwner ? (id: string) => removeMember(id).then(loadData) : undefined} currentUserId={dbUser?.user_id} />
-                <SquadRoster teamName="КРАСНАЯ_ЯЧЕЙКА" teamColor="red" members={members.filter(m => m.team === 'red')} onAddBot={isOwner ? () => addNoobBot(lobby.id, 'red').then(loadData) : undefined} onKick={isOwner ? (id: string) => removeMember(id).then(loadData) : undefined} currentUserId={dbUser?.user_id} />
+                <SquadRoster 
+                    teamName="СИНИЕ_СИЛЫ" teamColor="blue" 
+                    members={members.filter(m => m.team === 'blue')} 
+                    onToggleStatus={() => {}} 
+                    onKick={isOwner ? (id: string) => removeMember(id).then(loadData) : undefined}
+                    onAddBot={isOwner ? () => addNoobBot(lobby.id, 'blue').then(loadData) : undefined}
+                    currentUserId={dbUser?.user_id} 
+                />
+                <SquadRoster 
+                    teamName="КРАСНАЯ_ЯЧЕЙКА" teamColor="red" 
+                    members={members.filter(m => m.team === 'red')} 
+                    onToggleStatus={() => {}} 
+                    onKick={isOwner ? (id: string) => removeMember(id).then(loadData) : undefined}
+                    onAddBot={isOwner ? () => addNoobBot(lobby.id, 'red').then(loadData) : undefined}
+                    currentUserId={dbUser?.user_id} 
+                />
              </div>
           )}
 
@@ -207,40 +243,42 @@ export default function LobbyRoom() {
           )}
       </div>
 
-      {/* FIXED FOOTER CONTROLS */}
+      {/* COMBAT OVERRIDE & TEAM SWAP */}
       <div className="fixed bottom-24 left-4 right-4 max-w-md mx-auto z-50 pointer-events-none space-y-4">
           
+          {/* Main Action Key */}
           {userMember && lobby.status === 'active' && (
               userMember.status === 'alive' ? (
-                <button onClick={handleImHit} className="pointer-events-auto w-full bg-white text-black font-black py-6 uppercase tracking-[0.4em] border-4 border-black outline outline-1 outline-white active:bg-zinc-300 transition-all text-xl shadow-[0_0_50px_rgba(255,255,255,0.2)]">
-                    УБИТ_В_БОЮ
+                <button onClick={handleImHit} className="pointer-events-auto w-full bg-white text-black font-black py-6 uppercase tracking-[0.4em] border-4 border-black outline outline-1 outline-white active:bg-zinc-300 transition-all text-xl shadow-[0_0_40px_rgba(255,255,255,0.2)]">
+                    УБИТ_В_БОЮ // KIA
                 </button>
               ) : (
                 <button onClick={handleSelfRespawn} className="pointer-events-auto w-full bg-white text-black font-black py-6 uppercase tracking-[0.4em] border-4 border-black outline outline-1 outline-white active:bg-zinc-300 transition-all text-xl">
-                    ГОТОВ_К_БОЮ
+                    ГОТОВ_К_БОЮ // READY
                 </button>
               )
           )}
 
+          {/* Team Selection / Swapping */}
           {!isFinished && (
-            <div className="pointer-events-auto grid grid-cols-2 gap-px bg-zinc-800 border border-zinc-800">
+            <div className="pointer-events-auto grid grid-cols-2 gap-px bg-zinc-800 border border-zinc-800 shadow-2xl">
                 <button 
                     onClick={() => handleJoinTeam('blue')} 
                     className={cn(
                         "py-4 font-black uppercase text-[10px] tracking-widest transition-colors",
-                        userMember?.team === 'blue' ? "bg-zinc-700 text-white pointer-events-none" : "bg-black text-zinc-500 hover:bg-zinc-950"
+                        userMember?.team === 'blue' ? "bg-zinc-800 text-white pointer-events-none" : "bg-black text-zinc-600 hover:bg-zinc-950"
                     )}
                 >
-                    {userMember?.team === 'blue' ? "В_СИНИХ_СИЛАХ" : "ВСТУПИТЬ_К_СИНИМ"}
+                    {userMember?.team === 'blue' ? "[ В_СИНИХ_СИЛАХ ]" : "ВСТУПИТЬ_К_СИНИМ"}
                 </button>
                 <button 
                     onClick={() => handleJoinTeam('red')} 
                     className={cn(
                         "py-4 font-black uppercase text-[10px] tracking-widest transition-colors",
-                        userMember?.team === 'red' ? "bg-zinc-700 text-white pointer-events-none" : "bg-black text-zinc-500 hover:bg-zinc-950"
+                        userMember?.team === 'red' ? "bg-zinc-800 text-white pointer-events-none" : "bg-black text-zinc-600 hover:bg-zinc-950"
                     )}
                 >
-                    {userMember?.team === 'red' ? "В_КРАСНОЙ_ЯЧЕЙКЕ" : "ВСТУПИТЬ_К_КРАСНЫМ"}
+                    {userMember?.team === 'red' ? "[ В_КРАСНОЙ_ЯЧЕЙКЕ ]" : "ВСТУПИТЬ_К_КРАСНЫМ"}
                 </button>
             </div>
           )}
