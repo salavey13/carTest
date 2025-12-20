@@ -2,69 +2,75 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Globe, X, ExternalLink, Zap, Rocket, GraduationCap, Flame } from 'lucide-react';
+import { 
+  X, ExternalLink, Zap, Rocket, 
+  Terminal, ShieldAlert, Cpu, 
+  Target, Activity, ChevronRight 
+} from 'lucide-react';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
-// --- AD CONTENT DATA ---
+// --- TACTICAL INTELLIGENCE DROPS ---
 const ADS = [
   {
-    id: 'hostinger-style',
-    icon: <Globe className="w-6 h-6 text-purple-400" />,
-    title: "Твой код никто не видит?",
+    id: 'strikeball-os-gold',
+    icon: <Target className="w-8 h-8 text-red-600" />,
+    label: "OPERATIONAL_SITREP",
+    title: "ХВАТИТ ИГРАТЬ В СЛЕПУЮ",
     body: (
       <>
-        Ты выучил Python, написал бота, но он работает только на твоем ноуте? 
+        Твои игры в страйкбол — это хаос и споры о попаданиях? 
         <br/><br/>
-        <strong>Знакомо.</strong> В 2025 году, если твоего кода нет в облаке — его не существует. 
-        Забудь про сложные настройки серверов. 
-        <span className="text-white font-bold"> Cyber Vibe </span> деплоит твои проекты одной командой.
-        Никаких "тысяч строк конфигов". Просто <code>git push</code>.
+        Разверни <span className="text-white font-bold underline">Strikeball Tactical OS</span>. 
+        Реальное время, захват точек через QR, логистика отрядов и честный счет. 
         <br/><br/>
-        Зачем платить админам, если ты сам себе админ?
+        <span className="text-red-500 font-mono text-[10px]">/// СТАТУС: БОЕГОТОВНОСТЬ_100%</span>
       </>
     ),
-    cta: "ЗАДЕПЛОИТЬ БЕСПЛАТНО",
-    link: "/start-training",
-    color: "from-purple-900/40 to-indigo-900/40 border-purple-500/30"
+    cta: "КОМАНДОВАТЬ_ПАРАДОМ",
+    link: "/strikeball",
+    color: "border-red-900/50 bg-black shadow-[0_0_40px_rgba(220,38,38,0.1)]",
+    accent: "bg-red-600"
   },
   {
-    id: 'hubspot-style',
-    icon: <Rocket className="w-6 h-6 text-orange-400" />,
-    title: "Стартап в 7 классе?",
+    id: 'cybervibe-shovel-rickroll',
+    icon: <Cpu className="w-8 h-8 text-brand-cyan" />,
+    label: "SYSTEM_MANIFESTO",
+    title: "Я СОЗДАЛ ЭТО НА ТЕЛЕФОНЕ",
     body: (
       <>
-        Пока другие зубрят параграфы, 14-летний парень из Казани запустил AI-бота для подсчета калорий и поднял <strong>24 миллиона</strong>.
+        Страница, которую ты сейчас читаешь, была собрана AI-ассистентом, пока я ехал в автобусе. 
         <br/><br/>
-        Как? Он не изобретал велосипед. Он просто использовал готовые API.
-        <br/>
-        В нашем <strong>Кибер-Плейбуке</strong> мы разобрали 7 реальных схем: от парсинга Wildberries до Telegram-магазинов.
-        Хватит учиться "в стол". Учись зарабатывать.
+        Я не писал код. Я просто "вайбил". 
+        В 2025 году программирование — это не знание синтаксиса, а <span className="text-brand-cyan">сила твоего воображения</span>. 
+        <br/><br/>
+        Хочешь строить свои миры за 15 минут?
       </>
     ),
-    cta: "СКАЧАТЬ ПЛЕЙБУК",
+    cta: "ОТКРЫТЬ_ЛАБОРАТОРИЮ",
+    link: "/repo-xml",
+    color: "border-brand-cyan/30 bg-black shadow-[0_0_40px_rgba(0,194,255,0.1)]",
+    accent: "bg-brand-cyan"
+  },
+  {
+    id: 'syndicate-opportunity',
+    icon: <Terminal className="w-8 h-8 text-brand-green" />,
+    label: "MARKET_DISRUPTION",
+    title: "СХЕМА 'СИНДИКАТ'",
+    body: (
+      <>
+        Пока твои одноклассники качают героев в RPG, мы качаем реальные кэш-машины. 
+        <br/><br/>
+        От парсинга маркетплейсов до AI-автоматизации локального бизнеса. 
+        Наш <span className="text-brand-green font-bold">Кибер-Плейбук</span> — это не теория. Это алгоритмы заработка звёзд.
+        <br/><br/>
+        <span className="italic text-zinc-500">Доступ ограничен уровнем допуска.</span>
+      </>
+    ),
+    cta: "ПОЛУЧИТЬ_ДОПУСК",
     link: "/wblanding",
-    color: "from-orange-900/40 to-red-900/40 border-orange-500/30"
-  },
-  {
-    id: 'hoonigan-style',
-    icon: <Flame className="w-6 h-6 text-yellow-400" />,
-    title: "BLACK FRIDAY КАЖДЫЙ ДЕНЬ!",
-    body: (
-      <>
-        Скидки? Нет. <strong>ХАЛЯВА.</strong>
-        <br/><br/>
-        Мы раздаем доступ к закрытым уровням. Обычно это стоит 99XP, но сегодня — <strong>0</strong>. 
-        Потому что я так сказал! Ахаха!
-        <br/>
-        Новые скины для аватара, доступ к VIP-серверам, секретные шпаргалки по физике. 
-        Не тупи. Забирай, пока админ не проснулся.
-        <br/><br/>
-        Если ты ждешь знака — ЭТО ОН.
-      </>
-    ),
-    cta: "ЛУТАТЬ",
-    link: "/nexus",
-    color: "from-yellow-900/40 to-amber-900/40 border-yellow-500/30"
+    color: "border-brand-green/30 bg-black shadow-[0_0_40px_rgba(34,197,94,0.1)]",
+    accent: "bg-brand-green"
   }
 ];
 
@@ -72,7 +78,6 @@ export const AdBreak = () => {
   const [isVisible, setIsVisible] = useState(true);
   const [ad, setAd] = useState(ADS[0]);
 
-  // Randomize ad on mount to avoid hydration mismatch, but for now just pick one deterministic or use effect
   useEffect(() => {
     setAd(ADS[Math.floor(Math.random() * ADS.length)]);
   }, []);
@@ -82,53 +87,76 @@ export const AdBreak = () => {
   return (
     <AnimatePresence>
       <motion.div 
-        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        className={`relative my-12 p-6 rounded-2xl border ${ad.color} bg-gradient-to-br shadow-2xl overflow-hidden`}
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, y: 10 }}
+        className={cn(
+          "relative my-16 p-px overflow-hidden rounded-none border", 
+          ad.color.split(' ')[0] // Uses only the border class from data
+        )}
       >
-        {/* Background Noise */}
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none"></div>
-        
-        {/* Close Button */}
-        <button 
-          onClick={() => setIsVisible(false)}
-          className="absolute top-4 right-4 text-white/30 hover:text-white transition-colors"
-        >
-          <X size={20} />
-        </button>
+        {/* HARDWARE GRID OVERLAY */}
+        <div className="absolute inset-0 z-0 opacity-10 pointer-events-none"
+             style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
+        </div>
 
-        <div className="flex flex-col md:flex-row gap-6 items-start relative z-10">
-          {/* Visual Side */}
-          <div className="hidden md:flex flex-col items-center justify-center w-32 h-32 bg-black/40 rounded-xl border border-white/10 shrink-0">
+        <div className={cn("relative z-10 p-8 flex flex-col md:flex-row gap-8 items-center", ad.color.split(' ').slice(1).join(' '))}>
+          
+          {/* VISUAL UNIT */}
+          <div className="flex-shrink-0 flex flex-col items-center justify-center w-24 h-24 border border-zinc-800 bg-zinc-950 relative group">
+             <div className="absolute -top-1 -left-1 w-2 h-2 border-t border-l border-zinc-500" />
+             <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b border-r border-zinc-500" />
              {ad.icon}
-             <span className="text-[10px] text-gray-500 mt-2 font-mono uppercase">Sponsor</span>
+             <div className="mt-2 text-[8px] font-mono text-zinc-600 tracking-widest animate-pulse">UPLINK_READY</div>
           </div>
 
-          {/* Content Side */}
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-                <span className="bg-white/10 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-widest border border-white/10">
-                    Рекламная Пауза
+          {/* INTEL UNIT */}
+          <div className="flex-1 text-center md:text-left">
+            <div className="flex items-center justify-center md:justify-start gap-3 mb-4">
+                <span className="text-[10px] font-black text-zinc-500 tracking-[0.3em] uppercase">
+                  {ad.label}
                 </span>
+                <div className="h-px bg-zinc-800 flex-grow hidden md:block" />
+                <Activity className="w-3 h-3 text-zinc-700" />
             </div>
             
-            <h3 className="text-2xl font-black text-white mb-4 uppercase italic tracking-tight">
+            <h3 className="text-3xl font-black text-white mb-4 italic tracking-tighter uppercase">
                 {ad.title}
             </h3>
             
-            <div className="text-gray-300 text-sm leading-relaxed mb-6 font-serif">
+            <div className="text-zinc-400 text-sm leading-relaxed mb-8 font-mono">
                 {ad.body}
             </div>
 
-            <Link href={ad.link}>
-                <button className="group flex items-center gap-2 bg-white text-black px-6 py-3 rounded-lg font-bold text-sm hover:scale-105 transition-transform shadow-lg shadow-white/10">
-                    {ad.cta} <ExternalLink className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+                <Link href={ad.link} className="w-full sm:w-auto">
+                    <button className={cn(
+                        "w-full group flex items-center justify-center gap-3 px-8 py-4 font-black text-xs tracking-widest transition-all uppercase italic border-2",
+                        ad.accent === 'bg-red-600' ? "bg-red-600 border-white text-white hover:bg-white hover:text-black" :
+                        ad.accent === 'bg-brand-cyan' ? "bg-brand-cyan border-white text-black hover:bg-black hover:text-brand-cyan" :
+                        "bg-brand-green border-white text-black hover:bg-black hover:text-brand-green"
+                    )}>
+                        {ad.cta} <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                </Link>
+                
+                <button 
+                  onClick={() => setIsVisible(false)}
+                  className="text-[10px] font-mono text-zinc-600 hover:text-zinc-400 uppercase tracking-widest"
+                >
+                  [ Игнорировать_сигнал ]
                 </button>
-            </Link>
+            </div>
           </div>
+
+          {/* DECORATIVE SCANLINES */}
+          <div className="absolute inset-0 pointer-events-none opacity-5 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[size:100%_2px,3px_100%]" />
         </div>
 
+        {/* OLED BLACK MARGINS */}
+        <div className="absolute top-0 right-0 p-2 text-[8px] font-mono text-zinc-800 pointer-events-none">
+            SEC_ENCRYPT: AES-256
+        </div>
       </motion.div>
     </AnimatePresence>
   );
