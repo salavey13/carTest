@@ -163,7 +163,6 @@ function AppInitializers() {
 }
 
 const START_PARAM_PAGE_MAP: Record<string, string> = {
-  // Legacy / Standard
   elon: "/elon",
   musk_market: "/elon",
   arbitrage_seeker: "/elon",
@@ -173,27 +172,20 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   sauna: "/sauna-rent",
   streamer: "/streamer",
   demo: "/about_en",
-  
-  // Warehouse / Pirate Code Ops
   wb: "/wblanding", 
   wb_dashboard: "/wblanding",
   "audit-tool": "/wblanding",
   "create_crew": "/wblanding",
   reports: "/wblanding",
   crews: "/crews", 
-  
-  // Developer / CyberDev Ops
   "repo-xml": "/repo-xml",
   "style-guide": "/style-guide",
   "start-training": "/selfdev/gamified",
-  
-  // Racing / Legacy
   paddock: "/paddock",
   leaderboard: "/leaderboard",
   "rent-bike": "/rent-bike",
 };
 
-// BIO30 Product mapping for startapp parameters
 const BIO30_PRODUCT_PATHS: Record<string, string> = {
   'cordyceps': '/bio30/categories/cordyceps-sinensis',
   'spirulina': '/bio30/categories/spirulina-chlorella',
@@ -227,7 +219,6 @@ function useBio30ThemeFix() {
   }, [pathname]);
 }
 
-// --- THEME SYNC HOOK ---
 function useThemeSync() {
   const { dbUser, isLoading } = useAppContext();
   const { setTheme, resolvedTheme } = useTheme();
@@ -257,12 +248,12 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const {
     startParamPayload,
     dbUser,
-    userCrewInfo, // Access crew info for smart redirects
+    userCrewInfo, 
     refreshDbUser,
     isLoading: isAppLoading,
     isAuthenticating,
     clearStartParam,
-    activeLobby // NEW: Get global game state
+    activeLobby // GHOST-VIS: Global Active Combat State
   } = useAppContext();
   
   const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
@@ -274,17 +265,17 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const CurrentFooter = theme.Footer;
   const CurrentBottomNav = theme.BottomNav;
 
-  // --- GHOST-VIS LOGIC ---
+  // --- GHOST-VIS PREDICTIVE LOGIC ---
   const isStrikeballTheme = theme === THEME_CONFIG.strikeball;
-  // If we have an active lobby AND we are in the strikeball section -> Activate Tactical Mode
-  // Or if we are navigating to a lobby via start param
+  // Activate Tactical Blackout if:
+  // 1. We are in the Strikeball module AND
+  // 2. A game is confirmed active OR we are currently parsing a lobby joining link
   const isTacticalMode = isStrikeballTheme && (!!activeLobby || startParamPayload?.startsWith('lobby_'));
 
   useBio30ThemeFix();
   useThemeSync(); 
 
   useEffect(() => {
-    // Bio30 Referral Helper
     const handleBio30Referral = async (referrerId: string, paramToProcess: string) => {
       if (dbUser && dbUser.user_id && !dbUser.metadata?.referrer_id) {
         try {
@@ -294,14 +285,10 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
             referrerCode: paramToProcess,
           });
           if (result.success) {
-            logger.info(
-              `[ClientLayout] Referral set for user ${dbUser.user_id} to referrer ${referrerId}`
-            );
+            logger.info(`[ClientLayout] Referral set for user ${dbUser.user_id} to referrer ${referrerId}`);
             await refreshDbUser();
           } else {
-            logger.error(
-              `[ClientLayout] Failed to set referrer for user ${dbUser.user_id}: ${result.error}`
-            );
+            logger.error(`[ClientLayout] Failed to set referrer for user ${dbUser.user_id}: ${result.error}`);
           }
         } catch (error) {
           logger.error(`[ClientLayout] Error setting referrer:`, error);
@@ -309,11 +296,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // WB Syndicate Referral Helper
     const handleSyndicateReferral = async (refCode: string) => {
         if (!dbUser?.user_id) return;
-        
-        // Only apply if no referrer exists (First Touch Attribution)
         if (!dbUser.metadata?.referrer) {
             logger.info(`[Syndicate] Attempting to link referrer: ${refCode}`);
             const res = await applyReferralCode(dbUser.user_id, refCode);
@@ -326,16 +310,12 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
 
     const paramToProcess = startParamPayload || searchParams.get("tgWebAppStartParam");
     
-    // Process logic only when auth is done
     if (!isAppLoading && !isAuthenticating && paramToProcess && !startParamHandledRef.current) {
       startParamHandledRef.current = true;
       let targetPath: string | undefined;
 
       logger.info(`[ClientLayout] Processing Start Param: ${paramToProcess}`);
 
-      // ===================== ROUTING & PARSING LOGIC =====================
-
-      // 1. Specific Prefixes Check
       if (paramToProcess === "wb_dashboard") {
          if (userCrewInfo?.slug) targetPath = `/wb/${userCrewInfo.slug}`;
          else targetPath = "/wblanding";
@@ -344,9 +324,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         targetPath = START_PARAM_PAGE_MAP[paramToProcess];
       } 
       else if (paramToProcess.startsWith("crew_")) {
-        const content = paramToProcess.substring(5); // remove 'crew_'
+        const content = paramToProcess.substring(5); 
         if (content.endsWith("_join_crew")) {
-             const slug = content.substring(0, content.length - 10); // remove '_join_crew'
+             const slug = content.substring(0, content.length - 10); 
              targetPath = `/wb/${slug}?join_crew=true`;
         } else {
              targetPath = `/wb/${content}`;
@@ -357,7 +337,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         targetPath = `/god-mode-sandbox?simId=${simId}`;
       }
       else if (paramToProcess.startsWith("bio30_")) {
-        // bio30 logic...
         const parts = paramToProcess.split("_");
         let productId: string | undefined;
         let referrerId: string | undefined;
@@ -368,41 +347,28 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         if (referrerId) handleBio30Referral(referrerId, paramToProcess);
         targetPath = (productId && BIO30_PRODUCT_PATHS[productId]) ? BIO30_PRODUCT_PATHS[productId] : '/bio30';
       }
-      // === STRIKEBALL STARTAPP HANDLER ===
       else if (paramToProcess.startsWith("lobby_")) {
-          const lobbyId = paramToProcess.substring(6); // remove 'lobby_'
+          const lobbyId = paramToProcess.substring(6); 
           if (lobbyId) targetPath = `/strikeball/lobbies/${lobbyId}`;
       }
-      // ===================================
       else if (paramToProcess.startsWith("rental_") || paramToProcess.startsWith("rentals_")) {
-          // rental_ID
           const parts = paramToProcess.split("_");
           if (parts.length === 2) targetPath = `/rentals/${parts[1]}`;
       }
-      
-      // 2. UNIVERSAL REFERRAL CATCHER (Last check to catch ref_I_O_S_NN)
       else if (paramToProcess.startsWith("ref_")) {
           const refCode = paramToProcess.substring(4); 
-          
           handleSyndicateReferral(refCode);
-          
-          // If on main page, redirect to WB landing for conversion
           if (pathname === '/') targetPath = '/wblanding';
-          else targetPath = pathname; // Stay where we are
+          else targetPath = pathname; 
       }
-
-      // 3. Fallback
       else {
         targetPath = `/${paramToProcess}`;
       }
 
-      // ===================== EXECUTE REDIRECT =====================
       if (targetPath && targetPath !== pathname) {
         logger.info(`[ClientLayout] Redirecting to ${targetPath}`);
         router.replace(targetPath);
       }
-      
-      // Clear param to prevent loops
       clearStartParam?.();
     }
   }, [
@@ -434,7 +400,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/paddock",
     "/rentals",
     "/vipbikerental",
-    "/strikeball", // ADDED: Show bottom nav in Strikeball module
+    "/strikeball", 
   ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
     pathname?.startsWith(p)
@@ -446,7 +412,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname === "/profile" ||
         pathname === "/repo-xml" ||
         pathname === "/sauna-rent" ||
-        pathname?.startsWith("/wb") || // Hides standard header/footer for Warehouse pages
+        pathname?.startsWith("/wb") || 
         pathname === "/wblanding" || 
         pathname === "/wblanding/referral" ||
         pathname === "/csv-compare" ||
@@ -466,9 +432,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   return (
     <>
       {/* 
-          GHOST-VIS PROTOCOL: 
-          If TacticalMode is active, we suppress the background particles entirely.
-          Otherwise, if it's strikeball theme, show the fancy background.
+          GHOST-VIS: 
+          If Tactical Mode is active (Combat or Incoming Invite), we suppress the background 
+          completely to save battery and reduce screen illumination (Night Vision compatibility).
       */}
       {isStrikeballTheme && !isTacticalMode && <StrikeballBackground />}
 
@@ -477,16 +443,12 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       <main className={cn(
         "flex-1", 
         showBottomNav ? "pb-20 sm:pb-0" : "", 
-        
-        // GHOST-VIS: Force True Black if tactical.
-        isTacticalMode ? "bg-black text-white" : (!isTransparentPage && "bg-background")
+        // GHOST-VIS: Apply hard high-contrast blackout style during active operations
+        isTacticalMode ? "bg-[#000000] text-white selection:bg-red-900" : (!isTransparentPage && "bg-background")
       )}>
         {children}
       </main>
       
-      {/* 
-         Show Strikeball Nav regardless of showBottomNav check if we are in that module.
-      */}
       {(showBottomNav || isStrikeballTheme) && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
       
       <Suspense fallback={null}>
@@ -502,7 +464,6 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
     <ErrorOverlayProvider>
       <AppProvider>
         <AppInitializers />
-        {/* ADDED THEME PROVIDER HERE */}
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <TooltipProvider>
             <ErrorBoundaryForOverlay>

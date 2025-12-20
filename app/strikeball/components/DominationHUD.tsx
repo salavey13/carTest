@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import { supabaseAnon } from "@/hooks/supabase";
 import { getLobbyCheckpoints } from "../actions/domination";
 import { cn } from "@/lib/utils";
-import { FaFlag } from "react-icons/fa6";
 
 export const DominationHUD = ({ lobbyId }: { lobbyId: string }) => {
   const [points, setPoints] = useState<any[]>([]);
@@ -26,28 +25,28 @@ export const DominationHUD = ({ lobbyId }: { lobbyId: string }) => {
   if (points.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-3 gap-2 mb-4">
+    <div className="grid grid-cols-3 gap-px bg-zinc-800 border border-zinc-800 mb-4">
         {points.map(p => {
             const isBlue = p.owner_team === 'blue';
             const isRed = p.owner_team === 'red';
-            const isNeutral = p.owner_team === 'neutral';
 
             return (
                 <div key={p.id} className={cn(
-                    "border-2 rounded p-2 text-center transition-all duration-500 relative overflow-hidden",
-                    isBlue ? "bg-blue-900/50 border-blue-500 text-blue-100" :
-                    isRed ? "bg-red-900/50 border-red-500 text-red-100" :
-                    "bg-zinc-900 border-zinc-700 text-zinc-500"
+                    "h-20 flex flex-col items-center justify-center transition-colors duration-200",
+                    isBlue ? "bg-white text-black" : 
+                    isRed ? "bg-zinc-700 text-white" : 
+                    "bg-[#000000] text-zinc-600"
                 )}>
-                    {/* Pulsing Capture Effect */}
-                    {(isBlue || isRed) && (
-                        <div className={cn("absolute inset-0 opacity-20 animate-pulse", isBlue ? "bg-blue-400" : "bg-red-400")} />
-                    )}
-                    
-                    <div className="relative z-10 flex flex-col items-center">
-                        <FaFlag className={cn("mb-1", isNeutral && "opacity-50")} />
-                        <span className="font-black font-orbitron text-xs uppercase">{p.name}</span>
+                    <div className="text-[9px] font-mono font-bold uppercase tracking-tighter mb-1">
+                        SEC_{p.name}
                     </div>
+                    <div className="text-2xl font-black font-mono">
+                        {isBlue ? "B" : isRed ? "R" : "•"}
+                    </div>
+                    {/* Status Pip */}
+                    {(isBlue || isRed) && (
+                        <div className={cn("w-1 h-1 mt-1 animate-pulse", isBlue ? "bg-black" : "bg-white")} />
+                    )}
                 </div>
             )
         })}
