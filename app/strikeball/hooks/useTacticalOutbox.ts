@@ -15,6 +15,7 @@ export function useTacticalOutbox() {
     const syncLock = useRef(false);
     const queueRef = useRef<OutboxAction[]>([]);
 
+    // Initialize from LocalStorage
     useEffect(() => {
         const saved = localStorage.getItem('tactical_outbox');
         if (saved) {
@@ -38,6 +39,7 @@ export function useTacticalOutbox() {
         setIsSyncing(true);
         console.log(`[UPLINK] Начало передачи пакетов. Буфер: ${queueRef.current.length}`);
 
+        // Burst Mode: Process all packets in one loop if network is fast
         while (queueRef.current.length > 0) {
             const action = queueRef.current[0];
             console.log(`[HANDSHAKE] Отправка пакета ${action.type} (UID: ${action.id})`);
@@ -46,16 +48,16 @@ export function useTacticalOutbox() {
                 const res = await processFunc(action);
                 
                 if (res.success) {
-                    console.log(`[ACK] Пакет ${action.id} доставлен успешно.`);
+                    console.log(`[ACK] Пакет ${action.id} доставлен.`);
                     const updated = queueRef.current.slice(1);
                     updateQueue(updated);
                 } else {
-                    console.error(`[NACK] Сервер отклонил пакет ${action.id}:`, res.error);
-                    // Если это не ошибка сети, удаляем "битый" пакет, чтобы не вешать очередь
+                    console.error(`[NACK] Пакет ${action.id} отклонен:`, res.error);
+                    // If it's a logic error (not network), drop it to unblock the queue
                     if (res.error && !res.error.includes('fetch')) {
                         updateQueue(queueRef.current.slice(1));
                     }
-                    break; // Прерываем цикл для повтора позже
+                    break; // Stop burst on network error
                 }
             } catch (e) {
                 console.error(`[UPLINK_FATAL] Ошибка соединения при передаче ${action.id}`);
@@ -63,7 +65,6 @@ export function useTacticalOutbox() {
             }
         }
 
-        console.log(`[UPLINK] Передача завершена. Осталось в буфере: ${queueRef.current.length}`);
         setIsSyncing(false);
         syncLock.current = false;
     }, []);
@@ -73,7 +74,7 @@ export function useTacticalOutbox() {
             id: Math.random().toString(36).substring(7).toUpperCase(),
             type, payload, timestamp: Date.now()
         };
-        console.log(`[QUEUE] Добавлен новый пакет: ${newAction.id} (${type})`);
+        console.log(`[QUEUE] Добавлен пакет: ${newAction.id}`);
         updateQueue([...queueRef.current, newAction]);
     }, []);
 
