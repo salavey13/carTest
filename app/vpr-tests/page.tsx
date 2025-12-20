@@ -15,6 +15,8 @@ import {
 import { VibeContentRenderer } from "@/components/VibeContentRenderer"; 
 import type { Database } from '@/types/database.types';
 import { AdBreak } from "@/components/AdBreak";
+import { Button } from "@/components/ui/button";
+
 
 type Subject = Database['public']['Tables']['subjects']['Row'] & {
     grade_level?: number | null;
