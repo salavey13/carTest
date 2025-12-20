@@ -96,21 +96,34 @@ export default function LobbyRoom() {
   const isOwner = userMember?.role === 'owner' || lobby?.owner_id === dbUser?.user_id;
 
   // --- HANDLERS ---
-  const handleImHit = async () => { 
-      if (!userMember || userMember.status === 'dead') return;
-      setMembers(prev => prev.map(m => m.id === userMember.id ? { ...m, status: 'dead' } : m));
-      setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 200);
-      addToOutbox('HIT', { memberId: userMember.id });
-      toast.warning("KIA_RECORDED // UPLINK_QUEUED");
-  };
+  // Guarded KIA Handler
+const handleImHit = async () => { 
+    // CRITICAL GUARD: Don't queue if the combat link isn't established
+    if (!userMember || userMember.status === 'dead' || !lobbyId) {
+        console.error("KIA_REJECTED: Missing_Lobby_ID_Or_Member");
+        return;
+    }
+    
+    setMembers(prev => prev.map(m => m.id === userMember.id ? { ...m, status: 'dead' } : m));
+    setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 200);
+    
+    addToOutbox('HIT', { memberId: userMember.id });
+    toast.warning("KIA_RECORDED // UPLINK_QUEUED");
+};
 
-  const handleSelfRespawn = async () => { 
-      if (!userMember || userMember.status === 'alive') return;
-      setMembers(prev => prev.map(m => m.id === userMember.id ? { ...m, status: 'alive' } : m));
-      setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 200);
-      addToOutbox('RESPAWN', { memberId: userMember.id });
-      toast.success("READY_RECORDED // UPLINK_QUEUED");
-  };
+// Guarded Respawn Handler
+const handleSelfRespawn = async () => { 
+    if (!userMember || userMember.status === 'alive' || !lobbyId) {
+        console.error("RESPAWN_REJECTED: Missing_Lobby_ID");
+        return;
+    }
+    
+    setMembers(prev => prev.map(m => m.id === userMember.id ? { ...m, status: 'alive' } : m));
+    setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 200);
+    
+    addToOutbox('RESPAWN', { memberId: userMember.id });
+    toast.success("READY_RECORDED // UPLINK_QUEUED");
+};
 
   const updateTransport = async (role: string, seats: number = 0) => {
       if (!userMember) return;
