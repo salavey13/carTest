@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 type OutboxAction = {
     id: string;
-    type: 'HIT' | 'RESPAWN' | 'CAPTURE';
+    type: 'HIT' | 'RESPAWN' | 'CAPTURE' | 'BASE_INTERACT';
     payload: any;
     timestamp: number;
 };
@@ -13,7 +13,7 @@ export function useTacticalOutbox() {
     const [queue, setQueue] = useState<OutboxAction[]>([]);
     const [isSyncing, setIsSyncing] = useState(false);
     const syncLock = useRef(false);
-    const queueRef = useRef<OutboxAction[]>([]); // Alibi: Ref for consistent loop checks
+    const queueRef = useRef<OutboxAction[]>([]);
 
     useEffect(() => {
         const saved = localStorage.getItem('tactical_outbox');
@@ -30,34 +30,36 @@ export function useTacticalOutbox() {
         localStorage.setItem('tactical_outbox', JSON.stringify(newQueue));
     };
 
-    // BURST_MODE: Flushes as many as possible in one handshake cycle
     const burstSync = useCallback(async (processFunc: (action: OutboxAction) => Promise<{success: boolean, error?: string}>) => {
         if (syncLock.current || queueRef.current.length === 0) return;
         
         syncLock.current = true;
         setIsSyncing(true);
+        
+        console.log(`[UPLINK] Синхронизация... Пакетов: ${queueRef.current.length}`);
 
-        console.log(`[UPLINK] Буфер_Связи: ${queueRef.current.length} пакетов. Начало передачи.`);
+        // Используем локальную копию для управления циклом во избежание Race Condition
+        let currentQueue = [...queueRef.current];
 
-        while (queueRef.current.length > 0) {
-            const action = queueRef.current[0];
+        while (currentQueue.length > 0) {
+            const action = currentQueue[0];
             try {
                 const res = await processFunc(action);
-                
                 if (res.success) {
-                    console.log(`[ACK] Пакет ${action.id} доставлен.`);
-                    const updated = queueRef.current.slice(1);
-                    updateQueue(updated);
+                    console.log(`[ACK] Пакет ${action.id} подтвержден.`);
+                    currentQueue.shift();
+                    updateQueue([...currentQueue]); // Обновляем состояние и Ref
                 } else {
                     console.warn(`[NACK] Пакет ${action.id} отклонен: ${res.error}`);
-                    // If server error is fatal (not network), discard to unblock queue
                     if (res.error && !res.error.includes('fetch')) {
-                        updateQueue(queueRef.current.slice(1));
+                        currentQueue.shift();
+                        updateQueue([...currentQueue]);
+                        continue;
                     }
-                    break; // Stop burst on network drop
+                    break; 
                 }
             } catch (e) {
-                console.error("[UPLINK_FATAL] Потеря несущей частоты.");
+                console.error("[UPLINK_ERROR] Сбой канала.");
                 break;
             }
         }
