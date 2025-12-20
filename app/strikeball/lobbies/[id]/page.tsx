@@ -28,7 +28,7 @@ import { FaShareNodes, FaFilePdf, FaCar, FaClipboardCheck, FaUsers, FaGamepad, F
 export default function LobbyRoom() {
   const { id: lobbyId } = useParams(); 
   const { dbUser, tg } = useAppContext();
-  const { addToOutbox, flushQueue, queue } = useTacticalOutbox();
+  const { addToOutbox, burstSync, queue } = useTacticalOutbox();
   
   const [members, setMembers] = useState<any[]>([]);
   const [lobby, setLobby] = useState<any>(null);
@@ -41,6 +41,27 @@ export default function LobbyRoom() {
   const [carName, setCarName] = useState("");
   const [checkpoints, setCheckpoints] = useState<any[]>([]);
 
+  // Definition of how to process an outbox packet
+  const processUplink = useCallback(async (action: any) => {
+      if (action.type === 'HIT') return await playerHit(lobbyId as string, action.payload.memberId);
+      if (action.type === 'RESPAWN') return await playerRespawn(lobbyId as string, action.payload.memberId);
+      if (action.type === 'CAPTURE') return await captureCheckpoint(dbUser?.user_id!, action.payload.checkpointId);
+      return { success: true };
+  }, [lobbyId, dbUser]);
+
+  // WATCHDOG: Immediate burst on any queue change
+  useEffect(() => {
+      if (queue.length > 0) burstSync(processUplink);
+  }, [queue.length, burstSync, processUplink]);
+
+  // HEARTBEAT: Periodic check for missed packets (2G recovery)
+  useEffect(() => {
+      const i = setInterval(() => {
+          if (queue.length > 0) burstSync(processUplink);
+      }, 5000);
+      return () => clearInterval(i);
+  }, [queue.length, burstSync, processUplink]);
+
   const loadData = useCallback(async () => {
     try {
         const result = await fetchLobbyData(lobbyId as string);
@@ -49,6 +70,7 @@ export default function LobbyRoom() {
         setLobby(result.lobby);
         setMembers(result.members || []);
 
+        // Sync Logistics if user is driver
         const me = result.members?.find((m: any) => m.user_id === dbUser?.user_id);
         if (me?.metadata?.transport?.role === 'driver') {
              if (!carName) setCarName(me.metadata.transport.car_name || "");
@@ -60,21 +82,7 @@ export default function LobbyRoom() {
 
         if (result.lobby.status === 'finished' && activeTab !== 'game') setActiveTab('game');
     } catch (e) { setError("СИГНАЛ_ПОТЕРЯН"); }
-  }, [lobbyId, dbUser?.user_id, activeTab]);
-
-  // Persistent Sync Engine
-  useEffect(() => {
-    const interval = setInterval(() => {
-        if (queue.length === 0) return;
-        flushQueue(async (action) => {
-            if (action.type === 'HIT') return await playerHit(lobbyId as string, action.payload.memberId);
-            if (action.type === 'RESPAWN') return await playerRespawn(lobbyId as string, action.payload.memberId);
-            if (action.type === 'CAPTURE') return await captureCheckpoint(dbUser?.user_id!, action.payload.checkpointId);
-            return { success: true };
-        });
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [queue, flushQueue, lobbyId, dbUser]);
+  }, [lobbyId, dbUser?.user_id, activeTab, carName]);
 
   useEffect(() => {
     loadData();
@@ -89,21 +97,27 @@ export default function LobbyRoom() {
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
   const isOwner = userMember?.role === 'owner' || lobby?.owner_id === dbUser?.user_id;
 
-  // --- HANDLERS ---
+  // --- OPTIMISTIC HANDLERS ---
   const handleImHit = () => { 
     if (!userMember || userMember.status === 'dead' || !lobbyId) return;
+    
+    // 1. Update UI Instantly (Local Truth)
     setMembers(prev => prev.map(m => m.id === userMember.id ? { ...m, status: 'dead' } : m));
-    setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 200);
+    setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 150);
+    
+    // 2. Add to Outbox (Triggers Watchdog)
     addToOutbox('HIT', { memberId: userMember.id });
-    toast.warning("KIA_ЗАПИСАНО // ОЧЕРЕДЬ_ОТПРАВКИ");
+    toast.warning("УБИТ_В_БОЮ // ПАКЕТ_В_ОЧЕРЕДИ");
   };
 
   const handleSelfRespawn = () => { 
     if (!userMember || userMember.status === 'alive' || !lobbyId) return;
+    
     setMembers(prev => prev.map(m => m.id === userMember.id ? { ...m, status: 'alive' } : m));
-    setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 200);
+    setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 150);
+    
     addToOutbox('RESPAWN', { memberId: userMember.id });
-    toast.success("ГОТОВ_К_БОЮ // ОЧЕРЕДЬ_ОТПРАВКИ");
+    toast.success("ГОТОВ_К_БОЮ // ПАКЕТ_В_ОЧЕРЕДИ");
   };
 
   const handleJoinTeam = async (team: string) => {
@@ -117,7 +131,7 @@ export default function LobbyRoom() {
       if (res.success) loadData();
   };
 
-  if (error) return <div className="text-center pt-40 text-red-600 font-mono">КРИТИЧЕСКАЯ_ОШИБКА: {error}</div>;
+  if (error) return <div className="text-center pt-40 text-red-600 font-mono italic">КРИТИЧЕСКАЯ_ОШИБКА: {error}</div>;
   if (!lobby) return <div className="text-center pt-40 text-white font-mono animate-pulse">РЕКОНСТРУКЦИЯ_ОПЕРАЦИИ...</div>;
 
   const isFinished = lobby.status === 'finished';
@@ -125,22 +139,22 @@ export default function LobbyRoom() {
   return (
     <div className={cn("pt-28 pb-48 px-2 min-h-screen text-white font-mono transition-colors duration-200", whiteFlash ? "bg-white/10" : "bg-black")}>
       
-      {/* SYNC INDICATOR */}
+      {/* SYNC INDICATOR (Israeli Pager Hardening) */}
       {queue.length > 0 && (
-          <div className="fixed top-20 left-4 z-[70] flex items-center gap-2 bg-red-950/80 border border-red-600 px-3 py-1 animate-pulse">
+          <div className="fixed top-20 left-4 z-[70] flex items-center gap-2 bg-red-950/80 border border-red-600 px-3 py-1 animate-pulse shadow-[0_0_20px_rgba(220,38,38,0.4)]">
               <FaWifi className="text-red-500 text-xs" />
-              <span className="text-[9px] font-black text-red-500 tracking-widest">БУФЕР_СВЯЗИ: {queue.length}</span>
+              <span className="text-[9px] font-black text-red-500 tracking-widest uppercase">Буфер_Связи: {queue.length}</span>
           </div>
       )}
 
       {/* HEADER SITREP */}
       <div className="text-center mb-10 relative">
         <div className="absolute top-0 right-0 flex gap-2">
-             <button onClick={() => generateAndSendLobbyPdf(dbUser!.user_id, lobbyId as string)} className="p-2 border border-zinc-800 text-zinc-600 hover:text-white"><FaFilePdf /></button>
+             <button onClick={() => generateAndSendLobbyPdf(dbUser!.user_id, lobbyId as string)} className="p-2 border border-zinc-900 text-zinc-700 hover:text-white hover:border-white transition-all"><FaFilePdf /></button>
              <button onClick={() => {
                  const link = `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobbyId}`;
                  if (tg?.openTelegramLink) tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}`);
-             }} className="p-2 border border-zinc-800 text-zinc-600 hover:text-white"><FaShareNodes /></button>
+             }} className="p-2 border border-zinc-900 text-zinc-700 hover:text-white hover:border-white transition-all"><FaShareNodes /></button>
         </div>
         <h1 className="text-2xl font-black uppercase tracking-[0.2em]">{lobby.name}</h1>
         <div className="text-[9px] text-zinc-600 mt-1 uppercase tracking-widest">{lobby.mode} // {lobby.status}</div>
@@ -224,36 +238,36 @@ export default function LobbyRoom() {
           {/* Main Action Key */}
           {userMember && lobby.status === 'active' && (
               userMember.status === 'alive' ? (
-                <button onClick={handleImHit} className="pointer-events-auto w-full bg-white text-black font-black py-6 uppercase tracking-[0.4em] border-4 border-black outline outline-1 outline-white active:bg-zinc-300 transition-all text-xl shadow-[0_0_50px_rgba(255,255,255,0.2)]">
-                    REPORT_KIA // УБИТ
+                <button onClick={handleImHit} className="pointer-events-auto w-full bg-white text-black font-black py-6 uppercase tracking-[0.4em] border-4 border-black outline outline-1 outline-white active:bg-zinc-300 transition-all text-xl shadow-[0_10px_40px_rgba(255,255,255,0.15)]">
+                    УБИТ_В_БОЮ // KIA
                 </button>
               ) : (
                 <button onClick={handleSelfRespawn} className="pointer-events-auto w-full bg-white text-black font-black py-6 uppercase tracking-[0.4em] border-4 border-black outline outline-1 outline-white active:bg-zinc-300 transition-all text-xl">
-                    RESPAWN_READY // ГОТОВ
+                    ГОТОВ_К_БОЮ // READY
                 </button>
               )
           )}
 
-          {/* Team Selection / Swapping */}
+          {/* Team Selection / Swapping - Remains available for logistics phase */}
           {!isFinished && (
-            <div className="pointer-events-auto grid grid-cols-2 gap-px bg-zinc-800 border border-zinc-800">
+            <div className="pointer-events-auto grid grid-cols-2 gap-px bg-zinc-800 border border-zinc-800 shadow-2xl">
                 <button 
                     onClick={() => handleJoinTeam('blue')} 
                     className={cn(
                         "py-4 font-black uppercase text-[10px] tracking-widest transition-colors",
-                        userMember?.team === 'blue' ? "bg-zinc-700 text-white pointer-events-none" : "bg-black text-zinc-500 hover:bg-zinc-950"
+                        userMember?.team === 'blue' ? "bg-zinc-800 text-white pointer-events-none" : "bg-black text-zinc-600 hover:bg-zinc-950"
                     )}
                 >
-                    {userMember?.team === 'blue' ? "ЗА_СИНИХ [В_СЕТИ]" : "ВСТУПИТЬ_ЗА_СИНИХ"}
+                    {userMember?.team === 'blue' ? "[ В_СИНИХ_СИЛАХ ]" : "ВСТУПИТЬ_К_СИНИМ"}
                 </button>
                 <button 
                     onClick={() => handleJoinTeam('red')} 
                     className={cn(
                         "py-4 font-black uppercase text-[10px] tracking-widest transition-colors",
-                        userMember?.team === 'red' ? "bg-zinc-700 text-white pointer-events-none" : "bg-black text-zinc-500 hover:bg-zinc-950"
+                        userMember?.team === 'red' ? "bg-zinc-800 text-white pointer-events-none" : "bg-black text-zinc-600 hover:bg-zinc-950"
                     )}
                 >
-                    {userMember?.team === 'red' ? "ЗА_КРАСНЫХ [В_СЕТИ]" : "ВСТУПИТЬ_ЗА_КРАСНЫХ"}
+                    {userMember?.team === 'red' ? "[ В_КРАСНОЙ_ЯЧЕЙКЕ ]" : "ВСТУПИТЬ_К_КРАСНЫМ"}
                 </button>
             </div>
           )}
