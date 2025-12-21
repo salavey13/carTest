@@ -5,10 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 // These are deliberately inaccurate initial boundaries to demonstrate the calibration process.
 const INITIAL_MAP_BOUNDS = {
-  top: 56.4,
-  bottom: 56.2,
-  left: 43.7,
-  right: 44.1,
+  top: 56.42,
+  bottom: 56.0825,
+  left: 43.6603,
+  right: 44.1230,
 };
 
 export default function MapCalibratorPage() {
