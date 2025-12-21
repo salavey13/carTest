@@ -31,9 +31,9 @@ const DEFAULT_MAP_URL = 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/obj
 // Калиброванные границы для изображения города (Nizhny Novgorod Grid)
 const CITY_BOUNDS: MapBounds = { 
     top: 56.42, 
-    bottom: 56.0825, 
-    left: 43.6603, 
-    right: 44.1230 
+    bottom: 56.07, 
+    left: 43.8500, 
+    right: 44.1500 
 };
 
 export default function LobbyRoom() {
