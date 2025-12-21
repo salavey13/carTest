@@ -7,6 +7,23 @@ import { cn } from "@/lib/utils";
 
 export const CommandConsole = ({ lobbyId, userId, status, score }: any) => {
   const [isBusy, setIsBusy] = useState(false);
+  
+    const [newDate, setNewDate] = useState("");
+
+    const handlePropose = async () => {
+        if(!newDate) return;
+        const res = await proposeLobbyDate(lobbyId, userId, newDate);
+        if(res.success) toast.success("ДАТА_ОБНОВЛЕНА");
+    };
+
+    const handleAdminApprove = async (status: 'approved_unpaid' | 'approved_paid') => {
+        const res = await setLobbyApprovalStatus(lobbyId, status);
+        if(res.success) toast.success("СТАТУС_ИЗМЕНЕН");
+    };
+
+  
+            
+            
 
   const handleStart = async () => {
     if(!confirm("АКТИВИРОВАТЬ_БОЕВОЙ_РЕЖИМ?")) return;
@@ -47,6 +64,31 @@ export const CommandConsole = ({ lobbyId, userId, status, score }: any) => {
 
   return (
     <div className="space-y-4">
+                    {/* OWNER: ПРЕДЛОЖИТЬ ДАТУ */}
+            {status === 'open' && (
+                <div className="bg-zinc-950 border border-zinc-800 p-4">
+                    <h4 className="text-[9px] text-zinc-600 mb-2 uppercase font-mono tracking-widest">ПЕРЕНОС_ОПЕРАЦИИ</h4>
+                    <div className="flex gap-2">
+                        <input 
+                            type="datetime-local" 
+                            className="flex-1 bg-black border border-zinc-800 p-2 text-xs font-mono text-white"
+                            onChange={(e) => setNewDate(e.target.value)}
+                        />
+                        <button onClick={handlePropose} className="bg-white text-black px-4 text-[10px] font-black uppercase">PUSH</button>
+                    </div>
+                </div>
+            )}
+
+            {/* ADMIN: УТВЕРЖДЕНИЕ */}
+            {isAdmin && status === 'open' && (
+                <div className="bg-zinc-950 border border-zinc-800 p-4">
+                    <h4 className="text-[9px] text-zinc-600 mb-3 uppercase font-mono tracking-widest">ОРГ_КОНТРОЛЬ</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => handleAdminApprove('approved_unpaid')} className="bg-cyan-900/30 border border-cyan-500 text-cyan-400 py-2 text-[10px] font-black uppercase">APPROVE</button>
+                        <button onClick={() => handleAdminApprove('approved_paid')} className="bg-green-900/30 border border-green-500 text-green-400 py-2 text-[10px] font-black uppercase">PAID_OK</button>
+                    </div>
+                </div>
+            )}
         <div className="grid grid-cols-2 gap-4">
              <div className="bg-[#000000] border border-zinc-800 p-4">
                  <h4 className="text-zinc-600 font-mono text-[10px] mb-4 text-center tracking-widest uppercase">КОРР_СИНИХ</h4>
