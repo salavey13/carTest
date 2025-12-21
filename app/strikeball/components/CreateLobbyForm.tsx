@@ -31,7 +31,7 @@ export const CreateLobbyForm: React.FC = () => {
   const [mode, setMode] = useState("tdm");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("10:00");
-  const [location, setLocation] = useState("56.3269,44.0059"); // RESTORED
+  const [location, setLocation] = useState("56.226950,43.812079"); // RESTORED
   const [maxPlayers, setMaxPlayers] = useState<number>(20);
   const [hostAsCrew, setHostAsCrew] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
