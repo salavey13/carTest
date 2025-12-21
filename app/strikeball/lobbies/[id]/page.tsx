@@ -216,11 +216,29 @@ export default function LobbyRoom() {
           )}
 
           {activeTab === 'roster' && (
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-zinc-900 border border-zinc-900">
-                <SquadRoster teamName="СИНИЕ_СИЛЫ" teamColor="blue" members={members.filter(m => m.team === 'blue')} onAddBot={isOwner ? () => addNoobBot(lobby.id, 'blue').then(loadData) : undefined} onKick={isOwner ? (id: string) => removeMember(id).then(loadData) : undefined} currentUserId={dbUser?.user_id} />
-                <SquadRoster teamName="КРАСНАЯ_ЯЧЕЙКА" teamColor="red" members={members.filter(m => m.team === 'red')} onAddBot={isOwner ? () => addNoobBot(lobby.id, 'red').then(loadData) : undefined} onKick={isOwner ? (id: string) => removeMember(id).then(loadData) : undefined} currentUserId={dbUser?.user_id} />
-             </div>
-          )}
+   <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-zinc-900 border border-zinc-900">
+      <SquadRoster 
+          teamName="ALPHA" 
+          teamColor="blue" 
+          members={members.filter(m => m.team === 'blue')} 
+          onAddBot={isOwner ? () => addNoobBot(lobby.id, 'blue').then(loadData) : undefined} 
+          onKick={isOwner ? (id: string) => removeMember(id).then(loadData) : undefined} 
+          onInvite={handleShare} 
+          currentUserId={dbUser?.user_id} 
+          isOwner={isOwner}
+      />
+      <SquadRoster 
+          teamName="BRAVO" 
+          teamColor="red" 
+          members={members.filter(m => m.team === 'red')} 
+          onAddBot={isOwner ? () => addNoobBot(lobby.id, 'red').then(loadData) : undefined} 
+          onKick={isOwner ? (id: string) => removeMember(id).then(loadData) : undefined} 
+          onInvite={handleShare} 
+          currentUserId={dbUser?.user_id} 
+          isOwner={isOwner}
+      />
+   </div>
+)}
 
           {activeTab === 'map' && <MapTab mapData={mapData} fieldId={lobby.field_id} />}
 
