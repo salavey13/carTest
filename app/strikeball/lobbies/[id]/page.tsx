@@ -10,7 +10,7 @@ import { updateTransportStatus, signSafetyBriefing, joinCar } from "../../action
 import { generateAndSendLobbyPdf } from "../../actions/service";
 import { getLobbyCheckpoints, captureCheckpoint } from "../../actions/domination";
 
-// --- Extracted Components ---
+// --- Extracted Components (Israeli Pager Hardening) ---
 import { SyncIndicator } from "./components/SyncIndicator";
 import { LobbyHeader } from "./components/LobbyHeader";
 import { LobbyTabs } from "./components/LobbyTabs";
@@ -34,7 +34,7 @@ const CITY_BOUNDS: MapBounds = { top: 56.4242, bottom: 56.08, left: 43.66, right
 
 export default function LobbyRoom() {
   const { id: lobbyId } = useParams(); 
-  const { dbUser, tg, isAdmin: checkAdmin } = useAppContext();
+  const { dbUser, tg, isAdmin: checkAdminFunc } = useAppContext();
   const { addToOutbox, burstSync, queue } = useTacticalOutbox();
   
   const [members, setMembers] = useState<any[]>([]);
@@ -49,14 +49,13 @@ export default function LobbyRoom() {
   const [driverSeats, setDriverSeats] = useState(3);
   const [carName, setCarName] = useState("");
 
+  // EXECUTE admin check once for the whole tree
+  const isSystemAdmin = useMemo(() => {
+    return typeof checkAdminFunc === 'function' ? checkAdminFunc() : false;
+  }, [checkAdminFunc]);
+
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
   const isOwner = lobby?.owner_id === dbUser?.user_id;
-  
-  
-  // EXECUTE the check once to get a primitive boolean
-  const isSystemAdmin = useMemo(() => {
-    return typeof checkAdmin === 'function' ? checkAdmin() : false;
-  }, [checkAdmin]);
 
   // --- UPLINK PROCESSING ---
   const processUplink = useCallback(async (action: any) => {
@@ -107,7 +106,7 @@ export default function LobbyRoom() {
       return { points, bounds: CITY_BOUNDS };
   }, [lobby]);
 
-  // --- HANDLERS ---
+  // --- TOP-LEVEL HANDLERS ---
   const handlePdfGen = async () => {
     if (!dbUser?.user_id) return;
     setIsGeneratingPdf(true);
@@ -133,23 +132,19 @@ export default function LobbyRoom() {
 
   const handleImHit = () => { 
     if (!userMember || userMember.status === 'dead' || !lobbyId) return;
-    // UI Update (Local Truth)
     setMembers(prev => prev.map(m => m.id === userMember.id ? { ...m, status: 'dead' } : m));
     setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 150);
-    // Network Sync
     addToOutbox('HIT', { memberId: userMember.id });
     toast.warning("KIA_ЗАПИСАНО // ПЕРЕДАЧА...");
   };
 
   const handleTacticalRespawn = () => {
       if (!tg?.showScanQrPopup) {
-          // Fallback for desktop/no scanner
           setMembers(prev => prev.map(m => m.id === userMember.id ? { ...m, status: 'alive' } : m));
           setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 150);
           addToOutbox('RESPAWN', { memberId: userMember.id });
           return;
       }
-      // Tactical QR Flow
       tg.showScanQrPopup({ text: "СКАНИРУЙ_QR_БАЗЫ_ИЛИ_ТОЧКИ" }, async (text: string) => {
           tg.closeScanQrPopup();
           if (!text) return true;
@@ -170,6 +165,17 @@ export default function LobbyRoom() {
     if (!dbUser) return;
     const res = await joinLobby(dbUser.user_id, lobbyId as string, team);
     if (res.success) { toast.success(res.message); loadData(); }
+  };
+
+  const handleSafetySign = async (operatorData: any) => {
+      if (!userMember) return;
+      const res = await signSafetyBriefing(userMember.id, operatorData);
+      if (res.success) {
+          toast.success("ПРОТОКОЛ_ПОДПИСАН");
+          loadData();
+      } else {
+          toast.error(res.error);
+      }
   };
 
   if (error) return <div className="text-center pt-40 text-red-600 font-mono italic">КРИТИЧЕСКАЯ_ОШИБКА: {error}</div>;
@@ -230,7 +236,7 @@ export default function LobbyRoom() {
           )}
 
           {activeTab === 'safety' && (
-              <SafetyBriefing onComplete={(data: any) => signSafetyBriefing(userMember.id, data).then(loadData)} isSigned={!!userMember?.metadata?.safety_signed} />
+              <SafetyBriefing onComplete={handleSafetySign} isSigned={!!userMember?.metadata?.safety_signed} />
           )}
       </div>
 
