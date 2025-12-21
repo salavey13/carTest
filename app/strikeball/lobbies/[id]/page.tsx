@@ -28,6 +28,14 @@ import { VibeMap, MapBounds, PointOfInterest } from "@/components/VibeMap";
 
 const DEFAULT_MAP_URL = 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg';
 
+// Калиброванные границы для изображения города (Nizhny Novgorod Grid)
+const CITY_BOUNDS: MapBounds = { 
+    top: 56.4000, 
+    bottom: 56.1500, 
+    left: 43.7000, 
+    right: 44.1000 
+};
+
 export default function LobbyRoom() {
   const { id: lobbyId } = useParams(); 
   const { dbUser, tg } = useAppContext();
@@ -40,7 +48,6 @@ export default function LobbyRoom() {
   const [whiteFlash, setWhiteFlash] = useState(false);
   const [checkpoints, setCheckpoints] = useState<any[]>([]);
   
-  // States for Header Actions
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Logistics State
@@ -55,6 +62,7 @@ export default function LobbyRoom() {
       return { success: true };
   }, [lobbyId, dbUser]);
 
+  // WATCHDOG: Мгновенная отправка при изменении очереди
   useEffect(() => {
       if (queue.length > 0) burstSync(processUplink);
   }, [queue.length, burstSync, processUplink]);
@@ -87,18 +95,25 @@ export default function LobbyRoom() {
     return () => { supabaseAnon.removeChannel(channel); };
   }, [lobbyId, loadData]);
 
+  // FIXED: Корректная проекция GPS на сетку города
   const mapData = useMemo(() => {
       if (!lobby?.field_id) return null;
       const points: PointOfInterest[] = [];
-      let bounds: MapBounds = { top: 56.4, bottom: 56.2, left: 43.7, right: 44.1 };
+      
       if (lobby.field_id.includes(',')) {
           const [lat, lon] = lobby.field_id.split(',').map(Number);
           if (!isNaN(lat) && !isNaN(lon)) {
-              points.push({ id: 'target', name: 'ОБЪЕКТ', type: 'point', coords: [[lat, lon]], icon: '::FaFlag::', color: 'bg-red-600' });
-              bounds = { top: lat + 0.005, bottom: lat - 0.005, left: lon - 0.005, right: lon + 0.005 };
+              points.push({ 
+                  id: 'target', 
+                  name: 'ЦЕЛЬ_ОПЕРАЦИИ', 
+                  type: 'point', 
+                  coords: [[lat, lon]], 
+                  icon: '::FaFlag::', 
+                  color: 'bg-red-600' 
+              });
           }
       }
-      return { points, bounds };
+      return { points, bounds: CITY_BOUNDS };
   }, [lobby]);
 
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
@@ -155,11 +170,9 @@ export default function LobbyRoom() {
           addToOutbox('RESPAWN', { memberId: userMember.id });
           return;
       }
-
       tg.showScanQrPopup({ text: "СКАНИРУЙ_QR_БАЗЫ_ИЛИ_ТОЧКИ" }, async (text: string) => {
           tg.closeScanQrPopup();
           if (!text) return true;
-
           if (text.startsWith('respawn_')) {
               const team = text.split('_')[2];
               addToOutbox('BASE_INTERACT', { targetTeam: team });
@@ -168,8 +181,6 @@ export default function LobbyRoom() {
               const cpId = text.replace('capture_', '');
               addToOutbox('CAPTURE', { checkpointId: cpId });
               toast.success("ТОЧКА_ОБНАРУЖЕНА // ОБРАБОТКА");
-          } else {
-              toast.error("НЕИЗВЕСТНЫЙ_ПРОТОКОЛ");
           }
           return true;
       });
@@ -194,7 +205,7 @@ export default function LobbyRoom() {
           </div>
       )}
 
-      {/* HEADER SITREP С КНОПКАМИ PDF И SHARE */}
+      {/* HEADER SITREP */}
       <div className="text-center mb-10 relative">
         <div className="absolute top-0 right-0 flex gap-3">
              <button 
@@ -260,10 +271,21 @@ export default function LobbyRoom() {
           )}
 
           {activeTab === 'map' && (
-              <div className="h-[60vh] w-full border border-zinc-800 relative bg-zinc-950">
-                  <VibeMap points={mapData?.points || []} bounds={mapData?.bounds || { top: 56.4, bottom: 56.2, left: 43.7, right: 44.1 }} imageUrl={DEFAULT_MAP_URL} />
-                  <div className="absolute bottom-4 left-4 bg-black/80 p-2 border border-red-900 text-[9px] font-mono text-red-500 uppercase tracking-widest">
-                      GPS_SOURCE: {lobby.field_id || "LOCAL"}
+              <div className="h-[65vh] w-full border border-zinc-800 relative bg-zinc-950 overflow-hidden rounded-lg">
+                  {mapData && (
+                    <VibeMap 
+                        points={mapData.points} 
+                        bounds={mapData.bounds} 
+                        imageUrl={DEFAULT_MAP_URL}
+                        highlightedPointId="target"
+                    />
+                  )}
+                  {/* ТАКТИЧЕСКИЙ ФУТЕР КАРТЫ */}
+                  <div className="absolute bottom-4 left-4 z-10 bg-black/90 p-2 border border-red-900 shadow-[0_0_15px_rgba(220,38,38,0.3)]">
+                      <div className="text-[8px] text-zinc-600 uppercase font-bold mb-1">Source_Intel: GPS_Grid</div>
+                      <div className="text-[10px] text-red-500 font-mono tracking-widest uppercase">
+                          {lobby?.field_id ? `OBJECTIVE_LOC: ${lobby.field_id}` : "SIGNAL_LOST"}
+                      </div>
                   </div>
               </div>
           )}
@@ -297,7 +319,7 @@ export default function LobbyRoom() {
               )
           )}
 
-          {lobby.status === 'open' && (
+          {lobby?.status === 'open' && (
             <div className="pointer-events-auto grid grid-cols-2 gap-px bg-zinc-800 border border-zinc-800 shadow-2xl">
                 <button 
                     onClick={() => handleJoinTeam('blue')} 
