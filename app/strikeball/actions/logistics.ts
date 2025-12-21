@@ -69,13 +69,26 @@ export async function joinCar(passengerId: string, driverId: string) {
     } catch (e: any) { return { success: false, error: e.message }; }
 }
 
-export async function signSafetyBriefing(memberId: string) {
+export async function signSafetyBriefing(
+  memberId: string, 
+  operatorData: { fio: string, phone: string, school?: string }
+) {
   try {
     const { data: member } = await supabaseAdmin.from("lobby_members").select("metadata").eq("id", memberId).single();
     const currentMeta = (member?.metadata as Record<string, any>) || {};
-    const newMeta = { ...currentMeta, safety_signed: true, safety_signed_at: new Date().toISOString() };
+    
+    // Инжектим данные оператора в метаданные для PDF-генератора
+    const newMeta = { 
+        ...currentMeta, 
+        safety_signed: true, 
+        safety_signed_at: new Date().toISOString(),
+        operator_data: operatorData 
+    };
+
     const { error } = await supabaseAdmin.from("lobby_members").update({ metadata: newMeta }).eq("id", memberId);
     if (error) throw error;
+    
+    revalidatePath('/strikeball/lobbies');
     return { success: true };
   } catch (e: any) { return { success: false, error: e.message }; }
 }
