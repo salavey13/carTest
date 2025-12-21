@@ -104,6 +104,20 @@ export default function LobbyRoom() {
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
   const isOwner = userMember?.role === 'owner' || lobby?.owner_id === dbUser?.user_id;
 
+const handleSafetySign = async (operatorData: any) => {
+      if (!userMember) return;
+      
+      // CALL LOGISTICS ACTION TO COMMIT TO METADATA
+      const res = await signSafetyBriefing(userMember.id, operatorData);
+      
+      if (res.success) {
+          toast.success("ПРОТОКОЛ_ПОДПИСАН");
+          loadData(); // Force refresh to sync state
+      } else {
+          toast.error(res.error);
+      }
+  };
+
   // --- ТАКТИЧЕСКИЕ ОБРАБОТЧИКИ ---
   const handleImHit = () => { 
     if (!userMember || userMember.status === 'dead') return;
@@ -226,7 +240,10 @@ export default function LobbyRoom() {
           )}
 
           {activeTab === 'safety' && (
-              <SafetyBriefing onComplete={() => signSafetyBriefing(userMember.id).then(loadData)} isSigned={!!userMember?.metadata?.safety_signed} />
+              <SafetyBriefing 
+                onComplete={handleSafetySign} 
+                isSigned={!!userMember?.metadata?.safety_signed} 
+            />
           )}
       </div>
 
