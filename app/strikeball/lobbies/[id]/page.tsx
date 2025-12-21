@@ -252,7 +252,12 @@ export default function LobbyRoom() {
              ) : (
                  <div className="space-y-4">
                      <DominationHUD lobbyId={lobby.id} />
-                     <LiveHUD startTime={lobby.metadata?.actual_start_at} score={lobby.metadata?.score || {red:0, blue:0}} />
+                     <LiveHUD 
+              // Если игра активна, считаем от реального старта, если нет - от запланированного
+              startTime={lobby.status === 'active' ? lobby.metadata?.actual_start_at : lobby.start_at} 
+              score={lobby.metadata?.score || {red:0, blue:0}} 
+              status={lobby.status}
+           />
                      {isOwner && (
                          <div className="space-y-4 pt-10 border-t border-zinc-900">
                              <CommandConsole lobbyId={lobby.id} userId={dbUser!.user_id} status={lobby.status} score={lobby.metadata?.score || {red:0, blue:0}} />
