@@ -11,10 +11,192 @@ const fontkitModule = require('@pdf-lib/fontkit');
 const { PDFDocument, rgb } = pdfLibModule;
 
 /**
+ * Генерирует расширенный тактический PDF:
+ * Стр 1: Официальный Бриф (Приложение №3) со списком ФИО
+ * Стр 2+: QR-коды для баз, точек захвата и входа в игру
+ */
+export async function generateAndSendLobbyPdf(userId: string, lobbyId: string) {
+  try {
+    // 1. Сбор разведданных
+    const { data: lobby } = await supabaseAdmin.from("lobbies").select("*").eq("id", lobbyId).single();
+    const { data: members } = await supabaseAdmin.from("lobby_members").select("*").eq("lobby_id", lobbyId);
+    const { data: checkpoints } = await supabaseAdmin.from("lobby_checkpoints").select("*").eq("lobby_id", lobbyId);
+    
+    if (!lobby) throw new Error("Operation not found");
+
+    // 2. Инициализация PDF
+    const pdfDoc = await PDFDocument.create();
+    pdfDoc.registerFontkit(fontkitModule);
+    const fontPath = path.join(process.cwd(), 'server-assets', 'fonts', 'DejaVuSans.ttf');
+    const fontBytes = fs.readFileSync(fontPath);
+    const customFont = await pdfDoc.embedFont(fontBytes); 
+
+    let page = pdfDoc.addPage([595.28, 841.89]);
+    const { width, height } = page.getSize();
+
+    // --- ЦВЕТОВАЯ СХЕМА ---
+    const COLOR_RED = rgb(0.7, 0.1, 0.1);
+    const COLOR_BLUE = rgb(0.1, 0.2, 0.6);
+    const COLOR_DARK = rgb(0.1, 0.1, 0.1);
+
+    // ==========================================
+    // СТРАНИЦА 1: ОФИЦИАЛЬНЫЙ БРИФ (Приложение №3)
+    // ==========================================
+    page.drawText("Приложение №3 к договору оферты", { x: width - 250, y: height - 40, size: 10, font: customFont });
+    page.drawText("Бриф на спортивное мероприятие", { x: 40, y: height - 80, size: 20, font: customFont, color: COLOR_DARK });
+
+    let y = height - 120;
+    const drawCell = (label: string, value: string, x: number, w: number) => {
+        page.drawRectangle({ x, y: y - 25, width: w, height: 25, borderColor: rgb(0,0,0), borderWidth: 0.5 });
+        page.drawText(label, { x: x + 5, y: y - 10, size: 8, font: customFont, color: rgb(0.4, 0.4, 0.4) });
+        page.drawText(value, { x: x + 5, y: y - 22, size: 10, font: customFont });
+    };
+
+    // Строка 1
+    drawCell("Место проведения", "Клуб активного отдыха 'Антанта'", 40, 300);
+    drawCell("Дата начала", lobby.start_at ? new Date(lobby.start_at).toLocaleDateString('ru-RU') : "ПО ГОТОВНОСТИ", 340, 215);
+    
+    y -= 35;
+    // Строка 2
+    drawCell("Программа (Режим)", lobby.mode?.toUpperCase() || "TDM", 40, 300);
+    drawCell("Всего участников", String(members?.length || 0), 340, 215);
+
+    y -= 35;
+    // Строка 3 (Распределение по командам)
+    const childrenCount = members?.filter(m => m.team === 'blue').length || 0;
+    const adultsCount = members?.filter(m => m.team === 'red').length || 0;
+    drawCell("Детей (Blue Team)", String(childrenCount), 40, 140);
+    drawCell("Взрослых (Red Team)", String(adultsCount), 190, 150);
+    drawCell("Стоимость / чел", `${lobby.metadata?.price_per_person || "___"} руб`, 350, 205);
+
+    y -= 60;
+    page.drawText("СПИСОК УЧАСТНИКОВ (ПОДТВЕРЖДЕНО ЦИФРОВОЙ ПОДПИСЬЮ):", { x: 40, y, size: 11, font: customFont, color: COLOR_DARK });
+    y -= 25;
+
+    // ШАПКА ТАБЛИЦЫ
+    page.drawRectangle({ x: 40, y: y - 20, width: width - 80, height: 20, color: COLOR_DARK });
+    page.drawText("№", { x: 45, y: y - 13, size: 9, font: customFont, color: rgb(1,1,1) });
+    page.drawText("Ф.И.О. Оператора", { x: 70, y: y - 13, size: 9, font: customFont, color: rgb(1,1,1) });
+    page.drawText("Телефон", { x: 350, y: y - 13, size: 9, font: customFont, color: rgb(1,1,1) });
+    page.drawText("Команда", { x: 480, y: y - 13, size: 9, font: customFont, color: rgb(1,1,1) });
+    y -= 20;
+
+    // СПИСОК
+    members?.forEach((m: any, i: number) => {
+        y -= 20;
+        if (y < 120) { 
+            page = pdfDoc.addPage([595.28, 841.89]); 
+            y = height - 50; 
+        }
+
+        const data = m.metadata?.operator_data || {};
+        const name = data.fio || (m.is_bot ? `БОТ-${m.id.slice(0,4)}` : "НЕ ПОДПИСАНО");
+        const phone = data.phone || (m.is_bot ? "N/A" : "____");
+        const school = data.school ? ` [${data.school}]` : "";
+
+        page.drawRectangle({ x: 40, y, width: width - 80, height: 20, borderColor: rgb(0.8,0.8,0.8), borderWidth: 0.5 });
+        page.drawText(String(i + 1), { x: 45, y: y + 6, size: 8, font: customFont });
+        page.drawText(`${name}${school}`, { x: 70, y: y + 6, size: 8, font: customFont });
+        page.drawText(phone, { x: 350, y: y + 6, size: 8, font: customFont });
+        
+        const teamLabel = m.team === 'blue' ? "BLUE (Дети)" : "RED (Взр)";
+        const teamColor = m.team === 'blue' ? COLOR_BLUE : COLOR_RED;
+        page.drawText(teamLabel, { x: 480, y: y + 6, size: 7, font: customFont, color: teamColor });
+    });
+
+    // ПОДПИСЬ ЗАКАЗЧИКА
+    y -= 60;
+    page.drawText("С правилами техники безопасности (Приложение №1) ознакомлен,", { x: 40, y, size: 9, font: customFont });
+    y -= 12;
+    page.drawText("согласен и обязуюсь донести до всех участников мероприятия.", { x: 40, y, size: 9, font: customFont });
+    y -= 30;
+    page.drawText("Ф.И.О. Заказчика: ____________________________________", { x: 40, y, size: 10, font: customFont });
+    page.drawText("Подпись: ____________", { x: 420, y, size: 10, font: customFont });
+
+    // ==========================================
+    // СТРАНИЦА 2+: ТАКТИЧЕСКИЕ QR-КОДЫ
+    // ==========================================
+    page = pdfDoc.addPage([595.28, 841.89]);
+    y = height - 60;
+
+    page.drawText("ТАКТИЧЕСКИЕ ОБЪЕКТЫ (РАСПЕЧАТАТЬ И РАЗМЕСТИТЬ)", { x: 40, y, size: 14, font: customFont, color: COLOR_DARK });
+    page.drawLine({ start: { x: 40, y: y - 5 }, end: { x: width - 40, y: y - 5 }, thickness: 2, color: COLOR_RED });
+    y -= 40;
+
+    // Сетка для QR
+    let qrX = 40;
+    const qrSize = 130;
+    const gap = 50;
+
+    // 1. Сбор всех точек для генерации
+    const allPoints = [
+        { name: "ВХОД В ИГРУ (JOIN)", id: `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobby.id}`, color: COLOR_DARK },
+        { name: "БАЗА СИНИХ (RESPAWN)", id: `respawn_${lobby.id}_blue`, color: COLOR_BLUE },
+        { name: "БАЗА КРАСНЫХ (RESPAWN)", id: `respawn_${lobby.id}_red`, color: COLOR_RED },
+        ...(checkpoints || []).map(cp => ({
+            name: `СЕКТОР: ${cp.name.toUpperCase()}`,
+            id: `capture_${cp.id}`,
+            color: COLOR_DARK
+        }))
+    ];
+
+    for (const point of allPoints) {
+        // Проверка переноса строки/страницы
+        if (qrX + qrSize > width - 40) {
+            qrX = 40;
+            y -= (qrSize + 60);
+        }
+        if (y < 150) {
+            page = pdfDoc.addPage([595.28, 841.89]);
+            y = height - 60;
+            qrX = 40;
+        }
+
+        try {
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(point.id)}&color=000&bgcolor=fff&margin=1`;
+            const qrBytes = await fetch(qrUrl).then(res => res.arrayBuffer());
+            const qrImg = await pdfDoc.embedPng(qrBytes);
+
+            // Рамка QR
+            page.drawRectangle({ x: qrX, y: y - qrSize, width: qrSize, height: qrSize, borderColor: point.color, borderWidth: 2 });
+            page.drawImage(qrImg, { x: qrX + 5, y: y - qrSize + 5, width: qrSize - 10, height: qrSize - 10 });
+            
+            // Подпись под QR
+            page.drawText(point.name, { x: qrX, y: y - qrSize - 15, size: 8, font: customFont, color: point.color });
+            
+            qrX += qrSize + gap;
+        } catch (e) {
+            logger.error(`QR_GEN_ERROR for ${point.name}`, e);
+        }
+    }
+
+    // Футер на тактической странице
+    const footerY = 40;
+    page.drawText("STRIKEBALL TACTICAL OS // СИСТЕМА УПРАВЛЕНИЯ БОЕМ", { x: 40, y: footerY, size: 7, font: customFont, color: rgb(0.5, 0.5, 0.5) });
+    page.drawText(`ID_ОПЕРАЦИИ: ${lobby.id.split('-')[0].toUpperCase()}`, { x: width - 150, y: footerY, size: 7, font: customFont, color: rgb(0.5, 0.5, 0.5) });
+
+    // 4. Финализация и отправка
+    const pdfBytes = await pdfDoc.save();
+    const fileName = `BRIEF_ANTANTA_${lobby.name.replace(/\s+/g, '_')}.pdf`;
+    const fileBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+    
+    const sendRes = await sendTelegramDocument(userId, fileBlob, fileName, "📄 **ТАКТИЧЕСКИЙ ПАКЕТ СФОРМИРОВАН**\nВключает бриф и QR-коды для полигона.");
+    
+    if (!sendRes.success) throw new Error(sendRes.error);
+
+    return { success: true, message: "PDF Dossier transmitted." };
+
+  } catch (error: any) {
+    logger.error("generateAndSendLobbyPdf Error", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Generates a "Stylish as F*ck" Tactical Briefing PDF.
  * Includes Rosters, Game Info, and Checkpoint QR Codes.
  */
-export async function generateAndSendLobbyPdf(userId: string, lobbyId: string) {
+export async function generateAndSendLobbyPdfDefault(userId: string, lobbyId: string) {
   try {
     // 1. Fetch Data
     const { data: lobby } = await supabaseAdmin.from("lobbies").select("*").eq("id", lobbyId).single();
