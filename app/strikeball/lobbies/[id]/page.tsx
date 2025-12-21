@@ -49,6 +49,10 @@ export default function LobbyRoom() {
   const [driverSeats, setDriverSeats] = useState(3);
   const [carName, setCarName] = useState("");
 
+  const userMember = members.find(m => m.user_id === dbUser?.user_id);
+  const isOwner = lobby?.owner_id === dbUser?.user_id;
+  const isSystemAdmin = typeof isAdmin === 'function' ? isAdmin() : false;
+
   // --- UPLINK PROCESSING ---
   const processUplink = useCallback(async (action: any) => {
       if (action.type === 'HIT') return await playerHit(lobbyId as string, action.payload.memberId);
@@ -180,6 +184,8 @@ export default function LobbyRoom() {
         status={lobby.status} 
         startAt={lobby.start_at}
         metadata={lobby.metadata}
+        userMember={userMember} // Личный голос
+        isAdmin={isOwner || isSystemAdmin} // Статус админа
         onPdf={handlePdfGen} 
         onShare={handleShare} 
         loading={isGeneratingPdf} 
@@ -191,7 +197,14 @@ export default function LobbyRoom() {
           {activeTab === 'game' && (
              lobby.status === 'finished' 
                 ? <BattleReportView lobby={lobby} members={members} checkpoints={checkpoints} />
-                : <CombatHUD lobby={lobby} isOwner={isOwner} members={members} loadData={loadData} dbUser={dbUser} />
+                : <CombatHUD 
+                    lobby={lobby} 
+                    isOwner={isOwner} 
+                    members={members} // Передаем участников для расчета голосов
+                    loadData={loadData} 
+                    dbUser={dbUser} 
+                    isAdmin={isSystemAdmin}
+                  />
           )}
 
           {activeTab === 'roster' && (
