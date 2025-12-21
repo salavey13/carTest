@@ -1,9 +1,9 @@
 "use client";
 
-import { DominationHUD } from "../../components/DominationHUD";
-import { LiveHUD } from "../../components/LiveHUD";
-import { CommandConsole } from "../../components/CommandConsole";
-import { AdminCheckpointPanel } from "../../components/AdminCheckpointPanel";
+import { DominationHUD } from "../../../components/DominationHUD";
+import { LiveHUD } from "../../../components/LiveHUD";
+import { CommandConsole } from "../../../components/CommandConsole";
+import { AdminCheckpointPanel } from "../../../components/AdminCheckpointPanel";
 
 export function CombatHUD({ lobby, isOwner, loadData, dbUser }: any) {
     return (
