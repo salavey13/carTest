@@ -102,9 +102,6 @@ export default function LobbyRoom() {
       return { points, bounds: CITY_BOUNDS };
   }, [lobby]);
 
-  const userMember = members.find(m => m.user_id === dbUser?.user_id);
-  const isOwner = userMember?.role === 'owner' || lobby?.owner_id === dbUser?.user_id;
-
   // --- HANDLERS ---
   const handlePdfGen = async () => {
     if (!dbUser?.user_id) return;
