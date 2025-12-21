@@ -5,9 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 // These are deliberately inaccurate initial boundaries to demonstrate the calibration process.
 const INITIAL_MAP_BOUNDS = {
-  top: 56.42,
+  top: 56.4242,
   bottom: 56.07,
-  left: 43.6603,
+  left: 43.66,
   right: 44.1230,
 };
 

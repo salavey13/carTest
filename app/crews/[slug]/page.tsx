@@ -21,7 +21,7 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 
 const FALLBACK_MAP: VibeMapPreset = {
     id: 'fallback-map', name: 'Стандартная Карта', map_image_url: 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg',
-    bounds: { top: 56.42, bottom: 56.07, left: 43.6603, right: 44.1230 } as any, is_default: true, created_at: new Date().toISOString(), owner_id: null, points_of_interest: []
+    bounds: { top: 56.4242, bottom: 56.07, left: 43.66, right: 44.1230 } as any, is_default: true, created_at: new Date().toISOString(), owner_id: null, points_of_interest: []
 };
 
 const CommandDeckStat = ({ value, label, icon }: { value: string | number; label: string; icon: string; }) => (
