@@ -73,6 +73,9 @@ export function CombatHUD({ lobby, isOwner, members, loadData, dbUser, isAdmin }
     // Находим членство текущего пользователя
     const userMember = members?.find((m: any) => m.user_id === dbUser?.user_id);
 
+    // Determine if this user is a "Commander" (Owner or App Admin)
+    const isCommander = isOwner || isAdmin;
+
     return (
         <div className="space-y-4">
             {/* Панель планирования показывается только в статусе 'open' */}
@@ -94,7 +97,7 @@ export function CombatHUD({ lobby, isOwner, members, loadData, dbUser, isAdmin }
             />
 
             {/* Консоль командира (Владелец или Админ системы) */}
-            {(isOwner || isAdmin) && (
+            {isCommander && (
                 <div className="space-y-4 pt-10 border-t border-zinc-900">
                     <CommandConsole 
                         lobbyId={lobby.id} 
