@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { MapBounds, PointOfInterest } from "@/components/VibeMap";
 
+const DEFAULT_MAP_URL = 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg';
 const CITY_BOUNDS: MapBounds = { top: 56.4242, bottom: 56.08, left: 43.66, right: 44.1230 };
 
 export default function LobbyRoom() {
@@ -48,6 +49,7 @@ export default function LobbyRoom() {
   const [driverSeats, setDriverSeats] = useState(3);
   const [carName, setCarName] = useState("");
 
+  // --- UPLINK PROCESSING ---
   const processUplink = useCallback(async (action: any) => {
       if (action.type === 'HIT') return await playerHit(lobbyId as string, action.payload.memberId);
       if (action.type === 'RESPAWN') return await playerRespawn(lobbyId as string, action.payload.memberId);
@@ -99,6 +101,71 @@ export default function LobbyRoom() {
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
   const isOwner = userMember?.role === 'owner' || lobby?.owner_id === dbUser?.user_id;
 
+  // --- HANDLERS ---
+  const handlePdfGen = async () => {
+    if (!dbUser?.user_id) return;
+    setIsGeneratingPdf(true);
+    toast.loading("ГЕНЕРАЦИЯ_ОТЧЕТА...");
+    try {
+        const res = await generateAndSendLobbyPdf(dbUser.user_id, lobbyId as string);
+        if (res.success) toast.success("PDF_ОТПРАВЛЕН_В_TELEGRAM");
+        else toast.error(res.error);
+    } catch (e) {
+        toast.error("СБОЙ_ПЕЧАТИ");
+    } finally {
+        setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleShare = () => {
+    const link = `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobbyId}`;
+    const text = `Операция: ${lobby.name}\nПрисоединяйся к отряду!`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
+    if (tg?.openTelegramLink) tg.openTelegramLink(shareUrl);
+    else window.open(shareUrl, '_blank');
+  };
+
+  const handleImHit = () => { 
+    if (!userMember || userMember.status === 'dead' || !lobbyId) return;
+    // UI Update (Local Truth)
+    setMembers(prev => prev.map(m => m.id === userMember.id ? { ...m, status: 'dead' } : m));
+    setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 150);
+    // Network Sync
+    addToOutbox('HIT', { memberId: userMember.id });
+    toast.warning("KIA_ЗАПИСАНО // ПЕРЕДАЧА...");
+  };
+
+  const handleTacticalRespawn = () => {
+      if (!tg?.showScanQrPopup) {
+          // Fallback for desktop/no scanner
+          setMembers(prev => prev.map(m => m.id === userMember.id ? { ...m, status: 'alive' } : m));
+          setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 150);
+          addToOutbox('RESPAWN', { memberId: userMember.id });
+          return;
+      }
+      // Tactical QR Flow
+      tg.showScanQrPopup({ text: "СКАНИРУЙ_QR_БАЗЫ_ИЛИ_ТОЧКИ" }, async (text: string) => {
+          tg.closeScanQrPopup();
+          if (!text) return true;
+          if (text.startsWith('respawn_')) {
+              const team = text.split('_')[2];
+              addToOutbox('BASE_INTERACT', { targetTeam: team });
+              toast.success("ЗАПРОС_ВЫСАДКИ_ОТПРАВЛЕН");
+          } else if (text.startsWith('capture_')) {
+              const cpId = text.replace('capture_', '');
+              addToOutbox('CAPTURE', { checkpointId: cpId });
+              toast.success("ТОЧКА_ОБНАРУЖЕНА // ОБРАБОТКА");
+          }
+          return true;
+      });
+  };
+
+  const handleJoinTeam = async (team: string) => {
+    if (!dbUser) return;
+    const res = await joinLobby(dbUser.user_id, lobbyId as string, team);
+    if (res.success) { toast.success(res.message); loadData(); }
+  };
+
   if (error) return <div className="text-center pt-40 text-red-600 font-mono italic">КРИТИЧЕСКАЯ_ОШИБКА: {error}</div>;
   if (!lobby) return <div className="text-center pt-40 text-white font-mono animate-pulse uppercase">РЕКОНСТРУКЦИЯ_ОПЕРАЦИИ...</div>;
 
@@ -111,8 +178,10 @@ export default function LobbyRoom() {
         name={lobby.name} 
         mode={lobby.mode} 
         status={lobby.status} 
-        onPdf={() => generateAndSendLobbyPdf(dbUser!.user_id, lobbyId as string).then(setIsGeneratingPdf(false))} 
-        onShare={() => { /* share logic */ }} 
+        startAt={lobby.start_at}
+        metadata={lobby.metadata}
+        onPdf={handlePdfGen} 
+        onShare={handleShare} 
         loading={isGeneratingPdf} 
       />
 
@@ -122,7 +191,7 @@ export default function LobbyRoom() {
           {activeTab === 'game' && (
              lobby.status === 'finished' 
                 ? <BattleReportView lobby={lobby} members={members} checkpoints={checkpoints} />
-                : <CombatHUD lobby={lobby} isOwner={isOwner} loadData={loadData} dbUser={dbUser} />
+                : <CombatHUD lobby={lobby} isOwner={isOwner} members={members} loadData={loadData} dbUser={dbUser} />
           )}
 
           {activeTab === 'roster' && (
@@ -153,9 +222,9 @@ export default function LobbyRoom() {
       <LobbyFooter 
         status={lobby.status} 
         userMember={userMember} 
-        onHit={() => { /* hit logic */ }} 
-        onRespawn={() => { /* respawn logic */ }} 
-        onJoinTeam={(team: string) => joinLobby(dbUser!.user_id, lobbyId as string, team).then(loadData)} 
+        onHit={handleImHit} 
+        onRespawn={handleTacticalRespawn} 
+        onJoinTeam={handleJoinTeam} 
       />
     </div>
   );
