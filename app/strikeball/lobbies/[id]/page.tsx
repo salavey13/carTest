@@ -34,7 +34,7 @@ const CITY_BOUNDS: MapBounds = { top: 56.4242, bottom: 56.08, left: 43.66, right
 
 export default function LobbyRoom() {
   const { id: lobbyId } = useParams(); 
-  const { dbUser, tg } = useAppContext();
+  const { dbUser, tg, isAdmin: checkAdmin } = useAppContext();
   const { addToOutbox, burstSync, queue } = useTacticalOutbox();
   
   const [members, setMembers] = useState<any[]>([]);
@@ -51,7 +51,12 @@ export default function LobbyRoom() {
 
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
   const isOwner = lobby?.owner_id === dbUser?.user_id;
-  const isSystemAdmin = typeof isAdmin === 'function' ? isAdmin() : false;
+  
+  
+  // EXECUTE the check once to get a primitive boolean
+  const isSystemAdmin = useMemo(() => {
+    return typeof checkAdmin === 'function' ? checkAdmin() : false;
+  }, [checkAdmin]);
 
   // --- UPLINK PROCESSING ---
   const processUplink = useCallback(async (action: any) => {
@@ -181,8 +186,8 @@ export default function LobbyRoom() {
         status={lobby.status} 
         startAt={lobby.start_at}
         metadata={lobby.metadata}
-        userMember={userMember} // Личный голос
-        isAdmin={isOwner || isSystemAdmin} // Статус админа
+        userMember={userMember} 
+        isAdmin={isOwner || isSystemAdmin}
         onPdf={handlePdfGen} 
         onShare={handleShare} 
         loading={isGeneratingPdf} 
@@ -197,7 +202,7 @@ export default function LobbyRoom() {
                 : <CombatHUD 
                     lobby={lobby} 
                     isOwner={isOwner} 
-                    members={members} // Передаем участников для расчета голосов
+                    members={members}
                     loadData={loadData} 
                     dbUser={dbUser} 
                     isAdmin={isSystemAdmin}
