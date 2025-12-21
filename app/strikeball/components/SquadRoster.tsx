@@ -77,27 +77,23 @@ export const SquadRoster = ({
 
     return (
       <div className="flex flex-wrap gap-1 mt-1.5">
-        {/* Оружие */}
         {gearCounts.weapon && (
           <div className="flex items-center gap-1 bg-red-950/40 px-1.5 py-0.5 rounded border border-red-900/50 text-[7px] font-bold text-red-500 uppercase">
             <FaGun size={7} /> {gearCounts.weapon > 1 ? `x${gearCounts.weapon}` : 'ОРУЖИЕ'}
           </div>
         )}
-        {/* Экипировка */}
         {gearCounts.gear && (
           <div className="flex items-center gap-1 bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-900/50 text-[7px] font-bold text-cyan-400 uppercase">
             <FaShieldHalved size={7} /> {gearCounts.gear > 1 ? `x${gearCounts.gear}` : 'СНАРЯГА'}
           </div>
         )}
-        {/* Расходники */}
         {gearCounts.consumable && (
           <div className="flex items-center gap-1 bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-900/50 text-[7px] font-bold text-emerald-500 uppercase">
             <FaKitMedical size={7} /> {gearCounts.consumable > 1 ? `x${gearCounts.consumable}` : 'РАСХОДНИКИ'}
           </div>
         )}
-        {/* Гаджеты */}
         {gearCounts.gadget && (
-          <div className="flex items-center gap-1 bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-900/50 text-[7px] font-bold text-brand-gold uppercase">
+          <div className="flex items-center gap-1 bg-amber-950/30 px-1.5 py-0.5 rounded border border-amber-900/50 text-[7px] font-bold text-brand-gold uppercase">
             <FaMicrochip size={7} />
           </div>
         )}
@@ -144,7 +140,7 @@ export const SquadRoster = ({
                   key={m.id} 
                   className={cn(
                     "flex items-center justify-between p-3 transition-all relative group", 
-                    "hover:bg-zinc-900/40 active:bg-zinc-800", // Подсветка на десктопе и мобилках
+                    "hover:bg-zinc-900/40 active:bg-zinc-800",
                     isMe && "bg-white/[0.05]"
                   )}
                 >
@@ -156,24 +152,29 @@ export const SquadRoster = ({
                           isDead && "opacity-30"
                         )} />
 
-                        {/* Контейнер профиля (затемняется при смерти) */}
-                        <div className={cn(
-                          "w-10 h-10 shrink-0 bg-zinc-900 border border-zinc-800 overflow-hidden flex items-center justify-center relative transition-all",
-                          isDead && "opacity-40 grayscale"
-                        )}>
-                            {avatar ? (
-                              <img src={avatar} alt="P" className="w-full h-full object-cover" />
-                            ) : (
-                              m.is_bot ? <FaRobot className="text-zinc-600" /> : <FaUserAstronaut className={cn(isMe ? "text-brand-cyan" : "text-zinc-500")} />
-                            )}
+                        {/* КОНТЕЙНЕР ПРОФИЛЯ (Без overflow-hidden, чтобы не резать корону) */}
+                        <div className="w-10 h-10 shrink-0 relative">
+                            {/* Внутренний круг с аватаром (тут overflow-hidden нужен) */}
+                            <div className={cn(
+                              "w-full h-full bg-zinc-900 border border-zinc-800 overflow-hidden flex items-center justify-center transition-all",
+                              isDead && "opacity-40 grayscale"
+                            )}>
+                                {avatar ? (
+                                  <img src={avatar} alt="P" className="w-full h-full object-cover" />
+                                ) : (
+                                  m.is_bot ? <FaRobot className="text-zinc-600" /> : <FaUserAstronaut className={cn(isMe ? "text-brand-cyan" : "text-zinc-500")} />
+                                )}
+                            </div>
+                            
+                            {/* Значок Владельца (Теперь снаружи overflow-hidden, виден полностью) */}
                             {m.role === 'owner' && (
-                              <div className="absolute -top-1 -right-1 bg-black rounded-full p-0.5 border border-brand-gold">
+                              <div className="absolute -top-1.5 -right-1.5 bg-black rounded-full p-1 border border-brand-gold z-20 shadow-lg shadow-black">
                                 <FaCrown className="text-brand-gold text-[7px]" />
                               </div>
                             )}
                         </div>
                         
-                        {/* Инфо-блок (Никнейм всегда ярче аватара) */}
+                        {/* Инфо-блок */}
                         <div className="flex flex-col min-w-0">
                             <div className="flex items-center gap-2">
                                 <span className={cn(
@@ -222,7 +223,7 @@ export const SquadRoster = ({
         })}
       </div>
 
-      {/* КНОПКИ УПРАВЛЕНИЯ ОТРЯДОМ */}
+      {/* КНОПКИ УПРАВЛЕНИЯ ОТРЯДOМ */}
       <div className="grid grid-cols-2 gap-px bg-zinc-900 border-t border-zinc-900">
           {onAddBot && (
               <button 
