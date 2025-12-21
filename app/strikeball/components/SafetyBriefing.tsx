@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
-import { FaShieldHalved, FaSkull, FaEye, FaHandFist, FaCheck, FaUsers, FaFlame, FaUserEdit, FaPhone, FaSchool } from "react-icons/fa6";
+import { FaShieldHalved, FaSkull, FaEye, FaHandFist, FaCheck, FaUsers, FaFire, FaUserPen, FaPhone, FaSchool } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 import { toast } from 'sonner';
 
@@ -38,7 +38,7 @@ const RULES_SUMMARY = [
   { icon: FaEye, title: "ГЛАЗА", text: "Очки НИКОГДА не снимаются. Запотели? Иди в мертвяк." },
   { icon: FaUsers, title: "ДЕТИ", text: "До 14 лет — только с родителями. Родители следят за детьми 100% времени." },
   { icon: FaShieldHalved, title: "ЗДОРОВЬЕ", text: "Противопоказано при заболеваниях психики и позвоночника." },
-  { icon: FaFlame, title: "ПИРОТЕХНИКА", text: "Фейерверки и конфетти без согласования запрещены (Пункт №11)." }
+  { icon: FaFire, title: "ПИРОТЕХНИКА", text: "Фейерверки и конфетти без согласования запрещены (Пункт №11)." }
 ];
 
 export const SafetyBriefing = ({ onComplete, isSigned }: any) => {
@@ -83,7 +83,7 @@ export const SafetyBriefing = ({ onComplete, isSigned }: any) => {
   if (view === 'form') return (
     <div className="bg-zinc-900 border-2 border-brand-cyan p-6 space-y-6">
         <h3 className="text-xl font-black text-white font-orbitron uppercase flex items-center gap-3 italic">
-            <FaUserEdit className="text-brand-cyan" /> Анкетные_Данные
+            <FaUserPen className="text-brand-cyan" /> Анкетные_Данные
         </h3>
         <div className="space-y-4">
             <div className="space-y-1">
