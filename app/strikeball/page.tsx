@@ -43,22 +43,42 @@ const Q3MenuItem = ({ label, subLabel, href, onClick, icon: Icon, className }: a
   return (
     <Container 
         {...props}
-        className={cn("relative block group cursor-pointer w-full mb-3", className)}
+        className={cn("relative block group cursor-pointer w-full mb-4", className)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
     >
-      <div className={cn("absolute inset-0 bg-zinc-900/80 border-l-4 transition-all duration-200 skew-x-[-10deg]", hovered ? "border-red-500 bg-zinc-800 translate-x-2" : "border-zinc-700")} />
-      <div className="relative flex items-center justify-between p-4 pl-6 z-10">
+      {/* Слой подложки и рамки со скосом */}
+      <div className={cn(
+          "absolute inset-0 transition-all duration-200 skew-x-[-15deg] origin-bottom border-l-4", 
+          hovered 
+            ? "bg-zinc-800 border-red-500 translate-x-2 shadow-[0_0_20px_rgba(220,38,38,0.2)]" 
+            : "bg-zinc-900/80 border-zinc-700"
+      )} />
+      
+      {/* Слой контента (иконка и текст) */}
+      <div className="relative flex items-center justify-between p-4 pl-8 z-10">
           <div className="flex items-center gap-4">
-              <div className={cn("w-10 h-10 flex items-center justify-center bg-black/50 border border-zinc-700 transition-colors", hovered ? "border-red-500 text-white" : "text-zinc-500")}>
-                  {Icon && <Icon className={cn("w-5 h-5", hovered && "text-red-500")} />}
+              <div className={cn(
+                  "w-12 h-12 flex items-center justify-center bg-black/50 border transition-all duration-200", 
+                  hovered ? "border-red-500 text-red-500 rotate-12" : "border-zinc-700 text-zinc-500"
+              )}>
+                  {Icon && <Icon className="w-6 h-6" />}
               </div>
               <div className="flex flex-col">
-                  <span className={cn("font-black font-orbitron text-xl tracking-widest leading-none transition-colors", hovered ? "text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" : "text-zinc-400")}>{label}</span>
-                  <span className={cn("text-[10px] font-mono tracking-[0.2em] uppercase transition-colors", hovered ? "text-red-400" : "text-zinc-600")}>{subLabel}</span>
+                  <span className={cn(
+                      "font-black font-orbitron text-xl tracking-widest leading-none transition-colors", 
+                      hovered ? "text-white" : "text-zinc-400"
+                  )}>{label}</span>
+                  <span className={cn(
+                      "text-[10px] font-mono tracking-[0.2em] uppercase mt-1 transition-colors", 
+                      hovered ? "text-red-400" : "text-zinc-600"
+                  )}>{subLabel}</span>
               </div>
           </div>
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 font-black text-2xl pr-4">&gt;&gt;</div>
+          <div className={cn(
+              "transition-all duration-200 font-black text-2xl pr-4",
+              hovered ? "text-red-500 translate-x-1" : "opacity-0"
+          )}>&gt;&gt;</div>
       </div>
     </Container>
   );

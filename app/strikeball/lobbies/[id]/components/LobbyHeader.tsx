@@ -1,17 +1,21 @@
 "use client";
 
 import { FaShareNodes, FaFilePdf, FaSpinner } from "react-icons/fa6";
+import { cn } from "@/lib/utils";
 
 interface LobbyHeaderProps {
     name: string;
     mode: string;
     status: string;
+    startAt: string | null;
+    metadata: any; // Добавлено
     onPdf: () => void;
     onShare: () => void;
     loading: boolean;
 }
 
-export function LobbyHeader({ name, mode, status, onPdf, onShare, loading }: LobbyHeaderProps) {
+export function LobbyHeader({ name, mode, status, startAt, metadata, onPdf, onShare, loading }: LobbyHeaderProps) {
+    // Безопасное получение статуса согласования
     const approval = metadata?.approval_status || 'proposed';
     
     const statusColors: any = {
@@ -43,14 +47,19 @@ export function LobbyHeader({ name, mode, status, onPdf, onShare, loading }: Lob
                     <FaShareNodes />
                 </button>
             </div>
+            
             <h1 className="text-2xl font-black uppercase tracking-[0.2em]">{name}</h1>
+            
             <div className="flex flex-col items-center gap-2 mt-2">
-                <div className="text-[10px] font-mono text-zinc-500 uppercase">
+                <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
                     {mode} // ПЛАН: {startAt ? new Date(startAt).toLocaleString('ru-RU') : "НЕ ЗАДАНО"}
                 </div>
                 
                 {status === 'open' && (
-                    <div className={cn("px-3 py-1 border text-[9px] font-black tracking-widest uppercase animate-pulse", statusColors[approval])}>
+                    <div className={cn(
+                        "px-3 py-1 border text-[9px] font-black tracking-widest uppercase animate-pulse transition-colors duration-500", 
+                        statusColors[approval]
+                    )}>
                         ● {statusLabels[approval]}
                     </div>
                 )}
