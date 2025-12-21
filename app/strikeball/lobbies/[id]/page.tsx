@@ -10,7 +10,7 @@ import { updateTransportStatus, signSafetyBriefing, joinCar } from "../../action
 import { generateAndSendLobbyPdf } from "../../actions/service";
 import { getLobbyCheckpoints, captureCheckpoint } from "../../actions/domination";
 
-// --- Модули ---
+// --- Tactical Modules ---
 import { SquadRoster } from "../../components/SquadRoster";
 import { CommandConsole } from "../../components/CommandConsole"; 
 import { LiveHUD } from "../../components/LiveHUD";
@@ -23,7 +23,7 @@ import { useTacticalOutbox } from "../../hooks/useTacticalOutbox";
 
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { FaShareNodes, FaFilePdf, FaCar, FaClipboardCheck, FaUsers, FaGamepad, FaWifi, FaMapLocationDot, FaQrcode } from "react-icons/fa6";
+import { FaShareNodes, FaFilePdf, FaCar, FaClipboardCheck, FaUsers, FaGamepad, FaWifi, FaMapLocationDot, FaQrcode, FaSpinner } from "react-icons/fa6";
 import { VibeMap, MapBounds, PointOfInterest } from "@/components/VibeMap";
 
 const DEFAULT_MAP_URL = 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg';
@@ -39,12 +39,14 @@ export default function LobbyRoom() {
   const [activeTab, setActiveTab] = useState<'roster' | 'game' | 'map' | 'logistics' | 'safety'>('roster'); 
   const [whiteFlash, setWhiteFlash] = useState(false);
   const [checkpoints, setCheckpoints] = useState<any[]>([]);
+  
+  // States for Header Actions
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
-  // Логистика
+  // Logistics State
   const [driverSeats, setDriverSeats] = useState(3);
   const [carName, setCarName] = useState("");
 
-  // Маппинг функций для очереди
   const processUplink = useCallback(async (action: any) => {
       if (action.type === 'HIT') return await playerHit(lobbyId as string, action.payload.memberId);
       if (action.type === 'RESPAWN') return await playerRespawn(lobbyId as string, action.payload.memberId);
@@ -53,7 +55,6 @@ export default function LobbyRoom() {
       return { success: true };
   }, [lobbyId, dbUser]);
 
-  // СИНХРОНИЗАТОР
   useEffect(() => {
       if (queue.length > 0) burstSync(processUplink);
   }, [queue.length, burstSync, processUplink]);
@@ -64,6 +65,7 @@ export default function LobbyRoom() {
         if (!result.success || !result.lobby) { setError("ОШИБКА_УСТАНОВКИ_СВЯЗИ"); return; }
         setLobby(result.lobby);
         setMembers(result.members || []);
+
         const me = result.members?.find((m: any) => m.user_id === dbUser?.user_id);
         if (me?.metadata?.transport?.role === 'driver') {
              if (!carName) setCarName(me.metadata.transport.car_name || "");
@@ -81,12 +83,10 @@ export default function LobbyRoom() {
       .channel(`lobby_room_${lobbyId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members', filter: `lobby_id=eq.${lobbyId}` }, () => loadData())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobbies', filter: `id=eq.${lobbyId}` }, () => loadData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_checkpoints', filter: `lobby_id=eq.${lobbyId}` }, () => loadData())
       .subscribe();
     return () => { supabaseAnon.removeChannel(channel); };
   }, [lobbyId, loadData]);
 
-  // Данные для карты
   const mapData = useMemo(() => {
       if (!lobby?.field_id) return null;
       const points: PointOfInterest[] = [];
@@ -104,32 +104,52 @@ export default function LobbyRoom() {
   const userMember = members.find(m => m.user_id === dbUser?.user_id);
   const isOwner = userMember?.role === 'owner' || lobby?.owner_id === dbUser?.user_id;
 
-const handleSafetySign = async (operatorData: any) => {
+  // --- ACTIONS ---
+  const handlePdfGen = async () => {
+    if (!dbUser?.user_id) return;
+    setIsGeneratingPdf(true);
+    toast.loading("ГЕНЕРАЦИЯ_ОТЧЕТА...");
+    try {
+        const res = await generateAndSendLobbyPdf(dbUser.user_id, lobbyId as string);
+        toast.dismiss();
+        if (res.success) toast.success("PDF_ОТПРАВЛЕН_В_TELEGRAM");
+        else toast.error(res.error);
+    } catch (e) {
+        toast.error("СБОЙ_ПЕЧАТИ");
+    } finally {
+        setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleShare = () => {
+    const link = `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobbyId}`;
+    const text = `Операция: ${lobby.name}\nПрисоединяйся к отряду!`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
+    if (tg?.openTelegramLink) tg.openTelegramLink(shareUrl);
+    else window.open(shareUrl, '_blank');
+  };
+
+  const handleSafetySign = async (operatorData: any) => {
       if (!userMember) return;
-      
-      // CALL LOGISTICS ACTION TO COMMIT TO METADATA
       const res = await signSafetyBriefing(userMember.id, operatorData);
-      
       if (res.success) {
           toast.success("ПРОТОКОЛ_ПОДПИСАН");
-          loadData(); // Force refresh to sync state
+          loadData();
       } else {
           toast.error(res.error);
       }
   };
 
-  // --- ТАКТИЧЕСКИЕ ОБРАБОТЧИКИ ---
   const handleImHit = () => { 
-    if (!userMember || userMember.status === 'dead') return;
+    if (!userMember || userMember.status === 'dead' || !lobbyId) return;
     setMembers(prev => prev.map(m => m.id === userMember.id ? { ...m, status: 'dead' } : m));
     setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 150);
     addToOutbox('HIT', { memberId: userMember.id });
-    toast.warning("KIA_ПОДТВЕРЖДЕНО // ПЕРЕДАЧА...");
+    toast.warning("KIA_ЗАПИСАНО // ПЕРЕДАЧА...");
   };
 
   const handleTacticalRespawn = () => {
       if (!tg?.showScanQrPopup) {
-          // Если нет сканера (десктоп), используем стандартное возрождение
           setMembers(prev => prev.map(m => m.id === userMember.id ? { ...m, status: 'alive' } : m));
           setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 150);
           addToOutbox('RESPAWN', { memberId: userMember.id });
@@ -155,6 +175,12 @@ const handleSafetySign = async (operatorData: any) => {
       });
   };
 
+  const handleJoinTeam = async (team: string) => {
+    if (!dbUser) return;
+    const res = await joinLobby(dbUser.user_id, lobbyId as string, team);
+    if (res.success) { toast.success(res.message); loadData(); }
+  };
+
   if (error) return <div className="text-center pt-40 text-red-600 font-mono italic">КРИТИЧЕСКАЯ_ОШИБКА: {error}</div>;
   if (!lobby) return <div className="text-center pt-40 text-white font-mono animate-pulse uppercase">РЕКОНСТРУКЦИЯ_ОПЕРАЦИИ...</div>;
 
@@ -162,13 +188,31 @@ const handleSafetySign = async (operatorData: any) => {
     <div className={cn("pt-28 pb-48 px-2 min-h-screen text-white font-mono transition-colors duration-200", whiteFlash ? "bg-white/10" : "bg-black")}>
       
       {queue.length > 0 && (
-          <div className="fixed top-20 left-4 z-[70] flex items-center gap-2 bg-red-950/80 border border-red-600 px-3 py-1 animate-pulse shadow-[0_0_20px_rgba(255,0,0,0.2)]">
+          <div className="fixed top-20 left-4 z-[70] flex items-center gap-2 bg-red-950/80 border border-red-600 px-3 py-1 animate-pulse shadow-[0_0_20px_rgba(220,38,38,0.2)]">
               <FaWifi className="text-red-500 text-xs" />
               <span className="text-[9px] font-black text-red-500 tracking-widest uppercase">БУФЕР_СВЯЗИ: {queue.length}</span>
           </div>
       )}
 
-      <div className="text-center mb-10">
+      {/* HEADER SITREP С КНОПКАМИ PDF И SHARE */}
+      <div className="text-center mb-10 relative">
+        <div className="absolute top-0 right-0 flex gap-3">
+             <button 
+                onClick={handlePdfGen} 
+                disabled={isGeneratingPdf}
+                className="p-2 border border-zinc-800 text-zinc-600 hover:text-white hover:border-zinc-400 transition-all active:scale-95"
+                title="Печать PDF"
+             >
+                {isGeneratingPdf ? <FaSpinner className="animate-spin" /> : <FaFilePdf />}
+             </button>
+             <button 
+                onClick={handleShare}
+                className="p-2 border border-zinc-800 text-zinc-600 hover:text-white hover:border-zinc-400 transition-all active:scale-95"
+                title="Поделиться"
+             >
+                <FaShareNodes />
+             </button>
+        </div>
         <h1 className="text-2xl font-black uppercase tracking-[0.2em]">{lobby.name}</h1>
         <div className="text-[9px] text-zinc-600 mt-1 uppercase tracking-widest">{lobby.mode} // {lobby.status}</div>
       </div>
@@ -217,11 +261,7 @@ const handleSafetySign = async (operatorData: any) => {
 
           {activeTab === 'map' && (
               <div className="h-[60vh] w-full border border-zinc-800 relative bg-zinc-950">
-                  <VibeMap 
-                    points={mapData?.points || []} 
-                    bounds={mapData?.bounds || { top: 56.4, bottom: 56.2, left: 43.7, right: 44.1 }} 
-                    imageUrl={DEFAULT_MAP_URL} 
-                  />
+                  <VibeMap points={mapData?.points || []} bounds={mapData?.bounds || { top: 56.4, bottom: 56.2, left: 43.7, right: 44.1 }} imageUrl={DEFAULT_MAP_URL} />
                   <div className="absolute bottom-4 left-4 bg-black/80 p-2 border border-red-900 text-[9px] font-mono text-red-500 uppercase tracking-widest">
                       GPS_SOURCE: {lobby.field_id || "LOCAL"}
                   </div>
@@ -240,10 +280,7 @@ const handleSafetySign = async (operatorData: any) => {
           )}
 
           {activeTab === 'safety' && (
-              <SafetyBriefing 
-                onComplete={handleSafetySign} 
-                isSigned={!!userMember?.metadata?.safety_signed} 
-            />
+              <SafetyBriefing onComplete={handleSafetySign} isSigned={!!userMember?.metadata?.safety_signed} />
           )}
       </div>
 
@@ -258,6 +295,29 @@ const handleSafetySign = async (operatorData: any) => {
                     <FaQrcode /> ВОЗРОЖДЕНИЕ
                 </button>
               )
+          )}
+
+          {lobby.status === 'open' && (
+            <div className="pointer-events-auto grid grid-cols-2 gap-px bg-zinc-800 border border-zinc-800 shadow-2xl">
+                <button 
+                    onClick={() => handleJoinTeam('blue')} 
+                    className={cn(
+                        "py-4 font-black uppercase text-[10px] tracking-widest transition-colors",
+                        userMember?.team === 'blue' ? "bg-zinc-700 text-white pointer-events-none" : "bg-black text-zinc-600 hover:bg-zinc-950"
+                    )}
+                >
+                    {userMember?.team === 'blue' ? "[ В_СИНИХ_СИЛАХ ]" : "ВСТУПИТЬ_К_СИНИМ"}
+                </button>
+                <button 
+                    onClick={() => handleJoinTeam('red')} 
+                    className={cn(
+                        "py-4 font-black uppercase text-[10px] tracking-widest transition-colors",
+                        userMember?.team === 'red' ? "bg-zinc-700 text-white pointer-events-none" : "bg-black text-zinc-600 hover:bg-zinc-950"
+                    )}
+                >
+                    {userMember?.team === 'red' ? "[ В_КРАСНОЙ_ЯЧЕЙКЕ ]" : "ВСТУПИТЬ_К_КРАСНЫМ"}
+                </button>
+            </div>
           )}
       </div>
     </div>
