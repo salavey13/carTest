@@ -268,3 +268,52 @@ export async function togglePlayerStatus(memberId: string, currentStatus: string
         return { success: false, error: "Ошибка статуса" };
     }
 }
+
+/**
+ * Предложить новую дату (Owner Only)
+ */
+export async function proposeLobbyDate(lobbyId: string, userId: string, newDate: string) {
+    try {
+        const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id, metadata").eq("id", lobbyId).single();
+        if (lobby?.owner_id !== userId) throw new Error("Только владелец может менять дату");
+
+        const newMeta = { 
+            ...lobby.metadata, 
+            proposed_date: newDate,
+            approval_status: 'proposed' 
+        };
+
+        // Сбрасываем голоса при смене даты
+        await supabaseAdmin.from("lobby_members").update({ metadata: { vote: null } }).eq("lobby_id", lobbyId);
+        await supabaseAdmin.from("lobbies").update({ start_at: newDate, metadata: newMeta }).eq("id", lobbyId);
+
+        return { success: true };
+    } catch (e: any) { return { success: false, error: e.message }; }
+}
+
+/**
+ * Голосование за дату (Member Only)
+ */
+export async function voteForLobbyDate(lobbyId: string, userId: string, vote: 'ok' | 'not_ok') {
+    try {
+        const { data: member } = await supabaseAdmin.from("lobby_members").select("id, metadata").eq("lobby_id", lobbyId).eq("user_id", userId).single();
+        if (!member) throw new Error("Вы не участник операции");
+
+        const newMeta = { ...(member.metadata as object), vote };
+        await supabaseAdmin.from("lobby_members").update({ metadata: newMeta }).eq("id", member.id);
+
+        return { success: true };
+    } catch (e: any) { return { success: false, error: e.message }; }
+}
+
+/**
+ * Утверждение даты админом (Admin Only)
+ */
+export async function setLobbyApprovalStatus(lobbyId: string, status: 'approved_unpaid' | 'approved_paid') {
+    try {
+        const { data: lobby } = await supabaseAdmin.from("lobbies").select("metadata").eq("id", lobbyId).single();
+        const newMeta = { ...lobby.metadata, approval_status: status };
+        await supabaseAdmin.from("lobbies").update({ metadata: newMeta }).eq("id", lobbyId);
+        return { success: true };
+    } catch (e: any) { return { success: false, error: e.message }; }
+}
