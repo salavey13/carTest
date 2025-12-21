@@ -1,6 +1,6 @@
 "use client";
 
-import { FaShareNodes, FaFilePdf, FaSpinner, FaUserShield, FaCheckCircle, FaCircleXmark } from "react-icons/fa6";
+import { FaShareNodes, FaFilePdf, FaSpinner, FaUserShield, FaCircleCheck, FaCircleXmark } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 
 interface LobbyHeaderProps {
@@ -63,7 +63,7 @@ export function LobbyHeader({ name, mode, status, startAt, metadata, userMember,
                         {/* Личный статус голоса */}
                         {myVote && (
                             <div className={cn("flex items-center gap-1.5 text-[9px] font-bold uppercase", myVote === 'ok' ? "text-green-500" : "text-red-500")}>
-                                {myVote === 'ok' ? <FaCheckCircle /> : <FaCircleXmark />}
+                                {myVote === 'ok' ? <FaCircleCheck /> : <FaCircleXmark />}
                                 {myVote === 'ok' ? "Вы_ОК" : "Вы_не_можете"}
                             </div>
                         )}
