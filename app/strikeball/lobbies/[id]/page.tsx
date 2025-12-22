@@ -25,6 +25,9 @@ import { LogisticsPanel } from "../../components/LogisticsPanel";
 import { SafetyBriefing } from "../../components/SafetyBriefing";
 import { useTacticalOutbox } from "../../hooks/useTacticalOutbox";
 
+// --- Party Service Providers ---
+import { ProviderOffers } from "./components/ProviderOffers";
+
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { MapBounds, PointOfInterest } from "@/components/VibeMap";
@@ -237,6 +240,13 @@ export default function LobbyRoom() {
           currentUserId={dbUser?.user_id} 
           isOwner={isOwner}
       />
+
+        {/* The Comparison Marketplace - Only for 'open' lobbies */}
+        {lobby.status === 'open' && (
+            <div className="mt-10 border-t border-zinc-900 pt-10">
+                <ProviderOffers playerCount={members.length} />
+            </div>
+        )}
    </div>
 )}
 
