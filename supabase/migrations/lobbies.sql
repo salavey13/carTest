@@ -8,7 +8,8 @@ CREATE TABLE public.lobbies (
   start_at timestamptz,
   status text DEFAULT 'open',
   is_public boolean DEFAULT true,
-  created_at timestamptz DEFAULT now()
+  created_at timestamptz DEFAULT now(),
+  provider_id uuid DEFAULT NULL
 );
 
 -- Fix Lobbies Table (Add missing column)
