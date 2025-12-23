@@ -244,7 +244,12 @@ export default function LobbyRoom() {
         {/* The Comparison Marketplace - Only for 'open' lobbies */}
         {lobby.status === 'open' && (
             <div className="mt-10 border-t border-zinc-900 pt-10">
-                <ProviderOffers playerCount={members.length} />
+                <ProviderOffers 
+                    lobbyId={lobby.id} 
+                    playerCount={members.length} 
+                    selectedProviderId={lobby.provider_id}
+                    selectedServiceId={lobby.metadata?.selected_offer?.serviceId}
+                />
             </div>
         )}
    </div>
