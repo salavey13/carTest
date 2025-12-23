@@ -15,24 +15,31 @@ export async function getProviderOffers(playerCount: number, activityId?: string
     const comparisons = providers.map(p => {
         const services = p.metadata.services || [];
         
-        // Map through services and calculate price for the specific playerCount
-        const validOffers = services
+        const offers = services
             .filter((s: any) => !activityId || s.id === activityId)
-            .filter((s: any) => playerCount >= (s.min_players || 0))
-            .map((s: any) => ({
-                serviceName: s.name,
-                serviceId: s.id,
-                bestPackage: s.packages[0], // Assuming first is standard
-                totalPrice: s.packages[0].price * playerCount,
-                perPerson: s.packages[0].price
-            }));
+            .map((s: any) => {
+                const minReq = s.min_players || 0;
+                const isAvailable = playerCount >= minReq;
+                
+                return {
+                    serviceName: s.name,
+                    serviceId: s.id,
+                    bestPackage: s.packages[0],
+                    totalPrice: s.packages[0].price * playerCount,
+                    perPerson: s.packages[0].price,
+                    isAvailable,
+                    minPlayers: minReq,
+                    lockReason: !isAvailable ? `Требуется минимум ${minReq} чел.` : null
+                };
+            });
 
         return {
+            providerId: p.id, // Explicitly pass the UUID
             providerName: p.name,
             providerSlug: p.slug,
             logo: p.logo_url,
             location: p.hq_location,
-            offers: validOffers
+            offers
         };
     }).filter(p => p.offers.length > 0);
 
