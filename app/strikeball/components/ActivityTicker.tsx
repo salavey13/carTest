@@ -1,38 +1,36 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
-const ACTIVITIES = [
+const SERVICES = [
   "STRIKEBALL", "PAINTBALL", "HYDROBALL", "LAZERTAG", 
   "SNOWBOARD", "VIBECODE", "BIKERIDE", "ENDURO"
 ];
 
-export const ActivityTicker = ({ isLive }: { isLive?: boolean }) => {
-  const [index, setIndex] = useState(0);
+export const ActivityTicker = ({ isLive }: { isLive: boolean }) => {
+  const [idx, setIdx] = useState(0);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setIndex((prev) => (prev + 1) % ACTIVITIES.length);
-    }, 2500);
+    const timer = setInterval(() => setIdx(v => (v + 1) % SERVICES.length), 3000);
     return () => clearInterval(timer);
   }, []);
 
   return (
-    <div className="h-16 md:h-24 flex flex-col items-center justify-center overflow-hidden">
+    <div className="h-16 sm:h-24 flex items-center justify-center overflow-hidden">
       <AnimatePresence mode="wait">
         <motion.h1
-          key={ACTIVITIES[index]}
-          initial={{ y: 20, opacity: 0, skewX: -20 }}
+          key={SERVICES[idx]}
+          initial={{ y: 30, opacity: 0, skewX: -20 }}
           animate={{ y: 0, opacity: 1, skewX: -10 }}
-          exit={{ y: -20, opacity: 0, skewX: 20 }}
+          exit={{ y: -30, opacity: 0, skewX: 20 }}
           transition={{ duration: 0.4, ease: "anticipate" }}
           className={cn(
-            "font-black font-orbitron italic tracking-tighter uppercase text-center w-full px-2",
+            "font-black font-orbitron italic tracking-tighter uppercase text-center",
             isLive ? "text-3xl sm:text-4xl text-white" : "text-4xl sm:text-6xl md:text-8xl text-zinc-200 drop-shadow-2xl"
           )}
-          style={{ wordBreak: "keep-all" }}
         >
-          {ACTIVITIES[index]}
+          {SERVICES[idx]}
         </motion.h1>
       </AnimatePresence>
     </div>

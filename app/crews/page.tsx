@@ -116,11 +116,16 @@ export default function CrewsPage() {
         <div className="min-h-screen bg-[#050505] text-white pt-24 px-4 pb-32">
             <div className="max-w-7xl mx-auto">
                 <div className="mb-10 text-center lg:text-left">
-                    <h1 className="text-6xl font-black font-orbitron italic tracking-tighter uppercase drop-shadow-2xl">
+                    {/* Исправленный адаптивный размер заголовка */}
+                    <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl font-black font-orbitron italic tracking-tighter uppercase drop-shadow-2xl leading-none">
                         Network_<span className="text-cyan-500">Crews</span>
                     </h1>
-                    <p className="text-xs font-mono text-zinc-500 tracking-[0.4em] mt-2">GLOBAL_SQUAD_DATABASE_ACCESS_GRANTED</p>
+                    <p className="text-[9px] sm:text-xs font-mono text-zinc-500 tracking-[0.2em] sm:tracking-[0.4em] mt-3 uppercase">
+                        GLOBAL_SQUAD_DATABASE_ACCESS_GRANTED
+                    </p>
                 </div>
+                 
+            
                 <CrewsList />
             </div>
             <Link href="/crews/create" className="fixed bottom-24 right-6 z-50">
