@@ -1,206 +1,137 @@
 "use client";
 
-import { getAllPublicCrews, getMapPresets, updateMapPois } from '@/app/rentals/actions';
+import { getAllPublicCrews, getMapPresets } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { VibeMap, MapBounds, PointOfInterest } from '@/components/VibeMap';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Suspense, useEffect, useState, useMemo } from 'react';
-import RockstarHeroSection from '@/app/tutorials/RockstarHeroSection';
-import { motion } from 'framer-motion';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { v4 as uuidv4 } from 'uuid';
-import { useAppContext } from '@/contexts/AppContext';
-import { toast } from 'sonner';
-import { CrewWithCounts, MapPreset as VibeMapPreset } from '@/lib/types';
+import { Badge } from '@/components/ui/badge';
+import { FaShieldHalved, FaWarehouse, FaSackDollar, FaMapPin, FaAngleRight, FaPlus } from 'react-icons/fa6';
 import { cn } from "@/lib/utils";
 
-const FALLBACK_MAP: VibeMapPreset = {
-    id: 'fallback-map', name: 'Стандартная Карта',
-    map_image_url: 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg',
-    bounds: { top: 56.422313387, bottom: 56.123051835, left: 43.354366846, right: 44.435477408 } as any,
-    is_default: true, created_at: new Date().toISOString(), owner_id: null, points_of_interest: [],
-};
-
-const MetricItem = ({ icon, value, label }: { icon: string; value: string | number; label:string; }) => (
-    <div className='text-center p-2 rounded-lg bg-background/20'>
-        <VibeContentRenderer content={icon} className="mb-1 mx-auto text-xl text-accent-text" />
-        <p className="font-mono text-xs">
-            <strong className={`block text-2xl font-orbitron text-foreground`}>{value}</strong>
-            <span className="text-muted-foreground uppercase tracking-wider">{label}</span>
-        </p>
+const Metric = ({ icon: Icon, value, label, color }: any) => (
+    <div className="flex flex-col items-center p-2 bg-black/40 border border-white/5 rounded-sm">
+        <Icon className={cn("text-lg mb-1", color || "text-zinc-500")} />
+        <span className="text-lg font-black font-orbitron leading-none">{value}</span>
+        <span className="text-[7px] uppercase font-mono tracking-tighter text-zinc-600 mt-1">{label}</span>
     </div>
 );
 
 function CrewsList() {
-    const { dbUser, isAdmin } = useAppContext();
-    const [crews, setCrews] = useState<CrewWithCounts[]>([]);
-    const [mapPresets, setMapPresets] = useState<VibeMapPreset[]>([FALLBACK_MAP]);
-    const [selectedMap, setSelectedMap] = useState<VibeMapPreset>(FALLBACK_MAP);
+    const [crews, setCrews] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [highlightedCrewId, setHighlightedCrewId] = useState<string | null>(null);
-    const [isEditingMap, setIsEditingMap] = useState(false);
-    const [newPoi, setNewPoi] = useState<Partial<PointOfInterest>>({ type: 'path', name: '', icon: '::FaRoute::', color: '#EE6A59', coords: []});
-    const [isSavingPoi, setIsSavingPoi] = useState(false);
-
-    const loadMapData = async () => {
-        const mapsResult = await getMapPresets();
-        if (mapsResult.success && mapsResult.data && mapsResult.data.length > 0) {
-            setMapPresets(mapsResult.data);
-            const defaultMap = mapsResult.data.find(m => m.is_default) || mapsResult.data[0];
-            setSelectedMap(prev => mapsResult.data.find(m => m.id === prev.id) || defaultMap);
-        } else { setMapPresets([FALLBACK_MAP]); setSelectedMap(FALLBACK_MAP); }
-    };
+    const [hoveredId, setHoveredId] = useState<string | null>(null);
 
     useEffect(() => {
-        async function loadData() {
-            setLoading(true);
-            try {
-                const crewsResult = await getAllPublicCrews();
-                if (crewsResult.success && crewsResult.data) setCrews(crewsResult.data);
-                else setError(crewsResult.error || "Не удалось загрузить список экипажей.");
-                await loadMapData();
-            } catch (e: any) { setError(e.message || "Неизвестная ошибка на клиенте."); } finally { setLoading(false); }
-        }
-        loadData();
+        getAllPublicCrews().then(res => {
+            if (res.success) setCrews(res.data || []);
+            setLoading(false);
+        });
     }, []);
-    
-    const allMapPoints = useMemo(() => {
-        const crewPoints: PointOfInterest[] = crews
-            .filter(crew => crew.hq_location)
-            .map(crew => {
-                const [lat, lon] = (crew.hq_location as string).split(',').map(Number);
-                return { id: crew.id, name: crew.name, type: 'point', icon: '::FaSkullCrossbones::', color: 'bg-primary', coords: [[lat, lon]] };
-            });
-        const customPois = (selectedMap.points_of_interest as PointOfInterest[] || []);
-        return [...crewPoints, ...customPois];
-    }, [crews, selectedMap]);
 
-    const handleMapClick = (coords: [number, number]) => {
-        if (!isEditingMap) return;
-        setNewPoi(prev => ({...prev, coords: [...(prev.coords || []), coords]}));
-        toast.info(`Точка добавлена: ${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}`);
-    }
-
-    const handleSavePoi = async () => {
-        if (!dbUser?.user_id || !newPoi.name || !newPoi.coords || newPoi.coords.length === 0) {
-            toast.error("Необходимо название и хотя бы одна точка."); return;
-        }
-        setIsSavingPoi(true);
-        const finalPoi: PointOfInterest = {
-            id: uuidv4(), name: newPoi.name, type: newPoi.type!, icon: newPoi.icon!, color: newPoi.color!, coords: newPoi.coords
-        };
-        const currentPois = (selectedMap.points_of_interest as PointOfInterest[] || []);
-        const updatedPois = [...currentPois, finalPoi];
-        const result = await updateMapPois(dbUser.user_id, selectedMap.id, updatedPois);
-        if (result.success) {
-            toast.success("Точка интереса сохранена!");
-            await loadMapData(); 
-            setNewPoi({ type: 'path', name: '', icon: '::FaRoute::', color: '#EE6A59', coords: []});
-            setIsEditingMap(false);
-        } else { toast.error(`Ошибка: ${result.error}`); }
-        setIsSavingPoi(false);
-    }
-
-    if (loading) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ..." />;
-    if (error) return <div className="text-center py-10"><p className="text-muted-foreground font-mono">{error}</p></div>;
+    if (loading) return <Loading variant="bike" text="SCANNING SQUAD FREQUENCIES..." />;
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="lg:h-[80vh] lg:overflow-y-auto simple-scrollbar pr-4 space-y-6">
-                 {crews.map((crew, index) => (
-                    <Link href={`/crews/${crew.slug}`} key={crew.id} className="block group" onMouseEnter={() => setHighlightedCrewId(crew.id)} onMouseLeave={() => setHighlightedCrewId(null)}>
-                        <motion.div 
-                            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}
-                            className="bg-card/80 backdrop-blur-sm border border-border p-5 rounded-xl h-full flex flex-col transition-all duration-300 hover:border-accent hover:shadow-2xl hover:shadow-yellow-glow transform hover:-translate-y-1 relative overflow-hidden"
+            <div className="space-y-4 lg:h-[80vh] overflow-y-auto no-scrollbar pr-2">
+                {crews.map((crew, idx) => {
+                    const isProvider = crew.metadata?.is_provider;
+                    return (
+                        <motion.div
+                            key={crew.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: idx * 0.05 }}
+                            onMouseEnter={() => setHoveredId(crew.id)}
+                            onMouseLeave={() => setHoveredId(null)}
                         >
-                            <Image src={crew.logo_url || '/placeholder.svg'} alt={`${crew.name} Background`} fill className="absolute inset-0 object-cover opacity-[0.03] group-hover:opacity-[0.06] transition-opacity duration-300 blur-sm scale-125" />
-                            <div className="relative z-10 flex flex-col h-full">
-                                <div className="flex items-start gap-4 mb-4">
-                                    <Image src={crew.logo_url || '/placeholder.svg'} alt={`${crew.name} Logo`} width={64} height={64} className="rounded-full bg-background/50 border-2 border-border group-hover:border-accent transition-colors flex-shrink-0 shadow-lg" />
-                                    <div className="flex-grow">
-                                        <h2 className="text-2xl font-orbitron text-accent group-hover:text-shadow-brand-yellow">{crew.name}</h2>
-                                        <p className="text-xs text-muted-foreground font-mono">by @{crew.owner_username}</p>
+                            <Link href={`/crews/${crew.slug}`} className="block group">
+                                <div className={cn(
+                                    "relative bg-zinc-900/80 border-2 transition-all duration-300 p-4 overflow-hidden",
+                                    isProvider ? "border-amber-900/50 hover:border-amber-500" : "border-zinc-800 hover:border-cyan-500"
+                                )}>
+                                    {/* Decoration */}
+                                    <div className="absolute top-0 right-0 p-1 opacity-10 font-black text-4xl select-none uppercase italic">
+                                        {isProvider ? "ZONE" : "UNIT"}
+                                    </div>
+
+                                    <div className="flex gap-4 relative z-10">
+                                        <div className="w-16 h-16 bg-black border border-zinc-700 shrink-0 overflow-hidden relative">
+                                            <Image src={crew.logo_url || '/placeholder.svg'} alt="Logo" fill className="object-cover grayscale group-hover:grayscale-0 transition-all" />
+                                        </div>
+                                        
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <h2 className={cn(
+                                                    "text-xl font-black font-orbitron italic truncate",
+                                                    isProvider ? "text-amber-500" : "text-white group-hover:text-cyan-400"
+                                                )}>{crew.name}</h2>
+                                                {isProvider && <Badge className="bg-amber-600 text-[8px] h-4">PRO-HOST</Badge>}
+                                            </div>
+                                            <p className="text-[10px] text-zinc-500 font-mono line-clamp-2 leading-tight uppercase">
+                                                {crew.description || "No mission brief provided."}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-4 gap-2 mt-4">
+                                        <Metric icon={FaShieldHalved} value={crew.member_count} label="Operators" color={!isProvider ? "text-cyan-500" : ""} />
+                                        <Metric icon={FaWarehouse} value={crew.vehicle_count} label="Arsenal" color={isProvider ? "text-amber-500" : ""} />
+                                        <Metric icon={FaMapPin} value="HQ" label="Position" />
+                                        <div className="flex items-center justify-center group-hover:bg-white group-hover:text-black bg-zinc-800 transition-colors">
+                                            <FaAngleRight />
+                                        </div>
                                     </div>
                                 </div>
-                                <p className="text-muted-foreground font-sans text-sm mt-2 flex-grow min-h-[50px]">{crew.description}</p>
-                                <div className="grid grid-cols-3 gap-2 mt-4 border-t border-border/50 pt-4">
-                                   <MetricItem icon="::FaUsers::" value={crew.member_count || 0} label="Участников" />
-                                   <MetricItem icon="::FaWarehouse::" value={crew.vehicle_count || 0} label="Единиц" />
-                                   <MetricItem icon="::FaRoute::" value={'N/A'} label="Миссий" />
-                                </div>
-                            </div>
+                            </Link>
                         </motion.div>
-                    </Link>
-                ))}
+                    );
+                })}
             </div>
-            <div className="lg:sticky lg:top-24 h-[60vh] lg:h-[calc(100vh-8rem)]">
-                <div className="relative w-full h-full">
-                    <VibeMap points={allMapPoints} highlightedPointId={highlightedCrewId} bounds={selectedMap.bounds as MapBounds} imageUrl={selectedMap.map_image_url} isEditable={isEditingMap} onMapClick={handleMapClick} />
-                    <div className="absolute top-4 right-4 z-20 flex gap-2">
-                         <Sheet>
-                            <SheetTrigger asChild><Button variant="outline" size="icon" className="bg-card/50 backdrop-blur-sm"><VibeContentRenderer content="::FaPaintbrush::"/></Button></SheetTrigger>
-                            <SheetContent>
-                                <SheetHeader><SheetTitle>Выбрать Карту</SheetTitle></SheetHeader>
-                                <div className="py-4 space-y-2">{mapPresets.map(preset => ( <div key={preset.id} onClick={() => setSelectedMap(preset)} className="p-2 border rounded-md cursor-pointer hover:border-primary"><p className="font-semibold">{preset.name}</p><p className="text-xs text-muted-foreground">{preset.is_default ? "По умолчанию" : ""}</p></div>))}</div>
-                            </SheetContent>
-                        </Sheet>
-                        {isAdmin() && (
-                            <Sheet open={isEditingMap} onOpenChange={setIsEditingMap}>
-                                <SheetTrigger asChild><Button variant="outline" size="icon" className="bg-card/50 backdrop-blur-sm"><VibeContentRenderer content="::FaFlagCheckered::"/></Button></SheetTrigger>
-                                <SheetContent>
-                                    <SheetHeader><SheetTitle>Редактор POI</SheetTitle></SheetHeader>
-                                    <div className="py-4 space-y-4">
-                                        <p className="text-sm text-muted-foreground">Кликните на карту, чтобы добавить точки для нового пути или объекта.</p>
-                                        <div><Label>Название</Label><Input value={newPoi.name} onChange={e => setNewPoi(p => ({...p, name: e.target.value}))} className="input-cyber"/></div>
-                                        <div><Label>Тип</Label><Select value={newPoi.type} onValueChange={(v: any) => setNewPoi(p => ({...p, type: v}))}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="point">Точка</SelectItem><SelectItem value="path">Путь</SelectItem><SelectItem value="loop">Петля</SelectItem></SelectContent></Select></div>
-                                        <div><Label>Иконка (для точек)</Label><Input value={newPoi.icon} onChange={e => setNewPoi(p => ({...p, icon: e.target.value}))} className="input-cyber" placeholder="::FaRoute::"/></div>
-                                        <div><Label>Цвет</Label><Input type="color" value={newPoi.color} onChange={e => setNewPoi(p => ({...p, color: e.target.value}))} className="w-full p-1"/></div>
-                                        <div className="text-xs font-mono space-y-1"><Label>Координаты ({newPoi.coords?.length || 0})</Label><ScrollArea className="h-24 p-2 border rounded">{newPoi.coords?.map((c, i) => <div key={i}>{c[0].toFixed(4)}, {c[1].toFixed(4)}</div>)}</ScrollArea></div>
-                                    </div>
-                                    <SheetFooter><Button onClick={handleSavePoi} disabled={isSavingPoi}>{isSavingPoi ? "Сохранение..." : "Сохранить POI"}</Button></SheetFooter>
-                                </SheetContent>
-                            </Sheet>
-                        )}
-                    </div>
-                    <div className="absolute bottom-4 left-4 bg-card/50 backdrop-blur-sm p-2 rounded-lg text-xs font-mono flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center bg-primary">
-                            <VibeContentRenderer content="::FaSkullCrossbones::" className="w-4 h-4 text-white"/>
-                        </div>
-                        <span>Штаб Экипажа</span>
-                    </div>
-                </div>
+
+            <div className="hidden lg:block sticky top-24 h-[70vh] bg-black border border-zinc-800">
+                 <VibeMap 
+                    points={crews.filter(c => c.hq_location).map(c => ({
+                        id: c.id,
+                        name: c.name,
+                        coords: [c.hq_location.split(',').map(Number)],
+                        type: 'point',
+                        icon: c.metadata?.is_provider ? '::FaStar::' : '::FaSkull::',
+                        color: c.metadata?.is_provider ? 'bg-amber-600' : 'bg-cyan-600'
+                    }))} 
+                    highlightedPointId={hoveredId}
+                    bounds={{ top: 56.4242, bottom: 56.08, left: 43.66, right: 44.1230 }}
+                />
             </div>
         </div>
     );
 }
 
 export default function CrewsPage() {
-    const heroTriggerId = "crews-hero-trigger";
     return (
-        <div className="relative min-h-screen bg-background dark">
-            <RockstarHeroSection title="ЭКИПАЖИ" subtitle="Команды, которые правят улицами. Найди своих или брось им вызов." triggerElementSelector={`#${heroTriggerId}`} />
-            <div id={heroTriggerId} style={{ height: '100vh' }} aria-hidden="true" />
-            <div className="container mx-auto max-w-7xl px-4 py-12 relative z-20">
-                 <Suspense fallback={<Loading variant="bike" text="ЗАГРУЗКА ЭКИПАЖЕЙ..." />}>
-                    <CrewsList />
-                </Suspense>
+        <div className="min-h-screen bg-[#050505] text-white pt-24 px-4 pb-32">
+            <div className="max-w-7xl mx-auto">
+                <div className="mb-10 text-center lg:text-left">
+                    {/* Исправленный адаптивный размер заголовка */}
+                    <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl font-black font-orbitron italic tracking-tighter uppercase drop-shadow-2xl leading-none">
+                        Network_<span className="text-cyan-500">Crews</span>
+                    </h1>
+                    <p className="text-[9px] sm:text-xs font-mono text-zinc-500 tracking-[0.2em] sm:tracking-[0.4em] mt-3 uppercase">
+                        GLOBAL_SQUAD_DATABASE_ACCESS_GRANTED
+                    </p>
+                </div>
+                 
+            
+                <CrewsList />
             </div>
-            <Link href="/crews/create" className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 group">
-                <motion.div 
-                    className="w-16 h-16 flex items-center justify-center bg-accent/80 text-accent-foreground rounded-full shadow-lg shadow-accent/50 cursor-pointer backdrop-blur-sm hover:bg-accent transition-colors"
-                    title="Создать Экипаж"
-                    whileHover={{ scale: 1.1, rotate: 90 }} whileTap={{ scale: 0.95 }}
-                >
-                    <VibeContentRenderer content="::FaCirclePlus::" className="h-8 w-8"/>
-                </motion.div>
+            <Link href="/crews/create" className="fixed bottom-24 right-6 z-50">
+                <Button className="w-16 h-16 rounded-none bg-red-600 border-2 border-white text-white hover:bg-white hover:text-black transition-all rotate-45 shadow-[0_0_20px_rgba(220,38,38,0.5)]">
+                    <FaPlus className="-rotate-45 text-2xl" />
+                </Button>
             </Link>
         </div>
     );
