@@ -12,6 +12,7 @@ import { playerRespawn, handleBaseInteraction } from "./actions/game";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { FaQrcode, FaShieldHalved, FaUsers, FaPlus, FaTrophy, FaWifi } from "react-icons/fa6";
+import { ActivityTicker } from "./components/ActivityTicker";
 
 const QRDisplay = ({ value, onClose }: { value: string, onClose: () => void }) => (
     <motion.div 
@@ -159,7 +160,7 @@ export default function StrikeballDashboard() {
             initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} 
             className={cn("font-black font-orbitron italic tracking-tighter uppercase", isLive ? "text-4xl text-white" : "text-6xl md:text-8xl text-zinc-200 drop-shadow-2xl")}
         >
-          {isLive ? "GHOST_OS // v2.4" : "STRIKEBALL"}
+          {isLive ? "GHOST_OS // v2.4" : <ActivityTicker />}
         </motion.h1>
         {isLive && (
             <div className="mt-4 px-6 py-1 bg-red-600/10 border-x-4 border-red-600 inline-block">
