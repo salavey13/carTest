@@ -14,6 +14,7 @@ import {
     FaBolt, FaTerminal, FaPeopleGroup, FaWarehouse, FaCircleInfo 
 } from 'react-icons/fa6';
 import { cn } from '@/lib/utils';
+import Link from "next/link";
 import { useAppContext } from '@/contexts/AppContext';
 import { toast } from 'sonner';
 import { VibeMap } from '@/components/VibeMap';
