@@ -17,7 +17,7 @@ import { LobbyTabs } from "./components/LobbyTabs";
 import { LobbyFooter } from "./components/LobbyFooter";
 import { VirtualBlaster } from "./components/VirtualBlaster";
 import { LobbyTabManager } from "./components/LobbyTabManager";
-
+import { motion, AnimatePresence } from "framer-motion";
 // --- ХУКИ ---
 import { useGeoTracking } from "../../hooks/useGeoTracking";
 import { useTacticalOutbox } from "../../hooks/useTacticalOutbox";
