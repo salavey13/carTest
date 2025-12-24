@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { FaTerminal, FaCircleNodes, FaWandSparkles } from 'react-icons/fa6';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const AI_TEMPLATE = {
   is_provider: true,
