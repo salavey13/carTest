@@ -21,14 +21,13 @@ export async function getLobbyGeoData(lobbyId: string) {
 
         if (error) throw error;
 
-        // Group by user_id to get only the latest position for each player
-        const latestPositions = data.reduce((acc: any[], current) => {
-            const x = acc.find(item => item.user_id === current.user_id);
-            if (!x) acc.push(current);
+        // Оставляем только последний пинг для каждого пользователя
+        const latest = data.reduce((acc: any[], current) => {
+            if (!acc.find(item => item.user_id === current.user_id)) acc.push(current);
             return acc;
         }, []);
 
-        return { success: true, data: latestPositions };
+        return { success: true, data: latest };
     } catch (e: any) {
         return { success: false, error: e.message };
     }
