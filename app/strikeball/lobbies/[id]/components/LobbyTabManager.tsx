@@ -1,15 +1,15 @@
 "use client";
 
-import { SquadRoster } from "../../components/SquadRoster";
+import { SquadRoster } from "../../../components/SquadRoster";
 import { CombatHUD } from "./CombatHUD";
-import { BattleReportView } from "../../components/BattleReportView";
+import { BattleReportView } from "../../../components/BattleReportView";
 import { DrinkRoyaleMap } from "./DrinkRoyaleMap";
 import { MapTab } from "./MapTab";
-import { LogisticsPanel } from "../../components/LogisticsPanel";
-import { SafetyBriefing } from "../../components/SafetyBriefing";
+import { LogisticsPanel } from "../../../components/LogisticsPanel";
+import { SafetyBriefing } from "../../../components/SafetyBriefing";
 import { ProviderOffers } from "./ProviderOffers";
-import { addNoobBot, removeMember } from "../../actions/lobby";
-import { updateTransportStatus, joinCar, signSafetyBriefing } from "../../actions/logistics";
+import { addNoobBot, removeMember } from "../../../actions/lobby";
+import { updateTransportStatus, joinCar, signSafetyBriefing } from "../../../actions/logistics";
 
 export function LobbyTabManager({ activeTab, lobby, members, dbUser, isOwner, isAdmin, loadData }: any) {
   const isDrinkRoyale = lobby.mode === 'DRINKNIGHT ROYALE';
