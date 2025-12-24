@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 const SERVICES = [
   "STRIKEBALL", "PAINTBALL", "HYDROBALL", "LAZERTAG", 
-  "SNOWBOARD", "VIBECODE", "BIKERIDE", "ENDURO"
+  "SNOWBOARD", "VIBECODE", "BIKERIDE", "ENDURO", "DRINKNIGHT ROYALE"
 ];
 
 export const ActivityTicker = ({ isLive }: { isLive: boolean }) => {
