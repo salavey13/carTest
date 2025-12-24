@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { getCrewLiveDetails } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
 import Image from 'next/image';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
