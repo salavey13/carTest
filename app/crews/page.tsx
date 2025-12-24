@@ -10,7 +10,7 @@ import { Suspense, useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FaShieldHalved, FaWarehouse, FaSackDollar, FaMapPin, FaAngleRight } from 'react-icons/fa6';
+import { FaShieldHalved, FaWarehouse, FaSackDollar, FaMapPin, FaAngleRight, FaPlus } from 'react-icons/fa6';
 import { cn } from "@/lib/utils";
 
 const Metric = ({ icon: Icon, value, label, color }: any) => (
