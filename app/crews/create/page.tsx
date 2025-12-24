@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { createCrew } from "@/app/actions";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
