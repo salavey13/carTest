@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useMemo } from "react";
 import { SquadRoster } from "../../../components/SquadRoster";
 import { CombatHUD } from "./CombatHUD";
 import { BattleReportView } from "../../../components/BattleReportView";
@@ -10,9 +11,31 @@ import { SafetyBriefing } from "../../../components/SafetyBriefing";
 import { ProviderOffers } from "./ProviderOffers";
 import { addNoobBot, removeMember } from "../../../actions/lobby";
 import { updateTransportStatus, joinCar, signSafetyBriefing } from "../../../actions/logistics";
+import { PointOfInterest, MapBounds } from "@/components/VibeMap";
+
+const CITY_BOUNDS: MapBounds = { top: 56.4242, bottom: 56.08, left: 43.66, right: 44.1230 };
 
 export function LobbyTabManager({ activeTab, lobby, members, dbUser, isOwner, isAdmin, loadData }: any) {
   const isDrinkRoyale = lobby.mode === 'DRINKNIGHT ROYALE';
+
+  // Вычисляем POI для карты на лету
+  const mapData = useMemo(() => {
+    if (!lobby?.field_id) return null;
+    try {
+        const coords = lobby.field_id.split(',').map(Number);
+        if (coords.length !== 2 || isNaN(coords[0])) return null;
+        
+        const points: PointOfInterest[] = [{ 
+            id: 'target', 
+            name: 'ЦЕЛЬ_ОПЕРАЦИИ', 
+            type: 'point', 
+            coords: [coords as [number, number]], 
+            icon: '::FaFlag::', 
+            color: 'bg-red-600' 
+        }];
+        return { points, bounds: CITY_BOUNDS };
+    } catch (e) { return null; }
+  }, [lobby.field_id]);
 
   switch (activeTab) {
     case 'roster':
@@ -36,7 +59,7 @@ export function LobbyTabManager({ activeTab, lobby, members, dbUser, isOwner, is
     case 'map':
       return isDrinkRoyale 
         ? <DrinkRoyaleMap lobby={lobby} members={members} dbUser={dbUser} />
-        : <MapTab fieldId={lobby.field_id} />;
+        : <MapTab mapData={mapData} fieldId={lobby.field_id} />;
 
     case 'logistics':
       const userMember = members.find((m: any) => m.user_id === dbUser?.user_id);
