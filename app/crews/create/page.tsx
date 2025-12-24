@@ -134,7 +134,7 @@ export default function CreateCrewPage() {
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="space-y-4 pt-4 border-t border-zinc-800 overflow-hidden">
                     <div className="flex justify-between items-center">
                         <Label className="text-[10px] uppercase font-black text-amber-500">Service Config (JSON)</Label>
-                        <Button type="button" variant="ghost" className="h-6 text-[8px] gap-1 hover:text-amber-400" onClick={() => setMetadataJson(JSON.stringify(AI_TEMPLATE, null, 2))}>
+                        <Button type="button" variant="ghost" className="h-6 text-[8px] gap-1 hover:text-amber-400" onClick={() => setMetadataJson(JSON.stringify(MAX_PROVIDER_SCHEMA, null, 2))}>
                             <FaWandSparkles /> LOAD_AI_TEMPLATE
                         </Button>
                     </div>
