@@ -13,31 +13,42 @@ export function VirtualBlaster({ onHit, onDeath }: VirtualBlasterProps) {
   const sounds = useGameSounds();
   const [mode, setMode] = useState<"ranged" | "melee">("ranged");
 
-  // 🔊 Preload sounds on mount — no first-click delay!
+  // 🔊 Silent preload — NO autoplay
   useEffect(() => {
-    // Warm cache: trigger load without playing
-    sounds.fire();
-    sounds.meleeAttack();
-    sounds.death();
-    // Chrome requires user gesture to *play*, but loading metadata is instant
-    // We just ensure buffers are ready.
+    // Extract URLs from function.toString() — safe because `useGameSounds` uses static strings
+    const extractUrl = (fn: Function) => fn.toString().match(/['"`]([^'"`]+\.mp3)['"`]/)?.[1];
+    const urls = [
+      extractUrl(sounds.fire),
+      extractUrl(sounds.meleeAttack),
+      extractUrl(sounds.death),
+    ].filter(Boolean) as string[];
+
+    const disposers = urls.map((url) => {
+      const audio = new Audio(url);
+      audio.preload = "auto";
+      audio.load(); // 👈 loads metadata/buffer without playing
+      return () => {
+        audio.pause();
+        audio.src = "";
+      };
+    });
+
+    return () => disposers.forEach((dispose) => dispose());
   }, [sounds]);
 
-  // ✅ Fixed long-press state machine
+  // ✅ Tap & long-press with drag-cancel
   const pressTimer = useRef<NodeJS.Timeout | null>(null);
   const touchStartTime = useRef<number>(0);
   const isCancelled = useRef(false);
-
   const LONG_PRESS_THRESHOLD = 800; // ms
 
   const handleStart = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     isCancelled.current = false;
     touchStartTime.current = Date.now();
-
     pressTimer.current = setTimeout(() => {
       if (!isCancelled.current) {
-        setMode(prev => (prev === "ranged" ? "melee" : "ranged"));
+        setMode((prev) => (prev === "ranged" ? "melee" : "ranged"));
       }
     }, LONG_PRESS_THRESHOLD);
   };
@@ -51,15 +62,12 @@ export function VirtualBlaster({ onHit, onDeath }: VirtualBlasterProps) {
       pressTimer.current = null;
     }
 
-    // Only fire if NOT long-press & NOT cancelled (e.g., by move)
-    if (!isCancelled.current && elapsed < LONG_PRESS_THRESHOLD - 50) {
-      // Debounce rapid taps (esp. mobile)
-      if (elapsed > 50) {
-        if (mode === "ranged") {
-          sounds.fire();
-        } else {
-          sounds.meleeAttack();
-        }
+    // Valid tap: not cancelled, not long-press, not micro-tap
+    if (!isCancelled.current && elapsed > 50 && elapsed < LONG_PRESS_THRESHOLD - 50) {
+      if (mode === "ranged") {
+        sounds.fire();
+      } else {
+        sounds.meleeAttack();
       }
     }
   };
@@ -91,18 +99,17 @@ export function VirtualBlaster({ onHit, onDeath }: VirtualBlasterProps) {
     <div className="grid grid-cols-2 gap-4">
       {/* Action Button */}
       <button
-        // Mouse
         onMouseDown={handleStart}
         onMouseUp={handleEnd}
         onMouseLeave={handleCancel}
-        // Touch
         onTouchStart={handleStart}
         onTouchEnd={handleEnd}
         onTouchMove={handleCancel}
         onTouchCancel={handleCancel}
         className={cn(
-          "cyber-clip w-full aspect-square bg-gradient-to-br from-[#1a202c] to-[#2d3748] border relative overflow-hidden",
-          "shadow-lg transition-all duration-150 active:scale-95 focus:outline-none",
+          "cyber-clip w-full aspect-square bg-gradient-to-br from-[#1a202c] to-[#2d3748]",
+          "border relative overflow-hidden shadow-lg transition-all duration-150",
+          "active:scale-95 focus:outline-none",
           mode === "ranged"
             ? "border-brand-cyan/40 hover:border-brand-cyan/80"
             : "border-brand-gold/40 hover:border-brand-gold/80"
@@ -128,8 +135,10 @@ export function VirtualBlaster({ onHit, onDeath }: VirtualBlasterProps) {
       <button
         onClick={handleDeath}
         className={cn(
-          "cyber-clip-reverse w-full aspect-square bg-gradient-to-br from-[#2a0a0a] to-[#1a0505] border border-red-600/40",
-          "relative overflow-hidden shadow-lg transition-all duration-150 active:scale-95 focus:outline-none hover:border-red-600/80 group"
+          "cyber-clip-reverse w-full aspect-square",
+          "bg-gradient-to-br from-[#2a0a0a] to-[#1a0505] border border-red-600/40",
+          "relative overflow-hidden shadow-lg transition-all duration-150",
+          "active:scale-95 focus:outline-none hover:border-red-600/80 group"
         )}
       >
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 20px)" }} />
