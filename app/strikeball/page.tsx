@@ -160,7 +160,24 @@ export default function StrikeballDashboard() {
             initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} 
             className={cn("font-black font-orbitron italic tracking-tighter uppercase", isLive ? "text-4xl text-white" : "text-6xl md:text-8xl text-zinc-200 drop-shadow-2xl")}
         >
-          {isLive ? "GHOST_OS // v2.4" : <ActivityTicker />}
+          {isLive ? "GHOST_OS // v2.4" : <div className="relative bg-black/40 backdrop-blur-md border border-brand-cyan/30  overflow-hidden">
+  {/* Corners */}
+  <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-brand-cyan" />
+  <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-brand-cyan" />
+  <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-brand-cyan" />
+  <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-brand-cyan" />
+
+  {/* Label */}
+  <div className="flex items-center justify-between px-3 py-1 border-b border-brand-cyan/20 bg-brand-cyan/5">
+    <span className="text-xs font-orbitron text-brand-cyan tracking-widest uppercase">Live Feed</span>
+    <div className="flex gap-1">
+      <div className="w-1 h-1 rounded-full bg-red-500 animate-pulse" />
+      <span className="text-[10px] text-red-400 font-mono">REC</span>
+    </div>
+  </div>
+
+  <ActivityTicker isLive={true} />
+</div>}
         </motion.h1>
         {isLive && (
             <div className="mt-4 px-6 py-1 bg-red-600/10 border-x-4 border-red-600 inline-block">

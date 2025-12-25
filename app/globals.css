@@ -523,6 +523,15 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-cl
   animation: zap-bolt 1.2s ease-in-out infinite;
 }
 
+@layer utilities {
+  .cyber-clip {
+    clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%);
+  }
+  .cyber-clip-reverse {
+    clip-path: polygon(0 0, 90% 0, 100% 10%, 100% 100%, 10% 100%, 0 90%);
+  }
+}
+
 @keyframes pan-zoom {
   0% { transform: scale(1) translate(0, 0); }
   50% { transform: scale(1.1) translate(2%, -2%); }
@@ -581,4 +590,30 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-cl
 /* Hide the numbered dots that appear when CSS is missing */
 .slick-slider ul.slick-dots {
   display: none !important;
+}
+
+.glitch-text {
+  position: relative;
+}
+.glitch-text::before,
+.glitch-text::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.8;
+}
+.glitch-text::before {
+  left: 2px;
+  text-shadow: -1px 0 #ff00c1;
+  clip: rect(44px, 450px, 56px, 0);
+  animation: glitch-anim-1 5s infinite linear alternate-reverse;
+}
+.glitch-text::after {
+  left: -2px;
+  text-shadow: -1px 0 #00fff9;
+  clip: rect(44px, 450px, 56px, 0);
+  animation: glitch-anim-2 5s infinite linear alternate-reverse;
 }
