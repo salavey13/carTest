@@ -6,7 +6,7 @@ import { CombatHUD } from "./CombatHUD";
 import { BattleReportView } from "../../../components/BattleReportView";
 import { DrinkRoyaleMap } from "./DrinkRoyaleMap";
 import { MapTab } from "./MapTab";
-import { LogisticsPanel } from "../../../components/LogisticsPanel";
+import { LogisticsPanel } from "./LogisticsPanel";
 import { SafetyBriefing } from "../../../components/SafetyBriefing";
 import { ProviderOffers } from "./ProviderOffers";
 import { addNoobBot, removeMember } from "../../../actions/lobby";
@@ -17,14 +17,13 @@ const CITY_BOUNDS: MapBounds = { top: 56.4242, bottom: 56.08, left: 43.66, right
 
 export function LobbyTabManager({ activeTab, lobby, members, dbUser, isOwner, isAdmin, loadData }: any) {
   const isDrinkRoyale = lobby.mode === 'DRINKNIGHT ROYALE';
+  const userMember = members.find((m: any) => m.user_id === dbUser?.user_id);
 
-  // Вычисляем POI для карты на лету
+  // Генерируем данные карты из field_id (GPS координаты)
   const mapData = useMemo(() => {
     if (!lobby?.field_id) return null;
     try {
         const coords = lobby.field_id.split(',').map(Number);
-        if (coords.length !== 2 || isNaN(coords[0])) return null;
-        
         const points: PointOfInterest[] = [{ 
             id: 'target', 
             name: 'ЦЕЛЬ_ОПЕРАЦИИ', 
@@ -62,18 +61,17 @@ export function LobbyTabManager({ activeTab, lobby, members, dbUser, isOwner, is
         : <MapTab mapData={mapData} fieldId={lobby.field_id} />;
 
     case 'logistics':
-      const userMember = members.find((m: any) => m.user_id === dbUser?.user_id);
       return (
         <LogisticsPanel 
-          userMember={userMember} members={members} 
-          onToggleDriver={(role: string, seats: number, name: string) => updateTransportStatus(userMember.id, { role, seats, car_name: name }).then(loadData)}
+          userMember={userMember} 
+          members={members} 
+          onToggleDriver={(role: string, seats: number, carName: string) => updateTransportStatus(userMember.id, { role, seats, car_name: carName }).then(loadData)}
           onJoinCar={(dId: string) => joinCar(userMember.id, dId).then(loadData)}
         />
       );
 
     case 'safety':
-      const me = members.find((m: any) => m.user_id === dbUser?.user_id);
-      return <SafetyBriefing onComplete={(data: any) => signSafetyBriefing(me.id, data).then(loadData)} isSigned={!!me?.metadata?.safety_signed} />;
+      return <SafetyBriefing onComplete={(data: any) => signSafetyBriefing(userMember.id, data).then(loadData)} isSigned={!!userMember?.metadata?.safety_signed} />;
 
     default:
       return null;
