@@ -32,13 +32,14 @@ export function VibeMap({
 }: VibeMapProps) {
   const [viewState, setViewState] = useState({ x: 0, y: 0, scale: 1 });
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  // We need a ref to the inner moving content to calculate accurate clicks
+  const mapContentRef = useRef<HTMLDivElement>(null); 
   const [imageSize, setImageSize] = useState({ width: 1, height: 1 });
   
-  // Motion values for smoother drag interaction
   const x = useMotionValue(0);
   const y = useMotionValue(0);
 
-  // Helper to clamp values so we don't drag the map off-screen
+  // Simple clamp helper
   const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
   useGesture({
@@ -48,22 +49,20 @@ export function VibeMap({
       const containerW = mapContainerRef.current.offsetWidth;
       const containerH = mapContainerRef.current.offsetHeight;
       
-      // Calculate boundaries based on current scale
-      // If scale > 1, we can move the image around.
-      // The limit is how much "extra" space we have (imageSize * scale - containerSize)
+      // Boundary logic (Clamping)
+      // Prevents dragging the map entirely off-screen
       const maxOffsetX = Math.max(0, (containerW * viewState.scale) - containerW) / 2;
       const maxOffsetY = Math.max(0, (containerH * viewState.scale) - containerH) / 2;
       
-      // Allow some freedom to pan, but stop at edges
-      const clampedX = clamp(dx, -maxOffsetX, maxOffsetX);
-      const clampedY = clamp(dy, -maxOffsetY, maxOffsetY);
+      // Allow free drag if scaled down, clamp if scaled up
+      const clampedX = viewState.scale > 1 ? clamp(dx, -maxOffsetX, maxOffsetX) : dx;
+      const clampedY = viewState.scale > 1 ? clamp(dy, -maxOffsetY, maxOffsetY) : dy;
 
       setViewState(prev => ({ ...prev, x: clampedX, y: clampedY }));
       x.set(clampedX);
       y.set(clampedY);
     },
-    onPinch: ({ offset: [s], origin: [ox, oy] }) => {
-      // Basic pinch support (could be expanded for pinch-to-zoom at point)
+    onPinch: ({ offset: [s] }) => {
       const newScale = Math.max(0.5, Math.min(s, 6));
       setViewState(prev => ({ ...prev, scale: newScale }));
     },
@@ -75,79 +74,52 @@ export function VibeMap({
   });
 
   /**
-   * Zoom towards the mouse cursor position for better UX
+   * Safe Zoom - Centers the zoom action
+   * Reverting to center-based zoom logic for better mobile stability
    */
-  const handleZoom = useCallback((direction: 'in' | 'out', factor = 1.2, event?: React.WheelEvent<HTMLDivElement>) => {
-    if (!mapContainerRef.current) return;
-    
-    const rect = mapContainerRef.current.getBoundingClientRect();
-    
-    // Determine mouse position relative to container center
-    // If no event provided (button click), zoom to center
-    const mx = event ? event.clientX - rect.left : rect.width / 2;
-    const my = event ? event.clientY - rect.top : rect.height / 2;
-
+  const handleZoom = useCallback((direction: 'in' | 'out', factor = 1.2) => {
     const nextScale = clamp(
       direction === 'in' ? viewState.scale * factor : viewState.scale / factor,
       0.5,
       6
     );
-
-    // Math to adjust x/y so the point under the mouse stays stationary
-    // Formula: offset = mouse - (mouse - currentOffset) * (newScale / currentScale)
-    const newOffsetX = mx - (mx - viewState.x) * (nextScale / viewState.scale);
-    const newOffsetY = my - (my - viewState.y) * (nextScale / viewState.scale);
-
-    setViewState({ x: newOffsetX, y: newOffsetY, scale: nextScale });
-    x.set(newOffsetX);
-    y.set(newOffsetY);
-  }, [viewState, x, y]);
-
-  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!onMapClick || !mapContainerRef.current || !imageSize) return;
-
-    const containerRect = mapContainerRef.current.getBoundingClientRect();
     
-    // 1. Get click position relative to the container
-    const clickX = e.clientX - containerRect.left;
-    const clickY = e.clientY - containerRect.top;
+    setViewState(prev => ({ ...prev, scale: nextScale }));
+  }, [viewState.scale]);
 
-    // 2. Calculate letterboxing (Image contains within Container)
-    const containerRatio = containerRect.width / containerRect.height;
-    const imageRatio = imageSize.width / imageSize.height;
-    let renderW, renderH, padX = 0, padY = 0;
+  /**
+   * Robust Click Handler using getBoundingClientRect
+   * This avoids complex matrix math by asking the browser exactly where the element is.
+   */
+  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!onMapClick || !mapContainerRef.current || !mapContentRef.current) return;
 
-    if (imageRatio > containerRatio) {
-      renderW = containerRect.width;
-      renderH = renderW / imageRatio;
-      padY = (containerRect.height - renderH) / 2;
-    } else {
-      renderH = containerRect.height;
-      renderW = renderH * imageRatio;
-      padX = (containerRect.width - renderW) / 2;
+    // 1. Get the visual position of the map content relative to the viewport
+    const contentRect = mapContentRef.current.getBoundingClientRect();
+    const containerRect = mapContainerRef.current.getBoundingClientRect();
+
+    // 2. Get click coordinates
+    const clickX = e.clientX;
+    const clickY = e.clientY;
+
+    // 3. Check if the click was actually inside the rendered map content
+    // This naturally handles letterboxing and transparency
+    if (
+      clickX < contentRect.left || 
+      clickX > contentRect.right || 
+      clickY < contentRect.top || 
+      clickY > contentRect.bottom
+    ) {
+      return; // Clicked in the empty void (letterboxing area)
     }
 
-    // 3. Remove Pan and Scale to get coordinate relative to un-transformed container
-    // Note: We use transformOrigin: "0 0" on the motion.div, so this math is linear.
-    const rawX = (clickX - viewState.x) / viewState.scale;
-    const rawY = (clickY - viewState.y) / viewState.scale;
+    // 4. Calculate relative position (0.0 to 1.0) based on the ACTUAL drawn size
+    const relativeX = (clickX - contentRect.left) / contentRect.width;
+    const relativeY = (clickY - contentRect.top) / contentRect.height;
 
-    // 4. Remove Letterboxing to get coordinate relative to the Image itself
-    const imgX = rawX - padX;
-    const imgY = rawY - padY;
-
-    // 5. Check if click was inside the image (and not the black bars)
-    if (imgX < 0 || imgX > renderW || imgY < 0 || imgY > renderH) {
-      return; 
-    }
-
-    // 6. Convert pixel on image to percentage (0-1)
-    const xPct = imgX / renderW;
-    const yPct = imgY / renderH;
-
-    // 7. Convert percentage to Lat/Lon
-    const lon = xPct * (bounds.right - bounds.left) + bounds.left;
-    const lat = bounds.top - (yPct * (bounds.top - bounds.bottom));
+    // 5. Convert percentage to Lat/Lon
+    const lon = relativeX * (bounds.right - bounds.left) + bounds.left;
+    const lat = bounds.top - (relativeY * (bounds.top - bounds.bottom));
 
     onMapClick([lat, lon]);
   };
@@ -163,11 +135,12 @@ export function VibeMap({
         style={{ touchAction: 'none' }}
       >
         <motion.div
-          className="relative w-full h-full origin-top-left" // CRITICAL: Ensures math matches visuals
+          ref={mapContentRef}
+          className="relative w-full h-full"
           style={{ x, y, scale: viewState.scale }}
           onWheel={(e) => { 
             e.preventDefault(); 
-            handleZoom(e.deltaY < 0 ? 'in' : 'out', 1.2, e); 
+            handleZoom(e.deltaY < 0 ? 'in' : 'out', 1.2); 
           }}
         >
           <div className="absolute inset-0" onClick={isEditable ? handleMapClick : undefined}>
@@ -195,7 +168,6 @@ export function VibeMap({
 
                 if (pathPoints.length < 2) return null;
 
-                // Convert percentage coordinates to SVG pixel coordinates
                 const pathD = pathPoints.map((p, i) => {
                   const px = (p.x / 100) * imageSize.width;
                   const py = (p.y / 100) * imageSize.height;
@@ -207,7 +179,7 @@ export function VibeMap({
                     key={point.id}
                     d={pathD + (point.type === 'loop' ? ' Z' : '')}
                     stroke={point.color || '#FF69B4'}
-                    strokeWidth={2} // Constant stroke width in SVG pixels
+                    strokeWidth={2} 
                     fill="none"
                     strokeDasharray={isEditable ? "4 4" : 'none'}
                     initial={{ pathLength: 0, opacity: 0 }}
@@ -238,7 +210,7 @@ export function VibeMap({
                       style={{ 
                         left: `${projected.x}%`, 
                         top: `${projected.y}%`, 
-                        // Counter-scale to keep icon constant size on screen regardless of map zoom
+                        // Keep icon visual size constant relative to the screen, not the map
                         scale: (isHighlighted ? 1.5 : 1) / viewState.scale,
                         zIndex: isHighlighted ? 50 : 10 
                       }}
