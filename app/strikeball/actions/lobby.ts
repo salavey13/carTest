@@ -8,6 +8,32 @@ import { v4 as uuidv4 } from "uuid";
 const BOT_USERNAME = "oneSitePlsBot";
 
 /**
+ * Fetches the most recent geo-pings for all active members in a lobby.
+ * Privileged access via supabaseAdmin.
+ */
+export async function getLobbyGeoData(lobbyId: string) {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('lobby_geo_pings')
+            .select('user_id, lat, lng, timestamp')
+            .eq('lobby_id', lobbyId)
+            .order('timestamp', { ascending: false });
+
+        if (error) throw error;
+
+        // Оставляем только последний пинг для каждого пользователя
+        const latest = data.reduce((acc: any[], current) => {
+            if (!acc.find(item => item.user_id === current.user_id)) acc.push(current);
+            return acc;
+        }, []);
+
+        return { success: true, data: latest };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+/**
  * FETCH LOBBY DATA (Server-Side "Manual Join")
  */
 export async function fetchLobbyData(lobbyId: string) {

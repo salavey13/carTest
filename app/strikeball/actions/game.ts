@@ -177,3 +177,20 @@ export async function playerRespawnAtCheckpoint(lobbyId: string, userId: string,
         return { success: false, error: e.message };
     }
 }
+
+export async function updatePlayerLocation(lobbyId: string, userId: string, lat: number, lng: number) {
+    const { error } = await supabaseAdmin
+        .from('lobby_geo_pings')
+        .insert({ lobby_id: lobbyId, user_id: userId, lat, lng });
+
+    // Optional: Check if player is outside the circle and notify
+    // Logic: calculate distance from Rendezvous Point (lobby.field_id)
+    return { success: !error };
+}
+
+export async function eliminateFurthestPlayer(lobbyId: string) {
+    // This would be called by a CRON job or a specific admin trigger
+    // 1. Get all players last pings
+    // 2. Calculate distance to field_id center
+    // 3. Mark the furthest as 'dead'
+}
