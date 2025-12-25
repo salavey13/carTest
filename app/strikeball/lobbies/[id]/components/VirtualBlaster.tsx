@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 export function VirtualBlaster({ onHit }: { onHit: () => void }) {
     const handleFire = () => {
         // High-intensity tactical feedback
-        const audio = new Audio('https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/blaster-fire.mp3');
+        const audio = new Audio('https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions/sshotf1b.mp3');
         audio.volume = 0.8;
         audio.play().catch(() => {});
         
