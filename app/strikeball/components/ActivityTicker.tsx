@@ -4,8 +4,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const SERVICES = [
-  "STRIKEBALL", "PAINTBALL", "HYDROBALL", "LAZERTAG", 
-  "SNOWBOARD", "VIBECODE", "BIKERIDE", "ENDURO", "DRINKNIGHT ROYALE"
+  { text: "STRIKEBALL", color: "text-brand-cyan" },
+  { text: "PAINTBALL", color: "text-brand-purple" },
+  { text: "HYDROBALL", color: "text-blue-400" },
+  { text: "LAZERTAG", color: "text-brand-red-orange" },
+  { text: "VIBECODE", color: "text-green-400" },
+  { text: "DRINKROYALE", color: "text-red-400" },
+  { text: "BIKERIDE", color: "text-brand-gold" },
 ];
 
 export const ActivityTicker = ({ isLive }: { isLive: boolean }) => {
@@ -16,23 +21,34 @@ export const ActivityTicker = ({ isLive }: { isLive: boolean }) => {
     return () => clearInterval(timer);
   }, []);
 
+  const current = SERVICES[idx];
+
   return (
-    <div className="h-16 sm:h-24 flex items-center justify-center overflow-hidden">
+    <div className="relative h-24 flex items-center justify-center overflow-hidden">
       <AnimatePresence mode="wait">
-        <motion.h1
-          key={SERVICES[idx]}
-          initial={{ y: 30, opacity: 0, skewX: -20 }}
-          animate={{ y: 0, opacity: 1, skewX: -10 }}
-          exit={{ y: -30, opacity: 0, skewX: 20 }}
-          transition={{ duration: 0.4, ease: "anticipate" }}
-          className={cn(
-            "font-black font-orbitron italic tracking-tighter uppercase text-center",
-            isLive ? "text-3xl sm:text-4xl text-white" : "text-4xl sm:text-6xl md:text-8xl text-zinc-200 drop-shadow-2xl"
-          )}
+        <motion.div
+          key={current.text}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.3 }}
+          className="absolute inset-0 flex items-center justify-center"
         >
-          {SERVICES[idx]}
-        </motion.h1>
+          <h1
+            data-text={current.text}
+            className={cn(
+              "font-orbitron font-black italic tracking-tighter uppercase glitch-text drop-shadow-2xl",
+              "text-4xl sm:text-5xl md:text-6xl",
+              current.color
+            )}
+          >
+            {current.text}
+          </h1>
+        </motion.div>
       </AnimatePresence>
+
+      {/* Scanlines overlay */}
+      <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.3)_50%)] bg-[length:100%_4px] pointer-events-none opacity-20" />
     </div>
   );
 };
