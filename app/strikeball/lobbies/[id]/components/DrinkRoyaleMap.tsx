@@ -64,7 +64,7 @@ export function DrinkRoyaleMap({ lobby, members, dbUser }: any) {
             "relative h-[60vh] border-2 transition-all duration-500 overflow-hidden",
             isDanger ? "border-red-600 ring-4 ring-red-900/30 animate-pulse" : "border-zinc-800"
         )}>
-            <VibeMap points={points} bounds={{ top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 }} imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/city_grid_dark.jpg" />
+            <VibeMap points={points} bounds={{ top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 }} imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg" />
             <div className="absolute top-4 left-4 z-20 bg-black/90 p-2 border border-brand-cyan font-mono text-[9px] uppercase">
                 <div className="text-zinc-500">Радиус_Зоны</div>
                 <div className="text-brand-cyan font-black">{Math.round(currentRadius)}M</div>
