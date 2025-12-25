@@ -160,7 +160,7 @@ export default function StrikeballDashboard() {
             initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} 
             className={cn("font-black font-orbitron italic tracking-tighter uppercase", isLive ? "text-4xl text-white" : "text-6xl md:text-8xl text-zinc-200 drop-shadow-2xl")}
         >
-          {isLive ? "GHOST_OS // v2.4" : <div className="relative bg-black/40 backdrop-blur-md border border-brand-cyan/30 rounded-lg overflow-hidden">
+          {isLive ? "GHOST_OS // v2.4" : <div className="relative bg-black/40 backdrop-blur-md border border-brand-cyan/30  overflow-hidden">
   {/* Corners */}
   <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-brand-cyan" />
   <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-brand-cyan" />
