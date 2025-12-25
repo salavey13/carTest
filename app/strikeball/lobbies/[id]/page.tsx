@@ -46,7 +46,7 @@ export default function LobbyRoom() {
   const isDrinkRoyale = lobby?.mode === 'DRINKNIGHT ROYALE';
 
   // Трекинг работает, если это лобби активно
-  useGeoTracking(lobbyId as string, dbUser?.user_id!, lobby?.status === 'active');
+  useGeoTracking(lobbyId as string, dbUser?.user_id!, lobby?.status === 'active', dbUser);
 
   const loadData = useCallback(async () => {
     try {
