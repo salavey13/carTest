@@ -1,6 +1,6 @@
 "use client";
 
-import { FaFistRaised, FaGun, FaSkull } from "react-icons/fa6";
+import { FaHandFist, FaGun, FaSkull } from "react-icons/fa6";
 import { useState } from "react";
 import { useGameSounds } from "../hooks/useGameSounds";
 import { cn } from "@/lib/utils";
@@ -49,7 +49,7 @@ export function VirtualBlaster({ onHit, onDeath }: VirtualBlasterProps) {
           </>
         ) : (
           <>
-            <FaFistRaised className="text-4xl mb-2 animate-bounce" />
+            <FaHandFist className="text-4xl mb-2 animate-bounce" />
             <span>УДАР</span>
           </>
         )}
