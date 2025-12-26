@@ -278,20 +278,23 @@ export function WarehouseSyncButtons() {
 
   const getStatusBadge = () => {
     if (loading.general) {
-      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+      // FIXED: Added dark mode variant
+      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700">
         <Loader2 className="w-3 h-3 mr-1 animate-spin" />
         Загрузка...
       </Badge>;
     }
     
     if (needSetup) {
-      return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+      // FIXED: Added dark mode variant
+      return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
         <AlertCircle className="w-3 h-3 mr-1" />
         Требуется настройка
       </Badge>;
     }
     
-    return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+    // FIXED: Added dark mode variant
+    return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700">
       <CheckCircle className="w-3 h-3 mr-1" />
       Готов к работе
     </Badge>;
@@ -317,26 +320,27 @@ export function WarehouseSyncButtons() {
         
         <CardContent className="space-y-4">
           {/* Status Overview */}
+          {/* FIXED: Backgrounds adjusted for dark mode */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg">
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-800">
               <span className="text-muted-foreground">Товаров</span>
               <span className="font-semibold text-lg">{itemsCount}</span>
             </div>
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg">
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-800">
               <span className="text-muted-foreground">Wildberries</span>
-              <span className={`font-semibold ${hasSyncableWb ? 'text-green-600' : 'text-amber-600'}`}>
+              <span className={`font-semibold ${hasSyncableWb ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableWb ? 'Готов' : 'Нет SKU'}
               </span>
             </div>
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg">
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-800">
               <span className="text-muted-foreground">Ozon</span>
-              <span className={`font-semibold ${hasSyncableOzon ? 'text-green-600' : 'text-amber-600'}`}>
+              <span className={`font-semibold ${hasSyncableOzon ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableOzon ? 'Готов' : 'Нет SKU'}
               </span>
             </div>
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg">
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-800">
               <span className="text-muted-foreground">Яндекс.Маркет</span>
-              <span className={`font-semibold ${hasSyncableYm ? 'text-green-600' : 'text-amber-600'}`}>
+              <span className={`font-semibold ${hasSyncableYm ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableYm ? 'Готов' : 'Нет SKU'}
               </span>
             </div>
@@ -427,10 +431,11 @@ export function WarehouseSyncButtons() {
             </div>
 
             {/* Yandex Market Section */}
-            <div className="border rounded-lg p-3 bg-gradient-to-r from-amber-50 to-orange-50 space-y-3">
+            {/* FIXED: Background adjusted for dark mode */}
+            <div className="border rounded-lg p-3 bg-gradient-to-r from-amber-50 to-orange-50 space-y-3 dark:from-amber-950/30 dark:to-orange-950/30 dark:border-orange-900">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium text-sm flex items-center gap-2">
-                  <RefreshCcw className="w-4 h-4 text-amber-600" />
+                  <RefreshCcw className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   Яндекс.Маркет
                 </h4>
                 <Badge variant="secondary" className="text-xs">
@@ -508,7 +513,8 @@ export function WarehouseSyncButtons() {
                 </Button>
 
                 {tokenStatusText && (
-                  <div className="text-xs text-muted-foreground bg-white px-2 py-1 rounded border">
+                  {/* FIXED: Token status text background */}
+                  <div className="text-xs text-muted-foreground bg-white dark:bg-card dark:border dark:border-border px-2 py-1 rounded">
                     Статус: {tokenStatusText}
                   </div>
                 )}
