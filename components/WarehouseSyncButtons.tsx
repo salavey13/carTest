@@ -278,7 +278,6 @@ export function WarehouseSyncButtons() {
 
   const getStatusBadge = () => {
     if (loading.general) {
-      // FIXED: Added dark mode variant
       return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700">
         <Loader2 className="w-3 h-3 mr-1 animate-spin" />
         Загрузка...
@@ -286,14 +285,12 @@ export function WarehouseSyncButtons() {
     }
     
     if (needSetup) {
-      // FIXED: Added dark mode variant
       return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
         <AlertCircle className="w-3 h-3 mr-1" />
         Требуется настройка
       </Badge>;
     }
     
-    // FIXED: Added dark mode variant
     return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700">
       <CheckCircle className="w-3 h-3 mr-1" />
       Готов к работе
@@ -320,7 +317,7 @@ export function WarehouseSyncButtons() {
         
         <CardContent className="space-y-4">
           {/* Status Overview */}
-          {/* FIXED: Backgrounds adjusted for dark mode */}
+          {/* FIXED: High contrast backgrounds & text for dark mode */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
             <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-800">
               <span className="text-muted-foreground">Товаров</span>
@@ -431,7 +428,7 @@ export function WarehouseSyncButtons() {
             </div>
 
             {/* Yandex Market Section */}
-            {/* FIXED: Background adjusted for dark mode */}
+            {/* FIXED: High contrast backgrounds & text for dark mode */}
             <div className="border rounded-lg p-3 bg-gradient-to-r from-amber-50 to-orange-50 space-y-3 dark:from-amber-950/30 dark:to-orange-950/30 dark:border-orange-900">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium text-sm flex items-center gap-2">
@@ -513,7 +510,6 @@ export function WarehouseSyncButtons() {
                 </Button>
 
                 {tokenStatusText && (
-                  {/* FIXED: Token status text background */}
                   <div className="text-xs text-muted-foreground bg-white dark:bg-card dark:border dark:border-border px-2 py-1 rounded">
                     Статус: {tokenStatusText}
                   </div>
