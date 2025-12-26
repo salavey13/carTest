@@ -152,7 +152,13 @@ export default function WarehouseStats(inProps: IncomingProps) {
               </div>
             </section>
 
-            <section className={cn("p-3 rounded-lg border", changedCount > 0 ? "bg-emerald-50 border-emerald-200" : "bg-yellow-50 border-yellow-200")}>
+            {/* FIXED: Dark mode variants added for better contrast */}
+            <section className={cn(
+              "p-3 rounded-lg border",
+              changedCount > 0 
+                ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800" 
+                : "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-800"
+            )}>
               <div className="flex items-center justify-between">
                 <div className="text-[11px] text-muted-foreground">Checkpoint</div>
                 <div className="text-[11px] text-muted-foreground truncate">—</div>
@@ -170,10 +176,11 @@ export default function WarehouseStats(inProps: IncomingProps) {
             </section>
           </div>
 
-          <div className="mt-3 p-3 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200">
+          {/* FIXED: Dark mode variants added for the gradient */}
+          <div className="mt-3 p-3 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 dark:from-green-950/40 dark:to-emerald-950/40 dark:border-green-800">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-semibold flex items-center gap-2">
-                <Target className="w-4 h-4 text-green-600" />
+                <Target className="w-4 h-4 text-green-600 dark:text-green-400" />
                 Ежедневные цели
               </h4>
               <Badge variant={totalXtr > 0 ? "default" : "secondary"} className="text-xs">
@@ -187,7 +194,7 @@ export default function WarehouseStats(inProps: IncomingProps) {
                 <Progress value={unitsProgress} className="h-2" />
               </div>
               {errorFree && (
-                <div className="text-[11px] text-green-600 font-medium">✅ Без ошибок (бонус +{dailyGoals.xtr} XTR!)</div>
+                <div className="text-[11px] text-green-600 dark:text-green-400 font-medium">✅ Без ошибок (бонус +{dailyGoals.xtr} XTR!)</div>
               )}
             </div>
           </div>
@@ -250,10 +257,11 @@ export default function WarehouseStats(inProps: IncomingProps) {
                 {top.length > 0 ? top.map((entry, idx) => (
                   <motion.li key={idx} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
+                      {/* FIXED: Rank badges adjusted for dark mode contrast */}
                       <div className={cn("w-6 h-6 flex items-center justify-center rounded-full text-sm font-semibold",
-                        idx === 0 ? "bg-amber-300 text-amber-800" :
-                          idx === 1 ? "bg-slate-300 text-slate-800" :
-                            idx === 2 ? "bg-amber-100 text-amber-800" : "bg-muted text-muted-foreground"
+                        idx === 0 ? "bg-amber-300 text-amber-800 dark:bg-amber-600 dark:text-amber-100" :
+                          idx === 1 ? "bg-slate-300 text-slate-800 dark:bg-slate-600 dark:text-slate-200" :
+                            idx === 2 ? "bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100" : "bg-muted text-muted-foreground dark:bg-muted/50 dark:text-muted-foreground"
                       )}>
                         {idx + 1}
                       </div>
