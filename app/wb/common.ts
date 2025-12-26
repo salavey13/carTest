@@ -1,15 +1,18 @@
 import type { Database } from "@/types/database.types";
 
+// FIXED: Added dark mode variants to COLOR_MAP.
+// Light mode uses 200-series pastels.
+// Dark mode uses 900-series darks with 40% opacity to tint the background while keeping text readable.
 export const COLOR_MAP: {[key: string]: string} = {
-  beige: 'bg-yellow-200',
-  blue: 'bg-blue-200',
-  red: 'bg-red-200',
-  'light-green': 'bg-green-200',
-  'dark-green': 'bg-green-500',
-  gray: 'bg-gray-200',
-  adel: 'bg-blue-100',
-  malvina: 'bg-purple-100',
-  lavanda: 'bg-purple-200',
+  beige: 'bg-yellow-200 dark:bg-yellow-900/40',
+  blue: 'bg-blue-200 dark:bg-blue-900/40',
+  red: 'bg-red-200 dark:bg-red-900/40',
+  'light-green': 'bg-green-200 dark:bg-green-900/40',
+  'dark-green': 'bg-green-500 dark:bg-green-800',
+  gray: 'bg-gray-200 dark:bg-gray-700/40',
+  adel: 'bg-blue-100 dark:bg-blue-900/40',
+  malvina: 'bg-purple-100 dark:bg-purple-900/40',
+  lavanda: 'bg-purple-200 dark:bg-purple-900/40',
 };
 
 export const SIZE_PACK: {[key: string]: number} = {

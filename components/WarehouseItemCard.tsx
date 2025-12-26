@@ -26,7 +26,7 @@ export default function WarehouseItemCard({ item, onClick = () => {} }: Warehous
     <motion.div
       onClick={onClick}
       className={cn(
-        "relative rounded-lg overflow-hidden cursor-pointer text-[8px] h-20",
+        "relative rounded-lg overflow-hidden cursor-pointer h-20",
       )}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
@@ -34,15 +34,18 @@ export default function WarehouseItemCard({ item, onClick = () => {} }: Warehous
       {item?.image && (
         <Image src={item.image} alt={""} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
       )}
+      {/* The overlay now handles its own dark mode via COLOR_MAP in common.ts */}
       <div className={cn("absolute inset-0 opacity-60 transition-opacity duration-300", COLOR_MAP[item?.color || ""], tintClass)} />
-      <div className="relative z-10 flex flex-col h-full p-1 justify-between">
+      
+      {/* FIXED: Forced high contrast text colors for both light and dark modes */}
+      <div className="relative z-10 flex flex-col h-full p-1 justify-between text-gray-900 dark:text-gray-100">
         <div>
           <span className="font-semibold leading-tight whitespace-normal break-words text-[10px]" style={{ maxHeight: 10 }}>{item?.name}</span>
           <p className="text-[10px]">Кол: {item?.total_quantity ?? 0}</p>
         </div>
         <div className="flex flex-wrap gap-0.5">
           {safeLocations.map((loc) => (
-            <span key={loc.voxel} className="px-0.5 py-0.25 rounded bg-gray-800/50 text-white text-[7px]">
+            <span key={loc.voxel} className="px-0.5 py-0.25 rounded bg-gray-800/80 dark:bg-white/80 text-white dark:text-gray-900 text-[7px]">
               {loc.voxel}:{loc.quantity}
             </span>
           ))}
@@ -52,7 +55,7 @@ export default function WarehouseItemCard({ item, onClick = () => {} }: Warehous
         <motion.div
           initial={{ opacity: 0 }}
           whileHover={{ opacity: 1 }}
-          className="absolute inset-0 bg-gray-900/70 flex items-center justify-center text-center text-white p-1 text-[8px]"
+          className="absolute inset-0 bg-gray-900/90 dark:bg-black/90 flex items-center justify-center text-center text-white p-1 text-[8px]"
         >
           {item.description}
         </motion.div>
