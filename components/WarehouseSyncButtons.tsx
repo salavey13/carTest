@@ -307,7 +307,7 @@ export function WarehouseSyncButtons() {
                 <Zap className="w-5 h-5 text-blue-500" />
                 Синхронизация склада
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-gray-500 dark:text-gray-400">
                 Управление синхронизацией стоков между маркетплейсами
               </CardDescription>
             </div>
@@ -317,26 +317,26 @@ export function WarehouseSyncButtons() {
         
         <CardContent className="space-y-4">
           {/* Status Overview */}
-          {/* FIXED: High contrast backgrounds & text for dark mode */}
+          {/* FIXED: High contrast labels in dark mode */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
             <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-800">
-              <span className="text-muted-foreground">Товаров</span>
-              <span className="font-semibold text-lg">{itemsCount}</span>
+              <span className="text-gray-600 dark:text-gray-300">Товаров</span>
+              <span className="font-semibold text-lg text-gray-900 dark:text-white">{itemsCount}</span>
             </div>
             <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-800">
-              <span className="text-muted-foreground">Wildberries</span>
+              <span className="text-gray-600 dark:text-gray-300">Wildberries</span>
               <span className={`font-semibold ${hasSyncableWb ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableWb ? 'Готов' : 'Нет SKU'}
               </span>
             </div>
             <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-800">
-              <span className="text-muted-foreground">Ozon</span>
+              <span className="text-gray-600 dark:text-gray-300">Ozon</span>
               <span className={`font-semibold ${hasSyncableOzon ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableOzon ? 'Готов' : 'Нет SKU'}
               </span>
             </div>
             <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-800">
-              <span className="text-muted-foreground">Яндекс.Маркет</span>
+              <span className="text-gray-600 dark:text-gray-300">Яндекс.Маркет</span>
               <span className={`font-semibold ${hasSyncableYm ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableYm ? 'Готов' : 'Нет SKU'}
               </span>
@@ -428,27 +428,28 @@ export function WarehouseSyncButtons() {
             </div>
 
             {/* Yandex Market Section */}
-            {/* FIXED: High contrast backgrounds & text for dark mode */}
-            <div className="border rounded-lg p-3 bg-gradient-to-r from-amber-50 to-orange-50 space-y-3 dark:from-amber-950/30 dark:to-orange-950/30 dark:border-orange-900">
+            {/* FIXED: Solid background for dark mode text readability */}
+            <div className="border rounded-lg p-3 bg-gradient-to-r from-amber-50 to-orange-50 space-y-3 dark:from-amber-950/40 dark:to-orange-950/40 dark:border-orange-900">
               <div className="flex items-center justify-between">
-                <h4 className="font-medium text-sm flex items-center gap-2">
+                <h4 className="font-medium text-sm flex items-center gap-2 text-gray-900 dark:text-gray-100">
                   <RefreshCcw className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   Яндекс.Маркет
                 </h4>
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="secondary" className="text-xs bg-white dark:bg-slate-800 dark:text-gray-100 border border-gray-200 dark:border-slate-600">
                   {campaigns?.length || 0} кампаний
                 </Badge>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground">
+                  {/* FIXED: Explicit dark text for label */}
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
                     Выбор кампании
                   </label>
                   <div className="relative">
                     <select
                       aria-label="Выберите кампанию Яндекс.Маркет"
-                      className="w-full text-sm p-2 border rounded-md bg-background pr-8 appearance-none"
+                      className="w-full text-sm p-2 border rounded-md bg-background pr-8 appearance-none text-gray-900 dark:text-gray-100"
                       value={selectedCampaign || ""}
                       onChange={(e) => setSelectedCampaign(e.target.value || null)}
                       disabled={loading.checkToken || !campaigns}
@@ -460,7 +461,7 @@ export function WarehouseSyncButtons() {
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400 pointer-events-none" />
                   </div>
                 </div>
 
@@ -501,7 +502,7 @@ export function WarehouseSyncButtons() {
                   size="sm"
                   onClick={handleSetYmSku}
                   disabled={loading.ymSku}
-                  className="text-xs h-8"
+                  className="text-xs h-8 text-gray-600 dark:text-gray-400"
                 >
                   {loading.ymSku ? (
                     <Loader2 className="w-3 h-3 mr-1 animate-spin" />
@@ -509,9 +510,10 @@ export function WarehouseSyncButtons() {
                   Настроить YM SKU
                 </Button>
 
+                {/* FIXED: Solid background in dark mode for status box */}
                 {tokenStatusText && (
-                  <div className="text-xs text-muted-foreground bg-white dark:bg-card dark:border dark:border-border px-2 py-1 rounded">
-                    Статус: {tokenStatusText}
+                  <div className="text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-2 py-1 rounded shadow-sm">
+                    Статус: <span className="font-semibold">{tokenStatusText}</span>
                   </div>
                 )}
               </div>
@@ -519,7 +521,8 @@ export function WarehouseSyncButtons() {
           </div>
 
           {/* Footer Info */}
-          <div className="text-xs text-muted-foreground pt-2 border-t">
+          {/* FIXED: Darker text in dark mode */}
+          <div className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
             <p>
               Данные автоматически загружаются из Supabase. Автоматическая синхронизация выполняется ежедневно.
               {needSetup && " Настройте баркоды для товаров без WB SKU."}
