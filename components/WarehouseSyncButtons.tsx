@@ -278,20 +278,20 @@ export function WarehouseSyncButtons() {
 
   const getStatusBadge = () => {
     if (loading.general) {
-      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-slate-900 dark:text-white dark:border-blue-500">
+      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-black dark:text-blue-100 dark:border-blue-800">
         <Loader2 className="w-3 h-3 mr-1 animate-spin" />
         Загрузка...
       </Badge>;
     }
     
     if (needSetup) {
-      return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-slate-900 dark:text-white dark:border-amber-500">
+      return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-black dark:text-amber-100 dark:border-amber-800">
         <AlertCircle className="w-3 h-3 mr-1" />
         Требуется настройка
       </Badge>;
     }
     
-    return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-slate-900 dark:text-white dark:border-green-500">
+    return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-black dark:text-green-100 dark:border-green-800">
       <CheckCircle className="w-3 h-3 mr-1" />
       Готов к работе
     </Badge>;
@@ -299,7 +299,7 @@ export function WarehouseSyncButtons() {
 
   return (
     <TooltipProvider>
-      <Card className="w-full border-l-4 border-l-blue-500 shadow-sm">
+      <Card className="w-full border-l-4 border-l-blue-500 shadow-sm bg-white dark:bg-black">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div>
@@ -317,26 +317,26 @@ export function WarehouseSyncButtons() {
         
         <CardContent className="space-y-4">
           {/* Status Overview */}
-          {/* FIXED: SOLID DARK BACKGROUND (slate-900) + WHITE TEXT. MAX CONTRAST. */}
+          {/* FIXED: PURE BLACK BG IN DARK MODE. WHITE TEXT. */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-900 dark:border dark:border-gray-700">
-              <span className="text-gray-600 dark:text-gray-300">Товаров</span>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-black dark:border dark:border-gray-800">
+              <span className="text-gray-600 dark:text-gray-200">Товаров</span>
               <span className="font-semibold text-lg text-gray-900 dark:text-white">{itemsCount}</span>
             </div>
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-900 dark:border dark:border-gray-700">
-              <span className="text-gray-600 dark:text-gray-300">Wildberries</span>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-black dark:border dark:border-gray-800">
+              <span className="text-gray-600 dark:text-gray-200">Wildberries</span>
               <span className={`font-semibold ${hasSyncableWb ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableWb ? 'Готов' : 'Нет SKU'}
               </span>
             </div>
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-900 dark:border dark:border-gray-700">
-              <span className="text-gray-600 dark:text-gray-300">Ozon</span>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-black dark:border dark:border-gray-800">
+              <span className="text-gray-600 dark:text-gray-200">Ozon</span>
               <span className={`font-semibold ${hasSyncableOzon ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableOzon ? 'Готов' : 'Нет SKU'}
               </span>
             </div>
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-900 dark:border dark:border-gray-700">
-              <span className="text-gray-600 dark:text-gray-300">Яндекс.Маркет</span>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-black dark:border dark:border-gray-800">
+              <span className="text-gray-600 dark:text-gray-200">Яндекс.Маркет</span>
               <span className={`font-semibold ${hasSyncableYm ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableYm ? 'Готов' : 'Нет SKU'}
               </span>
@@ -428,27 +428,27 @@ export function WarehouseSyncButtons() {
             </div>
 
             {/* Yandex Market Section */}
-            {/* FIXED: SOLID DARK BACKGROUND (slate-900). */}
-            <div className="border rounded-lg p-3 bg-gradient-to-r from-amber-50 to-orange-50 space-y-3 dark:bg-slate-900 dark:border dark:border-gray-700">
+            {/* FIXED: PURE BLACK BG. WHITE TEXT. MAX CONTRAST. */}
+            <div className="border rounded-lg p-3 bg-gradient-to-r from-amber-50 to-orange-50 space-y-3 dark:bg-black dark:border dark:border-gray-800">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium text-sm flex items-center gap-2 text-gray-900 dark:text-white">
                   <RefreshCcw className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   Яндекс.Маркет
                 </h4>
-                <Badge variant="secondary" className="text-xs bg-white dark:bg-slate-800 dark:text-gray-100 border border-gray-200 dark:border-slate-600">
+                <Badge variant="secondary" className="text-xs bg-white dark:bg-gray-800 dark:text-white border border-gray-200 dark:border-gray-700">
                   {campaigns?.length || 0} кампаний
                 </Badge>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-200">
                     Выбор кампании
                   </label>
                   <div className="relative">
                     <select
                       aria-label="Выберите кампанию Яндекс.Маркет"
-                      className="w-full text-sm p-2 border rounded-md bg-background pr-8 appearance-none text-gray-900 dark:text-gray-100"
+                      className="w-full text-sm p-2 border rounded-md bg-background pr-8 appearance-none text-gray-900 dark:text-gray-100 dark:border-gray-300 dark:bg-gray-900"
                       value={selectedCampaign || ""}
                       onChange={(e) => setSelectedCampaign(e.target.value || null)}
                       disabled={loading.checkToken || !campaigns}
@@ -509,8 +509,9 @@ export function WarehouseSyncButtons() {
                   Настроить YM SKU
                 </Button>
 
+                {/* FIXED: BLACK BG FOR STATUS TEXT */}
                 {tokenStatusText && (
-                  <div className="text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-700 px-2 py-1 rounded shadow-sm">
+                  <div className="text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-black border border-gray-200 dark:border-gray-800 px-2 py-1 rounded shadow-sm">
                     Статус: <span className="font-semibold">{tokenStatusText}</span>
                   </div>
                 )}
@@ -519,7 +520,8 @@ export function WarehouseSyncButtons() {
           </div>
 
           {/* Footer Info */}
-          <div className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
+          {/* FIXED: DARKER TEXT IN DARK MODE */}
+          <div className="text-xs text-gray-500 dark:text-gray-300 pt-2 border-t border-gray-200 dark:border-gray-700">
             <p>
               Данные автоматически загружаются из Supabase. Автоматическая синхронизация выполняется ежедневно.
               {needSetup && " Настройте баркоды для товаров без WB SKU."}
