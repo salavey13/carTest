@@ -10,8 +10,8 @@ import { COLOR_MAP } from "@/app/wb/common";
  * Ultra-ultra-compact WarehouseViz (defensive)
  *
  * Changes:
- * - Fixed Dark Mode Contrast: Added dark:text- classes to ensure dark text is used
- *   over light pastel backgrounds (bg-red-200, etc.) in dark mode.
+ * - Fixed Dark Mode Contrast: Switched dark:text- to lighter colors (white/gray-100)
+ *   to ensure high readability against dark tinted backgrounds (bg-color-900/40).
  * - Accepts optional prop VOXELS (if passed, uses it; otherwise falls back to global VOXELS)
  * - Defensive guards for item.locations shape
  */
@@ -62,7 +62,7 @@ export function WarehouseViz(props: WarehouseVizProps & { VOXELS?: any[] }) {
         const isEmpty = content.length === 0;
         const firstColor = content[0]?.item?.color;
         const bgClass = isEmpty 
-          ? "bg-gray-100 dark:bg-gray-800" // Darken the empty cell background in dark mode
+          ? "bg-gray-100 dark:bg-gray-800" 
           : baseBgForColor(firstColor);
 
         return (
@@ -82,13 +82,14 @@ export function WarehouseViz(props: WarehouseVizProps & { VOXELS?: any[] }) {
               "min-h-[44px] max-h-[180px] overflow-hidden"
             )}
           >
+            {/* Header: Voxel ID & Total Count */}
             <div className="flex items-center justify-between px-1 py-[3px]">
-              {/* FIXED: High contrast text for dark mode */}
-              <div className="text-[9px] md:text-[11px] font-semibold leading-none text-gray-800 dark:text-gray-900">
+              {/* FIXED: Lighter text in dark mode (gray-100) */}
+              <div className="text-[9px] md:text-[11px] font-semibold leading-none text-gray-800 dark:text-gray-100">
                 {vid ?? "?"}
               </div>
               {!isEmpty && (
-                <div className="text-[9px] md:text-[11px] opacity-80 leading-none text-gray-700 dark:text-gray-800">
+                <div className="text-[9px] md:text-[11px] opacity-80 leading-none text-gray-700 dark:text-gray-200">
                   {content.reduce((s, c) => s + (c.quantity || 0), 0)}
                 </div>
               )}
@@ -112,19 +113,22 @@ export function WarehouseViz(props: WarehouseVizProps & { VOXELS?: any[] }) {
                       title={`${model}${make ? ` · ${make}` : ""} — ${quantity} шт`}
                       style={{ minHeight: 16 }}
                     >
+                      {/* Color dot (inherits from baseBgForColor) */}
                       <div className={cn("w-3 h-3 rounded-sm shrink-0", colorClass, seasonCls)} />
 
                       <div className="flex-1 min-w-0">
-                        {/* FIXED: High contrast text for dark mode */}
-                        <div className="text-[7px] md:text-[10px] leading-tight font-semibold truncate text-gray-900 dark:text-black">
+                        {/* FIXED: White text in dark mode for high contrast */}
+                        <div className="text-[7px] md:text-[10px] leading-tight font-semibold truncate text-gray-900 dark:text-white">
                           {model || item?.name || "—"}
                         </div>
-                        <div className="text-[6px] md:text-[9px] leading-tight opacity-70 truncate text-gray-700 dark:text-gray-800">
+                        {/* FIXED: Lighter text in dark mode */}
+                        <div className="text-[6px] md:text-[9px] leading-tight opacity-70 truncate text-gray-700 dark:text-gray-300">
                           {make || ""}
                         </div>
                       </div>
 
                       <div className="ml-1">
+                        {/* Badge: White text on dark/black tint works well for both modes */}
                         <div className="inline-flex items-center justify-center px-1 py-[2px] rounded-full text-[8px] md:text-[10px] font-semibold bg-black/20 text-white">
                           {quantity}
                         </div>

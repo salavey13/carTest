@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Settings, RefreshCcw, ChevronDown, CheckCircle, AlertCircle, Play, Zap } from "lucide-react";
@@ -15,9 +15,9 @@ import {
   syncCrewWbStocks,
   syncCrewOzonStocks,
   syncCrewYmStocks,
+  setCrewWbBarcodes,
   getCrewYmCampaigns,
   checkCrewYmToken,
-  setCrewWbBarcodes,
   setCrewYmSku,
 } from "@/app/wb/[slug]/actions_sync";
 import { getCrewWarehouseItems } from "@/app/wb/[slug]/actions_crud";
@@ -281,20 +281,20 @@ export function CrewWarehouseSyncButtons({ slug }: Props) {
 
   const getStatusBadge = () => {
     if (loading.general) {
-      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-slate-900 dark:text-blue-400 dark:border-blue-800">
         <Loader2 className="w-3 h-3 mr-1 animate-spin" />
         Загрузка...
       </Badge>;
     }
     
     if (needSetupWb) {
-      return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+      return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-slate-900 dark:text-amber-400 dark:border-amber-800">
         <AlertCircle className="w-3 h-3 mr-1" />
         Требуется настройка
       </Badge>;
     }
     
-    return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+    return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-slate-900 dark:text-green-400 dark:border-green-800">
       <CheckCircle className="w-3 h-3 mr-1" />
       Готов к работе
     </Badge>;
@@ -320,26 +320,27 @@ export function CrewWarehouseSyncButtons({ slug }: Props) {
         
         <CardContent className="space-y-4">
           {/* Status Overview */}
+          {/* FIXED: DARK BG (slate-900) + WHITE TEXT. NO LIGHT SPOTS. */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg">
-              <span className="text-muted-foreground">Товаров</span>
-              <span className="font-semibold text-lg">{itemsCount}</span>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-900 dark:border dark:border-gray-700">
+              <span className="text-gray-600 dark:text-gray-400">Товаров</span>
+              <span className="font-semibold text-lg text-gray-900 dark:text-white">{itemsCount}</span>
             </div>
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg">
-              <span className="text-muted-foreground">Wildberries</span>
-              <span className={`font-semibold ${hasSyncableWb ? 'text-green-600' : 'text-amber-600'}`}>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-900 dark:border dark:border-gray-700">
+              <span className="text-gray-600 dark:text-gray-400">Wildberries</span>
+              <span className={`font-semibold dark:text-white ${hasSyncableWb ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableWb ? 'Готов' : 'Нет SKU'}
               </span>
             </div>
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg">
-              <span className="text-muted-foreground">Ozon</span>
-              <span className={`font-semibold ${hasSyncableOzon ? 'text-green-600' : 'text-amber-600'}`}>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-900 dark:border dark:border-gray-700">
+              <span className="text-gray-600 dark:text-gray-400">Ozon</span>
+              <span className={`font-semibold dark:text-white ${hasSyncableOzon ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableOzon ? 'Готов' : 'Нет SKU'}
               </span>
             </div>
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg">
-              <span className="text-muted-foreground">Яндекс.Маркет</span>
-              <span className={`font-semibold ${hasSyncableYm ? 'text-green-600' : 'text-amber-600'}`}>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-900 dark:border dark:border-gray-700">
+              <span className="text-gray-600 dark:text-gray-400">Яндекс.Маркет</span>
+              <span className={`font-semibold dark:text-white ${hasSyncableYm ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableYm ? 'Готов' : 'Нет SKU'}
               </span>
             </div>
@@ -371,7 +372,7 @@ export function CrewWarehouseSyncButtons({ slug }: Props) {
                           ) : (
                             <Settings className="w-4 h-4 mr-2" />
                           )}
-                          Настроить баркоды WB
+                          Настроить баркоды
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -430,26 +431,28 @@ export function CrewWarehouseSyncButtons({ slug }: Props) {
             </div>
 
             {/* Yandex Market Section */}
-            <div className="border rounded-lg p-3 bg-gradient-to-r from-amber-50 to-orange-50 space-y-3">
+            {/* FIXED: DARK BG (slate-900) + LIGHT TEXT (gray-300/white). */}
+            <div className="border rounded-lg p-3  space-y-3 dark:bg-slate-900 dark:border dark:border-gray-700">
               <div className="flex items-center justify-between">
-                <h4 className="font-medium text-sm flex items-center gap-2">
-                  <RefreshCcw className="w-4 h-4 text-amber-600" />
+                <h4 className="font-medium text-sm flex items-center gap-2 text-gray-900 dark:text-white">
+                  <RefreshCcw className="w-4 h-4 text-amber-600 dark:text-black" />
                   Яндекс.Маркет
                 </h4>
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="secondary" className="text-xs bg-white dark:bg-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-600">
                   {campaigns?.length || 0} кампаний
                 </Badge>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground">
+                  {/* FIXED: EXPLICIT DARK TEXT FOR LABEL */}
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
                     Выбор кампании
                   </label>
                   <div className="relative">
                     <select
                       aria-label="Выберите кампанию Яндекс.Маркет"
-                      className="w-full text-sm p-2 border rounded-md bg-background pr-8 appearance-none"
+                      className="w-full text-sm p-2 border rounded-md bg-background pr-8 appearance-none text-gray-900 dark:text-gray-100 dark:border-gray-300 dark:bg-slate-800"
                       value={selectedCampaign || ""}
                       onChange={(e) => setSelectedCampaign(e.target.value || null)}
                       disabled={loading.checkToken || !campaigns}
@@ -461,7 +464,7 @@ export function CrewWarehouseSyncButtons({ slug }: Props) {
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-300 pointer-events-none" />
                   </div>
                 </div>
 
@@ -502,7 +505,7 @@ export function CrewWarehouseSyncButtons({ slug }: Props) {
                   size="sm"
                   onClick={handleSetYmSku}
                   disabled={loading.ymSku}
-                  className="text-xs h-8"
+                  className="text-xs h-8 text-gray-600 dark:text-gray-400"
                 >
                   {loading.ymSku ? (
                     <Loader2 className="w-3 h-3 mr-1 animate-spin" />
@@ -510,9 +513,10 @@ export function CrewWarehouseSyncButtons({ slug }: Props) {
                   Настроить YM SKU
                 </Button>
 
+                {/* FIXED: WHITE TEXT ON DARK BG */}
                 {tokenStatusText && (
-                  <div className="text-xs text-muted-foreground bg-white px-2 py-1 rounded border">
-                    Статус: {tokenStatusText}
+                  <div className="text-xs text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-700 px-2 py-1 rounded shadow-sm">
+                    Статус: <span className="font-semibold">{tokenStatusText}</span>
                   </div>
                 )}
               </div>
@@ -520,7 +524,7 @@ export function CrewWarehouseSyncButtons({ slug }: Props) {
           </div>
 
           {/* Footer Info */}
-          <div className="text-xs text-muted-foreground pt-2 border-t">
+          <div className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
             <p>
               Данные автоматически загружаются из Supabase. Автоматическая синхронизация выполняется ежедневно.
               {needSetupWb && " Настройте баркоды для товаров без WB SKU."}
