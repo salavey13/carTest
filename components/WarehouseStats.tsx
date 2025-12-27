@@ -10,18 +10,10 @@ import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
 import { toast } from "sonner";
 
-/**
- * Flexible WarehouseStats:
- * - accepts either 'stats' object (legacy compact) or explicit props
- * - provides sensible defaults
- */
-
 type LeaderboardEntry = { name: string; score: number; date: string; xtr?: number; };
 
 interface IncomingProps {
-  // legacy compact
   stats?: { changedCount?: number; totalDelta?: number; stars?: number; offloadUnits?: number; salary?: number };
-  // explicit overrides
   itemsCount?: number;
   uniqueIds?: number;
   score?: number;
@@ -48,7 +40,6 @@ interface IncomingProps {
 }
 
 export default function WarehouseStats(inProps: IncomingProps) {
-  // merge legacy stats object with explicit props; explicit props win
   const stats = inProps.stats || {};
   const itemsCount = inProps.itemsCount ?? 0;
   const uniqueIds = inProps.uniqueIds ?? 0;
@@ -152,7 +143,7 @@ export default function WarehouseStats(inProps: IncomingProps) {
               </div>
             </section>
 
-            {/* FIXED: Dark mode variants added for better contrast */}
+            {/* FIXED: High contrast backgrounds & text for dark mode */}
             <section className={cn(
               "p-3 rounded-lg border",
               changedCount > 0 
@@ -176,7 +167,7 @@ export default function WarehouseStats(inProps: IncomingProps) {
             </section>
           </div>
 
-          {/* FIXED: Dark mode variants added for the gradient */}
+          {/* FIXED: High contrast backgrounds & text for dark mode */}
           <div className="mt-3 p-3 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 dark:from-green-950/40 dark:to-emerald-950/40 dark:border-green-800">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-semibold flex items-center gap-2">
@@ -257,7 +248,7 @@ export default function WarehouseStats(inProps: IncomingProps) {
                 {top.length > 0 ? top.map((entry, idx) => (
                   <motion.li key={idx} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      {/* FIXED: Rank badges adjusted for dark mode contrast */}
+                      {/* FIXED: Rank badge text contrast */}
                       <div className={cn("w-6 h-6 flex items-center justify-center rounded-full text-sm font-semibold",
                         idx === 0 ? "bg-amber-300 text-amber-800 dark:bg-amber-600 dark:text-amber-100" :
                           idx === 1 ? "bg-slate-300 text-slate-800 dark:bg-slate-600 dark:text-slate-200" :

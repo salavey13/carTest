@@ -3,8 +3,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Play, Truck, LogOut } from "lucide-react";
+import { Play, Truck, LogOut, Activity } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
+import { Card } from "@/components/ui/card";
 
 export default function ShiftControls({ slug }: { slug: string }) {
   const { dbUser } = useAppContext();
@@ -131,21 +132,64 @@ export default function ShiftControls({ slug }: { slug: string }) {
     }
   };
 
+  const isRiding = liveStatus === "riding";
+
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="whitespace-nowrap">Статус: <strong>{liveStatus || "—"}</strong></span>
-      {activeShift ? (
-        <span className="whitespace-nowrap font-mono">{formatElapsed(elapsedSec)}</span>
-      ) : null}
-      <div className="flex gap-1 ml-auto">
-        <Button size="sm" variant="ghost" onClick={startShift} disabled={loading || liveStatus === "online" || liveStatus === "riding" || !userId} className="px-2 py-1">
-          <Play className="w-4 h-4" />
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-3 rounded-xl bg-card border border-border shadow-sm">
+      {/* Status & Timer Section */}
+      <div className="flex items-center gap-3 flex-1 min-w-0 justify-between sm:justify-start">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${liveStatus === 'riding' || liveStatus === 'online' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+          <span className="text-sm font-medium text-foreground truncate">
+            {liveStatus === 'riding' ? 'На байке' : liveStatus === 'online' ? 'Онлайн' : 'Офлайн'}
+          </span>
+        </div>
+        
+        {activeShift && (
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-background border border-border rounded-md">
+            <Activity className="w-3 h-3 text-brand-purple" />
+            <span className="font-mono text-sm text-foreground">{formatElapsed(elapsedSec)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Controls Section */}
+      <div className="flex items-center gap-2">
+        <Button 
+          size="sm" 
+          variant="ghost" 
+          onClick={startShift} 
+          disabled={loading || liveStatus === "online" || liveStatus === "riding" || !userId} 
+          className="h-9 px-3 text-xs hover:bg-green-500/10 hover:text-green-600 dark:hover:bg-green-500/20 dark:hover:text-green-400"
+        >
+          <Play className="w-4 h-4 mr-1" />
+          Начать
         </Button>
-        <Button size="sm" variant="outline" onClick={toggleRide} disabled={loading || !liveStatus || liveStatus === "offline" || !userId} className="px-2 py-1">
-          <Truck className="w-4 h-4" />
+
+        <Button 
+          size="sm" 
+          variant={isRiding ? "default" : "outline"} 
+          onClick={toggleRide} 
+          disabled={loading || !liveStatus || liveStatus === "offline" || !userId} 
+          className={`h-9 px-3 text-xs transition-all duration-300 ${
+            isRiding 
+            ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.5)]" 
+            : "border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400"
+          }`}
+        >
+          <Truck className="w-4 h-4 mr-1" />
+          Байк
         </Button>
-        <Button size="sm" variant="destructive" onClick={endShift} disabled={loading || liveStatus === "offline" || !userId} className="px-2 py-1">
-          <LogOut className="w-4 h-4" />
+
+        <Button 
+          size="sm" 
+          variant="destructive" 
+          onClick={endShift} 
+          disabled={loading || liveStatus === "offline" || !userId} 
+          className="h-9 px-3 text-xs"
+        >
+          <LogOut className="w-4 h-4 mr-1" />
+          Завершить
         </Button>
       </div>
     </div>
