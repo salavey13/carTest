@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useId, useCallback } from 'react'; 
+import React, { useState, useEffect, useId, useCallback } from "react"; 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
@@ -9,9 +9,9 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion"; 
+import { motion, AnimatePresence } from "framer-motion"; // Import AnimatePresence
 import RockstarHeroSection from "../tutorials/RockstarHeroSection"; 
-import { Textarea } from "@/components/ui/textarea"; 
+import { Textarea } from "@/components/ui/textarea"; // Import Textarea
 
 type Language = 'en' | 'ru';
 
@@ -20,9 +20,9 @@ interface SectionQuestion {
   type: 'yes_no' | 'multiple_choice' | 'reflection';
   textRu: string;
   textEn: string;
-  correctAnswer?: 'yes' | 'no' | string; 
-  optionsRu?: string[]; 
-  optionsEn?: string[]; 
+  correctAnswer?: 'yes' | 'no' | string; // For yes_no or multiple_choice (text of correct option)
+  optionsRu?: string[]; // For multiple_choice
+  optionsEn?: string[]; // For multiple_choice
   tipRu?: string;
   tipEn?: string;
 }
@@ -81,7 +81,7 @@ const pageTranslations = {
         points: [
           "Рон утверждал: <strong class='text-brand-yellow'>\"Если у тебя нет списка целей, я могу угадать твой банковский баланс с точностью до нескольких сотен долларов.\"</strong>",
           "Запиши свои цели: экономические, материальные, личное развитие. Сделай их конкретными, измеримыми, достижимыми, релевантными и ограниченными по времени (SMART).",
-          "<strong class='text-brand-yellow'>Причины важнее ответов.</strong> Найди свои 'почему' – личные, семейные, даже мелкие 'nitty-gritty' причины, которые зажгают в тебя огонь.",
+          "<strong class='text-brand-yellow'>Причины важнее ответов.</strong> Найди свои 'почему' – личные, семейные, даже мелкие 'nitty-gritty' причины, которые зажгут в тебе огонь.",
           "Твой <Link href='/game-plan' class='text-brand-blue hover:underline font-semibold'>Game Plan</Link> – это твоя стратегия, а <Link href='/p-plan' class='text-brand-blue hover:underline font-semibold'>P-Plan</Link> – твой тактический дневник для её воплощения.",
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/00FFEE/png?text=Карта+Целей`,
@@ -120,11 +120,11 @@ const pageTranslations = {
           textEn: "Winter (difficulties) in life is inevitable, and you just need to wait it out without trying to change.",
           correctAnswer: 'no',
           tipRu: "Не совсем! Трудности неизбежны, но важно не просто ждать, а становиться лучше и сильнее в процессе.",
-          tipEn: "Not quite! Difficulties are inevitable, but it's important not just to wait, but to get better and stronger in process.",
+          tipEn: "Not quite! Difficulties are inevitable, but it's important not just to wait, but to get better and stronger in the process.",
         },
         notablePhrase: {
           textRu: "Ты не можешь изменить времена года, но можешь изменить себя.",
-          textEn: "You cannot change seasons, but you can change yourself.",
+          textEn: "You cannot change the seasons, but you can change yourself.",
         }
       },
       {
@@ -158,7 +158,7 @@ const pageTranslations = {
         points: [
           "<strong class='text-brand-yellow'>Излишняя Осторожность:</strong> Жизнь рискованна по своей сути. 'Если думаешь, что пытаться рискованно, подожди, пока тебе выставят счет за то, что ты не пытался.'",
           "<strong class='text-brand-yellow'>Пессимизм:</strong> Ищи хорошее, а не плохое. Стакан всегда наполовину полон для того, кто хочет видеть возможности.",
-          "<strong class='text-brand-yellow'>Жалобы:</strong> 'Жалобись пять минут на жалобы, и ты впустую потратил пять минут.' Сосредоточся на решениях, а не на проблемах.",
+          "<strong class='text-brand-yellow'>Жалобы:</strong> 'Потрать пять минут на жалобы, и ты впустую потратил пять минут.' Сосредоточься на решениях, а не на проблемах.",
           "Твоё <Link href='/expmind' class='text-brand-blue hover:underline font-semibold'>Мышление</Link> – это твоя операционная система. Обновляй её регулярно.",
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/FF4500/png?text=Позитивный+Настрой`,
@@ -172,7 +172,7 @@ const pageTranslations = {
           tipEn: "Actually, pessimism can be one of the 'mind viruses.' A positive attitude opens up more opportunities.",
         },
         notablePhrase: {
-          textRu: "Жалобись пять минут на жалобы, и ты впустую потратил пять минут.",
+          textRu: "Потрать пять минут на жалобы, и ты впустую потратил пять минут.",
           textEn: "Spend five minutes complaining, and you've wasted five minutes.",
         }
       },
@@ -209,7 +209,7 @@ const pageTranslations = {
         icon: "::FaSeedling::",
         title: "Вселенский Принцип: Посев и Жатва",
         points: [
-          "<strong class='text-brand-yellow'>Что посеешь, то и пожнеш.</strong> И часто пожнешь гораздо больше, чем посеял.",
+          "<strong class='text-brand-yellow'>Что посеешь, то и пожнёшь.</strong> И часто пожнёшь гораздо больше, чем посеял.",
           "Этот закон работает во всех сферах: знания, усилия, отношения, финансы.",
           "Сей щедро и с умом. Твои действия сегодня формируют твою завтрашнюю жатву.",
           "Создавая ценность (<Link href='/purpose-profit' class='text-brand-blue hover:underline font-semibold'>Purpose</Link>), ты обеспечиваешь себе богатый урожай (<Link href='/purpose-profit' class='text-brand-blue hover:underline font-semibold'>Profit</Link>).",
@@ -218,15 +218,40 @@ const pageTranslations = {
         imageAlt: "Росток, пробивающийся из земли, и зрелые колосья",
         question: {
           type: 'yes_no',
-          textRu: "Принцип 'Что посеешь, то и пожнеш' применим только к финансам и не относится к знаниям или отношениям.",
+          textRu: "Принцип 'Что посеешь, то и пожнёшь' применим только к финансам и не относится к знаниям или отношениям.",
           textEn: "The 'What you sow, you will reap' principle only applies to finances and not to knowledge or relationships.",
           correctAnswer: 'no',
           tipRu: "Этот принцип универсален! Он работает во всех сферах жизни: в знаниях, усилиях, отношениях и финансах.",
           tipEn: "This principle is universal! It works in all areas of life: knowledge, effort, relationships, and finances.",
         },
         notablePhrase: {
-          textRu: "Что посеешь, то и пожнеш. И часто пожнешь гораздо больше, чем посеял.",
+          textRu: "Что посеешь, то и пожнёшь. И часто пожнёшь гораздо больше, чем посеял.",
           textEn: "What you sow, you will reap. And often, you will reap much more than you sowed.",
+        }
+      },
+      {
+        id: "law-of-use",
+        icon: "::FaDumbbell::",
+        title: "Закон Активации: Используй или Потеряешь",
+        points: [
+          "<strong class='text-brand-yellow'>Любой талант, не используемый, угасает. Любые знания, не применяемые, забываются.</strong>",
+          "Активно используй свои навыки, идеи, связи. Не давай им 'заржаветь'.",
+          "Притча о талантах: тот, кто не использовал свой талант, потерял его.",
+          "Постоянная практика и применение – ключ к сохранению и приумножению твоего потенциала.",
+        ],
+        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/4682B4/png?text=Используй+или+Потеряешь`,
+        imageAlt: "Сильная рука, держащая инструмент, символизирующая активное использование",
+        question: {
+          type: 'yes_no',
+          textRu: "Если у вас есть талант или знания, они останутся с вами, даже если вы не будете их активно использовать.",
+          textEn: "If you have a talent or knowledge, it will stay with you even if you don't actively use it.",
+          correctAnswer: 'no',
+          tipRu: "К сожалению, нет. Закон активации гласит: 'Используй или потеряешь'. Таланты и знания угасают без применения.",
+          tipEn: "Unfortunately, no. The Law of Use states: 'Use it or lose it.' Talents and knowledge fade without application.",
+        },
+        notablePhrase: {
+          textRu: "Любой талант, не используемый, угасает. Любые знания, не применяемые, забываются.",
+          textEn: "Any talent not used, fades. Any knowledge not applied, is forgotten.",
         }
       },
       {
@@ -236,7 +261,7 @@ const pageTranslations = {
         points: [
           "<strong class='text-brand-yellow'>Все успешные люди – ненасытные читатели и ученики.</strong>",
           "Одна книга может сэкономить тебе пять лет жизни, предостерегая от ошибок или открывая новые пути.",
-          "Не оставляй свой успех и развитие на волю случая. Делай их предметом изучения.",
+          "Не оставляй свой успех и развитие на волю случая. Сделай их предметом изучения.",
           "Погружайся в <Link href='/selfdev' class='text-brand-blue hover:underline font-semibold'>SelfDev</Link>, читай, анализируй, применяй. Это твой путь к мастерству в КиберВайбе.",
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/8B4513/png?text=Чтение+-+Сила`,
@@ -253,7 +278,242 @@ const pageTranslations = {
           textEn: "One book can save you five years of life, warning against mistakes or opening new paths.",
         }
       },
-    ] as SectionContent[]
+    ] as SectionContent[] // Explicitly type the sections array
+  },
+  en: {
+    pageTitle: "CyberVibe Upgrade",
+    pageSubtitle: "The major key to your better future is YOU. It's time to become more than you are, inspired by Jim Rohn.",
+    sections: [
+      {
+        id: "personal-development",
+        icon: "::FaUserAstronaut::",
+        title: "Foundation: You Are The Main Asset",
+        points: [
+          "Jim Rohn said: <strong class='text-brand-yellow'>\"Work harder on yourself than you do on your job.\"</strong> This is the core of CyberVibe. Your personal development is the main lever.",
+          "Your income and success rarely exceed your personal development. Want more? Become more!",
+          "Invest in your knowledge, skills, and mindset. These are the most valuable assets in the rapidly changing cyber-world.",
+          "This isn't just a platform; it's your <Link href='/selfdev' class='text-brand-blue hover:underline font-semibold'>SelfDev Laboratory</Link> for leveling up.",
+        ],
+        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/FFEE00/png?text=YOU+-+Asset`,
+        imageAlt: "Conceptual image of personal development as the main asset",
+        question: {
+          type: 'yes_no',
+          textRu: "Обучение – это в первую очередь инвестиция в себя, а не просто способ получить работу.",
+          textEn: "Learning is primarily an investment in yourself, not just a way to get a job.",
+          correctAnswer: 'yes',
+          tipRu: "Именно так! Джим Рон подчеркивал, что работа над собой важнее работы.",
+          tipEn: "That's right! Jim Rohn emphasized that working on yourself is more important than working on your job.",
+        },
+        notablePhrase: {
+          textRu: "Твой доход и успех редко превышают уровень твоего личного развития. Хочешь больше? Становись больше!",
+          textEn: "Your income and success rarely exceed your personal development. Want more? Become more!",
+        }
+      },
+      {
+        id: "goal-setting",
+        icon: "::FaBullseye::",
+        title: "Treasure Map: The Power of Goals",
+        points: [
+          "Rohn stated: <strong class='text-brand-yellow'>\"If you don't have a list of your goals, I can guess your bank balance to within a few hundred dollars.\"</strong>",
+          "Write down your goals: economic, material, personal development. Make them specific, measurable, achievable, relevant, and time-bound (SMART).",
+          "<strong class='text-brand-yellow'>Reasons come first, answers second.</strong> Find your 'whys' – personal, family, even small 'nitty-gritty' reasons that will ignite your fire.",
+          "Your <Link href='/game-plan' class='text-brand-blue hover:underline font-semibold'>Game Plan</Link> is your strategy, and your <Link href='/p-plan' class='text-brand-blue hover:underline font-semibold'>P-Plan</Link> – your tactical journal for its execution.",
+        ],
+        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/00FFEE/png?text=Goal+Map`,
+        imageAlt: "Visualization of a goal map and the path to achieve them",
+        question: {
+          type: 'multiple_choice',
+          textRu: "Представьте, что вы поставили цель 'хочу стать успешным'. Какой ключевой элемент SMART-цели вы упустили в этой формулировке?",
+          textEn: "Imagine you set a goal 'I want to be successful'. Which key SMART goal element did you miss in this wording?",
+          optionsRu: ["Конкретность", "Измеримость", "Ограничение по времени", "Все вышеперечисленное"],
+          optionsEn: ["Specific", "Measurable", "Time-bound", "All of the above"],
+          correctAnswer: "All of the above",
+          tipRu: "Верно! Цель должна быть конкретной, измеримой, достижимой, релевантной и ограниченной по времени (SMART).",
+          tipEn: "Correct! Goals should be Specific, Measurable, Achievable, Relevant, and Time-bound (SMART).",
+        },
+        notablePhrase: {
+          textRu: "Если у тебя нет списка целей, я могу угадать твой банковский баланс с точностью до нескольких сотен долларов.",
+          textEn: "If you don't have a list of your goals, I can guess your bank balance to within a few hundred dollars.",
+        }
+      },
+      {
+        id: "life-laws",
+        icon: "::FaCanadianMapleLeaf::",
+        title: "Laws of the CyberVibe Universe (The Seasons)",
+        points: [
+          "<strong class='text-brand-red'>Winter (Difficulties):</strong> They are inevitable. Don't wish it were easier; wish you were better. Learn to cope, become stronger.",
+          "<strong class='text-brand-green'>Spring (Opportunities):</strong> Always comes after winter. Use it! 'Sow in the spring or beg in the fall.' Launch new projects, learn new things.",
+          "<strong class='text-brand-orange'>Summer (Protection):</strong> All good things will be attacked. Protect your achievements, ideas, values. Be vigilant.",
+          "<strong class='text-brand-yellow'>Autumn (Harvest):</strong> Reap without complaint (if it's small) and without apology (if it's large). Take full responsibility for your results.",
+          "Upgrade your <Link href='/expmind' class='text-brand-blue hover:underline font-semibold'>Experimental Mindset</Link> to navigate these seasons.",
+        ],
+        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/FF9900/png?text=Seasons+of+Life`,
+        imageAlt: "Illustration of the four seasons as a metaphor for life cycles",
+        question: {
+          type: 'yes_no',
+          textRu: "Зима (трудности) в жизни неизбежна, и нужно просто переждать её, не пытаясь измениться.",
+          textEn: "Winter (difficulties) in life is inevitable, and you just need to wait it out without trying to change.",
+          correctAnswer: 'no',
+          tipRu: "Не совсем! Трудности неизбежны, но важно не просто ждать, а становиться лучше и сильнее в процессе.",
+          tipEn: "Not quite! Difficulties are inevitable, but it's important not just to wait, but to get better and stronger in the process.",
+        },
+        notablePhrase: {
+          textRu: "Ты не можешь изменить времена года, но можешь изменить себя.",
+          textEn: "You cannot change the seasons, but you can change yourself.",
+        }
+      },
+      {
+        id: "action-discipline",
+        icon: "::FaBolt::",
+        title: "Engine of Progress: Action & Discipline",
+        points: [
+          "<strong class='text-brand-yellow'>\"It's not what happens that determines your life, but what YOU DO with what happens.\"</strong>",
+          "Dicipline – bridge between goals and accomplishment. Start with small steps, build a habit of action.",
+          "Self-motivation – your inner fire. Don't wait for someone to come and 'turn you on.' Find your reasons and act.",
+          "Start acting now in the <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SuperVibe Studio</Link>, applying new knowledge.",
+        ],
+        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/FF00FF/png?text=Action!`,
+        imageAlt: "Lightning bolt symbol representing action and energy",
+        question: {
+          type: 'reflection',
+          textRu: "Опишите один маленький шаг, который вы можете сделать прямо сейчас, чтобы начать двигаться к одной из ваших целей.",
+          textEn: "Describe one tiny step you can take right now to start moving towards one of your goals.",
+          tipRu: "Отличная идея! Главное – начать и поддерживать дисциплину, даже с маленьких шагов.",
+          tipEn: "Great idea! The main thing is to start and maintain discipline, even with small steps.",
+        },
+        notablePhrase: {
+          textRu: "Не то, что случается, определяет твою жизнь, а то, что ТЫ ДЕЛАЕШЬ с тем, что случается.",
+          textEn: "It's not what happens that determines your life, but what YOU DO with what happens.",
+        }
+      },
+      {
+        id: "attitude-diseases",
+        icon: "::FaHeadSideVirus::",
+        title: "Mind Antivirus: Diseases of Attitude",
+        points: [
+          "<strong class='text-brand-yellow'>Over-Caution:</strong> Life is inherently risky. 'If you think trying is risky, wait till they hand you the bill for not trying.'",
+          "<strong class='text-brand-yellow'>Pessimism:</strong> Look for the good, not the bad. The glass is always half full for those who want to see opportunities.",
+          "<strong class='text-brand-yellow'>Complaining:</strong> 'Spend five minutes complaining, and you've wasted five minutes.' Focus on solutions, not problems.",
+          "Your <Link href='/expmind' class='text-brand-blue hover:underline font-semibold'>Mindset</Link> is your operating system. Update it regularly.",
+        ],
+        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/FF4500/png?text=Positive+Mindset`,
+        imageAlt: "A shield reflecting negative thoughts, symbolizing a strong mindset",
+        question: {
+          type: 'yes_no',
+          textRu: "Пессимизм – это лишь реалистичный взгляд на мир, и он не мешает личному развитию.",
+          textEn: "Pessimism is just a realistic view of the world, and it doesn't hinder personal development.",
+          correctAnswer: 'no',
+          tipRu: "На самом деле, пессимизм может быть одним из 'вирусов' мышления. Позитивный настрой открывает больше возможностей.",
+          tipEn: "Actually, pessimism can be one of the 'mind viruses.' A positive attitude opens up more opportunities.",
+        },
+        notablePhrase: {
+          textRu: "Потрать пять минут на жалобы, и ты впустую потратил пять минут.",
+          textEn: "Spend five minutes complaining, and you've wasted five minutes.",
+        }
+      },
+      {
+        id: "emotions-for-change",
+        icon: "::FaFire::",
+        title: "Emotional Reactor: Fuel for Change",
+        points: [
+          "Jim Rohn highlighted emotions capable of changing life in a single day:",
+          "<strong class='text-brand-red'>Disgust:</strong> Saying 'I've had enough!' with the current situation.",
+          "<strong class='text-brand-cyan'>Decision:</strong> Making a firm decision to change, to act.",
+          "<strong class='text-brand-yellow'>Desire:</b> Igniting a strong, passionate desire to achieve a goal.",
+          "<strong class='text-brand-purple'>Resolve:</strong> Saying 'I will do it!' and not backing down.",
+        ],
+        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/9400D3/png?text=Emotions+of+Change`,
+        imageAlt: "A bright flame symbolizing the power of emotions",
+        question: {
+          type: 'multiple_choice',
+          textRu: "Какая эмоция, по Джиму Рону, является первым шагом к радикальным изменениям в жизни?",
+          textEn: "Which emotion, according to Jim Rohn, is the first step toward radical life changes?",
+          optionsRu: ["Желание", "Решимость", "Отвращение", "Радость"],
+          optionsEn: ["Desire", "Resolve", "Disgust", "Joy"],
+          correctAnswer: "Disgust",
+          tipRu: "Верно! 'Отвращение' к текущей ситуации – мощный катализатор для начала перемен.",
+          tipEn: "Correct! 'Disgust' with the current situation is a powerful catalyst for initiating change.",
+        },
+        notablePhrase: {
+          textRu: "Четыре эмоции, способные изменить жизнь за один день: отвращение, решение, желание, решимость.",
+          textEn: "Four emotions that can change your life in one day: Disgust, Decision, Desire, Resolve.",
+        }
+      },
+      {
+        id: "sowing-reaping",
+        icon: "::FaSeedling::",
+        title: "Universal Principle: Sowing & Reaping",
+        points: [
+          "<strong class='text-brand-yellow'>What you sow, you will reap.</strong> And often, you will reap much more than you sowed.",
+          "This law works in all areas: knowledge, effort, relationships, finances.",
+          "Sow generously and wisely. Your actions today shape your harvest tomorrow.",
+          "By creating value (<Link href='/purpose-profit' class='text-brand-blue hover:underline font-semibold'>Purpose</Link>), you ensure a rich harvest (<Link href='/purpose-profit' class='text-brand-blue hover:underline font-semibold'>Profit</Link>).",
+        ],
+        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/32CD32/png?text=Посев+и+Жатва`,
+        imageAlt: "Росток, пробивающийся из земли, и зрелые колосья",
+        question: {
+          type: 'yes_no',
+          textRu: "Принцип 'Что посеешь, то и пожнёшь' применим только к финансам и не относится к знаниям или отношениям.",
+          textEn: "The 'What you sow, you will reap' principle only applies to finances and not to knowledge or relationships.",
+          correctAnswer: 'no',
+          tipRu: "Этот принцип универсален! Он работает во всех сферах жизни: в знаниях, усилиях, отношениях и финансах.",
+          tipEn: "This principle is universal! It works in all areas of life: knowledge, effort, relationships, and finances.",
+        },
+        notablePhrase: {
+          textRu: "Что посеешь, то и пожнёшь. И часто пожнёшь гораздо больше, чем посеял.",
+          textEn: "What you sow, you will reap. And often, you will reap much more than you sowed.",
+        }
+      },
+      {
+        id: "law-of-use",
+        icon: "::FaDumbbell::",
+        title: "Закон Активации: Используй или Потеряешь",
+        points: [
+          "<strong class='text-brand-yellow'>Any talent not used, uades. Any knowledge not applied, is forgotten.</strong>",
+          "Actively use your skills, ideas, connections. Don't let them 'rust'.",
+          "The parable of talents: he who did not use his talent, lost it.",
+          "Constant practice and application are key to preserving and multiplying your potential.",
+        ],
+        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/4682B4/png?text=Используй+или+Потеряешь`,
+        imageAlt: "Сильная рука, держащая инструмент, символизирующая активное использование",
+        question: {
+          type: 'yes_no',
+          textRu: "Если у вас есть талант или знания, они останутся с вами, даже если вы не будете их активно использовать.",
+          textEn: "If you have a talent or knowledge, it will stay with you even if you don't actively use it.",
+          correctAnswer: 'no',
+          tipRu: "К сожалению, нет. Закон активации гласит: 'Используй или потеряешь'. Таланты и знания угасают без применения.",
+          tipEn: "Unfortunately, no. The Law of Use states: 'Use it or lose it.' Talents and knowledge fade without application.",
+        },
+        notablePhrase: {
+          textRu: "Любой талант, не используемый, угасает. Любые знания, не применяемые, забываются.",
+          textEn: "Any talent not used, fades. Any knowledge not applied, is forgotten.",
+        }
+      },
+      {
+        id: "reading-learning",
+        icon: "::FaBookOpenReader::",
+        title: "Топливо для Роста: Чтение и Обучение",
+        points: [
+          "<strong class='text-brand-yellow'>Все успешные люди – ненасытные читатели и ученики.</strong>",
+          "Одна книга может сэкономить тебе пять лет жизни, предостерегая от ошибок или открывая новые пути.",
+          "Не оставляй свой успех и развитие на волю случая. Сделай их предметом изучения.",
+          "Погружайся в <Link href='/selfdev' class='text-brand-blue hover:underline font-semibold'>SelfDev</Link>, читай, анализируй, применяй. Это твой путь к мастерству в КиберВайбе.",
+        ],
+        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/8B4513/png?text=Чтение+-+Сила`,
+        imageAlt: "Открытая книга, из которой исходит свет знания",
+        question: {
+          type: 'reflection',
+          textRu: "Назовите одну тему или навык, который вы хотели бы изучить в ближайшее время, и как это поможет вам расти в КиберВайбе.",
+          textEn: "Name one topic or skill you'd like to learn soon, and how it will help you grow within CyberVibe.",
+          tipRu: "Отличный выбор! Продолжайте учиться и применять новые знания – это бесконечное топливо для роста.",
+          tipEn: "Great choice! Keep learning and applying new knowledge – it's endless fuel for growth.",
+        },
+        notablePhrase: {
+          textRu: "Одна книга может сэкономить тебе пять лет жизни, предостерегая от ошибок или открывая новые пути.",
+          textEn: "One book can save you five years of life, warning against mistakes or opening new paths.",
+        }
+      },
+    ] as SectionContent[] // Explicitly type the sections array
   }
 };
 
@@ -265,12 +525,13 @@ export default function CyberVibePage() {
 
   // Interactive content state
   const [visibleSectionIds, setVisibleSectionIds] = useState<Set<string>>(new Set());
-  const [answeredQuestions, setAnsweredQuestions] = useState<Record<string, { answered: boolean; correct?: boolean }>>({}); 
+  const [answeredQuestions, setAnsweredQuestions] = useState<Record<string, { answered: boolean; correct?: boolean }>>({}); // 'correct' is optional for reflection type
   const [currentActiveQuestionId, setCurrentActiveQuestionId] = useState<string | null>(null);
   const [showTipFor, setShowTipFor] = useState<string | null>(null);
   const [reflectionText, setReflectionText] = useState<string>("");
   const [savedNotes, setSavedNotes] = useState<string[]>([]);
   const [noteSavedFeedback, setNoteSavedFeedback] = useState<Record<string, boolean>>({});
+
 
   useEffect(() => {
     setIsMounted(true);
@@ -298,8 +559,8 @@ export default function CyberVibePage() {
     if (questionType === 'yes_no' || questionType === 'multiple_choice') {
         isCorrect = userAnswer === section.question.correctAnswer;
     } else if (questionType === 'reflection') {
-        isCorrect = true; 
-        setReflectionText(""); 
+        isCorrect = true; // Reflection answers are always "correct" in terms of completion
+        setReflectionText(""); // Clear reflection text after submission
     }
 
     setAnsweredQuestions(prev => ({
@@ -325,7 +586,7 @@ export default function CyberVibePage() {
     if (!savedNotes.includes(noteText)) {
       setSavedNotes(prevNotes => [...prevNotes, noteText]);
       setNoteSavedFeedback(prev => ({ ...prev, [sectionId]: true }));
-      setTimeout(() => setNoteSavedFeedback(prev => ({ ...prev, [sectionId]: false })), 2000); 
+      setTimeout(() => setNoteSavedFeedback(prev => ({ ...prev, [sectionId]: false })), 2000); // Reset feedback
     }
   }, [savedNotes]);
 
@@ -392,7 +653,7 @@ export default function CyberVibePage() {
       <div id={heroTriggerId} style={{ height: '150vh' }} aria-hidden="true" />
 
       <div className="relative z-10 container mx-auto px-4 pt-10 pb-10">
-        <Card className="max-w-4xl mx-auto bg-black dark:border dark:border-gray-700 shadow-2xl text-white rounded-2xl border-2 border-brand-yellow/50">
+        <Card className="max-w-4xl mx-auto bg-black/85 backdrop-blur-xl text-white rounded-2xl border-2 border-brand-yellow/50 shadow-[0_0_35px_theme(colors.brand-yellow/0.5)]">
           <CardContent className="space-y-12 p-4 md:p-8 pt-8">
 
             {t.sections.map((section, index) => {
@@ -410,13 +671,13 @@ export default function CyberVibePage() {
                   key={section.id} 
                   id={section.id} 
                   className={cn(
-                    `space-y-4 border-l-4 pl-4 md:pl-6 py-4 rounded-r-lg bg-slate-900/50 dark:bg-slate-900 transition-shadow duration-300`,
+                    `space-y-4 border-l-4 pl-4 md:pl-6 py-4 rounded-r-lg bg-dark-card/50 transition-shadow duration-300`,
                      borderColorClass,
                      shadowColorClass,
                      !isSectionVisible && 'opacity-30 pointer-events-none' 
                   )}
                   initial={{ opacity: 0, x: -30 }}
-                  animate={{ opacity: isSectionVisible ?1 : 0.3, x: isSectionVisible ? 0 : -30 }}
+                  animate={{ opacity: isSectionVisible ? 1 : 0.3, x: isSectionVisible ? 0 : -30 }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                 >
                   <h2 className={cn(`flex items-center text-2xl md:text-3xl font-semibold mb-3 font-orbitron`, textColorClass)}>
@@ -427,13 +688,13 @@ export default function CyberVibePage() {
                   </h2>
 
                   {section.points.map((point, i) => (
-                    <div key={i} className="text-gray-300 dark:text-gray-300 text-base md:text-lg leading-relaxed prose prose-sm md:prose-base prose-invert max-w-none prose-strong:font-orbitron prose-a:text-brand-blue hover:prose-a:text-brand-cyan prose-li:marker:text-current">
+                    <div key={i} className="text-gray-300 text-base md:text-lg leading-relaxed prose prose-sm md:prose-base prose-invert max-w-none prose-strong:font-orbitron prose-a:text-brand-blue hover:prose-a:text-brand-cyan prose-li:marker:text-current">
                         <VibeContentRenderer content={`• ${point}`} />
                     </div>
                   ))}
                   
                   {section.imageUrl && (
-                    <div className={cn(`my-5 p-1 border rounded-md max-w-sm mx-auto`, borderColorClass.replace('/60','/30'))}>
+                    <div className={cn(`my-5 p-1 border rounded-md bg-black/20 max-w-sm mx-auto`, borderColorClass.replace('/60','/30'))}>
                        <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-800/40 relative">
                         <Image
                             src={section.imageUrl} alt={section.imageAlt} width={600} height={338}
@@ -462,11 +723,7 @@ export default function CyberVibePage() {
                         )}
                         size="sm"
                       >
-                        {noteSavedFeedback[section.id] ? (selectedLang === 'ru' ? "Сохранено! " : "Saved! ") : (selectedLang === 'ru' ? "Сохранить заметку " : "Save Note ")}
-                        <VibeContentRenderer 
-                          content={noteSavedFeedback[section.id] ? "::FaCircleCheck::" : "::FaBookmark::"} 
-                          className="ml-1" 
-                        />
+                        {noteSavedFeedback[section.id] ? (selectedLang === 'ru' ? "Сохранено! ::FaCheck::" : "Saved! ::FaCheck::") : (selectedLang === 'ru' ? "Сохранить заметку ::FaBookmark::" : "Save Note ::FaBookmark::")}
                       </Button>
                     </motion.div>
                   )}
@@ -476,7 +733,7 @@ export default function CyberVibePage() {
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.3 }}
-                          className={cn("mt-6 p-4 rounded-lg border", "border-brand-yellow/50 bg-yellow-900/20 dark:bg-yellow-900/20 border-yellow-600/50")}
+                          className={cn("mt-6 p-4 rounded-lg border", "border-brand-yellow/50 bg-brand-yellow/10")}
                       >
                           <p className="text-lg font-semibold text-brand-yellow mb-4">
                               {selectedLang === 'ru' ? section.question.textRu : section.question.textEn}
@@ -512,12 +769,11 @@ export default function CyberVibePage() {
                           )}
                           {section.question.type === 'reflection' && (
                               <div className="flex flex-col gap-3">
-                                  {/* ENHANCED: Terminal Aesthetic Textarea */}
                                   <Textarea 
                                       placeholder={selectedLang === 'ru' ? "Напишите здесь..." : "Write here..."}
                                       value={reflectionText}
                                       onChange={(e) => setReflectionText(e.target.value)}
-                                      className="min-h-[80px] bg-slate-900 border-gray-700 text-gray-100 focus:ring-1 focus:ring-brand-cyan/50 placeholder:text-gray-500 font-mono text-sm"
+                                      className="min-h-[80px] bg-black/30 border-brand-yellow/30 text-white placeholder-gray-500"
                                   />
                                   <Button 
                                       onClick={() => handleAnswer(section.id, reflectionText, 'reflection', nextSection?.id)}
@@ -536,7 +792,7 @@ export default function CyberVibePage() {
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.3, delay: 0.1 }}
-                          className="mt-6 p-4 rounded-lg border border-gray-700 bg-slate-900/50"
+                          className="mt-6 p-4 rounded-lg border border-gray-700 bg-gray-900/50"
                       >
                           {section.question.type !== 'reflection' && ( 
                               <p className={cn("font-bold text-lg", isCorrectAnswer ? "text-brand-green" : "text-brand-red")}>
@@ -575,7 +831,7 @@ export default function CyberVibePage() {
                     initial={{ opacity: 0, y: 50 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.3 }}
-                    className="mt-12 p-6 rounded-lg border border-brand-green/50 bg-slate-900 shadow-lg space-y-4"
+                    className="mt-12 p-6 rounded-lg border border-brand-green/50 bg-brand-green/10 shadow-lg space-y-4"
                 >
                     <h3 className="text-2xl font-orbitron font-semibold text-brand-green">
                         {selectedLang === 'ru' ? "📝 Ваши Заметки" : "📝 Your Notes"}
@@ -587,21 +843,20 @@ export default function CyberVibePage() {
                             </li>
                         ))}
                     </ul>
-                    {/* ENHANCED: Pulse effect on save */}
                     <Button
                         onClick={handleSendNotesToTelegram}
-                        className="w-full bg-brand-purple hover:bg-brand-purple/80 text-white font-orbitron mt-4 flex items-center justify-center gap-2 shadow-lg"
+                        className="w-full bg-brand-purple hover:bg-brand-purple/80 text-white font-orbitron mt-4 flex items-center justify-center gap-2"
                     >
-                        <VibeContentRenderer content="::FaPaperPlane::" className="h-5 w-5" />
+                        <VibeContentRenderer content="::FaTelegramPlane::" className="h-5 w-5" />
                         {selectedLang === 'ru' ? "Отправить в Telegram" : "Send to Telegram"}
                     </Button>
                 </motion.section>
             )}
 
-            <section className="text-center pt-10 border-t border-gray-700 mt-10">
+            <section className="text-center pt-10 border-t border-brand-yellow/20 mt-10">
                <VibeContentRenderer 
                   content="Джим Рон оставил наследие мудрости. Твоя задача – взять эти принципы, пропустить через фильтр своего КиберВайба и построить жизнь, достойную легенды. <strong class='text-brand-yellow'>Ты – архитектор своего будущего.</strong>" 
-                  className="text-lg text-gray-300 italic prose-invert max-w-none prose-strong:text-brand-yellow"
+                  className="text-lg text-gray-300 italic prose prose-invert max-w-none prose-strong:text-brand-yellow"
                 />
                 <div className="mt-8 flex flex-wrap justify-center gap-3">
                     <Button asChild variant="outline" className="border-brand-blue text-brand-blue hover:bg-brand-blue/10 font-orbitron">
