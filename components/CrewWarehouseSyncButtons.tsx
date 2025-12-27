@@ -435,7 +435,7 @@ export function CrewWarehouseSyncButtons({ slug }: Props) {
             <div className="border rounded-lg p-3 bg-gradient-to-r from-amber-50 to-orange-50 space-y-3 dark:bg-slate-900 dark:border dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium text-sm flex items-center gap-2 text-gray-900 dark:text-white">
-                  <RefreshCcw className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <RefreshCcw className="w-4 h-4 text-amber-600 dark:text-black" />
                   Яндекс.Маркет
                 </h4>
                 <Badge variant="secondary" className="text-xs bg-white dark:bg-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-600">
