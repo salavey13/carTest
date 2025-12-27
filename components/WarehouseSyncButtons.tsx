@@ -307,7 +307,6 @@ export function WarehouseSyncButtons() {
                 <Zap className="w-5 h-5 text-blue-500" />
                 Синхронизация склада
               </CardTitle>
-              {/* FIXED: Darker text in dark mode */}
               <CardDescription className="text-gray-500 dark:text-gray-300">
                 Управление синхронизацией стоков между маркетплейсами
               </CardDescription>
@@ -318,26 +317,26 @@ export function WarehouseSyncButtons() {
         
         <CardContent className="space-y-4">
           {/* Status Overview */}
-          {/* FIXED: Brighter labels in dark mode */}
+          {/* FIXED: Darker background (slate-900) to blend with dark theme instead of looking "light" */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-800">
-              <span className="text-gray-600 dark:text-gray-200">Товаров</span>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-900 border border-transparent dark:border-gray-700">
+              <span className="text-gray-600 dark:text-gray-300">Товаров</span>
               <span className="font-semibold text-lg text-gray-900 dark:text-white">{itemsCount}</span>
             </div>
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-800">
-              <span className="text-gray-600 dark:text-gray-200">Wildberries</span>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-900 border border-transparent dark:border-gray-700">
+              <span className="text-gray-600 dark:text-gray-300">Wildberries</span>
               <span className={`font-semibold ${hasSyncableWb ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableWb ? 'Готов' : 'Нет SKU'}
               </span>
             </div>
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-800">
-              <span className="text-gray-600 dark:text-gray-200">Ozon</span>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-900 border border-transparent dark:border-gray-700">
+              <span className="text-gray-600 dark:text-gray-300">Ozon</span>
               <span className={`font-semibold ${hasSyncableOzon ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableOzon ? 'Готов' : 'Нет SKU'}
               </span>
             </div>
-            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-800">
-              <span className="text-gray-600 dark:text-gray-200">Яндекс.Маркет</span>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg dark:bg-slate-900 border border-transparent dark:border-gray-700">
+              <span className="text-gray-600 dark:text-gray-300">Яндекс.Маркет</span>
               <span className={`font-semibold ${hasSyncableYm ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                 {hasSyncableYm ? 'Готов' : 'Нет SKU'}
               </span>
@@ -429,21 +428,22 @@ export function WarehouseSyncButtons() {
             </div>
 
             {/* Yandex Market Section */}
-            <div className="border rounded-lg p-3 bg-gradient-to-r from-amber-50 to-orange-50 space-y-3 dark:from-amber-950/40 dark:to-orange-950/40 dark:border-orange-900">
+            {/* FIXED: Solid dark background (slate-800) instead of transparent gradient for better contrast */}
+            <div className="border rounded-lg p-3 bg-gradient-to-r from-amber-50 to-orange-50 space-y-3 dark:bg-slate-800 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium text-sm flex items-center gap-2 text-gray-900 dark:text-white">
                   <RefreshCcw className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   Яндекс.Маркет
                 </h4>
-                <Badge variant="secondary" className="text-xs bg-white dark:bg-slate-800 dark:text-gray-100 border border-gray-200 dark:border-slate-600">
+                <Badge variant="secondary" className="text-xs bg-white dark:bg-slate-700 dark:text-gray-100 border border-gray-200 dark:border-slate-600">
                   {campaigns?.length || 0} кампаний
                 </Badge>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  {/* FIXED: Brighter label */}
-                  <label className="text-xs font-medium text-gray-600 dark:text-gray-200">
+                  {/* FIXED: Explicit dark text for label */}
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
                     Выбор кампании
                   </label>
                   <div className="relative">
@@ -510,9 +510,8 @@ export function WarehouseSyncButtons() {
                   Настроить YM SKU
                 </Button>
 
-                {/* FIXED: Brighter text in dark mode */}
                 {tokenStatusText && (
-                  <div className="text-xs text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-2 py-1 rounded shadow-sm">
+                  <div className="text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-700 px-2 py-1 rounded shadow-sm">
                     Статус: <span className="font-semibold">{tokenStatusText}</span>
                   </div>
                 )}
@@ -521,7 +520,7 @@ export function WarehouseSyncButtons() {
           </div>
 
           {/* Footer Info */}
-          {/* FIXED: Brighter text in dark mode */}
+          {/* FIXED: Darker text in dark mode */}
           <div className="text-xs text-gray-500 dark:text-gray-300 pt-2 border-t border-gray-200 dark:border-gray-700">
             <p>
               Данные автоматически загружаются из Supabase. Автоматическая синхронизация выполняется ежедневно.
