@@ -1,19 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { motion } from "framer-motion";
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { 
-  FlaskVial, Terminal, Play, FaBeer, FaBox, FaGraduationCap, 
-  FaTerminal, FaBrain, FaDna, FaBolt, FaSackDollar
+  FlaskConical, Terminal, Play, Box, GraduationCap, 
+  Brain, Dna, Zap, DollarSign, AlertTriangle, CheckCircle,
+  ArrowRight, Activity, ShieldCheck, Wifi
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
-import { useAppContext } from "@/contexts/AppContext";
 
 // --- Types & Data ---
 
-type SectorStatus = 'trial' | 'live' | 'sandbox' | 'available';
+type SectorStatus = 'trial' | 'live' | 'sandbox' | 'secure';
+type RiskLevel = 'zero' | 'low' | 'time';
 
 interface SystemSector {
   id: string;
@@ -23,144 +24,163 @@ interface SystemSector {
   href: string;
   color: string;
   status: SectorStatus;
+  risk: RiskLevel;
   metrics: string;
-  filesCount: number;
+  tag: string;
 }
 
 const SECTORS: SystemSector[] = [
   {
     id: 'academy',
-    title: 'ПОПРОБУЙ ПЕРВЫМ',
-    description: 'Короткие задания: 5–15 минут. Без провалов — только данные.',
-    icon: 'FaGraduationCap',
+    title: 'ПЕСОЧНИЦА: АКАДЕМИЯ',
+    description: 'Безопасная среда для отработки навыков. Ошибки не стоят денег, они дают данные.',
+    icon: 'GraduationCap',
     href: '/vpr-tests',
     color: 'text-brand-green',
     status: 'trial',
-    metrics: '✓ Безопасно провалиться',
-    filesCount: 0
+    risk: 'zero',
+    metrics: 'Риск: 0%',
+    tag: 'ОБУЧЕНИЕ'
   },
   {
     id: 'logistics',
-    title: 'СКЛАД-РЕЙД (БЕТА)',
-    description: 'Запусти командное событие. Мы считаем победы, а не ошибки.',
-    icon: 'FaBox',
+    title: 'ОПС: WMS РЕЙД',
+    description: 'Складской учет как игра. Находи потери, получай XTR. Интегрируй с 1С.',
+    icon: 'Box',
     href: '/wblanding',
     color: 'text-brand-cyan',
     status: 'live',
-    metrics: 'Последняя победа: +4 800₽',
-    filesCount: 0
+    risk: 'time',
+    metrics: 'ROI: +21% (сред.)',
+    tag: 'ДОКАЗАНО'
   },
   {
     id: 'dr',
-    title: 'DRINK ROYALE',
-    description: 'Зови друзей → иди в бар → побеждай через геолокацию.',
-    icon: 'FaBeer',
+    title: 'СОЦСЕТЬ: DRINK ROYALE',
+    description: 'Гео-триггерная игра в городе. Найди врага, победи, получи скидку на чек.',
+    icon: 'Activity',
     href: '/strikeball',
     color: 'text-red-400',
     status: 'live',
-    metrics: 'Средний смех: 14 раз/матч',
-    filesCount: 0
+    risk: 'low',
+    metrics: 'Вход: Бесплатно',
+    tag: 'ВИРАЛЬНО'
   },
   {
     id: 'studio',
-    title: 'СДЕЛАЙ БОТА ЗА 10 МИН',
-    description: 'Мы даём песочницу. Ты — реальный релиз.',
-    icon: 'FaTerminal',
+    title: 'ДЕВ: BOT FORGE',
+    description: 'Создай Telegram-бота за 10 минут. Песочница, релиз, монетизация.',
+    icon: 'Terminal',
     href: '/repo-xml',
     color: 'text-brand-red-orange',
     status: 'sandbox',
-    metrics: 'Твой первый деплой: < 10 мин',
-    filesCount: 0
+    risk: 'time',
+    metrics: 'Время деплоя: <10м',
+    tag: 'СОЗДАВАТЬ'
   },
   {
     id: 'cybervibe',
-    title: 'КИБЕРВАЙБ-СЕССИЯ',
-    description: '1 час «что если?». Результат — PDF-дорожная карта.',
-    icon: 'FaBrain',
+    title: 'СТРАТ: CYBERVIBE',
+    description: 'Стратегическая сессия. PDF-дорожная карта за 1 час вместо месяца планирования.',
+    icon: 'Brain',
     href: '/cybervibe',
     color: 'text-brand-purple',
-    status: 'available',
-    metrics: 'Стоимость: 0 ₽ (плати после победы)',
-    filesCount: 0
+    status: 'secure',
+    risk: 'time',
+    metrics: 'Стоимость: 0₽ (Плати после победы)',
+    tag: 'РЕЗУЛЬТАТ'
   },
   {
     id: 'bio',
-    title: 'БИО-ТЕСТ (3 ДНЯ)',
-    description: 'Попробуй мелкое изменение (сон, добавка, прогулка). Отслеживай ощущения.',
-    icon: 'FaDna',
+    title: 'БИО: СЕЛФ-ТРЕКИНГ',
+    description: '3-дневный эксперимент. Измени один фактор (сон, добавка), засеки результат.',
+    icon: 'Dna',
     href: '/bio30',
     color: 'text-neon-lime',
     status: 'trial',
-    metrics: 'Длительность: 72 часа',
-    filesCount: 0
+    risk: 'low',
+    metrics: 'Длительность: 72ч',
+    tag: 'НАУКА'
   }
 ];
 
 // --- Components ---
 
 const SectorCard = ({ sector, index }: { sector: SystemSector; index: number }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
   const statusColors: Record<SectorStatus, string> = {
-    trial: "bg-amber-500",
-    live: "bg-green-500",
-    sandbox: "bg-purple-500",
-    available: "bg-blue-500",
+    trial: "bg-emerald-500",
+    live: "bg-red-500",
+    sandbox: "bg-orange-500",
+    secure: "bg-blue-500",
   };
 
-  const statusTexts: Record<SectorStatus, string> = {
-    trial: "ПОПРОБУЙ",
-    live: "ЖИВО",
-    sandbox: "ПЕСОЧНИЦА",
-    available: "ДОСТУПНО",
+  const riskLabels: Record<RiskLevel, { text: string; color: string }> = {
+    zero: { text: "НУЛЕВОЙ РИСК", color: "text-emerald-400 border-emerald-500/30" },
+    low: { text: "НИЗКИЙ РИСК", color: "text-yellow-400 border-yellow-500/30" },
+    time: { text: "ИНВЕСТИЦИЯ ВРЕМЕНИ", color: "text-cyan-400 border-cyan-500/30" }
   };
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1 }}
-      className="group relative"
+      transition={{ delay: index * 0.05, duration: 0.5 }}
+      onHoverStart={() => setIsHovered(true)}
+      onHoverEnd={() => setIsHovered(false)}
     >
       <Link href={sector.href} className="block h-full">
         <div className={cn(
-          "h-full bg-zinc-900/50 border border-white/5 rounded-xl p-6 backdrop-blur-md transition-all duration-300 overflow-hidden",
-          "hover:border-opacity-50 hover:bg-zinc-900/80 hover:shadow-[0_0_30px_-10px_rgba(0,0,0,0.5)]",
-          `hover:border-${sector.color.split('-')[1]}-500`
+          "relative h-full bg-black/80 border border-zinc-800 p-6 backdrop-blur-md transition-all duration-300 overflow-hidden group",
+          isHovered ? "border-opacity-100 shadow-[0_0_40px_-10px_rgba(255,255,255,0.1)]" : "border-opacity-30"
         )}>
-          {/* Status Dot */}
-          <div className="absolute top-4 right-4 flex items-center gap-2">
-            <span className={cn(
-              "w-2 h-2 rounded-full",
-              statusColors[sector.status]
-            )} />
-            <span className="text-[10px] uppercase font-mono text-zinc-500">
-              {statusTexts[sector.status]}
-            </span>
+          {/* Scanline Overlay */}
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-0 pointer-events-none bg-[length:100%_2px,3px_100%] opacity-20 group-hover:opacity-30" />
+
+          {/* Content */}
+          <div className="relative z-10 flex flex-col h-full">
+            {/* Header */}
+            <div className="flex justify-between items-start mb-4">
+              <div className={cn("p-3 rounded bg-zinc-900 border border-white/5 group-hover:border-white/20 transition-colors", sector.color)}>
+                <VibeContentRenderer content={`::${sector.icon}::`} />
+              </div>
+              <div className={cn(
+                "px-2 py-1 text-[9px] font-mono font-bold border rounded uppercase tracking-wider",
+                riskLabels[sector.risk].color
+              )}>
+                {riskLabels[sector.risk].text}
+              </div>
+            </div>
+
+            {/* Text */}
+            <h3 className="text-xl font-black text-white font-orbitron mb-2 group-hover:translate-x-1 transition-transform">
+              {sector.title}
+            </h3>
+            <p className="text-sm text-zinc-400 mb-6 line-clamp-2 font-mono leading-relaxed">
+              {sector.description}
+            </p>
+
+            {/* Footer */}
+            <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center">
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-zinc-600">Метрики</span>
+                <span className="text-xs font-mono text-zinc-300">{sector.metrics}</span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] uppercase font-black text-zinc-700 group-hover:text-white transition-colors">
+                  {sector.tag}
+                </span>
+                <ArrowRight className={cn("w-4 h-4 transform transition-transform duration-300", isHovered ? "translate-x-1" : "translate-x-0")} />
+              </div>
+            </div>
           </div>
 
-          {/* Icon */}
-          <div className={cn("mb-4 text-4xl", sector.color)}>
-            <VibeContentRenderer content={`::${sector.icon}::`} />
-          </div>
-
-          {/* Text */}
-          <h3 className="text-xl font-bold text-white font-orbitron mb-2 group-hover:text-white transition-colors">
-            {sector.title}
-          </h3>
-          <p className="text-sm text-gray-400 mb-6 line-clamp-2">
-            {sector.description}
-          </p>
-
-          {/* Footer */}
-          <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center text-xs font-mono text-zinc-500">
-            <span className="opacity-70 group-hover:opacity-100">
-              {sector.metrics}
-            </span>
-          </div>
-          
-          {/* Hover Glow */}
+          {/* Glow Effect */}
           <div className={cn(
-            "absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none bg-gradient-to-br",
-            sector.color.replace('text-', 'from-')
+            "absolute inset-0 opacity-0 group-hover:opacity-5 transition-opacity pointer-events-none",
+            `bg-gradient-to-br ${sector.color.replace('text-', 'from-')}/20 to-transparent`
           )} />
         </div>
       </Link>
@@ -168,158 +188,240 @@ const SectorCard = ({ sector, index }: { sector: SystemSector; index: number }) 
   );
 };
 
-const SystemStats = () => {
-  const stats = [
-    { label: "САМЫЙ БЫСТРЫЙ ВЫИГРЫШ", val: "12 мин", icon: FaBolt, color: "text-brand-cyan" },
-    { label: "ПОСЛЕДНЯЯ ПОБЕДА", val: "+2 300 ₽", icon: FaSackDollar, color: "text-green-400" },
-    { label: "ВАШ СТАТУС", val: "ГОТОВ ПРОБОВАТЬ", icon: FlaskVial, color: "text-brand-purple" },
+// Live System Feed Component (Живой Лог)
+const LiveSystemFeed = () => {
+  const [logs, setLogs] = useState<string[]>([
+    "> СИСТЕМА: VIBE_NEXUS ИНИЦИАЛИЗИРОВАНА...",
+    "> СЕТЬ: СОЕДИНЕНИЕ УСТАНОВЛЕНО [56.32.44.01]",
+    "> АВТОР: ОБНАРУЖЕН АНОНИМНЫЙ ПОЛЬЗОВАТЕЛЬ",
+  ]);
+
+  const messages = [
+    "> ПОБЕДА: USER_ID:992A НАШЕЛ +4500₽ НА СКЛАДЕ",
+    "> СИНХР: ИГРА DRINK ROYALE #442 НАЧАЛАСЬ",
+    "> АЛЕРТ: ОБНАРУЖЕН МАЛЫЙ ЗАПАС [СЕКТОР_7]",
+    "> ПОБЕДА: USER_ID:BB1Q ЗАВЕРШИЛ БИО-ТЕСТ",
+    "> МИНИНГ: 500 ТОКЕНОВ XTR СГЕНЕРИРОВАНО",
+    "> СЕТЬ: 4 НОВЫХ ОПЕРАТОРА В СЕТИ"
   ];
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const randomMsg = messages[Math.floor(Math.random() * messages.length)];
+      const timestamp = new Date().toLocaleTimeString('ru-RU', { hour12: false });
+      setLogs(prev => [`[${timestamp}] ${randomMsg}`, ...prev].slice(0, 8));
+    }, 3500); // Новая запись каждые 3.5 сек
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
-      {stats.map((stat, i) => (
-        <div key={i} className="bg-black/40 border border-white/10 p-4 rounded-lg flex items-center gap-4">
-          <div className={cn("text-2xl", stat.color)}>
-            <stat.icon className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider">{stat.label}</div>
-            <div className="text-lg font-bold text-white font-orbitron">{stat.val}</div>
-          </div>
-        </div>
-      ))}
+    <div className="bg-black border border-zinc-800 p-4 rounded-lg font-mono text-xs overflow-hidden relative">
+      <div className="flex items-center gap-2 mb-3 border-b border-zinc-900 pb-2">
+        <Wifi className="w-3 h-3 text-green-500 animate-pulse" />
+        <span className="text-zinc-500 font-bold uppercase tracking-widest text-[10px]">Живой Лог Системы</span>
+      </div>
+      <div className="space-y-1.5 h-32 overflow-y-auto no-scrollbar">
+        <AnimatePresence mode='popLayout'>
+          {logs.map((log, i) => (
+            <motion.div
+              key={`${log}-${i}`}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0.5, x: 10 }}
+              className={cn(
+                "truncate",
+                log.includes("ПОБЕДА") ? "text-brand-cyan" : 
+                log.includes("АЛЕРТ") ? "text-red-400" : "text-zinc-500"
+              )}
+            >
+              {log}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   );
 };
 
 export default function NexusPage() {
-  const { user } = useAppContext();
-  const [firstWinFeedback, setFirstWinFeedback] = useState<string | null>(null);
-
-  // Для логгирования в аналитику (например, PostHog, Plausible) — только на клиенте
-  useEffect(() => {
-    // Можно добавить: if (firstWinFeedback) track('first_experiment_started')
-  }, [firstWinFeedback]);
-
-  const handleFirstWin = () => {
-    setFirstWinFeedback("✅ Отлично! Теперь ты в игре. Следующий шаг — выбери эксперимент выше.");
-    // Если нужна аналитика — вызовите track() здесь, например:
-    // window.plausible?.('first_experiment_click');
+  const [protocolStatus, setProtocolStatus] = useState<'idle' | 'accepted' | 'deferred'>('idle');
+  
+  const handleAccept = () => {
+    setProtocolStatus('accepted');
+    // В реальном приложении здесь откроется модальное окно или произойдет редирект
   };
 
-  const handleNotToday = () => {
-    setFirstWinFeedback("Хорошо! Через пару дней напомним — без спама.");
+  const handleDefer = () => {
+    setProtocolStatus('deferred');
+    // Логика для напоминания позже
   };
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-brand-cyan/30 overflow-x-hidden relative">
       
-      {/* Grid Background */}
-      <div className="fixed inset-0 z-0 opacity-20 pointer-events-none" 
+      {/* Background Grid */}
+      <div className="fixed inset-0 z-0 opacity-15 pointer-events-none" 
            style={{ 
-             backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)', 
-             backgroundSize: '40px 40px',
-             transform: 'perspective(500px) rotateX(20deg) scale(1.5) translateY(-100px)'
+             backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', 
+             backgroundSize: '30px 30px'
            }} 
       />
       
       <main className="relative z-10 max-w-7xl mx-auto px-4 py-12 md:py-20">
         
         {/* Header */}
-        <header className="text-center mb-16">
+        <header className="mb-16 border-b border-white/5 pb-12">
           <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/20 bg-white/5 backdrop-blur-sm mb-6"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6"
           >
-            <FlaskVial className="w-4 h-4 text-brand-purple animate-pulse" />
-            <span className="text-xs font-mono text-gray-300">ВАШ ЭКСПЕРИМЕНТ — В РЕЖИМЕ ОЖИДАНИЯ</span>
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-2 w-2 bg-brand-cyan rounded-full animate-ping" />
+                <span className="text-[10px] font-mono text-brand-cyan tracking-[0.3em] uppercase">
+                  СТАТУС СИСТЕМЫ: ОПЕРАТИВЕН
+                </span>
+              </div>
+              <h1 className="text-6xl md:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/10 font-orbitron tracking-tighter leading-none mb-4">
+                VIBE<span className="text-brand-cyan italic">NEXUS</span>
+              </h1>
+              <p className="text-lg md:text-xl text-zinc-400 max-w-2xl font-mono border-l-2 border-brand-purple pl-4">
+                Выберите реальность. <br/>
+                <span className="text-white">Платите только за результат (Pay After Win).</span>
+              </p>
+            </div>
+            
+            {/* Live Stats Block */}
+            <div className="hidden md:flex flex-col gap-2 text-right">
+               <div className="text-3xl font-black font-orbitron text-white">12 402</div>
+               <div className="text-[10px] uppercase text-zinc-500 tracking-widest">Активных Экспериментов</div>
+               <div className="h-px w-32 bg-zinc-800 ml-auto mt-2" />
+               <div className="text-2xl font-black font-orbitron text-brand-green">840%</div>
+               <div className="text-[10px] uppercase text-zinc-500 tracking-widest">Средний ROI</div>
+            </div>
           </motion.div>
-          
-          <h1 className="text-5xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/10 font-orbitron mb-6 tracking-tighter">
-            YOUR<span className="text-brand-cyan"> EXPERIMENT</span> HUB
-          </h1>
-          <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-            Попробуй → Учись → Выиграй → Повтори.<br/>
-            Без настройки. Без риска. Только <span className="text-brand-green font-bold">реальные победы</span>.
-          </p>
         </header>
 
-        <SystemStats />
+        {/* Live Feed (Visual Engagement) */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="mb-12"
+        >
+          <LiveSystemFeed />
+        </motion.div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-20">
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-20">
           {SECTORS.map((sector, index) => (
             <SectorCard key={sector.id} sector={sector} index={index} />
           ))}
         </div>
 
-        {/* Real Wins */}
-        <div className="border-t border-white/10 pt-12">
-          <div className="flex flex-col md:flex-row justify-between items-end gap-6">
-            <div>
-              <h2 className="text-2xl font-bold font-orbitron mb-2 flex items-center gap-3">
-                <Terminal className="w-6 h-6 text-brand-purple" /> 
-                РЕАЛЬНЫЕ ЭКСПЕРИМЕНТЫ (ОТ ВАШИХ ДРУЗЕЙ)
-              </h2>
-              <p className="text-sm text-gray-500 font-mono">
-                Не теория. Только доказательства.
-              </p>
-            </div>
-            <Link href="/expmind">
-              <div className="group flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-brand-purple to-brand-cyan rounded-lg border border-transparent hover:border-white transition-all cursor-pointer">
-                <span className="text-sm font-bold text-black group-hover:text-white">Почему эксперименты побеждают планы</span>
-                <Play className="w-4 h-4 text-black group-hover:text-white group-hover:translate-x-1 transition-transform" />
-              </div>
-            </Link>
-          </div>
+        {/* The "PACT" Section: Activation Protocol */}
+        <motion.section 
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="relative max-w-4xl mx-auto"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-brand-purple/20 to-brand-cyan/20 blur-[100px] -z-10" />
           
-          <div className="mt-6 bg-black p-4 rounded-lg border border-white/10 font-mono text-xs text-gray-400 h-48 overflow-y-auto simple-scrollbar">
-            <p className="mb-1"><span className="text-green-500">✓</span> [ВЫИГРЫШ] Алекс запустил Drink Royale → заполнил слот во вторник у Антанты → получил +3 200₽ в фонд тимбилдинга.</p>
-            <p className="mb-1"><span className="text-green-500">✓</span> [ВЫИГРЫШ] Лена прошла Bio Test (холодный душ утром) → +2ч фокуса → залила фичу за 1 день.</p>
-            <p className="mb-1"><span className="text-green-500">✓</span> [ВЫИГРЫШ] Олег запустил Склад-Рейд → нашёл 7 пропавших джинс → сэкономил 21 000₽.</p>
-            <p className="mb-1"><span className="text-amber-500">→</span> [ДАЛЕЕ] Попробуй любой эксперимент. Если нет победы → $0. Никогда.</p>
-            <p>_</p>
-          </div>
-        </div>
+          <div className="bg-zinc-900 border border-white/10 p-1 rounded-2xl backdrop-blur-xl">
+            <div className="bg-black rounded-xl p-8 md:p-12 border border-zinc-800 relative overflow-hidden">
+              {/* Decoration */}
+              <div className="absolute top-0 right-0 p-32 bg-brand-cyan/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
 
-        {/* Mini PACT — полностью SSR-safe */}
-        <div className="mt-16 bg-zinc-950/60 border border-brand-purple/30 rounded-xl p-6 max-w-2xl mx-auto">
-          <div className="flex items-start gap-4">
-            <div className="mt-1 w-8 h-8 rounded-full bg-brand-purple flex items-center justify-center flex-shrink-0">
-              <FlaskVial className="w-4 h-4 text-black" />
-            </div>
-            <div>
-              <h3 className="font-orbitron font-bold text-lg text-brand-purple mb-2">Твой первый эксперимент (2 минуты):</h3>
-              <p className="text-sm text-gray-300 mb-4">
-                Открой Drink Royale → Отсканируй QR-код в любом баре → Узнай, кто «враг рядом».
-              </p>
-              
-              {firstWinFeedback ? (
-                <div className="mb-4 p-3 bg-black/30 border border-brand-green/30 rounded text-sm text-brand-green font-mono">
-                  {firstWinFeedback}
+              {protocolStatus === 'idle' && (
+                <div className="text-center space-y-8">
+                  <div className="inline-flex items-center justify-center p-4 rounded-full bg-zinc-900 border border-zinc-800 mb-4">
+                    <FlaskConical className="w-8 h-8 text-brand-purple" />
+                  </div>
+                  
+                  <h2 className="text-3xl md:text-4xl font-black font-orbitron text-white">
+                    ИНИЦИИРОВАТЬ ПЕРВЫЙ ЭКСПЕРИМЕНТ?
+                  </h2>
+                  
+                  <p className="text-zinc-400 max-w-xl mx-auto leading-relaxed">
+                    У нас нет подписок. Есть только результаты. 
+                    Выберите путь и докажите, что он работает. 
+                    Если результата нет — <span className="text-white font-bold">вы ничего не платите</span>.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
+                    <button
+                      onClick={handleAccept}
+                      className="group relative px-8 py-4 bg-white text-black font-black text-sm tracking-widest uppercase rounded hover:bg-brand-cyan transition-colors overflow-hidden"
+                    >
+                      <span className="relative z-10 flex items-center gap-2">
+                        ПРИНЯТЬ ПРОТОКОЛ <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      </span>
+                    </button>
+                    
+                    <button
+                      onClick={handleDefer}
+                      className="px-8 py-4 bg-transparent border border-zinc-700 text-zinc-400 font-bold text-sm tracking-widest uppercase rounded hover:border-zinc-500 hover:text-white transition-colors"
+                    >
+                      ОТЛОЖИТЬ (Смотреть)
+                    </button>
+                  </div>
+                  
+                  <div className="flex justify-center gap-6 mt-8">
+                     <div className="flex items-center gap-2 text-[10px] text-zinc-600 uppercase tracking-wider">
+                        <ShieldCheck className="w-3 h-3" /> Без Карты
+                     </div>
+                     <div className="flex items-center gap-2 text-[10px] text-zinc-600 uppercase tracking-wider">
+                        <CheckCircle className="w-3 h-3" /> Отмена В任何时候
+                     </div>
+                  </div>
                 </div>
-              ) : null}
+              )}
 
-              <div className="flex gap-3">
-                <button
-                  onClick={handleFirstWin}
-                  className="px-5 py-2 bg-brand-green hover:bg-green-400 text-black font-bold text-sm rounded uppercase tracking-wider transition-colors"
+              {protocolStatus === 'accepted' && (
+                <motion.div 
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="text-center py-12"
                 >
-                  Я ВЫИГРАЛ!
-                </button>
-                <button
-                  onClick={handleNotToday}
-                  className="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 text-gray-300 font-bold text-sm rounded uppercase tracking-wider transition-colors"
+                  <div className="inline-block p-4 rounded-full bg-brand-green/20 border border-brand-green/50 mb-6">
+                    <CheckCircle className="w-12 h-12 text-brand-green" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-4">ДОСТУП РАЗРЕШЕН</h3>
+                  <p className="text-zinc-400 mb-8">Выберите сектор выше для начала работы.</p>
+                  <button 
+                    onClick={() => setProtocolStatus('idle')}
+                    className="text-xs text-zinc-600 hover:text-white underline"
+                  >
+                    СБРОСИТЬ ПРОТОКОЛ
+                  </button>
+                </motion.div>
+              )}
+
+              {protocolStatus === 'deferred' && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center py-12"
                 >
-                  Не сегодня
-                </button>
-              </div>
-              <p className="text-[10px] text-gray-500 mt-3 italic">
-                Это не тест. Это твой первый шаг в экспериментальное мышление.
-              </p>
+                  <div className="inline-block p-4 rounded-full bg-zinc-800 mb-6">
+                    <AlertTriangle className="w-8 h-8 text-zinc-500" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-zinc-300 mb-4">ПРОТОКОЛ ПРИОСТАНОВЛЕН</h3>
+                  <p className="text-zinc-500 mb-8">Мы напомним вам через 48 часов. Без спама.</p>
+                  <button 
+                    onClick={() => setProtocolStatus('idle')}
+                    className="px-6 py-2 border border-zinc-700 text-white text-xs uppercase tracking-wider hover:bg-zinc-800"
+                  >
+                    ПЕРЕЗАПУСК
+                  </button>
+                </motion.div>
+              )}
+
             </div>
           </div>
-        </div>
+        </motion.section>
 
       </main>
     </div>
