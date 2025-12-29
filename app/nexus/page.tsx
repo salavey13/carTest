@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { 
@@ -9,18 +9,27 @@ import {
   ArrowRight, Activity, ShieldCheck, Wifi
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 
 // --- Types & Data ---
 
 type SectorStatus = 'trial' | 'live' | 'sandbox' | 'secure';
 type RiskLevel = 'zero' | 'low' | 'time';
 
+// Map to handle icons dynamically from string keys
+const ICON_MAP: Record<string, React.ElementType> = {
+  GraduationCap,
+  Box,
+  Activity,
+  Terminal,
+  Brain,
+  Dna,
+};
+
 interface SystemSector {
   id: string;
   title: string;
   description: string;
-  icon: string;
+  icon: string; // This maps to the ICON_MAP key
   href: string;
   color: string;
   status: SectorStatus;
@@ -108,6 +117,7 @@ const SECTORS: SystemSector[] = [
 
 const SectorCard = ({ sector, index }: { sector: SystemSector; index: number }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const IconComponent = ICON_MAP[sector.icon]; // Retrieve the Lucide component
 
   const statusColors: Record<SectorStatus, string> = {
     trial: "bg-emerald-500",
@@ -143,7 +153,8 @@ const SectorCard = ({ sector, index }: { sector: SystemSector; index: number }) 
             {/* Header */}
             <div className="flex justify-between items-start mb-4">
               <div className={cn("p-3 rounded bg-zinc-900 border border-white/5 group-hover:border-white/20 transition-colors", sector.color)}>
-                <VibeContentRenderer content={`::${sector.icon}::`} />
+                {/* Render Lucide Icon directly */}
+                {IconComponent && <IconComponent className="w-6 h-6" />}
               </div>
               <div className={cn(
                 "px-2 py-1 text-[9px] font-mono font-bold border rounded uppercase tracking-wider",
