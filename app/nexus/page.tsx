@@ -1,17 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { 
-  Activity, Server, Database, Globe, Cpu, 
-  ShieldCheck, Zap, Box, GraduationCap, 
-  DollarSign, Terminal, Lock, Play, FlaskVial
+  FlaskVial, Terminal, Play, FaBeer, FaBox, FaGraduationCap, 
+  FaTerminal, FaBrain, FaDna, FaBolt, FaSackDollar
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useAppContext } from "@/contexts/AppContext";
-import { toast } from "sonner";
 
 // --- Types & Data ---
 
@@ -152,14 +150,14 @@ const SectorCard = ({ sector, index }: { sector: SystemSector; index: number }) 
             {sector.description}
           </p>
 
-          {/* Tech Footer — simplified */}
+          {/* Footer */}
           <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center text-xs font-mono text-zinc-500">
             <span className="opacity-70 group-hover:opacity-100">
               {sector.metrics}
             </span>
           </div>
           
-          {/* Hover Glow Effect */}
+          {/* Hover Glow */}
           <div className={cn(
             "absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none bg-gradient-to-br",
             sector.color.replace('text-', 'from-')
@@ -171,16 +169,18 @@ const SectorCard = ({ sector, index }: { sector: SystemSector; index: number }) 
 };
 
 const SystemStats = () => {
+  const stats = [
+    { label: "САМЫЙ БЫСТРЫЙ ВЫИГРЫШ", val: "12 мин", icon: FaBolt, color: "text-brand-cyan" },
+    { label: "ПОСЛЕДНЯЯ ПОБЕДА", val: "+2 300 ₽", icon: FaSackDollar, color: "text-green-400" },
+    { label: "ВАШ СТАТУС", val: "ГОТОВ ПРОБОВАТЬ", icon: FlaskVial, color: "text-brand-purple" },
+  ];
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
-      {[
-        { label: "САМЫЙ БЫСТРЫЙ ВЫИГРЫШ", val: "12 мин", icon: "FaBolt", color: "text-brand-cyan" },
-        { label: "ПОСЛЕДНЯЯ ПОБЕДА", val: "+2 300 ₽", icon: "FaSackDollar", color: "text-green-400" },
-        { label: "ВАШ СТАТУС", val: "ГОТОВ ПРОБОВАТЬ", icon: "FaFlaskVial", color: "text-brand-purple" },
-      ].map((stat, i) => (
+      {stats.map((stat, i) => (
         <div key={i} className="bg-black/40 border border-white/10 p-4 rounded-lg flex items-center gap-4">
           <div className={cn("text-2xl", stat.color)}>
-             <VibeContentRenderer content={`::${stat.icon}::`} />
+            <stat.icon className="w-6 h-6" />
           </div>
           <div>
             <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider">{stat.label}</div>
@@ -194,17 +194,27 @@ const SystemStats = () => {
 
 export default function NexusPage() {
   const { user } = useAppContext();
-  
+  const [firstWinFeedback, setFirstWinFeedback] = useState<string | null>(null);
+
+  // Для логгирования в аналитику (например, PostHog, Plausible) — только на клиенте
+  useEffect(() => {
+    // Можно добавить: if (firstWinFeedback) track('first_experiment_started')
+  }, [firstWinFeedback]);
+
   const handleFirstWin = () => {
-    // Просто показываем фидбек — без API (для первого опыта)
-    toast.success("✅ Ты сделал первый шаг! Теперь ты в игре.");
-    // Логика аналитики — через hidden API, но пользователю — только позитив
+    setFirstWinFeedback("✅ Отлично! Теперь ты в игре. Следующий шаг — выбери эксперимент выше.");
+    // Если нужна аналитика — вызовите track() здесь, например:
+    // window.plausible?.('first_experiment_click');
+  };
+
+  const handleNotToday = () => {
+    setFirstWinFeedback("Хорошо! Через пару дней напомним — без спама.");
   };
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-brand-cyan/30 overflow-x-hidden relative">
       
-      {/* Dynamic Background Grid — оставляем, выглядит круто */}
+      {/* Grid Background */}
       <div className="fixed inset-0 z-0 opacity-20 pointer-events-none" 
            style={{ 
              backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)', 
@@ -213,10 +223,9 @@ export default function NexusPage() {
            }} 
       />
       
-      {/* Central Content */}
       <main className="relative z-10 max-w-7xl mx-auto px-4 py-12 md:py-20">
         
-        {/* Header — переименовано */}
+        {/* Header */}
         <header className="text-center mb-16">
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
@@ -236,17 +245,15 @@ export default function NexusPage() {
           </p>
         </header>
 
-        {/* Stats Row — обновлён */}
         <SystemStats />
 
-        {/* Grid of Sectors — обновлённые названия и описания */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-20">
           {SECTORS.map((sector, index) => (
             <SectorCard key={sector.id} sector={sector} index={index} />
           ))}
         </div>
 
-        {/* Deep Dive — переименовано в "Реальные эксперименты от друзей" */}
+        {/* Real Wins */}
         <div className="border-t border-white/10 pt-12">
           <div className="flex flex-col md:flex-row justify-between items-end gap-6">
             <div>
@@ -275,7 +282,7 @@ export default function NexusPage() {
           </div>
         </div>
 
-        {/* Мини-PACT прямо на странице */}
+        {/* Mini PACT — полностью SSR-safe */}
         <div className="mt-16 bg-zinc-950/60 border border-brand-purple/30 rounded-xl p-6 max-w-2xl mx-auto">
           <div className="flex items-start gap-4">
             <div className="mt-1 w-8 h-8 rounded-full bg-brand-purple flex items-center justify-center flex-shrink-0">
@@ -286,16 +293,23 @@ export default function NexusPage() {
               <p className="text-sm text-gray-300 mb-4">
                 Открой Drink Royale → Отсканируй QR-код в любом баре → Узнай, кто «враг рядом».
               </p>
+              
+              {firstWinFeedback ? (
+                <div className="mb-4 p-3 bg-black/30 border border-brand-green/30 rounded text-sm text-brand-green font-mono">
+                  {firstWinFeedback}
+                </div>
+              ) : null}
+
               <div className="flex gap-3">
                 <button
                   onClick={handleFirstWin}
-                  className="px-5 py-2 bg-brand-green hover:bg-green-400 text-black font-bold text-sm rounded uppercase tracking-wider"
+                  className="px-5 py-2 bg-brand-green hover:bg-green-400 text-black font-bold text-sm rounded uppercase tracking-wider transition-colors"
                 >
                   Я ВЫИГРАЛ!
                 </button>
                 <button
-                  onClick={() => toast.info("Не сегодня — нормально. Через 3 дня напомним.")}
-                  className="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 text-gray-300 font-bold text-sm rounded uppercase tracking-wider"
+                  onClick={handleNotToday}
+                  className="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 text-gray-300 font-bold text-sm rounded uppercase tracking-wider transition-colors"
                 >
                   Не сегодня
                 </button>
