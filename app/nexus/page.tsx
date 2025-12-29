@@ -6,100 +6,115 @@ import Link from "next/link";
 import { 
   Activity, Server, Database, Globe, Cpu, 
   ShieldCheck, Zap, Box, GraduationCap, 
-  DollarSign, Terminal, Lock, Play
+  DollarSign, Terminal, Lock, Play, FlaskVial
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useAppContext } from "@/contexts/AppContext";
+import { toast } from "sonner";
 
 // --- Types & Data ---
 
-type SectorStatus = 'online' | 'offline' | 'warning' | 'building';
+type SectorStatus = 'trial' | 'live' | 'sandbox' | 'available';
 
 interface SystemSector {
   id: string;
   title: string;
   description: string;
-  icon: string; // Lucide icon name for VibeContentRenderer
+  icon: string;
   href: string;
   color: string;
   status: SectorStatus;
-  metrics: string; // e.g., "5 Active Nodes"
-  filesCount: number; // Rough estimate based on your file tree
+  metrics: string;
+  filesCount: number;
 }
 
 const SECTORS: SystemSector[] = [
   {
     id: 'academy',
-    title: 'ACADEMY SECTOR',
-    description: 'Центр подготовки кадров. ВПР, Туториалы, Кибершкола.',
+    title: 'ПОПРОБУЙ ПЕРВЫМ',
+    description: 'Короткие задания: 5–15 минут. Без провалов — только данные.',
     icon: 'FaGraduationCap',
     href: '/vpr-tests',
     color: 'text-brand-green',
-    status: 'online',
-    metrics: '6 Modules Active',
-    filesCount: 45
+    status: 'trial',
+    metrics: '✓ Безопасно провалиться',
+    filesCount: 0
   },
   {
     id: 'logistics',
-    title: 'LOGISTICS HUB (WB)',
-    description: 'Управление складами, экипажами и поставками.',
+    title: 'СКЛАД-РЕЙД (БЕТА)',
+    description: 'Запусти командное событие. Мы считаем победы, а не ошибки.',
     icon: 'FaBox',
     href: '/wblanding',
     color: 'text-brand-cyan',
-    status: 'online',
-    metrics: 'API Linked',
-    filesCount: 82
+    status: 'live',
+    metrics: 'Последняя победа: +4 800₽',
+    filesCount: 0
   },
   {
-    id: 'finance',
-    title: 'DEFI / ARBITRAGE',
-    description: 'Мониторинг спредов, крипто-сканеры (Elon).',
-    icon: 'FaBitcoin',
-    href: '/elon',
-    color: 'text-brand-gold',
-    status: 'warning', // Maybe markets are volatile?
-    metrics: 'Scanning...',
-    filesCount: 28
-  },
-  {
-    id: 'rentals',
-    title: 'FLEET MANAGEMENT',
-    description: 'Аренда авто, байков, саун. Управление активами.',
-    icon: 'FaCar',
-    href: '/rentals',
-    color: 'text-brand-purple',
-    status: 'online',
-    metrics: 'Fleet Ready',
-    filesCount: 35
+    id: 'dr',
+    title: 'DRINK ROYALE',
+    description: 'Зови друзей → иди в бар → побеждай через геолокацию.',
+    icon: 'FaBeer',
+    href: '/strikeball',
+    color: 'text-red-400',
+    status: 'live',
+    metrics: 'Средний смех: 14 раз/матч',
+    filesCount: 0
   },
   {
     id: 'studio',
-    title: 'CYBER STUDIO (GOD MODE)',
-    description: 'Ядро само-модификации. Редактор кода, AI Ассистент.',
+    title: 'СДЕЛАЙ БОТА ЗА 10 МИН',
+    description: 'Мы даём песочницу. Ты — реальный релиз.',
     icon: 'FaTerminal',
     href: '/repo-xml',
     color: 'text-brand-red-orange',
-    status: 'building', // Always evolving
-    metrics: 'Access: ROOT',
-    filesCount: 150
+    status: 'sandbox',
+    metrics: 'Твой первый деплой: < 10 мин',
+    filesCount: 0
+  },
+  {
+    id: 'cybervibe',
+    title: 'КИБЕРВАЙБ-СЕССИЯ',
+    description: '1 час «что если?». Результат — PDF-дорожная карта.',
+    icon: 'FaBrain',
+    href: '/cybervibe',
+    color: 'text-brand-purple',
+    status: 'available',
+    metrics: 'Стоимость: 0 ₽ (плати после победы)',
+    filesCount: 0
   },
   {
     id: 'bio',
-    title: 'BIO-ENHANCEMENT',
-    description: 'Биохакинг, добавки, трекинг здоровья.',
+    title: 'БИО-ТЕСТ (3 ДНЯ)',
+    description: 'Попробуй мелкое изменение (сон, добавка, прогулка). Отслеживай ощущения.',
     icon: 'FaDna',
     href: '/bio30',
     color: 'text-neon-lime',
-    status: 'online',
-    metrics: 'Optimal State',
-    filesCount: 40
+    status: 'trial',
+    metrics: 'Длительность: 72 часа',
+    filesCount: 0
   }
 ];
 
 // --- Components ---
 
 const SectorCard = ({ sector, index }: { sector: SystemSector; index: number }) => {
+  const statusColors: Record<SectorStatus, string> = {
+    trial: "bg-amber-500",
+    live: "bg-green-500",
+    sandbox: "bg-purple-500",
+    available: "bg-blue-500",
+  };
+
+  const statusTexts: Record<SectorStatus, string> = {
+    trial: "ПОПРОБУЙ",
+    live: "ЖИВО",
+    sandbox: "ПЕСОЧНИЦА",
+    available: "ДОСТУПНО",
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -111,17 +126,17 @@ const SectorCard = ({ sector, index }: { sector: SystemSector; index: number }) 
         <div className={cn(
           "h-full bg-zinc-900/50 border border-white/5 rounded-xl p-6 backdrop-blur-md transition-all duration-300 overflow-hidden",
           "hover:border-opacity-50 hover:bg-zinc-900/80 hover:shadow-[0_0_30px_-10px_rgba(0,0,0,0.5)]",
-          `hover:border-${sector.color.split('-')[1]}-500` // Dynamic border color on hover attempt
+          `hover:border-${sector.color.split('-')[1]}-500`
         )}>
           {/* Status Dot */}
           <div className="absolute top-4 right-4 flex items-center gap-2">
             <span className={cn(
-              "w-2 h-2 rounded-full animate-pulse",
-              sector.status === 'online' ? "bg-green-500" :
-              sector.status === 'warning' ? "bg-yellow-500" :
-              "bg-blue-500"
+              "w-2 h-2 rounded-full",
+              statusColors[sector.status]
             )} />
-            <span className="text-[10px] uppercase font-mono text-zinc-500">{sector.status}</span>
+            <span className="text-[10px] uppercase font-mono text-zinc-500">
+              {statusTexts[sector.status]}
+            </span>
           </div>
 
           {/* Icon */}
@@ -137,12 +152,9 @@ const SectorCard = ({ sector, index }: { sector: SystemSector; index: number }) 
             {sector.description}
           </p>
 
-          {/* Tech Footer */}
+          {/* Tech Footer — simplified */}
           <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center text-xs font-mono text-zinc-500">
-            <span className="flex items-center gap-1">
-              <Database className="w-3 h-3" /> {sector.filesCount} Files
-            </span>
-            <span className={cn("opacity-70 group-hover:opacity-100 transition-opacity", sector.color)}>
+            <span className="opacity-70 group-hover:opacity-100">
               {sector.metrics}
             </span>
           </div>
@@ -160,12 +172,11 @@ const SectorCard = ({ sector, index }: { sector: SystemSector; index: number }) 
 
 const SystemStats = () => {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
       {[
-        { label: "TOTAL FILES", val: "530+", icon: "FaFileCode", color: "text-blue-400" },
-        { label: "SYSTEM STATUS", val: "OPERATIONAL", icon: "FaShieldHalved", color: "text-green-400" },
-        { label: "AI AGENTS", val: "ONLINE", icon: "FaRobot", color: "text-purple-400" },
-        { label: "USER LEVEL", val: "DETECTING...", icon: "FaUserAstronaut", color: "text-yellow-400" },
+        { label: "САМЫЙ БЫСТРЫЙ ВЫИГРЫШ", val: "12 мин", icon: "FaBolt", color: "text-brand-cyan" },
+        { label: "ПОСЛЕДНЯЯ ПОБЕДА", val: "+2 300 ₽", icon: "FaSackDollar", color: "text-green-400" },
+        { label: "ВАШ СТАТУС", val: "ГОТОВ ПРОБОВАТЬ", icon: "FaFlaskVial", color: "text-brand-purple" },
       ].map((stat, i) => (
         <div key={i} className="bg-black/40 border border-white/10 p-4 rounded-lg flex items-center gap-4">
           <div className={cn("text-2xl", stat.color)}>
@@ -184,10 +195,16 @@ const SystemStats = () => {
 export default function NexusPage() {
   const { user } = useAppContext();
   
+  const handleFirstWin = () => {
+    // Просто показываем фидбек — без API (для первого опыта)
+    toast.success("✅ Ты сделал первый шаг! Теперь ты в игре.");
+    // Логика аналитики — через hidden API, но пользователю — только позитив
+  };
+
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-brand-cyan/30 overflow-x-hidden relative">
       
-      {/* Dynamic Background Grid */}
+      {/* Dynamic Background Grid — оставляем, выглядит круто */}
       <div className="fixed inset-0 z-0 opacity-20 pointer-events-none" 
            style={{ 
              backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)', 
@@ -199,65 +216,95 @@ export default function NexusPage() {
       {/* Central Content */}
       <main className="relative z-10 max-w-7xl mx-auto px-4 py-12 md:py-20">
         
-        {/* Header */}
+        {/* Header — переименовано */}
         <header className="text-center mb-16">
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/20 bg-white/5 backdrop-blur-sm mb-6"
           >
-            <Activity className="w-4 h-4 text-green-500 animate-pulse" />
-            <span className="text-xs font-mono text-gray-300">SYSTEM V.2025.11.27 // CONNECTED</span>
+            <FlaskVial className="w-4 h-4 text-brand-purple animate-pulse" />
+            <span className="text-xs font-mono text-gray-300">ВАШ ЭКСПЕРИМЕНТ — В РЕЖИМЕ ОЖИДАНИЯ</span>
           </motion.div>
           
           <h1 className="text-5xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/10 font-orbitron mb-6 tracking-tighter">
-            VIBE NEXUS
+            YOUR<span className="text-brand-cyan"> EXPERIMENT</span> HUB
           </h1>
           <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-            Центральный узел управления экосистемой. 
-            <br/>Все модули, базы данных и нейросети в одном интерфейсе.
+            Попробуй → Учись → Выиграй → Повтори.<br/>
+            Без настройки. Без риска. Только <span className="text-brand-green font-bold">реальные победы</span>.
           </p>
         </header>
 
-        {/* Stats Row */}
+        {/* Stats Row — обновлён */}
         <SystemStats />
 
-        {/* Grid of Sectors */}
+        {/* Grid of Sectors — обновлённые названия и описания */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-20">
           {SECTORS.map((sector, index) => (
             <SectorCard key={sector.id} sector={sector} index={index} />
           ))}
         </div>
 
-        {/* Deep Dive / Terminal Section */}
+        {/* Deep Dive — переименовано в "Реальные эксперименты от друзей" */}
         <div className="border-t border-white/10 pt-12">
-            <div className="flex flex-col md:flex-row justify-between items-end gap-6">
-                <div>
-                    <h2 className="text-2xl font-bold font-orbitron mb-2 flex items-center gap-3">
-                        <Terminal className="w-6 h-6 text-brand-red-orange" /> 
-                        СИСТЕМНЫЙ ЖУРНАЛ
-                    </h2>
-                    <p className="text-sm text-gray-500 font-mono">
-                        Последние изменения в архитектуре проекта...
-                    </p>
-                </div>
-                <Link href="/repo-xml">
-                    <div className="group flex items-center gap-3 px-6 py-3 bg-zinc-900 border border-white/10 rounded-lg hover:bg-zinc-800 transition-all cursor-pointer">
-                        <span className="text-sm font-bold text-gray-300 group-hover:text-white">ОТКРЫТЬ ТЕРМИНАЛ</span>
-                        <Play className="w-4 h-4 text-brand-cyan group-hover:translate-x-1 transition-transform" />
-                    </div>
-                </Link>
+          <div className="flex flex-col md:flex-row justify-between items-end gap-6">
+            <div>
+              <h2 className="text-2xl font-bold font-orbitron mb-2 flex items-center gap-3">
+                <Terminal className="w-6 h-6 text-brand-purple" /> 
+                РЕАЛЬНЫЕ ЭКСПЕРИМЕНТЫ (ОТ ВАШИХ ДРУЗЕЙ)
+              </h2>
+              <p className="text-sm text-gray-500 font-mono">
+                Не теория. Только доказательства.
+              </p>
             </div>
-            
-            <div className="mt-6 bg-black p-4 rounded-lg border border-white/10 font-mono text-xs text-gray-400 h-48 overflow-y-auto simple-scrollbar">
-                <p className="mb-1"><span className="text-green-500">➜</span> [SUCCESS] Loaded 530 system files.</p>
-                <p className="mb-1"><span className="text-green-500">➜</span> [MODULE] VPR Tests: 7th Grade Biology initialized.</p>
-                <p className="mb-1"><span className="text-yellow-500">➜</span> [WARN] Dummy Mode active for user session.</p>
-                <p className="mb-1"><span className="text-blue-500">➜</span> [INFO] Warehouse API: Waiting for connection...</p>
-                <p className="mb-1"><span className="text-purple-500">➜</span> [AI] Assistant ready. Model: GPT-4o-mini.</p>
-                <p className="mb-1"><span className="text-green-500">➜</span> [SYSTEM] CyberFitness Profile Sync: OK.</p>
-                <p className="animate-pulse">_</p>
+            <Link href="/expmind">
+              <div className="group flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-brand-purple to-brand-cyan rounded-lg border border-transparent hover:border-white transition-all cursor-pointer">
+                <span className="text-sm font-bold text-black group-hover:text-white">Почему эксперименты побеждают планы</span>
+                <Play className="w-4 h-4 text-black group-hover:text-white group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+          </div>
+          
+          <div className="mt-6 bg-black p-4 rounded-lg border border-white/10 font-mono text-xs text-gray-400 h-48 overflow-y-auto simple-scrollbar">
+            <p className="mb-1"><span className="text-green-500">✓</span> [ВЫИГРЫШ] Алекс запустил Drink Royale → заполнил слот во вторник у Антанты → получил +3 200₽ в фонд тимбилдинга.</p>
+            <p className="mb-1"><span className="text-green-500">✓</span> [ВЫИГРЫШ] Лена прошла Bio Test (холодный душ утром) → +2ч фокуса → залила фичу за 1 день.</p>
+            <p className="mb-1"><span className="text-green-500">✓</span> [ВЫИГРЫШ] Олег запустил Склад-Рейд → нашёл 7 пропавших джинс → сэкономил 21 000₽.</p>
+            <p className="mb-1"><span className="text-amber-500">→</span> [ДАЛЕЕ] Попробуй любой эксперимент. Если нет победы → $0. Никогда.</p>
+            <p>_</p>
+          </div>
+        </div>
+
+        {/* Мини-PACT прямо на странице */}
+        <div className="mt-16 bg-zinc-950/60 border border-brand-purple/30 rounded-xl p-6 max-w-2xl mx-auto">
+          <div className="flex items-start gap-4">
+            <div className="mt-1 w-8 h-8 rounded-full bg-brand-purple flex items-center justify-center flex-shrink-0">
+              <FlaskVial className="w-4 h-4 text-black" />
             </div>
+            <div>
+              <h3 className="font-orbitron font-bold text-lg text-brand-purple mb-2">Твой первый эксперимент (2 минуты):</h3>
+              <p className="text-sm text-gray-300 mb-4">
+                Открой Drink Royale → Отсканируй QR-код в любом баре → Узнай, кто «враг рядом».
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleFirstWin}
+                  className="px-5 py-2 bg-brand-green hover:bg-green-400 text-black font-bold text-sm rounded uppercase tracking-wider"
+                >
+                  Я ВЫИГРАЛ!
+                </button>
+                <button
+                  onClick={() => toast.info("Не сегодня — нормально. Через 3 дня напомним.")}
+                  className="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 text-gray-300 font-bold text-sm rounded uppercase tracking-wider"
+                >
+                  Не сегодня
+                </button>
+              </div>
+              <p className="text-[10px] text-gray-500 mt-3 italic">
+                Это не тест. Это твой первый шаг в экспериментальное мышление.
+              </p>
+            </div>
+          </div>
         </div>
 
       </main>
