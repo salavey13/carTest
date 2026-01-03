@@ -77,8 +77,17 @@ export default function LobbyRoom() {
 
   useEffect(() => { if (queue.length > 0) burstSync(processUplink); }, [queue.length, burstSync, processUplink]);
 
-    const handleShare = async () => {
-    const res = await generateLobbyShareLink(lobbyId as string);
+  const handleShare = async () => {
+    // Форматируем дату на клиенте (использует локальный часовой пояс пользователя)
+    let timeStr = "СКОРО";
+    if (lobby.start_at) {
+      timeStr = new Date(lobby.start_at).toLocaleString('ru-RU', {
+          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    // Передаем отформатированную строку на сервер
+    const res = await generateLobbyShareLink(lobbyId as string, timeStr);
     
     if (res.success && res.shareUrl) {
       if (tg?.openTelegramLink) {
