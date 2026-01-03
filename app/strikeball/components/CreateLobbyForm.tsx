@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { createStrikeballLobby } from "../actions/lobby";
+// Assuming you will expose editLobby or move it. If it's in the same file, just import it.
+import { editLobby } from "../actions/lobby"; 
 import { cn } from "@/lib/utils";
-import { FaUsers, FaCheck, FaLocationDot, FaSitemap } from "react-icons/fa6";
+import { FaUsers, FaCheck, FaLocationDot, FaSitemap, FaRobot } from "react-icons/fa6";
 
-// --- UPDATED: Added onBlur prop to Q3Input ---
 const Q3Input = ({ label, value, onChange, type = "text", placeholder, icon, onBlur }: any) => (
   <label className="block mb-3">
     <div className="flex items-center gap-2 mb-1">
@@ -18,17 +19,25 @@ const Q3Input = ({ label, value, onChange, type = "text", placeholder, icon, onB
       type={type}
       value={value} 
       onChange={onChange} 
-      onBlur={onBlur} // Passed through now
+      onBlur={onBlur}
       className="w-full p-3 bg-zinc-950 border border-zinc-700 text-zinc-300 font-mono text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-900 transition-colors rounded-none placeholder:text-zinc-800" 
       placeholder={placeholder} 
     />
   </label>
 );
 
-export const CreateLobbyForm: React.FC = () => {
+// Расширяем интерфейс пропсов для поддержки редактирования
+interface CreateLobbyFormProps {
+  isEdit?: boolean;
+  initialData?: any; // Объект лобби при редактировании
+  onSubmit?: (lobbyId: string) => Promise<void>; // Коллбэк для завершения
+}
+
+export const CreateLobbyForm: React.FC<CreateLobbyFormProps> = ({ isEdit = false, initialData, onSubmit }) => {
   const { dbUser, userCrewInfo } = useAppContext();
   const userId = dbUser?.user_id ?? null;
 
+  // Состояния формы
   const [name, setName] = useState("");
   const [mode, setMode] = useState("STRIKEBALL");
   const [date, setDate] = useState("");
@@ -41,8 +50,31 @@ export const CreateLobbyForm: React.FC = () => {
   
   const [hostAsCrew, setHostAsCrew] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [botsEnabled, setBotsEnabled] = useState(true);
 
-  const submit = async (e?: React.FormEvent) => {
+  // Заполнение формы при редактировании
+  useEffect(() => {
+    if (isEdit && initialData) {
+      setName(initialData.name || "");
+      setMode(initialData.mode || "STRIKEBALL");
+      setHostAsCrew(!!initialData.crew_id);
+      
+      if (initialData.start_at) {
+        const d = new Date(initialData.start_at);
+        setDate(d.toISOString().split('T')[0]);
+        setTime(d.toTimeString().substring(0, 5));
+      }
+      
+      setLocation(initialData.field_id || "");
+      setMaxPlayersInput(String(initialData.max_players || 20));
+      
+      // Глубокая проверка для bots_enabled в metadata
+      const metaBots = initialData.metadata?.bots_enabled;
+      setBotsEnabled(metaBots !== undefined ? metaBots : true);
+    }
+  }, [isEdit, initialData]);
+
+  const handleFormSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!userId) return toast.error("ТРЕБУЕТСЯ АВТОРИЗАЦИЯ");
     if (name.trim().length < 3) return toast.error("СЛИШКОМ КОРОТКОЕ НАЗВАНИЕ");
@@ -54,18 +86,36 @@ export const CreateLobbyForm: React.FC = () => {
     }
 
     try {
-      const result = await createStrikeballLobby(userId, { 
-          name, 
-          mode, 
-          max_players: Number(maxPlayersInput) || 20, // Fallback to 20 if parsing fails
-          start_at: startAtISO,
-          crew_id: (hostAsCrew && userCrewInfo) ? userCrewInfo.id : undefined,
-          location: location 
-      });
-      
-      if (!result.success) throw new Error(result.error || "ОШИБКА СОЗДАНИЯ");
-      toast.success("ОПЕРАЦИЯ ИНИЦИИРОВАНА");
-      window.location.href = `/strikeball/lobbies/${result.lobbyId}`;
+      if (isEdit && onSubmit) {
+        // Режим редактирования
+        const result = await editLobby(userId, initialData.id, {
+            name,
+            mode,
+            max_players: Number(maxPlayersInput) || 20,
+            start_at: startAtISO,
+            crew_id: (hostAsCrew && userCrewInfo) ? userCrewInfo.id : undefined,
+            location: location,
+            metadata: { bots_enabled: botsEnabled }
+        });
+        
+        if (!result.success) throw new Error(result.error || "ОШИБКА ОБНОВЛЕНИЯ");
+        toast.success("ИЗМЕНЕНИЯ СОХРАНЕНЫ");
+        await onSubmit(initialData.id); // Коллбэк для родителя (например, перезагрузка)
+      } else {
+        // Режим создания
+        const result = await createStrikeballLobby(userId, { 
+            name, 
+            mode, 
+            max_players: Number(maxPlayersInput) || 20,
+            start_at: startAtISO,
+            crew_id: (hostAsCrew && userCrewInfo) ? userCrewInfo.id : undefined,
+            location: location 
+        });
+        
+        if (!result.success) throw new Error(result.error || "ОШИБКА СОЗДАНИЯ");
+        toast.success("ОПЕРАЦИЯ ИНИЦИИРОВАНА");
+        window.location.href = `/strikeball/lobbies/${result.lobbyId}`;
+      }
     } catch (err) {
       toast.error("ОШИБКА: " + ((err as Error).message));
     } finally { setIsSubmitting(false); }
@@ -79,7 +129,7 @@ export const CreateLobbyForm: React.FC = () => {
   };
 
   return (
-    <form onSubmit={submit} className="space-y-1">
+    <form onSubmit={handleFormSubmit} className="space-y-1">
       <Q3Input label="Название Операции" value={name} onChange={(e: any) => setName(e.target.value)} placeholder="Напр: Штурм Форта" />
 
       <div className="grid grid-cols-2 gap-3">
@@ -114,6 +164,17 @@ export const CreateLobbyForm: React.FC = () => {
 
       <Q3Input label="Координаты (GPS)" value={location} onChange={(e: any) => setLocation(e.target.value)} placeholder="56.3269, 44.0059" icon={<FaLocationDot />} />
 
+      {/* --- BOTS TOGGLE --- */}
+      <div onClick={() => setBotsEnabled(!botsEnabled)} className={cn("border p-3 cursor-pointer transition-all flex items-center justify-between mb-3 mt-2", botsEnabled ? "bg-amber-950/30 border-amber-500" : "bg-zinc-950 border-zinc-800 hover:border-zinc-600")}>
+          <div className="flex items-center gap-2">
+              <FaRobot className={botsEnabled ? "text-amber-400" : "text-zinc-600"} />
+              <span className={cn("text-xs font-bold", botsEnabled ? "text-amber-100" : "text-zinc-500")}>БОТЫ ВКЛЮЧЕНЫ (BOTS_ENABLED)</span>
+          </div>
+          <div className={cn("w-4 h-4 border flex items-center justify-center", botsEnabled ? "border-amber-500 bg-amber-500 text-black" : "border-zinc-700")}>
+              {botsEnabled && <FaCheck size={10} />}
+          </div>
+      </div>
+
       {/* --- CREW CHECKBOX FIX --- */}
       {/* Relaxed condition from userCrewInfo.is_owner to just userCrewInfo for visibility */}
       {userCrewInfo && (
@@ -134,7 +195,7 @@ export const CreateLobbyForm: React.FC = () => {
       </div>
 
       <button type="submit" disabled={isSubmitting} className={cn("w-full py-4 mt-6 font-black text-lg uppercase tracking-[0.2em] border-2 transition-all active:scale-95", isSubmitting ? "bg-zinc-800 border-zinc-600 text-zinc-500" : "bg-red-700 border-red-500 text-black hover:bg-red-600 hover:text-white")}>
-        {isSubmitting ? "РАЗВЕРТЫВАНИЕ..." : "НАЧАТЬ ОПЕРАЦИЮ"}
+        {isSubmitting ? "СОХРАНЕНИЕ..." : (isEdit ? "СОХРАНИТЬ ИЗМЕНЕНИЯ" : "НАЧАТЬ ОПЕРАЦИЮ")}
       </button>
     </form>
   );
