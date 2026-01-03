@@ -141,7 +141,7 @@ export default function StrikeballDashboard() {
 
   return (
     <div className={cn(
-        "pt-28 pb-32 px-4 relative min-h-screen transition-all duration-700",
+        "pt-28 pb-32 px-4 relative min-h-screen transition-all duration-700 overflow-x-hidden",
         isLive ? "bg-[#000000]" : "" 
     )}>
       <AnimatePresence>
