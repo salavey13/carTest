@@ -71,7 +71,7 @@ export function LobbyTabManager({ activeTab, lobby, members, dbUser, isOwner, is
       );
 
     case 'safety':
-      return <SafetyBriefing onComplete={(data: any) => signSafetyBriefing(userMember.id, data).then(loadData)} isSigned={!!userMember?.metadata?.safety_signed} />;
+      return <SafetyBriefing onComplete={(data: any) => signSafetyBriefing(userMember.id, data).then(loadData)} mode={lobby.mode} isSigned={!!userMember?.metadata?.safety_signed} />;
 
     default:
       return null;
