@@ -96,6 +96,7 @@ export const CreateLobbyForm: React.FC = () => {
                 <option value="VIBECODE">Vibe Coding</option>
                 <option value="ENDURO">Эндуро Рейд</option>
                 <option value="SNOWBOARD">Сноуборд / Лыжи</option>
+                <option value="LAN PARTY">LAN PARTY</option>
             </select>
         </label>
 

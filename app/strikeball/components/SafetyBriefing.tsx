@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
-import { FaShieldHalved, FaSkull, FaEye, FaHandFist, FaCheck, FaUsers, FaFire, FaUserPen, FaPhone, FaSchool, FaBeerMugEmpty, FaLaptopCode, FaMotorcycle, FaSnowflake } from "react-icons/fa6";
+import { FaShieldHalved, FaSkull, FaEye, FaHandFist, FaCheck, FaUsers, FaFire, FaUserPen, FaPhone, FaSchool, FaBeerMugEmpty, FaLaptopCode, FaMotorcycle, FaSnowflake, FaWifi, FaDownload } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 import { toast } from 'sonner';
 
@@ -84,6 +84,17 @@ const SNOWBOARD_QUESTIONS = [
   ]}
 ];
 
+const LAN_QUESTIONS = [
+  { id: 1, q: "Нужно ли установить фирменный клиент игры ДО прибытия?", options: [
+      { text: "Да пофиг ('fuck it'), скачаю на месте", correct: false, response: "НЕТ! Ты задержишь турнир и создашь очередь на Wi-Fi." },
+      { text: "Да, по ссылке в описании или у владельца", correct: true, response: "ВЕРНО. Это сэкономит время всех и обеспечит стабильный клиент." }
+  ]},
+  { id: 2, q: "Можно ли качать торренты во время турнира?", options: [
+      { text: "Да, у нас гигабит", correct: false, response: "НЕТ. Ты забьешь канал и создашь лаги для всех игроков." },
+      { text: "Нет, ограничить скорость", correct: true, response: "ВЕРНО. Respect the ping и другие." }
+  ]}
+];
+
 // --- CONTENT SELECTOR ---
 
 const getBriefingContent = (mode: string) => {
@@ -141,6 +152,17 @@ const getBriefingContent = (mode: string) => {
         { icon: FaSnowflake, title: "ПРИВЯЗЬ", text: "Leash (привязь) к ноге — ОБЯЗАТЕЛЬНО." },
         { icon: FaEye, title: "ПРАВА", text: "Уступай дорогу тем, кто ниже тебя на склоне." },
         { icon: FaShieldHalved, title: "ЭКИП", text: "Шлем и защита обязательны для катания." }
+      ]
+    };
+  }
+
+  if (["LAN PARTY"].includes(m)) {
+    return {
+      questions: LAN_QUESTIONS,
+      summary: [
+        { icon: FaWifi, title: "СЕТЬ", text: "Не грузи торрентами, во время турнира — уважай пинг." },
+        { icon: FaDownload, title: "ПРОГРАММЫ", text: "Скачай фирменный клиент ДО прибытия." },
+        { icon: FaShieldHalved, title: "ОБОРУДОВАНИЕ", text: "Неси свою клавиатуру и мышь, не трогай чужое." }
       ]
     };
   }
