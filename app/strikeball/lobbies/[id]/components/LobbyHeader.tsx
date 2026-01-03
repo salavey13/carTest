@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaShareNodes, FaFilePdf, FaSpinner, FaUserShield, FaCircleCheck, FaCircleXmark, FaPenToSquare } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
-import { CreateLobbyForm } from "../../components/CreateLobbyForm"; // Import reused form
+import { CreateLobbyForm } from "../../../components/CreateLobbyForm"; // Import reused form
 import { editLobby } from "../../actions/lobby"; // Import edit action
 import { toast } from 'sonner';
 
