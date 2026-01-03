@@ -3,45 +3,185 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
-import { FaShieldHalved, FaSkull, FaEye, FaHandFist, FaCheck, FaUsers, FaFire, FaUserPen, FaPhone, FaSchool } from "react-icons/fa6";
+import { FaShieldHalved, FaSkull, FaEye, FaHandFist, FaCheck, FaUsers, FaFire, FaUserPen, FaPhone, FaSchool, FaBeerMugEmpty, FaLaptopCode, FaMotorcycle, FaSnowflake, FaWifi, FaDownload } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 import { toast } from 'sonner';
 
-const SAFETY_QUESTIONS = [
+// --- CONTENT DEFINITIONS ---
+
+const TACTICAL_QUESTIONS = [
   { id: 1, q: "Ты потерял защитные очки во время боя. Твои действия?", options: [
       { text: "Прищуриться и бежать на базу", correct: false, response: "ОШИБКА. Стой на месте, закрой лицо руками и кричи 'СТОП ИГРА'!" },
       { text: "Упасть лицом в землю, закрыть голову руками, кричать 'СТОП ИГРА'", correct: true, response: "ВЕРНО. Безопасность превыше всего." }
   ]},
   { id: 2, q: "Тебе меньше 14 лет. Можешь ли ты находиться на территории клуба один?", options: [
-      { text: "Да, если я уже играл", correct: false, response: "НЕТ. Дети до 14 лет только с родителями (Пункт №2 правил клуба)." },
+      { text: "Да, если я уже играл", correct: false, response: "НЕТ. Дети до 14 лет только с родителями." },
       { text: "Нет, только в сопровождении родителей", correct: true, response: "ВЕРНО. Это требование безопасности." }
   ]},
   { id: 3, q: "В тебя попали, но ты не уверен, был ли это шар или ветка.", options: [
-      { text: "Играть дальше", correct: false, response: "НЕТ. Страйкбол — игра на честность. Сомневаешься — уходи." },
+      { text: "Играть дальше", correct: false, response: "НЕТ. Честность превыше всего. Сомневаешься — уходи." },
       { text: "Уйти в мертвяк", correct: true, response: "ВЕРНО. Сохраняй репутацию честного игрока." }
   ]},
-  { id: 4, q: "Кому категорически не рекомендуется посещение программ клуба?", options: [
-      { text: "Людям с заболеваниями психики или позвоночника", correct: true, response: "ВЕРНО. Это пункты №5 и №6 правил." },
-      { text: "Людям без камуфляжа", correct: false, response: "НЕТ. Основное ограничение — здоровье." }
+  { id: 4, q: "Кому категорически не рекомендуется посещение?", options: [
+      { text: "Людям с заболеваниями психики или позвоночника", correct: true, response: "ВЕРНО. Здоровье важнее игры." },
+      { text: "Людям без камуфляжа", correct: false, response: "НЕТ. Ограничение только по здоровью." }
   ]},
   { id: 5, q: "Ты видишь противника в 2 метрах от себя. Как стрелять?", options: [
-      { text: "Очередью в голову", correct: false, response: "ТРАВМООПАСНО. Стой! Используй 'гуманный' выстрел." },
+      { text: "Очередью в голову", correct: false, response: "ТРАВМООПАСНО. Используй 'гуманный' выстрел." },
       { text: "Сказать 'БАХ' или использовать пистолет", correct: true, response: "ВЕРНО. Не калечь друзей." }
   ]},
-  { id: 6, q: "Можно ли использовать свои петарды или конфетти на территории?", options: [
-      { text: "Да, это праздник", correct: false, response: "ЗАПРЕЩЕНО. Пункт №11: пиротехника только по согласованию." },
-      { text: "Нет, запрещено без согласования с админом", correct: true, response: "ВЕРНО. Только с разрешения." }
+  { id: 6, q: "Можно ли использовать свои петарды или конфетти?", options: [
+      { text: "Да, это праздник", correct: false, response: "ЗАПРЕЩЕНО. Пиротехника только по согласованию." },
+      { text: "Нет, запрещено без согласования с админом", correct: true, response: "ВЕРНО. Спроси у маршала." }
   ]}
 ];
 
-const RULES_SUMMARY = [
-  { icon: FaEye, title: "ГЛАЗА", text: "Очки НИКОГДА не снимаются. Запотели? Иди в мертвяк." },
-  { icon: FaUsers, title: "ДЕТИ", text: "До 14 лет — только с родителями. Родители следят за детьми 100% времени." },
-  { icon: FaShieldHalved, title: "ЗДОРОВЬЕ", text: "Противопоказано при заболеваниях психики и позвоночника." },
-  { icon: FaFire, title: "ПИРОТЕХНИКА", text: "Фейерверки и конфетти без согласования запрещены (Пункт №11)." }
+const PARTY_QUESTIONS = [
+  { id: 1, q: "Ты чувствуешь себя плохо после игры. Твои действия?", options: [
+      { text: "Молча уйти домой", correct: false, response: "ОПАСНО. Сообщи организатору или другу." },
+      { text: "Сообщить организатору и не садиться за руль", correct: true, response: "ВЕРНО. Безопасность приоритет." }
+  ]},
+  { id: 2, q: "Можно ли приводить друзей без предварительной записи?", options: [
+      { text: "Да, чем больше, тем веселее", correct: false, response: "НЕТ. У нас лимит мест и список гостей." },
+      { text: "Нет, нужно согласовать", correct: true, response: "ВЕРНО. Проверь свободные слоты." }
+  ]}
 ];
 
-export const SafetyBriefing = ({ onComplete, isSigned }: any) => {
+const TECH_QUESTIONS = [
+  { id: 1, q: "Можно ли пить напитки рядом с дорогостоящим оборудованием?", options: [
+      { text: "Да, я аккуратный", correct: false, response: "НЕТ. Любая капля может вывести технику из строя." },
+      { text: "Нет, только в designated зоне", correct: true, response: "ВЕРНО. Береги нервы и железо." }
+  ]},
+  { id: 2, q: "Ты случайно удалил важный файл. Что делать?", options: [
+      { text: "Молчать", correct: false, response: "ПЛОХО. Сообщи ментору, возможно что-то можно восстановить." },
+      { text: "Сразу сказать и попытаться восстановить", correct: true, response: "ВЕРНО. Honesty is best policy." }
+  ]}
+];
+
+const SPORT_QUESTIONS = [
+  { id: 1, q: "Обязательно ли носить шлем?", options: [
+      { text: "Нет, я крученый", correct: false, response: "ГЛУПОСТЬ. Шлем спасает жизнь." },
+      { text: "Да, всегда", correct: true, response: "ВЕРНО. Без шлема — никуда." }
+  ]},
+  { id: 2, q: "Ты сломался на трассе. Твои действия?", options: [
+      { text: "Оставить мопед посередине трассы", correct: false, response: "НЕТ. Это опасно для других." },
+      { text: "Оттащить в безопасное место и подать сигнал", correct: true, response: "ВЕРНО. Безопасность всех участников." }
+  ]}
+];
+
+const SNOWBOARD_QUESTIONS = [
+  { id: 1, q: "Обязательна ли привязь (leash) на борде?", options: [
+      { text: "Нет, это неудобно", correct: false, response: "НЕТ. Потерянный борд на горе может убить человека внизу." },
+      { text: "Да, это строгий стандарт безопасности", correct: true, response: "ВЕРНО. Привязь обязательна." }
+  ]},
+  { id: 2, q: "Кому нужно уступить дорогу на склоне?", options: [
+      { text: "Кто едет быстрее", correct: false, response: "НЕТ. Правом обладает тот, кто находится ниже (спереди)." },
+      { text: "Тот, кто едет позади (выше)", correct: true, response: "ВЕРНО. Контролируй скорость, не наезжай на тех, кто ниже." }
+  ]},
+  { id: 3, q: "Ты собираешься прыгнуть с трамплина, но сверху наваливается очередь.", options: [
+      { text: "Прыгать, чтобы не ждать", correct: false, response: "ОПАСНО. Остановись и убедись, что зона приземления свободна." },
+      { text: "Остановиться и убедиться в безопасности", correct: true, response: "ВЕРНО. Проверь трамплин перед стартом." }
+  ]}
+];
+
+const LAN_QUESTIONS = [
+  { id: 1, q: "Нужно ли установить фирменный клиент игры ДО прибытия?", options: [
+      { text: "Да пофиг ('fuck it'), скачаю на месте", correct: false, response: "НЕТ! Ты задержишь турнир и создашь очередь на Wi-Fi." },
+      { text: "Да, по ссылке в описании или у владельца", correct: true, response: "ВЕРНО. Это сэкономит время всех и обеспечит стабильный клиент." }
+  ]},
+  { id: 2, q: "Можно ли качать торренты во время турнира?", options: [
+      { text: "Да, у нас гигабит", correct: false, response: "НЕТ. Ты забьешь канал и создашь лаги для всех игроков." },
+      { text: "Нет, ограничить скорость", correct: true, response: "ВЕРНО. Respect the ping и другие." }
+  ]}
+];
+
+// --- CONTENT SELECTOR ---
+
+const getBriefingContent = (mode: string) => {
+  const m = mode?.toUpperCase();
+  
+  if (["STRIKEBALL", "PAINTBALL", "LAZERTAG", "HYDROBALL"].includes(m)) {
+    return {
+      questions: TACTICAL_QUESTIONS,
+      summary: [
+        { icon: FaEye, title: "ГЛАЗА", text: "Очки НИКОГДА не снимаются." },
+        { icon: FaUsers, title: "ДЕТИ", text: "До 14 лет — только с родителями." },
+        { icon: FaShieldHalved, title: "ЗДОРОВЬЕ", text: "Противопоказано при заболеваниях психики и позвоночника." },
+        { icon: FaFire, title: "ПИРОТЕХНИКА", text: "Без согласования запрещена." }
+      ]
+    };
+  }
+  
+  if (["DRINKNIGHT ROYALE"].includes(m)) {
+    return {
+      questions: PARTY_QUESTIONS,
+      summary: [
+        { icon: FaBeerMugEmpty, title: "АЛКОГОЛЬ", text: "Умеренность и ответственность." },
+        { icon: FaHandFist, title: "РЕСПЕКТ", text: "Никакой агрессии к другим игрокам." },
+        { icon: FaShieldHalved, title: "ДОРОГА", text: "Напился — вызвал такси. Пьяный за рулем = БАН." }
+      ]
+    };
+  }
+
+  if (["VIBECODE"].includes(m)) {
+    return {
+      questions: TECH_QUESTIONS,
+      summary: [
+        { icon: FaLaptopCode, title: "ТЕХНИКА", text: "Не роняй и не лей на ноутбуки." },
+        { icon: FaEye, title: "ГИГИЕНА", text: "Мой руки перед работой с чужим девайсом." },
+        { icon: FaFire, title: "ПИТАНИЕ", text: "Еда только в зоне отдыха (Kitchen)." }
+      ]
+    };
+  }
+
+  if (["ENDURO"].includes(m)) {
+    return {
+      questions: SPORT_QUESTIONS,
+      summary: [
+        { icon: FaMotorcycle, title: "ЭКИП", text: "Шлем, защита, перчатки — обязательно." },
+        { icon: FaUsers, title: "ТРАССА", text: "Движение только в одну сторону." },
+        { icon: FaHandFist, title: "ПОМОЩЬ", text: "Остановись, если кто-то упал." }
+      ]
+    };
+  }
+
+  if (["SNOWBOARD"].includes(m)) {
+    return {
+      questions: SNOWBOARD_QUESTIONS,
+      summary: [
+        { icon: FaSnowflake, title: "ПРИВЯЗЬ", text: "Leash (привязь) к ноге — ОБЯЗАТЕЛЬНО." },
+        { icon: FaEye, title: "ПРАВА", text: "Уступай дорогу тем, кто ниже тебя на склоне." },
+        { icon: FaShieldHalved, title: "ЭКИП", text: "Шлем и защита обязательны для катания." }
+      ]
+    };
+  }
+
+  if (["LAN PARTY"].includes(m)) {
+    return {
+      questions: LAN_QUESTIONS,
+      summary: [
+        { icon: FaWifi, title: "СЕТЬ", text: "Не грузи торрентами, во время турнира — уважай пинг." },
+        { icon: FaDownload, title: "ПРОГРАММЫ", text: "Скачай фирменный клиент ДО прибытия." },
+        { icon: FaShieldHalved, title: "ОБОРУДОВАНИЕ", text: "Неси свою клавиатуру и мышь, не трогай чужое." }
+      ]
+    };
+  }
+
+  // Fallback (Generic)
+  return {
+    questions: PARTY_QUESTIONS, // Reuse party questions as generic safe ones
+    summary: [
+      { icon: FaShieldHalved, title: "БЕЗОПАСНОСТЬ", text: "Соблюдай общие правила клуба." },
+      { icon: FaUsers, title: "УВАЖЕНИЕ", text: "Относись к другим игрокам с уважением." }
+    ]
+  };
+};
+
+// --- COMPONENT ---
+
+export const SafetyBriefing = ({ mode, onComplete, isSigned }: any) => {
+  const content = getBriefingContent(mode);
+  
   const [view, setView] = useState<'theory' | 'test' | 'form'>('theory');
   const [step, setStep] = useState(0);
   const [failed, setFailed] = useState(false);
@@ -50,7 +190,7 @@ export const SafetyBriefing = ({ onComplete, isSigned }: any) => {
   const handleAnswer = (correct: boolean, response: string) => {
     if (correct) {
       toast.success(response);
-      if (step < SAFETY_QUESTIONS.length - 1) setTimeout(() => setStep(step + 1), 800);
+      if (step < content.questions.length - 1) setTimeout(() => setStep(step + 1), 800);
       else setView('form');
     } else {
       toast.error(response);
@@ -68,7 +208,7 @@ export const SafetyBriefing = ({ onComplete, isSigned }: any) => {
     <div className="bg-emerald-950/20 border border-emerald-500 p-8 rounded-none text-center">
         <FaShieldHalved className="mx-auto text-5xl text-emerald-500 mb-4" />
         <h3 className="text-xl font-black text-emerald-500 font-orbitron uppercase">ДОПУСК_ПОЛУЧЕН</h3>
-        <p className="text-zinc-500 text-[10px] mt-2 font-mono uppercase tracking-widest">Digital signature confirmed // Archive_OK</p>
+        <p className="text-zinc-500 text-[10px] mt-2 font-mono uppercase tracking-widest">Digital signature confirmed // {mode}</p>
     </div>
   );
 
@@ -95,8 +235,8 @@ export const SafetyBriefing = ({ onComplete, isSigned }: any) => {
                 <input className="w-full bg-black border border-zinc-800 p-3 text-sm text-white focus:border-white outline-none rounded-none" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="8-9XX-XXX-XX-XX" />
             </div>
             <div className="space-y-1">
-                <span className="text-[8px] font-mono text-zinc-500 uppercase ml-1">Школа / Класс (Опционально)</span>
-                <input className="w-full bg-black border border-zinc-800 p-3 text-sm text-white focus:border-white outline-none rounded-none" value={formData.school} onChange={e => setFormData({...formData, school: e.target.value})} placeholder="Школа №1, 8А" />
+                <span className="text-[8px] font-mono text-zinc-500 uppercase ml-1">Школа / Организация (Опционально)</span>
+                <input className="w-full bg-black border border-zinc-800 p-3 text-sm text-white focus:border-white outline-none rounded-none" value={formData.school} onChange={e => setFormData({...formData, school: e.target.value})} placeholder="..." />
             </div>
         </div>
         <Button onClick={handleFinalSubmit} className="w-full bg-brand-cyan text-black font-black py-8 text-lg rounded-none hover:bg-white transition-all uppercase tracking-widest italic">
@@ -110,7 +250,7 @@ export const SafetyBriefing = ({ onComplete, isSigned }: any) => {
         <div className="bg-zinc-900/50 p-4 border-l-4 border-amber-600 mb-4">
             <p className="text-[10px] text-amber-500 font-mono italic">Пункт №1: Правила должны быть прочитаны до входа и соблюдаться неукоснительно.</p>
         </div>
-        {RULES_SUMMARY.map((rule, idx) => (
+        {content.summary.map((rule, idx) => (
             <div key={idx} className="bg-zinc-950 p-4 border border-zinc-900 flex gap-4">
                 <div className="text-zinc-600"><rule.icon size={20} /></div>
                 <div>
@@ -125,11 +265,11 @@ export const SafetyBriefing = ({ onComplete, isSigned }: any) => {
     <div className="bg-zinc-950 border border-zinc-800 p-6 rounded-none">
         <div className="mb-6 flex justify-between text-[8px] font-mono text-zinc-600">
             <span>ЭКЗАМЕН_ТБ</span>
-            <span>DATA_PACKET: {step + 1}/{SAFETY_QUESTIONS.length}</span>
+            <span>DATA_PACKET: {step + 1}/{content.questions.length}</span>
         </div>
-        <h4 className="text-lg font-bold text-white mb-6 leading-tight uppercase tracking-tighter">{SAFETY_QUESTIONS[step].q}</h4>
+        <h4 className="text-lg font-bold text-white mb-6 leading-tight uppercase tracking-tighter">{content.questions[step].q}</h4>
         <div className="space-y-3">
-            {SAFETY_QUESTIONS[step].options.map((opt, idx) => (
+            {content.questions[step].options.map((opt, idx) => (
                 <button key={idx} onClick={() => handleAnswer(opt.correct, opt.response)} className="w-full text-left p-4 bg-black border border-zinc-800 hover:border-brand-cyan hover:text-white text-[11px] text-zinc-400 font-mono transition-colors">
                     {opt.text}
                 </button>

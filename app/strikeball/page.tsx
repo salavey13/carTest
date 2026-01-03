@@ -172,7 +172,6 @@ export default function StrikeballDashboard() {
     <span className="text-xs font-orbitron text-brand-cyan tracking-widest uppercase">Live Feed</span>
     <div className="flex gap-1">
       <div className="w-1 h-1 rounded-full bg-red-500 animate-pulse" />
-      <span className="text-[10px] text-red-400 font-mono">REC</span>
     </div>
   </div>
 

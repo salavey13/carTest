@@ -8,9 +8,12 @@ const SERVICES = [
   { text: "PAINTBALL", color: "text-brand-purple" },
   { text: "HYDROBALL", color: "text-blue-400" },
   { text: "LAZERTAG", color: "text-brand-red-orange" },
+  { text: "DRINKNIGHT ROYALE", color: "text-red-400" },
   { text: "VIBECODE", color: "text-green-400" },
-  { text: "DRINKROYALE", color: "text-red-400" },
+  // Restored as a generic placeholder for all bike activities (Enduro, MX, etc.)
   { text: "BIKERIDE", color: "text-brand-gold" },
+  { text: "SNOWBOARD", color: "text-sky-300" },
+  { text: "LAN PARTY", color: "text-pink-500" },
 ];
 
 export const ActivityTicker = ({ isLive }: { isLive: boolean }) => {
