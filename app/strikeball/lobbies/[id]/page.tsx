@@ -8,7 +8,7 @@ import { useAppContext } from "@/contexts/AppContext";
 // --- ЭКШЕНЫ ---
 import { fetchLobbyData, joinLobby, addNoobBot, removeMember } from "../../actions/lobby";
 import { playerHit, playerRespawn, handleBaseInteraction } from "../../actions/game";
-import { generateAndSendLobbyPdf } from "../../actions/service";
+import { generateAndSendLobbyPdf, generateLobbyShareLink } from "../../actions/service";
 
 // --- КОМПОНЕНТЫ ---
 import { SyncIndicator } from "./components/SyncIndicator";
@@ -77,34 +77,18 @@ export default function LobbyRoom() {
 
   useEffect(() => { if (queue.length > 0) burstSync(processUplink); }, [queue.length, burstSync, processUplink]);
 
-    const handleShare = () => {
-    const link = `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobbyId}`;
+    const handleShare = async () => {
+    const res = await generateLobbyShareLink(lobbyId as string);
     
-    // Собираем детали для максимального хайпа
-    const count = members.length;
-    const maxPlayers = lobby.max_players || '?';
-    const mode = lobby.mode || 'CUSTOM';
-    
-    // Формируем красивую строку времени (если есть)
-    let timeStr = "СКОРО";
-    if (lobby.start_at) {
-      timeStr = new Date(lobby.start_at).toLocaleString('ru-RU', {
-          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-      });
+    if (res.success && res.shareUrl) {
+      if (tg?.openTelegramLink) {
+        tg.openTelegramLink(res.shareUrl);
+      } else {
+        window.open(res.shareUrl, '_blank');
+      }
+    } else {
+      toast.error("Не удалось создать ссылку для шеринга");
     }
-
-    // Gaming Party Vibe Message (Dota/CS style)
-    const text = `🎮 **ПОДБОР ИГРОКОВ** 🎮\n\n` + 
-                 `📢 ЗАХОДИ В: ${lobby.name}\n` +
-                 `🔥 МОД: ${mode.toUpperCase()}\n` +
-                 `👾 В ЛОББИ: ${count}/${maxPlayers} чел.\n` +
-                 `⏰ СТАРТ: ${timeStr}\n\n` +
-                 `👉 Ждем тебя в пати! Жми!`;
-
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
-    
-    if (tg?.openTelegramLink) tg.openTelegramLink(shareUrl);
-    else window.open(shareUrl, '_blank');
   };
 
   const handleImHit = () => { 
