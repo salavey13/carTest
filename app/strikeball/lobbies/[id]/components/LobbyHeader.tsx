@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 interface LobbyHeaderProps {
     name: string;
     mode: string;
-    id: string; // Added ID for editing
+    id: string;
     status: string;
     startAt: string | null;
     metadata: any;
@@ -20,7 +20,6 @@ interface LobbyHeaderProps {
     onPdf: () => void;
     onShare: () => void;
     loading: boolean;
-    // Callback to reload data after edit
     loadData?: () => void;
 }
 
@@ -89,7 +88,6 @@ export function LobbyHeader({ name, mode, id, status, startAt, metadata, userMem
                 <button onClick={onPdf} disabled={loading} className="p-2 border border-zinc-800 text-zinc-600 hover:text-white transition-all active:scale-95 rounded-none">
                     {loading ? <FaSpinner className="animate-spin" /> : <FaFilePdf />}
                 </button>
-                {/* --- NEW EDIT BUTTON --- */}
                 <button onClick={() => setIsEditing(true)} className="p-2 border border-zinc-800 text-zinc-600 hover:text-brand-cyan transition-all active:scale-95 rounded-none">
                     <FaPenToSquare />
                 </button>
@@ -103,10 +101,17 @@ export function LobbyHeader({ name, mode, id, status, startAt, metadata, userMem
                 <h1 className="text-2xl font-black uppercase tracking-[0.2em] italic">{name}</h1>
             </div>
             
-            <div className="flex flex-col items-center gap-3 mt-2">
+            <div className="flex flex-col items-center gap-3 mt-2 max-w-lg mx-auto">
                 <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest bg-zinc-900 px-2 py-0.5">
                     {mode} // ПЛАН: {startAt ? new Date(startAt).toLocaleString('ru-RU') : "НЕ ЗАДАНО"}
                 </div>
+                
+                {/* MISSION BRIEFING (DESCRIPTION) */}
+                {metadata?.description && (
+                     <p className="text-[11px] text-zinc-300 leading-relaxed px-4 py-3 border-y border-zinc-800/50 max-w-md mx-auto">
+                        {metadata.description}
+                     </p>
+                )}
                 
                 {status === 'open' && (
                     <div className="flex items-center gap-4">
