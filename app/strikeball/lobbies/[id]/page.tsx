@@ -77,6 +77,36 @@ export default function LobbyRoom() {
 
   useEffect(() => { if (queue.length > 0) burstSync(processUplink); }, [queue.length, burstSync, processUplink]);
 
+    const handleShare = () => {
+    const link = `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobbyId}`;
+    
+    // Собираем детали для максимального хайпа
+    const count = members.length;
+    const maxPlayers = lobby.max_players || '?';
+    const mode = lobby.mode || 'CUSTOM';
+    
+    // Формируем красивую строку времени (если есть)
+    let timeStr = "СКОРО";
+    if (lobby.start_at) {
+      timeStr = new Date(lobby.start_at).toLocaleString('ru-RU', {
+          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    // Gaming Party Vibe Message (Dota/CS style)
+    const text = `🎮 **ПОДБОР ИГРОКОВ** 🎮\n\n` + 
+                 `📢 ЗАХОДИ В: ${lobby.name}\n` +
+                 `🔥 МОД: ${mode.toUpperCase()}\n` +
+                 `👾 В ЛОББИ: ${count}/${maxPlayers} чел.\n` +
+                 `⏰ СТАРТ: ${timeStr}\n\n` +
+                 `👉 Ждем тебя в пати! Жми!`;
+
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
+    
+    if (tg?.openTelegramLink) tg.openTelegramLink(shareUrl);
+    else window.open(shareUrl, '_blank');
+  };
+
   const handleImHit = () => { 
     if (!userMember || userMember.status === 'dead') return;
     setWhiteFlash(true); setTimeout(() => setWhiteFlash(false), 150);
@@ -96,7 +126,8 @@ export default function LobbyRoom() {
         name={lobby.name} mode={lobby.mode} status={lobby.status} 
         startAt={lobby.start_at} metadata={lobby.metadata}
         userMember={userMember} isAdmin={isOwner || isSystemAdmin}
-        onPdf={() => generateAndSendLobbyPdf(dbUser?.user_id!, lobby.id)} onShare={() => {}} loading={isGeneratingPdf} 
+        onPdf={() => generateAndSendLobbyPdf(dbUser?.user_id!, lobby.id)} onShare={() => {}} loading={isGeneratingPdf}
+        onShare={handleShare}
       />
 
       <LobbyTabs activeTab={activeTab} setActiveTab={setActiveTab} />
