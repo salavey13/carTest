@@ -7,7 +7,8 @@ import { createStrikeballLobby } from "../actions/lobby";
 import { cn } from "@/lib/utils";
 import { FaUsers, FaCheck, FaLocationDot, FaSitemap } from "react-icons/fa6";
 
-const Q3Input = ({ label, value, onChange, type = "text", placeholder, icon }: any) => (
+// --- UPDATED: Added onBlur prop to Q3Input ---
+const Q3Input = ({ label, value, onChange, type = "text", placeholder, icon, onBlur }: any) => (
   <label className="block mb-3">
     <div className="flex items-center gap-2 mb-1">
         <div className="text-[10px] text-red-500 font-bold uppercase tracking-wider">{label}</div>
@@ -17,6 +18,7 @@ const Q3Input = ({ label, value, onChange, type = "text", placeholder, icon }: a
       type={type}
       value={value} 
       onChange={onChange} 
+      onBlur={onBlur} // Passed through now
       className="w-full p-3 bg-zinc-950 border border-zinc-700 text-zinc-300 font-mono text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-900 transition-colors rounded-none placeholder:text-zinc-800" 
       placeholder={placeholder} 
     />
@@ -100,17 +102,14 @@ export const CreateLobbyForm: React.FC = () => {
             </select>
         </label>
 
-        <label className="block mb-3">
-            <div className="text-[10px] text-red-500 font-bold mb-1 uppercase tracking-wider">Лимит Бойцов</div>
-            <input 
-                type="text"
-                inputMode="numeric"
-                value={maxPlayersInput} 
-                onChange={(e) => setMaxPlayersInput(e.target.value)}
-                onBlur={handleMaxPlayersBlur}
-                className="w-full p-3 bg-zinc-950 border border-zinc-700 text-zinc-300 font-mono text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-900 transition-colors rounded-none placeholder:text-zinc-800" 
-            />
-        </label>
+        {/* --- RESTORED Q3 STYLE --- */}
+        <Q3Input 
+            label="Лимит Бойцов" 
+            type="text"
+            value={maxPlayersInput} 
+            onChange={(e) => setMaxPlayersInput(e.target.value)}
+            onBlur={handleMaxPlayersBlur}
+        />
       </div>
 
       <Q3Input label="Координаты (GPS)" value={location} onChange={(e: any) => setLocation(e.target.value)} placeholder="56.3269, 44.0059" icon={<FaLocationDot />} />
