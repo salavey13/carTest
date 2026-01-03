@@ -115,7 +115,8 @@ export default function LobbyRoom() {
       
       <SyncIndicator count={queue.length} />
 
-      <LobbyHeader 
+      <LobbyHeader
+        id={lobby.id}  
         name={lobby.name} mode={lobby.mode} status={lobby.status} 
         startAt={lobby.start_at} metadata={lobby.metadata}
         userMember={userMember} isAdmin={isOwner || isSystemAdmin}
