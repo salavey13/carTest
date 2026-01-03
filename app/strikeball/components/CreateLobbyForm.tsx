@@ -4,10 +4,9 @@ import React, { useState, useEffect } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { createStrikeballLobby } from "../actions/lobby";
-// Assuming you will expose editLobby or move it. If it's in the same file, just import it.
-import { editLobby } from "../actions/lobby"; 
+import { editLobby } from "../actions/lobby"; // Import edit action
 import { cn } from "@/lib/utils";
-import { FaUsers, FaCheck, FaLocationDot, FaSitemap, FaRobot } from "react-icons/fa6";
+import { FaUsers, FaCheck, FaLocationDot, FaSitemap, FaRobot, FaAlignLeft } from "react-icons/fa6";
 
 const Q3Input = ({ label, value, onChange, type = "text", placeholder, icon, onBlur }: any) => (
   <label className="block mb-3">
@@ -21,6 +20,22 @@ const Q3Input = ({ label, value, onChange, type = "text", placeholder, icon, onB
       onChange={onChange} 
       onBlur={onBlur}
       className="w-full p-3 bg-zinc-950 border border-zinc-700 text-zinc-300 font-mono text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-900 transition-colors rounded-none placeholder:text-zinc-800" 
+      placeholder={placeholder} 
+    />
+  </label>
+);
+
+const Q3TextArea = ({ label, value, onChange, placeholder, icon }: any) => (
+  <label className="block mb-3">
+    <div className="flex items-center gap-2 mb-1">
+        <div className="text-[10px] text-red-500 font-bold uppercase tracking-wider">{label}</div>
+        {icon && <div className="text-red-500 text-xs">{icon}</div>}
+    </div>
+    <textarea 
+      value={value} 
+      onChange={onChange} 
+      rows={3}
+      className="w-full p-3 bg-zinc-950 border border-zinc-700 text-zinc-300 font-mono text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-900 transition-colors rounded-none placeholder:text-zinc-800 resize-none" 
       placeholder={placeholder} 
     />
   </label>
@@ -43,6 +58,7 @@ export const CreateLobbyForm: React.FC<CreateLobbyFormProps> = ({ isEdit = false
   const [date, setDate] = useState("");
   const [time, setTime] = useState("10:00");
   const [location, setLocation] = useState("56.226950,43.812079");
+  const [description, setDescription] = useState(""); // NEW STATE
   
   // --- MAX PLAYERS FIX ---
   // Using string state to allow empty input while typing, only set to "0" on blur
@@ -71,6 +87,9 @@ export const CreateLobbyForm: React.FC<CreateLobbyFormProps> = ({ isEdit = false
       // Глубокая проверка для bots_enabled в metadata
       const metaBots = initialData.metadata?.bots_enabled;
       setBotsEnabled(metaBots !== undefined ? metaBots : true);
+
+      // NEW: Populate description
+      setDescription(initialData.metadata?.description || "");
     }
   }, [isEdit, initialData]);
 
@@ -95,7 +114,7 @@ export const CreateLobbyForm: React.FC<CreateLobbyFormProps> = ({ isEdit = false
             start_at: startAtISO,
             crew_id: (hostAsCrew && userCrewInfo) ? userCrewInfo.id : undefined,
             location: location,
-            metadata: { bots_enabled: botsEnabled }
+            metadata: { bots_enabled: botsEnabled, description } // PASS DESCRIPTION TO METADATA
         });
         
         if (!result.success) throw new Error(result.error || "ОШИБКА ОБНОВЛЕНИЯ");
@@ -109,7 +128,8 @@ export const CreateLobbyForm: React.FC<CreateLobbyFormProps> = ({ isEdit = false
             max_players: Number(maxPlayersInput) || 20,
             start_at: startAtISO,
             crew_id: (hostAsCrew && userCrewInfo) ? userCrewInfo.id : undefined,
-            location: location 
+            location: location,
+            description // PASS DESCRIPTION TO CREATE ACTION
         });
         
         if (!result.success) throw new Error(result.error || "ОШИБКА СОЗДАНИЯ");
@@ -161,6 +181,15 @@ export const CreateLobbyForm: React.FC<CreateLobbyFormProps> = ({ isEdit = false
             onBlur={handleMaxPlayersBlur}
         />
       </div>
+
+      {/* --- NEW DESCRIPTION FIELD --- */}
+      <Q3TextArea 
+          label="Описание" 
+          value={description} 
+          onChange={(e) => setDescription(e.target.value)} 
+          placeholder="Детали операции, тактика, требования..."
+          icon={<FaAlignLeft />}
+      />
 
       <Q3Input label="Координаты (GPS)" value={location} onChange={(e: any) => setLocation(e.target.value)} placeholder="56.3269, 44.0059" icon={<FaLocationDot />} />
 

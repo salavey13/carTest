@@ -97,6 +97,7 @@ export async function fetchLobbyData(lobbyId: string) {
 /**
  * Создание нового лобби (Create Lobby)
  * Supports optional hosting by a Crew and Location.
+ * Supports 'description' in metadata.
  */
 export async function createStrikeballLobby(
   userId: string, 
@@ -106,17 +107,18 @@ export async function createStrikeballLobby(
     start_at?: string | null; 
     max_players?: number;
     crew_id?: string | null;
-    location?: string; // NEW: GPS or Address string
+    location?: string;
+    description?: string; // NEW: Description field
   }
 ) {
   if (!userId) return { success: false, error: "Unauthorized: No User ID" };
   
-  const { name, mode, start_at, max_players = 20, crew_id, location } = payload;
+  const { name, mode, start_at, max_players = 20, crew_id, location, description } = payload;
 
   try {
     const qrHash = uuidv4(); 
     
-    // 1. Create the Lobby record
+    // 1. Create Lobby record
     const { data: lobby, error: lobbyError } = await supabaseAdmin
       .from("lobbies")
       .insert({
@@ -128,8 +130,12 @@ export async function createStrikeballLobby(
         start_at: start_at || null,
         max_players,
         crew_id: crew_id || null,
-        field_id: location || null, // Storing location string in field_id
-        metadata: { bots_enabled: true }
+        field_id: location || null,
+        // PROPERLY HANDLE METADATA FOR CREATE
+        metadata: { 
+            bots_enabled: true,
+            description: description 
+        }
       })
       .select()
       .single();
@@ -161,7 +167,7 @@ export async function createStrikeballLobby(
     const timeStr = start_at ? new Date(start_at).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : 'СКОРО';
     const locStr = location ? `\n**Координаты:** ${location}` : '';
     const squadTag = crew_id ? `\n**Отряд:** OFFICIAL SQUAD RAID` : '';
-
+    
     sendComplexMessage(
       userId,
       `🔴 **ОПЕРАЦИЯ НАЧАТА** 🔴\n\n**Цель:** ${name}\n**Режим:** ${mode.toUpperCase()}\n**Сбор:** ${timeStr}${locStr}${squadTag}\n\n[🔗 ПРИГЛАСИТЬ БОЙЦОВ](${deepLink})`,
@@ -347,6 +353,7 @@ export async function setLobbyApprovalStatus(lobbyId: string, status: 'approved_
 /**
  * РЕДАКТИРОВАНИЕ ЛОББИ (Edit Lobby)
  * Обновляет поля лобби, включая метаданные.
+ * PROPERLY handles 'description' in metadata.
  */
 export async function editLobby(
   userId: string, 
@@ -357,7 +364,7 @@ export async function editLobby(
     start_at?: string | null; 
     max_players?: number;
     location?: string;
-    metadata?: any; // Обновление JSONB полей (например, bots_enabled)
+    metadata?: any; // Обновление JSONB полей (например, bots_enabled, description)
   }
 ) {
   if (!userId || !lobbyId) return { success: false, error: "Missing IDs" };
@@ -381,7 +388,13 @@ export async function editLobby(
     if (payload.metadata) {
         const { data: currentLobby } = await supabaseAdmin.from("lobbies").select("metadata").eq("id", lobbyId).single();
         const existingMeta = currentLobby?.metadata || {};
-        updateData.metadata = { ...existingMeta, ...payload.metadata };
+        
+        // Ensure we don't lose 'bots_enabled' if it wasn't in the payload
+        // And we update 'description' correctly
+        updateData.metadata = {
+            ...existingMeta, // Keep existing stuff
+            ...payload.metadata // Overwrite with new stuff
+        };
     }
 
     // 2. ЗАПИСЬ В БАЗУ
