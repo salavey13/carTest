@@ -1,24 +1,39 @@
 "use client";
 
-import { FaShareNodes, FaFilePdf, FaSpinner, FaUserShield, FaCircleCheck, FaCircleXmark } from "react-icons/fa6";
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FaShareNodes, FaFilePdf, FaSpinner, FaUserShield, FaCircleCheck, FaCircleXmark, FaPenToSquare } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
+import { CreateLobbyForm } from "../../components/CreateLobbyForm"; // Import reused form
+import { editLobby } from "../../actions/lobby"; // Import edit action
+import { toast } from 'sonner';
 
 interface LobbyHeaderProps {
     name: string;
     mode: string;
+    id: string; // Added ID for editing
     status: string;
     startAt: string | null;
     metadata: any;
-    userMember: any; // Добавлен для отслеживания голоса
-    isAdmin: boolean; // Добавлен для отображения прав
+    userMember: any; 
+    isAdmin: boolean; 
     onPdf: () => void;
     onShare: () => void;
     loading: boolean;
+    // Callback to reload data after edit
+    loadData?: () => void;
 }
 
-export function LobbyHeader({ name, mode, status, startAt, metadata, userMember, isAdmin, onPdf, onShare, loading }: LobbyHeaderProps) {
+export function LobbyHeader({ name, mode, id, status, startAt, metadata, userMember, isAdmin, onPdf, onShare, loading, loadData }: LobbyHeaderProps) {
     const approval = metadata?.approval_status || 'proposed';
     const myVote = userMember?.metadata?.vote;
+    const [isEditing, setIsEditing] = useState(false);
+
+    const handleEditSuccess = async () => {
+        setIsEditing(false);
+        toast.success("ОПЕРАЦИЯ ОБНОВЛЕНА");
+        if (loadData) loadData();
+    };
     
     const statusColors: any = {
         proposed: "text-amber-500 border-amber-900 bg-amber-950/20",
@@ -34,9 +49,49 @@ export function LobbyHeader({ name, mode, status, startAt, metadata, userMember,
 
     return (
         <div className="text-center mb-10 relative">
+            {/* EDIT MODAL OVERLAY */}
+            <AnimatePresence>
+                {isEditing && (
+                    <motion.div 
+                        initial={{ opacity: 0 }} 
+                        animate={{ opacity: 1 }} 
+                        exit={{ opacity: 0 }}
+                        onClick={() => setIsEditing(false)}
+                        className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 backdrop-blur-md"
+                    >
+                        <div className="bg-zinc-900 p-6 rounded-none border-4 border-brand-cyan shadow-[0_0_50px_rgba(220,38,38,0.5)] max-w-md w-full overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                             <h3 className="text-brand-cyan font-orbitron font-bold text-center text-xl mb-4 tracking-widest uppercase">РЕДАКТИРОВАНИЕ</h3>
+                             
+                             <CreateLobbyForm 
+                                 isEdit={true}
+                                 initialData={{
+                                     id,
+                                     name,
+                                     mode,
+                                     start_at: startAt,
+                                     max_players: 0, // Will be filled by effect if needed
+                                     field_id: "", // Placeholder, will be filled by effect
+                                     metadata: metadata,
+                                     crew_id: undefined // Not exposed in header, but needed for form logic if available
+                                 }}
+                                 onSubmit={handleEditSuccess}
+                             />
+                             
+                             <button onClick={() => setIsEditing(false)} className="w-full bg-zinc-700 hover:bg-zinc-600 text-white py-3 font-black font-orbitron uppercase tracking-wider transition-colors rounded-none mt-4">
+                                 ОТМЕНА
+                             </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <div className="absolute top-0 right-0 flex gap-3">
                 <button onClick={onPdf} disabled={loading} className="p-2 border border-zinc-800 text-zinc-600 hover:text-white transition-all active:scale-95 rounded-none">
                     {loading ? <FaSpinner className="animate-spin" /> : <FaFilePdf />}
+                </button>
+                {/* --- NEW EDIT BUTTON --- */}
+                <button onClick={() => setIsEditing(true)} className="p-2 border border-zinc-800 text-zinc-600 hover:text-brand-cyan transition-all active:scale-95 rounded-none">
+                    <FaPenToSquare />
                 </button>
                 <button onClick={onShare} className="p-2 border border-zinc-800 text-zinc-600 hover:text-white transition-all active:scale-95 rounded-none">
                     <FaShareNodes />

@@ -343,3 +343,58 @@ export async function setLobbyApprovalStatus(lobbyId: string, status: 'approved_
         return { success: true };
     } catch (e: any) { return { success: false, error: e.message }; }
 }
+
+/**
+ * РЕДАКТИРОВАНИЕ ЛОББИ (Edit Lobby)
+ * Обновляет поля лобби, включая метаданные.
+ */
+export async function editLobby(
+  userId: string, 
+  lobbyId: string, 
+  payload: { 
+    name?: string; 
+    mode?: string; 
+    start_at?: string | null; 
+    max_players?: number;
+    location?: string;
+    metadata?: any; // Обновление JSONB полей (например, bots_enabled)
+  }
+) {
+  if (!userId || !lobbyId) return { success: false, error: "Missing IDs" };
+
+  try {
+    // 0. ПРОВЕРКА ПРАВ (Проверка Владельца)
+    const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id").eq("id", lobbyId).single();
+    if (!lobby) throw new Error("Lobby not found");
+    if (lobby.owner_id !== userId) throw new Error("ACCESS DENIED");
+
+    // 1. ПОДГОТОВКА ОБНОВЛЕНИЙ
+    const updateData: any = {};
+    
+    if (payload.name) updateData.name = payload.name;
+    if (payload.mode) updateData.mode = payload.mode;
+    if (payload.start_at !== undefined) updateData.start_at = payload.start_at; // Разрешаем null
+    if (payload.max_players) updateData.max_players = payload.max_players;
+    if (payload.location) updateData.field_id = payload.location;
+    
+    // Специальная обработка для metadata, чтобы не перезаписать всё целиком, а смержить или обновить по ключу
+    if (payload.metadata) {
+        const { data: currentLobby } = await supabaseAdmin.from("lobbies").select("metadata").eq("id", lobbyId).single();
+        const existingMeta = currentLobby?.metadata || {};
+        updateData.metadata = { ...existingMeta, ...payload.metadata };
+    }
+
+    // 2. ЗАПИСЬ В БАЗУ
+    const { error } = await supabaseAdmin
+      .from("lobbies")
+      .update(updateData)
+      .eq("id", lobbyId);
+
+    if (error) throw error;
+
+    return { success: true, message: "ОПЕРАЦИЯ ОБНОВЛЕНА" };
+  } catch (e: any) {
+    logger.error("[editLobby] Exception:", e);
+    return { success: false, error: e.message || "Failed to update lobby." };
+  }
+}
