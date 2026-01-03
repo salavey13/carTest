@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
-import { FaShieldHalved, FaSkull, FaEye, FaHandFist, FaCheck, FaUsers, FaFire, FaUserPen, FaPhone, FaSchool, FaBeer, FaLaptopCode, FaMotorcycle, FaSnowflake } from "react-icons/fa6";
+import { FaShieldHalved, FaSkull, FaEye, FaHandFist, FaCheck, FaUsers, FaFire, FaUserPen, FaPhone, FaSchool, FaBeerMugEmpty, FaLaptopCode, FaMotorcycle, FaSnowflake } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 import { toast } from 'sonner';
 
@@ -105,7 +105,7 @@ const getBriefingContent = (mode: string) => {
     return {
       questions: PARTY_QUESTIONS,
       summary: [
-        { icon: FaBeer, title: "АЛКОГОЛЬ", text: "Умеренность и ответственность." },
+        { icon: FaBeerMugEmpty, title: "АЛКОГОЛЬ", text: "Умеренность и ответственность." },
         { icon: FaHandFist, title: "РЕСПЕКТ", text: "Никакой агрессии к другим игрокам." },
         { icon: FaShieldHalved, title: "ДОРОГА", text: "Напился — вызвал такси. Пьяный за рулем = БАН." }
       ]
