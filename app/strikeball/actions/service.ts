@@ -513,7 +513,11 @@ export async function generateGearCatalogPdf(userId: string) {
  * Генерирует готовую ссылку для шаринга лобби в Telegram.
  * Форматирует сообщение в стиле "Gaming Party Vibe".
  */
-export async function generateLobbyShareLink(lobbyId: string) {
+/**
+ * Генерирует готовую ссылку для шаринга лобби в Telegram.
+ * Принимает опционально отформатированную дату (чтобы избежать проблем с таймзоной сервера).
+ */
+export async function generateLobbyShareLink(lobbyId: string, formattedTime?: string) {
   try {
     // 1. Получаем данные лобби и участников
     const { data: lobby } = await supabaseAdmin.from("lobbies").select("*").eq("id", lobbyId).single();
@@ -526,15 +530,19 @@ export async function generateLobbyShareLink(lobbyId: string) {
     const maxPlayers = lobby.max_players || '?';
     const mode = lobby.mode || 'CUSTOM';
     
-    // Форматируем дату старта
-    let timeStr = "СКОРО";
-    if (lobby.start_at) {
+    // 3. Используем время, отформатированное на клиенте, либо серверный фоллбэк
+    let timeStr = formattedTime || "СКОРО";
+    
+    // Если клиент не передал время, пробуем отформатировать на сервере (с учетом таймзоны UTC сервера)
+    if (!formattedTime && lobby.start_at) {
+      // ВНИМАНИЕ: На сервере (Vercel/Node) это обычно UTC.
+      // Если важно конкретное время, лучше передавать его с клиента.
       timeStr = new Date(lobby.start_at).toLocaleString('ru-RU', {
           day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
       });
     }
 
-    // 3. Формируем текст сообщения (Party Vibe)
+    // 4. Формируем текст сообщения
     const text = `🎮 **ПОДБОР ИГРОКОВ** 🎮\n\n` + 
                  `📢 ЗАХОДИ В: ${lobby.name}\n` +
                  `🔥 МОД: ${mode.toUpperCase()}\n` +
@@ -542,7 +550,7 @@ export async function generateLobbyShareLink(lobbyId: string) {
                  `⏰ СТАРТ: ${timeStr}\n\n` +
                  `👉 Ждем тебя в пати! Жми!`;
 
-    // 4. Собираем итоговый URL
+    // 5. Собираем итоговый URL
     const appLink = `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobbyId}`;
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appLink)}&text=${encodeURIComponent(text)}`;
 
