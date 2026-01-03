@@ -508,3 +508,48 @@ export async function generateGearCatalogPdf(userId: string) {
     return { success: false, error: e.message };
   }
 }
+
+/**
+ * Генерирует готовую ссылку для шаринга лобби в Telegram.
+ * Форматирует сообщение в стиле "Gaming Party Vibe".
+ */
+export async function generateLobbyShareLink(lobbyId: string) {
+  try {
+    // 1. Получаем данные лобби и участников
+    const { data: lobby } = await supabaseAdmin.from("lobbies").select("*").eq("id", lobbyId).single();
+    const { data: members } = await supabaseAdmin.from("lobby_members").select("*").eq("lobby_id", lobbyId);
+
+    if (!lobby) throw new Error("Operation not found");
+
+    // 2. Подготовка данных для сообщения
+    const count = members?.length || 0;
+    const maxPlayers = lobby.max_players || '?';
+    const mode = lobby.mode || 'CUSTOM';
+    
+    // Форматируем дату старта
+    let timeStr = "СКОРО";
+    if (lobby.start_at) {
+      timeStr = new Date(lobby.start_at).toLocaleString('ru-RU', {
+          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    // 3. Формируем текст сообщения (Party Vibe)
+    const text = `🎮 **ПОДБОР ИГРОКОВ** 🎮\n\n` + 
+                 `📢 ЗАХОДИ В: ${lobby.name}\n` +
+                 `🔥 МОД: ${mode.toUpperCase()}\n` +
+                 `👾 В ЛОББИ: ${count}/${maxPlayers} чел.\n` +
+                 `⏰ СТАРТ: ${timeStr}\n\n` +
+                 `👉 Ждем тебя в пати! Жми!`;
+
+    // 4. Собираем итоговый URL
+    const appLink = `https://t.me/oneSitePlsBot/app?startapp=lobby_${lobbyId}`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appLink)}&text=${encodeURIComponent(text)}`;
+
+    return { success: true, shareUrl };
+
+  } catch (error: any) {
+    logger.error("generateLobbyShareLink Error", error);
+    return { success: false, error: error.message };
+  }
+}
