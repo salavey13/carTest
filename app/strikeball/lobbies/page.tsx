@@ -156,7 +156,7 @@ export default function LobbiesPageClient() {
              onClick={() => setIsCreatingSquad(!isCreatingSquad)}
              className="w-full py-4 border-2 border-dashed border-cyan-800 text-cyan-600 hover:text-cyan-400 hover:border-cyan-500 transition-colors uppercase font-bold flex items-center justify-center gap-2 font-orbitron"
           >
-              <FaPlus /> REGISTER NEW SQUAD
+              <FaPlus /> Создать SQUAD
           </button>
 
           {isCreatingSquad && (
