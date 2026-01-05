@@ -6,7 +6,7 @@ import {
   FaScrewdriverWrench, FaBiohazard, FaCrown, FaTriangleExclamation 
 } from "react-icons/fa6";
 import { useGameSounds } from "../hooks/useGameSounds";
-import { executeProximityBoom, fieldRepair } from "../../actions/blaster";
+import { executeProximityBoom, fieldRepair } from "../../../actions/blaster";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
