@@ -5,77 +5,72 @@ import { getLobbyGeoData } from "./lobby";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
 
-// Utility to calculate distance in meters
 function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
-    const R = 6371000; // Earth radius in meters
+    const R = 6371000;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 export async function executeProximityBoom(attackerId: string, lobbyId: string) {
     try {
-        // 1. Get all recent pings for the lobby
         const geoRes = await getLobbyGeoData(lobbyId);
-        if (!geoRes.success || !geoRes.data) return { success: false, error: "No telemetry data" };
+        if (!geoRes.success || !geoRes.data) return { success: false, error: "No telemetry" };
 
         const attackerPing = geoRes.data.find((p: any) => p.user_id === attackerId);
-        if (!attackerPing) return { success: false, error: "Attacker GPS signal lost" };
+        if (!attackerPing) return { success: false, error: "GPS Lost" };
 
-        // 2. Find the nearest target (within 5 meters)
         let nearestVictimId = null;
-        let minDistance = 5; // Max 5 meters for a "rubber knife" kill
+        let minDistance = 5; 
 
         geoRes.data.forEach((ping: any) => {
             if (ping.user_id === attackerId) return;
-
-            const dist = calculateDistanceMeters(
-                attackerPing.lat, attackerPing.lng,
-                ping.lat, ping.lng
-            );
-
+            const dist = calculateDistanceMeters(attackerPing.lat, attackerPing.lng, ping.lat, ping.lng);
             if (dist < minDistance) {
                 minDistance = dist;
                 nearestVictimId = ping.user_id;
             }
         });
 
-        if (!nearestVictimId) return { success: false, error: "No targets in range" };
+        if (!nearestVictimId) return { success: false, error: "Out of range" };
 
-        // 3. Fetch Attacker and Victim info for the message
-        const { data: attacker } = await supabaseAdmin.from("users").select("username, metadata").eq("user_id", attackerId).single();
-        const attackerName = attacker?.username || "Ghost Operator";
-        const activeSkinMsg = attacker?.metadata?.active_skin_msg || "💥 BOOM! YOU'RE DEAD.";
+        // 1. FETCH VICTIM CURRENT METADATA
+        const { data: victim } = await supabaseAdmin.from("users").select("metadata").eq("user_id", nearestVictimId).single();
+        const { data: attacker } = await supabaseAdmin.from("users").select("username").eq("user_id", attackerId).single();
 
-        // 4. THE SUCKERPUNCH: Direct Telegram Notification to Victim
-        const victimMsg = `⚠️ **COMBAT ALERT** ⚠️\n\n${activeSkinMsg}\n\n*Executed by:* @${attackerName}\n*Distance:* ${minDistance.toFixed(1)}m`;
+        // 2. INJECT HUMILIATION INTO VICTIM'S METADATA
+        const newMetadata = { 
+            ...(victim?.metadata || {}), 
+            is_humiliated: true, 
+            humiliated_by: attacker?.username || "Ghost",
+            humiliated_at: new Date().toISOString()
+        };
+
+        await supabaseAdmin.from("users").update({ metadata: newMetadata }).eq("user_id", nearestVictimId);
+
+        // 3. SEND NOTIFICATION WITH "GO CHECK IT" LINK
+        const victimMsg = `🛠️ **GEAR INTEGRITY COMPROMISED** 🛠️\n\n@${attacker?.username} just bent your barrel into a croissant.\n\n*Distance:* ${minDistance.toFixed(1)}m\n\n👇 **INSPECT DAMAGE / REPAIR**`;
         
-        await sendComplexMessage(nearestVictimId, victimMsg, [], { 
+        await sendComplexMessage(nearestVictimId, victimMsg, [
+            [{ text: "🚀 OPEN HUD", url: "https://t.me/oneSitePlsBot/app" }]
+        ], { 
             parseMode: 'Markdown',
-            imageQuery: 'explosion tactical' 
-        });
-
-        // 5. Log the incident for the PDF Dossier
-        await supabaseAdmin.from("events").insert({
-            type: 'CLOSE_ENCOUNTER_KILL',
-            lobby_id: lobbyId,
-            created_by: attackerId,
-            payload: {
-                victim_id: nearestVictimId,
-                distance: minDistance,
-                attacker_username: attackerName
-            }
+            imageQuery: 'broken metal weapon' 
         });
 
         return { success: true, victimId: nearestVictimId };
-
     } catch (e: any) {
         logger.error("[executeProximityBoom] Error:", e);
-        return { success: false, error: "Internal system error" };
+        return { success: false, error: "System Error" };
     }
+}
+
+export async function fieldRepair(userId: string) {
+    const { data: user } = await supabaseAdmin.from("users").select("metadata").eq("user_id", userId).single();
+    const newMetadata = { ...(user?.metadata || {}), is_humiliated: false };
+    await supabaseAdmin.from("users").update({ metadata: newMetadata }).eq("user_id", userId);
+    return { success: true };
 }

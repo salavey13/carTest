@@ -1,241 +1,169 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaCrosshairs, FaHandFist, FaRadiation, FaBolt, FaTemperatureHigh } from "react-icons/fa6";
+import { 
+  FaCrosshairs, FaHandFist, FaBolt, FaTemperatureHigh, 
+  FaScrewdriverWrench, FaBiohazard, FaCrown, FaTriangleExclamation 
+} from "react-icons/fa6";
 import { useGameSounds } from "../hooks/useGameSounds";
+import { executeProximityBoom, fieldRepair } from "../../actions/blaster";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { useAppContext } from "@/contexts/AppContext";
 
-interface VirtualBlasterProps {
-  onHit: () => void;
-  onDeath?: () => void;
-}
-
-export function VirtualBlaster({ onHit, onDeath }: VirtualBlasterProps) {
+export function VirtualBlaster({ onHit, onDeath, lobbyId, userId }: any) {
+  const { dbUser, refreshDbUser } = useAppContext();
   const sounds = useGameSounds();
   
-  // --- INTERNAL HARDWARE STATE ---
+  // --- STATES ---
   const [mode, setMode] = useState<"ranged" | "melee">("ranged");
-  const [heat, setHeat] = useState(0); // 0 to 100
+  const [heat, setHeat] = useState(0); 
   const [isOverheated, setIsOverheated] = useState(false);
   const [isFiring, setIsFiring] = useState(false);
-  const [isDead, setIsDead] = useState(false);
+  const [isRepairing, setIsRepairing] = useState(false);
 
-  // --- REFS FOR TOUCH LOGIC ---
-  const pressTimer = useRef<NodeJS.Timeout | null>(null);
-  const touchStartTime = useRef<number>(0);
-  const isCancelled = useRef(false);
-  const LONG_PRESS_THRESHOLD = 700;
+  // Check humiliation from Global Context
+  const isHumiliated = !!dbUser?.metadata?.is_humiliated;
 
-  // --- PASSIVE COOLING SYSTEM ---
+  // --- PASSIVE COOLING ---
   useEffect(() => {
     const coolingInterval = setInterval(() => {
-      setHeat((prev) => {
-        const next = Math.max(0, prev - (isOverheated ? 5 : 2));
-        if (isOverheated && next === 0) setIsOverheated(false);
-        return next;
-      });
+      setHeat((p) => Math.max(0, p - (isOverheated ? 4 : 2)));
+      if (isOverheated && heat === 0) setIsOverheated(false);
     }, 100);
     return () => clearInterval(coolingInterval);
-  }, [isOverheated]);
+  }, [isOverheated, heat]);
 
-  // --- COMBAT ACTIONS ---
+  // --- ACTIONS ---
   const triggerFire = useCallback(() => {
-    if (isOverheated || isDead) return;
-
+    if (isHumiliated) {
+        sounds.playHumiliation();
+        toast.error("HARDWARE FAILURE", { description: "Your barrel is bent. Repair required." });
+        return;
+    }
+    if (isOverheated) return;
+    
     sounds.fire();
     setIsFiring(true);
-    setHeat((prev) => {
-      const newHeat = prev + 15;
-      if (newHeat >= 100) {
-        setIsOverheated(true);
-        sounds.playHumiliation(); // "Overheated" sound
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 500]);
-        return 100;
-      }
-      return newHeat;
-    });
+    setHeat((p) => Math.min(100, p + 12));
+    if (heat + 12 >= 100) setIsOverheated(true);
+    setTimeout(() => setIsFiring(false), 80);
+  }, [isHumiliated, isOverheated, sounds, heat]);
 
-    setTimeout(() => setIsFiring(false), 100);
-  }, [isOverheated, isDead, sounds]);
-
-  const triggerMelee = useCallback(() => {
-    if (isDead) return;
-    sounds.meleeAttack();
-    setHeat((prev) => Math.min(100, prev + 40));
-    // Anduril-grade kinetic shake handled by Framer Motion
-  }, [isDead, sounds]);
-
-  const handleDeath = () => {
-    setIsDead(true);
-    sounds.death();
-    onHit();
-    onDeath?.();
-    if (navigator.vibrate) navigator.vibrate(800);
-  };
-
-  // --- TOUCH HANDLERS (REVERSED & OPTIMIZED) ---
-  const onTouchStart = (e: any) => {
-    if (isDead) return;
-    isCancelled.current = false;
-    touchStartTime.current = Date.now();
+  const triggerMelee = useCallback(async () => {
+    if (isHumiliated) return sounds.playHumiliation();
     
-    pressTimer.current = setTimeout(() => {
-      if (!isCancelled.current) {
-        setMode((prev) => (prev === "ranged" ? "melee" : "ranged"));
-        if (navigator.vibrate) navigator.vibrate(50);
-      }
-    }, LONG_PRESS_THRESHOLD);
+    sounds.meleeAttack();
+    setHeat((p) => Math.min(100, p + 35));
+    
+    const res = await executeProximityBoom(userId, lobbyId);
+    if (res.success) {
+      sounds.playHolyShit();
+      if (navigator.vibrate) navigator.vibrate([500, 100, 500]);
+      toast.success("HUMILIATION DELIVERED", { icon: <FaCrown /> });
+    }
+  }, [isHumiliated, sounds, userId, lobbyId]);
+
+  const handleRepair = async () => {
+    setIsRepairing(true);
+    sounds.playMedkit(); // Use medkit sound for mechanical repair vibe
+    await fieldRepair(userId);
+    await refreshDbUser();
+    setIsRepairing(false);
+    toast.success("GEAR REPAIRED", { description: "Integrity Restored to 100%" });
   };
 
-  const onTouchEnd = (e: any) => {
+  // --- TOUCH HANDLERS (Simplified for clarity) ---
+  const touchStartTime = useRef(0);
+  const handleTouchStart = () => { touchStartTime.current = Date.now(); };
+  const handleTouchEnd = () => {
     const elapsed = Date.now() - touchStartTime.current;
-    if (pressTimer.current) clearTimeout(pressTimer.current);
-
-    if (!isCancelled.current && elapsed > 40 && elapsed < LONG_PRESS_THRESHOLD) {
-      mode === "ranged" ? triggerFire() : triggerMelee();
-    }
+    if (elapsed < 500) mode === "ranged" ? triggerFire() : triggerMelee();
+    else setMode(prev => prev === "ranged" ? "melee" : "ranged");
   };
 
   return (
-    <div className="relative select-none touch-none">
+    <div className={cn(
+      "relative select-none touch-none p-4 rounded-2xl border-2 transition-all duration-700",
+      isHumiliated ? "bg-red-950/20 border-red-500 blur-[0.5px]" : "bg-black border-zinc-800"
+    )}>
       
-      {/* 📊 TELEMETRY OVERLAY */}
-      <div className="absolute -top-12 left-0 right-0 flex justify-between items-end px-2 font-mono">
+      {/* 📡 TELEMETRY */}
+      <div className="flex justify-between items-center mb-4 font-mono">
         <div className="flex flex-col">
-          <span className="text-[8px] text-zinc-500 uppercase">Hardware_Status</span>
-          <span className={cn(
-            "text-xs font-bold tracking-tighter",
-            isOverheated ? "text-red-500 animate-pulse" : "text-brand-cyan"
-          )}>
-            {isOverheated ? "SYS_OVERHEAT_LOCKOUT" : "UPLINK_STABLE"}
+          <span className="text-[7px] text-zinc-500 uppercase">Integrity_Control</span>
+          <span className={cn("text-[10px] font-bold", isHumiliated ? "text-red-500 animate-pulse" : "text-brand-cyan")}>
+            {isHumiliated ? "CRITICAL_FAILURE" : "SYSTEMS_NOMINAL"}
           </span>
         </div>
-        <div className="flex flex-col items-end">
-          <span className="text-[8px] text-zinc-500 uppercase">Core_Temp</span>
-          <span className={cn("text-xs font-bold", heat > 80 ? "text-red-500" : "text-white")}>
-            {heat}°C
-          </span>
-        </div>
+        {isHumiliated && (
+            <motion.div animate={{ rotate: [0, 10, -10, 0] }} transition={{ repeat: Infinity }}>
+                <FaTriangleExclamation className="text-red-500 text-lg" />
+            </motion.div>
+        )}
       </div>
 
-      {/* 🔥 HEAT BAR */}
-      <div className="w-full h-1.5 bg-zinc-900 border border-zinc-800 mb-4 overflow-hidden rounded-full">
-        <motion.div 
-          className={cn(
-            "h-full shadow-[0_0_10px_currentColor]",
-            isOverheated ? "bg-red-600" : "bg-brand-cyan"
-          )}
-          animate={{ width: `${heat}%` }}
-          transition={{ type: "spring", bounce: 0, duration: 0.2 }}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 relative">
         
-        {/* 🔫 MAIN BLASTER UNIT */}
+        {/* 🔫 THE BLASTER (COULD BE A CROISSANT) */}
         <motion.button
-          onMouseDown={onTouchStart} onMouseUp={onTouchEnd}
-          onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
-          animate={isFiring ? { scale: 0.95, y: 5 } : { scale: 1, y: 0 }}
+          onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
+          animate={isFiring ? { scale: 0.9, y: 5 } : { scale: 1, y: 0 }}
           className={cn(
-            "cyber-clip aspect-square relative flex flex-col items-center justify-center border-2 transition-all duration-300",
-            isOverheated ? "bg-red-950/20 border-red-900 opacity-50 grayscale" : 
-            mode === "ranged" ? "bg-zinc-900/80 border-brand-cyan shadow-[inset_0_0_20px_rgba(34,211,238,0.1)]" : 
-            "bg-zinc-900/80 border-brand-gold shadow-[inset_0_0_20px_rgba(234,179,8,0.1)]"
+            "cyber-clip aspect-square relative flex flex-col items-center justify-center border-2 transition-all duration-1000",
+            isHumiliated ? "border-red-900 bg-black rotate-[15deg] scale-x-75" : 
+            mode === "ranged" ? "border-brand-cyan bg-zinc-900" : "border-brand-gold bg-zinc-900"
           )}
         >
-          {/* Dynamic Reticle Background */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-10">
-             <motion.div 
-               animate={{ rotate: 360 }} 
-               transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-               className="w-3/4 h-3/4 border-2 border-dashed border-current rounded-full" 
-             />
-          </div>
-
+          {/* THE MANGLED EFFECT: If humiliated, rotate and skew the icon */}
           <div className={cn(
-            "text-5xl drop-shadow-[0_0_15px_currentColor]",
+            "text-5xl transition-all duration-1000",
+            isHumiliated ? "rotate-[120deg] scale-y-50 skew-x-12 opacity-40" : "",
             mode === "ranged" ? "text-brand-cyan" : "text-brand-gold"
           )}>
             {mode === "ranged" ? <FaCrosshairs /> : <FaHandFist />}
           </div>
 
-          <div className="mt-4 flex flex-col items-center gap-1">
-             <span className="text-[10px] font-black tracking-widest uppercase opacity-80">
-               {mode === "ranged" ? "Bolt_Rifle" : "Kinetic_Strike"}
-             </span>
-             <div className="flex gap-1">
-                {[1,2,3].map(i => (
-                  <div key={i} className={cn("w-1.5 h-1.5 rotate-45", heat > (i*25) ? "bg-current" : "bg-zinc-800")} />
-                ))}
-             </div>
+          <div className="mt-4 text-[8px] font-black uppercase opacity-50">
+            {isHumiliated ? "BENT_BARREL" : mode}
           </div>
-
-          {/* Overheat Indicator overlay */}
-          <AnimatePresence>
-            {isOverheated && (
-              <motion.div 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-red-900/40 backdrop-blur-sm flex flex-col items-center justify-center"
-              >
-                <FaTemperatureHigh className="text-4xl text-white animate-bounce" />
-                <span className="text-[8px] font-black text-white mt-2">COOLING_REQUIRED</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </motion.button>
 
-        {/* 💀 TERMINATION UNIT (DEATH) */}
-        <motion.button
-          onClick={handleDeath}
-          disabled={isDead}
-          whileTap={{ scale: 0.9 }}
-          className={cn(
-            "cyber-clip-reverse aspect-square relative overflow-hidden border-2 transition-all duration-500",
-            isDead ? "bg-zinc-950 border-zinc-800" : "bg-red-950/20 border-red-600 hover:bg-red-600 group"
-          )}
+        {/* 💀 DEATH / SIGNAL EXIT */}
+        <button
+          onClick={() => { sounds.death(); onHit(); }}
+          className="cyber-clip-reverse aspect-square flex flex-col items-center justify-center border-2 border-red-600 bg-red-950/20"
         >
-          {/* Static Scanline Overlay */}
-          <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.5)_50%)] bg-[size:100%_4px] opacity-20" />
-          
-          <div className="flex flex-col items-center justify-center h-full gap-2 relative z-10">
-            <FaRadiation className={cn(
-              "text-4xl transition-all",
-              isDead ? "text-zinc-800" : "text-red-500 group-hover:text-white animate-pulse"
-            )} />
-            <div className="text-center">
-              <div className={cn("text-xs font-black tracking-tighter uppercase", isDead ? "text-zinc-700" : "text-white")}>
-                {isDead ? "Signal_Lost" : "Signal_Kill"}
-              </div>
-              <div className="text-[8px] font-mono text-red-500 group-hover:text-white opacity-60">
-                [ Protocol_Alpha ]
-              </div>
-            </div>
-          </div>
+          <FaBiohazard className="text-4xl text-red-500" />
+          <span className="mt-4 text-[8px] font-mono text-red-500">TERMINATE</span>
+        </button>
 
-          {/* Flash Effect on death */}
-          <AnimatePresence>
-            {isDead && (
-              <motion.div 
-                initial={{ x: "-100%" }} animate={{ x: "100%" }}
-                transition={{ duration: 0.5, repeat: Infinity }}
-                className="absolute inset-0 bg-white/5 skew-x-12"
-              />
-            )}
-          </AnimatePresence>
-        </motion.button>
-
+        {/* 🛠️ REPAIR OVERLAY */}
+        <AnimatePresence>
+          {isHumiliated && (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="absolute inset-0 z-20 flex flex-col items-center justify-center backdrop-blur-sm bg-black/60 rounded-xl"
+            >
+              <Button 
+                onClick={handleRepair}
+                disabled={isRepairing}
+                className="bg-white text-black font-black hover:bg-brand-cyan transition-all px-6 py-8 rounded-none skew-x-[-10deg]"
+              >
+                {isRepairing ? "REPAIRING..." : <><FaScrewdriverWrench className="mr-2" /> FIELD REPAIR</>}
+              </Button>
+              <span className="text-[8px] text-white/40 mt-4 font-mono">ESTIMATED_TIME: 1.5s</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* 🧩 FOOTER STATUS */}
-      <div className="mt-4 flex justify-between items-center px-4 py-2 bg-zinc-950/50 border-x border-zinc-900">
-         <div className="flex items-center gap-2">
-            <FaBolt className={cn("text-[10px]", heat > 50 ? "text-brand-yellow" : "text-zinc-600")} />
-            <span className="text-[7px] font-mono text-zinc-500 uppercase tracking-widest">Battery: 84%</span>
-         </div>
-         <div className="text-[7px] font-mono text-zinc-700 uppercase">
-            Anduril_Tactical_v4.0.1
-         </div>
+      {/* 🧩 FOOTER */}
+      <div className="mt-4 flex justify-between items-center px-2 py-1 bg-zinc-950 border border-zinc-900">
+         <span className="text-[7px] text-zinc-600 font-mono">UID: {userId.slice(0,8)}</span>
+         <a href="https://t.me/oneSitePlsBot/app" className="text-[7px] font-bold text-brand-cyan animate-pulse">
+            FW: ANDURIL_MANGLED_v4.2
+         </a>
       </div>
     </div>
   );
