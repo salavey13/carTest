@@ -11,50 +11,55 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 
-export function VirtualBlaster({ onHit, onDeath, lobbyId, userId }: any) {
+export function VirtualBlaster({ onHit, lobbyId, userId }: any) {
   const { dbUser, refreshDbUser } = useAppContext();
   const sounds = useGameSounds();
   
-  // --- STATES ---
   const [mode, setMode] = useState<"ranged" | "melee">("ranged");
   const [heat, setHeat] = useState(0); 
   const [isOverheated, setIsOverheated] = useState(false);
   const [isFiring, setIsFiring] = useState(false);
   const [isRepairing, setIsRepairing] = useState(false);
 
-  // Check humiliation from Global Context
   const isHumiliated = !!dbUser?.metadata?.is_humiliated;
 
-  // --- PASSIVE COOLING ---
+  // Boot sound
+  useEffect(() => { sounds.startMatch(); }, []);
+
+  // Passive Cooling logic with Heat-Sync
   useEffect(() => {
     const coolingInterval = setInterval(() => {
-      setHeat((p) => Math.max(0, p - (isOverheated ? 4 : 2)));
-      if (isOverheated && heat === 0) setIsOverheated(false);
+      setHeat((p) => {
+        const next = Math.max(0, p - (isOverheated ? 4 : 2));
+        if (isOverheated && next === 0) setIsOverheated(false);
+        return next;
+      });
     }, 100);
     return () => clearInterval(coolingInterval);
-  }, [isOverheated, heat]);
+  }, [isOverheated]);
 
-  // --- ACTIONS ---
   const triggerFire = useCallback(() => {
-    if (isHumiliated) {
-        sounds.playHumiliation();
-        toast.error("HARDWARE FAILURE", { description: "Your barrel is bent. Repair required." });
+    if (isHumiliated || isOverheated) {
+        sounds.playHumiliation(); // "Empty click" sound
+        if (isOverheated) toast.error("THERMAL_LOCK", { description: "Weapon too hot. Venting..." });
         return;
     }
-    if (isOverheated) return;
     
     sounds.fire();
     setIsFiring(true);
-    setHeat((p) => Math.min(100, p + 12));
-    if (heat + 12 >= 100) setIsOverheated(true);
+    setHeat((p) => {
+        const next = Math.min(100, p + 15);
+        if (next >= 100) setIsOverheated(true);
+        return next;
+    });
     setTimeout(() => setIsFiring(false), 80);
-  }, [isHumiliated, isOverheated, sounds, heat]);
+  }, [isHumiliated, isOverheated, sounds]);
 
   const triggerMelee = useCallback(async () => {
     if (isHumiliated) return sounds.playHumiliation();
     
     sounds.meleeAttack();
-    setHeat((p) => Math.min(100, p + 35));
+    setHeat((p) => Math.min(100, p + 40));
     
     const res = await executeProximityBoom(userId, lobbyId);
     if (res.success) {
@@ -66,76 +71,94 @@ export function VirtualBlaster({ onHit, onDeath, lobbyId, userId }: any) {
 
   const handleRepair = async () => {
     setIsRepairing(true);
-    sounds.playMedkit(); // Use medkit sound for mechanical repair vibe
+    sounds.playMedkit(); // "Pneumatic/Hiss" sound
     await fieldRepair(userId);
     await refreshDbUser();
     setIsRepairing(false);
-    toast.success("GEAR REPAIRED", { description: "Integrity Restored to 100%" });
   };
 
-  // --- TOUCH HANDLERS (Simplified for clarity) ---
   const touchStartTime = useRef(0);
   const handleTouchStart = () => { touchStartTime.current = Date.now(); };
   const handleTouchEnd = () => {
     const elapsed = Date.now() - touchStartTime.current;
-    if (elapsed < 500) mode === "ranged" ? triggerFire() : triggerMelee();
-    else setMode(prev => prev === "ranged" ? "melee" : "ranged");
+    if (elapsed < 350) mode === "ranged" ? triggerFire() : triggerMelee();
+    else {
+        setMode(prev => prev === "ranged" ? "melee" : "ranged");
+        if (navigator.vibrate) navigator.vibrate(20);
+    }
   };
 
   return (
     <div className={cn(
-      "relative select-none touch-none p-4 rounded-2xl border-2 transition-all duration-700",
-      isHumiliated ? "bg-red-950/20 border-red-500 blur-[0.5px]" : "bg-black border-zinc-800"
+      "relative select-none touch-none p-4 rounded-3xl border-4 transition-all duration-700",
+      isHumiliated ? "bg-red-950/20 border-red-600 shadow-[0_0_20px_red]" : "bg-black border-zinc-800",
+      isOverheated && "border-orange-600 shadow-[0_0_15px_orange]"
     )}>
       
-      {/* 📡 TELEMETRY */}
-      <div className="flex justify-between items-center mb-4 font-mono">
+      {/* 📡 TELEMETRY (DYNAMIC TEXT) */}
+      <div className="flex justify-between items-center mb-6 font-mono">
         <div className="flex flex-col">
-          <span className="text-[7px] text-zinc-500 uppercase">Integrity_Control</span>
-          <span className={cn("text-[10px] font-bold", isHumiliated ? "text-red-500 animate-pulse" : "text-brand-cyan")}>
-            {isHumiliated ? "CRITICAL_FAILURE" : "SYSTEMS_NOMINAL"}
+          <span className="text-[7px] text-zinc-600 uppercase tracking-tighter">Combat_Link</span>
+          <span className={cn(
+            "text-[10px] font-black tracking-widest",
+            isHumiliated ? "text-red-600" : isOverheated ? "text-orange-500 animate-pulse" : "text-brand-cyan"
+          )}>
+            {isHumiliated ? "MANGLED_UNIT" : isOverheated ? "OVERHEATED" : "ANDURIL_READY"}
           </span>
         </div>
-        {isHumiliated && (
-            <motion.div animate={{ rotate: [0, 10, -10, 0] }} transition={{ repeat: Infinity }}>
-                <FaTriangleExclamation className="text-red-500 text-lg" />
-            </motion.div>
-        )}
+        <div className="text-right">
+            <span className="text-[7px] text-zinc-600 uppercase">Temp</span>
+            <span className={cn("text-[10px] font-bold block", heat > 70 ? "text-orange-500" : "text-zinc-400")}>
+                {heat}%
+            </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 relative">
         
-        {/* 🔫 THE BLASTER (COULD BE A CROISSANT) */}
+        {/* 🔫 THE BLASTER (WITH INTEGRATED HEAT RING) */}
         <motion.button
           onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
-          animate={isFiring ? { scale: 0.9, y: 5 } : { scale: 1, y: 0 }}
+          animate={isFiring ? { scale: 0.85, y: 10, rotate: -2 } : { scale: 1, y: 0, rotate: isHumiliated ? 15 : 0 }}
           className={cn(
-            "cyber-clip aspect-square relative flex flex-col items-center justify-center border-2 transition-all duration-1000",
-            isHumiliated ? "border-red-900 bg-black rotate-[15deg] scale-x-75" : 
-            mode === "ranged" ? "border-brand-cyan bg-zinc-900" : "border-brand-gold bg-zinc-900"
+            "aspect-square relative flex flex-col items-center justify-center border-2 rounded-2xl transition-all duration-500",
+            isHumiliated ? "bg-zinc-950 border-red-900 scale-x-75" : 
+            mode === "ranged" ? "bg-zinc-900 border-brand-cyan/30" : "bg-zinc-900 border-brand-gold/30"
           )}
         >
-          {/* THE MANGLED EFFECT: If humiliated, rotate and skew the icon */}
+          {/* THE HEAT RING: Visual fill around the button */}
+          <svg className="absolute inset-0 w-full h-full -rotate-90">
+            <circle
+              cx="50%" cy="50%" r="48%"
+              fill="none"
+              stroke={isOverheated ? "orange" : "white"}
+              strokeWidth="2"
+              strokeDasharray="251"
+              strokeDashoffset={251 - (251 * heat) / 100}
+              className="transition-all duration-200 opacity-20"
+            />
+          </svg>
+
           <div className={cn(
             "text-5xl transition-all duration-1000",
-            isHumiliated ? "rotate-[120deg] scale-y-50 skew-x-12 opacity-40" : "",
+            isHumiliated ? "rotate-[130deg] scale-y-50 blur-[1px] opacity-30" : "",
             mode === "ranged" ? "text-brand-cyan" : "text-brand-gold"
           )}>
             {mode === "ranged" ? <FaCrosshairs /> : <FaHandFist />}
           </div>
 
-          <div className="mt-4 text-[8px] font-black uppercase opacity-50">
-            {isHumiliated ? "BENT_BARREL" : mode}
-          </div>
+          <span className="mt-4 text-[9px] font-black uppercase text-zinc-600">
+            {isHumiliated ? "BENT" : mode}
+          </span>
         </motion.button>
 
-        {/* 💀 DEATH / SIGNAL EXIT */}
+        {/* 💀 TERMINATE */}
         <button
           onClick={() => { sounds.death(); onHit(); }}
-          className="cyber-clip-reverse aspect-square flex flex-col items-center justify-center border-2 border-red-600 bg-red-950/20"
+          className="aspect-square flex flex-col items-center justify-center border-2 border-red-900 bg-red-950/10 rounded-2xl active:bg-red-600 transition-colors group"
         >
-          <FaBiohazard className="text-4xl text-red-500" />
-          <span className="mt-4 text-[8px] font-mono text-red-500">TERMINATE</span>
+          <FaBiohazard className="text-4xl text-red-900 group-active:text-white" />
+          <span className="mt-4 text-[9px] font-bold text-red-900 group-active:text-white">EXIT</span>
         </button>
 
         {/* 🛠️ REPAIR OVERLAY */}
@@ -143,20 +166,28 @@ export function VirtualBlaster({ onHit, onDeath, lobbyId, userId }: any) {
           {isHumiliated && (
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              className="absolute inset-0 z-20 flex flex-col items-center justify-center backdrop-blur-sm bg-black/60 rounded-xl"
+              className="absolute inset-0 z-20 flex flex-col items-center justify-center backdrop-blur-md bg-black/60 rounded-2xl border-2 border-red-500"
             >
               <Button 
                 onClick={handleRepair}
                 disabled={isRepairing}
-                className="bg-white text-black font-black hover:bg-brand-cyan transition-all px-6 py-8 rounded-none skew-x-[-10deg]"
+                className="bg-white text-black font-black hover:bg-brand-cyan transition-all h-20 w-32 rounded-none skew-x-[-15deg]"
               >
-                {isRepairing ? "REPAIRING..." : <><FaScrewdriverWrench className="mr-2" /> FIELD REPAIR</>}
+                {isRepairing ? "FIXING..." : "REPAIR"}
               </Button>
-              <span className="text-[8px] text-white/40 mt-4 font-mono">ESTIMATED_TIME: 1.5s</span>
+              <div className="flex gap-1 mt-4">
+                 <motion.div animate={{ opacity: [1,0,1] }} className="w-1 h-1 bg-red-500" />
+                 <span className="text-[8px] text-red-500 font-bold uppercase">Barrel_Warped</span>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      {/* ⚠️ OVERHEAT GLITCH OVERLAY */}
+      {isOverheated && (
+          <div className="absolute inset-0 pointer-events-none border-2 border-orange-500/50 animate-pulse rounded-3xl" />
+      )}
     </div>
   );
 }
