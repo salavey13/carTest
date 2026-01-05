@@ -157,14 +157,6 @@ export function VirtualBlaster({ onHit, onDeath, lobbyId, userId }: any) {
           )}
         </AnimatePresence>
       </div>
-
-      {/* 🧩 FOOTER */}
-      <div className="mt-4 flex justify-between items-center px-2 py-1 bg-zinc-950 border border-zinc-900">
-         <span className="text-[7px] text-zinc-600 font-mono">UID: {userId.slice(0,8)}</span>
-         <a href="https://t.me/oneSitePlsBot/app" className="text-[7px] font-bold text-brand-cyan animate-pulse">
-            FW: ANDURIL_MANGLED_v4.2
-         </a>
-      </div>
     </div>
   );
 }
