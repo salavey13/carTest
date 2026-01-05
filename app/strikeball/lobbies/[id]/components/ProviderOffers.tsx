@@ -2,20 +2,19 @@
 
 import React, { useEffect, useState } from "react";
 import { getProviderOffers, selectProviderForLobby } from "../../../actions/providers";
-import { FaMotorcycle, FaGun, FaPersonSkiing, FaChevronRight, FaCubes, FaTerminal, FaLock, FaUsers } from "react-icons/fa6";
+import { 
+    FaMotorcycle, FaGun, FaPersonSkiing, FaChevronRight, 
+    FaCubes, FaTerminal, FaLock, FaUsers, FaClock, 
+    FaMapLocationDot, FaShieldHeart, FaCircleInfo 
+} from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 
-export function ProviderOffers({ lobbyId, playerCount, selectedProviderId, selectedServiceId }: { 
-    lobbyId: string, 
-    playerCount: number, 
-    selectedProviderId?: string,
-    selectedServiceId?: string 
-}) {
+export function ProviderOffers({ lobbyId, playerCount, selectedProviderId, selectedServiceId }: any) {
     const [providers, setProviders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isSelecting, setIsSelecting] = useState(false);
 
     useEffect(() => {
         getProviderOffers(playerCount).then(res => {
@@ -24,121 +23,99 @@ export function ProviderOffers({ lobbyId, playerCount, selectedProviderId, selec
         });
     }, [playerCount]);
 
-    const handleSelectOffer = async (providerId: string, providerSlug: string, offer: any) => {
+    const handleSelect = async (providerId: string, offer: any) => {
         if (!offer.isAvailable) return toast.error(offer.lockReason);
-        
-        setIsSelecting(true);
         const res = await selectProviderForLobby(lobbyId, providerId, offer);
-        setIsSelecting(false);
-        
-        if (res.success) {
-            toast.success(`Контракт с ${providerSlug.toUpperCase()} инициирован!`);
-        } else {
-            toast.error(res.error);
-        }
+        if (res.success) toast.success("Контракт отправлен провайдеру!");
     };
 
-    if (loading) return <div className="animate-pulse text-[10px] text-zinc-500 font-mono">SCANNIG MARKET FOR BEST DEALS...</div>;
+    if (loading) return <div className="p-4 border border-zinc-800 animate-pulse text-[10px] font-mono text-zinc-500 uppercase">Scanning Tactical Market...</div>;
 
     return (
-        <div className="space-y-4">
-            <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] flex justify-between">
-                <span>Рынок Услуг // Группа: {playerCount}</span>
-                <span className="text-red-500 animate-pulse">LIVE_PRICES</span>
-            </h3>
-            
-            <div className="grid grid-cols-1 gap-4">
-                {providers.map(provider => {
-                    // BUG FIX: Ensure we compare the actual UUIDs
-                    const isProviderSelected = selectedProviderId === provider.providerId;
-                    
-                    return (
-                        <div key={provider.providerId} className={cn(
-                            "bg-zinc-900/60 border p-4 transition-all relative",
-                            isProviderSelected ? "border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.1)]" : "border-zinc-800"
-                        )}>
-                            <div className="flex justify-between items-center mb-4">
-                                <Link href={`/crews/${provider.providerSlug}`} className="flex items-center gap-3 group">
-                                    <div className="w-10 h-10 relative bg-black border border-zinc-700 overflow-hidden">
-                                        <img src={provider.logo} className="w-full h-full object-cover grayscale group-hover:grayscale-0" alt="Logo" />
-                                    </div>
-                                    <div>
-                                        <span className="font-black text-xs uppercase tracking-widest block group-hover:text-red-500">{provider.providerName}</span>
-                                        <span className="text-[8px] text-zinc-600 font-mono uppercase">{provider.location || 'Tactical HQ'}</span>
-                                    </div>
-                                </Link>
-                                {isProviderSelected && (
-                                    <div className="text-[9px] bg-emerald-500 text-black px-2 py-0.5 font-black uppercase flex items-center gap-1">
-                                        АКТИВНЫЙ_ШТАБ
-                                    </div>
-                                )}
-                            </div>
-                            
-                            <div className="space-y-1.5">
-                                {provider.offers.map((offer: any) => {
-                                    const isThisServiceSelected = isProviderSelected && selectedServiceId === offer.serviceId;
-                                    
-                                    return (
-                                        <button 
-                                            key={offer.serviceId}
-                                            disabled={isSelecting || !offer.isAvailable}
-                                            onClick={() => handleSelectOffer(provider.providerId, provider.providerSlug, offer)}
-                                            className={cn(
-                                                "w-full flex justify-between items-center p-3 transition-all group relative overflow-hidden border",
-                                                !offer.isAvailable ? "bg-black/20 border-zinc-900 cursor-not-allowed opacity-60" : 
-                                                isThisServiceSelected ? "bg-emerald-950/20 border-emerald-500" : "bg-black border-zinc-800 hover:border-red-600"
-                                            )}
-                                        >
-                                            <div className="flex items-center gap-3 relative z-10 text-left">
-                                                <div className={cn("transition-colors", !offer.isAvailable ? "text-zinc-700" : "text-white")}>
-                                                    {offer.isAvailable ? <ServiceIcon type={offer.serviceId} /> : <FaLock size={12} className="text-red-900" />}
-                                                </div>
-                                                <div>
-                                                    <div className={cn(
-                                                        "text-[10px] font-bold uppercase",
-                                                        !offer.isAvailable ? "text-zinc-600" : "text-white"
-                                                    )}>
-                                                        {offer.serviceName}
-                                                    </div>
-                                                    <div className="text-[8px] text-zinc-500 leading-tight">
-                                                        {offer.isAvailable ? `${offer.bestPackage.name} | ${offer.bestPackage.includes}` : offer.lockReason}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {offer.isAvailable ? (
-                                                <div className="text-right relative z-10">
-                                                    <div className="text-sm font-black text-red-500 group-hover:scale-110 transition-transform">
-                                                        {offer.totalPrice.toLocaleString()} ₽
-                                                    </div>
-                                                    <div className="text-[8px] text-zinc-600 font-mono">{offer.perPerson} / чел</div>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-1 text-[8px] font-mono text-red-900 uppercase font-bold">
-                                                    <FaUsers size={10} /> {offer.minPlayers} min
-                                                </div>
-                                            )}
-                                            
-                                            {offer.isAvailable && (
-                                                <div className="absolute inset-0 bg-gradient-to-r from-red-600/0 via-red-600/5 to-red-600/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    );
-                })}
+        <div className="space-y-6">
+            <div className="flex justify-between items-end border-b border-zinc-800 pb-2">
+                <h3 className="text-xs font-black font-orbitron uppercase tracking-widest text-zinc-400">Рынок Операций</h3>
+                <span className="text-[9px] font-mono text-brand-cyan uppercase">Найдено: {providers.length} локаций</span>
             </div>
+            
+            {providers.map(provider => (
+                <div key={provider.providerId} className={cn(
+                    "bg-zinc-950 border-2 transition-all overflow-hidden",
+                    selectedProviderId === provider.providerId ? "border-brand-cyan shadow-[0_0_25px_rgba(0,255,255,0.1)]" : "border-zinc-900"
+                )}>
+                    {/* Header: Provider Intel */}
+                    <div className="p-4 bg-zinc-900/50 flex justify-between items-start">
+                        <Link href={`/crews/${provider.providerSlug}`} className="flex gap-4 group">
+                            <img src={provider.logo} className="w-12 h-12 bg-black border border-zinc-700 grayscale group-hover:grayscale-0 transition-all" />
+                            <div>
+                                <h4 className="font-black text-sm uppercase group-hover:text-brand-cyan">{provider.providerName}</h4>
+                                <div className="flex items-center gap-3 text-[9px] text-zinc-500 font-mono mt-1">
+                                    <span className="flex items-center gap-1"><FaMapLocationDot /> {provider.location}</span>
+                                    <span className="flex items-center gap-1"><FaClock /> {provider.working_hours || "10:00-22:00"}</span>
+                                </div>
+                            </div>
+                        </Link>
+                        {selectedProviderId === provider.providerId && <Badge className="bg-brand-cyan text-black font-black text-[8px] rounded-none">ACTIVE_CONTRACT</Badge>}
+                    </div>
+
+                    {/* Amenities Bar */}
+                    {provider.amenities?.length > 0 && (
+                        <div className="flex gap-4 px-4 py-2 bg-black/40 border-y border-zinc-900 overflow-x-auto no-scrollbar">
+                            {provider.amenities.map((a: any) => (
+                                <div key={a.id} className="flex items-center gap-1.5 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
+                                    <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-tighter">{a.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Offers List */}
+                    <div className="p-2 space-y-2">
+                        {provider.offers.map((offer: any) => {
+                            const isSelected = selectedServiceId === offer.serviceId && selectedProviderId === provider.providerId;
+                            
+                            return (
+                                <button 
+                                    key={offer.serviceId}
+                                    onClick={() => handleSelect(provider.providerId, offer)}
+                                    className={cn(
+                                        "w-full p-4 border text-left transition-all relative group",
+                                        !offer.isAvailable ? "opacity-40 cursor-not-allowed border-zinc-900" :
+                                        isSelected ? "border-brand-cyan bg-brand-cyan/5" : "border-zinc-800 hover:border-zinc-600 bg-zinc-900/30"
+                                    )}
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <h5 className="font-black text-xs uppercase">{offer.serviceName}</h5>
+                                                {offer.age_limit && <span className="text-[8px] border border-zinc-700 px-1 text-zinc-500">{offer.age_limit}+</span>}
+                                            </div>
+                                            <p className="text-[10px] text-zinc-500 leading-tight max-w-[200px]">{offer.description}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-lg font-black font-orbitron text-white">{offer.totalPrice.toLocaleString()} ₽</div>
+                                            <div className="text-[9px] font-mono text-zinc-600">{offer.perPerson} ₽ / за бойца</div>
+                                        </div>
+                                    </div>
+
+                                    {offer.isAvailable ? (
+                                        <div className="mt-3 flex items-center gap-4 text-[9px] font-mono">
+                                            <span className="text-brand-cyan flex items-center gap-1">
+                                                <FaShieldHeart /> {offer.bestPackage.includes}
+                                            </span>
+                                            {offer.gear_info && <span className="text-zinc-500 italic">Экип: {offer.gear_info}</span>}
+                                        </div>
+                                    ) : (
+                                        <div className="mt-3 text-[9px] text-red-900 font-black uppercase flex items-center gap-1">
+                                            <FaLock /> {offer.lockReason}
+                                        </div>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            ))}
         </div>
     );
-}
-
-function ServiceIcon({ type }: { type: string }) {
-    const t = type.toLowerCase();
-    if (t.includes('bike') || t.includes('enduro')) return <FaMotorcycle className="text-amber-500" />;
-    if (t.includes('snow')) return <FaPersonSkiing className="text-cyan-400" />;
-    if (t.includes('paintball')) return <FaCubes className="text-orange-500" />;
-    if (t.includes('cyber') || t.includes('wms')) return <FaTerminal className="text-brand-cyan" />;
-    return <FaGun className="text-red-600" />;
 }
