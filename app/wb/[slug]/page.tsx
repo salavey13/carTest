@@ -365,28 +365,29 @@ export default function CrewWarehousePage() {
 
         {/* СТАТИСТИКА */}
         <div className="p-2 bg-white dark:bg-gray-800 border-b">
-          <WarehouseStats
-            itemsCount={localItems.reduce((s, it) => s + (it.total_quantity || 0), 0)}
-            uniqueIds={localItems.length}
-            score={score} level={level} streak={streak} dailyStreak={dailyStreak}
-            checkpointMain={checkpointStart ? formatSec(Math.floor((Date.now() - checkpointStart) / 1000)) : (lastCheckpointDurationSec ? formatSec(lastCheckpointDurationSec) : "--:--")}
-            checkpointSub={checkpointStart ? "в процессе" : (lastCheckpointDurationSec ? `последнее: ${formatSec(lastCheckpointDurationSec)}` : "не запускался")}
-            changedCount={checkpointStart ? statsObj.changedCount : (lastProcessedCount ?? 0)}
-            totalDelta={checkpointStart ? statsObj.totalDelta : (lastProcessedTotalDelta ?? 0)}
-            stars={checkpointStart ? statsObj.stars : (lastProcessedStars ?? 0)}
-            offloadUnits={checkpointStart ? statsObj.offloadUnits : (lastProcessedOffloadUnits ?? 0)}
-            salary={checkpointStart ? statsObj.salary : (lastProcessedSalary ?? 0)}
-            achievements={achievements}
-            sessionStart={sessionStart}
-            errorCount={errorCount}
-            bossMode={bossMode}
-            bossTimer={bossTimer}
-            leaderboard={leaderboard}
-            efficiency={efficiency}
-            avgTimePerItem={avgTimePerItem}
-            dailyGoals={dailyGoals}
-            sessionDuration={sessionDuration}
-          />
+          
+<WarehouseStats
+  itemsCount={localItems.reduce((s, it) => s + (it.total_quantity || 0), 0)}
+  uniqueIds={localItems.length}
+  score={score} 
+  level={level} 
+  streak={streak} 
+  dailyStreak={dailyStreak}
+  // Передаем живые счетчики из хука вместо застывших стейтов
+  offloadUnits={offloadCount} 
+  onloadUnits={onloadCount}
+  totalDelta={offloadCount + onloadCount + editCount}
+  salary={offloadCount * 50} // Твоя формула: 50 руб за единицу
+  // Остальное по классике
+  achievements={achievements}
+  sessionDuration={sessionDuration}
+  errorCount={errorCount}
+  bossMode={bossMode}
+  bossTimer={bossTimer}
+  leaderboard={leaderboard}
+  efficiency={efficiency}
+  avgTimePerItem={avgTimePerItem}
+/>
         </div>
 
         {/* НИЖНИЕ КНОПКИ */}
