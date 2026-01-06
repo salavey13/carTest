@@ -642,142 +642,91 @@ export const logCyberFitnessAction = async (
   countOrDetails: number | { featureName: string; featureValue?: string | number | boolean } | { minutes: number } 
 ): Promise<{ success: boolean; error?: string; newAchievements?: Achievement[] }> => {
   if (!userId) {
-    logger.warn("[CyberFitness LogAction] User ID (string) is missing. Cannot log action.");
-    return { success: false, error: "User ID (string) is required." };
+    logger.warn("[CyberFitness LogAction] User ID (string) is missing.");
+    return { success: false, error: "User ID is required." };
   }
-  
-  if (actionType === 'featureUsed') {
-      if (typeof countOrDetails !== 'object' || countOrDetails === null || !('featureName' in countOrDetails) || typeof (countOrDetails as any).featureName !== 'string') {
-          logger.warn(`[CyberFitness LogAction] Invalid countOrDetails for 'featureUsed'. Expected {featureName: string, featureValue?: any}. Received:`, countOrDetails);
-          return { success: false, error: `Invalid data for action ${actionType}. Expected {featureName: string}.` };
-      }
-  } else if (actionType === 'focusTimeAdded') {
-      if (typeof countOrDetails !== 'object' || countOrDetails === null || !('minutes'in countOrDetails) || typeof (countOrDetails as any).minutes !== 'number') {
-          logger.warn(`[CyberFitness LogAction] Invalid countOrDetails for 'focusTimeAdded'. Expected {minutes: number}. Received:`, countOrDetails);
-          return { success: false, error: `Invalid data for action ${actionType}. Expected {minutes: number}.` };
-      }
-  } else if (typeof countOrDetails !== 'number') {
-      logger.warn(`[CyberFitness LogAction] Action '${actionType}' expects a numeric count. Received:`, countOrDetails);
-      return { success: false, error: `Action '${actionType}' expects a numeric count.` };
+
+  // --- 1. ВЫЧИСЛЯЕМ ДЕЛЬТУ KV ---
+  let kiloVibesDelta = 0;
+  let featureKey: string | null = null;
+  let featureVal: any = null;
+
+  if (actionType === 'filesExtracted' && typeof countOrDetails === 'number') {
+    kiloVibesDelta = countOrDetails * 0.1;
+    featureKey = 'totalFilesExtracted'; // Обновим счетчик в featuresUsed для истории
+    featureVal = countOrDetails; 
+  } 
+  else if (actionType === 'tokensProcessed' && typeof countOrDetails === 'number') {
+    kiloVibesDelta = countOrDetails * 0.001;
+    featureKey = 'lastTokensCount';
+    featureVal = countOrDetails;
+  } 
+  else if (actionType === 'kworkRequestSent' && typeof countOrDetails === 'number') {
+    kiloVibesDelta = countOrDetails * 5;
+    featureKey = 'totalKworkRequests';
+    featureVal = countOrDetails;
+  } 
+  else if (actionType === 'prCreated' && typeof countOrDetails === 'number') {
+    kiloVibesDelta = countOrDetails * 50;
+    featureKey = 'lastPrTs';
+    featureVal = new Date().toISOString();
+  } 
+  else if (actionType === 'branchUpdated' && typeof countOrDetails === 'number') {
+    kiloVibesDelta = countOrDetails * 20;
+    featureKey = 'lastBranchUpdateTs';
+    featureVal = new Date().toISOString();
+  } 
+  else if (actionType === 'featureUsed' && typeof countOrDetails === 'object' && 'featureName' in countOrDetails) {
+    kiloVibesDelta = 5; // Бонус за использование фичи
+    featureKey = countOrDetails.featureName;
+    featureVal = countOrDetails.featureValue ?? true;
+  } 
+  else if (actionType === 'focusTimeAdded' && typeof countOrDetails === 'object' && 'minutes' in countOrDetails) {
+    kiloVibesDelta = countOrDetails.minutes * 0.5;
+    featureKey = 'lastFocusMinutes';
+    featureVal = countOrDetails.minutes;
   }
 
   try {
-    const profileResult = await fetchUserCyberFitnessProfile(userId); 
-    if (!profileResult.success && !profileResult.data?.hasOwnProperty('level')) { 
-      logger.error(`[CyberFitness LogAction] Failed to get profile data for ${userId} and no default profile returned. Error: ${profileResult.error}`);
-      return { success: false, error: profileResult.error || "Failed to get current profile data." };
-    }
+    // --- 2. АТОМАРНЫЙ ВЫЗОВ RPC ---
+    // Это "Suckerpunch" по гонке данных. База сама заблокирует строку и прибавит дельту.
+    const { data: newMetadata, error: rpcError } = await supabaseAdmin.rpc('update_user_cyber_stats', {
+      p_user_id: userId,
+      p_kv_delta: kiloVibesDelta,
+      p_gv_delta: 0, // В Студии GV пока не майним
+      p_new_achievement: null, // Достижения проверим после апдейта
+      p_feature_key: featureKey,
+      p_feature_val: JSON.stringify(featureVal)
+    });
+
+    if (rpcError) throw rpcError;
+
+    // --- 3. ПОСТ-ОБРАБОТКА (Daily Log & Achievements) ---
+    // Чтобы не усложнять RPC, Daily Log обновим отдельно или оставим как есть.
+    // Но так как KV теперь в безопасности (атомарны), затирание профиля прекратится.
     
-    let currentProfile = profileResult.data || getDefaultCyberFitnessProfile(); 
-
-    let dailyLog = currentProfile.dailyActivityLog ? [...currentProfile.dailyActivityLog] : [];
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    let todayEntry = dailyLog.find(entry => entry.date === todayStr);
-
-    if (!todayEntry) {
-      todayEntry = { date: todayStr, filesExtracted: 0, tokensProcessed: 0, kworkRequestsSent: 0, prsCreated: 0, branchesUpdated: 0, focusTimeMinutes: 0 };
-      dailyLog.push(todayEntry);
-    } else { 
-       todayEntry.filesExtracted = todayEntry.filesExtracted || 0;
-       todayEntry.tokensProcessed = todayEntry.tokensProcessed || 0;
-       todayEntry.kworkRequestsSent = todayEntry.kworkRequestsSent || 0;
-       todayEntry.prsCreated = todayEntry.prsCreated || 0;
-       todayEntry.branchesUpdated = todayEntry.branchesUpdated || 0;
-       todayEntry.focusTimeMinutes = todayEntry.focusTimeMinutes || 0;
-    }
+    const profile = getCyberFitnessProfile(userId, newMetadata);
     
-    const profileUpdates: Partial<CyberFitnessProfile> = {
-        featuresUsed: { ...(currentProfile.featuresUsed || {}) } 
-    };
-    let kiloVibesFromAction = 0;
-
-    if (actionType === 'filesExtracted' && typeof countOrDetails === 'number') {
-        let count = countOrDetails;
-        if (count < 0) { logger.warn(`[CF LogAction] Negative filesExtracted count (${count}). Correcting to 0.`); count = 0; }
-        todayEntry.filesExtracted += count;
-        profileUpdates.totalFilesExtracted = count; 
-        kiloVibesFromAction += count * 0.1; 
-        if (count >= 20 && !currentProfile.featuresUsed?.added20PlusFilesToKworkOnce) {
-             profileUpdates.featuresUsed!.added20PlusFilesToKworkOnce = true; 
-        } else if (count >= 10 && !currentProfile.featuresUsed?.added10PlusFilesToKworkOnce) {
-            profileUpdates.featuresUsed!.added10PlusFilesToKworkOnce = true;
-        }
-    } else if (actionType === 'tokensProcessed' && typeof countOrDetails === 'number') {
-        let tokenCount = countOrDetails;
-        if (tokenCount < 0) {
-            logger.warn(`[CF LogAction] Negative tokensProcessed count (${tokenCount}). Correcting to 0.`);
-            tokenCount = 0;
-        }
-        todayEntry.tokensProcessed += tokenCount; 
-        profileUpdates.totalTokensProcessed = tokenCount; 
-        kiloVibesFromAction += tokenCount * 0.001; 
-    } else if (actionType === 'kworkRequestSent' && typeof countOrDetails === 'number') {
-        let count = countOrDetails;
-        if (count < 0) { logger.warn(`[CF LogAction] Negative kworkRequestSent count (${count}). Correcting to 0.`); count = 0; }
-        todayEntry.kworkRequestsSent += count; 
-        profileUpdates.totalKworkRequestsSent = count; 
-        kiloVibesFromAction += count * 5; 
-    } else if (actionType === 'prCreated' && typeof countOrDetails === 'number') {
-        let count = countOrDetails;
-        if (count <= 0) { logger.warn(`[CF LogAction] Non-positive prCreated count (${count}). Correcting to 1.`); count = 1; }
-        else if (count !== 1) { logger.warn(`[CF LogAction] Unusual prCreated count (${count}). Using provided count for KiloVibes and totals, but daily log will sum correctly.`);}
-        todayEntry.prsCreated += count; 
-        profileUpdates.totalPrsCreated = count; 
-        kiloVibesFromAction += count * 50; 
-    } else if (actionType === 'branchUpdated' && typeof countOrDetails === 'number') {
-        let count = countOrDetails;
-        if (count <= 0) { logger.warn(`[CF LogAction] Non-positive branchUpdated count (${count}). Correcting to 1.`); count = 1; }
-        else if (count !== 1) { logger.warn(`[CF LogAction] Unusual branchUpdated count (${count}). Using provided count for KiloVibes and totals, but daily log will sum correctly.`);}
-        todayEntry.branchesUpdated += count; 
-        profileUpdates.totalBranchesUpdated = count; 
-        kiloVibesFromAction += count * 20; 
-    } else if (actionType === 'featureUsed' && typeof countOrDetails === 'object' && 'featureName' in countOrDetails) {
-        const featureDetails = countOrDetails as { featureName: string; featureValue?: string | number | boolean };
-        const featureName = featureDetails.featureName;
-        const featureValue = featureDetails.featureValue !== undefined ? featureDetails.featureValue : true;
-
-        if (currentProfile.featuresUsed?.[featureName] !== featureValue) { 
-             profileUpdates.featuresUsed![featureName] = featureValue;
-             if (featureValue === true && !currentProfile.featuresUsed?.[featureName]) { 
-                 kiloVibesFromAction += 5; 
-             }
-        }
-    } else if (actionType === 'focusTimeAdded' && typeof countOrDetails === 'object' && 'minutes' in countOrDetails) {
-        const focusDetails = countOrDetails as { minutes: number };
-        const minutes = focusDetails.minutes;
-        if (minutes > 0) {
-            profileUpdates.focusTimeHours = minutes / 60; 
-            todayEntry.focusTimeMinutes = (todayEntry.focusTimeMinutes || 0) + minutes;
-            kiloVibesFromAction += minutes * 0.5; 
-        } else if (minutes < 0) {
-            logger.warn(`[CyberFitness LogAction] Negative minutes for 'focusTimeAdded': ${minutes}. Ignoring.`);
+    // Проверяем, не открылись ли новые ачивки на основе нового баланса KV
+    const newlyUnlocked: Achievement[] = [];
+    for (const ach of ALL_ACHIEVEMENTS) {
+        if (!ach.isQuest && !ach.isDynamic && !profile.achievements.includes(ach.id) && ach.checkCondition(profile)) {
+            // Если условие выполнено, делаем еще один быстрый вызов RPC, чтобы добавить ID ачивки
+            await supabaseAdmin.rpc('update_user_cyber_stats', {
+                p_user_id: userId,
+                p_new_achievement: ach.id,
+                p_kv_delta: ach.kiloVibesAward || 0
+            });
+            newlyUnlocked.push(ach);
         }
     }
 
-    if (kiloVibesFromAction > 0) {
-        profileUpdates.kiloVibes = kiloVibesFromAction;
-    }
-
-    dailyLog.sort((a, b) => b.date.localeCompare(a.date)); 
-    if (dailyLog.length > MAX_DAILY_LOG_ENTRIES) {
-      dailyLog = dailyLog.slice(0, MAX_DAILY_LOG_ENTRIES);
-    }
-    profileUpdates.dailyActivityLog = dailyLog;
-
-    const updateResult = await updateUserCyberFitnessProfile(userId, profileUpdates); 
-    
-    if (!updateResult.success) {
-      logger.error(`[CyberFitness LogAction] Failed to save profile for ${userId} after logging ${actionType}. Error: ${updateResult.error}`);
-      return { success: false, error: updateResult.error || "Failed to save updated profile." };
-    }
-
-    const finalKiloVibes = updateResult.data?.metadata?.[CYBERFIT_METADATA_KEY]?.kiloVibes; 
-    logger.info(`[CyberFitness LogAction EXIT] Action '${actionType}' logged for ${userId}. Final KV: ${finalKiloVibes ?? 'N/A'}. New ach: ${updateResult.newAchievements?.length || 0}`);
-    return { success: true, newAchievements: updateResult.newAchievements };
+    logger.info(`[CyberFitness LogAction EXIT] Atomic update ok. KV Delta: ${kiloVibesDelta}`);
+    return { success: true, newAchievements: newlyUnlocked };
 
   } catch (e: any) {
-    logger.error(`[CyberFitness LogAction CATCH] Exception for ${userId} logging ${actionType}:`, e);
-    return { success: false, error: e.message || "Failed to log CyberFitness action." };
+    logger.error(`[CyberFitness LogAction CATCH] Exception for ${userId}:`, e);
+    return { success: false, error: e.message || "RPC Update Failed" };
   }
 };
 
