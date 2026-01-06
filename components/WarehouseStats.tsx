@@ -73,9 +73,9 @@ export default function WarehouseStats(inProps: IncomingProps) {
   const { dbUser } = useAppContext();
   const [copied, setCopied] = useState(false);
 
-  // --- VIBE GHOST LOGIC ---
+  // --- GHOST ECONOMY CALCULATIONS ---
   const sessionGV = useMemo(() => (offloadUnits * 7) + (Math.max(0, totalDelta - offloadUnits) * 3), [offloadUnits, totalDelta]);
-  const squadTaxExpected = useMemo(() => Math.floor(salary * 0.13), [salary]);
+  const squadTax = useMemo(() => Math.floor(salary * 0.13), [salary]);
   const totalGhostBalance = dbUser?.metadata?.cyberFitness?.ghost_stats?.balance || 0;
 
   const top = useMemo(() => (Array.isArray(leaderboard) ? leaderboard.slice(0, 3) : []), [leaderboard]);
@@ -90,7 +90,6 @@ export default function WarehouseStats(inProps: IncomingProps) {
   }, [unitsProgress, errorFree, dailyGoals]);
 
   const formatDuration = (sec: number) => {
-    if (!Number.isFinite(sec) || sec <= 0) return "00:00";
     const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
     const s = sec % 60;
@@ -98,167 +97,109 @@ export default function WarehouseStats(inProps: IncomingProps) {
   };
 
   const shareScore = () => {
-    const text = `📦 MISSION REPORT: ${offloadUnits} units offloaded. Mined ${sessionGV} Ghost Vibes. Payout: ${salary} RUB. Tax: ${squadTaxExpected} RUB.`;
-    navigator.clipboard.writeText(text).then(() => { setCopied(true); toast.success("Сводка скопирована!"); setTimeout(() => setCopied(false), 2000); });
+    const text = `📊 SITREP: ${offloadUnits} Out. +${sessionGV} GV Mined. Payout: ${salary} RUB.`;
+    navigator.clipboard.writeText(text).then(() => { setCopied(true); toast.success("Copied to clipboard!"); setTimeout(() => setCopied(false), 2000); });
   };
 
   return (
-    <div className="p-3 bg-muted rounded-lg text-[13px] border border-border/40 shadow-sm font-sans">
-      <div className="flex flex-col lg:flex-row items-stretch gap-4">
-        <main className="flex-1 min-w-0">
-          
-          {/* HEADER: Original Meta + Mission Info */}
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="min-w-0">
-              <h3 className="font-black text-sm uppercase tracking-tighter flex items-center gap-2">
-                <ShieldAlert size={14} className="text-red-600" /> Operational SITREP
+    <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl text-[13px] font-mono">
+      <div className="flex flex-col lg:flex-row gap-4">
+        <main className="flex-1">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="font-black text-white uppercase flex items-center gap-2">
+                <ShieldAlert size={14} className="text-red-600" /> Operational_Status
               </h3>
-              <div className="mt-1 text-[10px] text-muted-foreground flex gap-2 font-mono">
-                <span>SKU: {uniqueIds}</span>
-                <span>TOTAL: {itemsCount}</span>
-                <span className="text-brand-cyan">SESSION: {formatDuration(sessionDuration)}</span>
-              </div>
+              <div className="text-[10px] text-zinc-500 mt-1">ID: {dbUser?.user_id?.slice(0,8)} | T: {formatDuration(sessionDuration)}</div>
             </div>
             <div className="flex gap-2">
-               <Badge variant="outline" className="h-5 text-[9px] bg-background font-black">LVL {level}</Badge>
-               {bossMode && <Badge className="h-5 text-[9px] bg-red-600 animate-pulse">BOSS_MODE: {Math.max(0, Math.floor(bossTimer / 1000))}s</Badge>}
+              <Badge variant="outline" className="h-5 text-[9px] border-zinc-700 text-zinc-400">LVL {level}</Badge>
+              <Badge variant="outline" className="h-5 text-[9px] border-brand-pink text-brand-pink">STREAK {streak}</Badge>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* COLUMN 1: KINETIC PERFORMANCE */}
-            <section className="p-3 rounded-lg bg-background/60 border border-border flex flex-col relative group">
+            {/* PERFORMANCE */}
+            <section className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg relative overflow-hidden group">
               <div className="flex items-start gap-3">
-                <motion.div animate={{ rotate: efficiency > 50 ? 360 : 0 }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }} className="flex-shrink-0 rounded-full bg-emerald-500 p-1.5 shadow-lg shadow-emerald-500/20">
-                  <Zap className="w-4 h-4 text-white" />
+                <motion.div animate={{ rotate: efficiency > 50 ? 360 : 0 }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }} className="p-1.5 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.4)]">
+                  <Zap size={14} className="text-black" />
                 </motion.div>
                 <div>
-                  <div className="text-[10px] text-muted-foreground uppercase font-bold">Combat_Efficiency</div>
-                  <div className="text-lg font-black tracking-tight">{score.toLocaleString()}</div>
+                  <div className="text-[10px] text-zinc-500 font-bold uppercase">Combat_Score</div>
+                  <div className="text-lg font-black text-white">{score.toLocaleString()}</div>
                 </div>
               </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <div className="p-2 bg-zinc-950/20 rounded border border-transparent hover:border-border/40 transition-colors">
-                  <div className="text-[9px] text-muted-foreground uppercase flex items-center gap-1"><Star size={10} className="text-yellow-400" /> Streak</div>
-                  <div className="font-black text-xs text-brand-pink">{streak}</div>
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <div className="bg-black/40 p-2 border border-zinc-800 rounded">
+                    <div className="text-[8px] text-zinc-500 uppercase flex items-center gap-1"><Ghost size={10} className="text-brand-purple" /> Session_GV</div>
+                    <div className="text-xs font-black text-brand-purple">+{sessionGV}</div>
                 </div>
-                <div className="p-2 bg-zinc-950/20 rounded border border-transparent hover:border-border/40 transition-colors">
-                  <div className="text-[9px] text-muted-foreground uppercase flex items-center gap-1"><Ghost size={10} className="text-brand-purple" /> Session_GV</div>
-                  <div className="font-black text-xs text-brand-purple">+{sessionGV}</div>
+                <div className="bg-black/40 p-2 border border-zinc-800 rounded">
+                    <div className="text-[8px] text-zinc-500 uppercase flex items-center gap-1"><Star size={10} className="text-yellow-500" /> Stars</div>
+                    <div className="text-xs font-black text-white">{stars}</div>
                 </div>
-              </div>
-
-              <div className="mt-3 pt-2 border-t border-border/50 flex justify-between text-[9px] text-muted-foreground font-mono uppercase">
-                <span>{efficiency} unit/h</span>
-                <span>{avgTimePerItem}s/unit</span>
               </div>
             </section>
 
-            {/* COLUMN 2: FINANCIAL HARVEST (The Lube) */}
-            <section className={cn(
-              "p-3 rounded-lg border flex flex-col justify-between",
-              changedCount > 0 ? "bg-emerald-50/30 border-emerald-300 dark:bg-emerald-950/10 dark:border-emerald-800" : "bg-background/40 border-border"
-            )}>
-              <div className="flex justify-between items-start">
-                <div>
-                    <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Market_Harvest</div>
-                    <div className="mt-1 flex items-baseline gap-1">
-                        <span className="font-black text-2xl text-emerald-600 dark:text-emerald-500">{salary.toLocaleString()}</span>
-                        <span className="text-[9px] text-muted-foreground font-bold">RUB</span>
-                    </div>
-                </div>
-                <div className="flex flex-col items-end">
-                    <Badge className="bg-emerald-600 text-[8px] h-4 rounded-none">POW_VERIFIED</Badge>
-                    <span className="text-[8px] text-zinc-500 font-mono mt-1">{checkpointMain || "NO_CP"}</span>
+            {/* HARVEST */}
+            <section className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex flex-col justify-between">
+              <div>
+                <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Market_Harvest</div>
+                <div className="flex items-baseline gap-1">
+                    <span className="font-black text-2xl text-emerald-500">{salary.toLocaleString()}</span>
+                    <span className="text-[9px] text-zinc-600 font-bold uppercase">RUB</span>
                 </div>
               </div>
-
-              <div className="mt-4 space-y-2">
-                <div className="flex justify-between text-[10px] items-center pb-1.5 border-b border-border/30">
-                    <span className="text-muted-foreground uppercase">Выгрузка (Actions):</span>
-                    <span className="font-black">{offloadUnits} units</span>
-                </div>
-                <div className="flex justify-between text-[10px] items-center pt-0.5">
-                    <span className="text-brand-pink font-bold flex items-center gap-1 uppercase">
-                        <Users size={10} /> Squad_Fund (13%):
-                    </span>
-                    <span className="text-brand-pink font-black">+{squadTaxExpected} ₽</span>
+              <div className="mt-4 pt-2 border-t border-zinc-800">
+                <div className="flex justify-between text-[10px] items-center text-brand-pink">
+                    <span className="font-bold flex items-center gap-1"><Users size={10} /> SQUAD_TAX (13%):</span>
+                    <span className="font-black">+{squadTax} ₽</span>
                 </div>
               </div>
             </section>
           </div>
 
-          {/* PROGRESS: DAILY MILESTONES */}
-          <div className="mt-3 p-3 rounded-lg bg-background/40 border border-border">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-[10px] font-black uppercase flex items-center gap-2 tracking-widest text-zinc-500">
-                <Target size={12} className="text-green-500" /> Operational Quota
-              </h4>
-              <Badge variant={totalXtr > 0 ? "default" : "secondary"} className="text-[9px] h-4 font-black">
-                {totalXtr} XTR BONUS
-              </Badge>
+          {/* GOALS */}
+          <div className="mt-3 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[10px] font-black uppercase text-zinc-600 tracking-widest">Operational Quota</span>
+              <Badge variant={totalXtr > 0 ? "default" : "secondary"} className="text-[8px] h-4">{totalXtr} XTR</Badge>
             </div>
             <Progress value={unitsProgress} className="h-1 bg-zinc-800" />
-            <div className="mt-2 flex justify-between items-center">
-                <div className="text-[9px] text-muted-foreground uppercase">
-                    Quota: {offloadUnits} / {dailyGoals.units} units
-                </div>
-                {errorCount > 0 && <span className="text-[9px] text-red-500 font-bold uppercase">Errors: {errorCount}</span>}
+            <div className="mt-2 text-[9px] text-zinc-500 flex justify-between uppercase">
+                <span>{offloadUnits} / {dailyGoals.units} units</span>
+                {errorCount > 0 && <span className="text-red-500 font-bold">Errors: {errorCount}</span>}
             </div>
           </div>
         </main>
 
-        {/* SIDEBAR: PERSISTENT GHOST LEDGER */}
-        <aside className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-3">
-          
-          {/* THE LEDGER Block */}
-          <div className="p-3 rounded-lg bg-zinc-900 border-2 border-brand-purple shadow-lg shadow-purple-900/10 relative overflow-hidden group">
+        {/* SIDEBAR */}
+        <aside className="w-full lg:w-64 flex flex-col gap-3">
+          <div className="p-3 bg-zinc-900 border-2 border-brand-purple rounded-lg relative overflow-hidden group">
             <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity"><Ghost size={80} /></div>
-            <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 text-brand-purple">
-                    <Coins size={14} />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Ghost_Vault</span>
-                </div>
-                <div className="text-[8px] bg-brand-purple/20 text-brand-purple px-1.5 font-bold">NODE_01</div>
+            <div className="text-[10px] text-brand-purple font-black uppercase tracking-widest mb-1 flex items-center gap-2">
+                <Coins size={12} /> Ghost_Ledger
             </div>
-            <div className="flex items-baseline gap-2">
-                <div className="text-4xl font-black text-white tracking-tighter">{totalGhostBalance.toLocaleString()}</div>
-                <div className="text-xs text-brand-purple font-bold">GV</div>
-            </div>
-            <div className="mt-3 flex justify-between items-center">
-                <div className="text-[9px] text-zinc-500 uppercase font-mono">
-                    Extraction: <span className="text-white">{Math.min(100, (totalGhostBalance/50000)*100).toFixed(1)}%</span>
-                </div>
-                <Button variant="ghost" onClick={shareScore} className="h-6 w-6 p-0 hover:text-brand-cyan"><Share2 size={12} /></Button>
+            <div className="text-3xl font-black text-white tracking-tighter">{totalGhostBalance.toLocaleString()} <span className="text-xs text-brand-purple">GV</span></div>
+            <div className="mt-2 text-[9px] text-zinc-500 uppercase font-mono">
+                System_Node: <span className="text-white">Active</span>
             </div>
           </div>
 
-          {/* ACHIEVEMENTS / RECENT LOGS (Integrated compatibility) */}
-          <div className="p-3 rounded-lg bg-background/50 border border-border flex-1">
-             <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3 border-b border-border/50 pb-1 flex justify-between">
-                <span>Roster_Intel</span>
-                <span>Active</span>
-             </div>
-             
-             {/* Render simple list of achievements split by space as requested */}
-             <div className="flex flex-wrap gap-1.5 mb-4">
-                {achievements.length > 0 ? achievements.map((a, i) => (
-                    <div key={i} className="text-[8px] font-bold px-2 py-0.5 bg-brand-pink/10 text-brand-pink border border-brand-pink/20 rounded-none uppercase">
-                        {a.split(" ")[0]}
-                    </div>
-                )) : <span className="text-[9px] text-zinc-700 italic">No medals earned.</span>}
-             </div>
-
-             {/* Top Leaderboard preserved */}
-             <div className="space-y-1.5">
+          <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex-1">
+            <div className="flex justify-between items-center mb-3 border-b border-zinc-800 pb-2">
+                <span className="text-[9px] font-black uppercase text-amber-500">Elite_Operators</span>
+                <Button variant="ghost" onClick={shareScore} className="h-5 w-5 p-0 hover:text-brand-cyan"><Share2 size={10} /></Button>
+            </div>
+            <div className="space-y-1.5">
                 {top.map((entry, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-[11px] p-1 rounded hover:bg-zinc-800/30 transition-colors">
+                  <div key={idx} className="flex justify-between text-[11px] p-1 rounded hover:bg-zinc-800/50">
                     <span className="font-bold text-zinc-400">0{idx+1} <span className="text-zinc-200 ml-1">{entry.name}</span></span>
                     <span className="font-black text-brand-cyan">{entry.score}</span>
                   </div>
                 ))}
-             </div>
+            </div>
           </div>
         </aside>
       </div>
