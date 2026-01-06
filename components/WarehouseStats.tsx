@@ -2,7 +2,11 @@
 
 import React, { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Star, Package, Clock, Zap, Award, AlertTriangle, Users, TrendingUp, Target, Share2 } from "lucide-react";
+import { 
+  Star, Package, Clock, Zap, Award, 
+  AlertTriangle, Users, TrendingUp, 
+  Target, Share2, Ghost, ShieldAlert 
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -40,6 +44,7 @@ interface IncomingProps {
 }
 
 export default function WarehouseStats(inProps: IncomingProps) {
+  // --- Сохраняем все деструктурированные пропсы ---
   const stats = inProps.stats || {};
   const itemsCount = inProps.itemsCount ?? 0;
   const uniqueIds = inProps.uniqueIds ?? 0;
@@ -61,11 +66,20 @@ export default function WarehouseStats(inProps: IncomingProps) {
   const avgTimePerItem = inProps.avgTimePerItem ?? 0;
   const dailyGoals = inProps.dailyGoals ?? { units: 100, errors: 0, xtr: 100 };
 
-  const { user } = useAppContext();
+  const { dbUser } = useAppContext();
   const [copied, setCopied] = useState(false);
 
-  const top = useMemo(() => (Array.isArray(leaderboard) ? leaderboard.slice(0, 3) : []), [leaderboard]);
+  // --- Новая логика Ghost Economy ---
+  // Накапливаем Ghost Vibes за сессию (offload дает больше "вкуса")
+  const sessionGhostVibes = useMemo(() => offloadUnits * 7 + (totalDelta - offloadUnits) * 3, [offloadUnits, totalDelta]);
+  
+  // Те самые 13% от выручки, которые владелец должен банде
+  const teambuildingContribution = useMemo(() => Math.floor(salary * 0.13), [salary]);
+  
+  // Общий баланс из метаданных (кумулятивный)
+  const totalGhostBalance = dbUser?.metadata?.cyberFitness?.ghost_stats?.balance || 0;
 
+  const top = useMemo(() => (Array.isArray(leaderboard) ? leaderboard.slice(0, 3) : []), [leaderboard]);
   const unitsProgress = useMemo(() => Math.min(100, (offloadUnits / (dailyGoals?.units || 1)) * 100), [offloadUnits, dailyGoals]);
   const errorFree = errorCount === 0 && sessionDuration > 3600;
 
@@ -86,209 +100,183 @@ export default function WarehouseStats(inProps: IncomingProps) {
   };
 
   const shareScore = () => {
-    const text = `🏆 Мой счёт в Warehouse: ${score} очков! Уровень ${level}, серия ${streak}. Заработано ${totalXtr} XTR.`;
+    const text = `📊 СВОДКА ОПЕРАЦИИ: Выдано ${offloadUnits} ед. Намайнено ${sessionGhostVibes} GV. К выплате: ${salary} RUB.`;
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
-      toast.success("Счёт скопирован!");
+      toast.success("Отчёт скопирован!");
       setTimeout(() => setCopied(false), 2000);
     });
   };
 
   return (
-    <div className="p-3 bg-muted rounded-lg text-[13px]">
+    <div className="p-3 bg-muted rounded-lg text-[13px] border border-border/50 shadow-inner">
       <div className="flex flex-col lg:flex-row items-stretch gap-4">
         <main className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="font-semibold text-sm truncate">Статистика склада</h3>
-              <div className="mt-1 text-xs text-muted-foreground truncate">Элементов: <b>{itemsCount}</b> · Уник.: <b>{uniqueIds}</b></div>
+              <h3 className="font-black text-sm uppercase tracking-tighter flex items-center gap-2">
+                <ShieldAlert size={14} className="text-red-500" /> Отчет за смену
+              </h3>
+              <div className="mt-1 text-xs text-muted-foreground truncate">
+                ID: {dbUser?.user_id?.slice(0, 8)} · Склад: <b>{itemsCount}</b> · Уник.: <b>{uniqueIds}</b>
+              </div>
             </div>
             <div className="hidden sm:flex items-center gap-2">
-              <div className="text-xs text-muted-foreground">Ур: <b>{level}</b></div>
-              <div className="text-xs text-muted-foreground">Серия: <b>{streak}</b></div>
+              <Badge variant="outline" className="text-xs bg-background">LVL {level}</Badge>
+              <Badge variant="outline" className="text-xs border-brand-pink text-brand-pink">STREAK {streak}</Badge>
             </div>
           </div>
 
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <section className="p-3 rounded-lg bg-background/50 border border-border flex flex-col">
+            {/* СЕКЦИЯ 1: ПРОИЗВОДИТЕЛЬНОСТЬ (Original) */}
+            <section className="p-3 rounded-lg bg-background/50 border border-border flex flex-col relative overflow-hidden group">
               <div className="flex items-start gap-3">
                 <motion.div
                   animate={{ rotate: efficiency > 50 ? 360 : 0 }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="flex-shrink-0 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 p-2"
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  className="flex-shrink-0 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 p-2 shadow-lg shadow-emerald-500/20"
                 >
                   <Zap className="w-5 h-5 text-white" />
                 </motion.div>
                 <div className="min-w-0">
-                  <div className="text-[11px] text-muted-foreground truncate">Эффективность</div>
-                  <div className="text-lg font-bold truncate">{Number.isFinite(score) ? score.toLocaleString() : 0}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase font-bold">Combat_Score</div>
+                  <div className="text-lg font-black">{Number.isFinite(score) ? score.toLocaleString() : 0}</div>
                 </div>
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="flex flex-col">
-                  <div className="text-[11px] text-muted-foreground flex items-center gap-2"><Star className="w-4 h-4 text-yellow-400" /> Звёзды</div>
-                  <div className="font-medium mt-1">{Number.isFinite(stars) ? stars : 0}</div>
+                <div className="flex flex-col p-1.5 bg-zinc-950/20 rounded">
+                  <div className="text-[10px] text-muted-foreground flex items-center gap-2 uppercase"><Star className="w-3 h-3 text-yellow-400" /> Stars</div>
+                  <div className="font-bold mt-0.5">{Number.isFinite(stars) ? stars : 0}</div>
                 </div>
-
-                <div className="flex flex-col">
-                  <div className="text-[11px] text-muted-foreground flex items-center gap-2"><Package className="w-4 h-4" /> Упаковок</div>
-                  <div className="font-medium mt-1">0</div>
+                <div className="flex flex-col p-1.5 bg-zinc-950/20 rounded">
+                  <div className="text-[10px] text-muted-foreground flex items-center gap-2 uppercase"><Ghost className="w-3 h-3 text-brand-purple" /> Vibes</div>
+                  <div className="font-bold mt-0.5 text-brand-purple">+{sessionGhostVibes}</div>
                 </div>
               </div>
 
-              <div className="mt-2 pt-2 border-t border-border/50">
-                <div className="text-[11px] text-muted-foreground flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Эффект.: {efficiency} ед/ч</div>
-                <div className="text-[11px] text-muted-foreground flex items-center gap-2"><Clock className="w-4 h-4" /> Ср. время: {avgTimePerItem}s/ед</div>
+              <div className="mt-2 pt-2 border-t border-border/50 flex justify-between">
+                <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1"><TrendingUp size={12} /> {efficiency} ед/ч</div>
+                <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1"><Clock size={12} /> {avgTimePerItem}s/ед</div>
               </div>
             </section>
 
-            {/* FIXED: High contrast backgrounds & text for dark mode */}
+            {/* СЕКЦИЯ 2: ХАРВЕСТ (Upgrade: RUB + Teambuilding Fund) */}
             <section className={cn(
-              "p-3 rounded-lg border",
+              "p-3 rounded-lg border flex flex-col justify-between transition-all",
               changedCount > 0 
-                ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800" 
-                : "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-800"
+                ? "bg-emerald-50/50 border-emerald-200 dark:bg-emerald-950/10 dark:border-emerald-900/50" 
+                : "bg-background/50 border-border"
             )}>
-              <div className="flex items-center justify-between">
-                <div className="text-[11px] text-muted-foreground">Checkpoint</div>
-                <div className="text-[11px] text-muted-foreground truncate">—</div>
+              <div>
+                <div className="flex items-center justify-between">
+                    <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Market_Harvest</div>
+                    <Badge className="bg-emerald-600 text-[9px] h-4">Verified</Badge>
+                </div>
+
+                <div className="mt-2 flex items-baseline gap-2">
+                    <div className="font-black text-2xl text-emerald-600 dark:text-emerald-500">{salary.toLocaleString()}</div>
+                    <div className="text-[10px] text-muted-foreground font-bold uppercase">RUB</div>
+                </div>
               </div>
 
-              <div className="mt-2 flex items-baseline gap-3">
-                <div className="font-mono text-2xl font-bold truncate">{changedCount}</div>
-                <div className="text-sm text-muted-foreground">Изм. позиций: <b>{changedCount}</b></div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-1 gap-2 text-[12px] text-muted-foreground">
-                <div>Изменённое кол-во: <b className="text-foreground">{totalDelta}</b></div>
-                <div>Выдано: <b className="text-foreground">{offloadUnits}</b> · Зарплата: <b className="text-foreground">{Number.isFinite(salary) ? salary.toLocaleString() : 0}</b> руб</div>
+              <div className="mt-3 space-y-2">
+                <div className="flex justify-between text-[11px] items-center">
+                    <span className="text-muted-foreground">Выгружено:</span>
+                    <span className="font-bold">{offloadUnits} ед.</span>
+                </div>
+                <div className="flex justify-between text-[11px] items-center pt-1 border-t border-emerald-500/20">
+                    <span className="text-brand-pink font-bold flex items-center gap-1">
+                        <Users size={12} /> Squad_Tax (13%):
+                    </span>
+                    <span className="text-brand-pink font-black">+{teambuildingContribution} ₽</span>
+                </div>
+                <div className="text-[8px] text-zinc-500 italic leading-none">
+                    * Ожидаемое пополнение фонда тимбилдинга
+                </div>
               </div>
             </section>
           </div>
 
-          {/* FIXED: High contrast backgrounds & text for dark mode */}
-          <div className="mt-3 p-3 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 dark:from-green-950/40 dark:to-emerald-950/40 dark:border-green-800">
+          {/* СЕКЦИЯ 3: DAILY GOALS (Original logic) */}
+          <div className="mt-3 p-3 rounded-lg bg-background/50 border border-border">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-semibold flex items-center gap-2">
-                <Target className="w-4 h-4 text-green-600 dark:text-green-400" />
+              <h4 className="text-[11px] font-bold uppercase flex items-center gap-2 tracking-widest text-zinc-400">
+                <Target className="w-3 h-3 text-green-500" />
                 Ежедневные цели
               </h4>
-              <Badge variant={totalXtr > 0 ? "default" : "secondary"} className="text-xs">
+              <Badge variant={totalXtr > 0 ? "default" : "secondary"} className="text-[10px] font-black">
                 {totalXtr} XTR
               </Badge>
             </div>
-
             <div className="space-y-3">
               <div>
-                <div className="text-[11px] text-muted-foreground mb-1">Выдано ед.: {offloadUnits}/{dailyGoals.units}</div>
-                <Progress value={unitsProgress} className="h-2" />
+                <div className="text-[10px] text-muted-foreground mb-1 flex justify-between">
+                    <span>Выдано: {offloadUnits}/{dailyGoals.units}</span>
+                    <span>{unitsProgress.toFixed(0)}%</span>
+                </div>
+                <Progress value={unitsProgress} className="h-1" />
               </div>
               {errorFree && (
-                <div className="text-[11px] text-green-600 dark:text-green-400 font-medium">✅ Без ошибок (бонус +{dailyGoals.xtr} XTR!)</div>
+                <div className="text-[10px] text-green-500 font-bold flex items-center gap-1">
+                    <Award size={12} /> PERFECT SHIFT: +{dailyGoals.xtr} XTR UNLOCKED
+                </div>
               )}
-            </div>
-          </div>
-
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-2 rounded-lg bg-background/40 border border-border text-[12px] flex flex-col">
-              <div className="text-[11px] text-muted-foreground">Время сессии</div>
-              <div className="font-mono font-semibold mt-1">{formatDuration(sessionDuration)}</div>
-            </div>
-
-            <div className="p-2 rounded-lg bg-background/40 border border-border text-[12px] flex flex-col">
-              <div className="text-[11px] text-muted-foreground">Ошибки</div>
-              <div className="font-semibold mt-1 text-destructive">{errorCount}</div>
-            </div>
-
-            <div className="p-2 rounded-lg bg-background/40 border border-border text-[12px] flex flex-col">
-              <div className="text-[11px] text-muted-foreground flex items-center gap-2">Босс режим: {bossMode ? <AlertTriangle className="w-4 h-4 text-destructive" /> : <Users className="w-4 h-4 text-muted-foreground" />}</div>
-              <div className="font-semibold mt-1">{bossMode ? `${Math.max(0, Math.floor((bossTimer || 0) / 1000))} сек` : "—"}</div>
-            </div>
-          </div>
-
-          <div className="mt-3">
-            <div className="text-[11px] text-muted-foreground">Достижения</div>
-            <div className="mt-1 flex flex-wrap gap-2">
-              <AnimatePresence>
-                {(!achievements || achievements.length === 0) ? (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[12px] text-muted-foreground">
-                    —
-                  </motion.div>
-                ) : (
-                  achievements.map((a, i) => (
-                    <motion.div key={i} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-xs font-semibold text-white shadow-lg">
-                      {a.split(" ")[0]}
-                    </motion.div>
-                  ))
-                )}
-              </AnimatePresence>
             </div>
           </div>
         </main>
 
-        <aside className="w-full lg:w-72 flex-shrink-0">
-          <div className="p-3 rounded-lg bg-background/50 border border-border">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2 text-sm font-semibold"><Award className="w-4 h-4 text-amber-400" /> Рейтинг</div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={shareScore}
-                className="h-6 text-xs"
-                disabled={copied}
-              >
-                <Share2 className="w-3 h-3 mr-1" />
-                {copied ? "Скопировано!" : "Поделиться"}
+        {/* ASIDE: GHOST BALANCE & RATING */}
+        <aside className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-3">
+          {/* КУМУЛЯТИВНЫЙ БАЛАНС GV (Новый блок) */}
+          <div className="p-3 rounded-lg bg-zinc-900 border-2 border-brand-purple shadow-[0_0_15px_rgba(168,85,247,0.1)] relative overflow-hidden group">
+            <div className="absolute -right-2 -bottom-2 opacity-5 group-hover:opacity-10 transition-opacity">
+                <Ghost size={60} />
+            </div>
+            <div className="text-[10px] text-brand-purple font-black uppercase tracking-widest mb-1">Ghost_Ledger_Total</div>
+            <div className="flex items-baseline gap-2">
+                <div className="text-3xl font-black text-white">{totalGhostBalance.toLocaleString()}</div>
+                <div className="text-xs text-brand-purple font-bold">GV</div>
+            </div>
+            <div className="mt-2 text-[9px] text-zinc-500 leading-tight uppercase">
+                Mining status: <span className="text-brand-green">Stable</span> <br/>
+                Next unlock: <span className="text-white">Anduril_Blaster v2</span>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-lg bg-background/50 border border-border flex-1">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-amber-500">
+                <Award className="w-4 h-4" /> Top Operators
+              </div>
+              <Button variant="ghost" size="sm" onClick={shareScore} className="h-6 text-[10px] font-bold">
+                <Share2 className="w-3 h-3 mr-1" /> EXPORT
               </Button>
             </div>
 
-            <ol className="mt-3 space-y-2 text-[13px]">
+            <ol className="space-y-2 text-[12px]">
               <AnimatePresence>
                 {top.length > 0 ? top.map((entry, idx) => (
-                  <motion.li key={idx} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="flex items-center justify-between gap-2">
+                  <motion.li key={idx} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center justify-between gap-2 p-1.5 rounded bg-zinc-950/20 border border-transparent hover:border-border/50">
                     <div className="flex items-center gap-2 min-w-0">
-                      {/* FIXED: Rank badge text contrast */}
-                      <div className={cn("w-6 h-6 flex items-center justify-center rounded-full text-sm font-semibold",
-                        idx === 0 ? "bg-amber-300 text-amber-800 dark:bg-amber-600 dark:text-amber-100" :
-                          idx === 1 ? "bg-slate-300 text-slate-800 dark:bg-slate-600 dark:text-slate-200" :
-                            idx === 2 ? "bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100" : "bg-muted text-muted-foreground dark:bg-muted/50 dark:text-muted-foreground"
+                      <div className={cn("w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-black",
+                        idx === 0 ? "bg-amber-500 text-black" :
+                          idx === 1 ? "bg-slate-400 text-black" :
+                            idx === 2 ? "bg-amber-800 text-white" : "bg-muted"
                       )}>
                         {idx + 1}
                       </div>
                       <div className="min-w-0">
-                        <div className="font-medium truncate">{entry.name}</div>
-                        <div className="text-[11px] text-muted-foreground truncate">{entry.date}</div>
+                        <div className="font-bold truncate uppercase">{entry.name}</div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 font-semibold">
-                      {entry.score}
-                      {entry.xtr ? <Star className="w-3 h-3 text-yellow-400" /> : null}
-                    </div>
+                    <div className="font-black text-brand-cyan">{entry.score}</div>
                   </motion.li>
                 )) : (
-                  <motion.li initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[12px] text-muted-foreground">Пусто — будь первым!</motion.li>
+                  <li className="text-zinc-600 italic text-[11px] text-center py-4 uppercase tracking-widest">Scanning local frequencies...</li>
                 )}
               </AnimatePresence>
             </ol>
-          </div>
-
-          <div className="mt-3 p-3 rounded-lg bg-background/30 border border-border text-[12px]">
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground">Быстрые показатели</div>
-            <div className="mt-2 grid grid-cols-1 gap-2">
-              <div className="flex items-center justify-between">
-                <div className="text-[12px]">Изм. позиций</div>
-                <div className="font-medium">{changedCount}</div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-[12px]">Выдано ед.</div>
-                <div className="font-medium">{offloadUnits}</div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-[12px]">Зарплата</div>
-                <div className="font-medium">{Number.isFinite(salary) ? salary.toLocaleString() : 0} руб + {totalXtr} XTR</div>
-              </div>
-            </div>
           </div>
         </aside>
       </div>
