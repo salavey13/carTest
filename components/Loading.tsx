@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, useMotionValue, useTransform } from "framer-motion";
-import { Ghost, Motorcycle } from "lucide-react";
+import { Ghost, Bike } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LoadingProps {
@@ -12,7 +12,7 @@ interface LoadingProps {
 }
 
 // --- INTERNAL: PARTICLE SYSTEM ---
-const ParticleField = ({ count = 60, color = "brand-purple" }: { count?: number; color?: string }) => {
+const ParticleField = ({ count = 60, color = "brand-purple", windowHeight = 1000 }: { count?: number; color?: string; windowHeight: number }) => {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       {Array.from({ length: count }).map((_, i) => {
@@ -37,7 +37,7 @@ const ParticleField = ({ count = 60, color = "brand-purple" }: { count?: number;
               boxShadow: `0 0 ${size * 2}px currentColor`,
             }}
             animate={{
-              y: [-20, -window.innerHeight - 100],
+              y: [-20, -windowHeight - 100],
               opacity: [0, 0.8, 0],
               scale: [1, 1.5, 0.5],
             }}
@@ -86,20 +86,35 @@ const CyberGrid = ({ color = "rgba(147, 51, 234, 0.3)" }: { color?: string }) =>
 
 export function Loading({ variant = 'generic', text, className }: LoadingProps) {
   const [mounted, setMounted] = useState(false);
+  // Safe window dimensions initialization to prevent SSR errors
+  const [windowWidth, setWindowWidth] = useState(1920);
+  const [windowHeight, setWindowHeight] = useState(1080);
   
-  // Parallax Logic
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
   
-  const moveX = useTransform(mouseX, [0, window.innerWidth], [-20, 20]);
-  const moveY = useTransform(mouseY, [0, window.innerHeight], [-20, 20]);
+  // Update dimensions on mount
+  useEffect(() => {
+    setMounted(true);
+    setWindowWidth(window.innerWidth);
+    setWindowHeight(window.innerHeight);
+
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+      setWindowHeight(window.innerHeight);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const moveX = useTransform(mouseX, [0, windowWidth], [-20, 20]);
+  const moveY = useTransform(mouseY, [0, windowHeight], [-20, 20]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     mouseX.set(e.clientX);
     mouseY.set(e.clientY);
   };
-
-  useEffect(() => setMounted(true), []);
 
   // ================= GENERIC VARIANT =================
   if (variant === 'generic') {
@@ -117,7 +132,7 @@ export function Loading({ variant = 'generic', text, className }: LoadingProps) 
         
         {/* 2. Particle System (Parallax) */}
         <motion.div style={{ x: moveX, y: moveY }} className="absolute inset-0 z-0 scale-110">
-           <ParticleField count={60} color="brand-purple" />
+           <ParticleField count={60} color="brand-purple" windowHeight={windowHeight} />
         </motion.div>
 
         {/* 3. Central Vortex */}
@@ -221,7 +236,7 @@ export function Loading({ variant = 'generic', text, className }: LoadingProps) 
            animate={{ boxShadow: ["0 0 0px rgba(239,68,68,0)", "0 0 30px rgba(239,68,68,0.6)", "0 0 0px rgba(239,68,68,0)"] }}
            transition={{ duration: 2, repeat: Infinity }}
          >
-            <Motorcycle size={48} className="text-brand-red-orange" />
+            <Bike size={48} className="text-brand-red-orange" />
             {/* Rotating ring around bike */}
             <motion.div 
               className="absolute inset-0 border-2 border-dashed border-brand-red-orange rounded-full"
