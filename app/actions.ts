@@ -1,4 +1,3 @@
-// /app/actions.ts
 "use server"; 
 
 import {
@@ -112,7 +111,29 @@ export async function saveThemePreference(userId: string, theme: 'light' | 'dark
   }
 }
 
-export async function createCrew({ name, description, logo_url, owner_id, slug, hq_location }: CreateCrewArgs): Promise<{
+// /app/actions.ts
+"use server"; 
+
+import {
+  generateCarEmbedding, 
+  supabaseAdmin, 
+  fetchUserData as dbFetchUserData, 
+  updateUserMetadata as dbUpdateUserMetadata,
+  uploadImage, 
+} from "@/hooks/supabase"; 
+import axios from "axios";
+import { verifyJwtToken, generateJwtToken } from "@/lib/auth"; 
+import { logger } from "@/lib/logger"; 
+import type { WebAppUser } from "@/types/telegram";
+import { createHash } from "crypto"; 
+import { handleWebhookProxy } from "./webhook-handlers/proxy"; 
+import { getBaseUrl } from "@/lib/utils"; 
+import type { Database } from "@/types/database.types";
+import { Bucket } from '@supabase/storage-js'; 
+import { v4 as uuidv4 } from "uuid"; 
+import { sendComplexMessage } from "./webhook-handlers/actions/sendComplexMessage";
+
+export async function createCrew({ name, description, logo_url, owner_id, slug, hq_location, metadata = {} }: CreateCrewArgs): Promise<{
   success: boolean;
   data?: Database['public']['Tables']['crews']['Row'];
   error?: string;
@@ -122,16 +143,40 @@ export async function createCrew({ name, description, logo_url, owner_id, slug, 
       throw new Error("Название и slug экипажа обязательны.");
     }
     
-    // Check if slug is unique
-    const { data: existingCrew, error: slugError } = await supabaseAdmin
+    // Check if this is an upgrade request (crew already exists)
+    const { data: existingCrew, error: checkError } = await supabaseAdmin
       .from('crews')
-      .select('id')
+      .select('id, metadata')
       .eq('slug', slug)
       .maybeSingle();
 
-    if (slugError) throw slugError;
-    if (existingCrew) throw new Error(`Экипаж с таким slug (${slug}) уже существует.`);
+    if (checkError) throw checkError;
+    
+    // If crew exists, update it instead of creating a new one
+    if (existingCrew) {
+      // Merge existing metadata with new metadata
+      const updatedMetadata = { ...existingCrew.metadata, ...metadata };
+      
+      const { data, error } = await supabaseAdmin
+        .from("crews")
+        .update({
+          name,
+          description,
+          logo_url,
+          hq_location,
+          metadata: updatedMetadata,
+          updated_at: new Date().toISOString()
+        })
+        .eq('slug', slug)
+        .select()
+        .single();
 
+      if (error) throw error;
+      
+      logger.info(`[upgradeCrew Action] Successfully upgraded crew ${slug}`);
+      return { success: true, data: data };
+    }
+    
     // --- Step 1: Create the crew ---
     const { data, error } = await supabaseAdmin
       .from("crews")
@@ -142,13 +187,12 @@ export async function createCrew({ name, description, logo_url, owner_id, slug, 
         owner_id,
         slug,
         hq_location,
+        metadata
       }])
       .select()
       .single();
 
     if (error) throw error;
-    
-    // Vibe Architect's Fix: Start of new logic after successful crew creation
     
     // --- Step 2: Add the owner as the first member of the crew ---
     const { error: memberError } = await supabaseAdmin
@@ -182,8 +226,6 @@ export async function createCrew({ name, description, logo_url, owner_id, slug, 
     } else {
       logger.info(`[createCrew Action] Successfully assigned bikes for owner ${owner_id} to new crew ${data.id}.`);
     }
-    
-    // End of new logic
     
     return { success: true, data: data };
   } catch (error) {
@@ -897,7 +939,6 @@ export async function saveMapPreset(
         return { success: false, error: errorMessage };
     }
 }
-
 
 export async function sendServiceInvoice(
   chatId: string, 
