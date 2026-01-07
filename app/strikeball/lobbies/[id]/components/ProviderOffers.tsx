@@ -5,23 +5,35 @@ import { getProviderOffers, selectProviderForLobby } from "../../../actions/prov
 import { 
     FaMotorcycle, FaGun, FaPersonSkiing, FaChevronRight, 
     FaCubes, FaTerminal, FaLock, FaUsers, FaClock, 
-    FaMapLocationDot, FaShieldHeart, FaCircleInfo 
+    FaMapLocationDot, FaShieldHeart, FaCircleInfo, FaSnowflake,
+    FaGamepad, FaPaintRoller, FaVrCardboard
 } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
-export function ProviderOffers({ lobbyId, playerCount, selectedProviderId, selectedServiceId }: any) {
+// Activity type to icon mapping
+const activityIcons: Record<string, React.ReactNode> = {
+    strikeball: <FaGun />,
+    paintball: <FaPaintRoller />,
+    lazertag: <FaGamepad />,
+    snowboard: <FaPersonSkiing />,
+    vr: <FaVrCardboard />,
+    default: <FaCubes />
+};
+
+export function ProviderOffers({ lobbyId, playerCount, activityType, selectedProviderId, selectedServiceId }: any) {
     const [providers, setProviders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [filter, setFilter] = useState<string>(activityType || 'all');
 
     useEffect(() => {
-        getProviderOffers(playerCount).then(res => {
+        getProviderOffers(playerCount, filter === 'all' ? undefined : filter).then(res => {
             if (res.success) setProviders(res.data);
             setLoading(false);
         });
-    }, [playerCount]);
+    }, [playerCount, filter]);
 
     const handleSelect = async (providerId: string, offer: any) => {
         if (!offer.isAvailable) return toast.error(offer.lockReason);
@@ -31,11 +43,46 @@ export function ProviderOffers({ lobbyId, playerCount, selectedProviderId, selec
 
     if (loading) return <div className="p-4 border border-zinc-800 animate-pulse text-[10px] font-mono text-zinc-500 uppercase">Scanning Tactical Market...</div>;
 
+    // Extract unique activity types for filter
+    const activityTypes = Array.from(new Set(
+        providers.flatMap(p => p.offers.map((o: any) => o.serviceId))
+    ));
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-end border-b border-zinc-800 pb-2">
                 <h3 className="text-xs font-black font-orbitron uppercase tracking-widest text-zinc-400">Рынок Операций</h3>
                 <span className="text-[9px] font-mono text-brand-cyan uppercase">Найдено: {providers.length} локаций</span>
+            </div>
+            
+            {/* Activity Type Filter */}
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                <button
+                    onClick={() => setFilter('all')}
+                    className={cn(
+                        "px-3 py-1 text-[9px] font-black uppercase border transition-all whitespace-nowrap",
+                        filter === 'all' 
+                            ? "bg-brand-cyan text-black border-brand-cyan" 
+                            : "bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300"
+                    )}
+                >
+                    Все активности
+                </button>
+                {activityTypes.map(type => (
+                    <button
+                        key={type}
+                        onClick={() => setFilter(type)}
+                        className={cn(
+                            "px-3 py-1 text-[9px] font-black uppercase border transition-all whitespace-nowrap flex items-center gap-1",
+                            filter === type 
+                                ? "bg-brand-cyan text-black border-brand-cyan" 
+                                : "bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-zinc-300"
+                        )}
+                    >
+                        {activityIcons[type] || activityIcons.default}
+                        {type}
+                    </button>
+                ))}
             </div>
             
             {providers.map(provider => (
@@ -87,14 +134,15 @@ export function ProviderOffers({ lobbyId, playerCount, selectedProviderId, selec
                                     <div className="flex justify-between items-start">
                                         <div className="space-y-1">
                                             <div className="flex items-center gap-2">
+                                                {activityIcons[offer.serviceId] || activityIcons.default}
                                                 <h5 className="font-black text-xs uppercase">{offer.serviceName}</h5>
                                                 {offer.age_limit && <span className="text-[8px] border border-zinc-700 px-1 text-zinc-500">{offer.age_limit}+</span>}
                                             </div>
                                             <p className="text-[10px] text-zinc-500 leading-tight max-w-[200px]">{offer.description}</p>
                                         </div>
                                         <div className="text-right">
-                                            <div className="text-lg font-black font-orbitron text-white">{offer.totalPrice.toLocaleString()} ₽</div>
-                                            <div className="text-[9px] font-mono text-zinc-600">{offer.perPerson} ₽ / за бойца</div>
+                                            <div className="text-lg font-black font-orbitron text-white">{offer.totalPrice.toLocaleString()} {offer.currency || '₽'}</div>
+                                            <div className="text-[9px] font-mono text-zinc-600">{offer.perPerson} {offer.currency || '₽'} / за бойца</div>
                                         </div>
                                     </div>
 
