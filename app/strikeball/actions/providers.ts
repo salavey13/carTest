@@ -42,10 +42,11 @@ export async function getProviderOffers(playerCount: number, activityId?: string
             });
 
         return {
-            providerId: p.id, // Explicitly pass the UUID
+            providerId: p.id,
             providerName: p.name,
             providerSlug: p.slug,
             logo: p.logo_url,
+            owner_id: p.owner_id, // CRITICAL: Included for Ownership Checks
             location: p.hq_location,
             working_hours: p.metadata.contacts?.working_hours,
             amenities: p.metadata.amenities || [],
@@ -58,7 +59,7 @@ export async function getProviderOffers(playerCount: number, activityId?: string
 
 export async function selectProviderForLobby(lobbyId: string, providerId: string, offer: any) {
     try {
-        // 1. Get current lobby details (Name + Metadata)
+        //1. Get current lobby details (Name + Metadata)
         const { data: lobby } = await supabaseAdmin.from('lobbies').select('name, metadata').eq('id', lobbyId).single();
         
         if (!lobby) throw new Error("Lobby not found");
@@ -102,7 +103,7 @@ export async function selectProviderForLobby(lobbyId: string, providerId: string
 👉 <a href="${lobbyDeepLink}">OPEN LOBBY TO APPROVE</a>
         `;
 
-        // 4. Send to Provider (Owner ID is usually the most reliable contact method for crews)
+        // 4. Send to Provider (Owner ID is usually most reliable contact method for crews)
         await sendComplexMessage(provider.owner_id, messageText, [], {
             parseMode: 'HTML',
             imageQuery: 'tactical map'
@@ -110,6 +111,114 @@ export async function selectProviderForLobby(lobbyId: string, providerId: string
         
         revalidatePath(`/strikeball/lobbies/${lobbyId}`);
         return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function approveProviderForLobby(lobbyId: string, providerId: string, userId: string) {
+    try {
+        // 1. Verify Identity: Ensure requester is OWNER of the PROVIDER Crew
+        const { data: providerCrew, error: crewError } = await supabaseAdmin
+            .from('crews')
+            .select('id, owner_id, name')
+            .eq('id', providerId)
+            .single();
+
+        if (crewError || !providerCrew) throw new Error("Provider crew not found");
+        if (providerCrew.owner_id !== userId) throw new Error("ACCESS DENIED: You are not the provider owner.");
+
+        // 2. Get Lobby Data for Notifications
+        const { data: lobby, error: lobbyError } = await supabaseAdmin
+            .from('lobbies')
+            .select('name, owner_id, metadata, status')
+            .eq('id', lobbyId)
+            .single();
+
+        if (lobbyError || !lobby) throw new Error("Lobby not found");
+        if (lobby.metadata?.approval_status !== 'proposed') throw new Error("Lobby is not in proposed state");
+
+        // 3. Update Lobby Status
+        const newMetadata = {
+            ...lobby.metadata,
+            approval_status: 'approved',
+            approved_at: new Date().toISOString()
+        };
+
+        const { error: updateError } = await supabaseAdmin
+            .from('lobbies')
+            .update({ metadata: newMetadata })
+            .eq('id', lobbyId);
+
+        if (updateError) throw updateError;
+
+        // 4. Notify Lobby Owner (The original User who started game)
+        const offerName = lobby.metadata?.selected_offer?.serviceName || "Service";
+        const lobbyDeepLink = `${BOT_APP_URL}?startapp=lobby_${lobbyId}`;
+
+        await sendComplexMessage(lobby.owner_id, `
+✅ <b>OFFER APPROVED</b>
+👷 <b>Provider:</b> ${providerCrew.name}
+📦 <b>Confirmed Service:</b> ${offerName}
+
+The provider has reviewed your request and accepted. 
+Access the lobby to finalize details.
+👉 <a href="${lobbyDeepLink}">ENTER LOBBY</a>
+        `, [], { parseMode: 'HTML', imageQuery: 'contract signed' });
+
+        revalidatePath(`/strikeball/lobbies/${lobbyId}`);
+        return { success: true, message: "Offer approved. Owner notified." };
+
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function rejectProviderForLobby(lobbyId: string, providerId: string, userId: string) {
+    try {
+        // Similar validation logic
+        const { data: providerCrew, error: crewError } = await supabaseAdmin
+            .from('crews')
+            .select('id, owner_id, name')
+            .eq('id', providerId)
+            .single();
+
+        if (crewError || !providerCrew) throw new Error("Provider crew not found");
+        if (providerCrew.owner_id !== userId) throw new Error("ACCESS DENIED");
+
+        const { data: lobby, error: lobbyError } = await supabaseAdmin
+            .from('lobbies')
+            .select('name, owner_id')
+            .eq('id', lobbyId)
+            .single();
+
+        if (lobbyError || !lobby) throw new Error("Lobby not found");
+
+        // Reset provider proposal
+        const { error: updateError } = await supabaseAdmin
+            .from('lobbies')
+            .update({ 
+                provider_id: null,
+                metadata: { 
+                    ...lobby.metadata, 
+                    selected_offer: null, 
+                    approval_status: null 
+                }
+            })
+            .eq('id', lobbyId);
+
+        if (updateError) throw updateError;
+
+        await sendComplexMessage(lobby.owner_id, `
+🚫 <b>OFFER REJECTED</b>
+👷 <b>Provider:</b> ${providerCrew.name}
+
+The provider declined your request. You can select a different provider in the Logistics tab.
+        `, [], { parseMode: 'HTML', imageQuery: 'stamp rejected' });
+
+        revalidatePath(`/strikeball/lobbies/${lobbyId}`);
+        return { success: true, message: "Offer rejected." };
+
     } catch (e: any) {
         return { success: false, error: e.message };
     }
