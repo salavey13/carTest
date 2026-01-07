@@ -2,6 +2,9 @@
 
 import { supabaseAdmin } from "@/hooks/supabase";
 import { revalidatePath } from "next/cache";
+import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
+
+const BOT_APP_URL = "https://t.me/oneSitePlsBot/app";
 
 export async function getProviderOffers(playerCount: number, activityId?: string) {
     const { data: providers, error } = await supabaseAdmin
@@ -55,16 +58,18 @@ export async function getProviderOffers(playerCount: number, activityId?: string
 
 export async function selectProviderForLobby(lobbyId: string, providerId: string, offer: any) {
     try {
-        // 1. Get current lobby metadata
-        const { data: lobby } = await supabaseAdmin.from('lobbies').select('metadata').eq('id', lobbyId).single();
+        // 1. Get current lobby details (Name + Metadata)
+        const { data: lobby } = await supabaseAdmin.from('lobbies').select('name, metadata').eq('id', lobbyId).single();
+        
+        if (!lobby) throw new Error("Lobby not found");
         
         const newMetadata = {
-            ...lobby?.metadata,
+            ...lobby.metadata,
             selected_offer: offer,
             approval_status: 'proposed' // Moves lobby to "Pending Provider Approval"
         };
 
-        const { error } = await supabaseAdmin
+        const { error: updateError } = await supabaseAdmin
             .from('lobbies')
             .update({ 
                 provider_id: providerId,
@@ -72,7 +77,36 @@ export async function selectProviderForLobby(lobbyId: string, providerId: string
             })
             .eq('id', lobbyId);
 
-        if (error) throw error;
+        if (updateError) throw updateError;
+        
+        // 2. Fetch Provider Info for Notification
+        const { data: provider } = await supabaseAdmin
+            .from('crews')
+            .select('owner_id, name, logo_url, metadata')
+            .eq('id', providerId)
+            .single();
+            
+        if (!provider) throw new Error("Provider not found");
+
+        // 3. Prepare Notification
+        // Deep Link to App with specific lobby parameter
+        const lobbyDeepLink = `${BOT_APP_URL}?startapp=lobby_${lobbyId}`;
+        
+        const messageText = `
+📢 <b>NEW LOBBY PROPOSAL</b>
+🏟 <b>Lobby:</b> ${lobby.name}
+📦 <b>Service:</b> ${offer.serviceName}
+💰 <b>Total Price:</b> ${offer.totalPrice} ${offer.currency}
+👥 <b>Players:</b> ${(offer.totalPrice / offer.perPerson).toFixed(0)}
+
+👉 <a href="${lobbyDeepLink}">OPEN LOBBY TO APPROVE</a>
+        `;
+
+        // 4. Send to Provider (Owner ID is usually the most reliable contact method for crews)
+        await sendComplexMessage(provider.owner_id, messageText, [], {
+            parseMode: 'HTML',
+            imageQuery: 'tactical map'
+        });
         
         revalidatePath(`/strikeball/lobbies/${lobbyId}`);
         return { success: true };
