@@ -84,7 +84,7 @@ const CyberGrid = ({ color = "rgba(147, 51, 234, 0.3)" }: { color?: string }) =>
   );
 };
 
-export default function Loading({ variant = 'generic', text, className }: LoadingProps) {
+export function Loading({ variant = 'generic', text, className }: LoadingProps) {
   const [mounted, setMounted] = useState(false);
   
   // Parallax Logic
