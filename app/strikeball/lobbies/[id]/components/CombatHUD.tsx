@@ -3,159 +3,19 @@
 import { DominationHUD } from "../../../components/DominationHUD";
 import { LiveHUD } from "../../../components/LiveHUD";
 import { CommandConsole } from "../../../components/CommandConsole";
-import { AdminCheckpointPanel } from "../../../components/AdminCheckpointPanel";
-// Import new provider actions
-import { voteForLobbyDate } from "../../../actions/lobby";
-import { approveProviderForLobby, rejectProviderForLobby } from "../../../actions/providers";
-import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { PlanningPanel } from "./PlanningPanel";
+import { FaUserShield } from "react-icons/fa6";
 
-// --- Planning Panel (Now handles Voting AND Provider Approval) ---
-function PlanningPanel({ lobby, userMember, dbUser, loadData }: any) {
-    const currentVote = userMember?.metadata?.vote;
-    const currentUserId = dbUser?.user_id;
-
-    // Determine if the current user is the OWNER of the selected PROVIDER
-    // We assume if there is a provider_id on lobby, and user is logged in, they can act.
-    const isProviderOwner = !!lobby?.provider_id; 
-
-    const handleVote = async (vote: 'ok' | 'not_ok') => {
-        if (!currentUserId) return toast.error("ТРЕБУЕТСЯ АВТОРИЗАЦИЯ");
-        
-        const res = await voteForLobbyDate(lobby.id, currentUserId, vote);
-        if (res.success) {
-            toast.success(vote === 'ok' ? "ГОТОВНОСТЬ ПОДТВЕРЖДЕНА" : "ОТКАЗ ЗАРЕГИСТРИРОВАН");
-            loadData();
-        } else {
-            toast.error(res.error);
-        }
-    };
-
-    const handleApprove = async () => {
-        if (!currentUserId) return toast.error("ТРЕБУЕТСЯ АВТОРИЗАЦИЯ");
-        
-        toast.loading("Обработка контракта...", { id: "provider-approval" });
-        
-        const res = await approveProviderForLobby(lobby.id, lobby.provider_id, currentUserId);
-        
-        toast.dismiss("provider-approval");
-
-        if (res.success) {
-            toast.success("Контракт утвержден! Владелец лобби уведомлен.", {
-                description: "Провайдер подключен к лобби."
-            });
-            loadData();
-        } else {
-            toast.error("Ошибка утверждения", { description: res.error });
-        }
-    };
-
-    const handleReject = async () => {
-        if (!currentUserId) return toast.error("ТРЕБУЕТСЯ АВТОРИЗАЦИЯ");
-
-        toast.loading("Отказ от контракта...", { id: "provider-rejection" });
-        
-        const res = await rejectProviderForLobby(lobby.id, lobby.provider_id, currentUserId);
-        
-        toast.dismiss("provider-rejection");
-
-        if (res.success) {
-            toast.info("Предложение отклонено.", {
-                description: "Провайдер отключен от лобби."
-            });
-            loadData();
-        } else {
-            toast.error("Ошибка отмены", { description: res.error });
-        }
-    };
-
-    if (!lobby.start_at) return null;
-
-    // Priority Check: If there is a Provider Proposal to approve, show those controls. 
-    // Otherwise show standard planning controls.
-    const hasProviderProposal = lobby.approval_status === 'proposed';
-    const canManageProvider = isProviderOwner && hasProviderProposal;
-
-    return (
-        <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-none mb-6 relative overflow-hidden">
-            {/* Декоративный фон для фазы планирования */}
-            <div className="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-brand-cyan to-transparent" />
-            
-            {/* CASE 1: PROVIDER APPROVAL CONTROLS */}
-            {canManageProvider ? (
-                <div className="relative z-10 space-y-4">
-                    <h4 className="text-[10px] font-mono text-zinc-500 mb-4 uppercase tracking-widest text-center italic">
-                         ПРОВЕРКА КОНТРАКТА НА ПРЕДЛОЖЕНИЕ №3
-                    </h4>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <button 
-                            onClick={handleApprove}
-                            className="py-4 font-black text-[10px] transition-all border uppercase tracking-tighter bg-green-600 border-white text-black shadow-[0_0_15px_rgba(34,197,94,0.4)] hover:bg-green-500 active:scale-95"
-                        >
-                            УТВЕРЖДАЮ ПРЕДЛОЖЕНИЕ
-                        </button>
-                        <button 
-                            onClick={handleReject}
-                            className="py-4 font-black text-[10px] transition-all border uppercase tracking-tighter bg-red-600 border-white text-black shadow-[0_0_15px_rgba(220,38,38,0.4)] hover:bg-red-500 active:scale-95"
-                        >
-                            ОТКЛОНЯЮ ПРЕДЛОЖЕНИЕ
-                        </button>
-                    </div>
-                </div>
-            ) : (
-                /* CASE 2: STANDARD PLANNING (VOTING) */
-                <div className="relative z-10">
-                    <h4 className="text-[10px] font-mono text-zinc-500 mb-4 uppercase tracking-widest text-center italic">
-                         Подтвердите готовность на: <br/>
-                        <span className="text-white not-italic text-sm">
-                            {new Date(lobby.start_at).toLocaleString('ru-RU', { 
-                                day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' 
-                            })}
-                        </span>
-                    </h4>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                        <button 
-                            onClick={() => handleVote('ok')}
-                            className={cn(
-                                "py-3 font-black text-[10px] transition-all border uppercase tracking-tighter",
-                                currentVote === 'ok' 
-                                    ? "bg-green-600 border-white text-black shadow-[0_0_15px_rgba(34,197,94,0.4)]" 
-                                    : "bg-black border-zinc-800 text-green-500 hover:border-green-500"
-                            )}
-                        >
-                            Я_В_ДЕЛЕ [OK]
-                        </button>
-                        <button 
-                            onClick={() => handleVote('not_ok')}
-                            className={cn(
-                                "py-3 font-black text-[10px] transition-all border uppercase tracking-tighter",
-                                currentVote === 'not_ok' 
-                                    ? "bg-red-600 border-white text-black shadow-[0_0_15px_rgba(220,38,38,0.4)]" 
-                                    : "bg-black border-zinc-800 text-red-500 hover:border-red-500"
-                            )}
-                        >
-                            НЕ_СМОГУ
-                        </button>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-// --- Основной компонент CombatHUD ---
 export function CombatHUD({ lobby, isOwner, members, loadData, dbUser, isAdmin }: any) {
-    // Находим членство текущего пользователя
     const userMember = members?.find((m: any) => m.user_id === dbUser?.user_id);
-
-    // Determine if this user is a "Commander" (Owner or App Admin)
     const isCommander = isOwner || isAdmin;
 
     return (
         <div className="space-y-4">
-            {/* Панель планирования (PlanningPanel) теперь включает логику голосования или одобрения провайдера */}
+            {/* Панель планирования (PlanningPanel) показывает в статусе 'open' */}
+            {/* Панель планирования показывается только в статусе 'open' И только если нет активного предложения от провайдера */}
+            {/* Логика: Если есть провайдер (approval_status === 'proposed'), то голосование по дате скрывается */}
+            {/* И показываются кнопки управления провайдером (в CommandConsole) */}
             {lobby.status === 'open' && (
                 <PlanningPanel 
                     lobby={lobby} 
@@ -176,8 +36,10 @@ export function CombatHUD({ lobby, isOwner, members, loadData, dbUser, isAdmin }
             {/* Консоль командира (Владелец или Админ системы) */}
             {isCommander && (
                 <div className="space-y-4 pt-10 border-t border-zinc-900">
+                    {/* PASSING providerId to CommandConsole */}
                     <CommandConsole 
-                        lobbyId={lobby.id} 
+                        lobbyId={lobby.id}
+                        providerId={lobby.provider_id}
                         userId={dbUser!.user_id} 
                         status={lobby.status} 
                         score={lobby.metadata?.score || {red:0, blue:0}} 
@@ -185,7 +47,6 @@ export function CombatHUD({ lobby, isOwner, members, loadData, dbUser, isAdmin }
                         isAdmin={isAdmin}
                         onLoad={loadData}
                     />
-                    <AdminCheckpointPanel lobbyId={lobby.id} onLoad={loadData} />
                 </div>
             )}
         </div>

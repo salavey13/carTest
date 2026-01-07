@@ -59,8 +59,8 @@ export async function getProviderOffers(playerCount: number, activityId?: string
 
 export async function selectProviderForLobby(lobbyId: string, providerId: string, offer: any) {
     try {
-        //1. Get current lobby details (Name + Metadata)
-        const { data: lobby } = await supabaseAdmin.from('lobbies').select('name, metadata').eq('id', lobbyId).single();
+        // 1. Get current lobby details (Name + Metadata)
+        const { data: lobby } = await supabaseAdmin.from('lobbies').select('name, metadata, owner_id').eq('id', lobbyId).single();
         
         if (!lobby) throw new Error("Lobby not found");
         
@@ -152,7 +152,7 @@ export async function approveProviderForLobby(lobbyId: string, providerId: strin
 
         if (updateError) throw updateError;
 
-        // 4. Notify Lobby Owner (The original User who started game)
+        // 4. Notify Lobby Owner (The original User who started the game)
         const offerName = lobby.metadata?.selected_offer?.serviceName || "Service";
         const lobbyDeepLink = `${BOT_APP_URL}?startapp=lobby_${lobbyId}`;
 
