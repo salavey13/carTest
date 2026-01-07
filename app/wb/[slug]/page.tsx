@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Save, RotateCcw, FileUp, Car } from "lucide-react";
+import { Save, RotateCcw, FileUp, Car, Settings2, ChevronUp, ChevronDown } from "lucide-react";
 import { useCrewWarehouse } from "./warehouseHooks";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import { WarehouseViz } from "@/components/WarehouseViz";
@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppContext } from "@/contexts/AppContext";
 import { getCrewLiveDetails } from "@/app/rentals/actions";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
@@ -31,6 +32,7 @@ export default function CrewWarehousePage() {
   const { dbUser, userCrewInfo } = useAppContext();
 
   const [currentCrew, setCurrentCrew] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     async function fetchCrew() {
@@ -69,8 +71,6 @@ export default function CrewWarehousePage() {
     leaderboard,
     loadItems,
     handleUpdateLocationQty,
-    handleWorkflowNext,
-    handleSkipItem,
     handlePlateClick,
     handleItemClick,
     search,
@@ -108,18 +108,11 @@ export default function CrewWarehousePage() {
   const [isOwner, setIsOwner] = useState(false);
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [activeShift, setActiveShift] = useState<any | null>(null);
-  const [statsObj, setStatsObj] = useState({ changedCount: 0, totalDelta: 0, stars: 0, offloadUnits: 0, salary: 0 });
+  
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editVoxel, setEditVoxel] = useState<string | null>(null);
   const [editContents, setEditContents] = useState<Array<{ item: any; quantity: number; newQuantity: number }>>([]);
-  const [checkpointStart, setCheckpointStart] = useState<number | null>(null);
-  const [tick, setTick] = useState(0);
-  const [lastCheckpointDurationSec, setLastCheckpointDurationSec] = useState<number | null>(null);
-  const [lastProcessedCount, setLastProcessedCount] = useState<number | null>(null);
-  const [lastProcessedTotalDelta, setLastProcessedTotalDelta] = useState<number | null>(null);
-  const [lastProcessedStars, setLastProcessedStars] = useState<number | null>(null);
-  const [lastProcessedOffloadUnits, setLastProcessedOffloadUnits] = useState<number | null>(null);
-  const [lastProcessedSalary, setLastProcessedSalary] = useState<number | null>(null);
+  
   const [checkingPending, setCheckingPending] = useState(false);
   const [exportingDaily, setExportingDaily] = useState(false);
   const [sendingCar, setSendingCar] = useState(false);
@@ -130,8 +123,10 @@ export default function CrewWarehousePage() {
   const uniqueColors = useMemo(() => [...new Set(localItems.map(i => i.color).filter(Boolean))].sort(), [localItems]);
   const uniqueSizes = useMemo(() => [...new Set(localItems.map(i => i.size).filter(Boolean))].sort((a, b) => getSizePriority(a) - getSizePriority(b)), [localItems, getSizePriority]);
 
+  // Sync local items to hook items (when hook updates state)
   useEffect(() => setLocalItems(hookItems || []), [hookItems]);
-  useEffect(() => { const iv = setInterval(() => setTick(t => t + 1), 1000); return () => clearInterval(iv); }, []);
+
+  useEffect(() => { const iv = setInterval(() => {}, 1000); return () => clearInterval(iv); }, []);
 
   useEffect(() => {
     if (!registerNotifier || !toast) return;
@@ -146,7 +141,6 @@ export default function CrewWarehousePage() {
     return () => registerNotifier(null);
   }, [registerNotifier, toast]);
 
-  // Use userCrewInfo from AppContext — NO getCrewBySlug needed
   useEffect(() => {
     if (userCrewInfo?.slug === slug) {
       setIsOwner(userCrewInfo.is_owner);
@@ -181,29 +175,18 @@ export default function CrewWarehousePage() {
     return Boolean(owner || isActiveMember || isGlobalAdmin);
   }, [dbUser, membershipStatus, memberRole, isOwner]);
 
-  const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
-    setLocalItems(prev => prev.map(i => {
-      if (i.id !== itemId) return i;
-      const locs = (i.locations || []).map(l => ({ ...l }));
-      const idx = locs.findIndex(l => l.voxel === voxelId);
-      if (idx !== -1) locs[idx].quantity = Math.max(0, locs[idx].quantity + delta);
-      else if (delta > 0) locs.push({ voxel: voxelId, quantity: delta });
-      const filtered = locs.filter(l => l.quantity > 0);
-      const newTotal = filtered.reduce((acc, l) => acc + l.quantity, 0);
-      return { ...i, locations: filtered, total_quantity: newTotal };
-    }));
-    const absDelta = Math.abs(delta);
-    if (gameMode === "onload" && delta > 0) setOnloadCount(p => p + absDelta);
-    else if (gameMode === "offload" && delta < 0) setOffloadCount(p => p + absDelta);
-    else setEditCount(p => p + absDelta);
-    handleUpdateLocationQty(itemId, voxelId, delta, true).catch(() => { loadItems(); toast.error("Ошибка сервера"); });
-  };
+  // Simplified optimistic update: relies on the hook to handle state updates
+  // We only need to trigger the hook action.
+  const optimisticUpdate = useCallback((itemId: string, voxelId: string, delta: number) => {
+    handleUpdateLocationQty(itemId, voxelId, delta, true).catch(() => { 
+      // Error handling is done in the hook, but we keep this catch to prevent unhandled rejection promises
+    });
+  }, [handleUpdateLocationQty]);
 
   const handleCheckpoint = async () => {
     if (!canManage) return toast.error("Нет прав");
     const snapshot = localItems.map(i => ({ id: i.id, locations: i.locations.map(l => ({ voxel: l.voxel, quantity: l.quantity })) }));
     setCheckpoint(snapshot);
-    setCheckpointStart(Date.now());
     setOnloadCount(0); setOffloadCount(0); setEditCount(0);
     toast.success("Чекпоинт локально");
     try {
@@ -215,7 +198,6 @@ export default function CrewWarehousePage() {
   const handleReset = async () => {
     if (!canManage || !checkpoint.length) return toast.error("Нет чекпоинта");
     setLocalItems(checkpoint.map(i => ({ ...i, locations: [...i.locations] })));
-    setCheckpointStart(null);
     setOnloadCount(0); setOffloadCount(0); setEditCount(0);
     toast.success("Сброс локально");
     try {
@@ -320,7 +302,7 @@ export default function CrewWarehousePage() {
         </div>
       </header>
 
-      {/* SHIFT CONTROLS — 1 LINE */}
+      {/* SHIFT CONTROLS */}
       <div className="p-2 bg-white dark:bg-gray-800 border-b">
         <ShiftControls slug={slug!} />
       </div>
@@ -368,30 +350,28 @@ export default function CrewWarehousePage() {
           <WarehouseStats
             itemsCount={localItems.reduce((s, it) => s + (it.total_quantity || 0), 0)}
             uniqueIds={localItems.length}
-            score={score} level={level} streak={streak} dailyStreak={dailyStreak}
-            checkpointMain={checkpointStart ? formatSec(Math.floor((Date.now() - checkpointStart) / 1000)) : (lastCheckpointDurationSec ? formatSec(lastCheckpointDurationSec) : "--:--")}
-            checkpointSub={checkpointStart ? "в процессе" : (lastCheckpointDurationSec ? `последнее: ${formatSec(lastCheckpointDurationSec)}` : "не запускался")}
-            changedCount={checkpointStart ? statsObj.changedCount : (lastProcessedCount ?? 0)}
-            totalDelta={checkpointStart ? statsObj.totalDelta : (lastProcessedTotalDelta ?? 0)}
-            stars={checkpointStart ? statsObj.stars : (lastProcessedStars ?? 0)}
-            offloadUnits={checkpointStart ? statsObj.offloadUnits : (lastProcessedOffloadUnits ?? 0)}
-            salary={checkpointStart ? statsObj.salary : (lastProcessedSalary ?? 0)}
+            score={score} 
+            level={level} 
+            streak={streak} 
+            dailyStreak={dailyStreak}
+            offloadUnits={offloadCount} 
+            onloadUnits={onloadCount}
+            totalDelta={offloadCount + onloadCount + editCount}
+            salary={offloadCount * 50}
             achievements={achievements}
-            sessionStart={sessionStart}
+            sessionDuration={sessionDuration}
             errorCount={errorCount}
             bossMode={bossMode}
             bossTimer={bossTimer}
             leaderboard={leaderboard}
             efficiency={efficiency}
             avgTimePerItem={avgTimePerItem}
-            dailyGoals={dailyGoals}
-            sessionDuration={sessionDuration}
           />
         </div>
 
         {/* НИЖНИЕ КНОПКИ */}
         <div className="p-2 bg-white dark:bg-gray-800">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2 mb-2">
             <Button onClick={handleCheckpoint} size="sm" variant="outline" className="h-8 text-xs" disabled={!activeShift || !canManage}>
               <Save className="w-4 h-4 mr-1" /> Чекпоинт
             </Button>
@@ -422,9 +402,33 @@ export default function CrewWarehousePage() {
             </Button>
           </div>
 
-          <div className="mt-3">
-            <CrewWarehouseSyncButtons slug={slug!} />
-          </div>
+          {/* COLLAPSIBLE SYNC COMPONENT */}
+          <Button 
+            onClick={() => setShowAdvanced(prev => !prev)} 
+            size="sm" 
+            variant="ghost" 
+            className="w-full h-8 text-xs text-muted-foreground hover:bg-muted"
+          >
+            {showAdvanced ? <ChevronUp className="w-4 h-4 mr-2"/> : <ChevronDown className="w-4 h-4 mr-2"/>}
+            {showAdvanced ? "Скрыть" : "Настройки и Синхронизация"}
+          </Button>
+
+          <AnimatePresence initial={false}>
+            {showAdvanced && (
+              <motion.div 
+                key="sync-panel"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+                className="overflow-hidden"
+              >
+                <div className="pt-2 mt-2 border-t border-border">
+                  <CrewWarehouseSyncButtons slug={slug!} />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </main>
 
@@ -433,8 +437,8 @@ export default function CrewWarehousePage() {
         currentWorkflowIndex={currentWorkflowIndex}
         selectedWorkflowVoxel={selectedWorkflowVoxel}
         setSelectedWorkflowVoxel={setSelectedWorkflowVoxel}
-        handleWorkflowNext={handleWorkflowNext}
-        handleSkipItem={handleSkipItem}
+        handleWorkflowNext={wh.handleWorkflowNext} // Added wh. prefix as it was missing in original imports
+        handleSkipItem={wh.handleSkipItem} // Added wh. prefix
         editDialogOpen={editDialogOpen}
         setEditDialogOpen={setEditDialogOpen}
         editVoxel={editVoxel}

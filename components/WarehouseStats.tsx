@@ -2,7 +2,11 @@
 
 import React, { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Star, Package, Clock, Zap, Award, AlertTriangle, Users, TrendingUp, Target, Share2 } from "lucide-react";
+import { 
+  Star, Package, Clock, Zap, Award, 
+  AlertTriangle, Users, TrendingUp, 
+  Target, Share2, Ghost, ShieldAlert, Coins 
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -61,11 +65,15 @@ export default function WarehouseStats(inProps: IncomingProps) {
   const avgTimePerItem = inProps.avgTimePerItem ?? 0;
   const dailyGoals = inProps.dailyGoals ?? { units: 100, errors: 0, xtr: 100 };
 
-  const { user } = useAppContext();
+  const { dbUser } = useAppContext();
   const [copied, setCopied] = useState(false);
 
-  const top = useMemo(() => (Array.isArray(leaderboard) ? leaderboard.slice(0, 3) : []), [leaderboard]);
+  // --- GHOST ECONOMY: РУСИФИЦИРОВАННЫЕ РАСЧЕТЫ ---
+  const sessionGV = useMemo(() => (offloadUnits * 7) + (Math.max(0, totalDelta - offloadUnits) * 3), [offloadUnits, totalDelta]);
+  const squadTax = useMemo(() => Math.floor(salary * 0.13), [salary]);
+  const totalGhostBalance = dbUser?.metadata?.cyberFitness?.ghost_stats?.balance || 0;
 
+  const top = useMemo(() => (Array.isArray(leaderboard) ? leaderboard.slice(0, 3) : []), [leaderboard]);
   const unitsProgress = useMemo(() => Math.min(100, (offloadUnits / (dailyGoals?.units || 1)) * 100), [offloadUnits, dailyGoals]);
   const errorFree = errorCount === 0 && sessionDuration > 3600;
 
@@ -77,217 +85,121 @@ export default function WarehouseStats(inProps: IncomingProps) {
   }, [unitsProgress, errorFree, dailyGoals]);
 
   const formatDuration = (sec: number) => {
-    if (!Number.isFinite(sec) || sec <= 0) return "00:00";
     const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
     const s = sec % 60;
-    if (h > 0) return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    return h > 0 ? `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
 
   const shareScore = () => {
-    const text = `🏆 Мой счёт в Warehouse: ${score} очков! Уровень ${level}, серия ${streak}. Заработано ${totalXtr} XTR.`;
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      toast.success("Счёт скопирован!");
-      setTimeout(() => setCopied(false), 2000);
-    });
+    const text = `📊 ОТЧЕТ ОПЕРАЦИИ:
+Выдано: ${offloadUnits} ед.
+Намайнено: ${sessionGV} GV.
+К выплате: ${salary} RUB.
+Налог Squad (13%): ${squadTax} RUB.`;
+    navigator.clipboard.writeText(text).then(() => { setCopied(true); toast.success("Отчет скопирован!"); setTimeout(() => setCopied(false), 2000); });
   };
 
   return (
-    <div className="p-3 bg-muted rounded-lg text-[13px]">
-      <div className="flex flex-col lg:flex-row items-stretch gap-4">
-        <main className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h3 className="font-semibold text-sm truncate">Статистика склада</h3>
-              <div className="mt-1 text-xs text-muted-foreground truncate">Элементов: <b>{itemsCount}</b> · Уник.: <b>{uniqueIds}</b></div>
+    <div className="p-3 bg-card border border-border rounded-xl text-[13px] font-mono shadow-sm">
+      <div className="flex flex-col lg:flex-row gap-4">
+        <main className="flex-1">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="font-black text-foreground uppercase flex items-center gap-2 tracking-tighter">
+                <ShieldAlert size={14} className="text-destructive" /> Оперативная_Сводка
+              </h3>
+              <div className="text-[10px] text-muted-foreground mt-1 uppercase">ID: {dbUser?.user_id?.slice(0,8)} | ВРЕМЯ: {formatDuration(sessionDuration)}</div>
             </div>
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="text-xs text-muted-foreground">Ур: <b>{level}</b></div>
-              <div className="text-xs text-muted-foreground">Серия: <b>{streak}</b></div>
+            <div className="flex gap-2">
+              <Badge variant="outline" className="h-5 text-[9px] border-border text-secondary-foreground">УР {level}</Badge>
+              <Badge variant="outline" className="h-5 text-[9px] border-brand-pink text-brand-pink uppercase bg-brand-pink/10">СЕРИЯ {streak}</Badge>
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <section className="p-3 rounded-lg bg-background/50 border border-border flex flex-col">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* ЭФФЕКТИВНОСТЬ */}
+            <section className="p-3 bg-secondary border border-border rounded-lg relative overflow-hidden group">
               <div className="flex items-start gap-3">
-                <motion.div
-                  animate={{ rotate: efficiency > 50 ? 360 : 0 }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="flex-shrink-0 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 p-2"
-                >
-                  <Zap className="w-5 h-5 text-white" />
+                <motion.div animate={{ rotate: efficiency > 50 ? 360 : 0 }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }} className="p-1.5 bg-brand-green rounded-full shadow-lg shadow-brand-green/20">
+                  <Zap size={14} className="text-white dark:text-black" />
                 </motion.div>
-                <div className="min-w-0">
-                  <div className="text-[11px] text-muted-foreground truncate">Эффективность</div>
-                  <div className="text-lg font-bold truncate">{Number.isFinite(score) ? score.toLocaleString() : 0}</div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">Боевой_Счет</div>
+                  <div className="text-lg font-black text-foreground">{score.toLocaleString()}</div>
                 </div>
               </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="flex flex-col">
-                  <div className="text-[11px] text-muted-foreground flex items-center gap-2"><Star className="w-4 h-4 text-yellow-400" /> Звёзды</div>
-                  <div className="font-medium mt-1">{Number.isFinite(stars) ? stars : 0}</div>
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <div className="bg-background/50 p-2 border border-border rounded">
+                    <div className="text-[8px] text-muted-foreground uppercase flex items-center gap-1"><Ghost size={10} className="text-brand-purple" /> Сессия_GV</div>
+                    <div className="text-xs font-black text-brand-purple">+{sessionGV}</div>
                 </div>
-
-                <div className="flex flex-col">
-                  <div className="text-[11px] text-muted-foreground flex items-center gap-2"><Package className="w-4 h-4" /> Упаковок</div>
-                  <div className="font-medium mt-1">0</div>
+                <div className="bg-background/50 p-2 border border-border rounded">
+                    <div className="text-[8px] text-muted-foreground uppercase flex items-center gap-1"><Star size={10} className="text-brand-gold" /> Звезды</div>
+                    <div className="text-xs font-black text-foreground">{stars}</div>
                 </div>
-              </div>
-
-              <div className="mt-2 pt-2 border-t border-border/50">
-                <div className="text-[11px] text-muted-foreground flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Эффект.: {efficiency} ед/ч</div>
-                <div className="text-[11px] text-muted-foreground flex items-center gap-2"><Clock className="w-4 h-4" /> Ср. время: {avgTimePerItem}s/ед</div>
               </div>
             </section>
 
-            {/* FIXED: High contrast backgrounds & text for dark mode */}
-            <section className={cn(
-              "p-3 rounded-lg border",
-              changedCount > 0 
-                ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800" 
-                : "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-800"
-            )}>
-              <div className="flex items-center justify-between">
-                <div className="text-[11px] text-muted-foreground">Checkpoint</div>
-                <div className="text-[11px] text-muted-foreground truncate">—</div>
-              </div>
-
-              <div className="mt-2 flex items-baseline gap-3">
-                <div className="font-mono text-2xl font-bold truncate">{changedCount}</div>
-                <div className="text-sm text-muted-foreground">Изм. позиций: <b>{changedCount}</b></div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-1 gap-2 text-[12px] text-muted-foreground">
-                <div>Изменённое кол-во: <b className="text-foreground">{totalDelta}</b></div>
-                <div>Выдано: <b className="text-foreground">{offloadUnits}</b> · Зарплата: <b className="text-foreground">{Number.isFinite(salary) ? salary.toLocaleString() : 0}</b> руб</div>
-              </div>
-            </section>
-          </div>
-
-          {/* FIXED: High contrast backgrounds & text for dark mode */}
-          <div className="mt-3 p-3 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 dark:from-green-950/40 dark:to-emerald-950/40 dark:border-green-800">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-semibold flex items-center gap-2">
-                <Target className="w-4 h-4 text-green-600 dark:text-green-400" />
-                Ежедневные цели
-              </h4>
-              <Badge variant={totalXtr > 0 ? "default" : "secondary"} className="text-xs">
-                {totalXtr} XTR
-              </Badge>
-            </div>
-
-            <div className="space-y-3">
+            {/* ХАРВЕСТ */}
+            <section className="p-3 bg-secondary border border-border rounded-lg flex flex-col justify-between">
               <div>
-                <div className="text-[11px] text-muted-foreground mb-1">Выдано ед.: {offloadUnits}/{dailyGoals.units}</div>
-                <Progress value={unitsProgress} className="h-2" />
+                <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mb-1">Рыночный_Харвест</div>
+                <div className="flex items-baseline gap-1">
+                    <span className="font-black text-2xl text-brand-green">{salary.toLocaleString()}</span>
+                    <span className="text-[9px] text-muted-foreground font-bold uppercase">RUB</span>
+                </div>
               </div>
-              {errorFree && (
-                <div className="text-[11px] text-green-600 dark:text-green-400 font-medium">✅ Без ошибок (бонус +{dailyGoals.xtr} XTR!)</div>
-              )}
-            </div>
+              <div className="mt-4 pt-2 border-t border-border">
+                <div className="flex justify-between text-[10px] items-center text-brand-pink">
+                    <span className="font-bold flex items-center gap-1 uppercase tracking-tighter"><Users size={10} /> Налог_Squad (13%):</span>
+                    <span className="font-black">+{squadTax} ₽</span>
+                </div>
+              </div>
+            </section>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-2 rounded-lg bg-background/40 border border-border text-[12px] flex flex-col">
-              <div className="text-[11px] text-muted-foreground">Время сессии</div>
-              <div className="font-mono font-semibold mt-1">{formatDuration(sessionDuration)}</div>
+          {/* ЦЕЛИ */}
+          <div className="mt-3 p-3 bg-muted border border-border rounded-lg">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Оперативная Квота</span>
+              <Badge variant={totalXtr > 0 ? "default" : "secondary"} className="text-[8px] h-4">{totalXtr} XTR БОНУС</Badge>
             </div>
-
-            <div className="p-2 rounded-lg bg-background/40 border border-border text-[12px] flex flex-col">
-              <div className="text-[11px] text-muted-foreground">Ошибки</div>
-              <div className="font-semibold mt-1 text-destructive">{errorCount}</div>
-            </div>
-
-            <div className="p-2 rounded-lg bg-background/40 border border-border text-[12px] flex flex-col">
-              <div className="text-[11px] text-muted-foreground flex items-center gap-2">Босс режим: {bossMode ? <AlertTriangle className="w-4 h-4 text-destructive" /> : <Users className="w-4 h-4 text-muted-foreground" />}</div>
-              <div className="font-semibold mt-1">{bossMode ? `${Math.max(0, Math.floor((bossTimer || 0) / 1000))} сек` : "—"}</div>
-            </div>
-          </div>
-
-          <div className="mt-3">
-            <div className="text-[11px] text-muted-foreground">Достижения</div>
-            <div className="mt-1 flex flex-wrap gap-2">
-              <AnimatePresence>
-                {(!achievements || achievements.length === 0) ? (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[12px] text-muted-foreground">
-                    —
-                  </motion.div>
-                ) : (
-                  achievements.map((a, i) => (
-                    <motion.div key={i} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-xs font-semibold text-white shadow-lg">
-                      {a.split(" ")[0]}
-                    </motion.div>
-                  ))
-                )}
-              </AnimatePresence>
+            <Progress value={unitsProgress} className="h-1 bg-secondary" />
+            <div className="mt-2 text-[9px] text-muted-foreground flex justify-between uppercase font-mono">
+                <span>{offloadUnits} / {dailyGoals.units} ЕД.</span>
+                {errorCount > 0 && <span className="text-destructive font-bold">ОШИБКИ: {errorCount}</span>}
             </div>
           </div>
         </main>
 
-        <aside className="w-full lg:w-72 flex-shrink-0">
-          <div className="p-3 rounded-lg bg-background/50 border border-border">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2 text-sm font-semibold"><Award className="w-4 h-4 text-amber-400" /> Рейтинг</div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={shareScore}
-                className="h-6 text-xs"
-                disabled={copied}
-              >
-                <Share2 className="w-3 h-3 mr-1" />
-                {copied ? "Скопировано!" : "Поделиться"}
-              </Button>
+        {/* САЙДБАР */}
+        <aside className="w-full lg:w-64 flex flex-col gap-3">
+          {/* ПРИЗРАЧНЫЙ РЕЕСТР */}
+          <div className="p-3 bg-secondary border-2 border-brand-purple rounded-lg relative overflow-hidden group">
+            <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity"><Ghost size={80} /></div>
+            <div className="text-[10px] text-brand-purple font-black uppercase tracking-widest mb-1 flex items-center gap-2">
+                <Coins size={12} /> Призрачный_Реестр
             </div>
-
-            <ol className="mt-3 space-y-2 text-[13px]">
-              <AnimatePresence>
-                {top.length > 0 ? top.map((entry, idx) => (
-                  <motion.li key={idx} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {/* FIXED: Rank badge text contrast */}
-                      <div className={cn("w-6 h-6 flex items-center justify-center rounded-full text-sm font-semibold",
-                        idx === 0 ? "bg-amber-300 text-amber-800 dark:bg-amber-600 dark:text-amber-100" :
-                          idx === 1 ? "bg-slate-300 text-slate-800 dark:bg-slate-600 dark:text-slate-200" :
-                            idx === 2 ? "bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100" : "bg-muted text-muted-foreground dark:bg-muted/50 dark:text-muted-foreground"
-                      )}>
-                        {idx + 1}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{entry.name}</div>
-                        <div className="text-[11px] text-muted-foreground truncate">{entry.date}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 font-semibold">
-                      {entry.score}
-                      {entry.xtr ? <Star className="w-3 h-3 text-yellow-400" /> : null}
-                    </div>
-                  </motion.li>
-                )) : (
-                  <motion.li initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[12px] text-muted-foreground">Пусто — будь первым!</motion.li>
-                )}
-              </AnimatePresence>
-            </ol>
+            <div className="text-3xl font-black text-foreground tracking-tighter">{totalGhostBalance.toLocaleString()} <span className="text-xs text-brand-purple">GV</span></div>
+            <div className="mt-2 text-[9px] text-muted-foreground uppercase font-mono">
+                Статус: <span className="text-foreground">Автономно</span>
+            </div>
           </div>
 
-          <div className="mt-3 p-3 rounded-lg bg-background/30 border border-border text-[12px]">
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground">Быстрые показатели</div>
-            <div className="mt-2 grid grid-cols-1 gap-2">
-              <div className="flex items-center justify-between">
-                <div className="text-[12px]">Изм. позиций</div>
-                <div className="font-medium">{changedCount}</div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-[12px]">Выдано ед.</div>
-                <div className="font-medium">{offloadUnits}</div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-[12px]">Зарплата</div>
-                <div className="font-medium">{Number.isFinite(salary) ? salary.toLocaleString() : 0} руб + {totalXtr} XTR</div>
-              </div>
+          {/* РЕЙТИНГ */}
+          <div className="p-3 bg-secondary border border-border rounded-lg flex-1">
+            <div className="flex justify-between items-center mb-3 border-b border-border pb-2">
+                <span className="text-[9px] font-black uppercase text-amber-600 dark:text-amber-500 tracking-tighter">Элитные Операторы</span>
+                <Button variant="ghost" onClick={shareScore} className="h-5 w-5 p-0 hover:text-brand-cyan text-foreground"><Share2 size={10} /></Button>
+            </div>
+            <div className="space-y-1.5">
+                {top.map((entry, idx) => (
+                  <div key={idx} className="flex justify-between text-[11px] p-1 rounded hover:bg-accent/50 transition-colors">
+                    <span className="font-bold text-muted-foreground">0{idx+1} <span className="text-foreground ml-1 uppercase">{entry.name}</span></span>
+                    <span className="font-black text-brand-cyan">{entry.score}</span>
+                  </div>
+                ))}
             </div>
           </div>
         </aside>
