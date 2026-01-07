@@ -149,61 +149,79 @@ export function useCrewWarehouse(slug: string) {
     setLeaderboard(savedLeaderboard);
   }, [loadItems, slug, fireNotify]);
 
+  // --- FIX 1: Auto-sync session counters to localStorage ---
+  // This ensures that if counters are reset via UI, the update is persisted immediately.
+  useEffect(() => {
+    if (!slug) return;
+    const sessionData = {
+      mode: gameMode,
+      checkpointData: checkpoint,
+      onload: onloadCount,
+      offload: offloadCount,
+      edits: editCount,
+    };
+    localStorage.setItem(`warehouse_session_${slug}`, JSON.stringify(sessionData));
+  }, [slug, gameMode, checkpoint, onloadCount, offloadCount, editCount]);
+
   const handleUpdateLocationQty = useCallback(
     async (itemId: string, voxelId: string, delta: number, isGameAction: boolean = false) => {
+      const absDelta = Math.abs(delta);
+
+      // --- FIX 2: Optimistic UI Updates ---
+      // Apply changes to state immediately for instant feedback
+      setItems((prev) =>
+        prev.map((i) => {
+          if (i.id !== itemId) return i;
+          const locs = (i.locations || []).map((l: any) => ({ ...l }));
+          const idx = locs.findIndex((l: any) => (l.voxel || "") === voxelId);
+          if (idx !== -1) {
+            locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
+          } else if (delta > 0) {
+            locs.push({ voxel: voxelId, quantity: delta });
+          }
+          const filtered = locs.filter((l) => l.quantity > 0).sort((a, b) => (a.voxel || "").localeCompare(b.voxel || ""));
+          return { ...i, locations: filtered, total_quantity: filtered.reduce((acc, l) => acc + (l.quantity || 0), 0) };
+        })
+      );
+
+      if (isGameAction) {
+        setScore((prev) => prev + (gameMode === "onload" ? 10 : 5) * (level / 2));
+        setStreak((prev) => prev + 1);
+        checkAchievements();
+      }
+
+      if (gameMode === 'onload' && delta > 0) setOnloadCount(p => p + absDelta);
+      else if (gameMode === 'offload' && delta < 0) setOffloadCount(p => p + absDelta);
+      else setEditCount(p => p + absDelta);
+
+      // Perform Server Action
       const { success, error: updateError } = await updateCrewItemLocationQty(slug, itemId, voxelId, delta, dbUser?.user_id);
-      if (success) {
-        // --- 🟢 ATOMIC MINING INJECTION ---
-        (async () => {
-          if (!dbUser?.user_id) return;
-          const actionType = delta > 0 ? 'onload' : 'offload';
-          const gvEarned = Math.abs(delta) * (actionType === 'offload' ? 7 : 3);
-          const kvEarned = Math.abs(delta) * 0.5;
 
-          await supabaseAdmin.rpc('update_user_cyber_stats', {
-              p_user_id: dbUser.user_id,
-              p_gv_delta: gvEarned,
-              p_kv_delta: kvEarned,
-              p_feature_key: `last_wh_action`,
-              p_feature_val: JSON.stringify({ type: actionType, qty: Math.abs(delta), ts: new Date().toISOString() })
-          });
-        })();
-
-        setItems((prev) =>
-          prev.map((i) => {
-            if (i.id !== itemId) return i;
-            const locs = (i.locations || []).map((l: any) => ({ ...l }));
-            const idx = locs.findIndex((l: any) => (l.voxel || "") === voxelId);
-            if (idx !== -1) {
-              locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
-            } else if (delta > 0) {
-              locs.push({ voxel: voxelId, quantity: delta });
-            }
-            const filtered = locs.filter((l) => l.quantity > 0).sort((a, b) => (a.voxel || "").localeCompare(b.voxel || ""));
-            return { ...i, locations: filtered, total_quantity: filtered.reduce((acc, l) => acc + (l.quantity || 0), 0) };
-          })
-        );
-
-        if (isGameAction) {
-          setScore((prev) => prev + (gameMode === "onload" ? 10 : 5) * (level / 2));
-          setStreak((prev) => prev + 1);
-          checkAchievements();
-        }
-
-        const absDelta = Math.abs(delta);
-        if (gameMode === 'onload' && delta > 0) setOnloadCount(p => p + absDelta);
-        else if (gameMode === 'offload' && delta < 0) setOffloadCount(p => p + absDelta);
-        else setEditCount(p => p + absDelta);
-
-        localStorage.setItem(`warehouse_session_${slug}`, JSON.stringify({
-          mode: gameMode, checkpointData: checkpoint, onload: onloadCount, offload: offloadCount, edits: editCount,
-        }));
-      } else {
+      if (!success) {
+        // Rollback: If server fails, reload items to revert optimistic changes
         fireNotify("error", updateError || "Ошибка синхронизации");
         if (isGameAction) setErrorCount((prev) => prev + 1);
+        loadItems(); 
+        return;
       }
+
+      // --- Success Path (Background Mining) ---
+      (async () => {
+        if (!dbUser?.user_id) return;
+        const actionType = delta > 0 ? 'onload' : 'offload';
+        const gvEarned = Math.abs(delta) * (actionType === 'offload' ? 7 : 3);
+        const kvEarned = Math.abs(delta) * 0.5;
+
+        await supabaseAdmin.rpc('update_user_cyber_stats', {
+            p_user_id: dbUser.user_id,
+            p_gv_delta: gvEarned,
+            p_kv_delta: kvEarned,
+            p_feature_key: `last_wh_action`,
+            p_feature_val: JSON.stringify({ type: actionType, qty: Math.abs(delta), ts: new Date().toISOString() })
+        });
+      })();
     },
-    [slug, gameMode, level, checkAchievements, checkpoint, onloadCount, offloadCount, editCount, dbUser, fireNotify],
+    [slug, gameMode, level, checkAchievements, dbUser, fireNotify, loadItems],
   );
 
   const startBossMode = () => {
