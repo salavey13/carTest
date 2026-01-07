@@ -1,17 +1,18 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { getProviderOffers, selectProviderForLobby } from "../../../actions/providers";
+import { getProviderOffers, selectProviderForLobby, approveProviderForLobby, rejectProviderForLobby } from "../../../actions/providers";
 import { 
     FaMotorcycle, FaGun, FaPersonSkiing, FaChevronRight, 
     FaCubes, FaTerminal, FaLock, FaUsers, FaClock, 
     FaMapLocationDot, FaShieldHeart, FaCircleInfo, FaSnowflake,
-    FaGamepad, FaPaintRoller, FaVrCardboard, FaCircleCheck
+    FaGamepad, FaPaintRoller, FaVrCardboard, FaCircleCheck, FaXmark
 } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { useAppContext } from "@/contexts/AppContext";
 
 // Activity type to icon mapping
 const activityIcons: Record<string, React.ReactNode> = {
@@ -24,6 +25,7 @@ const activityIcons: Record<string, React.ReactNode> = {
 };
 
 export function ProviderOffers({ lobbyId, playerCount, activityType, selectedProviderId, selectedServiceId }: any) {
+    const { dbUser } = useAppContext();
     const [providers, setProviders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<string>(activityType || 'all');
@@ -37,19 +39,40 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
 
     const handleSelect = async (providerId: string, offer: any) => {
         if (!offer.isAvailable) return toast.error(offer.lockReason);
-        
-        // Optimistic UI Update could happen here if desired, but we rely on server state
-        toast.loading("Обработка заявки...", { id: "provider-req" });
-        
         const res = await selectProviderForLobby(lobbyId, providerId, offer);
+        if (res.success) toast.success("Контракт отправлен провайдеру!");
+    };
+
+    const handleApprove = async () => {
+        if (!dbUser?.user_id) return toast.error("Authorization Required");
+        // Only one provider can be "active" in the lobby proposal state at a time (usually)
+        const providerId = selectedProviderId;
+        if (!providerId) return toast.error("No provider selected");
+        
+        const res = await approveProviderForLobby(lobbyId, providerId, dbUser.user_id);
         if (res.success) {
-            toast.success("Контракт отправлен провайдеру!", {
-                id: "provider-req",
-                description: "Провайдер получил ссылку на это лобби.",
+            toast.success("ОФЕРТА ПРИНЯТА!", {
+                description: "Владелец лобби уведомлен.",
                 icon: <FaCircleCheck className="text-brand-cyan" />
             });
         } else {
-            toast.error("Ошибка", { description: res.error, id: "provider-req" });
+            toast.error("Ошибка одобрения", { description: res.error });
+        }
+    };
+
+    const handleReject = async () => {
+        if (!dbUser?.user_id) return toast.error("Authorization Required");
+        const providerId = selectedProviderId;
+        if (!providerId) return toast.error("No provider selected");
+        
+        const res = await rejectProviderForLobby(lobbyId, providerId, dbUser.user_id);
+        if (res.success) {
+            toast.info("ОФЕРТА ОТКЛОНЕНА", {
+                description: "Можете выбрать другого провайдера.",
+                icon: <FaXmark className="text-red-500" />
+            });
+        } else {
+            toast.error("Ошибка отмены", { description: res.error });
         }
     };
 
@@ -97,13 +120,18 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                 ))}
             </div>
             
-            {providers.map(provider => (
+            {providers.map(provider => {
+                // PERMISSION CHECK: Is current user the owner of this Provider (Crew)?
+                const isProviderOwner = dbUser?.user_id === provider.owner_id;
+                const isCurrentProposal = selectedProviderId === provider.providerId;
+                
+                return (
                 <div key={provider.providerId} className={cn(
                     "bg-zinc-950 border-2 transition-all overflow-hidden",
-                    selectedProviderId === provider.providerId ? "border-brand-cyan shadow-[0_0_25px_rgba(0,255,255,0.1)]" : "border-zinc-900"
+                    isCurrentProposal ? "border-brand-cyan shadow-[0_0_25px_rgba(0,255,255,0.1)]" : "border-zinc-900"
                 )}>
                     {/* Header: Provider Intel */}
-                    <div className="p-4 bg-zinc-900/50 flex justify-between items-start">
+                    <div className="p-4 bg-zinc-900/50 flex justify-between items-start relative">
                         <Link href={`/crews/${provider.providerSlug}`} className="flex gap-4 group">
                             <img src={provider.logo} className="w-12 h-12 bg-black border border-zinc-700 grayscale group-hover:grayscale-0 transition-all" />
                             <div>
@@ -114,7 +142,37 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                                 </div>
                             </div>
                         </Link>
-                        {selectedProviderId === provider.providerId && <Badge className="bg-brand-cyan text-black font-black text-[8px] rounded-none">ACTIVE_CONTRACT</Badge>}
+                        
+                        {/* CONTROLS: Show Badge OR Approval Buttons */}
+                        <div className="flex flex-col items-end gap-2">
+                            {isCurrentProposal ? (
+                                isProviderOwner ? (
+                                    // APPROVER UI (Provider Owner)
+                                    <div className="flex gap-1">
+                                        <button 
+                                            onClick={handleReject}
+                                            className="px-2 py-1 bg-red-900/20 border border-red-800 text-red-400 text-[8px] font-black uppercase hover:bg-red-900 hover:text-red-300 transition-colors"
+                                        >
+                                            REJECT
+                                        </button>
+                                        <button 
+                                            onClick={handleApprove}
+                                            className="px-2 py-1 bg-green-900/20 border border-green-800 text-green-400 text-[8px] font-black uppercase hover:bg-green-900 hover:text-green-300 transition-colors"
+                                        >
+                                            APPROVE
+                                        </button>
+                                    </div>
+                                ) : (
+                                    // VIEWER UI (Regular User) - Shows "WAITING FOR PROVIDER" badge
+                                    <Badge className="bg-brand-cyan text-black font-black text-[8px] rounded-none">PENDING_APPROVAL</Badge>
+                                )
+                            ) : (
+                                // STATUS: If not selected, show basic status icon or nothing
+                                <div className="text-zinc-600">
+                                    <FaCircleInfo />
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Amenities Bar */}
@@ -137,11 +195,11 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                                 <button 
                                     key={offer.serviceId}
                                     onClick={() => handleSelect(provider.providerId, offer)}
-                                    disabled={!!selectedProviderId && !isSelected} // Lock other buttons if one is selected
+                                    disabled={!isProviderOwner && isCurrentProposal} // Disable selection if provider is already selected by someone else
                                     className={cn(
                                         "w-full p-4 border text-left transition-all relative group",
                                         !offer.isAvailable ? "opacity-40 cursor-not-allowed border-zinc-900" :
-                                        isSelected ? "border-brand-cyan bg-brand-cyan/5" : "border-zinc-800 hover:border-zinc-600 bg-zinc-900/30 hover:bg-zinc-800/60"
+                                        isSelected ? "border-brand-cyan bg-brand-cyan/5" : "border-zinc-800 hover:border-zinc-600 bg-zinc-900/30"
                                     )}
                                 >
                                     <div className="flex justify-between items-start">
@@ -176,7 +234,8 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                         })}
                     </div>
                 </div>
-            ))}
+                );
+            })}
         </div>
     );
 }
