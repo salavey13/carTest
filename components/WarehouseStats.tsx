@@ -101,56 +101,56 @@ export default function WarehouseStats(inProps: IncomingProps) {
   };
 
   return (
-    <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl text-[13px] font-mono">
+    <div className="p-3 bg-card border border-border rounded-xl text-[13px] font-mono shadow-sm">
       <div className="flex flex-col lg:flex-row gap-4">
         <main className="flex-1">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <h3 className="font-black text-white uppercase flex items-center gap-2 tracking-tighter">
-                <ShieldAlert size={14} className="text-red-600" /> Оперативная_Сводка
+              <h3 className="font-black text-foreground uppercase flex items-center gap-2 tracking-tighter">
+                <ShieldAlert size={14} className="text-destructive" /> Оперативная_Сводка
               </h3>
-              <div className="text-[10px] text-zinc-500 mt-1 uppercase">ID: {dbUser?.user_id?.slice(0,8)} | ВРЕМЯ: {formatDuration(sessionDuration)}</div>
+              <div className="text-[10px] text-muted-foreground mt-1 uppercase">ID: {dbUser?.user_id?.slice(0,8)} | ВРЕМЯ: {formatDuration(sessionDuration)}</div>
             </div>
             <div className="flex gap-2">
-              <Badge variant="outline" className="h-5 text-[9px] border-zinc-700 text-zinc-400">УР {level}</Badge>
-              <Badge variant="outline" className="h-5 text-[9px] border-brand-pink text-brand-pink uppercase">СЕРИЯ {streak}</Badge>
+              <Badge variant="outline" className="h-5 text-[9px] border-border text-secondary-foreground">УР {level}</Badge>
+              <Badge variant="outline" className="h-5 text-[9px] border-brand-pink text-brand-pink uppercase bg-brand-pink/10">СЕРИЯ {streak}</Badge>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* ЭФФЕКТИВНОСТЬ */}
-            <section className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg relative overflow-hidden group">
+            <section className="p-3 bg-secondary border border-border rounded-lg relative overflow-hidden group">
               <div className="flex items-start gap-3">
-                <motion.div animate={{ rotate: efficiency > 50 ? 360 : 0 }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }} className="p-1.5 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.4)]">
-                  <Zap size={14} className="text-black" />
+                <motion.div animate={{ rotate: efficiency > 50 ? 360 : 0 }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }} className="p-1.5 bg-brand-green rounded-full shadow-lg shadow-brand-green/20">
+                  <Zap size={14} className="text-white dark:text-black" />
                 </motion.div>
                 <div>
-                  <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-tight">Боевой_Счет</div>
-                  <div className="text-lg font-black text-white">{score.toLocaleString()}</div>
+                  <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">Боевой_Счет</div>
+                  <div className="text-lg font-black text-foreground">{score.toLocaleString()}</div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-4">
-                <div className="bg-black/40 p-2 border border-zinc-800 rounded">
-                    <div className="text-[8px] text-zinc-500 uppercase flex items-center gap-1"><Ghost size={10} className="text-brand-purple" /> Сессия_GV</div>
+                <div className="bg-background/50 p-2 border border-border rounded">
+                    <div className="text-[8px] text-muted-foreground uppercase flex items-center gap-1"><Ghost size={10} className="text-brand-purple" /> Сессия_GV</div>
                     <div className="text-xs font-black text-brand-purple">+{sessionGV}</div>
                 </div>
-                <div className="bg-black/40 p-2 border border-zinc-800 rounded">
-                    <div className="text-[8px] text-zinc-500 uppercase flex items-center gap-1"><Star size={10} className="text-yellow-500" /> Звезды</div>
-                    <div className="text-xs font-black text-white">{stars}</div>
+                <div className="bg-background/50 p-2 border border-border rounded">
+                    <div className="text-[8px] text-muted-foreground uppercase flex items-center gap-1"><Star size={10} className="text-brand-gold" /> Звезды</div>
+                    <div className="text-xs font-black text-foreground">{stars}</div>
                 </div>
               </div>
             </section>
 
             {/* ХАРВЕСТ */}
-            <section className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex flex-col justify-between">
+            <section className="p-3 bg-secondary border border-border rounded-lg flex flex-col justify-between">
               <div>
-                <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Рыночный_Харвест</div>
+                <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mb-1">Рыночный_Харвест</div>
                 <div className="flex items-baseline gap-1">
-                    <span className="font-black text-2xl text-emerald-500">{salary.toLocaleString()}</span>
-                    <span className="text-[9px] text-zinc-600 font-bold uppercase">RUB</span>
+                    <span className="font-black text-2xl text-brand-green">{salary.toLocaleString()}</span>
+                    <span className="text-[9px] text-muted-foreground font-bold uppercase">RUB</span>
                 </div>
               </div>
-              <div className="mt-4 pt-2 border-t border-zinc-800">
+              <div className="mt-4 pt-2 border-t border-border">
                 <div className="flex justify-between text-[10px] items-center text-brand-pink">
                     <span className="font-bold flex items-center gap-1 uppercase tracking-tighter"><Users size={10} /> Налог_Squad (13%):</span>
                     <span className="font-black">+{squadTax} ₽</span>
@@ -160,15 +160,15 @@ export default function WarehouseStats(inProps: IncomingProps) {
           </div>
 
           {/* ЦЕЛИ */}
-          <div className="mt-3 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+          <div className="mt-3 p-3 bg-muted border border-border rounded-lg">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-[10px] font-black uppercase text-zinc-600 tracking-widest">Оперативная Квота</span>
+              <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Оперативная Квота</span>
               <Badge variant={totalXtr > 0 ? "default" : "secondary"} className="text-[8px] h-4">{totalXtr} XTR БОНУС</Badge>
             </div>
-            <Progress value={unitsProgress} className="h-1 bg-zinc-800" />
-            <div className="mt-2 text-[9px] text-zinc-500 flex justify-between uppercase font-mono">
+            <Progress value={unitsProgress} className="h-1 bg-secondary" />
+            <div className="mt-2 text-[9px] text-muted-foreground flex justify-between uppercase font-mono">
                 <span>{offloadUnits} / {dailyGoals.units} ЕД.</span>
-                {errorCount > 0 && <span className="text-red-500 font-bold">ОШИБКИ: {errorCount}</span>}
+                {errorCount > 0 && <span className="text-destructive font-bold">ОШИБКИ: {errorCount}</span>}
             </div>
           </div>
         </main>
@@ -176,27 +176,27 @@ export default function WarehouseStats(inProps: IncomingProps) {
         {/* САЙДБАР */}
         <aside className="w-full lg:w-64 flex flex-col gap-3">
           {/* ПРИЗРАЧНЫЙ РЕЕСТР */}
-          <div className="p-3 bg-zinc-900 border-2 border-brand-purple rounded-lg relative overflow-hidden group">
+          <div className="p-3 bg-secondary border-2 border-brand-purple rounded-lg relative overflow-hidden group">
             <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity"><Ghost size={80} /></div>
             <div className="text-[10px] text-brand-purple font-black uppercase tracking-widest mb-1 flex items-center gap-2">
                 <Coins size={12} /> Призрачный_Реестр
             </div>
-            <div className="text-3xl font-black text-white tracking-tighter">{totalGhostBalance.toLocaleString()} <span className="text-xs text-brand-purple">GV</span></div>
-            <div className="mt-2 text-[9px] text-zinc-500 uppercase font-mono">
-                Статус: <span className="text-white">Автономно</span>
+            <div className="text-3xl font-black text-foreground tracking-tighter">{totalGhostBalance.toLocaleString()} <span className="text-xs text-brand-purple">GV</span></div>
+            <div className="mt-2 text-[9px] text-muted-foreground uppercase font-mono">
+                Статус: <span className="text-foreground">Автономно</span>
             </div>
           </div>
 
           {/* РЕЙТИНГ */}
-          <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex-1">
-            <div className="flex justify-between items-center mb-3 border-b border-zinc-800 pb-2">
-                <span className="text-[9px] font-black uppercase text-amber-500 tracking-tighter">Элитные Операторы</span>
-                <Button variant="ghost" onClick={shareScore} className="h-5 w-5 p-0 hover:text-brand-cyan"><Share2 size={10} /></Button>
+          <div className="p-3 bg-secondary border border-border rounded-lg flex-1">
+            <div className="flex justify-between items-center mb-3 border-b border-border pb-2">
+                <span className="text-[9px] font-black uppercase text-amber-600 dark:text-amber-500 tracking-tighter">Элитные Операторы</span>
+                <Button variant="ghost" onClick={shareScore} className="h-5 w-5 p-0 hover:text-brand-cyan text-foreground"><Share2 size={10} /></Button>
             </div>
             <div className="space-y-1.5">
                 {top.map((entry, idx) => (
-                  <div key={idx} className="flex justify-between text-[11px] p-1 rounded hover:bg-zinc-800/50 transition-colors">
-                    <span className="font-bold text-zinc-400">0{idx+1} <span className="text-zinc-200 ml-1 uppercase">{entry.name}</span></span>
+                  <div key={idx} className="flex justify-between text-[11px] p-1 rounded hover:bg-accent/50 transition-colors">
+                    <span className="font-bold text-muted-foreground">0{idx+1} <span className="text-foreground ml-1 uppercase">{entry.name}</span></span>
                     <span className="font-black text-brand-cyan">{entry.score}</span>
                   </div>
                 ))}
