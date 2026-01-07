@@ -6,7 +6,7 @@ import {
     FaMotorcycle, FaGun, FaPersonSkiing, FaChevronRight, 
     FaCubes, FaTerminal, FaLock, FaUsers, FaClock, 
     FaMapLocationDot, FaShieldHeart, FaCircleInfo, FaSnowflake,
-    FaGamepad, FaPaintRoller, FaVrCardboard
+    FaGamepad, FaPaintRoller, FaVrCardboard, FaCircleCheck
 } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -37,8 +37,20 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
 
     const handleSelect = async (providerId: string, offer: any) => {
         if (!offer.isAvailable) return toast.error(offer.lockReason);
+        
+        // Optimistic UI Update could happen here if desired, but we rely on server state
+        toast.loading("Обработка заявки...", { id: "provider-req" });
+        
         const res = await selectProviderForLobby(lobbyId, providerId, offer);
-        if (res.success) toast.success("Контракт отправлен провайдеру!");
+        if (res.success) {
+            toast.success("Контракт отправлен провайдеру!", {
+                id: "provider-req",
+                description: "Провайдер получил ссылку на это лобби.",
+                icon: <FaCircleCheck className="text-brand-cyan" />
+            });
+        } else {
+            toast.error("Ошибка", { description: res.error, id: "provider-req" });
+        }
     };
 
     if (loading) return <div className="p-4 border border-zinc-800 animate-pulse text-[10px] font-mono text-zinc-500 uppercase">Scanning Tactical Market...</div>;
@@ -125,10 +137,11 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                                 <button 
                                     key={offer.serviceId}
                                     onClick={() => handleSelect(provider.providerId, offer)}
+                                    disabled={!!selectedProviderId && !isSelected} // Lock other buttons if one is selected
                                     className={cn(
                                         "w-full p-4 border text-left transition-all relative group",
                                         !offer.isAvailable ? "opacity-40 cursor-not-allowed border-zinc-900" :
-                                        isSelected ? "border-brand-cyan bg-brand-cyan/5" : "border-zinc-800 hover:border-zinc-600 bg-zinc-900/30"
+                                        isSelected ? "border-brand-cyan bg-brand-cyan/5" : "border-zinc-800 hover:border-zinc-600 bg-zinc-900/30 hover:bg-zinc-800/60"
                                     )}
                                 >
                                     <div className="flex justify-between items-start">
