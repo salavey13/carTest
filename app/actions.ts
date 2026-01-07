@@ -111,28 +111,6 @@ export async function saveThemePreference(userId: string, theme: 'light' | 'dark
   }
 }
 
-// /app/actions.ts
-"use server"; 
-
-import {
-  generateCarEmbedding, 
-  supabaseAdmin, 
-  fetchUserData as dbFetchUserData, 
-  updateUserMetadata as dbUpdateUserMetadata,
-  uploadImage, 
-} from "@/hooks/supabase"; 
-import axios from "axios";
-import { verifyJwtToken, generateJwtToken } from "@/lib/auth"; 
-import { logger } from "@/lib/logger"; 
-import type { WebAppUser } from "@/types/telegram";
-import { createHash } from "crypto"; 
-import { handleWebhookProxy } from "./webhook-handlers/proxy"; 
-import { getBaseUrl } from "@/lib/utils"; 
-import type { Database } from "@/types/database.types";
-import { Bucket } from '@supabase/storage-js'; 
-import { v4 as uuidv4 } from "uuid"; 
-import { sendComplexMessage } from "./webhook-handlers/actions/sendComplexMessage";
-
 export async function createCrew({ name, description, logo_url, owner_id, slug, hq_location, metadata = {} }: CreateCrewArgs): Promise<{
   success: boolean;
   data?: Database['public']['Tables']['crews']['Row'];
