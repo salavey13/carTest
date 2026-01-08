@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation"; // Import useRouter for navigation
-import { createSnowboardLobby } from "../actions"; // Import the new 1-click creation action
+import { createSnowboardLobby, getSnowboardInstructors } from "../actions"; // Import the new 1-click creation action
 import { useAppContext } from "@/contexts/AppContext";
 import { 
     FaPersonSkiing, FaMapLocationDot, FaClock, FaStar, 
