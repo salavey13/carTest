@@ -1,18 +1,20 @@
 "use client";
 
 import React, { useEffect, useState, useTransition } from "react";
-import { getSnowboardInstructors, bookSnowboardLesson } from "../actions";
+import { useRouter } from "next/navigation"; // Import useRouter for navigation
+import { createSnowboardLobby } from "../actions"; // Import the new 1-click creation action
 import { useAppContext } from "@/contexts/AppContext";
 import { 
     FaPersonSkiing, FaMapLocationDot, FaClock, FaStar, 
     FaArrowRight, FaCircleCheck, FaHourglassHalf, FaSnowflake, 
-    FaPaperPlane 
+    FaPaperPlane, FaSpinner 
 } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export default function SnowboardInstructorsPage() {
     const { dbUser } = useAppContext();
+    const router = useRouter();
     const [instructors, setInstructors] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isPending, startTransition] = useTransition();
@@ -26,19 +28,27 @@ export default function SnowboardInstructorsPage() {
 
     const handleBooking = (providerId: string, packageId: string, packageName: string) => {
         if (!dbUser?.user_id) {
-            return toast.error("Authentication Required", { description: "Please login to book a lesson." });
+            return toast.error("ТРЕБУЕТСЯ АВТОРИЗАЦИЯ", { description: "Пожалуйста войдите для создания лобби." });
         }
 
         startTransition(async () => {
-            const res = await bookSnowboardLesson(providerId, packageId, dbUser.user_id);
+            // Call the new createSnowboardLobby action
+            // It expects: clientUserId, providerId, packageId
+            const res = await createSnowboardLobby(providerId, packageId, dbUser.user_id);
+            
             if (res.success) {
-                toast.success(`Заявка отправлена на "${packageName}"`, {
-                    description: "Проверьте Telegram. Инструктор свяжется с вами для создания лобби.",
+                toast.success("ЛОББИ СОЗДАНО!", {
+                    description: "Вы были перемещены в лобби урока. Пожалуйста, проверьте детали во вкладке планирования.",
                     icon: <FaCircleCheck className="text-brand-gold" />,
-                    duration: 5000
+                    duration: 3000
                 });
+                
+                // Redirect to the newly created lobby immediately
+                if (res.lobbyId) {
+                    router.push(`/strikeball/lobbies/${res.lobbyId}`);
+                }
             } else {
-                toast.error("Ошибка бронирования", { description: res.error });
+                toast.error("Ошибка создания лобби", { description: res.error });
             }
         });
     };
@@ -63,7 +73,7 @@ export default function SnowboardInstructorsPage() {
                         </span>
                     </h1>
                     <p className="text-muted-foreground font-mono text-sm max-w-lg mx-auto">
-                        Подключитесь к сертифицированным инструкторам. Выберите пакет обучения для активации сессии.
+                        Выберите инструктора и пакет для автоматического создания лобби и подключения.
                     </p>
                 </div>
 
@@ -155,7 +165,7 @@ export default function SnowboardInstructorsPage() {
                                                         >
                                                             {isPending ? (
                                                                 <>
-                                                                    SENDING... <div className="animate-spin h-3 w-3 border border-current border-t-transparent rounded-full" />
+                                                                    CREATING... <div className="animate-spin h-3 w-3 border border-current border-t-transparent rounded-full" />
                                                                 </>
                                                             ) : (
                                                                 <>
