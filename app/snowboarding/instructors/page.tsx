@@ -13,7 +13,6 @@ import { toast } from "sonner";
 
 const SERVICE_TYPES = [
     { id: 'snowboard_instructor', label: 'Сноуборд', icon: <FaSnowflake />, color: 'from-blue-500 to-cyan-400' },
-    { id: 'ski_instructor', label: 'Лыжи', icon: <FaPersonSkiing />, color: 'from-zinc-400 to-zinc-100' },
     { id: 'dota2_coach', label: 'Dota 2 / LAN', icon: <FaGamepad />, color: 'from-red-600 to-purple-600' }
 ];
 
