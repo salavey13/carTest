@@ -232,3 +232,124 @@ export async function addSnowboardServiceToCrew(crewId: string) {
         return { success: false, error: e.message };
     }
 }
+
+/**
+ * 1-CLICK LOBBY CREATION FOR SNOWBOARDING
+ * Automatically creates a lobby, assigns the provider, notifies both parties.
+ */
+export async function createSnowboardLobby(
+  clientUserId: string, 
+  providerId: string, 
+  packageId: string
+) {
+  try {
+    // 1. Fetch Provider Details to generate lobby info
+    const { data: provider, error: providerError } = await supabaseAdmin
+      .from('crews')
+      .select('name, slug, owner_id, metadata')
+      .eq('id', providerId)
+      .single();
+
+    if (providerError || !provider) throw new Error("Provider not found");
+
+    // 2. Locate specific service and package
+    const service = provider.metadata.services?.find((s: any) => s.id === 'snowboard_instructor');
+    if (!service) throw new Error("Snowboarding service not found for this provider");
+
+    const selectedPackage = service.packages?.find((pkg: any) => pkg.id === packageId);
+    if (!selectedPackage) throw new Error("Package not found");
+
+    // 3. Generate Lobby Config (The "Mini Config")
+    const lobbyName = `Сноуборд с ${provider.name}`;
+    const lobbyMode = 'SNOWBOARD';
+    
+    // Compose description dynamically
+    const benefitsHtml = service.benefits.map((b: string) => `• ${b}`).join('\n');
+    const description = `Урок: ${selectedPackage.name}\n${selectedPackage.includes}\n\n${benefitsHtml}`;
+    
+    // Date: "Now" -> ISO String (allows easy editing in app later)
+    const startAtISO = new Date().toISOString();
+
+    // 4. Insert Lobby Record
+    // We use direct supabaseAdmin insert for speed and control
+    const { data: lobby, error: lobbyError } = await supabaseAdmin
+      .from("lobbies")
+      .insert({
+        name: lobbyName,
+        owner_id: clientUserId,
+        mode: lobbyMode,
+        status: "open",
+        start_at: startAtISO, // "Now"
+        max_players: 10, // Default for lessons
+        crew_id: providerId, // CRITICAL: Assign provider immediately
+        field_id: service.location_details?.address || null,
+        metadata: {
+            bots_enabled: false,
+            selected_offer: {
+                serviceName: selectedPackage.name,
+                price: selectedPackage.price,
+                serviceId: service.id
+            },
+            description: description // Store generated description
+        }
+      })
+      .select()
+      .single();
+
+    if (lobbyError) {
+        throw new Error(`DB Insert Error: ${lobbyError.message}`);
+    }
+    if (!lobby) {
+        throw new Error("Lobby creation failed (no data returned).");
+    }
+
+    // 5. Auto-join Owner (User) to ensure they are in members list
+    await supabaseAdmin.from("lobby_members").insert({
+      lobby_id: lobby.id,
+      user_id: clientUserId,
+      role: 'owner',
+      team: "blue", // Default team
+      is_bot: false,
+      status: "ready"
+    });
+
+    // 6. Prepare Deep Link
+    const lobbyDeepLink = `${BOT_APP_URL}?startapp=lobby_${lobby.id}`;
+
+    // 7. Notify User (The Client)
+    // Message: "Lobby created. Here is the link."
+    const userMessageText = `
+🏂 <b>ЛОББИ СОЗДАНО</b>
+🎿 Урок "${selectedPackage.name}" с инструктором "${provider.name}" запланирован.
+<br>Дата и время можете скорректировать в приложении.
+👉 <a href="${lobbyDeepLink}">ОТКРЫТЬ ЛОББИ</a>
+    `;
+
+    await sendComplexMessage(clientUserId, userMessageText, [], {
+        parseMode: 'HTML',
+        imageQuery: 'snowboard slope'
+    });
+
+    // 8. Notify Provider (The Crew Owner)
+    // Message: "New request from [Client]. Lobby created. Approve."
+    // Note: We notify the provider owner_id (not necessarily the chat_id if it's a different user)
+    const providerMessageText = `
+🔔 <b>НОВЫЙ ЗАКАЗ НА УРОК</b>
+👤 Клиент создал лобби для урока: <b>${selectedPackage.name}</b>
+💰 Стоимость: ${selectedPackage.price} RUB
+
+Пожалуйста, подтвердите готовность в приложении.
+👉 <a href="${lobbyDeepLink}">ПЕРЕЙТИ В ПРИЛОЖЕНИЕ</a>
+    `;
+
+    await sendComplexMessage(provider.owner_id, providerMessageText, [], {
+        parseMode: 'HTML',
+        imageQuery: 'notification bell'
+    });
+
+    return { success: true, lobbyId: lobby.id };
+  } catch (e: any) {
+    logger.error("[createSnowboardLobby] Exception:", e);
+    return { success: false, error: e.message };
+  }
+}
