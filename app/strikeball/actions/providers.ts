@@ -80,7 +80,7 @@ export async function selectProviderForLobby(lobbyId: string, providerId: string
 
         if (updateError) throw updateError;
         
-        // 2. Fetch Provider Info for Notification
+        // 2. Fetch Provider Info for Notifications
         const { data: provider } = await supabaseAdmin
             .from('crews')
             .select('owner_id, name, logo_url, metadata')
@@ -93,20 +93,32 @@ export async function selectProviderForLobby(lobbyId: string, providerId: string
         // Deep Link to App with specific lobby parameter
         const lobbyDeepLink = `${BOT_APP_URL}?startapp=lobby_${lobbyId}`;
         
-        const messageText = `
-📢 <b>NEW LOBBY PROPOSAL</b>
-🏟 <b>Lobby:</b> ${lobby.name}
-📦 <b>Service:</b> ${offer.serviceName}
-💰 <b>Total Price:</b> ${offer.totalPrice} ${offer.currency}
-👥 <b>Players:</b> ${(offer.totalPrice / offer.perPerson).toFixed(0)}
+        const providerMessageText = `
+📢 <b>НОВЫЙ ЗАПРОС НА ЛОББИ</b>
+🏟 <b>Лобби:</b> ${lobby.name}
+📦 <b>Услуга:</b> ${offer.serviceName}
+💰 <b>Стоимость:</b> ${offer.totalPrice} ${offer.currency}
+👥 <b>Игроков:</b> ${(offer.totalPrice / offer.perPerson).toFixed(0)}
 
-👉 <a href="${lobbyDeepLink}">OPEN LOBBY TO APPROVE</a>
+👉 <a href="${lobbyDeepLink}">ОТКРЫТЬ ЛОББИ ДЛЯ ОДОБРЕНИЯ</a>
         `;
 
         // 4. Send to Provider (Owner ID is usually most reliable contact method for crews)
-        await sendComplexMessage(provider.owner_id, messageText, [], {
+        await sendComplexMessage(provider.owner_id, providerMessageText, [], {
             parseMode: 'HTML',
             imageQuery: 'tactical map'
+        });
+
+        // 5. NOTIFY LOBBY OWNER (User) - Ensure they know request was sent
+        const userMessageText = `
+✅ <b>ЗАПРОС ОТПРАВЛЕН</b>
+Вы выбрали провайдера "<b>${provider.name}</b>" для лобби "${lobby.name}".
+Ожидание подтверждения от провайдера.
+        `;
+
+        await sendComplexMessage(lobby.owner_id, userMessageText, [], {
+            parseMode: 'HTML',
+            imageQuery: 'sent message'
         });
         
         revalidatePath(`/strikeball/lobbies/${lobbyId}`);
@@ -157,13 +169,13 @@ export async function approveProviderForLobby(lobbyId: string, providerId: strin
         const lobbyDeepLink = `${BOT_APP_URL}?startapp=lobby_${lobbyId}`;
 
         await sendComplexMessage(lobby.owner_id, `
-✅ <b>OFFER APPROVED</b>
-👷 <b>Provider:</b> ${providerCrew.name}
-📦 <b>Confirmed Service:</b> ${offerName}
+✅ <b>ПРЕДЛОЖЕНИЕ ПРИНЯТО</b>
+👷 <b>Провайдер:</b> ${providerCrew.name}
+📦 <b>Подтвержденная услуга:</b> ${offerName}
 
-The provider has reviewed your request and accepted. 
-Access the lobby to finalize details.
-👉 <a href="${lobbyDeepLink}">ENTER LOBBY</a>
+Провайдер рассмотрел ваш запрос и принял. 
+Перейдите в лобби для финализации.
+👉 <a href="${lobbyDeepLink}">ВОЙТИ В ЛОББИ</a>
         `, [], { parseMode: 'HTML', imageQuery: 'contract signed' });
 
         revalidatePath(`/strikeball/lobbies/${lobbyId}`);
@@ -210,10 +222,10 @@ export async function rejectProviderForLobby(lobbyId: string, providerId: string
         if (updateError) throw updateError;
 
         await sendComplexMessage(lobby.owner_id, `
-🚫 <b>OFFER REJECTED</b>
-👷 <b>Provider:</b> ${providerCrew.name}
+🚫 <b>ПРЕДЛОЖЕНИЕ ОТКЛОНЕНО</b>
+👷 <b>Провайдер:</b> ${providerCrew.name}
 
-The provider declined your request. You can select a different provider in the Logistics tab.
+Провайдер отклонил ваш запрос. Вы можете выбрать другого провайдера во вкладке "Логистика".
         `, [], { parseMode: 'HTML', imageQuery: 'stamp rejected' });
 
         revalidatePath(`/strikeball/lobbies/${lobbyId}`);

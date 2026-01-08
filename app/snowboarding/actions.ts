@@ -76,7 +76,8 @@ export async function bookSnowboardLesson(providerId: string, packageId: string,
         const clientName = clientUser?.full_name || clientUser?.username || "Райдер";
 
         // 4. Prepare Notification
-        const webAppUrl = `${BOT_APP_URL}?startapp=snowboard`; // Link to general app or specific section
+        // Link to Web App general lobby入口
+        const webAppUrl = `${BOT_APP_URL}?startapp=snowboard`;
         
         // Notification to Provider (Russian)
         const providerMessageText = `
@@ -101,10 +102,10 @@ export async function bookSnowboardLesson(providerId: string, packageId: string,
             ? provider.telegram_handle 
             : provider.owner_id;
 
-        // Send to Provider
+        // Send to Provider (Owner or specific handle)
         await sendComplexMessage(chatId, providerMessageText, [], {
             parseMode: 'HTML',
-            imageQuery: 'snowboard slope' // Adds a random cool image
+            imageQuery: 'snowboard slope'
         });
 
         // Send to Client (Notify them that request was sent)
@@ -225,8 +226,7 @@ export async function addSnowboardServiceToCrew(crewId: string) {
             
         if (error) throw error;
         
-        // No revalidatePath needed here as we are updating crews metadata directly
-        
+        revalidatePath(`/crews/${crewId}`);
         return { success: true };
     } catch (e: any) {
         return { success: false, error: e.message };
