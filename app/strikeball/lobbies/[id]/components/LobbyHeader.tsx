@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
 import { CreateLobbyForm } from "../../../components/CreateLobbyForm";
 import { editLobby } from "../../actions/lobby";
-import { approveProviderForLobby, rejectProviderForLobby } from "../../actions/providers"; // NEW IMPORT
+import { approveProviderForLobby, rejectProviderForLobby } from "../../../actions/providers"; // NEW IMPORT
 import { toast } from 'sonner';
 
 interface LobbyHeaderProps {
