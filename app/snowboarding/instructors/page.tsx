@@ -76,14 +76,14 @@ export default function UniversalInstructorsPage() {
                         </span>
                     </h1>
                     <p className="text-zinc-500 font-mono text-[10px] uppercase tracking-[0.3em]">
-                        Available_Tactical_Instructors // Frequency_Stable
+                        Инструкторы
                     </p>
                 </div>
 
                 {/* 3. Instructors List */}
                 <div className="grid grid-cols-1 gap-6">
                     {loading ? (
-                        <div className="py-20 text-center animate-pulse text-zinc-700 font-black">SCANNING SECTOR...</div>
+                        <div className="py-20 text-center animate-pulse text-zinc-700 font-black">Загрузка...</div>
                     ) : instructors.map((instructor) => (
                         <div key={instructor.id} className="bg-zinc-900/50 border border-zinc-800 rounded-none overflow-hidden hover:border-zinc-500 transition-all">
                             <div className="p-6 flex flex-col md:flex-row gap-8">
@@ -103,7 +103,7 @@ export default function UniversalInstructorsPage() {
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <div className="text-[8px] text-zinc-500 font-mono uppercase">Starting_At</div>
+                                            <div className="text-[8px] text-zinc-500 font-mono uppercase">От</div>
                                             <div className="text-xl font-black text-white">{instructor.min_price} ₽</div>
                                         </div>
                                     </div>
@@ -125,7 +125,7 @@ export default function UniversalInstructorsPage() {
                                                     disabled={isPending}
                                                     className="px-4 py-2 bg-zinc-100 text-black font-black text-[9px] uppercase tracking-widest hover:bg-brand-cyan transition-all"
                                                 >
-                                                    DEPLOY_LOBBY
+                                                    ГО ПАТИ
                                                 </button>
                                             </div>
                                         ))}
@@ -140,8 +140,8 @@ export default function UniversalInstructorsPage() {
                 {!loading && instructors.length === 0 && (
                     <div className="text-center py-20 border-2 border-dashed border-zinc-900">
                         <FaCrosshairs className="text-4xl text-zinc-800 mx-auto mb-4" />
-                        <h3 className="text-zinc-600 font-black uppercase">Signal_Lost</h3>
-                        <p className="text-zinc-800 text-[10px] font-mono">No operators found in this frequency.</p>
+                        <h3 className="text-zinc-600 font-black uppercase">ПУСТО</h3>
+                        <p className="text-zinc-800 text-[10px] font-mono">Пока никого.</p>
                     </div>
                 )}
             </div>
