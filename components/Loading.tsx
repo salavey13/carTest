@@ -2,17 +2,17 @@
 
 import React, { useEffect, useState } from "react";
 import { motion, useMotionValue, useTransform } from "framer-motion";
-import { Ghost, Bike } from "lucide-react";
+import { Ghost, Bike, Cpu } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LoadingProps {
-  variant?: 'bike' | 'generic';
+  variant?: 'bike' | 'generic' | 'system';
   text?: string;
   className?: string;
 }
 
 // --- INTERNAL: PARTICLE SYSTEM ---
-const ParticleField = ({ count = 60, color = "brand-purple", windowHeight = 1000 }: { count?: number; color?: string; windowHeight: number }) => {
+const ParticleField = ({ count = 60, colorClass = "bg-brand-deep-indigo", windowHeight = 1000 }: { count?: number; colorClass?: string; windowHeight: number }) => {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       {Array.from({ length: count }).map((_, i) => {
@@ -24,11 +24,7 @@ const ParticleField = ({ count = 60, color = "brand-purple", windowHeight = 1000
         return (
           <motion.div
             key={i}
-            className={cn("absolute rounded-full opacity-20 dark:opacity-40", 
-              color === "brand-purple" ? "bg-brand-purple" : 
-              color === "brand-cyan" ? "bg-brand-cyan" : 
-              "bg-brand-red-orange"
-            )}
+            className={cn("absolute rounded-full opacity-20 dark:opacity-40", colorClass)}
             style={{
               width: size,
               height: size,
@@ -38,8 +34,8 @@ const ParticleField = ({ count = 60, color = "brand-purple", windowHeight = 1000
             }}
             animate={{
               y: [-20, -windowHeight - 100],
-              opacity: [0, 0.8, 0],
-              scale: [1, 1.5, 0.5],
+              opacity: [0, 0.6, 0],
+              scale: [1, 1.2, 0.5],
             }}
             transition={{
               duration: duration,
@@ -55,16 +51,16 @@ const ParticleField = ({ count = 60, color = "brand-purple", windowHeight = 1000
 };
 
 // --- INTERNAL: PERSPECTIVE GRID ---
-const CyberGrid = ({ color = "rgba(147, 51, 234, 0.3)" }: { color?: string }) => {
+const CyberGrid = () => {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-      {/* Grid Floor */}
+      {/* Grid Floor - Uses border-color which adapts to theme */}
       <motion.div 
-        className="absolute bottom-[-50%] left-[-50%] w-[200%] h-[100%] opacity-30"
+        className="absolute bottom-[-50%] left-[-50%] w-[200%] h-[100%] opacity-30 dark:opacity-20"
         style={{
            backgroundImage: `
-            linear-gradient(to right, ${color} 1px, transparent 1px),
-            linear-gradient(to bottom, ${color} 1px, transparent 1px)
+            linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
+            linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px)
           `,
           backgroundSize: '60px 60px',
           transform: 'perspective(600px) rotateX(60deg)'
@@ -79,37 +75,28 @@ const CyberGrid = ({ color = "rgba(147, 51, 234, 0.3)" }: { color?: string }) =>
         }}
       />
       {/* Vignette overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent z-10" />
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent z-10" />
     </div>
   );
 };
 
 export function Loading({ variant = 'generic', text, className }: LoadingProps) {
   const [mounted, setMounted] = useState(false);
-  // Safe window dimensions initialization to prevent SSR errors
-  const [windowWidth, setWindowWidth] = useState(1920);
   const [windowHeight, setWindowHeight] = useState(1080);
   
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
   
-  // Update dimensions on mount
   useEffect(() => {
     setMounted(true);
-    setWindowWidth(window.innerWidth);
     setWindowHeight(window.innerHeight);
-
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-      setWindowHeight(window.innerHeight);
-    };
-
+    const handleResize = () => setWindowHeight(window.innerHeight);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const moveX = useTransform(mouseX, [0, windowWidth], [-20, 20]);
-  const moveY = useTransform(mouseY, [0, windowHeight], [-20, 20]);
+  const moveX = useTransform(mouseX, [0, 1920], [-20, 20]); // Assuming 1920 base width
+  const moveY = useTransform(mouseY, [0, 1080], [-20, 20]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     mouseX.set(e.clientX);
@@ -122,17 +109,17 @@ export function Loading({ variant = 'generic', text, className }: LoadingProps) 
       <div 
         onMouseMove={handleMouseMove}
         className={cn(
-          "min-h-screen bg-black flex flex-col items-center justify-center overflow-hidden relative selection:bg-brand-purple selection:text-white", 
+          "min-h-screen bg-background text-foreground flex flex-col items-center justify-center overflow-hidden relative selection:bg-brand-purple selection:text-white", 
           className
         )}
       >
         {/* 1. Background Layers */}
-        <CyberGrid color="rgba(147, 51, 234, 0.4)" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#000_90%)] z-10" />
+        <CyberGrid />
         
         {/* 2. Particle System (Parallax) */}
         <motion.div style={{ x: moveX, y: moveY }} className="absolute inset-0 z-0 scale-110">
-           <ParticleField count={60} color="brand-purple" windowHeight={windowHeight} />
+           {/* In light mode, use deep indigo particles. In dark mode, use purple. */}
+           <ParticleField count={60} colorClass="bg-brand-deep-indigo dark:bg-brand-purple" windowHeight={windowHeight} />
         </motion.div>
 
         {/* 3. Central Vortex */}
@@ -142,30 +129,30 @@ export function Loading({ variant = 'generic', text, className }: LoadingProps) 
             
             {/* Ring 1 */}
             <motion.div 
-              className="absolute inset-0 border-2 border-brand-purple/50 rounded-full border-t-brand-cyan border-l-transparent"
+              className="absolute inset-0 border-2 border-brand-purple/20 dark:border-brand-purple/50 rounded-full border-t-brand-deep-indigo dark:border-t-brand-cyan border-l-transparent"
               animate={{ rotate: 360 }}
               transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
             />
             
             {/* Ring 2 */}
             <motion.div 
-              className="absolute inset-4 border-2 border-brand-cyan/30 rounded-full border-t-transparent border-r-brand-pink"
+              className="absolute inset-4 border-2 border-brand-cyan/20 dark:border-brand-cyan/30 rounded-full border-t-transparent border-r-brand-red-orange dark:border-r-brand-pink"
               animate={{ rotate: -360 }}
               transition={{ duration: 7, repeat: Infinity, ease: "linear" }}
             />
 
             {/* Ring 3 (Dashed) */}
             <motion.div 
-              className="absolute inset-8 border-2 border-dashed border-brand-pink/40 rounded-full"
+              className="absolute inset-8 border-2 border-dashed border-brand-pink/20 dark:border-brand-pink/40 rounded-full"
               animate={{ rotate: 360 }}
               transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
             />
 
-            {/* Core Ghost Icon */}
+            {/* Core Ghost Icon - Adapts color via text-foreground or specific brand color */}
             <motion.div
               animate={{ scale: [1, 1.1, 1], opacity: [0.8, 1, 0.8] }}
               transition={{ duration: 3, repeat: Infinity }}
-              className="text-white drop-shadow-[0_0_15px_rgba(147,51,234,0.8)]"
+              className="text-foreground dark:text-white drop-shadow-[0_0_15px_rgba(var(--brand-purple),0.5)] dark:drop-shadow-[0_0_15px_rgba(147,51,234,0.8)]"
             >
               <Ghost size={64} className="fill-current" />
             </motion.div>
@@ -173,11 +160,11 @@ export function Loading({ variant = 'generic', text, className }: LoadingProps) 
 
           {/* Text Status */}
           <div className="mt-8 text-center z-20">
-            <h2 className="font-orbitron font-bold text-2xl sm:text-3xl text-transparent bg-clip-text bg-gradient-to-r from-brand-purple via-brand-cyan to-brand-pink tracking-widest uppercase">
+            <h2 className="font-orbitron font-bold text-2xl sm:text-3xl text-transparent bg-clip-text bg-gradient-to-r from-brand-deep-indigo via-brand-purple to-brand-red-orange dark:from-brand-purple dark:via-brand-cyan dark:to-brand-pink tracking-widest uppercase">
               Vibe OS
             </h2>
             <motion.p 
-              className="font-mono text-xs sm:text-sm text-brand-purple/80 mt-2 tracking-[0.2em] uppercase"
+              className="font-mono text-xs sm:text-sm text-muted-foreground dark:text-brand-purple/80 mt-2 tracking-[0.2em] uppercase"
               animate={{ opacity: [0.5, 1, 0.5] }}
               transition={{ duration: 2, repeat: Infinity }}
             >
@@ -189,7 +176,7 @@ export function Loading({ variant = 'generic', text, className }: LoadingProps) 
               {[0, 1, 2].map((i) => (
                 <motion.div
                   key={i}
-                  className="h-1 w-8 bg-brand-cyan"
+                  className="h-1 w-8 bg-brand-deep-indigo dark:bg-brand-cyan"
                   animate={{ scaleX: [0, 1, 0] }}
                   transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2, ease: "easeInOut" }}
                 />
@@ -202,67 +189,89 @@ export function Loading({ variant = 'generic', text, className }: LoadingProps) 
   }
 
   // ================= BIKE VARIANT (SPEED TUNNEL) =================
-  return (
-    <div className={cn("min-h-screen bg-black flex flex-col items-center justify-center overflow-hidden relative", className)}>
-       {/* Speed Lines Background */}
-       <div className="absolute inset-0 perspective-container">
-         {[...Array(30)].map((_, i) => (
-           <motion.div
-             key={i}
-             className="absolute bg-brand-red-orange/30 h-[1px] w-full left-0"
-             style={{
-               top: `${Math.random() * 100}%`,
-               transformOrigin: "center",
-             }}
-             animate={{
-               x: ['-50%', '150%'],
-               width: ['10%', '100%'],
-               opacity: [0, 1, 0]
-             }}
-             transition={{
-               duration: Math.random() * 1 + 0.5,
-               repeat: Infinity,
-               delay: Math.random() * 2,
-               ease: "linear"
-             }}
-           />
-         ))}
-       </div>
-
-       <div className="relative z-20 flex flex-col items-center">
-         {/* Central Icon */}
-         <motion.div 
-           className="relative p-6 rounded-full border border-brand-red-orange/20 bg-black/50 backdrop-blur-sm"
-           animate={{ boxShadow: ["0 0 0px rgba(239,68,68,0)", "0 0 30px rgba(239,68,68,0.6)", "0 0 0px rgba(239,68,68,0)"] }}
-           transition={{ duration: 2, repeat: Infinity }}
-         >
-            <Bike size={48} className="text-brand-red-orange" />
-            {/* Rotating ring around bike */}
-            <motion.div 
-              className="absolute inset-0 border-2 border-dashed border-brand-red-orange rounded-full"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-            />
-         </motion.div>
-
-         <div className="mt-8 text-center">
-            <h2 className="font-orbitron font-black text-3xl text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600 uppercase tracking-widest animate-pulse">
-              Garage Sync
-            </h2>
-            <p className="font-mono text-sm text-orange-500/80 mt-2 tracking-widest">
-              {text || 'REVVING ENGINE...'}
-            </p>
-            {/* Speedometer Bar */}
-            <div className="w-64 h-2 bg-gray-900 rounded-full mt-4 overflow-hidden border border-gray-800">
-                <motion.div 
-                    className="h-full bg-gradient-to-r from-orange-600 to-red-600"
-                    initial={{ width: "0%" }}
-                    animate={{ width: "100%" }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                />
-            </div>
+  if (variant === 'bike') {
+    return (
+      <div className={cn("min-h-screen bg-background text-foreground flex flex-col items-center justify-center overflow-hidden relative", className)}>
+         {/* Speed Lines Background */}
+         <div className="absolute inset-0 perspective-container">
+           {[...Array(30)].map((_, i) => (
+             <motion.div
+               key={i}
+               className="absolute bg-brand-red-orange/20 dark:bg-brand-red-orange/30 h-[1px] w-full left-0"
+               style={{
+                 top: `${Math.random() * 100}%`,
+                 transformOrigin: "center",
+               }}
+               animate={{
+                 x: ['-50%', '150%'],
+                 width: ['10%', '100%'],
+                 opacity: [0, 1, 0]
+               }}
+               transition={{
+                 duration: Math.random() * 1 + 0.5,
+                 repeat: Infinity,
+                 delay: Math.random() * 2,
+                 ease: "linear"
+               }}
+             />
+           ))}
          </div>
-       </div>
+
+         <div className="relative z-20 flex flex-col items-center">
+           {/* Central Icon */}
+           <motion.div 
+             className="relative p-6 rounded-full border border-brand-red-orange/20 bg-card/50 backdrop-blur-sm dark:bg-black/50"
+             animate={{ boxShadow: ["0 0 0px rgba(239,68,68,0)", "0 0 30px rgba(239,68,68,0.6)", "0 0 0px rgba(239,68,68,0)"] }}
+             transition={{ duration: 2, repeat: Infinity }}
+           >
+              <Bike size={48} className="text-brand-red-orange" />
+              {/* Rotating ring around bike */}
+              <motion.div 
+                className="absolute inset-0 border-2 border-dashed border-brand-red-orange rounded-full"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+              />
+           </motion.div>
+
+           <div className="mt-8 text-center">
+              <h2 className="font-orbitron font-black text-3xl text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600 uppercase tracking-widest animate-pulse">
+                Garage Sync
+              </h2>
+              <p className="font-mono text-sm text-muted-foreground dark:text-orange-500/80 mt-2 tracking-widest">
+                {text || 'REVVING ENGINE...'}
+              </p>
+              {/* Speedometer Bar */}
+              <div className="w-64 h-2 bg-muted rounded-full mt-4 overflow-hidden border border-border dark:border-gray-800">
+                  <motion.div 
+                      className="h-full bg-gradient-to-r from-orange-600 to-red-600"
+                      initial={{ width: "0%" }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                  />
+              </div>
+           </div>
+         </div>
+      </div>
+    );
+  }
+
+  // ================= SYSTEM VARIANT (NEW) =================
+  return (
+    <div className={cn("min-h-screen bg-background text-foreground flex flex-col items-center justify-center overflow-hidden relative", className)}>
+      <div className="relative z-10 flex flex-col items-center space-y-8">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+          className="p-4 rounded-full border-2 border-border border-t-primary"
+        >
+          <Cpu className="w-16 h-16 text-primary" />
+        </motion.div>
+        <div className="text-center space-y-2">
+          <h2 className="font-orbitron font-bold text-xl text-foreground">SYSTEM UPGRADE</h2>
+          <p className="text-sm text-muted-foreground font-mono">{text || 'Optimizing core modules...'}</p>
+        </div>
+      </div>
+      <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
     </div>
   );
 }
