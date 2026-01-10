@@ -97,7 +97,7 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                         "px-3 py-1 text-[9px] font-black uppercase border transition-all whitespace-nowrap",
                         filter === 'all' 
                             ? "bg-brand-cyan text-black border-brand-cyan" 
-                            : "bg-muted text-muted-foreground border-border hover:text-foreground"
+                            : "bg-muted text-muted-foreground border-border hover:text-foreground hover:border-muted-foreground/50"
                     )}
                 >
                     Все активности
@@ -110,7 +110,7 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                             "px-3 py-1 text-[9px] font-black uppercase border transition-all whitespace-nowrap flex items-center gap-1",
                             filter === type 
                                 ? "bg-brand-cyan text-black border-brand-cyan" 
-                                : "bg-muted text-muted-foreground border-border hover:text-foreground"
+                                : "bg-muted text-muted-foreground border-border hover:text-foreground hover:border-muted-foreground/50"
                         )}
                     >
                         {activityIcons[type] || activityIcons.default}
@@ -126,13 +126,13 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                 
                 return (
                 <div key={provider.providerId} className={cn(
-                    "bg-card border-2 transition-all overflow-hidden shadow-sm", // Changed to bg-card
-                    isCurrentProposal ? "border-brand-cyan shadow-[0_0_25px_rgba(0,255,255,0.1)]" : "border-border"
+                    "bg-card border border-border transition-all overflow-hidden shadow-sm", // Fixed contrast: bg-card, border-border
+                    isCurrentProposal ? "border-brand-cyan shadow-[0_0_25px_rgba(0,255,255,0.1)]" : "hover:border-muted-foreground/30"
                 )}>
                     {/* Header: Provider Intel */}
                     <div className="p-4 bg-muted/30 flex justify-between items-start relative">
                         <Link href={`/crews/${provider.providerSlug}`} className="flex gap-4 group">
-                            <img src={provider.logo} className="w-12 h-12 bg-black border border-border grayscale group-hover:grayscale-0 transition-all" />
+                            <img src={provider.logo} className="w-12 h-12 bg-black border border-border grayscale group-hover:grayscale-0 transition-all object-cover rounded-md" />
                             <div>
                                 <h4 className="font-black text-sm uppercase group-hover:text-brand-cyan text-foreground">{provider.providerName}</h4>
                                 <div className="flex items-center gap-3 text-[9px] text-muted-foreground font-mono mt-1">
@@ -162,11 +162,10 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                                         </button>
                                     </div>
                                 ) : (
-                                    // VIEWER UI (Regular User) - Shows "WAITING FOR PROVIDER" badge
+                                    // VIEWER UI (Regular User)
                                     <Badge className="bg-brand-cyan text-black font-black text-[8px] rounded-none">PENDING_APPROVAL</Badge>
                                 )
                             ) : (
-                                // STATUS: If not selected, show basic status icon or nothing
                                 <div className="text-muted-foreground">
                                     <FaCircleInfo />
                                 </div>
@@ -198,7 +197,7 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                                     className={cn(
                                         "w-full p-4 border text-left transition-all relative group",
                                         !offer.isAvailable ? "opacity-40 cursor-not-allowed border-border" :
-                                        isSelected ? "border-brand-cyan bg-brand-cyan/5" : "border-border hover:border-muted-foreground bg-card/50"
+                                        isSelected ? "border-brand-cyan bg-brand-cyan/5" : "border-border hover:border-muted-foreground/50 bg-card/50"
                                     )}
                                 >
                                     <div className="flex justify-between items-start">
