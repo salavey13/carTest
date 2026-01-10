@@ -75,7 +75,7 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
         }
     };
 
-    if (loading) return <div className="p-4 border border-border animate-pulse text-[10px] font-mono text-muted-foreground uppercase">Scanning Tactical Market...</div>;
+    if (loading) return <div className="p-4 border border-border animate-pulse text-[10px] font-mono text-foreground uppercase">Scanning Tactical Market...</div>;
 
     // Extract unique activity types for filter
     const activityTypes = Array.from(new Set(
@@ -97,7 +97,7 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                         "px-3 py-1 text-[9px] font-black uppercase border transition-all whitespace-nowrap",
                         filter === 'all' 
                             ? "bg-brand-cyan text-black border-brand-cyan" 
-                            : "bg-muted text-muted-foreground border-border hover:text-foreground hover:border-muted-foreground/50"
+                            : "bg-muted text-foreground border-border hover:border-foreground/50"
                     )}
                 >
                     Все активности
@@ -110,7 +110,7 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                             "px-3 py-1 text-[9px] font-black uppercase border transition-all whitespace-nowrap flex items-center gap-1",
                             filter === type 
                                 ? "bg-brand-cyan text-black border-brand-cyan" 
-                                : "bg-muted text-muted-foreground border-border hover:text-foreground hover:border-muted-foreground/50"
+                                : "bg-muted text-foreground border-border hover:border-foreground/50"
                         )}
                     >
                         {activityIcons[type] || activityIcons.default}
@@ -126,7 +126,7 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                 
                 return (
                 <div key={provider.providerId} className={cn(
-                    "bg-card border border-border transition-all overflow-hidden shadow-sm", // Fixed contrast: bg-card, border-border
+                    "bg-card border border-border transition-all overflow-hidden shadow-sm",
                     isCurrentProposal ? "border-brand-cyan shadow-[0_0_25px_rgba(0,255,255,0.1)]" : "hover:border-muted-foreground/30"
                 )}>
                     {/* Header: Provider Intel */}
@@ -135,7 +135,7 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                             <img src={provider.logo} className="w-12 h-12 bg-black border border-border grayscale group-hover:grayscale-0 transition-all object-cover rounded-md" />
                             <div>
                                 <h4 className="font-black text-sm uppercase group-hover:text-brand-cyan text-foreground">{provider.providerName}</h4>
-                                <div className="flex items-center gap-3 text-[9px] text-muted-foreground font-mono mt-1">
+                                <div className="flex items-center gap-3 text-[9px] text-foreground dark:text-muted-foreground font-mono mt-1">
                                     <span className="flex items-center gap-1"><FaMapLocationDot /> {provider.location}</span>
                                     <span className="flex items-center gap-1"><FaClock /> {provider.working_hours || "10:00-22:00"}</span>
                                 </div>
@@ -166,7 +166,7 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                                     <Badge className="bg-brand-cyan text-black font-black text-[8px] rounded-none">PENDING_APPROVAL</Badge>
                                 )
                             ) : (
-                                <div className="text-muted-foreground">
+                                <div className="text-foreground dark:text-muted-foreground">
                                     <FaCircleInfo />
                                 </div>
                             )}
@@ -177,8 +177,8 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                     {provider.amenities?.length > 0 && (
                         <div className="flex gap-4 px-4 py-2 bg-card border-y border-border overflow-x-auto no-scrollbar">
                             {provider.amenities.map((a: any) => (
-                                <div key={a.id} className="flex items-center gap-1.5 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
-                                    <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter">{a.name}</span>
+                                <div key={a.id} className="flex items-center gap-1.5 shrink-0 opacity-80 hover:opacity-100 transition-opacity">
+                                    <span className="text-[8px] font-bold text-foreground dark:text-muted-foreground uppercase tracking-tighter">{a.name}</span>
                                 </div>
                             ))}
                         </div>
@@ -197,7 +197,7 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                                     className={cn(
                                         "w-full p-4 border text-left transition-all relative group",
                                         !offer.isAvailable ? "opacity-40 cursor-not-allowed border-border" :
-                                        isSelected ? "border-brand-cyan bg-brand-cyan/5" : "border-border hover:border-muted-foreground/50 bg-card/50"
+                                        isSelected ? "border-brand-cyan bg-brand-cyan/5" : "border-border hover:border-foreground/30 bg-card/50"
                                     )}
                                 >
                                     <div className="flex justify-between items-start">
@@ -205,13 +205,13 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                                             <div className="flex items-center gap-2">
                                                 {activityIcons[offer.serviceId] || activityIcons.default}
                                                 <h5 className="font-black text-xs uppercase text-foreground">{offer.serviceName}</h5>
-                                                {offer.age_limit && <span className="text-[8px] border border-border px-1 text-muted-foreground">{offer.age_limit}+</span>}
+                                                {offer.age_limit && <span className="text-[8px] border border-border px-1 text-foreground dark:text-muted-foreground bg-background">{offer.age_limit}+</span>}
                                             </div>
-                                            <p className="text-[10px] text-muted-foreground leading-tight max-w-[200px]">{offer.description}</p>
+                                            <p className="text-[10px] text-foreground dark:text-muted-foreground leading-tight max-w-[200px]">{offer.description}</p>
                                         </div>
                                         <div className="text-right">
                                             <div className="text-lg font-black font-orbitron text-foreground">{offer.totalPrice.toLocaleString()} {offer.currency || '₽'}</div>
-                                            <div className="text-[9px] font-mono text-muted-foreground">{offer.perPerson} {offer.currency || '₽'} / за бойца</div>
+                                            <div className="text-[9px] font-mono text-foreground dark:text-muted-foreground">{offer.perPerson} {offer.currency || '₽'} / за бойца</div>
                                         </div>
                                     </div>
 
@@ -220,7 +220,7 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                                             <span className="text-brand-cyan flex items-center gap-1">
                                                 <FaShieldHeart /> {offer.bestPackage.includes}
                                             </span>
-                                            {offer.gear_info && <span className="text-muted-foreground italic">Экип: {offer.gear_info}</span>}
+                                            {offer.gear_info && <span className="text-foreground/80 dark:text-muted-foreground italic">Экип: {offer.gear_info}</span>}
                                         </div>
                                     ) : (
                                         <div className="mt-3 text-[9px] text-destructive font-black uppercase flex items-center gap-1">
