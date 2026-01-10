@@ -10,14 +10,13 @@ import {
     FaPersonSkiing, FaGamepad, FaGun, FaPaintRoller, 
     FaMapLocationDot, FaStar, FaBolt, FaCircleCheck, 
     FaSnowflake, FaCrosshairs, FaFire, FaChevronLeft,
-    FaShieldVirus, FaRobot
+    FaShieldVirus, FaRobot, FaHome, FaArrowRight
 } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 
-// --- ACTIVITY CONFIGURATION ---
-// Extended list with theme-specific colors and icons
+// --- КОНФИГУРАЦИЯ АКТИВНОСТЕЙ ---
 const SERVICE_TYPES = [
     { 
         id: 'snowboard_instructor', label: 'Сноуборд', icon: <FaSnowflake />, 
@@ -75,7 +74,7 @@ export default function UniversalInstructorsPage() {
     const [isPending, startTransition] = useTransition();
     const [isLoaded, setIsLoaded] = useState(false);
 
-    // Animation trigger for initial load
+    // Анимация при начальной загрузке
     useEffect(() => setIsLoaded(true), []);
 
     useEffect(() => {
@@ -105,7 +104,7 @@ export default function UniversalInstructorsPage() {
     return (
         <div className="min-h-screen bg-background text-foreground transition-colors duration-300 selection:bg-primary selection:text-primary-foreground relative">
             
-            {/* BACKGROUND AMBIENCE */}
+            {/* ФОНОВАЯ АТМОСФЕРА */}
             <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
                  <motion.div 
                     className={cn("absolute -top-[20%] -right-[10%] w-[600px] h-[600px] rounded-full blur-[120px] opacity-20 dark:opacity-10", currentTheme.bgGlow)}
@@ -114,30 +113,10 @@ export default function UniversalInstructorsPage() {
                  />
             </div>
 
-            {/* 1. STICKY NAVIGATION HEADER */}
-            <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md px-4 h-16 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Link 
-                        href="/strikeball" 
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-muted transition-colors group"
-                    >
-                        <FaChevronLeft className="text-muted-foreground group-hover:text-foreground transition-colors" size={14} />
-                        <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors hidden sm:block">Тактический Центр</span>
-                        <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors sm:hidden">Назад</span>
-                    </Link>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <span className="text-[10px] uppercase font-mono tracking-widest text-muted-foreground hidden md:block">
-                        VIBE.OS v2.4
-                    </span>
-                    <ThemeToggleButton size="sm" />
-                </div>
-            </nav>
-
-            <div className="max-w-5xl mx-auto pt-8 pb-32 px-4 relative z-10 space-y-12">
+            {/* ОСНОВНОЙ КОНТЕНТ */}
+            <div className="max-w-5xl mx-auto pt-24 pb-24 px-4 relative z-10 space-y-12">
                 
-                {/* 2. DYNAMIC HERO SECTION */}
+                {/* 1. ДИНАМИЧЕСКИЙ ГЕРОЙ-СЕКШН */}
                 <AnimatePresence mode="wait">
                     <motion.div 
                         key={activeService.id}
@@ -158,9 +137,8 @@ export default function UniversalInstructorsPage() {
                         
                         <h1 className="text-5xl md:text-7xl font-black font-orbitron tracking-tighter uppercase italic">
                             <span className={cn("text-transparent bg-clip-text bg-gradient-to-r", currentTheme.gradient)}>
-                                {activeService.label}
+                                {activeService.label} Операции
                             </span>
-                            <span className="text-foreground dark:text-white"> Ops</span>
                         </h1>
                         
                         <p className="text-muted-foreground font-mono text-xs md:text-sm uppercase tracking-[0.3em] max-w-lg mx-auto">
@@ -169,7 +147,7 @@ export default function UniversalInstructorsPage() {
                     </motion.div>
                 </AnimatePresence>
 
-                {/* 3. ACTIVITY SWITCHER (Segmented Control) */}
+                {/* 2. ПЕРЕКЛЮЧАТЕЛЬ АКТИВНОСТЕЙ */}
                 <div className="flex justify-center">
                     <div className="inline-flex bg-muted/50 border border-border p-1 rounded-full backdrop-blur-sm">
                         {SERVICE_TYPES.map((type) => (
@@ -192,12 +170,12 @@ export default function UniversalInstructorsPage() {
                     </div>
                 </div>
 
-                {/* 4. INSTRUCTORS LIST */}
+                {/* 3. СПИСОК ИНСТРУКТОРОВ */}
                 <div className="grid grid-cols-1 gap-6">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 space-y-4">
                             <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                            <p className="font-mono text-muted-foreground text-sm animate-pulse">SCANNING DATABASE...</p>
+                            <p className="font-mono text-muted-foreground text-sm animate-pulse">СКАНЕРОВАНИЕ БАЗЫ ДАННЫХ...</p>
                         </div>
                     ) : instructors.length > 0 ? (
                         instructors.map((instructor, index) => (
@@ -211,14 +189,14 @@ export default function UniversalInstructorsPage() {
                                     "hover:border-primary/50"
                                 )}
                             >
-                                {/* Hover Glow Effect */}
+                                {/* Эффект свечения при наведении */}
                                 <div className={cn(
                                     "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none",
                                     "bg-gradient-to-r from-transparent via-primary/5 to-transparent"
                                 )} />
 
                                 <div className="relative p-6 md:p-8 flex flex-col md:flex-row gap-8">
-                                    {/* Avatar */}
+                                    {/* Аватар */}
                                     <div className={cn(
                                         "w-full md:w-48 h-48 shrink-0 rounded-xl overflow-hidden relative border",
                                         "border-border group-hover:border-primary transition-colors"
@@ -231,13 +209,13 @@ export default function UniversalInstructorsPage() {
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
                                         <div className="absolute bottom-4 left-4">
                                             <span className={cn("text-xs font-bold px-2 py-1 rounded bg-background/90 backdrop-blur border border-border", currentTheme.primary)}>
-                                                TOP RATED
+                                                ТОП РЕЙТИНГ
                                             </span>
                                         </div>
                                     </div>
 
                                     <div className="flex-1 flex flex-col justify-between space-y-6">
-                                        {/* Header Info */}
+                                        {/* Инфо заголовка */}
                                         <div>
                                             <div className="flex justify-between items-start">
                                                 <div>
@@ -250,12 +228,12 @@ export default function UniversalInstructorsPage() {
                                                             <span className="text-sm font-bold">{instructor.rating}</span>
                                                         </div>
                                                         <span className="text-[10px] text-muted-foreground font-mono uppercase border-l border-border pl-3">
-                                                            [{instructor.reviews} REVIEWS]
+                                                            [{instructor.reviews} ОТЗЫВОВ]
                                                         </span>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <div className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">Starting at</div>
+                                                    <div className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">От</div>
                                                     <div className={cn("text-2xl font-black font-orbitron", currentTheme.primary)}>
                                                         {instructor.min_price} ₽
                                                     </div>
@@ -267,10 +245,10 @@ export default function UniversalInstructorsPage() {
                                             </p>
                                         </div>
 
-                                        {/* Packages */}
+                                        {/* Пакеты услуг */}
                                         <div className="space-y-3">
                                             <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-                                                Available Protocols
+                                                Доступные протоколы
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                 {instructor.packages.map((pkg: any) => (
@@ -284,7 +262,7 @@ export default function UniversalInstructorsPage() {
                                                                 {pkg.name}
                                                             </h3>
                                                             <span className="text-xs font-mono text-muted-foreground">
-                                                                {pkg.duration}m
+                                                                {pkg.duration}м
                                                             </span>
                                                         </div>
                                                         <p className="text-[10px] text-muted-foreground line-clamp-2">
@@ -298,7 +276,7 @@ export default function UniversalInstructorsPage() {
                                                                 isPending && "opacity-50 cursor-not-allowed"
                                                             )}
                                                         >
-                                                            {isPending ? 'PROCESSING...' : 'INITIATE CONTRACT'}
+                                                            {isPending ? 'ОБРАБОТКА...' : 'НАЧАТЬ КОНТРАКТ'}
                                                         </button>
                                                     </div>
                                                 ))}
@@ -309,7 +287,7 @@ export default function UniversalInstructorsPage() {
                             </motion.div>
                         ))
                     ) : (
-                        /* Empty State */
+                        /* Пустое состояние */
                         <motion.div 
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -318,12 +296,35 @@ export default function UniversalInstructorsPage() {
                             <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto">
                                 <FaCrosshairs className="text-muted-foreground text-2xl" />
                             </div>
-                            <h3 className="text-foreground font-black uppercase tracking-widest">NO OPERATORS FOUND</h3>
-                            <p className="text-muted-foreground text-sm font-mono">Please check back later or select another sector.</p>
+                            <h3 className="text-foreground font-black uppercase tracking-widest">ОПЕРАТОРЫ НЕ НАЙДЕНЫ</h3>
+                            <p className="text-muted-foreground text-sm font-mono">Проверьте позже или выберите другой сектор.</p>
                         </motion.div>
                     )}
                 </div>
             </div>
+
+            {/* СТОЙКИЙ ФУТЕР */}
+            <footer className="fixed bottom-0 w-full z-50 border-t border-border bg-background/80 backdrop-blur-md px-4 h-16 flex items-center justify-between shadow-[0_-4px_20px_rgba(0,0,0,0.05)] dark:shadow-none">
+                <Link 
+                    href="/strikeball" 
+                    className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-muted transition-colors group"
+                >
+                    <div className="bg-primary/10 p-2 rounded-full text-primary group-hover:scale-110 transition-transform">
+                        <FaArrowRight size={16} className="rotate-180" />
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-[10px] uppercase font-mono text-muted-foreground leading-none mb-1">Меню</span>
+                        <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">Тактический Центр</span>
+                    </div>
+                </Link>
+
+                <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-mono tracking-widest text-muted-foreground hidden md:block">
+                        VIBE.OS v2.4
+                    </span>
+                    <ThemeToggleButton size="sm" />
+                </div>
+            </footer>
         </div>
     );
 }
