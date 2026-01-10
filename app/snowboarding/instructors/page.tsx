@@ -146,27 +146,26 @@ export default function UniversalInstructorsPage() {
                     </motion.div>
                 </AnimatePresence>
 
-                {/* 2. ПЕРЕКЛЮЧАТЕЛЬ АКТИВНОСТЕЙ (ADAPTIVE) */}
-                <div className="w-full overflow-x-auto no-scrollbar md:justify-center flex md:flex justify-start pb-2">
-                    <div className="inline-flex bg-muted/50 border border-border p-1 rounded-full backdrop-blur-sm whitespace-nowrap shadow-sm">
-                        {SERVICE_TYPES.map((type) => (
-                            <button
-                                key={type.id}
-                                onClick={() => setActiveService(type)}
-                                className={cn(
-                                    "relative px-4 py-2 rounded-full text-xs md:text-sm font-black font-orbitron uppercase tracking-wider transition-all duration-200 flex items-center gap-2",
-                                    activeService.id === type.id 
-                                        ? "bg-foreground text-background shadow-lg scale-105" 
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
-                                )}
-                            >
-                                <span className={cn("text-sm md:text-base", activeService.id === type.id ? type.theme.primary : "")}>
-                                    {type.icon}
-                                </span>
-                                <span>{type.label}</span>
-                            </button>
-                        ))}
-                    </div>
+                {/* 2. ПЕРЕКЛЮЧАТЕЛЬ АКТИВНОСТЕЙ (ADAPTIVE & WRAPPED) */}
+                <div className="w-full flex flex-wrap justify-center gap-2 pb-2">
+                    {SERVICE_TYPES.map((type) => (
+                        <button
+                            key={type.id}
+                            onClick={() => setActiveService(type)}
+                            className={cn(
+                                "relative px-4 py-2.5 rounded-full text-xs md:text-sm font-black font-orbitron uppercase tracking-wider transition-all duration-200 flex items-center gap-2",
+                                "bg-muted/50 border border-border hover:bg-muted/80",
+                                activeService.id === type.id 
+                                    ? "bg-foreground text-background shadow-lg scale-105 border-foreground" 
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            <span className={cn("text-sm md:text-base", activeService.id === type.id ? type.theme.primary : "")}>
+                                {type.icon}
+                            </span>
+                            <span>{type.label}</span>
+                        </button>
+                    ))}
                 </div>
 
                 {/* 3. СПИСОК ИНСТРУКТОРОВ */}
