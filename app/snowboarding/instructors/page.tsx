@@ -7,10 +7,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getInstructorsByService, createInstructorLobby } from "../actions";
 import { useAppContext } from "@/contexts/AppContext";
 import { 
-    FaPersonSkiing, FaGamepad, FaGun, FaPaintRoller, 
-    FaMapLocationDot, FaStar, FaBolt, FaCircleCheck, 
-    FaSnowflake, FaCrosshairs, FaFire, FaChevronLeft,
-    FaShieldVirus, FaRobot, FaHome, FaArrowRight
+    FaSnowflake, FaGamepad, FaGun, FaPaintRoller, 
+    FaStar, FaBolt, FaCircleCheck, 
+    FaCrosshairs, FaArrowRight
 } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -114,7 +113,7 @@ export default function UniversalInstructorsPage() {
             </div>
 
             {/* ОСНОВНОЙ КОНТЕНТ */}
-            <div className="max-w-5xl mx-auto pt-24 pb-24 px-4 relative z-10 space-y-12">
+            <div className="max-w-5xl mx-auto pt-24 pb-24 px-4 relative z-10 space-y-8">
                 
                 {/* 1. ДИНАМИЧЕСКИЙ ГЕРОЙ-СЕКШН */}
                 <AnimatePresence mode="wait">
@@ -135,21 +134,21 @@ export default function UniversalInstructorsPage() {
                             </span>
                         </motion.div>
                         
-                        <h1 className="text-5xl md:text-7xl font-black font-orbitron tracking-tighter uppercase italic">
+                        <h1 className="text-4xl sm:text-5xl md:text-7xl font-black font-orbitron tracking-tighter uppercase italic leading-tight">
                             <span className={cn("text-transparent bg-clip-text bg-gradient-to-r", currentTheme.gradient)}>
                                 {activeService.label} Операции
                             </span>
                         </h1>
                         
-                        <p className="text-muted-foreground font-mono text-xs md:text-sm uppercase tracking-[0.3em] max-w-lg mx-auto">
+                        <p className="text-muted-foreground font-mono text-xs md:text-sm uppercase tracking-[0.2em] max-w-lg mx-auto">
                             Выберите элитного оператора для вашей миссии
                         </p>
                     </motion.div>
                 </AnimatePresence>
 
-                {/* 2. ПЕРЕКЛЮЧАТЕЛЬ АКТИВНОСТЕЙ */}
-                <div className="flex justify-center">
-                    <div className="inline-flex bg-muted/50 border border-border p-1 rounded-full backdrop-blur-sm">
+                {/* 2. ПЕРЕКЛЮЧАТЕЛЬ АКТИВНОСТЕЙ (ADAPTIVE) */}
+                <div className="w-full overflow-x-auto no-scrollbar md:justify-center flex md:flex justify-start pb-2">
+                    <div className="inline-flex bg-muted/50 border border-border p-1 rounded-full backdrop-blur-sm whitespace-nowrap shadow-sm">
                         {SERVICE_TYPES.map((type) => (
                             <button
                                 key={type.id}
@@ -157,11 +156,11 @@ export default function UniversalInstructorsPage() {
                                 className={cn(
                                     "relative px-4 py-2 rounded-full text-xs md:text-sm font-black font-orbitron uppercase tracking-wider transition-all duration-200 flex items-center gap-2",
                                     activeService.id === type.id 
-                                        ? "bg-foreground text-background shadow-lg" 
+                                        ? "bg-foreground text-background shadow-lg scale-105" 
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
                                 )}
                             >
-                                <span className={activeService.id === type.id ? type.theme.primary : ""}>
+                                <span className={cn("text-sm md:text-base", activeService.id === type.id ? type.theme.primary : "")}>
                                     {type.icon}
                                 </span>
                                 <span>{type.label}</span>
@@ -219,7 +218,7 @@ export default function UniversalInstructorsPage() {
                                         <div>
                                             <div className="flex justify-between items-start">
                                                 <div>
-                                                    <h2 className="text-2xl md:text-3xl font-black font-orbitron uppercase text-foreground tracking-tight">
+                                                    <h2 className="text-xl md:text-3xl font-black font-orbitron uppercase text-foreground tracking-tight">
                                                         {instructor.name}
                                                     </h2>
                                                     <div className="flex items-center gap-3 mt-2">
