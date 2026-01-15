@@ -9,7 +9,8 @@ import {
   Calculator, Zap, BookOpen, 
   RotateCcw, CheckCircle2, AlertTriangle, 
   Terminal, Hash, Layers, 
-  Code, Sparkles, Brain, Lightbulb
+  Code, Sparkles, Brain, Lightbulb,
+  TrendingUp, MoveRight, Infinity
 } from "lucide-react";
 import { cn } from '@/lib/utils';
 
@@ -24,9 +25,19 @@ const FRAGMENTS = [
 ];
 const CORRECT_SEQ = [1, 2, 3, 4, 5, 6];
 
+// --- НОВАЯ МИНИ-ИГРА: РЕШЕНИЕ ЛИНЕЙНОГО УРАВНЕНИЯ ---
+const EQUATION_STEPS = [
+  { id: 1, eq: "2x + 5 = 13", action: "Начальное уравнение" },
+  { id: 2, eq: "2x = 13 - 5", action: "Переносим +5 вправо с изменением знака" },
+  { id: 3, eq: "2x = 8", action: "Вычисляем 13 - 5 = 8" },
+  { id: 4, eq: "x = 8 ÷ 2", action: "Делим обе части на 2" },
+  { id: 5, eq: "x = 4", action: "Получаем ответ" },
+];
+
 export default function Algebra8FriendlyCheatsheet() {
   const [seq, setSeq] = useState<number[]>([]);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [stepIndex, setStepIndex] = useState(0);
 
   const handleFragClick = (id: number) => {
     if (status === 'success') return;
@@ -36,6 +47,14 @@ export default function Algebra8FriendlyCheatsheet() {
 
   const checkResult = () => {
     setStatus(seq.join(',') === CORRECT_SEQ.join(',') ? 'success' : 'error');
+  };
+
+  const nextStep = () => {
+    setStepIndex(prev => Math.min(prev + 1, EQUATION_STEPS.length - 1));
+  };
+
+  const prevStep = () => {
+    setStepIndex(prev => Math.max(prev - 1, 0));
   };
 
   return (
@@ -54,13 +73,150 @@ export default function Algebra8FriendlyCheatsheet() {
             className="inline-flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-4 py-1.5 rounded-full text-xs font-medium mb-6"
           >
             <Sparkles className="w-4 h-4 text-brand-cyan" /> 
-            <span>Помощник по Алгебре • 8 класс • 1 полугодие</span>
+            <span>Помощник по Алгебре • 8 класс • Все темы</span>
           </motion.div>
           <h1 className="text-4xl md:text-6xl font-black text-white mb-4 tracking-tight">
             Algebra <span className="text-brand-cyan">Master</span>
           </h1>
           <p className="text-zinc-500 text-lg">Всё, что нужно для контрольных и ВПР, в одном месте.</p>
         </header>
+
+        {/* TOPIC 0: LINEAR EQUATIONS (НОВЫЙ РАЗДЕЛ) */}
+        <section className="mb-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <TrendingUp className="text-green-400" /> 0. Линейные уравнения (3 четверть)
+            </h2>
+            
+            {/* ВИЗУАЛИЗАЦИЯ РЕШЕНИЯ */}
+            <Card className="bg-zinc-900/50 border-green-500/30 mb-6">
+              <CardHeader className="border-b border-green-500/10">
+                <CardTitle className="text-lg flex items-center gap-2">
+                    <MoveRight className="w-5 h-5 text-green-400" /> Пошаговый разбор
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-6 p-4 bg-black border border-green-500/20 rounded-xl">
+                  <div className="text-center mb-2">
+                    <span className="text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded-full">Шаг {stepIndex + 1} из {EQUATION_STEPS.length}</span>
+                  </div>
+                  <div className="text-2xl font-bold text-center font-mono text-white mb-2">
+                    {EQUATION_STEPS[stepIndex].eq}
+                  </div>
+                  <div className="text-sm text-center text-zinc-400">
+                    {EQUATION_STEPS[stepIndex].action}
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <Button 
+                    onClick={prevStep} 
+                    disabled={stepIndex === 0}
+                    variant="outline" 
+                    size="sm"
+                    className="border-green-500/30 text-green-400"
+                  >
+                    ← Назад
+                  </Button>
+                  <div className="flex gap-2">
+                    {EQUATION_STEPS.map((_, idx) => (
+                      <div 
+                        key={idx}
+                        className={cn(
+                          "w-2 h-2 rounded-full transition-all",
+                          idx === stepIndex ? "bg-green-500" : "bg-zinc-700"
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <Button 
+                    onClick={nextStep} 
+                    disabled={stepIndex === EQUATION_STEPS.length - 1}
+                    variant="outline" 
+                    size="sm"
+                    className="border-green-500/30 text-green-400"
+                  >
+                    Дальше →
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ФОРМУЛЫ И ПРАВИЛА */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm text-green-400">Стандартный вид</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-center font-mono">ax + b = 0</div>
+                        <div className="text-xs text-zinc-500 mt-2 text-center">
+                            a ≠ 0, x — переменная
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm text-green-400">Алгоритм решения</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span>1. Переносим числа вправо</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span>2. Делим на коэффициент</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span>3. Получаем x = -b/a</span>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm text-green-400">Особые случаи</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <Infinity className="w-4 h-4 text-blue-400" />
+                            <span className="text-xs">0x = 0 → бесконечно много решений</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-red-400" />
+                            <span className="text-xs">0x = 5 → нет решений</span>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* БЫСТРЫЕ ПРИМЕРЫ */}
+            <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl">
+                <h4 className="font-bold text-white mb-3 text-sm flex items-center gap-2">
+                    <Lightbulb className="w-4 h-4 text-yellow-400" /> Примеры на скорость
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm font-mono">
+                    <div className="space-y-2">
+                        <div className="text-zinc-500">3x - 6 = 0</div>
+                        <div className="text-white">x = 2</div>
+                    </div>
+                    <div className="space-y-2">
+                        <div className="text-zinc-500">2x + 8 = 4</div>
+                        <div className="text-white">x = -2</div>
+                    </div>
+                    <div className="space-y-2">
+                        <div className="text-zinc-500">5(x - 1) = 10</div>
+                        <div className="text-white">x = 3</div>
+                    </div>
+                    <div className="space-y-2">
+                        <div className="text-zinc-500">x/2 + 3 = 7</div>
+                        <div className="text-white">x = 8</div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         {/* TOPIC 1: RATIONAL FRACTIONS */}
         <section className="mb-12">
@@ -237,7 +393,7 @@ export default function Algebra8FriendlyCheatsheet() {
 
         {/* FOOTER */}
         <footer className="text-center pb-20 text-zinc-700 text-[10px] font-mono uppercase tracking-widest">
-            Generated with AI in CyberVibe Studio // First half of 8th Grade Protocol // No copyright, just Vibe.
+            Generated with AI in CyberVibe Studio // Full 8th Grade Curriculum // No copyright, just Vibe.
         </footer>
 
       </div>
