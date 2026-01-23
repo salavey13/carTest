@@ -21,7 +21,7 @@ export async function validateTelegramInitData(
 
     const params = new URLSearchParams(initDataString);
     
-    // Get hash parameter (case-insensitive)
+    // Extract hash (case-insensitive)
     let receivedHash = null;
     for (const key of params.keys()) {
       if (key.toLowerCase() === 'hash') {
@@ -35,37 +35,31 @@ export async function validateTelegramInitData(
       return { valid: false, computedHash: null, receivedHash: null, reason: "hash param missing" };
     }
 
-    // Timestamp check (case-insensitive)
-    let authDateParam = null;
+    // Auth date check (case-insensitive)
+    let authDate = null;
     for (const key of params.keys()) {
       if (key.toLowerCase() === 'auth_date') {
-        authDateParam = params.get(key);
+        authDate = parseInt(params.get(key) || '0', 10);
         break;
       }
     }
     
     const maxAgeSeconds = parseInt(process.env.TELEGRAM_AUTH_MAX_AGE_SECONDS || '86400', 10);
     const currentTime = Math.floor(Date.now() / 1000);
+    const age = currentTime - authDate;
     
-    if (authDateParam) {
-      const authDate = parseInt(authDateParam, 10);
-      const age = currentTime - authDate;
-      
-      if (age > maxAgeSeconds) {
-        logger.warn(`[TG-VALIDATOR] ❌ auth_date expired: ${age}s old (max: ${maxAgeSeconds}s)`);
-        return { valid: false, computedHash: null, receivedHash: null, reason: "auth_date expired" };
-      }
-      logger.log(`[TG-VALIDATOR] auth_date fresh: ${age}s ago`);
+    if (authDate && age > maxAgeSeconds) {
+      logger.warn(`[TG-VALIDATOR] ❌ auth_date expired: ${age}s old (max: ${maxAgeSeconds}s)`);
+      return { valid: false, computedHash: null, receivedHash: null, reason: "auth_date expired" };
     }
+    logger.log(`[TG-VALIDATOR] auth_date fresh: ${age}s ago`);
 
-    // Build data check string EXACTLY as Telegram expects
-    const paramNames = Array.from(params.keys());
-    const filteredNames = paramNames.filter(name => name.toLowerCase() !== 'hash');
-    filteredNames.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    // Build data check string WITHOUT modifying params
+    const keys = Array.from(params.keys())
+      .filter(key => key.toLowerCase() !== 'hash')
+      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
     
-    const dataCheckString = filteredNames
-      .map(name => `${name}=${params.get(name)}`)
-      .join('\n');
+    const dataCheckString = keys.map(key => `${key}=${params.get(key)}`).join('\n');
 
     logger.log(`[TG-VALIDATOR] Data check string length: ${dataCheckString.length}`);
     logger.log(`[TG-VALIDATOR] Data check string:`, dataCheckString);
@@ -77,32 +71,18 @@ export async function validateTelegramInitData(
     logger.log(`[TG-VALIDATOR] Computed hash: ${computedHash.substring(0, 16)}...`);
     logger.log(`[TG-VALIDATOR] Received hash: ${receivedHash.substring(0, 16)}...`);
 
-    // Timing-safe comparison
+    // Compare
     let valid = false;
     try {
-      valid = crypto.timingSafeEqual(
-        Buffer.from(computedHash, 'hex'),
-        Buffer.from(receivedHash, 'hex')
-      );
-    } catch (e) {
-      valid = false;
-    }
+      valid = crypto.timingSafeEqual(Buffer.from(computedHash, 'hex'), Buffer.from(receivedHash, 'hex'));
+    } catch { valid = false; }
 
     // Parse user for return value (separate from validation logic)
     let user = undefined;
-    let userParam = null;
-    for (const key of params.keys()) {
-      if (key.toLowerCase() === 'user') {
-        userParam = params.get(key);
-        break;
-      }
-    }
-    
+    const userParam = params.get('user') || params.get('USER');
     if (userParam) {
       try {
-        const decodedUserStr = decodeURIComponent(userParam);
-        const userObj = JSON.parse(decodedUserStr);
-        // Normalize keys for internal use (doesn't affect hash)
+        const userObj = JSON.parse(userParam);
         user = {
           id: userObj.ID ?? userObj.id,
           first_name: userObj.FIRST_NAME ?? userObj.first_name,
@@ -118,11 +98,7 @@ export async function validateTelegramInitData(
       }
     }
 
-    if (valid) {
-      logger.info("[TG-VALIDATOR] ✅ Validation SUCCESS");
-    } else {
-      logger.warn("[TG-VALIDATOR] ❌ Validation FAILED - Hash mismatch");
-    }
+    logger.info(`[TG-VALIDATOR] ${valid ? '✅ Validation SUCCESS' : '❌ Validation FAILED - Hash mismatch'}`);
 
     return { 
       valid, 

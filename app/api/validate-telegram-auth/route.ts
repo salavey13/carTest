@@ -45,16 +45,11 @@ logger.log(initData); // This will show the actual string
 logger.log("🔍 BUILDING DATA CHECK STRING...");
 const params = new URLSearchParams(initData);
 const keys = Array.from(params.keys())
-  .filter(k => k.toLowerCase() !== "hash") // Fix: case-insensitive
-  .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())); // Fix: case-insensitive
+  .filter(k => k.toLowerCase() !== "hash") // Case-insensitive
+  .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())); // Telegram's sort
 const dataCheckString = keys.map(k => `${k}=${params.get(k)}`).join("\n");
 logger.log("🔍 Data check string:", dataCheckString);
 logger.log("🔍 Data check string length:", dataCheckString.length);
-
-// 🔥 DEBUG: Show each parameter
-keys.forEach(k => {
-  logger.log(`🔍 Param ${k}: ${params.get(k)?.substring(0, 50)}...`);
-});
 
     if (!BOT_TOKEN) {
       logger.error("💥 TELEGRAM_BOT_TOKEN not configured");
