@@ -9,8 +9,8 @@ type ValidateResult = {
   reason?: string;
 };
 
-// 🔥 CRITICAL: Parse without ANY decoding or transformation
-function parseQueryStringExact(queryString: string): Map<string, string> {
+// 🔥 CRITICAL: Preserve exact string including URL encoding
+function parseQueryStringPreserveCase(queryString: string): Map<string, string> {
   const params = new Map<string, string>();
   const pairs = queryString.split('&');
   
@@ -19,8 +19,8 @@ function parseQueryStringExact(queryString: string): Map<string, string> {
     if (eqIndex === -1) continue;
     
     const key = pair.substring(0, eqIndex);
-    const value = pair.substring(eqIndex + 1);
-    params.set(key, value); // Keep EXACTLY as-is
+    const value = pair.substring(eqIndex + 1); // KEEP URL-ENCODED!
+    params.set(key, value);
   }
   return params;
 }
@@ -35,8 +35,7 @@ export async function validateTelegramInitData(
     if (!initDataString) return { valid: false, reason: "empty initData", computedHash: null, receivedHash: null };
     if (!botToken) return { valid: false, reason: "bot token missing", computedHash: null, receivedHash: null };
 
-    // Parse params WITHOUT any decoding
-    const params = parseQueryStringExact(initDataString);
+    const params = parseQueryStringPreserveCase(initDataString);
     
     // Extract hash
     let receivedHash = null;
@@ -52,8 +51,15 @@ export async function validateTelegramInitData(
       return { valid: false, reason: "hash param missing", computedHash: null, receivedHash: null };
     }
 
-    // Auth date check (decode only for validation, not for hash)
-    let authDateStr = params.get('auth_date') || params.get('AUTH_DATE');
+    // Auth date check (decode temporarily)
+    let authDateStr = null;
+    for (const key of params.keys()) {
+      if (key.toLowerCase() === 'auth_date') {
+        authDateStr = decodeURIComponent(params.get(key) || ''); // DECODE for validation
+        break;
+      }
+    }
+    
     const maxAgeSeconds = parseInt(process.env.TELEGRAM_AUTH_MAX_AGE_SECONDS || '86400', 10);
     const currentTime = Math.floor(Date.now() / 1000);
     
@@ -67,11 +73,12 @@ export async function validateTelegramInitData(
       logger.log(`[TG-VALIDATOR] auth_date fresh: ${age}s ago`);
     }
 
-    // Build data check string with EXACT raw values
+    // Build data check string with RAW, URL-ENCODED values
     const keys = Array.from(params.keys())
       .filter(key => key.toLowerCase() !== 'hash')
       .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
     
+    // 🔥 CRITICAL: Use raw, encoded values
     const dataCheckString = keys.map(key => `${key}=${params.get(key)}`).join('\n');
 
     logger.log(`[TG-VALIDATOR] Data check string length: ${dataCheckString.length}`);
@@ -90,13 +97,13 @@ export async function validateTelegramInitData(
       valid = crypto.timingSafeEqual(Buffer.from(computedHash, 'hex'), Buffer.from(receivedHash, 'hex'));
     } catch { valid = false; }
 
-    // Parse user for return value (decode only for user object)
+    // Parse user for return value (decode temporarily)
     let user = undefined;
     const userParam = params.get('user') || params.get('USER');
     if (userParam) {
       try {
-        const decodedUser = decodeURIComponent(userParam);
-        const userObj = JSON.parse(decodedUser);
+        const decodedUserStr = decodeURIComponent(userParam);
+        const userObj = JSON.parse(decodedUserStr);
         user = {
           id: userObj.ID ?? userObj.id,
           first_name: userObj.FIRST_NAME ?? userObj.first_name,

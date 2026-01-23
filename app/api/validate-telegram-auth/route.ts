@@ -9,22 +9,6 @@ if (BYPASS_VALIDATION_ENV) {
   logger.warn("⚠️  BYPASS MODE ACTIVE - All validations will be forced to pass!");
 }
 
-// 🔥 Manual parser to match validator
-function parseQueryStringPreserveCase(queryString: string): Map<string, string> {
-  const params = new Map<string, string>();
-  const pairs = queryString.split('&');
-  
-  for (const pair of pairs) {
-    const eqIndex = pair.indexOf('=');
-    if (eqIndex === -1) continue;
-    
-    const key = pair.substring(0, eqIndex);
-    const value = pair.substring(eqIndex + 1);
-    params.set(key, decodeURIComponent(value));
-  }
-  return params;
-}
-
 export async function POST(req: NextRequest) {
   logger.info("🚀 POST /api/validate-telegram-auth hit");
 
@@ -60,22 +44,6 @@ export async function POST(req: NextRequest) {
     // 🔥 DEBUG: Log the raw string
     logger.log("🔍 RAW INITDATA STRING:");
     logger.log(initData);
-
-    // 🔥 DEBUG: Log what the validator sees
-    logger.log("🔍 BUILDING DATA CHECK STRING...");
-    const params = parseQueryStringPreserveCase(initData); // Use manual parser
-    
-    // Log the ACTUAL keys extracted
-    const actualKeys = Array.from(params.keys());
-    logger.log("🔍 PARAM KEYS FROM MANUAL PARSER:", actualKeys);
-
-    const keys = actualKeys
-      .filter(k => k.toLowerCase() !== "hash")
-      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-    
-    const dataCheckString = keys.map(k => `${k}=${params.get(k)}`).join("\n");
-    logger.log("🔍 DATA CHECK STRING:", dataCheckString);
-    logger.log("🔍 DATA CHECK STRING LENGTH:", dataCheckString.length);
 
     if (!BOT_TOKEN) {
       logger.error("💥 TELEGRAM_BOT_TOKEN not configured");
