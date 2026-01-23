@@ -1,140 +1,99 @@
-// /app/api/validate-telegram-auth/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { webcrypto } from 'crypto'; 
-import { logger } from '@/lib/logger'; 
+import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
+import { validateTelegramInitData } from "@/lib/telegram-validator";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const BYPASS_VALIDATION_ENV = process.env.TEMP_BYPASS_TG_AUTH_VALIDATION === 'true';
+const BYPASS_VALIDATION_ENV = process.env.TEMP_BYPASS_TG_AUTH_VALIDATION === "true";
 
 if (BYPASS_VALIDATION_ENV) {
-  logger.warn("API_VALIDATE_INIT: TEMP_BYPASS_TG_AUTH_VALIDATION is TRUE. Hash validation will be bypassed! FOR DEBUGGING ONLY.");
-}
-
-async function validateTelegramHash(initDataString: string): Promise<{ isValid: boolean; user?: any; error?: string }> {
-  logger.log("[API_VALIDATE_HASH_FN_ENTRY] Starting hash validation process.");
-
-  if (!BOT_TOKEN) {
-    logger.error("API_VALIDATE_HASH_FN_ERROR: TELEGRAM_BOT_TOKEN is not set.");
-    return { isValid: false, error: "Bot token not configured on server." };
-  }
-
-  const params = new URLSearchParams(initDataString);
-  const hashFromClient = params.get("hash");
-
-  if (!hashFromClient) {
-    logger.warn("[API_VALIDATE_HASH_FN_WARN] Hash missing in initData.");
-    return { isValid: false, error: "Hash not found in initData." };
-  }
-
-  logger.log(`[API_VALIDATE_HASH_FN_INFO] Client hash: ${hashFromClient}`);
-
-  const keys = Array.from(params.keys())
-    .filter(key => key !== "hash" && key !== "signature")
-    .sort();
-
-  const dataCheckString = keys.map(key => `${key}=${params.get(key)}`).join('\n');
-
-  logger.log(`[API_VALIDATE_HASH_FN_INFO] DataCheckString (len: ${dataCheckString.length}): "${dataCheckString.slice(0, 200)}${dataCheckString.length > 200 ? '...' : ''}"`);
-
-  try {
-    const secretKey = await webcrypto.subtle.importKey(
-      "raw", new TextEncoder().encode(BOT_TOKEN),
-      { name: "HMAC", hash: "SHA-256" },
-      false, ["sign"]
-    );
-
-    const derivedKeyBuffer = await webcrypto.subtle.sign(
-      "HMAC", secretKey, new TextEncoder().encode("WebAppData")
-    );
-
-    const derivedKey = await webcrypto.subtle.importKey(
-      "raw", derivedKeyBuffer,
-      { name: "HMAC", hash: "SHA-256" },
-      false, ["sign"]
-    );
-
-    const signatureBuffer = await webcrypto.subtle.sign(
-      "HMAC", derivedKey, new TextEncoder().encode(dataCheckString)
-    );
-
-    const signatureHex = Array.from(new Uint8Array(signatureBuffer))
-      .map(b => b.toString(16).padStart(2, '0')).join('');
-
-    logger.log(`[API_VALIDATE_HASH_FN_INFO] Computed hash: ${signatureHex}`);
-
-    const isStrictlyValid = signatureHex === hashFromClient;
-
-    if (BYPASS_VALIDATION_ENV) {
-      if (!isStrictlyValid) {
-        logger.warn(`[API_VALIDATE_HASH_FN_WARN] HASH MISMATCH! Computed: ${signatureHex}, Received: ${hashFromClient}.`);
-      }
-      logger.warn("[API_VALIDATE_HASH_FN_INFO] BYPASS ACTIVE: Proceeding anyway.");
-      const userParam = params.get("user");
-      if (userParam) {
-        try {
-          const user = JSON.parse(decodeURIComponent(userParam));
-          logger.info("[API_VALIDATE_HASH_FN_INFO] (Bypass Mode) User parsed successfully:", { userId: user?.id, username: user?.username });
-          return { isValid: true, user };
-        } catch (e) {
-          logger.error("[API_VALIDATE_HASH_FN_ERROR] (Bypass Mode) Failed to parse user:", e);
-          return { isValid: true, error: "Bypassed hash, but user parse failed." };
-        }
-      }
-      return { isValid: true };
-    }
-
-    if (isStrictlyValid) {
-      logger.info("[API_VALIDATE_HASH_FN_SUCCESS] Hash matched.");
-      const userParam = params.get("user");
-      if (userParam) {
-        try {
-          const user = JSON.parse(decodeURIComponent(userParam));
-          logger.info("[API_VALIDATE_HASH_FN_SUCCESS] User parsed successfully:", { userId: user?.id, username: user?.username });
-          return { isValid: true, user };
-        } catch (e) {
-          logger.error("[API_VALIDATE_HASH_FN_ERROR] Hash valid, but user parse failed:", e);
-          return { isValid: true, error: "Hash valid, user parse failed." };
-        }
-      }
-      return { isValid: true };
-    }
-
-    logger.error(`[API_VALIDATE_HASH_FN_ERROR] Hash mismatch. Computed: ${signatureHex}, Received: ${hashFromClient}`);
-    return { isValid: false, error: "Hash mismatch (strict check failed)." };
-
-  } catch (e: any) {
-    logger.error("[API_VALIDATE_HASH_FN_ERROR] Crypto failure:", e.message, e.stack);
-    return { isValid: false, error: `Crypto error: ${e.message}` };
-  }
+  logger.warn("⚠️  BYPASS MODE ACTIVE - All validations will be forced to pass!");
 }
 
 export async function POST(req: NextRequest) {
-  logger.info("[API_VALIDATE_POST_ENTRY] /api/validate-telegram-auth POST hit.");
+  logger.info("🚀 POST /api/validate-telegram-auth hit");
+
   try {
-    const body = await req.json();
+    const body = await req.json().catch((e) => {
+      logger.error("❌ Failed to parse JSON body", e);
+      return null;
+    });
+
+    if (!body || typeof body.initData !== "string") {
+      logger.warn("⚠️  Invalid input: initData must be a non-empty string");
+      return NextResponse.json(
+        { isValid: false, error: "initData must be a non-empty string." },
+        { status: 400 }
+      );
+    }
+
     const { initData } = body;
 
-    logger.log("[API_VALIDATE_POST_INFO] Body parsed. initData:", typeof initData === 'string' ? initData.slice(0, 60) + (initData.length > 60 ? '...' : '') : typeof initData);
+    // 🔥 BYPASS CHECK MOVED TO TOP
+    // This overrides everything else. If true, we don't care if token exists or if hash matches.
+    if (BYPASS_VALIDATION_ENV) {
+      logger.warn("🔓 BYPASS ACTIVE: Forcing success response");
+      
+      // Try to validate anyway just to log the result for debugging, but don't fail if it breaks
+      let debugInfo = { computed: null, received: null, note: "BYPASS_MODE_ACTIVE" };
+      let user = null;
 
-    if (typeof initData !== "string" || !initData) {
-      logger.warn("[API_VALIDATE_POST_WARN] Invalid input. initData must be non-empty string.");
-      return NextResponse.json({ isValid: false, error: "initData must be a non-empty string." }, { status: 400 });
+      if (BOT_TOKEN) {
+        try {
+          const result = await validateTelegramInitData(initData, BOT_TOKEN);
+          debugInfo = { 
+            computed: result.computedHash, 
+            received: result.receivedHash,
+            note: "BYPASS_MODE_ACTIVE (Validation Attempted)" 
+          };
+          user = result.user; // Pass through the user if we managed to parse it
+          logger.log(`   Original validation: ${result.valid ? '✅ PASS' : '❌ FAIL'}`);
+        } catch (e) {
+          logger.log(`   Validation skipped due to error: ${(e as Error).message}`);
+        }
+      } else {
+        logger.log(`   Validation skipped (No BOT_TOKEN configured)`);
+      }
+
+      return NextResponse.json(
+        { isValid: true, user, ...debugInfo },
+        { status: 200 }
+      );
     }
+
+    // --- STANDARD VALIDATION FLOW (If Bypass is OFF) ---
 
     if (!BOT_TOKEN) {
-      logger.error("[API_VALIDATE_POST_ERROR] TELEGRAM_BOT_TOKEN missing.");
-      return NextResponse.json({ isValid: false, error: "Server bot token misconfigured." }, { status: 500 });
+      logger.error("💥 TELEGRAM_BOT_TOKEN not configured");
+      return NextResponse.json(
+        { isValid: false, error: "Server bot token misconfigured." },
+        { status: 500 }
+      );
     }
 
-    const result = await validateTelegramHash(initData);
+    const result = await validateTelegramInitData(initData, BOT_TOKEN);
 
-    const status = BYPASS_VALIDATION_ENV ? 200 : result.isValid ? 200 : 401;
-    logger.log(`[API_VALIDATE_POST_INFO] Responding with status ${status}. Valid: ${result.isValid}, Bypass: ${BYPASS_VALIDATION_ENV}`);
+    const status = result.valid ? 200 : 401;
+    
+    if (result.valid) {
+      logger.info(`✅ Validation PASSED for user ${result.user?.username ?? 'N/A'}`);
+    } else {
+      logger.warn(`❌ Validation FAILED: ${result.reason}`);
+    }
 
-    return NextResponse.json(result, { status });
+    return NextResponse.json(
+      { 
+        isValid: result.valid, 
+        user: result.user ?? null, 
+        reason: result.reason 
+      },
+      { status }
+    );
 
-  } catch (e: any) {
-    logger.error("[API_VALIDATE_POST_ERROR] JSON parsing or logic error:", e.message, e.stack);
-    return NextResponse.json({ isValid: false, error: `Server error: ${e.message}` }, { status: 500 });
+  } catch (err: any) {
+    logger.error("💥 Unexpected server error:", err);
+    return NextResponse.json(
+      { isValid: false, error: `Server error: ${err?.message ?? "unknown"}` },
+      { status: 500 }
+    );
   }
 }
