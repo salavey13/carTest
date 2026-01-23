@@ -9,17 +9,21 @@ type ValidateResult = {
   reason?: string;
 };
 
-// 🔥 Parse manually to preserve exact string structure
-function parseQueryStringPreserveCase(queryString: string): Map<string, string> {
+// 🔥 Parse raw string manually to preserve exact parameter names and values
+function parseInitDataRaw(initDataString: string): Map<string, string> {
   const params = new Map<string, string>();
-  const pairs = queryString.split('&');
+  const pairs = initDataString.split('&');
   
   for (const pair of pairs) {
     const eqIndex = pair.indexOf('=');
     if (eqIndex === -1) continue;
     
     const key = pair.substring(0, eqIndex);
-    const value = pair.substring(eqIndex + 1); // KEEP URL-ENCODED
+    const value = pair.substring(eqIndex + 1); // Keep RAW, URL-encoded value!
+    
+    // Debug: Log the raw key-value pair
+    logger.log(`[PARSE] Key: "${key}", Value: "${value.substring(0, 20)}..."`);
+    
     params.set(key, value);
   }
   return params;
@@ -35,9 +39,9 @@ export async function validateTelegramInitData(
     if (!initDataString) return { valid: false, reason: "empty initData", computedHash: null, receivedHash: null };
     if (!botToken) return { valid: false, reason: "bot token missing", computedHash: null, receivedHash: null };
 
-    const params = parseQueryStringPreserveCase(initDataString);
+    const params = parseInitDataRaw(initDataString);
     
-    // Extract hash
+    // Extract hash (raw)
     let receivedHash = null;
     for (const key of params.keys()) {
       if (key.toLowerCase() === 'hash') {
@@ -51,7 +55,7 @@ export async function validateTelegramInitData(
       return { valid: false, reason: "hash param missing", computedHash: null, receivedHash: null };
     }
 
-    // Auth date check
+    // Auth date check (decode temporarily for validation)
     let authDateStr = null;
     for (const key of params.keys()) {
       if (key.toLowerCase() === 'auth_date') {
@@ -73,24 +77,13 @@ export async function validateTelegramInitData(
       logger.log(`[TG-VALIDATOR] auth_date fresh: ${age}s ago`);
     }
 
-    // 🔥 CRITICAL: Force uppercase keys to match Telegram's expected format
+    // Build data check string with RAW keys and RAW, URL-ENCODED values
     const keys = Array.from(params.keys())
       .filter(key => key.toLowerCase() !== 'hash')
-      .map(key => {
-        // Force uppercase for known Telegram parameters
-        const upperKey = key.toUpperCase();
-        // Return uppercase if it's a standard Telegram param, else original
-        return ['user', 'chat_instance', 'chat_type', 'auth_date', 'signature'].includes(key.toLowerCase()) 
-          ? upperKey 
-          : key;
-      })
       .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
     
-    // Build data check string with forced uppercase keys AND URL-encoded values
-    const dataCheckString = keys.map(key => {
-      const originalKey = Array.from(params.keys()).find(k => k.toLowerCase() === key.toLowerCase());
-      return `${key}=${params.get(originalKey!)}`;
-    }).join('\n');
+    // 🔥 CRITICAL: Use RAW values, do NOT decode
+    const dataCheckString = keys.map(key => `${key}=${params.get(key)}`).join('\n');
 
     logger.log(`[TG-VALIDATOR] Data check string length: ${dataCheckString.length}`);
     logger.log(`[TG-VALIDATOR] Data check string:\n${dataCheckString}`);
@@ -108,7 +101,7 @@ export async function validateTelegramInitData(
       valid = crypto.timingSafeEqual(Buffer.from(computedHash, 'hex'), Buffer.from(receivedHash, 'hex'));
     } catch { valid = false; }
 
-    // Parse user for return value
+    // Parse user for return value (decode temporarily)
     let user = undefined;
     const userParam = params.get('user') || params.get('USER');
     if (userParam) {
