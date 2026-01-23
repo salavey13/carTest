@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
 
     const result = await validateTelegramInitData(initData, BOT_TOKEN);
 
+    // 🚨 PRODUCTION: REMOVE THIS BLOCK ENTIRELY
     if (BYPASS_VALIDATION_ENV) {
       logger.warn("🔓 BYPASS ACTIVE: Forcing success response");
       logger.log(`   Original validation: ${result.valid ? '✅ PASS' : '❌ FAIL'}${result.valid ? '' : ` (reason: ${result.reason})`}`);
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
         { status: 200 }
       );
     }
+    // 🚨 END REMOVE BLOCK
 
     const status = result.valid ? 200 : 401;
     

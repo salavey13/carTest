@@ -21,7 +21,7 @@ export async function setTelegramWebhook() {
   const webhookUrl = `${APP_URL}/api/telegramWebhook`
   logger.info(`📡 Setting Telegram webhook: ${webhookUrl}`);
   
-  const response = await fetch(`https://api.telegram.org/bot ${TELEGRAM_BOT_TOKEN}/setWebhook`, {
+  const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -74,7 +74,7 @@ export async function sendTelegramMessage(chatId: string, text: string) {
 
   logger.log(`📤 Sending message to ${chatId}: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
   
-  const response = await fetch(`https://api.telegram.org/bot ${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+  const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

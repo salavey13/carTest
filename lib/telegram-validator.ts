@@ -12,9 +12,10 @@ type ValidateResult = {
 function buildDataCheckString(initDataString: string): string {
   const params = new URLSearchParams(initDataString);
   const keys = Array.from(params.keys())
-    .filter(k => k !== "hash")
+    .filter(k => k !== "hash") // ✅ Includes 'signature' if present
     .sort();
   
+  // URLSearchParams automatically decodes values - this is CORRECT
   return keys.map(k => `${k}=${params.get(k)}`).join("\n");
 }
 
@@ -35,7 +36,7 @@ export async function validateTelegramInitData(
       return { valid: false, computedHash: null, receivedHash: null, reason: "hash param missing" };
     }
 
-    // 🚨 TIMESTAMP FRESHNESS CHECK (prevent replay attacks)
+    // 🚨 TIMESTAMP FRESHNESS CHECK (prevents replay attacks)
     const authDateParam = params.get("auth_date");
     const maxAgeSeconds = parseInt(process.env.TELEGRAM_AUTH_MAX_AGE_SECONDS || '86400', 10);
     const currentTime = Math.floor(Date.now() / 1000);
@@ -63,6 +64,7 @@ export async function validateTelegramInitData(
 
     logger.log(`[TG-VALIDATOR] Computed hash: ${computedHash.substring(0, 16)}...`);
 
+    // ✅ Secure timing-safe comparison
     let valid = false;
     try {
       valid = crypto.timingSafeEqual(
@@ -70,7 +72,7 @@ export async function validateTelegramInitData(
         Buffer.from(receivedHash, 'hex')
       );
     } catch (e) {
-      valid = false;
+      valid = false; // Length mismatch = invalid
     }
 
     let user = undefined;
