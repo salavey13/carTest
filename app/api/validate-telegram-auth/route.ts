@@ -27,23 +27,6 @@ export async function POST(req: NextRequest) {
     }
 
     const { initData } = body;
-  
-    // 🔥 DEBUG: Character-level analysis
-    logger.log("🔍 INITDATA HEX DUMP (first 200 chars):", Buffer.from(initData).toString('hex').substring(0, 200));
-    logger.log("🔍 INITDATA CHAR CODES (first 10 chars):", initData.substring(0, 10).split('').map(c => c.charCodeAt(0)));
-
-    // ✅ Log structured data
-    logger.log("🔍 INITDATA RAW BYTES: " + JSON.stringify({
-      length: initData.length,
-      first50: initData.substring(0, 50),
-      last50: initData.substring(initData.length - 50),
-      includesDoubleEncoded: initData.includes('%25'),
-      hashFromData: initData.match(/hash=([a-f0-9]+)/i)?.[1]
-    }, null, 2));
-
-    // 🔥 DEBUG: Log the raw string
-    logger.log("🔍 RAW INITDATA STRING:");
-    logger.log(initData);
 
     if (!BOT_TOKEN) {
       logger.error("💥 TELEGRAM_BOT_TOKEN not configured");

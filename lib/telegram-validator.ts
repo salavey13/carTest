@@ -9,7 +9,7 @@ type ValidateResult = {
   reason?: string;
 };
 
-// 🔥 CRITICAL: Preserve exact string including URL encoding
+// 🔥 Parse manually to preserve exact string structure
 function parseQueryStringPreserveCase(queryString: string): Map<string, string> {
   const params = new Map<string, string>();
   const pairs = queryString.split('&');
@@ -19,7 +19,7 @@ function parseQueryStringPreserveCase(queryString: string): Map<string, string> 
     if (eqIndex === -1) continue;
     
     const key = pair.substring(0, eqIndex);
-    const value = pair.substring(eqIndex + 1); // KEEP URL-ENCODED!
+    const value = pair.substring(eqIndex + 1); // KEEP URL-ENCODED
     params.set(key, value);
   }
   return params;
@@ -51,11 +51,11 @@ export async function validateTelegramInitData(
       return { valid: false, reason: "hash param missing", computedHash: null, receivedHash: null };
     }
 
-    // Auth date check (decode temporarily)
+    // Auth date check
     let authDateStr = null;
     for (const key of params.keys()) {
       if (key.toLowerCase() === 'auth_date') {
-        authDateStr = decodeURIComponent(params.get(key) || ''); // DECODE for validation
+        authDateStr = decodeURIComponent(params.get(key) || '');
         break;
       }
     }
@@ -73,13 +73,24 @@ export async function validateTelegramInitData(
       logger.log(`[TG-VALIDATOR] auth_date fresh: ${age}s ago`);
     }
 
-    // Build data check string with RAW, URL-ENCODED values
+    // 🔥 CRITICAL: Force uppercase keys to match Telegram's expected format
     const keys = Array.from(params.keys())
       .filter(key => key.toLowerCase() !== 'hash')
+      .map(key => {
+        // Force uppercase for known Telegram parameters
+        const upperKey = key.toUpperCase();
+        // Return uppercase if it's a standard Telegram param, else original
+        return ['user', 'chat_instance', 'chat_type', 'auth_date', 'signature'].includes(key.toLowerCase()) 
+          ? upperKey 
+          : key;
+      })
       .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
     
-    // 🔥 CRITICAL: Use raw, encoded values
-    const dataCheckString = keys.map(key => `${key}=${params.get(key)}`).join('\n');
+    // Build data check string with forced uppercase keys AND URL-encoded values
+    const dataCheckString = keys.map(key => {
+      const originalKey = Array.from(params.keys()).find(k => k.toLowerCase() === key.toLowerCase());
+      return `${key}=${params.get(originalKey!)}`;
+    }).join('\n');
 
     logger.log(`[TG-VALIDATOR] Data check string length: ${dataCheckString.length}`);
     logger.log(`[TG-VALIDATOR] Data check string:\n${dataCheckString}`);
@@ -97,7 +108,7 @@ export async function validateTelegramInitData(
       valid = crypto.timingSafeEqual(Buffer.from(computedHash, 'hex'), Buffer.from(receivedHash, 'hex'));
     } catch { valid = false; }
 
-    // Parse user for return value (decode temporarily)
+    // Parse user for return value
     let user = undefined;
     const userParam = params.get('user') || params.get('USER');
     if (userParam) {
