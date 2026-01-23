@@ -9,6 +9,22 @@ type ValidateResult = {
   reason?: string;
 };
 
+// 🔥 NEW: Manual parser to preserve parameter name case
+function parseQueryStringPreserveCase(queryString: string): Map<string, string> {
+  const params = new Map<string, string>();
+  const pairs = queryString.split('&');
+  
+  for (const pair of pairs) {
+    const eqIndex = pair.indexOf('=');
+    if (eqIndex === -1) continue;
+    
+    const key = pair.substring(0, eqIndex);
+    const value = pair.substring(eqIndex + 1);
+    params.set(key, decodeURIComponent(value));
+  }
+  return params;
+}
+
 export async function validateTelegramInitData(
   initDataString: string, 
   botToken: string
@@ -19,10 +35,10 @@ export async function validateTelegramInitData(
     if (!initDataString) return { valid: false, reason: "empty initData", computedHash: null, receivedHash: null };
     if (!botToken) return { valid: false, reason: "bot token missing", computedHash: null, receivedHash: null };
 
-    // Parse params ONCE and preserve original case
-    const params = new URLSearchParams(initDataString);
+    // 🔥 Use manual parser instead of URLSearchParams
+    const params = parseQueryStringPreserveCase(initDataString);
     
-    // Extract hash (case-insensitive, but preserve original key)
+    // Extract hash
     let receivedHash = null;
     for (const key of params.keys()) {
       if (key.toLowerCase() === 'hash') {
@@ -58,8 +74,7 @@ export async function validateTelegramInitData(
       logger.log(`[TG-VALIDATOR] auth_date fresh: ${age}s ago`);
     }
 
-    // Build data check string EXACTLY as parsed by URLSearchParams
-    // DO NOT modify case, DO NOT re-encode values
+    // 🔥 Build data check string with PRESERVED case
     const keys = Array.from(params.keys())
       .filter(key => key.toLowerCase() !== 'hash')
       .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
@@ -67,7 +82,7 @@ export async function validateTelegramInitData(
     const dataCheckString = keys.map(key => `${key}=${params.get(key)}`).join('\n');
 
     logger.log(`[TG-VALIDATOR] Data check string length: ${dataCheckString.length}`);
-    logger.log(`[TG-VALIDATOR] Data check string:\n${dataCheckString}`); // Log full string
+    logger.log(`[TG-VALIDATOR] Data check string:\n${dataCheckString}`);
 
     // Compute hash
     const secretKey = crypto.createHmac('sha256', botToken).update('WebAppData').digest();
@@ -82,7 +97,7 @@ export async function validateTelegramInitData(
       valid = crypto.timingSafeEqual(Buffer.from(computedHash, 'hex'), Buffer.from(receivedHash, 'hex'));
     } catch { valid = false; }
 
-    // Parse user for return value (separate from validation)
+    // Parse user for return value
     let user = undefined;
     const userParam = params.get('user') || params.get('USER');
     if (userParam) {

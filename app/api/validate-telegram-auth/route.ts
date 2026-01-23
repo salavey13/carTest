@@ -9,6 +9,22 @@ if (BYPASS_VALIDATION_ENV) {
   logger.warn("⚠️  BYPASS MODE ACTIVE - All validations will be forced to pass!");
 }
 
+// 🔥 Manual parser to match validator
+function parseQueryStringPreserveCase(queryString: string): Map<string, string> {
+  const params = new Map<string, string>();
+  const pairs = queryString.split('&');
+  
+  for (const pair of pairs) {
+    const eqIndex = pair.indexOf('=');
+    if (eqIndex === -1) continue;
+    
+    const key = pair.substring(0, eqIndex);
+    const value = pair.substring(eqIndex + 1);
+    params.set(key, decodeURIComponent(value));
+  }
+  return params;
+}
+
 export async function POST(req: NextRequest) {
   logger.info("🚀 POST /api/validate-telegram-auth hit");
 
@@ -29,7 +45,7 @@ export async function POST(req: NextRequest) {
     const { initData } = body;
   
     // 🔥 DEBUG: Character-level analysis
-    logger.log("🔍 INITDATA HEX DUMP (first 100 chars):", Buffer.from(initData).toString('hex').substring(0, 200));
+    logger.log("🔍 INITDATA HEX DUMP (first 200 chars):", Buffer.from(initData).toString('hex').substring(0, 200));
     logger.log("🔍 INITDATA CHAR CODES (first 10 chars):", initData.substring(0, 10).split('').map(c => c.charCodeAt(0)));
 
     // ✅ Log structured data
@@ -47,11 +63,11 @@ export async function POST(req: NextRequest) {
 
     // 🔥 DEBUG: Log what the validator sees
     logger.log("🔍 BUILDING DATA CHECK STRING...");
-    const params = new URLSearchParams(initData);
+    const params = parseQueryStringPreserveCase(initData); // Use manual parser
     
-    // Log the ACTUAL keys extracted from params
+    // Log the ACTUAL keys extracted
     const actualKeys = Array.from(params.keys());
-    logger.log("🔍 PARAM KEYS FROM URLSearchParams:", actualKeys);
+    logger.log("🔍 PARAM KEYS FROM MANUAL PARSER:", actualKeys);
 
     const keys = actualKeys
       .filter(k => k.toLowerCase() !== "hash")
