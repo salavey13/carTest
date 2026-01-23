@@ -9,7 +9,7 @@ type ValidateResult = {
   reason?: string;
 };
 
-// Whitelist of valid Telegram keys to ignore garbage like 'signature'
+// Whitelist to ignore junk like 'signature'
 const ALLOWED_KEYS = [
   'auth_date', 'can_send_after', 'chat', 'chat_instance', 
   'chat_type', 'query_id', 'start_param', 'user'
@@ -25,8 +25,7 @@ export async function validateTelegramInitData(
     if (!initDataString) return { valid: false, reason: "empty initData", computedHash: null, receivedHash: null };
     if (!botToken) return { valid: false, reason: "bot token missing", computedHash: null, receivedHash: null };
 
-    // 1. Parse using URLSearchParams
-    // This automatically DECODES the values (e.g. %7B becomes {)
+    // 1. Parse using URLSearchParams (Decodes values automatically)
     const searchParams = new URLSearchParams(initDataString);
 
     // 2. Extract the Hash
@@ -36,8 +35,7 @@ export async function validateTelegramInitData(
     }
     searchParams.delete('hash');
 
-    // 3. Filter: Remove non-standard keys (like 'signature')
-    // We reconstruct the params to only include allowed keys
+    // 3. Filter: Remove non-standard keys
     const cleanParams = new URLSearchParams();
     for (const [key, value] of searchParams.entries()) {
       if (ALLOWED_KEYS.includes(key)) {
@@ -48,11 +46,9 @@ export async function validateTelegramInitData(
     }
 
     // 4. Sort keys alphabetically
-    // Telegram docs: "sorted alphabetically"
     const sortedKeys = Array.from(cleanParams.keys()).sort();
 
-    // 5. Build Data Check String
-    // Format: key=value\nkey=value...
+    // 5. Build Data Check String (Decoded values)
     const dataCheckString = sortedKeys
       .map(key => `${key}=${cleanParams.get(key)}`)
       .join('\n');
@@ -80,14 +76,13 @@ export async function validateTelegramInitData(
       Buffer.from(receivedHash, 'hex')
     );
 
-    // 9. Parse User
+    // 9. Parse User (Normalize keys in case of uppercase JSON)
     let user = undefined;
     if (isValid) {
       const userStr = cleanParams.get('user');
       if (userStr) {
         try {
           const userObj = JSON.parse(userStr);
-          // Normalize keys just in case, though userStr is already decoded
           user = {
             id: userObj.id || userObj.ID,
             first_name: userObj.first_name || userObj.FIRST_NAME,
