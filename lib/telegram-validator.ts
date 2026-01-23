@@ -10,95 +10,96 @@ type ValidateResult = {
 };
 
 export async function validateTelegramInitData(
-  initDataString: string, 
+  initDataString: string,
   botToken: string
 ): Promise<ValidateResult> {
-  logger.info("[TG-VALIDATOR] Starting validation...");
-  
+  logger.info("[TG-VALIDATOR] Standard Validation...");
+
   try {
     if (!initDataString) return { valid: false, reason: "empty initData", computedHash: null, receivedHash: null };
     if (!botToken) return { valid: false, reason: "bot token missing", computedHash: null, receivedHash: null };
 
-    // 1. Split raw pairs
+    // 1. Clean token (remove accidental whitespace)
+    const cleanToken = botToken.trim();
+
+    // 2. Extract Hash and Build Data Check String in one pass
+    // We use .split('&') because URLSearchParams automatically DECODES values,
+    // which breaks the hash calculation if the client sent URL-encoded values.
     const pairs = initDataString.split('&');
-    
-    // 2. Parse and Filter
-    // We keep the ORIGINAL CASE of keys (e.g., AUTH_DATE stays AUTH_DATE)
-    // We only remove 'hash' (case-insensitive check)
-    const sortedData = pairs
-      .map(pair => {
-        const eqIndex = pair.indexOf('=');
-        if (eqIndex === -1) return null;
-        const key = pair.substring(0, eqIndex); // 🔥 KEEP ORIGINAL CASE
-        const value = pair.substring(eqIndex + 1);
-        return { key, value };
-      })
-      .filter(item => {
-        if (!item) return false;
-        // Remove hash, signature, sign (Case Insensitive removal)
-        if (item.key.toLowerCase() === 'hash' || 
-            item.key.toLowerCase() === 'signature' || 
-            item.key.toLowerCase() === 'sign') {
-          return false;
-        }
-        return true;
-      }) as { key: string, value: string }[];
+    let receivedHash: string | null = null;
+    const dataPairs: string[] = [];
 
-    // 3. Sort alphabetically (Standard String Sort - respects case)
-    sortedData.sort((a, b) => a.key.localeCompare(b.key));
+    for (const pair of pairs) {
+      const [rawKey, rawValue] = pair.split('=');
+      if (!rawKey) continue;
 
-    // 4. Build string
-    const dataCheckString = sortedData.map(item => `${item.key}=${item.value}`).join('\n');
-
-    logger.log(`[TG-VALIDATOR] Data Check String:\n${dataCheckString}`);
-
-    // 5. Validate Date
-    const authDateItem = sortedData.find(item => item.key.toLowerCase() === 'auth_date');
-    if (authDateItem) {
-      try {
-        const authDate = parseInt(decodeURIComponent(authDateItem.value), 10);
-        const maxAgeSeconds = parseInt(process.env.TELEGRAM_AUTH_MAX_AGE_SECONDS || '86400', 10);
-        const currentTime = Math.floor(Date.now() / 1000);
-        const age = currentTime - authDate;
-        
-        if (age > maxAgeSeconds) {
-          return { valid: false, reason: "auth_date expired", computedHash: null, receivedHash: null };
-        }
-        logger.log(`[TG-VALIDATOR] ✅ auth_date valid: ${age}s ago`);
-      } catch (e) {
-        logger.warn("[TG-VALIDATOR] ⚠️ Could not parse auth_date");
+      if (rawKey.toLowerCase() === 'hash') {
+        receivedHash = rawValue; // Keep the raw hash value
+      } else {
+        // We reconstruct the pair EXACTLY as it was received
+        // to ensure we match the client's hash input.
+        dataPairs.push(`${rawKey}=${rawValue || ''}`);
       }
     }
 
-    // 6. Extract Received Hash (Case Insensitive lookup)
-    const receivedHashItem = pairs.find(p => p.toLowerCase().startsWith('hash='));
-    const receivedHashValue = receivedHashItem ? receivedHashItem.split('=')[1] : null;
-
-    if (!receivedHashValue) {
-      return { valid: false, reason: "hash param missing", computedHash: null, receivedHash: null };
+    if (!receivedHash) {
+      return { valid: false, reason: "hash missing", computedHash: null, receivedHash: null };
     }
 
-    // 7. Compute Hash
-    const secretKey = crypto.createHmac('sha256', botToken).update('WebAppData').digest();
-    const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+    // 3. Sort Keys Alphabetically
+    // This matches the official spec: "sorted alphabetically"
+    // Note: We sort the reconstructed strings "key=value" to handle sorting easily.
+    dataPairs.sort((a, b) => {
+      const keyA = a.split('=')[0];
+      const keyB = b.split('=')[0];
+      return keyA.localeCompare(keyB);
+    });
 
+    // 4. Join with Newlines
+    const dataCheckString = dataPairs.join('\n');
+
+    logger.log(`[TG-VALIDATOR] Data Check String:\n${dataCheckString}`);
+
+    // 5. Create Secret Key
+    // secret = HMAC-SHA256(<bot_token>, "WebAppData")
+    const secretKey = crypto
+      .createHmac('sha256', cleanToken)
+      .update('WebAppData')
+      .digest();
+
+    // 6. Compute Hash
+    // hash = HMAC-SHA256(<secret>, <data_check_string>)
+    const computedHash = crypto
+      .createHmac('sha256', secretKey)
+      .update(dataCheckString)
+      .digest('hex');
+
+    logger.log(`[TG-VALIDATOR] Received: ${receivedHash}`);
     logger.log(`[TG-VALIDATOR] Computed: ${computedHash}`);
-    logger.log(`[TG-VALIDATOR] Received: ${receivedHashValue}`);
 
-    // 8. Compare
-    let valid = false;
-    try {
-      valid = crypto.timingSafeEqual(Buffer.from(computedHash, 'hex'), Buffer.from(receivedHashValue, 'hex'));
-    } catch { valid = false; }
+    // 7. Compare
+    const valid = crypto.timingSafeEqual(
+      Buffer.from(computedHash, 'hex'),
+      Buffer.from(receivedHash, 'hex')
+    );
 
-    // 9. Parse User
+    if (valid) {
+      logger.info("[TG-VALIDATOR] ✅ SUCCESS");
+    } else {
+      logger.error("[TG-VALIDATOR] ❌ FAILED: Hash mismatch");
+    }
+
+    // 8. Parse User (Optional, for return value)
     let user = undefined;
-    const userItem = sortedData.find(item => item.key.toLowerCase() === 'user');
-    if (userItem) {
+    const userPair = dataPairs.find(p => p.toLowerCase().startsWith('user='));
+    if (userPair) {
       try {
-        const decodedUserStr = decodeURIComponent(userItem.value);
-        const userObj = JSON.parse(decodedUserStr);
+        const rawValue = userPair.split('=')[1];
+        // Now we decode for usage
+        const decodedStr = decodeURIComponent(rawValue);
+        const userObj = JSON.parse(decodedStr);
         
+        // Handle Uppercase JSON keys from weird clients
         user = {
           id: userObj.id || userObj.ID,
           first_name: userObj.first_name || userObj.FIRST_NAME,
@@ -106,18 +107,16 @@ export async function validateTelegramInitData(
           username: userObj.username || userObj.USERNAME,
           language_code: userObj.language_code || userObj.LANGUAGE_CODE,
           allows_write_to_pm: userObj.allows_write_to_pm || userObj.ALLOWS_WRITE_TO_PM,
+          photo_url: userObj.photo_url || userObj.PHOTO_URL,
         };
-        logger.log(`[TG-VALIDATOR] User: ${user.username} (${user.id})`);
       } catch (e) {
-        logger.warn("[TG-VALIDATOR] Failed to parse user", e);
+        logger.warn("[TG-VALIDATOR] Failed to parse user JSON", e);
       }
     }
 
-    logger.info(`[TG-VALIDATOR] ${valid ? '✅ SUCCESS' : '❌ FAILED'}`);
-
-    return { valid, computedHash, receivedHash: receivedHashValue, user, reason: valid ? undefined : "hash mismatch" };
+    return { valid, computedHash, receivedHash, user, reason: valid ? undefined : "hash mismatch" };
   } catch (e: any) {
-    logger.error("[TG-VALIDATOR] 💥 Error", e);
+    logger.error("[TG-VALIDATOR] 💥 Critical Error", e);
     return { valid: false, reason: e.message, computedHash: null, receivedHash: null };
   }
 }
