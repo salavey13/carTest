@@ -6,72 +6,82 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BYPASS_VALIDATION_ENV = process.env.TEMP_BYPASS_TG_AUTH_VALIDATION === "true";
 
 if (BYPASS_VALIDATION_ENV) {
-  logger.warn(
-    "API_VALIDATE_INIT: TEMP_BYPASS_TG_AUTH_VALIDATION is TRUE. Hash validation will be bypassed! FOR DEBUGGING ONLY."
-  );
+  logger.warn("⚠️  BYPASS MODE ACTIVE - All validations will be forced to pass!");
 }
 
-/**
- * Request body shape expected:
- * { initData: string }
- */
 export async function POST(req: NextRequest) {
-  logger.info("[API_VALIDATE_POST_ENTRY] /api/validate-telegram-auth POST hit.");
+  logger.info("🚀 POST /api/validate-telegram-auth hit");
 
   try {
     const body = await req.json().catch((e) => {
-      logger.warn("[API_VALIDATE_POST_WARN] Failed to parse JSON body.", e);
+      logger.error("❌ Failed to parse JSON body", e);
       return null;
     });
 
     if (!body || typeof body.initData !== "string") {
-      logger.warn("[API_VALIDATE_POST_WARN] Invalid input. initData must be a non-empty string.");
+      logger.warn("⚠️  Invalid input: initData must be a non-empty string");
       return NextResponse.json(
         { isValid: false, error: "initData must be a non-empty string." },
         { status: 400 }
       );
     }
 
-    const { initData } = body as { initData: string };
+    const { initData } = body;
+    logger.log(`📥 Received initData (${initData.length} chars)`);
 
     if (!BOT_TOKEN) {
-      logger.error("[API_VALIDATE_POST_ERROR] TELEGRAM_BOT_TOKEN is not set.");
+      logger.error("💥 TELEGRAM_BOT_TOKEN not configured");
       return NextResponse.json(
         { isValid: false, error: "Server bot token misconfigured." },
         { status: 500 }
       );
     }
 
-    // Delegate to shared validator
-    const res = await validateTelegramInitData(initData, BOT_TOKEN);
+    const result = await validateTelegramInitData(initData, BOT_TOKEN);
 
-    // If bypass env active - always return success but keep detailed logs
     if (BYPASS_VALIDATION_ENV) {
-      if (!res.valid) {
-        logger.warn("[API_VALIDATE_POST_WARN] Bypass active but validation failed.", {
-          reason: res.reason,
-          computed: res.computedHash,
-          received: res.receivedHash,
-        });
-      } else {
-        logger.info("[API_VALIDATE_POST_INFO] Bypass active and validation passed (ok).");
-      }
-      // Return user if parsed (helpful for debug), and note that bypass is active
+      logger.warn("🔓 BYPASS ACTIVE: Forcing success response");
+      logger.log(`   Original validation: ${result.valid ? '✅ PASS' : '❌ FAIL'}${result.valid ? '' : ` (reason: ${result.reason})`}`);
+      
       return NextResponse.json(
-        { isValid: true, user: res.user ?? null, note: "bypass active", debug: { computed: res.computedHash, received: res.receivedHash } },
+        { 
+          isValid: true, 
+          user: result.user ?? null, 
+          note: "BYPASS_MODE_ACTIVE",
+          debug: { 
+            computed: result.computedHash, 
+            received: result.receivedHash 
+          } 
+        },
         { status: 200 }
       );
     }
 
-    const status = res.valid ? 200 : 401;
-    logger.log(`[API_VALIDATE_POST_INFO] Validation result: valid=${res.valid}, reason=${res.reason}`);
+    const status = result.valid ? 200 : 401;
+    
+    if (result.valid) {
+      logger.info(`✅ Validation PASSED for user ${result.user?.username ?? 'N/A'}`);
+    } else {
+      logger.warn(`❌ Validation FAILED: ${result.reason}`);
+      logger.log(`   Computed: ${result.computedHash?.substring(0, 16)}...`);
+      logger.log(`   Received: ${result.receivedHash?.substring(0, 16)}...`);
+    }
 
     return NextResponse.json(
-      { isValid: res.valid, user: res.user ?? null, reason: res.reason, debug: { computed: res.computedHash, received: res.receivedHash } },
+      { 
+        isValid: result.valid, 
+        user: result.user ?? null, 
+        reason: result.reason,
+        debug: { 
+          computed: result.computedHash, 
+          received: result.receivedHash 
+        } 
+      },
       { status }
     );
+
   } catch (err: any) {
-    logger.error("[API_VALIDATE_POST_ERROR] Unexpected server error:", err?.message ?? err, err?.stack);
+    logger.error("💥 Unexpected server error:", err);
     return NextResponse.json(
       { isValid: false, error: `Server error: ${err?.message ?? "unknown"}` },
       { status: 500 }
