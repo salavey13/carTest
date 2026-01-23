@@ -28,6 +28,40 @@ export async function POST(req: NextRequest) {
 
     const { initData } = body;
 
+    // 🔥 BYPASS CHECK MOVED TO TOP
+    // This overrides everything else. If true, we don't care if token exists or if hash matches.
+    if (BYPASS_VALIDATION_ENV) {
+      logger.warn("🔓 BYPASS ACTIVE: Forcing success response");
+      
+      // Try to validate anyway just to log the result for debugging, but don't fail if it breaks
+      let debugInfo = { computed: null, received: null, note: "BYPASS_MODE_ACTIVE" };
+      let user = null;
+
+      if (BOT_TOKEN) {
+        try {
+          const result = await validateTelegramInitData(initData, BOT_TOKEN);
+          debugInfo = { 
+            computed: result.computedHash, 
+            received: result.receivedHash,
+            note: "BYPASS_MODE_ACTIVE (Validation Attempted)" 
+          };
+          user = result.user; // Pass through the user if we managed to parse it
+          logger.log(`   Original validation: ${result.valid ? '✅ PASS' : '❌ FAIL'}`);
+        } catch (e) {
+          logger.log(`   Validation skipped due to error: ${(e as Error).message}`);
+        }
+      } else {
+        logger.log(`   Validation skipped (No BOT_TOKEN configured)`);
+      }
+
+      return NextResponse.json(
+        { isValid: true, user, ...debugInfo },
+        { status: 200 }
+      );
+    }
+
+    // --- STANDARD VALIDATION FLOW (If Bypass is OFF) ---
+
     if (!BOT_TOKEN) {
       logger.error("💥 TELEGRAM_BOT_TOKEN not configured");
       return NextResponse.json(
@@ -38,43 +72,19 @@ export async function POST(req: NextRequest) {
 
     const result = await validateTelegramInitData(initData, BOT_TOKEN);
 
-    if (BYPASS_VALIDATION_ENV) {
-      logger.warn("🔓 BYPASS ACTIVE: Forcing success response");
-      logger.log(`   Original validation: ${result.valid ? '✅ PASS' : '❌ FAIL'}${result.valid ? '' : ` (reason: ${result.reason})`}`);
-      
-      return NextResponse.json(
-        { 
-          isValid: true, 
-          user: result.user ?? null, 
-          note: "BYPASS_MODE_ACTIVE",
-          debug: { 
-            computed: result.computedHash, 
-            received: result.receivedHash 
-          } 
-        },
-        { status: 200 }
-      );
-    }
-
     const status = result.valid ? 200 : 401;
     
     if (result.valid) {
       logger.info(`✅ Validation PASSED for user ${result.user?.username ?? 'N/A'}`);
     } else {
       logger.warn(`❌ Validation FAILED: ${result.reason}`);
-      logger.log(`   Computed: ${result.computedHash?.substring(0, 16)}...`);
-      logger.log(`   Received: ${result.receivedHash?.substring(0, 16)}...`);
     }
 
     return NextResponse.json(
       { 
         isValid: result.valid, 
         user: result.user ?? null, 
-        reason: result.reason,
-        debug: { 
-          computed: result.computedHash, 
-          received: result.receivedHash 
-        } 
+        reason: result.reason 
       },
       { status }
     );

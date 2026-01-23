@@ -9,7 +9,6 @@ type ValidateResult = {
   reason?: string;
 };
 
-// Whitelist to ignore junk like 'signature'
 const ALLOWED_KEYS = [
   'auth_date', 'can_send_after', 'chat', 'chat_instance', 
   'chat_type', 'query_id', 'start_param', 'user'
@@ -19,8 +18,6 @@ export async function validateTelegramInitData(
   initDataString: string,
   botToken: string
 ): Promise<ValidateResult> {
-  logger.info("[TG-VALIDATOR] Standard Implementation (Decoded)");
-
   try {
     if (!initDataString) return { valid: false, reason: "empty initData", computedHash: null, receivedHash: null };
     if (!botToken) return { valid: false, reason: "bot token missing", computedHash: null, receivedHash: null };
@@ -40,8 +37,6 @@ export async function validateTelegramInitData(
     for (const [key, value] of searchParams.entries()) {
       if (ALLOWED_KEYS.includes(key)) {
         cleanParams.append(key, value);
-      } else {
-        logger.log(`[TG-VALIDATOR] Ignoring param: ${key}`);
       }
     }
 
@@ -52,8 +47,6 @@ export async function validateTelegramInitData(
     const dataCheckString = sortedKeys
       .map(key => `${key}=${cleanParams.get(key)}`)
       .join('\n');
-
-    logger.log(`[TG-VALIDATOR] Data String: ${dataCheckString}`);
 
     // 6. Compute Secret Key
     const secretKey = crypto
@@ -66,9 +59,6 @@ export async function validateTelegramInitData(
       .createHmac('sha256', secretKey)
       .update(dataCheckString)
       .digest('hex');
-
-    logger.log(`[TG-VALIDATOR] Received: ${receivedHash}`);
-    logger.log(`[TG-VALIDATOR] Computed: ${computedHash}`);
 
     // 8. Compare
     const isValid = crypto.timingSafeEqual(
@@ -92,13 +82,9 @@ export async function validateTelegramInitData(
             photo_url: userObj.photo_url || userObj.PHOTO_URL,
             allows_write_to_pm: userObj.allows_write_to_pm || userObj.ALLOWS_WRITE_TO_PM,
           };
-        } catch (e) {
-          logger.error("Failed to parse user", e);
-        }
+        } catch (e) {}
       }
     }
-
-    logger.info(`[TG-VALIDATOR] Result: ${isValid ? '✅ PASS' : '❌ FAIL'}`);
 
     return { 
       valid: isValid, 
@@ -109,7 +95,6 @@ export async function validateTelegramInitData(
     };
 
   } catch (e: any) {
-    logger.error("[TG-VALIDATOR] Error", e);
     return { valid: false, reason: e.message, computedHash: null, receivedHash: null };
   }
 }
