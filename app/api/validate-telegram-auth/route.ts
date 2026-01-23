@@ -27,7 +27,15 @@ export async function POST(req: NextRequest) {
     }
 
     const { initData } = body;
-    logger.log(`📥 Received initData (${initData.length} chars)`);
+  
+  // 🔥 CRITICAL DEBUGGING
+  logger.log("🔍 INITDATA RAW BYTES", {
+    length: initData.length,
+    first50: initData.substring(0, 50),
+    last50: initData.substring(initData.length - 50),
+    includesDoubleEncoded: initData.includes('%25'), // Checks for %2522 etc.
+    hashFromData: initData.match(/hash=([a-f0-9]+)/)?.[1]
+  });
 
     if (!BOT_TOKEN) {
       logger.error("💥 TELEGRAM_BOT_TOKEN not configured");
@@ -39,7 +47,6 @@ export async function POST(req: NextRequest) {
 
     const result = await validateTelegramInitData(initData, BOT_TOKEN);
 
-    // 🚨 PRODUCTION: REMOVE THIS BLOCK ENTIRELY
     if (BYPASS_VALIDATION_ENV) {
       logger.warn("🔓 BYPASS ACTIVE: Forcing success response");
       logger.log(`   Original validation: ${result.valid ? '✅ PASS' : '❌ FAIL'}${result.valid ? '' : ` (reason: ${result.reason})`}`);
@@ -57,7 +64,6 @@ export async function POST(req: NextRequest) {
         { status: 200 }
       );
     }
-    // 🚨 END REMOVE BLOCK
 
     const status = result.valid ? 200 : 401;
     
