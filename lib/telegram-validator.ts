@@ -9,54 +9,6 @@ type ValidateResult = {
   reason?: string;
 };
 
-// 🔥 Normalize user object keys from uppercase to lowercase
-function normalizeUserObject(user: any): any {
-  if (!user) return user;
-  
-  // If already lowercase, return as-is
-  if (user.id !== undefined) return user;
-  
-  // Normalize uppercase keys to lowercase
-  return {
-    id: user.ID,
-    first_name: user.FIRST_NAME,
-    last_name: user.LAST_NAME,
-    username: user.USERNAME,
-    language_code: user.LANGUAGE_CODE,
-    photo_url: user.PHOTO_URL,
-    allows_write_to_pm: user.ALLOWS_WRITE_TO_PM,
-    is_premium: user.IS_PREMIUM,
-    is_bot: user.IS_BOT,
-    added_to_attachment_menu: user.ADDED_TO_ATTACHMENT_MENU
-  };
-}
-
-// 🔥 FIXED: Normalize user JSON before building data-check-string
-function buildDataCheckString(initDataString: string): string {
-  const params = new URLSearchParams(initDataString);
-  
-  // Normalize the user parameter if present
-  const userParam = params.get("user");
-  if (userParam) {
-    try {
-      const decodedUser = decodeURIComponent(userParam);
-      const userObj = JSON.parse(decodedUser);
-      const normalizedUserObj = normalizeUserObject(userObj);
-      const normalizedUserStr = JSON.stringify(normalizedUserObj);
-      params.set("user", encodeURIComponent(normalizedUserStr));
-    } catch (e) {
-      logger.warn("[TG-VALIDATOR] Failed to normalize user param", e);
-      // Fall back to original if normalization fails
-    }
-  }
-  
-  const keys = Array.from(params.keys())
-    .filter(k => k !== "hash")
-    .sort();
-  
-  return keys.map(k => `${k}=${params.get(k)}`).join("\n");
-}
-
 export async function validateTelegramInitData(
   initDataString: string, 
   botToken: string
@@ -68,14 +20,30 @@ export async function validateTelegramInitData(
     if (!botToken) return { valid: false, computedHash: null, receivedHash: null, reason: "bot token missing" };
 
     const params = new URLSearchParams(initDataString);
-    const receivedHash = params.get("hash");
+    
+    // Get hash parameter (case-insensitive)
+    let receivedHash = null;
+    for (const key of params.keys()) {
+      if (key.toLowerCase() === 'hash') {
+        receivedHash = params.get(key);
+        break;
+      }
+    }
+    
     if (!receivedHash) {
       logger.warn("[TG-VALIDATOR] ❌ Missing hash parameter");
       return { valid: false, computedHash: null, receivedHash: null, reason: "hash param missing" };
     }
 
-    // Timestamp check
-    const authDateParam = params.get("auth_date");
+    // Timestamp check (case-insensitive)
+    let authDateParam = null;
+    for (const key of params.keys()) {
+      if (key.toLowerCase() === 'auth_date') {
+        authDateParam = params.get(key);
+        break;
+      }
+    }
+    
     const maxAgeSeconds = parseInt(process.env.TELEGRAM_AUTH_MAX_AGE_SECONDS || '86400', 10);
     const currentTime = Math.floor(Date.now() / 1000);
     
@@ -88,19 +56,26 @@ export async function validateTelegramInitData(
         return { valid: false, computedHash: null, receivedHash: null, reason: "auth_date expired" };
       }
       logger.log(`[TG-VALIDATOR] auth_date fresh: ${age}s ago`);
-    } else {
-      logger.warn("[TG-VALIDATOR] ⚠️ auth_date missing from initData");
     }
 
-    logger.log(`[TG-VALIDATOR] Received hash: ${receivedHash.substring(0, 16)}...`);
-    const dataCheckString = buildDataCheckString(initDataString);
-    logger.log(`[TG-VALIDATOR] Data check string length: ${dataCheckString.length}`);
+    // Build data check string EXACTLY as Telegram expects
+    const paramNames = Array.from(params.keys());
+    const filteredNames = paramNames.filter(name => name.toLowerCase() !== 'hash');
+    filteredNames.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    
+    const dataCheckString = filteredNames
+      .map(name => `${name}=${params.get(name)}`)
+      .join('\n');
 
-    // ✅ CORRECT: Mini App algorithm
+    logger.log(`[TG-VALIDATOR] Data check string length: ${dataCheckString.length}`);
+    logger.log(`[TG-VALIDATOR] Data check string:`, dataCheckString);
+
+    // Compute hash
     const secretKey = crypto.createHmac('sha256', botToken).update('WebAppData').digest();
     const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
     logger.log(`[TG-VALIDATOR] Computed hash: ${computedHash.substring(0, 16)}...`);
+    logger.log(`[TG-VALIDATOR] Received hash: ${receivedHash.substring(0, 16)}...`);
 
     // Timing-safe comparison
     let valid = false;
@@ -113,13 +88,30 @@ export async function validateTelegramInitData(
       valid = false;
     }
 
-    // Parse user for return value
+    // Parse user for return value (separate from validation logic)
     let user = undefined;
-    const userParam = params.get("user");
+    let userParam = null;
+    for (const key of params.keys()) {
+      if (key.toLowerCase() === 'user') {
+        userParam = params.get(key);
+        break;
+      }
+    }
+    
     if (userParam) {
       try {
-        const rawUser = JSON.parse(decodeURIComponent(userParam));
-        user = normalizeUserObject(rawUser);
+        const decodedUserStr = decodeURIComponent(userParam);
+        const userObj = JSON.parse(decodedUserStr);
+        // Normalize keys for internal use (doesn't affect hash)
+        user = {
+          id: userObj.ID ?? userObj.id,
+          first_name: userObj.FIRST_NAME ?? userObj.first_name,
+          last_name: userObj.LAST_NAME ?? userObj.last_name,
+          username: userObj.USERNAME ?? userObj.username,
+          language_code: userObj.LANGUAGE_CODE ?? userObj.language_code,
+          photo_url: userObj.PHOTO_URL ?? userObj.photo_url,
+          allows_write_to_pm: userObj.ALLOWS_WRITE_TO_PM ?? userObj.allows_write_to_pm,
+        };
         logger.log(`[TG-VALIDATOR] User parsed: ${user.username} (${user.id})`);
       } catch (e) {
         logger.warn("[TG-VALIDATOR] ⚠️ Failed to parse user param", e);

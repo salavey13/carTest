@@ -44,7 +44,9 @@ logger.log(initData); // This will show the actual string
 // 🔥 DEBUG: Log what the validator sees
 logger.log("🔍 BUILDING DATA CHECK STRING...");
 const params = new URLSearchParams(initData);
-const keys = Array.from(params.keys()).filter(k => k !== "hash").sort();
+const keys = Array.from(params.keys())
+  .filter(k => k.toLowerCase() !== "hash") // Fix: case-insensitive
+  .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())); // Fix: case-insensitive
 const dataCheckString = keys.map(k => `${k}=${params.get(k)}`).join("\n");
 logger.log("🔍 Data check string:", dataCheckString);
 logger.log("🔍 Data check string length:", dataCheckString.length);
