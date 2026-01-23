@@ -9,13 +9,34 @@ type ValidateResult = {
   reason?: string;
 };
 
+// 🔥 NEW: Normalize uppercase keys to lowercase
+function normalizeUserObject(user: any): any {
+  if (!user) return user;
+  
+  // If already lowercase, return as-is
+  if (user.id !== undefined) return user;
+  
+  // Normalize uppercase keys
+  return {
+    id: user.ID,
+    first_name: user.FIRST_NAME,
+    last_name: user.LAST_NAME,
+    username: user.USERNAME,
+    language_code: user.LANGUAGE_CODE,
+    photo_url: user.PHOTO_URL,
+    allows_write_to_pm: user.ALLOWS_WRITE_TO_PM,
+    is_premium: user.IS_PREMIUM,
+    is_bot: user.IS_BOT,
+    added_to_attachment_menu: user.ADDED_TO_ATTACHMENT_MENU
+  };
+}
+
 function buildDataCheckString(initDataString: string): string {
   const params = new URLSearchParams(initDataString);
   const keys = Array.from(params.keys())
-    .filter(k => k !== "hash") // ✅ Includes 'signature' if present
+    .filter(k => k !== "hash")
     .sort();
   
-  // URLSearchParams automatically decodes values - this is CORRECT
   return keys.map(k => `${k}=${params.get(k)}`).join("\n");
 }
 
@@ -36,7 +57,7 @@ export async function validateTelegramInitData(
       return { valid: false, computedHash: null, receivedHash: null, reason: "hash param missing" };
     }
 
-    // 🚨 TIMESTAMP FRESHNESS CHECK (prevents replay attacks)
+    // Timestamp check
     const authDateParam = params.get("auth_date");
     const maxAgeSeconds = parseInt(process.env.TELEGRAM_AUTH_MAX_AGE_SECONDS || '86400', 10);
     const currentTime = Math.floor(Date.now() / 1000);
@@ -58,13 +79,13 @@ export async function validateTelegramInitData(
     const dataCheckString = buildDataCheckString(initDataString);
     logger.log(`[TG-VALIDATOR] Data check string length: ${dataCheckString.length}`);
 
-    // ✅ CORRECT: Mini App algorithm - HMAC-SHA256(botToken, "WebAppData")
+    // ✅ CORRECT: Mini App algorithm
     const secretKey = crypto.createHmac('sha256', botToken).update('WebAppData').digest();
     const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
     logger.log(`[TG-VALIDATOR] Computed hash: ${computedHash.substring(0, 16)}...`);
 
-    // ✅ Secure timing-safe comparison
+    // Timing-safe comparison
     let valid = false;
     try {
       valid = crypto.timingSafeEqual(
@@ -72,14 +93,16 @@ export async function validateTelegramInitData(
         Buffer.from(receivedHash, 'hex')
       );
     } catch (e) {
-      valid = false; // Length mismatch = invalid
+      valid = false;
     }
 
+    // 🔥 FIXED: Normalize user object keys
     let user = undefined;
     const userParam = params.get("user");
     if (userParam) {
       try {
-        user = JSON.parse(decodeURIComponent(userParam));
+        const rawUser = JSON.parse(decodeURIComponent(userParam));
+        user = normalizeUserObject(rawUser);
         logger.log(`[TG-VALIDATOR] User parsed: ${user.username} (${user.id})`);
       } catch (e) {
         logger.warn("[TG-VALIDATOR] ⚠️ Failed to parse user param", e);
