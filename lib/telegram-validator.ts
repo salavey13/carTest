@@ -9,22 +9,32 @@ type ValidateResult = {
   reason?: string;
 };
 
+// 🔥 Strict Whitelist of allowed parameters (from Telegram Docs)
+const ALLOWED_KEYS = [
+  'auth_date',
+  'can_send_after',
+  'chat',
+  'chat_instance',
+  'chat_type',
+  'query_id',
+  'start_param',
+  'user'
+];
+
 export async function validateTelegramInitData(
   initDataString: string,
   botToken: string
 ): Promise<ValidateResult> {
-  logger.info("[TG-VALIDATOR] Standard Validation...");
+  logger.info("[TG-VALIDATOR] Strict Whitelist Validation...");
 
   try {
     if (!initDataString) return { valid: false, reason: "empty initData", computedHash: null, receivedHash: null };
     if (!botToken) return { valid: false, reason: "bot token missing", computedHash: null, receivedHash: null };
 
-    // 1. Clean token (remove accidental whitespace)
+    // 1. Clean token
     const cleanToken = botToken.trim();
 
-    // 2. Extract Hash and Build Data Check String in one pass
-    // We use .split('&') because URLSearchParams automatically DECODES values,
-    // which breaks the hash calculation if the client sent URL-encoded values.
+    // 2. Parse and Filter
     const pairs = initDataString.split('&');
     let receivedHash: string | null = null;
     const dataPairs: string[] = [];
@@ -33,12 +43,16 @@ export async function validateTelegramInitData(
       const [rawKey, rawValue] = pair.split('=');
       if (!rawKey) continue;
 
-      if (rawKey.toLowerCase() === 'hash') {
-        receivedHash = rawValue; // Keep the raw hash value
-      } else {
-        // We reconstruct the pair EXACTLY as it was received
-        // to ensure we match the client's hash input.
+      const lowerKey = rawKey.toLowerCase();
+
+      if (lowerKey === 'hash') {
+        receivedHash = rawValue;
+      } else if (ALLOWED_KEYS.includes(lowerKey)) {
+        // Only add if it's in the whitelist
         dataPairs.push(`${rawKey}=${rawValue || ''}`);
+      } else {
+        // 🔥 Log skipped junk (like SIGNATURE) so we know what's happening
+        logger.warn(`[TG-VALIDATOR] Skipping non-standard parameter: ${rawKey}`);
       }
     }
 
@@ -47,8 +61,6 @@ export async function validateTelegramInitData(
     }
 
     // 3. Sort Keys Alphabetically
-    // This matches the official spec: "sorted alphabetically"
-    // Note: We sort the reconstructed strings "key=value" to handle sorting easily.
     dataPairs.sort((a, b) => {
       const keyA = a.split('=')[0];
       const keyB = b.split('=')[0];
@@ -61,14 +73,12 @@ export async function validateTelegramInitData(
     logger.log(`[TG-VALIDATOR] Data Check String:\n${dataCheckString}`);
 
     // 5. Create Secret Key
-    // secret = HMAC-SHA256(<bot_token>, "WebAppData")
     const secretKey = crypto
       .createHmac('sha256', cleanToken)
       .update('WebAppData')
       .digest();
 
     // 6. Compute Hash
-    // hash = HMAC-SHA256(<secret>, <data_check_string>)
     const computedHash = crypto
       .createHmac('sha256', secretKey)
       .update(dataCheckString)
@@ -86,20 +96,18 @@ export async function validateTelegramInitData(
     if (valid) {
       logger.info("[TG-VALIDATOR] ✅ SUCCESS");
     } else {
-      logger.error("[TG-VALIDATOR] ❌ FAILED: Hash mismatch");
+      logger.error("[TG-VALIDATOR] ❌ FAILED: Hash mismatch (Is your token correct?)");
     }
 
-    // 8. Parse User (Optional, for return value)
+    // 8. Parse User
     let user = undefined;
     const userPair = dataPairs.find(p => p.toLowerCase().startsWith('user='));
     if (userPair) {
       try {
         const rawValue = userPair.split('=')[1];
-        // Now we decode for usage
         const decodedStr = decodeURIComponent(rawValue);
         const userObj = JSON.parse(decodedStr);
         
-        // Handle Uppercase JSON keys from weird clients
         user = {
           id: userObj.id || userObj.ID,
           first_name: userObj.first_name || userObj.FIRST_NAME,
