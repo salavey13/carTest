@@ -28,14 +28,31 @@ export async function POST(req: NextRequest) {
 
     const { initData } = body;
   
-  // 🔥 CRITICAL DEBUGGING
-  logger.log("🔍 INITDATA RAW BYTES", {
-    length: initData.length,
-    first50: initData.substring(0, 50),
-    last50: initData.substring(initData.length - 50),
-    includesDoubleEncoded: initData.includes('%25'), // Checks for %2522 etc.
-    hashFromData: initData.match(/hash=([a-f0-9]+)/)?.[1]
-  });
+  // ✅ CORRECT (stringify it)
+logger.log("🔍 INITDATA RAW BYTES: " + JSON.stringify({
+  length: initData.length,
+  first50: initData.substring(0, 50),
+  last50: initData.substring(initData.length - 50),
+  includesDoubleEncoded: initData.includes('%25'),
+  hashFromData: initData.match(/hash=([a-f0-9]+)/)?.[1]
+}, null, 2));
+
+// 🔥 DEBUG: Log the raw string
+logger.log("🔍 RAW INITDATA STRING:");
+logger.log(initData); // This will show the actual string
+
+// 🔥 DEBUG: Log what the validator sees
+logger.log("🔍 BUILDING DATA CHECK STRING...");
+const params = new URLSearchParams(initData);
+const keys = Array.from(params.keys()).filter(k => k !== "hash").sort();
+const dataCheckString = keys.map(k => `${k}=${params.get(k)}`).join("\n");
+logger.log("🔍 Data check string:", dataCheckString);
+logger.log("🔍 Data check string length:", dataCheckString.length);
+
+// 🔥 DEBUG: Show each parameter
+keys.forEach(k => {
+  logger.log(`🔍 Param ${k}: ${params.get(k)?.substring(0, 50)}...`);
+});
 
     if (!BOT_TOKEN) {
       logger.error("💥 TELEGRAM_BOT_TOKEN not configured");
