@@ -19,30 +19,41 @@ export async function validateTelegramInitData(
     if (!initDataString) return { valid: false, reason: "empty initData", computedHash: null, receivedHash: null };
     if (!botToken) return { valid: false, reason: "bot token missing", computedHash: null, receivedHash: null };
 
-    // 1. Split into pairs
+    // 1. Split raw pairs
     const pairs = initDataString.split('&');
     
-    // 2. Process pairs: Filter out 'hash', Force Keys to Lowercase, Keep Values as-is
+    // 2. Parse and Filter
+    // We keep the ORIGINAL CASE of keys (e.g., AUTH_DATE stays AUTH_DATE)
+    // We only remove 'hash' (case-insensitive check)
     const sortedData = pairs
       .map(pair => {
         const eqIndex = pair.indexOf('=');
         if (eqIndex === -1) return null;
-        const key = pair.substring(0, eqIndex).toLowerCase(); // 🔥 Force Key Lowercase
+        const key = pair.substring(0, eqIndex); // 🔥 KEEP ORIGINAL CASE
         const value = pair.substring(eqIndex + 1);
         return { key, value };
       })
-      .filter(item => item !== null && item.key !== 'hash' && item.key !== 'signature' && item.key !== 'sign') as { key: string, value: string }[];
+      .filter(item => {
+        if (!item) return false;
+        // Remove hash, signature, sign (Case Insensitive removal)
+        if (item.key.toLowerCase() === 'hash' || 
+            item.key.toLowerCase() === 'signature' || 
+            item.key.toLowerCase() === 'sign') {
+          return false;
+        }
+        return true;
+      }) as { key: string, value: string }[];
 
-    // 3. Sort alphabetically by key (now lowercase)
+    // 3. Sort alphabetically (Standard String Sort - respects case)
     sortedData.sort((a, b) => a.key.localeCompare(b.key));
 
-    // 4. Build the string: "key=value\n..."
+    // 4. Build string
     const dataCheckString = sortedData.map(item => `${item.key}=${item.value}`).join('\n');
 
     logger.log(`[TG-VALIDATOR] Data Check String:\n${dataCheckString}`);
 
-    // 5. Validate Auth Date (Find it in our processed data)
-    const authDateItem = sortedData.find(item => item.key === 'auth_date');
+    // 5. Validate Date
+    const authDateItem = sortedData.find(item => item.key.toLowerCase() === 'auth_date');
     if (authDateItem) {
       try {
         const authDate = parseInt(decodeURIComponent(authDateItem.value), 10);
@@ -51,7 +62,6 @@ export async function validateTelegramInitData(
         const age = currentTime - authDate;
         
         if (age > maxAgeSeconds) {
-          logger.warn(`[TG-VALIDATOR] ❌ auth_date expired: ${age}s old`);
           return { valid: false, reason: "auth_date expired", computedHash: null, receivedHash: null };
         }
         logger.log(`[TG-VALIDATOR] ✅ auth_date valid: ${age}s ago`);
@@ -60,12 +70,9 @@ export async function validateTelegramInitData(
       }
     }
 
-    // 6. Extract Hash from original string
-    const receivedHash = pairs
-      .map(p => { const i = p.indexOf('='); return i === -1 ? p : p.substring(0, i); })
-      .find(k => k.toLowerCase() === 'hash');
-
-    const receivedHashValue = pairs.find(p => p.toLowerCase().startsWith('hash='))?.split('=')[1];
+    // 6. Extract Received Hash (Case Insensitive lookup)
+    const receivedHashItem = pairs.find(p => p.toLowerCase().startsWith('hash='));
+    const receivedHashValue = receivedHashItem ? receivedHashItem.split('=')[1] : null;
 
     if (!receivedHashValue) {
       return { valid: false, reason: "hash param missing", computedHash: null, receivedHash: null };
@@ -84,22 +91,20 @@ export async function validateTelegramInitData(
       valid = crypto.timingSafeEqual(Buffer.from(computedHash, 'hex'), Buffer.from(receivedHashValue, 'hex'));
     } catch { valid = false; }
 
-    // 9. Parse User (if present)
+    // 9. Parse User
     let user = undefined;
-    const userItem = sortedData.find(item => item.key === 'user');
+    const userItem = sortedData.find(item => item.key.toLowerCase() === 'user');
     if (userItem) {
       try {
         const decodedUserStr = decodeURIComponent(userItem.value);
         const userObj = JSON.parse(decodedUserStr);
         
-        // Normalize user object keys to lowercase just in case
         user = {
           id: userObj.id || userObj.ID,
           first_name: userObj.first_name || userObj.FIRST_NAME,
           last_name: userObj.last_name || userObj.LAST_NAME,
           username: userObj.username || userObj.USERNAME,
           language_code: userObj.language_code || userObj.LANGUAGE_CODE,
-          photo_url: userObj.photo_url || userObj.PHOTO_URL,
           allows_write_to_pm: userObj.allows_write_to_pm || userObj.ALLOWS_WRITE_TO_PM,
         };
         logger.log(`[TG-VALIDATOR] User: ${user.username} (${user.id})`);
