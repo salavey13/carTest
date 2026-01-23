@@ -9,14 +9,14 @@ type ValidateResult = {
   reason?: string;
 };
 
-// 🔥 NEW: Normalize uppercase keys to lowercase
+// 🔥 Normalize user object keys from uppercase to lowercase
 function normalizeUserObject(user: any): any {
   if (!user) return user;
   
   // If already lowercase, return as-is
   if (user.id !== undefined) return user;
   
-  // Normalize uppercase keys
+  // Normalize uppercase keys to lowercase
   return {
     id: user.ID,
     first_name: user.FIRST_NAME,
@@ -31,8 +31,25 @@ function normalizeUserObject(user: any): any {
   };
 }
 
+// 🔥 FIXED: Normalize user JSON before building data-check-string
 function buildDataCheckString(initDataString: string): string {
   const params = new URLSearchParams(initDataString);
+  
+  // Normalize the user parameter if present
+  const userParam = params.get("user");
+  if (userParam) {
+    try {
+      const decodedUser = decodeURIComponent(userParam);
+      const userObj = JSON.parse(decodedUser);
+      const normalizedUserObj = normalizeUserObject(userObj);
+      const normalizedUserStr = JSON.stringify(normalizedUserObj);
+      params.set("user", encodeURIComponent(normalizedUserStr));
+    } catch (e) {
+      logger.warn("[TG-VALIDATOR] Failed to normalize user param", e);
+      // Fall back to original if normalization fails
+    }
+  }
+  
   const keys = Array.from(params.keys())
     .filter(k => k !== "hash")
     .sort();
@@ -96,7 +113,7 @@ export async function validateTelegramInitData(
       valid = false;
     }
 
-    // 🔥 FIXED: Normalize user object keys
+    // Parse user for return value
     let user = undefined;
     const userParam = params.get("user");
     if (userParam) {
