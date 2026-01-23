@@ -9,7 +9,7 @@ type ValidateResult = {
   reason?: string;
 };
 
-// Manual parser to preserve exact strings
+// 🔥 Parse raw string manually - no URLSearchParams nonsense
 function parseInitDataRaw(initDataString: string): Map<string, string> {
   const params = new Map<string, string>();
   const pairs = initDataString.split('&');
@@ -55,7 +55,6 @@ export async function validateTelegramInitData(
     // 🔥 CRITICAL: Remove non-standard parameters that break the hash
     params.delete('signature');
     params.delete('SIGNATURE');
-    params.delete('signature_fake'); // In case it appears
 
     // Auth date check (decode temporarily for validation)
     let authDateStr = null;
@@ -79,10 +78,15 @@ export async function validateTelegramInitData(
       logger.log(`[TG-VALIDATOR] auth_date fresh: ${age}s ago`);
     }
 
-    // Build data check string with EXACT keys and preserved case
-    // Use alphabetical sort (per Telegram spec)
-    const keys = Array.from(params.keys()).sort((a, b) => a.localeCompare(b));
-    const dataCheckString = keys.map(key => `${key}=${params.get(key)}`).join('\n');
+    // 🔥 CRITICAL: Force lowercase keys AND sort alphabetically
+    const lowercaseKeys = Array.from(params.keys()).map(k => k.toLowerCase());
+    const sortedKeys = lowercaseKeys.sort(); // Alphabetical sort
+    
+    // Build data-check-string with lowercase keys and original values
+    const dataCheckString = sortedKeys.map(key => {
+      const originalKey = Array.from(params.keys()).find(k => k.toLowerCase() === key);
+      return `${key}=${params.get(originalKey!)}`;
+    }).join('\n');
 
     logger.log(`[TG-VALIDATOR] Data check string length: ${dataCheckString.length}`);
     logger.log(`[TG-VALIDATOR] Data check string:\n${dataCheckString}`);
