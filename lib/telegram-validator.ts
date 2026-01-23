@@ -9,7 +9,7 @@ type ValidateResult = {
   reason?: string;
 };
 
-// 🔥 Parse raw string manually
+// Manual parser to preserve exact strings
 function parseInitDataRaw(initDataString: string): Map<string, string> {
   const params = new Map<string, string>();
   const pairs = initDataString.split('&');
@@ -20,10 +20,6 @@ function parseInitDataRaw(initDataString: string): Map<string, string> {
     
     const key = pair.substring(0, eqIndex);
     const value = pair.substring(eqIndex + 1); // Keep URL-encoded
-    
-    // Debug: Log the raw key-value pair
-    logger.log(`[PARSE] Key: "${key}", Value: "${value.substring(0, 20)}..."`);
-    
     params.set(key, value);
   }
   return params;
@@ -41,11 +37,12 @@ export async function validateTelegramInitData(
 
     const params = parseInitDataRaw(initDataString);
     
-    // Extract hash (raw)
+    // Extract and remove hash
     let receivedHash = null;
     for (const key of params.keys()) {
       if (key.toLowerCase() === 'hash') {
         receivedHash = params.get(key);
+        params.delete(key);
         break;
       }
     }
@@ -54,6 +51,11 @@ export async function validateTelegramInitData(
       logger.warn("[TG-VALIDATOR] ❌ Missing hash parameter");
       return { valid: false, reason: "hash param missing", computedHash: null, receivedHash: null };
     }
+
+    // 🔥 CRITICAL: Remove non-standard parameters that break the hash
+    params.delete('signature');
+    params.delete('SIGNATURE');
+    params.delete('signature_fake'); // In case it appears
 
     // Auth date check (decode temporarily for validation)
     let authDateStr = null;
@@ -77,12 +79,9 @@ export async function validateTelegramInitData(
       logger.log(`[TG-VALIDATOR] auth_date fresh: ${age}s ago`);
     }
 
-    // Build data check string with RAW keys and RAW, URL-ENCODED values
-    const keys = Array.from(params.keys())
-      .filter(key => key.toLowerCase() !== 'hash')
-      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-    
-    // 🔥 CRITICAL: Use RAW values, do NOT decode
+    // Build data check string with EXACT keys and preserved case
+    // Use alphabetical sort (per Telegram spec)
+    const keys = Array.from(params.keys()).sort((a, b) => a.localeCompare(b));
     const dataCheckString = keys.map(key => `${key}=${params.get(key)}`).join('\n');
 
     logger.log(`[TG-VALIDATOR] Data check string length: ${dataCheckString.length}`);
@@ -101,7 +100,7 @@ export async function validateTelegramInitData(
       valid = crypto.timingSafeEqual(Buffer.from(computedHash, 'hex'), Buffer.from(receivedHash, 'hex'));
     } catch { valid = false; }
 
-    // Parse user for return value (separate from validation)
+    // Parse user for return value (decode temporarily)
     let user = undefined;
     const userParam = params.get('user') || params.get('USER');
     if (userParam) {
