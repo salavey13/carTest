@@ -28,28 +28,38 @@ export async function POST(req: NextRequest) {
 
     const { initData } = body;
   
-  // ✅ CORRECT (stringify it)
-logger.log("🔍 INITDATA RAW BYTES: " + JSON.stringify({
-  length: initData.length,
-  first50: initData.substring(0, 50),
-  last50: initData.substring(initData.length - 50),
-  includesDoubleEncoded: initData.includes('%25'),
-  hashFromData: initData.match(/hash=([a-f0-9]+)/)?.[1]
-}, null, 2));
+    // 🔥 DEBUG: Character-level analysis
+    logger.log("🔍 INITDATA HEX DUMP (first 100 chars):", Buffer.from(initData).toString('hex').substring(0, 200));
+    logger.log("🔍 INITDATA CHAR CODES (first 10 chars):", initData.substring(0, 10).split('').map(c => c.charCodeAt(0)));
 
-// 🔥 DEBUG: Log the raw string
-logger.log("🔍 RAW INITDATA STRING:");
-logger.log(initData); // This will show the actual string
+    // ✅ Log structured data
+    logger.log("🔍 INITDATA RAW BYTES: " + JSON.stringify({
+      length: initData.length,
+      first50: initData.substring(0, 50),
+      last50: initData.substring(initData.length - 50),
+      includesDoubleEncoded: initData.includes('%25'),
+      hashFromData: initData.match(/hash=([a-f0-9]+)/i)?.[1]
+    }, null, 2));
 
-// 🔥 DEBUG: Log what the validator sees
-logger.log("🔍 BUILDING DATA CHECK STRING...");
-const params = new URLSearchParams(initData);
-const keys = Array.from(params.keys())
-  .filter(k => k.toLowerCase() !== "hash") // Case-insensitive
-  .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())); // Telegram's sort
-const dataCheckString = keys.map(k => `${k}=${params.get(k)}`).join("\n");
-logger.log("🔍 Data check string:", dataCheckString);
-logger.log("🔍 Data check string length:", dataCheckString.length);
+    // 🔥 DEBUG: Log the raw string
+    logger.log("🔍 RAW INITDATA STRING:");
+    logger.log(initData);
+
+    // 🔥 DEBUG: Log what the validator sees
+    logger.log("🔍 BUILDING DATA CHECK STRING...");
+    const params = new URLSearchParams(initData);
+    
+    // Log the ACTUAL keys extracted from params
+    const actualKeys = Array.from(params.keys());
+    logger.log("🔍 PARAM KEYS FROM URLSearchParams:", actualKeys);
+
+    const keys = actualKeys
+      .filter(k => k.toLowerCase() !== "hash")
+      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    
+    const dataCheckString = keys.map(k => `${k}=${params.get(k)}`).join("\n");
+    logger.log("🔍 DATA CHECK STRING:", dataCheckString);
+    logger.log("🔍 DATA CHECK STRING LENGTH:", dataCheckString.length);
 
     if (!BOT_TOKEN) {
       logger.error("💥 TELEGRAM_BOT_TOKEN not configured");

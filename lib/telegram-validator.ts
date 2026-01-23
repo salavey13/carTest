@@ -16,12 +16,13 @@ export async function validateTelegramInitData(
   logger.info("[TG-VALIDATOR] Starting validation...");
   
   try {
-    if (!initDataString) return { valid: false, computedHash: null, receivedHash: null, reason: "empty initData" };
-    if (!botToken) return { valid: false, computedHash: null, receivedHash: null, reason: "bot token missing" };
+    if (!initDataString) return { valid: false, reason: "empty initData", computedHash: null, receivedHash: null };
+    if (!botToken) return { valid: false, reason: "bot token missing", computedHash: null, receivedHash: null };
 
+    // Parse params ONCE and preserve original case
     const params = new URLSearchParams(initDataString);
     
-    // Extract hash (case-insensitive)
+    // Extract hash (case-insensitive, but preserve original key)
     let receivedHash = null;
     for (const key of params.keys()) {
       if (key.toLowerCase() === 'hash') {
@@ -32,29 +33,33 @@ export async function validateTelegramInitData(
     
     if (!receivedHash) {
       logger.warn("[TG-VALIDATOR] ❌ Missing hash parameter");
-      return { valid: false, computedHash: null, receivedHash: null, reason: "hash param missing" };
+      return { valid: false, reason: "hash param missing", computedHash: null, receivedHash: null };
     }
 
-    // Auth date check (case-insensitive)
-    let authDate = null;
+    // Auth date check
+    let authDateStr = null;
     for (const key of params.keys()) {
       if (key.toLowerCase() === 'auth_date') {
-        authDate = parseInt(params.get(key) || '0', 10);
+        authDateStr = params.get(key);
         break;
       }
     }
     
     const maxAgeSeconds = parseInt(process.env.TELEGRAM_AUTH_MAX_AGE_SECONDS || '86400', 10);
     const currentTime = Math.floor(Date.now() / 1000);
-    const age = currentTime - authDate;
     
-    if (authDate && age > maxAgeSeconds) {
-      logger.warn(`[TG-VALIDATOR] ❌ auth_date expired: ${age}s old (max: ${maxAgeSeconds}s)`);
-      return { valid: false, computedHash: null, receivedHash: null, reason: "auth_date expired" };
+    if (authDateStr) {
+      const authDate = parseInt(authDateStr, 10);
+      const age = currentTime - authDate;
+      if (age > maxAgeSeconds) {
+        logger.warn(`[TG-VALIDATOR] ❌ auth_date expired: ${age}s old (max: ${maxAgeSeconds}s)`);
+        return { valid: false, reason: "auth_date expired", computedHash: null, receivedHash: null };
+      }
+      logger.log(`[TG-VALIDATOR] auth_date fresh: ${age}s ago`);
     }
-    logger.log(`[TG-VALIDATOR] auth_date fresh: ${age}s ago`);
 
-    // Build data check string WITHOUT modifying params
+    // Build data check string EXACTLY as parsed by URLSearchParams
+    // DO NOT modify case, DO NOT re-encode values
     const keys = Array.from(params.keys())
       .filter(key => key.toLowerCase() !== 'hash')
       .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
@@ -62,14 +67,14 @@ export async function validateTelegramInitData(
     const dataCheckString = keys.map(key => `${key}=${params.get(key)}`).join('\n');
 
     logger.log(`[TG-VALIDATOR] Data check string length: ${dataCheckString.length}`);
-    logger.log(`[TG-VALIDATOR] Data check string:`, dataCheckString);
+    logger.log(`[TG-VALIDATOR] Data check string:\n${dataCheckString}`); // Log full string
 
     // Compute hash
     const secretKey = crypto.createHmac('sha256', botToken).update('WebAppData').digest();
     const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
-    logger.log(`[TG-VALIDATOR] Computed hash: ${computedHash.substring(0, 16)}...`);
-    logger.log(`[TG-VALIDATOR] Received hash: ${receivedHash.substring(0, 16)}...`);
+    logger.log(`[TG-VALIDATOR] Computed hash: ${computedHash}`);
+    logger.log(`[TG-VALIDATOR] Received hash: ${receivedHash}`);
 
     // Compare
     let valid = false;
@@ -77,7 +82,7 @@ export async function validateTelegramInitData(
       valid = crypto.timingSafeEqual(Buffer.from(computedHash, 'hex'), Buffer.from(receivedHash, 'hex'));
     } catch { valid = false; }
 
-    // Parse user for return value (separate from validation logic)
+    // Parse user for return value (separate from validation)
     let user = undefined;
     const userParam = params.get('user') || params.get('USER');
     if (userParam) {
@@ -100,15 +105,9 @@ export async function validateTelegramInitData(
 
     logger.info(`[TG-VALIDATOR] ${valid ? '✅ Validation SUCCESS' : '❌ Validation FAILED - Hash mismatch'}`);
 
-    return { 
-      valid, 
-      computedHash, 
-      receivedHash, 
-      user, 
-      reason: valid ? undefined : "hash mismatch" 
-    };
+    return { valid, computedHash, receivedHash, user, reason: valid ? undefined : "hash mismatch" };
   } catch (e: any) {
     logger.error("[TG-VALIDATOR] 💥 Unexpected error", e);
-    return { valid: false, computedHash: null, receivedHash: null, reason: e.message };
+    return { valid: false, reason: e.message, computedHash: null, receivedHash: null };
   }
 }
