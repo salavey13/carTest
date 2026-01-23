@@ -9,128 +9,47 @@ type ValidateResult = {
   reason?: string;
 };
 
-// 🔥 Parse raw string manually - no URLSearchParams nonsense
-function parseInitDataRaw(initDataString: string): Map<string, string> {
-  const params = new Map<string, string>();
-  const pairs = initDataString.split('&');
-  
-  for (const pair of pairs) {
-    const eqIndex = pair.indexOf('=');
-    if (eqIndex === -1) continue;
-    
-    const key = pair.substring(0, eqIndex);
-    const value = pair.substring(eqIndex + 1); // Keep URL-encoded
-    params.set(key, value);
-  }
-  return params;
-}
-
 export async function validateTelegramInitData(
   initDataString: string, 
   botToken: string
 ): Promise<ValidateResult> {
-  logger.info("[TG-VALIDATOR] Starting validation...");
-  
-  try {
-    if (!initDataString) return { valid: false, reason: "empty initData", computedHash: null, receivedHash: null };
-    if (!botToken) return { valid: false, reason: "bot token missing", computedHash: null, receivedHash: null };
+  // Split raw string manually
+  const pairs = initDataString.split('&');
+  const params = new Map<string, string>();
+  let receivedHash = null;
 
-    const params = parseInitDataRaw(initDataString);
+  for (const pair of pairs) {
+    const [key, ...valueParts] = pair.split('=');
+    const value = valueParts.join('='); // Handle values with =
     
-    // Extract and remove hash
-    let receivedHash = null;
-    for (const key of params.keys()) {
-      if (key.toLowerCase() === 'hash') {
-        receivedHash = params.get(key);
-        params.delete(key);
-        break;
-      }
+    if (key.toLowerCase() === 'hash') {
+      receivedHash = value;
+    } else if (key.toLowerCase() === 'signature') {
+      // Skip non-standard signature parameter
+      continue;
+    } else {
+      params.set(key, value);
     }
-    
-    if (!receivedHash) {
-      logger.warn("[TG-VALIDATOR] ❌ Missing hash parameter");
-      return { valid: false, reason: "hash param missing", computedHash: null, receivedHash: null };
-    }
-
-    // 🔥 CRITICAL: Remove non-standard parameters that break the hash
-    params.delete('signature');
-    params.delete('SIGNATURE');
-
-    // Auth date check (decode temporarily for validation)
-    let authDateStr = null;
-    for (const key of params.keys()) {
-      if (key.toLowerCase() === 'auth_date') {
-        authDateStr = decodeURIComponent(params.get(key) || '');
-        break;
-      }
-    }
-    
-    const maxAgeSeconds = parseInt(process.env.TELEGRAM_AUTH_MAX_AGE_SECONDS || '86400', 10);
-    const currentTime = Math.floor(Date.now() / 1000);
-    
-    if (authDateStr) {
-      const authDate = parseInt(authDateStr, 10);
-      const age = currentTime - authDate;
-      if (age > maxAgeSeconds) {
-        logger.warn(`[TG-VALIDATOR] ❌ auth_date expired: ${age}s old (max: ${maxAgeSeconds}s)`);
-        return { valid: false, reason: "auth_date expired", computedHash: null, receivedHash: null };
-      }
-      logger.log(`[TG-VALIDATOR] auth_date fresh: ${age}s ago`);
-    }
-
-    // 🔥 CRITICAL: Force lowercase keys AND sort alphabetically
-    const lowercaseKeys = Array.from(params.keys()).map(k => k.toLowerCase());
-    const sortedKeys = lowercaseKeys.sort(); // Alphabetical sort
-    
-    // Build data-check-string with lowercase keys and original values
-    const dataCheckString = sortedKeys.map(key => {
-      const originalKey = Array.from(params.keys()).find(k => k.toLowerCase() === key);
-      return `${key}=${params.get(originalKey!)}`;
-    }).join('\n');
-
-    logger.log(`[TG-VALIDATOR] Data check string length: ${dataCheckString.length}`);
-    logger.log(`[TG-VALIDATOR] Data check string:\n${dataCheckString}`);
-
-    // Compute hash
-    const secretKey = crypto.createHmac('sha256', botToken).update('WebAppData').digest();
-    const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
-
-    logger.log(`[TG-VALIDATOR] Computed hash: ${computedHash}`);
-    logger.log(`[TG-VALIDATOR] Received hash: ${receivedHash}`);
-
-    // Compare
-    let valid = false;
-    try {
-      valid = crypto.timingSafeEqual(Buffer.from(computedHash, 'hex'), Buffer.from(receivedHash, 'hex'));
-    } catch { valid = false; }
-
-    // Parse user for return value (decode temporarily)
-    let user = undefined;
-    const userParam = params.get('user') || params.get('USER');
-    if (userParam) {
-      try {
-        const decodedUserStr = decodeURIComponent(userParam);
-        const userObj = JSON.parse(decodedUserStr);
-        user = {
-          id: userObj.ID ?? userObj.id,
-          first_name: userObj.FIRST_NAME ?? userObj.first_name,
-          last_name: userObj.LAST_NAME ?? userObj.last_name,
-          username: userObj.USERNAME ?? userObj.username,
-          language_code: userObj.LANGUAGE_CODE ?? userObj.language_code,
-          photo_url: userObj.PHOTO_URL ?? userObj.photo_url,
-          allows_write_to_pm: userObj.ALLOWS_WRITE_TO_PM ?? userObj.allows_write_to_pm,
-        };
-        logger.log(`[TG-VALIDATOR] User parsed: ${user.username} (${user.id})`);
-      } catch (e) {
-        logger.warn("[TG-VALIDATOR] ⚠️ Failed to parse user param", e);
-      }
-    }
-
-    logger.info(`[TG-VALIDATOR] ${valid ? '✅ Validation SUCCESS' : '❌ Validation FAILED - Hash mismatch'}`);
-
-    return { valid, computedHash, receivedHash, user, reason: valid ? undefined : "hash mismatch" };
-  } catch (e: any) {
-    logger.error("[TG-VALIDATOR] 💥 Unexpected error", e);
-    return { valid: false, reason: e.message, computedHash: null, receivedHash: null };
   }
+
+  if (!receivedHash) {
+    return { valid: false, reason: "hash missing", computedHash: null, receivedHash: null };
+  }
+
+  // Force lowercase keys AND sort alphabetically
+  const items = Array.from(params.entries())
+    .map(([k, v]) => [k.toLowerCase(), v] as [string, string])
+    .sort(([a], [b]) => a.localeCompare(b));
+  
+  const dataCheckString = items.map(([k, v]) => `${k}=${v}`).join('\n');
+
+  const secretKey = crypto.createHmac('sha256', botToken).update('WebAppData').digest();
+  const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+  const valid = crypto.timingSafeEqual(
+    Buffer.from(computedHash, 'hex'),
+    Buffer.from(receivedHash, 'hex')
+  );
+
+  return { valid, computedHash, receivedHash, user: null, reason: valid ? undefined : "hash mismatch" };
 }
