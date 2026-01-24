@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { sendTelegramMessage } from "@/app/actions";
+import { notifyAdmin } from "@/app/actions";
 
 export default function TeaCallPage() {
   const [isSending, setIsSending] = useState(false);
@@ -14,16 +14,14 @@ export default function TeaCallPage() {
       setIsSending(true);
       setStatus(null);
 
-      const res = await sendTelegramMessage(
-        "☕ Пользователь нажал кнопку на странице /tea-call и просит срочно принести чай!"
-      );
+      const res = await notifyAdmin("Админ, принеси чай.");
 
       if (res?.success) {
-        setStatus("Админ уже уведомлён и несётся с чаем.");
+        setStatus("Админ уведомлён, жди чай.");
       } else {
-        setStatus("Не получилось докричаться до админа, попробуй ещё раз.");
+        setStatus("Не удалось уведомить админа, попробуй ещё раз.");
       }
-    } catch (e) {
+    } catch {
       setStatus("Произошла ошибка при вызове админа.");
     } finally {
       setIsSending(false);
@@ -42,7 +40,7 @@ export default function TeaCallPage() {
           Вызвать админа за чаем
         </h1>
         <p className="text-muted-foreground font-mono text-sm">
-          Нажми кнопку, и админ получит телеграм‑сигнал, что пора принести чай.
+          Нажми кнопку — и в админский телеграм прилетит ровно одна команда.
         </p>
 
         <Button
