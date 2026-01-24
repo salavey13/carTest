@@ -173,7 +173,7 @@ export default function UniversalInstructorsPage() {
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 space-y-4">
                             <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                            <p className="font-mono text-muted-foreground text-sm animate-pulse">СКАНЕРОВАНИЕ БАЗЫ ДАННЫХ...</p>
+                            <p className="font-mono text-muted-foreground text-sm animate-pulse">СКАНИРОВАНИЕ БАЗЫ ДАННЫХ...</p>
                         </div>
                     ) : instructors.length > 0 ? (
                         instructors.map((instructor, index) => (
