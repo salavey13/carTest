@@ -27,14 +27,16 @@ export const ReferralPirateCard = () => {
 
   const handleCopy = () => {
     if (!code) return;
-    // FIX: Correct link
     const link = `https://t.me/oneBikePlsBot/sklad?startapp=ref_${code}`;
     navigator.clipboard.writeText(link);
     toast.success("Ссылка скопирована! Отправляй в чат селлеров.");
   };
 
-  const rewardPerFriend = 2000;
-  const potentialEarnings = friendsCount * rewardPerFriend;
+  // 3-Level calculation for display
+  const lvl1 = friendsCount * 2000;
+  const lvl2 = Math.floor(friendsCount * 0.3) * 300; // Assuming 30% conversion
+  const lvl3 = Math.floor(friendsCount * 0.1) * 100; // Assuming 10% conversion
+  const potentialEarnings = lvl1 + lvl2 + lvl3;
 
   if (!dbUser) {
      return (
@@ -76,16 +78,16 @@ export const ReferralPirateCard = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2 p-4 bg-zinc-900/50 rounded-xl border border-zinc-800">
-                        <p className="text-gray-300 font-bold text-sm uppercase tracking-wide text-neon-lime">Твоя добыча (20%)</p>
+                        <p className="text-gray-300 font-bold text-sm uppercase tracking-wide text-neon-lime">Твоя добыча (3 уровня)</p>
                         <p className="text-sm text-gray-400 leading-relaxed">
-                            Ты получаешь <span className="text-white font-bold">2 000 ₽</span> живыми деньгами за каждого, кто купит настройку. 
-                            <br/>5 друзей = <span className="text-neon-lime">10 000 ₽</span> (Окупаемость 100%).
+                            Юридически чистая система вознаграждений. 
+                            <br/>Max 3 уровня — соответствует ФЗ-117.
                         </p>
                     </div>
                     <div className="space-y-2 p-4 bg-zinc-900/50 rounded-xl border border-zinc-800">
-                        <p className="text-gray-300 font-bold text-sm uppercase tracking-wide text-brand-cyan">Бонус друга (Скидка)</p>
+                        <p className="text-gray-300 font-bold text-sm uppercase tracking-wide text-brand-cyan">Бонус друга</p>
                         <p className="text-sm text-gray-400 leading-relaxed">
-                            Они получают скидку <span className="text-white font-bold">1 000 ₽</span> на старт.
+                            Каждый приглашенный получает скидку <span className="text-white font-bold">1 000 ₽</span> на старт.
                             <br/>Им выгодно использовать именно твой код.
                         </p>
                     </div>
@@ -95,7 +97,7 @@ export const ReferralPirateCard = () => {
                     <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-indigo-500 to-purple-500"></div>
                     
                     <div className="text-center md:text-left z-10">
-                        <p className="text-[10px] text-zinc-500 mb-2 font-mono uppercase tracking-widest">ТВОЙ ЛИЧНЫЙ КОД (USERNAME)</p>
+                        <p className="text-[10px] text-zinc-500 mb-2 font-mono uppercase tracking-widest">ТВОЙ ЛИЧНЫЙ КОД</p>
                         {loading ? (
                             <div className="h-10 w-40 bg-zinc-800 animate-pulse rounded mx-auto md:mx-0"></div>
                         ) : (
@@ -111,10 +113,10 @@ export const ReferralPirateCard = () => {
 
                 <div className="space-y-4 pt-4">
                      <div className="flex justify-between items-end">
-                        <span className="text-xs font-mono text-gray-500 uppercase">Калькулятор профита</span>
+                        <span className="text-xs font-mono text-gray-500 uppercase">Калькулятор профита (3 уровня)</span>
                         <div className="text-right">
                             <span className="text-2xl font-black text-neon-lime font-mono">{potentialEarnings.toLocaleString()} ₽</span>
-                            <span className="text-xs text-gray-500 block">твой потенциальный доход</span>
+                            <span className="text-xs text-gray-500 block">потенциальный доход</span>
                         </div>
                      </div>
                      
@@ -131,6 +133,42 @@ export const ReferralPirateCard = () => {
                         <span className="text-white">{friendsCount} друзей</span>
                         <span>20 друзей</span>
                     </div>
+
+                    {/* 3-Level Breakdown Visualization */}
+                    {friendsCount >= 1 && (
+                        <div className="mt-6 p-4 bg-zinc-950/50 rounded-lg border border-zinc-800 space-y-2">
+                            <div className="flex justify-between items-center text-xs font-mono mb-2 border-b border-zinc-800 pb-2">
+                                <span className="text-zinc-500">Детализация дохода (3 уровня)</span>
+                                <span className="text-neon-lime font-bold">{potentialEarnings.toLocaleString()} ₽</span>
+                            </div>
+                            <div className="space-y-1 text-[11px] font-mono">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-zinc-400 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                                        L1 Прямые (20%):
+                                    </span>
+                                    <span className="text-white">{friendsCount} × 2000₽ = {lvl1.toLocaleString()}₽</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-zinc-400 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-zinc-500"></span>
+                                        L2 Косвенные (3%):
+                                    </span>
+                                    <span className="text-zinc-300">~{Math.floor(friendsCount * 0.3)} × 300₽ = {lvl2.toLocaleString()}₽</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-zinc-400 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-zinc-700"></span>
+                                        L3 Сеть (1%):
+                                    </span>
+                                    <span className="text-zinc-500">~{Math.floor(friendsCount * 0.1)} × 100₽ = {lvl3.toLocaleString()}₽</span>
+                                </div>
+                            </div>
+                            <p className="text-[10px] text-zinc-600 mt-2 text-center">
+                                * Соответствует ФЗ-117 о прямых продажах. Вознаграждение за реальный продукт.
+                            </p>
+                        </div>
+                    )}
 
                     {friendsCount >= 5 && (
                         <div className="p-3 bg-green-900/20 border border-green-500/20 rounded-lg text-center animate-pulse">

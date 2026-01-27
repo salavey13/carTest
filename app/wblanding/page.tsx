@@ -12,7 +12,7 @@ import {
   Loader2, ShieldCheck, Server, Lock, Zap, Clock, Users, 
   Smartphone, BarChart3, Database, Ban, Skull, Fingerprint, 
   Key, Anchor, ArrowRight, FileText, GitFork, Code2,
-  Target, Cpu
+  Target, Cpu, FileSpreadsheet
 } from 'lucide-react';
 
 // Components
@@ -142,7 +142,7 @@ export default function WarehouseLandingPage() {
                   
                   <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-xl hover:border-green-500/50 transition-colors">
                      <h4 className="text-white font-bold mb-2 flex items-center gap-2 font-orbitron">
-                        <FileText className="w-5 h-5 text-green-500" />
+                        <FileSpreadsheet className="w-5 h-5 text-green-500" />
                         Zero-Lock Export
                      </h4>
                      <p className="text-sm text-zinc-400 leading-relaxed">
@@ -351,7 +351,7 @@ export default function WarehouseLandingPage() {
          </div>
       </section>
 
-      {/* 6. PAIN POINTS */}
+      {/* 8. PAIN POINTS */}
       <section className="py-20 bg-black border-y border-white/10">
         <div className="max-w-6xl mx-auto px-4">
           <h2 className="text-3xl md:text-5xl font-bold text-center mb-16 text-white font-orbitron">ПОЧЕМУ ОНИ ВАС БЕСЯТ</h2>
@@ -375,17 +375,17 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* 7. AUDIT */}
+      {/* 9. AUDIT */}
       {showAudit && (
         <section id="audit-tool" className="py-16 px-4 bg-white/5 backdrop-blur-sm" ref={auditRef}>
           <WarehouseAuditTool />
         </section>
       )}
 
-      {/* 8. REVIEWS */}
+      {/* 10. REVIEWS */}
       <ReviewsSection />
 
-      {/* 9. CREW CREATION & LIST */}
+      {/* 11. CREW CREATION & LIST */}
       <section className="py-24 bg-zinc-900 text-center border-t border-gray-800">
           <h2 className="text-3xl md:text-5xl font-bold text-white mb-8 font-orbitron">ТВОЙ СКЛАД ЖДЕТ</h2>
           <CrewCreationForm />
