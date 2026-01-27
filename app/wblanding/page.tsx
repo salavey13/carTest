@@ -3,17 +3,16 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useAppContext } from "@/contexts/AppContext";
-// IMPORT LOCAL ACTION (The Exoskeleton)
 import { purchaseWbService } from "./actions_invoicing"; 
 import { getDiscountedPrice } from "./actions_referral";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { 
   Loader2, ShieldCheck, Server, Lock, Zap, Clock, Users, 
   Smartphone, BarChart3, Database, Ban, Skull, Fingerprint, 
-  Key, Anchor, ArrowRight, FileText, GitFork, Code2
+  Key, Anchor, ArrowRight, FileText, GitFork, Code2,
+  Target, Cpu
 } from 'lucide-react';
 
 // Components
@@ -26,7 +25,8 @@ import { CrewsListSimplified } from "./components/CrewsListSimplified";
 import { ReferralPirateCard } from "./components/ReferralPirateCard";
 import { WbFooter } from "./components/WbFooter";
 import { ExitIntentPopup } from "./components/ExitIntentPopup";
-import { ReviewsSection } from "./components/ReviewsSection"; // New component
+import { ReviewsSection } from "./components/ReviewsSection";
+import { SovereigntyPanel } from "./components/SovereigntyPanel";
 
 export default function WarehouseLandingPage() {
   const { dbUser, isLoading: appContextLoading } = useAppContext();
@@ -54,7 +54,6 @@ export default function WarehouseLandingPage() {
     if (!dbUser?.user_id) { toast.error("Пожалуйста, войдите в систему"); return; }
     setIsSendingInvoice(true);
     try {
-      // Use the local invoicing action that handles logic & validation
       const result = await purchaseWbService(dbUser.user_id, serviceType);
       
       if (result.success) {
@@ -110,7 +109,63 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* 3. MIGRATOR */}
+      {/* 3. SOVEREIGNTY PANEL */}
+      <section className="py-16 bg-black border-y border-white/5">
+         <div className="max-w-4xl mx-auto px-4">
+            <div className="flex flex-col md:flex-row items-center gap-8 mb-8">
+               <div className="bg-brand-cyan/10 p-4 rounded-full border border-brand-cyan/30">
+                   <Database className="w-10 h-10 text-brand-cyan" />
+               </div>
+               <div className="text-center md:text-left">
+                   <h2 className="text-2xl md:text-3xl font-bold text-white font-orbitron mb-2">СУВЕРЕНИТЕТ ДАННЫХ</h2>
+                   <p className="text-gray-400 font-mono text-sm md:text-base">
+                      Ты арендуешь квартиру? Нет. Ты владеешь домом. 
+                      Весь код и данные — экспортируемы в один клик.
+                   </p>
+               </div>
+            </div>
+            
+            <div className="grid md:grid-cols-2 gap-8 items-start">
+               <SovereigntyPanel />
+               
+               <div className="space-y-4 flex flex-col justify-center h-full">
+                  <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-xl hover:border-brand-cyan/50 transition-colors">
+                     <h4 className="text-white font-bold mb-2 flex items-center gap-2 font-orbitron">
+                        <Server className="w-5 h-5 text-brand-cyan" />
+                        Self-Hosted Mode
+                     </h4>
+                     <p className="text-sm text-zinc-400 leading-relaxed">
+                        Разверни на своем сервере. Полный контроль. 
+                        Мы даем Docker-контейнер, миграции и исходники.
+                     </p>
+                  </div>
+                  
+                  <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-xl hover:border-green-500/50 transition-colors">
+                     <h4 className="text-white font-bold mb-2 flex items-center gap-2 font-orbitron">
+                        <FileText className="w-5 h-5 text-green-500" />
+                        Zero-Lock Export
+                     </h4>
+                     <p className="text-sm text-zinc-400 leading-relaxed">
+                        Любые данные в CSV/JSON за 10 секунд. 
+                        Никаких «дайте нам 30 дней на выгрузку».
+                     </p>
+                  </div>
+
+                  <div className="p-5 bg-zinc-900/50 border border-zinc-800 rounded-xl hover:border-red-500/50 transition-colors">
+                     <h4 className="text-white font-bold mb-2 flex items-center gap-2 font-orbitron">
+                        <Lock className="w-5 h-5 text-red-500" />
+                        Right to Erasure (GDPR/152-ФЗ)
+                     </h4>
+                     <p className="text-sm text-zinc-400 leading-relaxed">
+                        Полное удаление по запросу. Никаких следов в бэкапах.
+                     </p>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </section>
+
+      {/* 4. MIGRATOR */}
       <section id="migrator" className="py-20 bg-black relative border-b border-white/5">
           <div className="max-w-4xl mx-auto px-4">
               <div className="text-center mb-12">
@@ -121,13 +176,104 @@ export default function WarehouseLandingPage() {
           </div>
       </section>
 
-      {/* 4. PRICING */}
+      {/* 5. POWER RANGERS MODEL */}
+      <section id="collaboration" className="py-20 bg-gradient-to-b from-zinc-900 to-black border-y border-white/5">
+         <div className="max-w-5xl mx-auto px-4">
+            <div className="text-center mb-12">
+               <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full border border-neon-lime/30 bg-neon-lime/10 text-neon-lime font-mono text-xs mb-6">
+                  КОЛЛАБОРАЦИЯ
+               </div>
+               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 font-orbitron">
+                  МОГУЧИЕ РЕЙНДЖЕРЫ
+               </h2>
+               <p className="text-gray-400 max-w-2xl mx-auto">
+                  Не надо учиться кодить. Найди боль — мы превратим её в софт за вечер.
+               </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-8 items-stretch">
+               <div className="bg-zinc-900 border border-red-500/30 p-8 rounded-2xl relative overflow-hidden group hover:border-red-500/60 transition-all">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 blur-[60px] rounded-full group-hover:bg-red-500/20 transition-all"></div>
+                  <div className="relative z-10">
+                     <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-6 border-2 border-red-500 shadow-lg shadow-red-500/20">
+                        <Target className="w-8 h-8 text-red-500" />
+                     </div>
+                     <h3 className="text-2xl font-bold text-white mb-2 font-orbitron">ОПЕРАТОР</h3>
+                     <p className="text-red-400 font-mono text-sm mb-4 uppercase tracking-wider">Ты в поле</p>
+                     <ul className="space-y-3 text-sm text-gray-300">
+                        <li className="flex items-start gap-3">
+                           <span className="text-red-500 mt-1">►</span>
+                           <span>Видишь, где люди теряют время и деньги</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                           <span className="text-red-500 mt-1">►</span>
+                           <span>Знаешь язык клиента (сленг, не код)</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                           <span className="text-red-500 mt-1">►</span>
+                           <span>Говоришь: «Нужно считать залог водителю»</span>
+                        </li>
+                     </ul>
+                  </div>
+               </div>
+
+               <div className="bg-zinc-900 border border-brand-cyan/30 p-8 rounded-2xl relative overflow-hidden group hover:border-brand-cyan/60 transition-all">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-cyan/10 blur-[60px] rounded-full group-hover:bg-brand-cyan/20 transition-all"></div>
+                  <div className="relative z-10">
+                     <div className="w-16 h-16 bg-brand-cyan/20 rounded-full flex items-center justify-center mb-6 border-2 border-brand-cyan shadow-lg shadow-brand-cyan/20">
+                        <Cpu className="w-8 h-8 text-brand-cyan" />
+                     </div>
+                     <h3 className="text-2xl font-bold text-white mb-2 font-orbitron">АРХИТЕКТОР</h3>
+                     <p className="text-brand-cyan font-mono text-sm mb-4 uppercase tracking-wider">У станка</p>
+                     <ul className="space-y-3 text-sm text-gray-300">
+                        <li className="flex items-start gap-3">
+                           <span className="text-brand-cyan mt-1">►</span>
+                           <span>Превращает «надо» в работающий код</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                           <span className="text-brand-cyan mt-1">►</span>
+                           <span>CyberVibe Studio: 3 минуты на фичу</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                           <span className="text-brand-cyan mt-1">►</span>
+                           <span>Деплоит сразу, без бюрократии</span>
+                        </li>
+                     </ul>
+                  </div>
+               </div>
+            </div>
+
+            <div className="mt-12 p-6 bg-black border border-zinc-800 rounded-2xl relative overflow-hidden">
+               <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 via-transparent to-brand-cyan/5"></div>
+               <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
+                  <div className="flex-1 space-y-1">
+                     <p className="text-zinc-600 font-mono text-[10px] uppercase tracking-widest">15:00</p>
+                     <p className="text-white font-bold font-orbitron text-lg">Боль</p>
+                     <p className="text-sm text-zinc-400">«Водила торчит на 50к»</p>
+                  </div>
+                  <div className="text-zinc-700 font-mono text-2xl hidden md:block">→</div>
+                  <div className="flex-1 space-y-1 border-t md:border-t-0 md:border-l border-zinc-800 pt-4 md:pt-0 md:pl-6">
+                     <p className="text-zinc-600 font-mono text-[10px] uppercase tracking-widest">15:05</p>
+                     <p className="text-white font-bold font-orbitron text-lg">Vibe Coding</p>
+                     <p className="text-sm text-zinc-400">AI генерит код</p>
+                  </div>
+                  <div className="text-zinc-700 font-mono text-2xl hidden md:block">→</div>
+                  <div className="flex-1 space-y-1 border-t md:border-t-0 md:border-l border-zinc-800 pt-4 md:pt-0 md:pl-6">
+                     <p className="text-zinc-600 font-mono text-[10px] uppercase tracking-widest">15:10</p>
+                     <p className="text-white font-bold font-orbitron text-lg">Deploy</p>
+                     <p className="text-sm text-zinc-400">У водилы красный алерт</p>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </section>
+
+      {/* 6. PRICING */}
       <section id="pricing" className="py-20 bg-zinc-900">
         <div className="max-w-6xl mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-white font-orbitron">СИСТЕМА (ТАРИФЫ)</h2>
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto items-start">
             
-            {/* FREE */}
             <div className="bg-zinc-900 border border-gray-800 rounded-2xl p-8 hover:border-white transition-all">
                 <h3 className="text-2xl font-bold text-white mb-2">ПАРТИЗАН</h3>
                 <div className="text-4xl font-bold text-white mb-4">0 ₽ <span className="text-sm text-gray-500 font-normal">/ мес</span></div>
@@ -140,7 +286,6 @@ export default function WarehouseLandingPage() {
                 <Button onClick={() => { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }} className="w-full bg-gray-800 hover:bg-gray-700">СОЗДАТЬ СКЛАД</Button>
             </div>
 
-            {/* SETUP */}
             <div className="bg-black border-2 border-brand-cyan rounded-2xl p-8 relative shadow-[0_0_30px_rgba(0,255,255,0.15)] transform scale-105 z-10">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-brand-cyan text-black px-4 py-1 rounded-full text-xs font-bold tracking-wider">РЕКОМЕНДУЕМ</div>
                 <h3 className="text-2xl font-bold text-brand-cyan mb-2">ФОРСАЖ</h3>
@@ -169,7 +314,6 @@ export default function WarehouseLandingPage() {
                 </Button>
             </div>
 
-            {/* SCHOOL */}
             <div className="bg-zinc-900 border border-purple-500/30 rounded-2xl p-8 hover:border-purple-500 transition-all">
                 <h3 className="text-2xl font-bold text-purple-400 mb-2">CYBERSCHOOL</h3>
                 <div className="text-4xl font-bold text-white mb-4">Бесценно</div>
@@ -187,7 +331,8 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
       
-      {/* 5. REFERRAL SYSTEM */}
+      {/* 7. REFERRAL SYSTEM */}
+      
       <section className="py-20 bg-gradient-to-r from-indigo-900/20 to-purple-900/20 border-y border-indigo-500/20">
          <div className="max-w-3xl mx-auto px-4 text-center">
             <div className="flex items-center justify-center gap-3 mb-6">
