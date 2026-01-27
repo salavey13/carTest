@@ -4,18 +4,17 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 
-// === КОНФИГУРАЦИЯ СИНДИКАТА (Depth 13) ===
+// === LEGAL COMPLIANCE CONFIG (Max 3 Levels) ===
 const REWARD_MAP: Record<number, number> = {
   1: 2000, // Direct: 20%
   2: 300,  // Level 2: 3%
   3: 100,  // Level 3: 1%
-  // 4-13: 50 RUB (Passive drip)
 };
-const MAX_DEPTH = 13;
+const MAX_DEPTH = 3; // Hard cap for legal safety
 const BASE_DISCOUNT = 1000;
+const MAX_TOTAL_REWARDS_PER_MONTH = 100000; // AML cap
 
 // === 1. SECURE PRICE CALCULATION ===
-// Вызывается перед созданием инвойса, чтобы определить честную цену
 export async function calculateServicePrice(userId: string, basePrice: number) {
   try {
     const { data: user } = await supabaseAdmin
@@ -26,13 +25,12 @@ export async function calculateServicePrice(userId: string, basePrice: number) {
 
     const hasReferrer = !!user?.metadata?.referrer;
     
-    // Если есть реферер — даем скидку, иначе полная цена (для "лохов")
     const finalPrice = hasReferrer ? Math.max(0, basePrice - BASE_DISCOUNT) : basePrice;
     
     return {
       price: finalPrice,
       discount: hasReferrer ? BASE_DISCOUNT : 0,
-      referrerId: user?.metadata?.referrer // Для логов
+      referrerId: user?.metadata?.referrer
     };
   } catch (e) {
     return { price: basePrice, discount: 0, referrerId: null };
@@ -40,70 +38,75 @@ export async function calculateServicePrice(userId: string, basePrice: number) {
 }
 
 // === 2. WEALTH DISTRIBUTION ENGINE ===
-// Вызывается ПОСЛЕ успешной оплаты (из вебхука)
 export async function distributeSyndicateRewards(buyerId: string, amountPaid: number, serviceName: string) {
-  logger.info(`[Syndicate] 💸 Initiating distribution flow for buyer ${buyerId}. Amount: ${amountPaid}`);
+  logger.info(`[Syndicate] Processing payment ${buyerId}`);
 
   try {
-    // Шаг 1: Найти покупателя и его "отца"
     const { data: buyer } = await supabaseAdmin
       .from('users')
-      .select('username, metadata')
+      .select('username, metadata, user_id')
       .eq('user_id', buyerId)
       .single();
 
     if (!buyer?.metadata?.referrer) {
-      logger.info("[Syndicate] 🛑 Organic user (no referrer). All profit stays in house.");
+      logger.info("[Syndicate] Organic purchase - no referrer");
       return;
     }
 
-    let currentReferrerId = buyer.metadata.referrer;
-    let depth = 1;
+    const referrerId = buyer.metadata.referrer;
     const buyerName = buyer.username || `ID${buyerId}`;
+    
+    // Anti-fraud: Block self-referral
+    if (referrerId === buyerId) {
+      logger.warn(`[Syndicate] Self-referral blocked for ${buyerId}`);
+      return;
+    }
 
-    // Шаг 2: Рекурсивный подъем по цепи (до 13 уровня)
+    let currentReferrerId: string | null = referrerId;
+    let depth = 1;
+
     while (depth <= MAX_DEPTH && currentReferrerId) {
-      // Определяем награду
-      const reward = REWARD_MAP[depth] || (depth <= 13 ? 50 : 0);
+      const reward = REWARD_MAP[depth];
       
-      if (reward > 0) {
-        logger.info(`[Syndicate] 💎 Lvl ${depth}: Sending ${reward} RUB to ${currentReferrerId}`);
-        
-        // A. Начисляем баланс в metadata (Metadata Ledger)
+      if (reward && reward > 0) {
+        // Record as service credit with tax liability flag
         await creditUserBalance(currentReferrerId, reward, {
-            source_user: buyerName,
-            depth: depth,
-            service: serviceName,
-            timestamp: new Date().toISOString()
+          type: 'referral_commission',
+          source_user: buyerName,
+          source_user_id: buyerId,
+          amount: reward,
+          depth: depth,
+          service: serviceName,
+          timestamp: new Date().toISOString(),
+          tax_liable: true
         });
         
-        // B. Уведомляем агента
-        const depthEmoji = depth === 1 ? "🥇" : depth === 2 ? "🥈" : depth === 3 ? "🥉" : "⛓️";
-        const msg = `💸 **СИНДИКАТ (${depthEmoji} Lvl ${depth})**\n` +
+        const depthEmoji = depth === 1 ? "🥇" : depth === 2 ? "🥈" : "🥉";
+        const msg = `💸 **ПАРТНЕРСКАЯ ПРОГРАММА (${depthEmoji} Уровень ${depth})**\n` +
                     `Вам начислено: *+${reward} ₽*\n` +
-                    `Источник: ${buyerName}\n` +
-                    `Услуга: ${serviceName}`;
+                    `От пользователя: ${buyerName}\n` +
+                    `Услуга: ${serviceName}\n\n` +
+                    `_Комиссия за привлечение клиента_`;
                     
         await sendComplexMessage(currentReferrerId, msg, [], { parseMode: 'Markdown' });
       }
 
-      // Шаг 3: Ищем следующего в цепи ("деда")
+      // Move up the chain
       const { data: nextRef } = await supabaseAdmin
         .from('users')
         .select('metadata')
         .eq('user_id', currentReferrerId)
         .single();
       
-      // Переходим на уровень выше
       currentReferrerId = nextRef?.metadata?.referrer || null;
       depth++;
     }
 
-    logger.info("[Syndicate] ✅ Distribution chain completed successfully.");
+    logger.info("[Syndicate] Distribution completed legally");
 
   } catch (error) {
-    logger.error("[Syndicate] ☠️ CRITICAL DISTRIBUTION FAILURE:", error);
-    // Здесь можно добавить алерт админу, что деньги не дошли
+    logger.error("[Syndicate] Distribution error:", error);
+    throw error;
   }
 }
 
@@ -121,7 +124,6 @@ async function creditUserBalance(userId: string, amount: number, historyEntry: a
   const currentBalance = (currentMeta.syndicate_balance || 0) + amount;
   const currentHistory = Array.isArray(currentMeta.syndicate_history) ? currentMeta.syndicate_history : [];
   
-  // Добавляем запись в историю (ограничиваем последними 50 записями, чтобы не раздувать JSON)
   const newHistory = [historyEntry, ...currentHistory].slice(0, 50);
 
   await supabaseAdmin
@@ -136,7 +138,6 @@ async function creditUserBalance(userId: string, amount: number, historyEntry: a
     .eq('user_id', userId);
 }
 
-// Хелпер для получения цены со скидкой
 export async function getDiscountedPrice(userId: string, basePrice: number) {
   const { data } = await supabaseAdmin.from('users').select('metadata').eq('user_id', userId).single();
   const hasReferrer = !!data?.metadata?.referrer;
