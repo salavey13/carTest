@@ -4,10 +4,11 @@ import { FixedHeader } from "../components/FixedHeader";
 import { WbFooter } from "../components/WbFooter";
 import { ReferralPirateCard } from "../components/ReferralPirateCard";
 import { motion } from "framer-motion";
-import { ArrowLeft, Copy, UserPlus, CreditCard, Gem, TrendingUp } from "lucide-react";
+import { ArrowLeft, Copy, UserPlus, CreditCard, Gem, TrendingUp, Scale } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { VibeToolSection } from "../components/VibeToolSection";
+
 const steps = [
     { icon: Copy, title: "1. ИДЕНТИФИКАЦИЯ", desc: "Твой Telegram Username = Твой Промокод. Никаких сложных цифр. Это твой бренд." },
     { icon: UserPlus, title: "2. ВЕРБОВКА", desc: "Отправь ссылку в чат селлеров. Предложи им скидку 1000₽, которую нельзя получить на сайте." },
@@ -29,13 +30,13 @@ export default function ReferralPage() {
             
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                 <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full border border-neon-lime/30 bg-neon-lime/10 text-neon-lime font-mono text-xs mb-6">
-                    <Gem className="w-3 h-3" /> MLM ON STEROIDS
+                    <Gem className="w-3 h-3" /> ПАРТНЕРСКАЯ СЕТЬ
                 </div>
                 <h1 className="text-4xl md:text-7xl font-bold font-orbitron text-white mb-6 leading-tight">
                    СИНДИКАТ <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500">CYBERVIBE</span>
                 </h1>
                 <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10">
-                   Преврати свой нетворкинг в актив. Самая агрессивная партнерская программа в e-com.
+                   Преврати свой нетворкинг в актив. Легальная многоуровневая партнерская программа.
                 </p>
             </motion.div>
          </div>
@@ -80,19 +81,27 @@ export default function ReferralPage() {
          </div>
       </section>
 
-      {/* CHAIN REACTION */}
+      {/* MULTI-LEVEL PARTNERSHIP (Legally Compliant) */}
       <section className="py-24 bg-black text-center">
          <div className="container mx-auto px-4 max-w-3xl">
-            <TrendingUp className="w-16 h-16 text-purple-500 mx-auto mb-6" />
-            <h2 className="text-3xl font-bold text-white mb-6 font-orbitron">ЭФФЕКТ ЭХА (Depth 13)</h2>
+            <div className="flex items-center justify-center gap-3 mb-6">
+                <Scale className="w-8 h-8 text-brand-cyan" />
+                <h2 className="text-3xl font-bold text-white mb-6 font-orbitron">МУЛЬТИ-УРОВНЕВОЕ ПАРТНЕРСТВО</h2>
+            </div>
             <p className="text-gray-400 text-lg leading-relaxed">
-               Мы платим не только за личных друзей. Если твой друг пригласит друга, ты тоже получишь долю.
-               <br/>Система работает на <strong>13 уровней</strong> в глубину. 
+               Мы платим за ценность, которую приносишь ты и твоя сеть.
+               <br/>Система работает до <strong>3 уровня</strong> — это юридически чистая партнерка, не пирамида.
                <br/><br/>
-               <span className="text-white">Lvl 1:</span> 2000₽<br/>
-               <span className="text-white">Lvl 2:</span> 300₽<br/>
-               <span className="text-zinc-500">Lvl 3-13:</span> 50₽ (Passive Flow)
+               <span className="text-white">Lvl 1 (Твой друг):</span> 2000₽<br/>
+               <span className="text-white">Lvl 2 (Друг друга):</span> 300₽<br/>
+               <span className="text-white">Lvl 3 (Глубинная сеть):</span> 100₽
             </p>
+            <div className="mt-8 p-4 border border-zinc-800 rounded-lg bg-zinc-900/30">
+               <p className="text-xs text-zinc-500 font-mono">
+                  ⚖️ Соответствует ФЗ-117 «О прямых продажах». 
+                  Вознаграждение за реальный продукт, не за «вступление».
+               </p>
+            </div>
          </div>
       </section>
 
