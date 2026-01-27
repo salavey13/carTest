@@ -2,7 +2,8 @@
 
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { FaSkullCrossbones, FaFire, FaFileCsv } from 'react-icons/fa6';
+import { Zap } from "lucide-react";
+import { FaFire, FaFileCsv } from 'react-icons/fa6';
 import Link from "next/link";
 
 export const HeroSection = ({ onAuditClick }: { onAuditClick: () => void }) => {
@@ -13,11 +14,11 @@ export const HeroSection = ({ onAuditClick }: { onAuditClick: () => void }) => {
         <video 
           className="w-full h-full object-cover brightness-[0.3] grayscale" 
           autoPlay loop muted playsInline
-          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4" 
+          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4 " 
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-black"></div>
         {/* Cyber Overlay */}
-        <div className="absolute inset-0 bg-[url('https://i.pinimg.com/originals/2b/2b/e4/2b2be452536454126e86014092321051.gif')] opacity-5 bg-cover bg-center mix-blend-overlay pointer-events-none"></div>
+        <div className="absolute inset-0 bg-[url('https://i.pinimg.com/originals/2b/2b/e4/2b2be452536454126e86014092321051.gif ')] opacity-5 bg-cover bg-center mix-blend-overlay pointer-events-none"></div>
       </div>
 
       <div className="relative z-10 max-w-5xl mx-auto px-4 text-center">
@@ -26,9 +27,9 @@ export const HeroSection = ({ onAuditClick }: { onAuditClick: () => void }) => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
         >
-            <span className="inline-block py-1 px-3 rounded-full bg-red-500/20 border border-red-500/50 text-red-400 text-xs md:text-sm font-mono mb-6 backdrop-blur-md">
-                <FaSkullCrossbones className="inline mr-2 mb-0.5"/>
-                МЫ УКРАЛИ ИДЕЮ У МОЙСКЛАД, ЧТОБЫ ВЫ НЕ ПЛАТИЛИ
+            <span className="inline-block py-1 px-3 rounded-full bg-brand-cyan/20 border border-brand-cyan/50 text-brand-cyan text-xs md:text-sm font-mono mb-6 backdrop-blur-md">
+                <Zap className="inline mr-2 mb-0.5"/>
+                СУВЕРЕННЫЙ СОФТ ДЛЯ ТОВАРОК: БЕЗ АБОНЕНТКИ И ВЕНДОР-ЛОКА
             </span>
         </motion.div>
 
@@ -49,9 +50,9 @@ export const HeroSection = ({ onAuditClick }: { onAuditClick: () => void }) => {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
         >
-            Импорт из Excel за секунды. Песочница для тестов. 
+            Ваши данные — ваша крепость. Telegram-first WMS без подписок.
             <br className="hidden md:block"/>
-            Никаких API ключей на старте — <span className="text-neon-lime font-bold">мы не просим ключи от квартиры</span>, пока вы не решите там жить.
+            <span className="text-neon-lime font-bold">Импорт за 10 сек. Экспорт когда захотите.</span>
         </motion.p>
 
         <motion.div 
