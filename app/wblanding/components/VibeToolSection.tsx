@@ -9,7 +9,7 @@ import {
   FileWarning, Eye, Sparkles, Database, FileCode, Layers, Download
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Link from "next/link"; // Added Link for download button
+import Link from "next/link";
 
 // --- Custom Glitch Title Component ---
 const GlitchText = ({ text }: { text: string }) => {
@@ -79,6 +79,19 @@ const AUTONOMY_LEVELS = [
     borderColor: "border-brand-gold",
     bgGradient: "from-brand-gold/20 to-transparent",
     terminalOutput: "> SYSTEM: Forking Repository... Deploying to Client Server... GOODBYE."
+  },
+  {
+    id: 11,
+    label: "LV.11: DUAL-USE ARCHITECTURE",
+    role: "DIPLOMAT",
+    title: "Camouflage Mode",
+    desc: "Снаружи — сноуборд/страйкбол. Внутри — ERP. Для посторонних глаз это игра. Для тебя — машина для денег. Apple видит развлечение, налоговая видит хобби.",
+    task: "Задача: Легальная маскировка",
+    icon: Fingerprint,
+    color: "text-orange-500",
+    borderColor: "border-orange-500",
+    bgGradient: "from-orange-500/20 to-transparent",
+    terminalOutput: "> AI: Compiling recreational interface... Business logic secured."
   }
 ];
 
