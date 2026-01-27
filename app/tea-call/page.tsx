@@ -1,220 +1,521 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { notifyAdmin } from "@/app/actions";
+import { notifyAdmin, notifyAdmins } from "@/app/actions";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Wand2, X, Coffee, Code, Bot, Zap } from "lucide-react";
+import { 
+  Wand2, 
+  X, 
+  Coffee, 
+  Bot, 
+  Zap, 
+  AlertTriangle, 
+  MessageSquare, 
+  Terminal,
+  User,
+  Clock,
+  Sparkles,
+  Command,
+  Activity,
+  ChevronRight
+} from "lucide-react";
+import { useAppContext } from "@/contexts/AppContext";
+import { ThemeToggleButton } from "@/components/ThemeToggleButton";
+import { cn } from "@/lib/utils";
 
 // GitHub Raw URL for the instructions
 const INSTRUCTIONS_URL =
-  "https://raw.githubusercontent.com/salavey13/carTest/main/docs/%D0%BC%D0%B0%D0%B3%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B0%D1%8F_%D0%BA%D0%BD%D0%BE%D0%BF%D0%BA%D0%B0_%D0%B2_cyber_vibe_studio_%D1%82%D1%83%D1%82%D0%BE%D1%80%D0%B8%D0%B0%D0%BB_%D0%B4%D0%BB%D1%8F_%D0%BD%D0%BE%D0%B2%D0%B8%D1%87%D0%BA%D0%BE%D0%B2(imgs).md";
+  "https://raw.githubusercontent.com/salavey13/carTest/main/docs/%D0%BC%D0%B0%D0%B3%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B0%D1%8F_%D0%BA%D0%BD%D0%BE%D0%BF%D0%BA%D0%B0_%D0%B2_cyber_vibe_studio_%D1%82%D1%83%D1%82%D0%BE%D1%80%D0%B8%D0%B0%D0%BB_%D0%B4%D0%BB%D1%8F_%D0%BD%D0%BE%D0%B2%D0%B8%D1%87%D0%BA%D0%BE%D0%B2(imgs).md ";
+
+type LogEntry = {
+  id: string;
+  message: string;
+  timestamp: Date;
+  type: 'info' | 'success' | 'warning' | 'error';
+};
+
+type CommandButton = {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+  message: string;
+  description: string;
+  variant: 'primary' | 'danger' | 'secondary';
+};
+
+const commands: CommandButton[] = [
+  {
+    id: 'tea',
+    label: 'Вызвать за чаем',
+    icon: <Coffee className="w-5 h-5" />,
+    color: 'from-amber-500 to-orange-600',
+    message: 'Админ, принеси чай. ☕️',
+    description: 'Стандартный запрос чая',
+    variant: 'primary'
+  },
+  {
+    id: 'urgent',
+    label: 'Срочный вызов',
+    icon: <AlertTriangle className="w-5 h-5" />,
+    color: 'from-red-500 to-rose-600',
+    message: '🚨 АДМИН! СРОЧНО НУЖЕН ЧАЙ! 🚨',
+    description: 'Высокий приоритет',
+    variant: 'danger'
+  },
+  {
+    id: 'broadcast',
+    label: 'Оповестить всех',
+    icon: <MessageSquare className="w-5 h-5" />,
+    color: 'from-cyan-500 to-blue-600',
+    message: 'Всем админам: пора на чайную паузу! 🫖',
+    description: 'Уведомление всей команды',
+    variant: 'secondary'
+  }
+];
 
 export default function TeaCallPage() {
-  const [isSending, setIsSending] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
-  
-  // Modal & Instructions State
+  const { dbUser, isAuthenticated } = useAppContext();
+  const [isSending, setIsSending] = useState<string | null>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [mdContent, setMdContent] = useState<string>("");
   const [isLoadingMd, setIsLoadingMd] = useState(false);
+  const [activeGlow, setActiveGlow] = useState<number>(0);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+  
+  // Background animation controls
+  const orbControls = useAnimation();
 
-  // Fetch instructions on mount (or lazily when opening modal, doing it on mount here for speed)
+  // Auto-scroll logs
   useEffect(() => {
-    const loadInstructions = async () => {
-      try {
-        setIsLoadingMd(true);
-        const response = await fetch(INSTRUCTIONS_URL);
-        if (!response.ok) throw new Error("Failed to load instructions");
-        const text = await response.text();
-        setMdContent(text);
-      } catch (error) {
-        console.error("Error loading MD:", error);
-        setMdContent("# Ошибка загрузки\nНе удалось загрузить инструкции из репозитория.");
-      } finally {
-        setIsLoadingMd(false);
+    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
+
+  // Floating orbs animation
+  useEffect(() => {
+    const sequence = async () => {
+      while (true) {
+        await orbControls.start({
+          scale: [1, 1.2, 1],
+          opacity: [0.3, 0.6, 0.3],
+          transition: { duration: 8, ease: "easeInOut" }
+        });
       }
     };
+    sequence();
+  }, [orbControls]);
 
-    // Only load if we don't have content yet
-    if (!mdContent && !isLoadingMd) {
-      loadInstructions();
+  // Cycled glow effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveGlow((prev) => (prev + 1) % 3);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
+    setLogs(prev => [...prev.slice(-9), {
+      id: Math.random().toString(36).substr(2, 9),
+      message,
+      timestamp: new Date(),
+      type
+    }]);
+  }, []);
+
+  const fetchInstructions = async () => {
+    if (mdContent) {
+      setIsModalOpen(true);
+      return;
     }
-  }, [mdContent, isLoadingMd]);
-
-  const handleCallClick = async () => {
+    
+    setIsLoadingMd(true);
+    setIsModalOpen(true);
     try {
-      setIsSending(true);
-      setStatus(null);
-
-      const res = await notifyAdmin("Админ, принеси чай.");
-
-      if (res?.success) {
-        setStatus("Админ уведомлён, жди чай.");
-      } else {
-        setStatus("Не удалось уведомить админа, попробуй ещё раз.");
-      }
-    } catch {
-      setStatus("Произошла ошибка при вызове админа.");
+      const response = await fetch(INSTRUCTIONS_URL);
+      if (!response.ok) throw new Error("Failed to load");
+      const text = await response.text();
+      setMdContent(text);
+      addLog('Инструкции загружены из репозитория', 'success');
+    } catch (error) {
+      setMdContent("# Ошибка загрузки\nНе удалось загрузить инструкции.");
+      addLog('Ошибка загрузки инструкций', 'error');
     } finally {
-      setIsSending(false);
+      setIsLoadingMd(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-dark-bg text-white flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden">
+  const executeCommand = async (command: CommandButton) => {
+    if (isSending) return;
+    
+    setIsSending(command.id);
+    addLog(`Выполнение команды: ${command.label}...`, 'info');
+
+    try {
+      let result;
       
-      {/* Background Accents */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
-        <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-brand-pink/10 rounded-full blur-[100px]" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-brand-cyan/10 rounded-full blur-[100px]" />
+      if (command.id === 'broadcast') {
+        result = await notifyAdmins(command.message);
+      } else {
+        result = await notifyAdmin(command.message);
+      }
+
+      if (result?.success) {
+        addLog(`✓ ${command.label}: Успешно отправлено`, 'success');
+      } else {
+        addLog(`✗ ${command.label}: Ошибка отправки`, 'error');
+      }
+    } catch (err) {
+      addLog(`✗ ${command.label}: Системная ошибка`, 'error');
+    } finally {
+      setIsSending(null);
+    }
+  };
+
+  // Initialize with welcome message
+  useEffect(() => {
+    if (isAuthenticated && dbUser) {
+      addLog(`Добро пожаловать, ${dbUser.username || 'Пользователь'}!`, 'info');
+    } else {
+      addLog('Система готова к работе', 'info');
+    }
+  }, [isAuthenticated, dbUser, addLog]);
+
+  return (
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 pointer-events-none">
+        {/* Cyber Grid */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+        
+        {/* Floating Orbs */}
+        <motion.div
+          animate={orbControls}
+          className="absolute top-20 left-10 w-72 h-72 bg-brand-red-orange/20 rounded-full blur-[100px]"
+        />
+        <motion.div
+          animate={{ ...orbControls, transition: { delay: 2 } }}
+          className="absolute bottom-20 right-10 w-96 h-96 bg-brand-deep-indigo/20 rounded-full blur-[100px]"
+        />
+        <motion.div
+          animate={{ ...orbControls, transition: { delay: 4 } }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-brand-gold/10 rounded-full blur-[120px]"
+        />
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 120 }}
-        className="text-center space-y-6 max-w-2xl w-full"
-      >
-        {/* Header */}
-        <div className="space-y-2">
-          <h1 className="text-4xl sm:text-6xl font-orbitron font-bold text-transparent bg-clip-text bg-gradient-to-r from-brand-yellow via-white to-brand-pink drop-shadow-lg">
-            Вызвать админа
-          </h1>
-          <p className="text-muted-foreground font-mono text-sm sm:text-base">
-            Нажми кнопку — и в телеграм прилетит команда.
-          </p>
-        </div>
-
-        {/* Action Buttons Area */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-          <Button
-            onClick={handleCallClick}
-            disabled={isSending}
-            size="lg"
-            className="bg-brand-pink hover:bg-brand-pink/90 text-white px-10 py-7 text-xl rounded-full shadow-[0_0_20px_rgba(236,72,153,0.5)] hover:shadow-[0_0_30px_rgba(236,72,153,0.8)] transition-all duration-300 border-2 border-white/10 w-full sm:w-auto"
-          >
-            {isSending ? (
-              <span className="flex items-center gap-2">
-                <Coffee className="animate-pulse" /> Зову админа...
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <Coffee /> Позвать за чаем
-              </span>
-            )}
-          </Button>
-
-          {/* NEW MAGIC BUTTON */}
-          <Button
-            onClick={() => setIsModalOpen(true)}
-            variant="outline"
-            size="icon"
-            className="rounded-full h-14 w-14 border-brand-yellow/50 text-brand-yellow hover:bg-brand-yellow hover:text-black transition-all duration-300"
-            title="Посмотреть инструкции"
-          >
-            <Wand2 className="h-6 w-6" />
-          </Button>
-        </div>
-
-        {status && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-xs sm:text-sm font-mono text-brand-cyan mt-2 bg-brand-cyan/10 px-4 py-2 rounded-lg inline-block border border-brand-cyan/20"
-          >
-            {status}
-          </motion.p>
-        )}
-
-        {/* SMALL AD SECTION */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.3 }}
-          className="mt-12 p-4 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800 rounded-xl text-left overflow-hidden relative group"
-        >
-          <div className="absolute top-0 right-0 p-2 opacity-20 group-hover:opacity-100 transition-opacity">
-             <Zap className="w-6 h-6 text-brand-yellow" />
+      {/* Header */}
+      <header className="relative z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Command className="w-6 h-6 text-brand-gold" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            </div>
+            <h1 className="font-orbitron text-lg tracking-wider bg-gradient-to-r from-brand-gold via-brand-red-orange to-brand-deep-indigo bg-clip-text text-transparent">
+              ADMIN TERMINAL
+            </h1>
           </div>
           
-          <div className="flex gap-3 items-start">
-             <div className="bg-brand-yellow text-black p-2 rounded-lg">
-                <Bot className="w-5 h-5" />
-             </div>
-             <div className="space-y-1">
-                <h3 className="text-sm font-bold font-orbitron text-white">Нужен автомат или склад?</h3>
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  Привет! Я Павел. Делаю телеграм-ботов и веб-приложения (не на Python). 
-                  Заменю платный "МойСклад" и помогу с автоматизацией от 2000₽.
-                </p>
-             </div>
+          <div className="flex items-center gap-4">
+            {isAuthenticated && dbUser && (
+              <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
+                <User className="w-4 h-4" />
+                <span className="font-mono">@{dbUser.username || dbUser.user_id}</span>
+              </div>
+            )}
+            <ThemeToggleButton />
+          </div>
+        </div>
+      </header>
+
+      <main className="relative z-10 max-w-6xl mx-auto px-4 py-8 space-y-6">
+        {/* Hero Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+        >
+          {/* Main Control Panel */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/60 backdrop-blur-xl shadow-2xl">
+              {/* Decorative Top Border */}
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand-red-orange via-brand-gold to-brand-cyan" />
+              
+              <div className="p-6 sm:p-8 space-y-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-2xl font-orbitron font-bold flex items-center gap-2">
+                      <Terminal className="w-6 h-6 text-brand-cyan" />
+                      Панель управления
+                    </h2>
+                    <p className="text-muted-foreground mt-1 font-mono text-sm">
+                      Выберите команду для выполнения
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-brand-gold/10 border border-brand-gold/20 text-brand-gold text-xs font-mono">
+                    <Activity className="w-3 h-3 animate-pulse" />
+                    ONLINE
+                  </div>
+                </div>
+
+                {/* Command Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {commands.map((cmd, idx) => (
+                    <motion.div
+                      key={cmd.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: idx * 0.1 }}
+                    >
+                      <button
+                        onClick={() => executeCommand(cmd)}
+                        disabled={!!isSending}
+                        className={cn(
+                          "group relative w-full p-4 rounded-xl border transition-all duration-300 overflow-hidden",
+                          activeGlow === idx 
+                            ? "shadow-[0_0_30px_rgba(236,72,153,0.3)] border-brand-pink/50" 
+                            : "border-border/50 hover:border-brand-gold/50",
+                          isSending === cmd.id && "opacity-80 cursor-wait"
+                        )}
+                      >
+                        {/* Background Gradient */}
+                        <div className={cn(
+                          "absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-10 transition-opacity duration-300",
+                          cmd.color
+                        )} />
+                        
+                        <div className="relative z-10 flex flex-col items-center gap-3">
+                          <div className={cn(
+                            "w-12 h-12 rounded-lg bg-gradient-to-br flex items-center justify-center text-white shadow-lg transition-transform duration-300 group-hover:scale-110",
+                            cmd.color,
+                            isSending === cmd.id && "animate-pulse"
+                          )}>
+                            {isSending === cmd.id ? (
+                              <Sparkles className="w-6 h-6 animate-spin" />
+                            ) : (
+                              cmd.icon
+                            )}
+                          </div>
+                          
+                          <div className="text-center">
+                            <div className="font-bold text-sm">{cmd.label}</div>
+                            <div className="text-xs text-muted-foreground mt-1">{cmd.description}</div>
+                          </div>
+                        </div>
+
+                        {/* Hover Glow */}
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+                          <div className={cn(
+                            "absolute inset-0 bg-gradient-to-r opacity-20 blur-xl",
+                            cmd.color
+                          )} />
+                        </div>
+                      </button>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Magic Button Row */}
+                <div className="pt-4 border-t border-border/50">
+                  <Button
+                    onClick={() => fetchInstructions()}
+                    variant="outline"
+                    className="w-full group relative overflow-hidden border-dashed border-brand-yellow/50 hover:border-brand-yellow hover:bg-brand-yellow/5"
+                  >
+                    <span className="relative z-10 flex items-center justify-center gap-2">
+                      <Wand2 className="w-4 h-4 text-brand-yellow group-hover:animate-pulse" />
+                      <span className="font-mono text-sm">Открыть инструкцию по магическим кнопкам</span>
+                      <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                    </span>
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Developer Card - Elevated */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="relative overflow-hidden rounded-xl border border-border/50 bg-gradient-to-br from-zinc-900/80 to-zinc-950/80 backdrop-blur-md p-6 group"
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
+                <Zap className="w-24 h-24 text-brand-yellow" />
+              </div>
+              
+              <div className="relative z-10 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                <div className="bg-brand-yellow/20 p-3 rounded-xl border border-brand-yellow/30">
+                  <Bot className="w-8 h-8 text-brand-yellow" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-orbitron font-bold text-lg flex items-center gap-2">
+                    Нужен автомат или склад?
+                    <Sparkles className="w-4 h-4 text-brand-gold animate-pulse" />
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1 leading-relaxed max-w-xl">
+                    Привет! Я Павел. Делаю телеграм-ботов и веб-приложения (не на Python). 
+                    Заменю платный "МойСклад" и помогу с автоматизацией от 2000₽.
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="border-brand-yellow/30 text-brand-yellow hover:bg-brand-yellow/10 shrink-0"
+                  onClick={() => addLog('Контакт с разработчиком запрошен', 'info')}
+                >
+                  Связаться
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Sidebar - Logs & Status */}
+          <div className="space-y-6">
+            {/* Status Panel */}
+            <div className="rounded-2xl border border-border/50 bg-card/60 backdrop-blur-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-border/50 bg-muted/50 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
+                  <Terminal className="w-3 h-3" />
+                  СИСТЕМНЫЙ ЛОГ
+                </div>
+                <div className="flex gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-red-500/50" />
+                  <div className="w-2 h-2 rounded-full bg-yellow-500/50" />
+                  <div className="w-2 h-2 rounded-full bg-green-500/50" />
+                </div>
+              </div>
+              
+              <div className="h-[300px] overflow-y-auto p-4 font-mono text-xs space-y-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                {logs.length === 0 ? (
+                  <div className="text-muted-foreground/50 italic text-center py-8">
+                    Ожидание команд...
+                  </div>
+                ) : (
+                  <AnimatePresence initial={false}>
+                    {logs.map((log) => (
+                      <motion.div
+                        key={log.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 10 }}
+                        className={cn(
+                          "flex gap-2 items-start p-2 rounded border-l-2",
+                          log.type === 'success' && "bg-green-500/5 border-green-500 text-green-600 dark:text-green-400",
+                          log.type === 'error' && "bg-red-500/5 border-red-500 text-red-600 dark:text-red-400",
+                          log.type === 'info' && "bg-blue-500/5 border-blue-500 text-blue-600 dark:text-blue-400",
+                          log.type === 'warning' && "bg-yellow-500/5 border-yellow-500 text-yellow-600 dark:text-yellow-400",
+                        )}
+                      >
+                        <Clock className="w-3 h-3 mt-0.5 shrink-0 opacity-50" />
+                        <div className="flex-1 break-words">
+                          <span className="opacity-50 text-[10px]">
+                            {log.timestamp.toLocaleTimeString()} 
+                          </span>
+                          <div className="mt-0.5">{log.message}</div>
+                        </div>
+                      </motion.div>
+                    ))}
+                    <div ref={logsEndRef} />
+                  </AnimatePresence>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-4 rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm">
+                <div className="text-2xl font-bold text-brand-gold">3</div>
+                <div className="text-xs text-muted-foreground mt-1">Доступные команды</div>
+              </div>
+              <div className="p-4 rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm">
+                <div className="text-2xl font-bold text-brand-cyan">{logs.filter(l => l.type === 'success').length}</div>
+                <div className="text-xs text-muted-foreground mt-1">Успешных вызовов</div>
+              </div>
+            </div>
           </div>
         </motion.div>
-      </motion.div>
+      </main>
 
-      {/* INSTRUCTIONS MODAL (Rich Text Shower) */}
+      {/* Instructions Modal - Cyber Style */}
       <AnimatePresence>
         {isModalOpen && (
           <>
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsModalOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
             />
             
-            {/* Modal Content */}
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                className="bg-zinc-900 border border-zinc-700 w-full max-w-2xl max-h-[85vh] rounded-2xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col"
-              >
-                {/* Header */}
-                <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950/50">
-                  <h2 className="font-orbitron text-lg text-brand-yellow flex items-center gap-2">
-                    <Wand2 className="w-4 h-4" /> Инструкция
-                  </h2>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsModalOpen(false)}
-                    className="text-gray-400 hover:text-white"
-                  >
-                    <X className="h-5 w-5" />
-                  </Button>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-3xl md:h-[80vh] z-50 bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-brand-yellow/10 border border-brand-yellow/20">
+                    <Wand2 className="w-5 h-5 text-brand-yellow" />
+                  </div>
+                  <div>
+                    <h2 className="font-orbitron font-bold text-zinc-100">Магические инструкции</h2>
+                    <p className="text-xs text-zinc-500 font-mono">v1.0 // Загружено из GitHub</p>
+                  </div>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsModalOpen(false)}
+                  className="text-zinc-400 hover:text-white hover:bg-zinc-800"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
 
-                {/* Scrollable Content */}
-                <div className="p-6 overflow-y-auto prose prose-invert prose-sm max-w-none">
-                  {isLoadingMd ? (
-                    <div className="flex items-center justify-center h-40 text-gray-500 font-mono">
-                      Загрузка данных из GitHub...
-                    </div>
-                  ) : (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {mdContent}
-                    </ReactMarkdown>
-                  )}
-                </div>
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto p-6 prose prose-invert prose-sm max-w-none prose-headings:font-orbitron prose-headings:text-brand-gold prose-a:text-brand-cyan hover:prose-a:text-brand-cyan/80 prose-code:text-brand-pink prose-code:bg-zinc-900 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-800">
+                {isLoadingMd ? (
+                  <div className="flex flex-col items-center justify-center h-40 gap-4 text-zinc-500">
+                    <div className="w-8 h-8 border-2 border-brand-yellow/30 border-t-brand-yellow rounded-full animate-spin" />
+                    <span className="font-mono text-sm">Загрузка данных...</span>
+                  </div>
+                ) : (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {mdContent}
+                  </ReactMarkdown>
+                )}
+              </div>
 
-                {/* Footer */}
-                <div className="p-4 border-t border-zinc-800 bg-zinc-950/50 text-center">
-                  <Button onClick={() => setIsModalOpen(false)} variant="outline" className="border-zinc-700 hover:bg-zinc-800">
-                    Понятно, закрыть
-                  </Button>
+              {/* Modal Footer */}
+              <div className="px-6 py-4 border-t border-zinc-800 bg-zinc-900/50 flex justify-between items-center">
+                <div className="text-xs text-zinc-500 font-mono">
+                  Кодировка: UTF-8 | Протокол: HTTPS
                 </div>
-              </motion.div>
-            </div>
+                <Button 
+                  onClick={() => setIsModalOpen(false)}
+                  className="bg-brand-yellow text-black hover:bg-brand-yellow/90 font-bold"
+                >
+                  Закрыть терминал
+                </Button>
+              </div>
+            </motion.div>
           </>
         )}
       </AnimatePresence>
+
+      {/* Keyboard Hints */}
+      <div className="fixed bottom-4 right-4 z-40 hidden lg:block">
+        <div className="flex gap-2 text-[10px] font-mono text-muted-foreground/50">
+          <span className="px-2 py-1 rounded bg-muted border border-border">ESC закрыть</span>
+          <span className="px-2 py-1 rounded bg-muted border border-border">T чай</span>
+        </div>
+      </div>
     </div>
   );
 }
