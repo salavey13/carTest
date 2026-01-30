@@ -15,23 +15,22 @@ async function resolveCrewBySlug(slug: string) {
     .from("crews")
     .select("id, name, slug, owner_id")
     .eq("slug", slug)
-    .single();
-  if (error || !data) throw new Error(`Crew '${slug}' not found`);
+    .maybeSingle();
+  if (error || !data) throw new Error(`Экипаж '${slug}' не найден`);
   return data;
 }
 
 /**
- * verifyCrewAccess - THE HYBRID CLEARANCE ENGINE
- * Checks permanent membership OR active participation in a linked Lobby.
+ * Проверка доступа: Владелец, Член экипажа или Участник активного лобби (Рейдер)
  */
 async function verifyCrewAccess(crewId: string, userId: string | undefined) {
-  if (!userId) return { isMember: false, role: null, isOwner: false };
+  if (!userId) return { allowed: false, role: null };
 
-  // 1. Check if Owner
+  // 1. Проверка на владельца
   const { data: crew } = await supabaseAdmin.from("crews").select("owner_id").eq("id", crewId).single();
-  if (crew?.owner_id === userId) return { isMember: true, role: 'owner', isOwner: true };
+  if (crew?.owner_id === userId) return { allowed: true, role: 'owner' };
 
-  // 2. Check Permanent Membership
+  // 2. Проверка на постоянное членство
   const { data: member } = await supabaseAdmin
     .from("crew_members")
     .select("role, membership_status")
@@ -39,21 +38,40 @@ async function verifyCrewAccess(crewId: string, userId: string | undefined) {
     .eq("user_id", userId)
     .eq("membership_status", "active")
     .maybeSingle();
-  if (member) return { isMember: true, role: member.role, isOwner: false };
+  if (member) return { allowed: true, role: member.role };
 
-  // 3. Check Temporary "Raid" Clearance via Lobby
-  // Access granted if user is in an 'active' lobby tied to this crew
+  // 3. Проверка на временный доступ через активное Лобби
   const { data: lobbyMember } = await supabaseAdmin
     .from("lobby_members")
-    .select("role, lobbies!inner(status, crew_id)")
+    .select("lobbies!inner(status, crew_id)")
     .eq("user_id", userId)
     .eq("lobbies.crew_id", crewId)
     .eq("lobbies.status", "active")
     .maybeSingle();
 
-  if (lobbyMember) return { isMember: true, role: 'raider', isOwner: false };
+  if (lobbyMember) return { allowed: true, role: 'raider' };
 
-  return { isMember: false, role: null, isOwner: false };
+  return { allowed: false, role: null };
+}
+
+export async function getCrewWarehouseItems(slug: string) {
+  noStore();
+  try {
+    const crew = await resolveCrewBySlug(slug);
+    const { data, error } = await supabaseAdmin
+      .from("cars")
+      .select("*")
+      .eq("type", "wb_item")
+      .eq("crew_id", crew.id)
+      .order("model");
+
+    if (error) throw error;
+    const items = (data || []).map((i: any) => ({ ...i, specs: safeParseSpecs(i.specs) }));
+
+    return { success: true, data: items, crew };
+  } catch (e: any) {
+    return { success: false, error: e?.message || "Ошибка загрузки" };
+  }
 }
 
 export async function updateCrewItemLocationQty(
@@ -66,29 +84,27 @@ export async function updateCrewItemLocationQty(
   noStore();
   try {
     const crew = await resolveCrewBySlug(slug);
-    const { isMember, error: authErr } = await verifyCrewAccess(crew.id, userId);
-    if (!isMember) throw new Error(authErr || "NO_TACTICAL_CLEARANCE");
+    const { allowed } = await verifyCrewAccess(crew.id, userId);
+    if (!allowed) throw new Error("У вас нет доступа к этому складу");
 
-    // 1. Fetch Item
     const { data: item } = await supabaseAdmin.from("cars").select("specs, make, model").eq("id", itemId).single();
-    if (!item) throw new Error("ITEM_NOT_FOUND");
+    if (!item) throw new Error("Товар не найден");
 
     const specs = safeParseSpecs(item.specs);
     if (!Array.isArray(specs.warehouse_locations)) specs.warehouse_locations = [];
 
-    // 2. Voxel Math
-    let location = specs.warehouse_locations.find((l: any) => (l.voxel_id || l.voxel) === voxelId);
+    let location = specs.warehouse_locations.find((l: any) => l.voxel_id === voxelId);
     if (!location) {
       location = { voxel_id: voxelId, quantity: 0 };
       specs.warehouse_locations.push(location);
     }
+
     location.quantity = Math.max(0, (location.quantity || 0) + delta);
-    specs.warehouse_locations = specs.warehouse_locations.filter((l: any) => l.quantity > 0);
+    specs.warehouse_locations = specs.warehouse_locations.filter((l: any) => (l.quantity || 0) > 0);
 
-    // 3. Commit to Database
-    await supabaseAdmin.from("cars").update({ specs }).eq("id", itemId);
+    await supabaseAdmin.from("cars").update({ specs }).eq("id", itemId).eq("crew_id", crew.id);
 
-    // 4. --- RAID LOGGING (The Ledger) ---
+    // Логирование действия в активную смену
     if (userId) {
       const { data: activeShift } = await supabaseAdmin
         .from("crew_member_shifts")
@@ -98,10 +114,10 @@ export async function updateCrewItemLocationQty(
         .is("clock_out_time", null)
         .maybeSingle();
 
-      // Auto-start shift for ad-hoc raiders if it doesn't exist
       let shiftId = activeShift?.id;
-      let currentActions = Array.isArray(activeShift?.actions) ? [...activeShift.actions] : [];
+      let actions = Array.isArray(activeShift?.actions) ? [...activeShift.actions] : [];
 
+      // Если смены нет (рейдер забыл нажать "Начать"), создаем её автоматически
       if (!shiftId) {
         const { data: newShift } = await supabaseAdmin.from("crew_member_shifts").insert({
           member_id: userId,
@@ -113,33 +129,20 @@ export async function updateCrewItemLocationQty(
       }
 
       if (shiftId) {
-        currentActions.push({
+        actions.push({
           type: delta < 0 ? "offload" : "onload",
           itemId,
           item: `${item.make} ${item.model}`,
-          voxel_id: voxelId,
+          voxel: voxelId,
           qty: Math.abs(delta),
           ts: new Date().toISOString()
         });
-        await supabaseAdmin.from("crew_member_shifts").update({ actions: currentActions }).eq("id", shiftId);
+        await supabaseAdmin.from("crew_member_shifts").update({ actions }).eq("id", shiftId);
       }
     }
 
     return { success: true };
   } catch (e: any) {
-    return { success: false, error: e.message };
-  }
-}
-
-export async function getCrewWarehouseItems(slug: string) {
-  noStore();
-  try {
-    const crew = await resolveCrewBySlug(slug);
-    const { data, error } = await supabaseAdmin.from("cars").select("*").eq("type", "wb_item").eq("crew_id", crew.id).order("model");
-    if (error) throw error;
-    const items = (data || []).map((i: any) => ({ ...i, specs: safeParseSpecs(i.specs) }));
-    return { success: true, data: items, crew };
-  } catch (e: any) {
-    return { success: false, error: e.message };
+    return { success: false, error: e?.message || "Ошибка обновления" };
   }
 }
