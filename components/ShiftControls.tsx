@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Play, LogOut, Activity, FileText, Timer, Package, Coins } from "lucide-react";
+import { Play, LogOut, Activity, FileText, Timer, Package, Coins, Share2 } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -18,7 +18,7 @@ export default function ShiftControls({ slug }: { slug: string }) {
   const [elapsedSec, setElapsedSec] = useState<number>(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Расчет статистики из логов действий
+  // Расчет данных сессии
   const processedCount = useMemo(() => activeShift?.actions?.length || 0, [activeShift]);
   const estimatedRUB = useMemo(() => processedCount * 50, [processedCount]);
 
@@ -32,13 +32,13 @@ export default function ShiftControls({ slug }: { slug: string }) {
       const shiftRes = await mod.getActiveShiftForCrewMember(slug, userId);
       setActiveShift(shiftRes?.shift || null);
     } catch (e) {
-      console.warn("Ошибка загрузки статуса смены");
+      console.warn("Сбой синхронизации статуса");
     }
   };
 
   useEffect(() => {
     loadStatus();
-    const poll = setInterval(loadStatus, 15000);
+    const poll = setInterval(loadStatus, 20000);
     return () => clearInterval(poll);
   }, [slug, userId]);
 
@@ -63,20 +63,20 @@ export default function ShiftControls({ slug }: { slug: string }) {
   };
 
   const startShift = async () => {
-    if (!slug || !userId) return toast.error("Ошибка данных");
+    if (!slug || !userId) return toast.error("Ошибка идентификации");
     setLoading(true);
     try {
       const mod = await import(`@/app/wb/[slug]/actions_shifts`);
       const res = await mod.startWarehouseShift(slug, userId);
       if (res?.success) {
         await mod.setCrewMemberLiveStatus(slug, userId, "online");
-        toast.success("Смена начата");
+        toast.success("Смена запущена");
         await loadStatus();
       } else {
-        toast.error(res?.error || "Не удалось начать смену");
+        toast.error(res?.error || "Ошибка старта");
       }
     } catch (e) {
-      toast.error("Ошибка подключения к серверу");
+      toast.error("Ошибка сети");
     } finally {
       setLoading(false);
     }
@@ -94,7 +94,7 @@ export default function ShiftControls({ slug }: { slug: string }) {
         await loadStatus();
       }
     } catch (e) {
-      toast.error("Ошибка завершения смены");
+      toast.error("Ошибка завершения");
     } finally {
       setLoading(false);
     }
@@ -103,76 +103,87 @@ export default function ShiftControls({ slug }: { slug: string }) {
   const isWorking = !!activeShift;
 
   return (
-    <Card className="p-4 bg-card border-border shadow-md">
-      <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
+    <Card className="p-0 bg-card border-border shadow-lg rounded-none sm:rounded-xl overflow-hidden">
+      {/* Основная панель управления */}
+      <div className="flex items-center justify-between p-3 gap-2">
         
-        {/* Инфо о сессии */}
-        <div className="flex items-center gap-4 flex-1">
+        {/* Блок Времени и Статуса */}
+        <div className="flex items-center gap-3 min-w-0">
           <div className={cn(
-            "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors",
-            isWorking ? "border-green-500 bg-green-500/10 text-green-500" : "border-muted text-muted-foreground"
-          )}>
-            {isWorking ? <Activity className="animate-pulse" /> : <Timer />}
-          </div>
+            "w-2 h-8 rounded-full transition-colors shrink-0",
+            isWorking ? "bg-green-500 animate-pulse" : "bg-muted"
+          )} />
           <div className="flex flex-col">
-            <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
-              {activeLobby ? `Рейд: ${activeLobby.name}` : "Работа на складе"}
-            </span>
-            <span className="text-xl font-mono font-bold leading-none">
+            <div className="flex items-center gap-1.5">
+               <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter truncate">
+                 {activeLobby ? activeLobby.name : "ОПЕРАЦИЯ: СКЛАД"}
+               </span>
+               {isWorking && <Activity size={10} className="text-green-500 animate-pulse" />}
+            </div>
+            <span className="text-2xl font-mono font-bold leading-none tracking-tighter">
               {formatTime(elapsedSec)}
             </span>
           </div>
         </div>
 
-        {/* Статистика в реальном времени */}
-        {isWorking && (
-          <div className="flex gap-6 px-4 py-2 bg-muted/30 rounded-lg border border-border/50">
-            <div className="flex flex-col">
-              <span className="text-[9px] text-muted-foreground uppercase flex items-center gap-1">
-                <Package size={10} /> Собрано
-              </span>
-              <span className="text-sm font-bold">{processedCount} шт.</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[9px] text-muted-foreground uppercase flex items-center gap-1">
-                <Coins size={10} /> Доход
-              </span>
-              <span className="text-sm font-bold text-green-600 dark:text-green-400">{estimatedRUB} ₽</span>
-            </div>
-          </div>
-        )}
-
-        {/* Кнопки управления */}
+        {/* Кнопка действия (Главная цель на мобилке) */}
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled // Готовим к будущим обновлениям
-            className="hidden sm:flex gap-2"
-            title="Выгрузить отчет в PDF"
-          >
-            <FileText className="w-4 h-4" />
-            PDF
-          </Button>
-
           {!isWorking ? (
             <Button 
               onClick={startShift} 
               disabled={loading || !userId} 
-              className="bg-primary text-primary-foreground font-bold px-6"
+              className="h-12 px-6 bg-foreground text-background hover:bg-foreground/90 font-black uppercase italic tracking-widest text-sm rounded-none transition-all"
             >
-              {loading ? "..." : "Начать смену"}
+              {loading ? "..." : "НАЧАТЬ"}
             </Button>
           ) : (
             <Button 
               variant="destructive" 
               onClick={endShift} 
               disabled={loading} 
-              className="font-bold px-6"
+              className="h-12 px-6 font-black uppercase italic tracking-widest text-sm rounded-none transition-all"
             >
-              {loading ? "..." : "Завершить"}
+              {loading ? "..." : "СТОП"}
             </Button>
           )}
+        </div>
+      </div>
+
+      {/* Скрываемая панель статистики (только при активной смене) */}
+      <AnimatePresence>
+        {isWorking && (
+          <div className="flex items-center justify-between px-3 py-2 bg-muted/20 border-t border-border/50">
+            <div className="flex gap-4">
+              <div className="flex items-center gap-1.5">
+                <Package size={12} className="text-muted-foreground" />
+                <span className="text-xs font-bold">{processedCount} <span className="text-[10px] text-muted-foreground font-normal">ед.</span></span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Coins size={12} className="text-green-600" />
+                <span className="text-xs font-bold">{estimatedRUB} <span className="text-[10px] text-muted-foreground font-normal">₽</span></span>
+              </div>
+            </div>
+
+            <div className="flex gap-1">
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" title="Поделиться">
+                    <Share2 size={14} />
+                </Button>
+                <Button variant="ghost" size="icon" disabled className="h-7 w-7 text-muted-foreground" title="PDF Отчет (Скоро)">
+                    <FileText size={14} />
+                </Button>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+      
+      {/* Системная инфо-строка */}
+      <div className="bg-muted/10 px-3 py-1 flex justify-between items-center border-t border-border/30">
+        <span className="text-[8px] font-mono text-muted-foreground uppercase tracking-widest">
+          ID: {userId?.slice(0,8) || "GHOST"} // V.2.0
+        </span>
+        <div className="flex items-center gap-1">
+            <Timer size={10} className="text-zinc-500" />
+            <span className="text-[8px] font-mono text-muted-foreground uppercase">Realtime_Sync_Active</span>
         </div>
       </div>
     </Card>
