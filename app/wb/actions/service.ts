@@ -147,3 +147,104 @@ export async function generateCrewShiftPdf(userId: string, shiftId: string) {
     return { success: false, error: error.message || "Ошибка генерации PDF" };
   }
 }
+
+/**
+ * Генерирует сводный отчет по ВСЕМ сменам рейда за сегодня.
+ * Стр 1: Список участников и итоговые суммы (The Payout List)
+ * Стр 2: Суммарная статистика по обработанным SKU
+ */
+export async function generateRaidSummaryPdf(userId: string, slug: string) {
+  logger.info(`[RAID_SUMMARY] Initiating summary for Crew: ${slug}`);
+
+  try {
+    const { data: crew } = await supabaseAdmin.from("crews").select("id, name").eq("slug", slug).single();
+    if (!crew) throw new Error("Экипаж не найден.");
+
+    const today = new Date().toISOString().split('T')[0];
+    
+    // 1. Извлекаем все смены за сегодня
+    const { data: shifts, error } = await supabaseAdmin
+      .from("crew_member_shifts")
+      .select("*, users(username, full_name)")
+      .eq("crew_id", crew.id)
+      .gte("clock_in_time", `${today}T00:00:00`)
+      .order("clock_in_time", { ascending: true });
+
+    if (error || !shifts || shifts.length === 0) throw new Error("Активных смен за сегодня не обнаружено.");
+
+    // 2. Инициализация PDF
+    const pdfDoc = await PDFDocument.create();
+    pdfDoc.registerFontkit(fontkit);
+    const fontPath = path.join(process.cwd(), 'server-assets', 'fonts', 'DejaVuSans.ttf');
+    const fontBytes = fs.readFileSync(fontPath);
+    const customFont = await pdfDoc.embedFont(fontBytes); 
+
+    let page = pdfDoc.addPage([595.28, 841.89]);
+    const { width, height } = page.getSize();
+
+    // --- HEADER ---
+    page.drawRectangle({ x: 0, y: height - 80, width, height: 80, color: rgb(0.1, 0.1, 0.1) });
+    page.drawText("RAID_LOGISTICS_SUMMARY // СВОДНЫЙ ОТЧЕТ", { x: 40, y: height - 40, size: 18, font: customFont, color: rgb(1,1,1) });
+    page.drawText(`СКЛАД: ${crew.name.toUpperCase()} // ДАТА: ${today}`, { x: 40, y: height - 60, size: 9, font: customFont, color: rgb(0, 0.76, 1) });
+
+    let y = height - 120;
+
+    // --- PAYOUT TABLE ---
+    page.drawText("СПИСОК ВЫПЛАТ ПО РЕЗУЛЬТАТАМ РЕЙДА:", { x: 40, y, size: 11, font: customFont });
+    y -= 25;
+
+    // Header
+    page.drawRectangle({ x: 40, y: y - 20, width: width - 80, height: 20, color: rgb(0.2, 0.2, 0.2) });
+    const cols = ["ОПЕРАТОР", "ВРЕМЯ", "ОБЪЕМ", "К ВЫПЛАТЕ"];
+    const xOffsets = [45, 200, 350, 480];
+    cols.forEach((c, i) => page.drawText(c, { x: xOffsets[i], y: y - 13, size: 8, font: customFont, color: rgb(1,1,1) }));
+    y -= 20;
+
+    let grandTotalUnits = 0;
+    let grandTotalCash = 0;
+
+    shifts.forEach((s: any) => {
+        const name = s.users?.username || s.users?.full_name || "RECRUIT";
+        const actions = Array.isArray(s.actions) ? s.actions : [];
+        const units = actions.reduce((acc: number, a: any) => acc + (a.qty || 0), 0);
+        const cash = units * 50;
+        
+        grandTotalUnits += units;
+        grandTotalCash += cash;
+
+        y -= 20;
+        if (y < 60) { page = pdfDoc.addPage(); y = height - 50; }
+
+        page.drawRectangle({ x: 40, y, width: width - 80, height: 20, borderColor: rgb(0.9, 0.9, 0.9), borderWidth: 0.5 });
+        page.drawText(name, { x: 45, y: y + 6, size: 8, font: customFont });
+        page.drawText(`${Math.round(s.duration_minutes || 0)} м`, { x: 200, y: y + 6, size: 8, font: customFont });
+        page.drawText(`${units} ед`, { x: 350, y: y + 6, size: 8, font: customFont });
+        page.drawText(`${cash} ₽`, { x: 480, y: y + 6, size: 8, font: customFont, color: rgb(0, 0.5, 0) });
+    });
+
+    // Total Row
+    y -= 30;
+    page.drawRectangle({ x: 40, y, width: width - 80, height: 30, color: rgb(0.95, 0.95, 0.95) });
+    page.drawText("ИТОГО ПО РЕЙДУ:", { x: 45, y + 10, size: 10, font: customFont, color: rgb(0,0,0) });
+    page.drawText(`${grandTotalUnits} ед.`, { x: 350, y + 10, size: 10, font: customFont });
+    page.drawText(`${grandTotalCash} ₽`, { x: 480, y + 10, size: 12, font: customFont, color: rgb(0, 0.5, 0) });
+
+    // 4. Отправка
+    const pdfBytes = await pdfDoc.save();
+    const fileName = `RAID_SUMMARY_${slug.toUpperCase()}_${today}.pdf`;
+    const fileBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+    
+    const sendRes = await sendTelegramDocument(userId, fileBlob, fileName, 
+        `🏛️ **СВОДНЫЙ ОТЧЕТ ПО РЕЙДУ**\n\n` +
+        `📍 Склад: ${crew.name}\n` +
+        `👥 Участников: ${shifts.length}\n` +
+        `📦 Всего обработано: ${grandTotalUnits}\n` +
+        `💰 Общая касса: ${grandTotalCash} ₽`
+    );
+
+    return { success: sendRes.success };
+  } catch (e: any) {
+    logger.error("[RAID_PDF_FAIL]", e);
+    return { success: false, error: e.message };
+  }
+}
