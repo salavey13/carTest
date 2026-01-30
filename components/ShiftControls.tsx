@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { 
   Play, 
@@ -13,29 +12,39 @@ import {
   Package, 
   Coins, 
   Share2, 
-  Loader2 
+  Loader2,
+  FileBarChart
 } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-// Correct local import path
-import { generateCrewShiftPdf } from "@/app/wb/actions/service";
+// Импорт тактических экшенов
+import { generateCrewShiftPdf, generateRaidSummaryPdf } from "@/app/wb/actions/service";
 import { generateLobbyShareLink } from "@/app/strikeball/actions/service";
 
 export default function ShiftControls({ slug }: { slug: string }) {
-  const { dbUser, activeLobby, tg } = useAppContext();
+  const { dbUser, activeLobby, userCrewInfo, tg } = useAppContext();
   const userId = dbUser?.user_id;
+  const isOwner = userCrewInfo?.is_owner && userCrewInfo?.slug === slug;
 
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [activeShift, setActiveShift] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
+  const [generatingPersonal, setGeneratingPersonal] = useState(false);
+  const [generatingRaid, setGeneratingRaid] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [elapsedSec, setElapsedSec] = useState<number>(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Live session statistics
-  const processedCount = useMemo(() => activeShift?.actions?.length || 0, [activeShift]);
+  // --- ТЕЛЕМЕТРИЯ: Динамический расчет из логов ---
+  const processedCount = useMemo(() => {
+    if (!activeShift?.actions) return 0;
+    // Считаем сумму 'qty' всех действий в массиве actions
+    return Array.isArray(activeShift.actions) 
+      ? activeShift.actions.reduce((acc: number, curr: any) => acc + (Number(curr.qty) || 0), 0)
+      : 0;
+  }, [activeShift]);
+
   const estimatedRUB = useMemo(() => processedCount * 50, [processedCount]);
 
   const loadStatus = async () => {
@@ -48,15 +57,17 @@ export default function ShiftControls({ slug }: { slug: string }) {
       const shiftRes = await mod.getActiveShiftForCrewMember(slug, userId);
       setActiveShift(shiftRes?.shift || null);
     } catch (e) {
-      console.warn("ShiftControls: Link sync failed");
+      console.warn("ShiftControls: Ошибка синхронизации");
     }
   };
 
   useEffect(() => {
     loadStatus();
-    const poll = setInterval(loadStatus, 20000);
+    // Интенсивный опрос во время активного рейда для обновления счетчиков
+    const pollInterval = activeShift ? 10000 : 20000;
+    const poll = setInterval(loadStatus, pollInterval);
     return () => clearInterval(poll);
-  }, [slug, userId]);
+  }, [slug, userId, !!activeShift]);
 
   useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -79,7 +90,7 @@ export default function ShiftControls({ slug }: { slug: string }) {
   };
 
   const startShift = async () => {
-    if (!slug || !userId) return toast.error("Ошибка идентификации");
+    if (!slug || !userId) return toast.error("Ошибка ID");
     setLoading(true);
     try {
       const mod = await import(`@/app/wb/[slug]/actions_shifts`);
@@ -88,14 +99,9 @@ export default function ShiftControls({ slug }: { slug: string }) {
         await mod.setCrewMemberLiveStatus(slug, userId, "online");
         toast.success("Смена начата");
         await loadStatus();
-      } else {
-        toast.error(res?.error || "Ошибка старта");
-      }
-    } catch (e) {
-      toast.error("Сбой подключения");
-    } finally {
-      setLoading(false);
-    }
+      } else toast.error(res?.error);
+    } catch (e) { toast.error("Ошибка Uplink"); } 
+    finally { setLoading(false); }
   };
 
   const endShift = async () => {
@@ -109,33 +115,36 @@ export default function ShiftControls({ slug }: { slug: string }) {
         toast.success("Смена завершена");
         await loadStatus();
       }
-    } catch (e) {
-      toast.error("Сбой завершения");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { toast.error("Ошибка Downlink"); } 
+    finally { setLoading(false); }
   };
 
-  const handleExportPdf = async () => {
+  const handleExportPersonalPdf = async () => {
     if (!activeShift?.id || !userId) return;
-    setGenerating(true);
-    const toastId = toast.loading("ФОРМИРОВАНИЕ ТАКТИЧЕСКОГО ОТЧЕТА...");
+    setGeneratingPersonal(true);
+    const tId = toast.loading("СБОРКА ЛИЧНОГО ОТЧЕТА...");
     try {
         const res = await generateCrewShiftPdf(userId, activeShift.id);
-        if (res.success) {
-            toast.success("ОТЧЕТ ОТПРАВЛЕН ВАМ В TELEGRAM", { id: toastId });
-        } else {
-            toast.error(res.error || "Ошибка генерации", { id: toastId });
-        }
-    } catch (e) {
-        toast.error("Критическая ошибка системы печати", { id: toastId });
-    } finally {
-        setGenerating(false);
-    }
+        if (res.success) toast.success("ОТЧЕТ ОТПРАВЛЕН ВАМ В ЛС", { id: tId });
+        else toast.error(res.error, { id: tId });
+    } catch (e) { toast.error("Критическая ошибка PDF", { id: tId }); } 
+    finally { setGeneratingPersonal(false); }
+  };
+
+  const handleExportRaidSummary = async () => {
+    if (!userId || !slug) return;
+    setGeneratingRaid(true);
+    const tId = toast.loading("СБОР ДАННЫХ ПО ВСЕМУ ОТРЯДУ...");
+    try {
+        const res = await generateRaidSummaryPdf(userId, slug);
+        if (res.success) toast.success("СВОДНАЯ ВЕДОМОСТЬ ОТПРАВЛЕНА", { id: tId });
+        else toast.error(res.error, { id: tId });
+    } catch (e) { toast.error("Ошибка ведомости", { id: tId }); } 
+    finally { setGeneratingRaid(false); }
   };
 
   const handleShare = async () => {
-    if (!activeLobby?.id) return toast.error("Активная операция не найдена");
+    if (!activeLobby?.id) return toast.error("Лобби не активно");
     setSharing(true);
     try {
         const res = await generateLobbyShareLink(activeLobby.id);
@@ -150,8 +159,8 @@ export default function ShiftControls({ slug }: { slug: string }) {
   const isWorking = !!activeShift && !activeShift.clock_out_time;
 
   return (
-    <Card className="p-0 bg-card border-border shadow-lg rounded-none sm:rounded-xl overflow-hidden">
-      {/* --- Main Action Bar --- */}
+    <Card className="p-0 bg-card border-border shadow-lg rounded-none sm:rounded-xl overflow-hidden border-t-2 border-t-brand-cyan">
+      {/* ПАНЕЛЬ УПРАВЛЕНИЯ */}
       <div className="flex items-center justify-between p-3 gap-2">
         <div className="flex items-center gap-3 min-w-0">
           <div className={cn(
@@ -161,7 +170,7 @@ export default function ShiftControls({ slug }: { slug: string }) {
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
                <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter truncate">
-                 {activeLobby ? activeLobby.name : "АВТОНОМНЫЙ_РЕЖИМ"}
+                 {activeLobby ? activeLobby.name : "ОПЕРАЦИЯ: СКЛАД"}
                </span>
                {isWorking && <Activity size={10} className="text-green-500 animate-pulse" />}
             </div>
@@ -193,51 +202,56 @@ export default function ShiftControls({ slug }: { slug: string }) {
         </div>
       </div>
 
-      {/* --- Live Telemetry Strip --- */}
-      <AnimatePresence>
-        {isWorking && (
-          <div className="flex items-center justify-between px-3 py-2 bg-muted/20 border-t border-border/50">
-            <div className="flex gap-4">
-              <div className="flex items-center gap-1.5" title="Обработано единиц">
-                <Package size={12} className="text-muted-foreground" />
-                <span className="text-xs font-bold">{processedCount} <span className="text-[10px] text-muted-foreground font-normal">ед.</span></span>
-              </div>
-              <div className="flex items-center gap-1.5" title="Примерная выплата">
-                <Coins size={12} className="text-green-600" />
-                <span className="text-xs font-bold">{estimatedRUB} <span className="text-[10px] text-muted-foreground font-normal">₽</span></span>
-              </div>
+      {/* ЖИВАЯ ТЕЛЕМЕТРИЯ И ОТЧЕТЫ */}
+      {isWorking && (
+        <div className="flex items-center justify-between px-3 py-2 bg-muted/20 border-t border-border/50">
+          <div className="flex gap-4">
+            <div className="flex items-center gap-1.5" title="Всего действий">
+              <Package size={12} className="text-muted-foreground" />
+              <span className="text-xs font-bold">{processedCount} <span className="text-[10px] text-muted-foreground font-normal">ед.</span></span>
             </div>
-
-            <div className="flex gap-2">
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-7 w-7 text-muted-foreground hover:text-brand-cyan" 
-                    onClick={handleShare}
-                    disabled={sharing}
-                >
-                    {sharing ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
-                </Button>
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={handleExportPdf}
-                    disabled={generating}
-                    className={cn("h-7 w-7 hover:text-brand-cyan", generating ? "text-brand-cyan" : "text-muted-foreground")}
-                >
-                    {generating ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
-                </Button>
+            <div className="flex items-center gap-1.5" title="Текущий заработок">
+              <Coins size={12} className="text-green-600 dark:text-green-400" />
+              <span className="text-xs font-bold">{estimatedRUB} <span className="text-[10px] text-muted-foreground font-normal">₽</span></span>
             </div>
           </div>
-        )}
-      </AnimatePresence>
+
+          <div className="flex gap-1">
+              {/* РЕКРУТИНГ */}
+              <Button 
+                variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-brand-cyan" 
+                onClick={handleShare} disabled={sharing || !activeLobby}
+              >
+                  {sharing ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
+              </Button>
+              
+              {/* ЛИЧНЫЙ ОТЧЕТ */}
+              <Button 
+                variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-brand-cyan" 
+                onClick={handleExportPersonalPdf} disabled={generatingPersonal}
+              >
+                  {generatingPersonal ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+              </Button>
+
+              {/* СВОДНЫЙ ОТЧЕТ (Только для Командира) */}
+              {isOwner && (
+                <Button 
+                    variant="ghost" size="icon" className="h-7 w-7 text-indigo-500 hover:text-indigo-400 border border-indigo-500/20" 
+                    onClick={handleExportRaidSummary} disabled={generatingRaid}
+                >
+                    {generatingRaid ? <Loader2 size={14} className="animate-spin" /> : <FileBarChart size={14} />}
+                </Button>
+              )}
+          </div>
+        </div>
+      )}
       
-      {/* --- Hardware System Line --- */}
+      {/* СИСТЕМНАЯ СТРОКА */}
       <div className="bg-muted/10 px-3 py-1 flex justify-between items-center border-t border-border/30 font-mono text-[8px] text-muted-foreground uppercase tracking-widest">
-        <span>UNIT_ID: {userId?.slice(0,8) || "ANON"} // OS_2.4</span>
+        <span>OPERATOR: {dbUser?.username?.toUpperCase() || "ANON"} // {isOwner ? "OVERSEER" : "RAIDER"}</span>
         <div className="flex items-center gap-1">
             <Timer size={10} className="text-zinc-500" />
-            <span>Telemetry_Secure_OLED</span>
+            <span>Secure_OLED_Protocol</span>
         </div>
       </div>
     </Card>
