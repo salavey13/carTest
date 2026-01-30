@@ -1,197 +1,125 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Play, Truck, LogOut, Activity } from "lucide-react";
+import { Activity, Users, Zap, Timer, CheckCircle2, ShieldEllipsis } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export default function ShiftControls({ slug }: { slug: string }) {
-  const { dbUser } = useAppContext();
+  const { dbUser, activeLobby } = useAppContext();
   const userId = dbUser?.user_id;
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [activeShift, setActiveShift] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
-  const [elapsedSec, setElapsedSec] = useState<number | null>(null);
-  const timerRef = useRef<number | null>(null);
+  const [elapsedSec, setElapsedSec] = useState<number>(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const unitsProcessed = useMemo(() => activeShift?.actions?.length || 0, [activeShift]);
+  const estimatedEarnings = useMemo(() => unitsProcessed * 50, [unitsProcessed]);
 
   const loadStatus = async () => {
     if (!slug || !userId) return;
     try {
       const mod = await import(`@/app/wb/[slug]/actions_shifts`);
       const statusRes = await mod.getCrewMemberStatus(slug, userId);
-      if (statusRes?.success) setLiveStatus(statusRes.live_status || null);
+      setLiveStatus(statusRes?.live_status || 'offline');
       const shiftRes = await mod.getActiveShiftForCrewMember(slug, userId);
       setActiveShift(shiftRes?.shift || null);
-    } catch (e) {
-      console.warn("ShiftControls: failed to load status", e);
-    }
+    } catch (e) { console.warn("Link lost"); }
   };
 
   useEffect(() => {
     loadStatus();
-    const poll = setInterval(loadStatus, 30_000);
+    const poll = setInterval(loadStatus, 15000);
     return () => clearInterval(poll);
   }, [slug, userId]);
 
   useEffect(() => {
-    if (timerRef.current) window.clearInterval(timerRef.current);
-    if (activeShift && activeShift.clock_in_time && !activeShift.clock_out_time) {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (activeShift?.clock_in_time && !activeShift?.clock_out_time) {
       const startTs = Date.parse(activeShift.clock_in_time);
-      setElapsedSec(Math.floor((Date.now() - startTs) / 1000));
-      timerRef.current = window.setInterval(() => {
+      timerRef.current = setInterval(() => {
         setElapsedSec(Math.floor((Date.now() - startTs) / 1000));
-      }, 1000) as any;
-    } else {
-      setElapsedSec(null);
+      }, 1000);
     }
-    return () => { if (timerRef.current) window.clearInterval(timerRef.current); };
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [activeShift]);
 
-  const formatElapsed = (s: number | null) => {
-    if (s === null) return "--:--:--";
+  const formatTime = (s: number) => {
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
     const sec = s % 60;
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   };
 
-  const emitShiftChanged = () => {
-    window.dispatchEvent(new CustomEvent("crew:shift:changed", { detail: { slug, userId } }));
-  };
-
-    const startShift = async () => {
-    if (!slug || !userId) return toast.error("Нет данных пользователя/экипажа");
-    setLoading(true);
-    try {
-      const mod = await import(`@/app/wb/[slug]/actions_shifts`);
-      const startRes = await mod.startWarehouseShift(slug, userId);
-      if (!startRes?.success) {
-        toast.error(startRes?.error || "Не удалось начать смену (shift row)");
-      } else {
-        toast.success("Смена начата");
-      }
-      const setRes = await mod.setCrewMemberLiveStatus(slug, userId, "online");
-      if (!setRes?.success) toast.error(setRes?.error || "Не удалось установить статус участника");
-      await loadStatus();
-      emitShiftChanged();
-    } catch (e: any) {
-      console.error("startShift error", e);
-      toast.error(e?.message || "Ошибка при старте смены");
-      emitShiftChanged();
-    } finally {
-      setLoading(false);
-    }
-  };
-  const toggleRide = async () => {
-    if (!slug || !userId) return toast.error("Нет данных пользователя/экипажа");
-    setLoading(true);
-    try {
-      const mod = await import(`@/app/wb/[slug]/actions_shifts`);
-      const statusRes = await mod.getCrewMemberStatus(slug, userId);
-      const current = statusRes?.live_status || null;
-      const newStatus = current === "riding" ? "online" : "riding";
-      const setRes = await mod.setCrewMemberLiveStatus(slug, userId, newStatus);
-      if (!setRes?.success) toast.error(setRes?.error || "Не удалось переключить статус");
-      else toast.success(newStatus === "riding" ? "Статус: На байке" : "Статус: Онлайн (в боксе)");
-      await loadStatus();
-      emitShiftChanged();
-    } catch (e: any) {
-      console.error("toggleRide error", e);
-      toast.error(e?.message || "Ошибка переключения статуса");
-      emitShiftChanged();
-    } finally {
-      setLoading(false);
-    }
-  };
-  const endShift = async () => {
-    if (!slug || !userId) return toast.error("Нет данных пользователя/экипажа");
-    setLoading(true);
-    try {
-      const mod = await import(`@/app/wb/[slug]/actions_shifts`);
-      const s = await mod.getActiveShiftForCrewMember(slug, userId);
-      const shift = s?.shift || null;
-      if (shift && shift.id) {
-        const endRes = await mod.endWarehouseShift(slug, shift.id);
-        if (!endRes?.success) toast.error(endRes?.error || "Не удалось завершить смену (shift end)");
-        else toast.success("Смена завершена");
-      } else {
-        toast.info("Активной смены не найдено, переключаем статус участника в offline");
-      }
-      const setRes = await mod.setCrewMemberLiveStatus(slug, userId, "offline", { last_location: null });
-      if (!setRes?.success) toast.error(setRes?.error || "Не удалось установить offline");
-      await loadStatus();
-      emitShiftChanged();
-    } catch (e: any) {
-      console.error("endShift error", e);
-      toast.error(e?.message || "Ошибка завершения смены");
-      emitShiftChanged();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const isRiding = liveStatus === "riding";
+  const isRaider = activeShift?.shift_type === 'raid';
 
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-3 rounded-xl bg-card border border-border shadow-sm">
-      {/* Status & Timer Section */}
-      <div className="flex items-center gap-3 flex-1 min-w-0 justify-between sm:justify-start">
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${liveStatus === 'riding' || liveStatus === 'online' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-          <span className="text-sm font-medium text-foreground truncate">
-            {liveStatus === 'riding' ? 'На байке' : liveStatus === 'online' ? 'Онлайн' : 'Офлайн'}
-          </span>
-        </div>
+    <Card className="bg-black/60 backdrop-blur-xl border-white/5 rounded-none overflow-hidden shadow-2xl">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center p-5 gap-6">
         
+        {/* IDENTITY & UPLINK */}
+        <div className="flex items-center gap-4 flex-1">
+          <div className={cn(
+            "w-12 h-12 flex items-center justify-center border transition-all duration-700",
+            activeShift ? "border-brand-cyan bg-brand-cyan/10" : "border-zinc-800 bg-zinc-950"
+          )}>
+            {isRaider ? <ShieldEllipsis className="w-6 h-6 text-brand-cyan" /> : <Users className="w-6 h-6 text-zinc-600" />}
+          </div>
+          
+          <div className="flex flex-col">
+            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+              {isRaider ? `TEMP_CLEARANCE: ${activeLobby?.name || 'RAID'}` : `CORE_CLEARANCE: ${slug.toUpperCase()}`}
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black font-mono tracking-tighter text-white">
+                {formatTime(elapsedSec)}
+              </span>
+              <Timer className="w-3 h-3 text-zinc-800" />
+            </div>
+          </div>
+        </div>
+
+        {/* LIVE TELEMETRY */}
         {activeShift && (
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-background border border-border rounded-md">
-            <Activity className="w-3 h-3 text-brand-purple" />
-            <span className="font-mono text-sm text-foreground">{formatElapsed(elapsedSec)}</span>
+          <div className="flex items-center gap-8 px-8 border-x border-white/5 font-mono">
+            <div className="text-center">
+              <p className="text-[8px] text-zinc-600 uppercase">Load_Units</p>
+              <p className="text-xl font-bold text-brand-cyan">{unitsProcessed}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[8px] text-zinc-600 uppercase">Est_Reward</p>
+              <p className="text-xl font-bold text-emerald-500">{estimatedEarnings} ₽</p>
+            </div>
           </div>
         )}
+
+        {/* ACCESS CONTROL */}
+        <div className="flex items-center gap-4">
+           {activeShift ? (
+               <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/30">
+                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                  <span className="text-[10px] font-black text-emerald-500 uppercase">Active_Session</span>
+               </div>
+           ) : (
+               <div className="text-[10px] font-mono text-zinc-700 uppercase">Standby_For_Uplink...</div>
+           )}
+        </div>
       </div>
-
-      {/* Controls Section */}
-      <div className="flex items-center gap-2">
-        <Button 
-          size="sm" 
-          variant="ghost" 
-          onClick={startShift} 
-          disabled={loading || liveStatus === "online" || liveStatus === "riding" || !userId} 
-          className="h-9 px-3 text-xs hover:bg-green-500/10 hover:text-green-600 dark:hover:bg-green-500/20 dark:hover:text-green-400"
-        >
-          <Play className="w-4 h-4 mr-1" />
-          Начать
-        </Button>
-
-        <Button 
-          size="sm" 
-          variant={isRiding ? "default" : "outline"} 
-          onClick={toggleRide} 
-          disabled={loading || !liveStatus || liveStatus === "offline" || !userId} 
-          className={`h-9 px-3 text-xs transition-all duration-300 ${
-            isRiding 
-            ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.5)]" 
-            : "border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400"
-          }`}
-        >
-          <Truck className="w-4 h-4 mr-1" />
-          Байк
-        </Button>
-
-        <Button 
-          size="sm" 
-          variant="destructive" 
-          onClick={endShift} 
-          disabled={loading || liveStatus === "offline" || !userId} 
-          className="h-9 px-3 text-xs"
-        >
-          <LogOut className="w-4 h-4 mr-1" />
-          Завершить
-        </Button>
+      
+      {/* SYSTEM BAR */}
+      <div className="bg-white/5 px-4 py-1.5 flex justify-between border-t border-white/5">
+        <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-widest">
+          Auth: {isRaider ? 'LOBBY_TOKEN' : 'CREW_KEY'} // ID: {userId?.slice(0,8)}
+        </span>
+        <div className="flex items-center gap-2">
+            <Zap className="w-2 h-2 text-brand-yellow" />
+            <span className="text-[8px] font-mono text-zinc-600 uppercase">Sync_Secure_OLED</span>
+        </div>
       </div>
-    </div>
+    </Card>
   );
 }
