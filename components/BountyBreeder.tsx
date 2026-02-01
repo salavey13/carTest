@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { sendDonationInvoice } from "@/app/actions";
+import { createBountyInvoice } from "@/app/wblanding/actions_bounty"; // LOCAL ACTION
 import { useAppContext } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ const confettiConfig = { angle: 90, spread: 360, startVelocity: 40, elementCount
 
 export default function BountyBreeder() {
   const { dbUser, isAuthenticated } = useAppContext();
-  const [mode, setMode] = useState<'love' | 'mutate'>('love'); // The Mode Switch
+  const [mode, setMode] = useState<'love' | 'mutate'>('love');
   const [amount, setAmount] = useState("100");
   const [bountyTitle, setBountyTitle] = useState("");
   const [bountyDesc, setBountyDesc] = useState("");
@@ -27,45 +27,43 @@ export default function BountyBreeder() {
     if (!isAuthenticated || !dbUser) { toast.error("Войдите в систему (Telegram)"); return; }
     const val = parseInt(amount);
     if (isNaN(val) || val < 10) { toast.error("Минимум 10 XTR"); return; }
-
-    // Format the payload based on mode
-    // If 'mutate', we prefix with BOUNTY: so the backend/admin knows it's a feature request
-    const messagePayload = mode === 'love' 
-      ? `DONATION: ${bountyDesc || "Just pure vibe"}` 
-      : `BOUNTY: [${bountyTitle}] ${bountyDesc}`;
+    if (mode === 'mutate' && !bountyTitle) { toast.error("Назовите вашу мутацию!"); return; }
 
     startTransition(async () => {
-      const result = await sendDonationInvoice(dbUser.user_id, val, messagePayload);
+      // Server Action Call
+      const result = await createBountyInvoice(
+        dbUser.user_id, 
+        val, 
+        mode, 
+        { title: bountyTitle, desc: bountyDesc }
+      );
+
       if (result.success) {
         toast.success(mode === 'love' ? "Спасибо за поддержку! 💖" : "Баунти создано! Счет в Telegram. 🚀");
         setShowConfetti(true);
-        // Reset form slightly delayed
-        setTimeout(() => { setShowConfetti(false); setBountyTitle(""); setBountyDesc(""); }, 1000);
+        setTimeout(() => { setShowConfetti(false); if(mode === 'mutate') { setBountyTitle(""); setBountyDesc(""); } }, 1000);
       } else {
-        toast.error("Ошибка создания счета: " + result.error);
+        toast.error("Ошибка: " + result.error);
       }
     });
   };
 
   return (
-    <Card className="bg-zinc-900 border-zinc-800 overflow-hidden relative">
+    <Card className="bg-zinc-900 border-zinc-800 overflow-hidden relative shadow-xl">
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500" />
       
       <CardHeader className="text-center pb-2">
         <div className="flex justify-center gap-4 mb-4 bg-black/50 p-1 rounded-full w-fit mx-auto border border-zinc-800">
           <button onClick={() => setMode('love')} className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 ${mode === 'love' ? 'bg-pink-500/20 text-pink-400 border border-pink-500/50' : 'text-zinc-500 hover:text-white'}`}>
-            <FaHeart /> LUV (Donation)
+            <FaHeart /> LUV
           </button>
           <button onClick={() => setMode('mutate')} className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 ${mode === 'mutate' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50' : 'text-zinc-500 hover:text-white'}`}>
-            <FaBug /> FIX (Bounty)
+            <FaBug /> FIX
           </button>
         </div>
         <CardTitle className="text-2xl font-orbitron text-white">
           {mode === 'love' ? "Поддержать Вайб" : "Заказать Мутацию"}
         </CardTitle>
-        <p className="text-xs text-zinc-500 font-mono">
-          {mode === 'love' ? "Твоя энергия питает Архитектора." : "Твои деньги определяют приоритет разработки."}
-        </p>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -76,18 +74,16 @@ export default function BountyBreeder() {
               className="space-y-3"
             >
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-cyan-500">Цель (Что сломалось / Что добавить)</label>
                 <Input 
-                  placeholder="Например: Интеграция с МойСклад" 
-                  className="bg-black border-zinc-700 text-white" 
+                  placeholder="Название фичи (Например: Интеграция с 1С)" 
+                  className="bg-black border-zinc-700 text-white placeholder:text-zinc-600 focus:border-cyan-500" 
                   value={bountyTitle} onChange={e => setBountyTitle(e.target.value)}
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-cyan-500">Детали (Почему это важно)</label>
                 <Textarea 
-                  placeholder="Без этого мои менеджеры плачут..." 
-                  className="bg-black border-zinc-700 text-white min-h-[80px]" 
+                  placeholder="Опиши боль. Почему это нужно? Чем больше деталей, тем быстрее реализую." 
+                  className="bg-black border-zinc-700 text-white min-h-[80px] placeholder:text-zinc-600 focus:border-cyan-500" 
                   value={bountyDesc} onChange={e => setBountyDesc(e.target.value)}
                 />
               </div>
@@ -95,39 +91,32 @@ export default function BountyBreeder() {
           )}
         </AnimatePresence>
 
-        <div className="space-y-1 pt-2">
-          <label className="text-[10px] uppercase font-bold text-green-500 flex justify-between">
-            <span>Энергия (XTR)</span>
-            <span className="text-zinc-500">{parseInt(amount) * 2} RUB (approx)</span>
-          </label>
-          <div className="grid grid-cols-4 gap-2 mb-2">
+        <div className="space-y-2 pt-2">
+          <div className="grid grid-cols-4 gap-2">
             {[50, 100, 500, 1000].map(val => (
-              <button key={val} onClick={() => setAmount(String(val))} className={`text-xs py-1 rounded border ${amount === String(val) ? 'bg-green-500/20 border-green-500 text-green-400' : 'bg-black border-zinc-800 text-zinc-500 hover:border-zinc-600'}`}>
+              <button key={val} onClick={() => setAmount(String(val))} className={`text-xs py-2 rounded border transition-colors ${amount === String(val) ? 'bg-green-500/20 border-green-500 text-green-400 font-bold' : 'bg-black border-zinc-800 text-zinc-500 hover:border-zinc-600'}`}>
                 {val} ★
               </button>
             ))}
           </div>
-          <Input 
-            type="number" value={amount} onChange={e => setAmount(e.target.value)}
-            className="bg-black border-zinc-700 text-green-400 font-mono text-lg text-right"
-          />
+          <div className="relative">
+             <Input 
+                type="number" value={amount} onChange={e => setAmount(e.target.value)}
+                className="bg-black border-zinc-700 text-green-400 font-mono text-lg text-right pr-12"
+             />
+             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-mono text-sm">XTR</span>
+          </div>
         </div>
 
-        <div className="relative">
+        <div className="relative pt-2">
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"><Confetti active={showConfetti} config={confettiConfig} /></div>
           <Button 
             onClick={handleCommit} disabled={isPending}
-            className={`w-full py-6 font-bold text-black font-orbitron transition-all ${mode === 'love' ? 'bg-pink-500 hover:bg-pink-400 shadow-[0_0_20px_rgba(236,72,153,0.4)]' : 'bg-cyan-500 hover:bg-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.4)]'}`}
+            className={`w-full py-6 font-bold text-black font-orbitron transition-all shadow-lg hover:scale-[1.02] active:scale-[0.98] ${mode === 'love' ? 'bg-pink-500 hover:bg-pink-400 shadow-pink-500/20' : 'bg-cyan-500 hover:bg-cyan-400 shadow-cyan-500/20'}`}
           >
-            {isPending ? <FaBolt className="animate-pulse" /> : (mode === 'love' ? <><FaHeart className="mr-2"/> SUPPORT</> : <><FaRocket className="mr-2"/> DEPLOY BOUNTY</>)}
+            {isPending ? <FaBolt className="animate-pulse" /> : (mode === 'love' ? <><FaHeart className="mr-2"/> DONATE</> : <><FaRocket className="mr-2"/> PUSH BOUNTY</>)}
           </Button>
         </div>
-        
-        {mode === 'mutate' && (
-          <p className="text-[10px] text-center text-zinc-600">
-            * Баунти попадает на доску сразу после оплаты. Если Архитектор отклонит задачу, средства вернутся в карму (но не на карту, лол).
-          </p>
-        )}
       </CardContent>
     </Card>
   );
