@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { FaGithub, FaShieldHalved, FaFileContract, FaScroll, FaGavel, FaSpinner, FaExternalLinkAlt } from "react-icons/fa6";
+import { FaGithub, FaShieldHalved, FaFileContract, FaScroll, FaGavel, FaSpinner, FaLink } from "react-icons/fa6";
 import { PrivacyModal } from "./PrivacyModal";
 
 // Компонент для отображения raw Markdown (constitution)
@@ -61,7 +61,7 @@ const ConstitutionModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               target="_blank"
               className="flex items-center gap-2 px-3 py-1.5 text-xs bg-zinc-900 hover:bg-zinc-800 text-brand-cyan border border-brand-cyan/30 rounded transition-all"
             >
-              <FaExternalLinkAlt /> GitHub
+              <FaLink /> GitHub
             </Link>
             <button 
               onClick={onClose}
