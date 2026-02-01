@@ -27,6 +27,8 @@ import { WbFooter } from "./components/WbFooter";
 import { ExitIntentPopup } from "./components/ExitIntentPopup";
 import { ReviewsSection } from "./components/ReviewsSection";
 import { SovereigntyPanel } from "./components/SovereigntyPanel";
+import BountyBreeder from "@/components/BountyBreeder";
+import BountyBoard from "@/components/BountyBoard";
 
 export default function WarehouseLandingPage() {
   const { dbUser, isLoading: appContextLoading } = useAppContext();
@@ -395,6 +397,29 @@ export default function WarehouseLandingPage() {
               <CrewsListSimplified />
           </div>
       </section>
+
+<section className="py-20 bg-black border-t border-white/10">
+  <div className="max-w-6xl mx-auto px-4">
+    <div className="grid md:grid-cols-2 gap-12 items-start">
+      
+      {/* The Womb: Where new features are born */}
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-6 font-orbitron">ПРЕДЛОЖИ МУТАЦИЮ</h2>
+        <p className="text-gray-400 text-sm mb-8">
+          Не жди, пока я догадаюсь. Опиши, чего не хватает, и закинь донат. 
+          Деньги — лучший пруф необходимости фичи.
+        </p>
+        <BountyBreeder />
+      </div>
+
+      {/* The Landscape: What is currently evolving */}
+      <div>
+        <BountyBoard />
+      </div>
+      
+    </div>
+  </div>
+</section>
 
       <WbFooter />
       <ExitIntentPopup />
