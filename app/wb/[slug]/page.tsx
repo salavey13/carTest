@@ -351,8 +351,12 @@ export default function CrewWarehousePage() {
             itemsCount={localItems.reduce((s, it) => s + (it.total_quantity || 0), 0)}
             uniqueIds={localItems.length}
             score={score} 
-            level={level} 
-            streak={streak} 
+            activeShift={activeShift}  // Pass this from your state
+  slug={slug}
+  userId={dbUser?.user_id}
+  // Rename game props to legal terms in parent too:
+  streak={streak} // Now displays as "СТАЖ" (Seniority)
+  level={level}   // Now displays as "КВАЛ" (Qualification) 
             dailyStreak={dailyStreak}
             offloadUnits={offloadCount} 
             onloadUnits={onloadCount}
