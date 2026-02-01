@@ -9,7 +9,8 @@ import { selfDevBoostHandler } from "./selfdev-boost";
 import { disableDummyModeHandler } from "./disable-dummy-mode";
 import { protocardPurchaseHandler } from "./protocard-purchase-handler";
 import { wbReferralServiceHandler } from "./wb-referral-service";
-import { qrMerchantHandler } from "./qr-merchant"; // NEW IMPORT
+import { qrMerchantHandler } from "./qr-merchant";
+import { bountyHandler } from "./bounty";
 
 import { logger } from "@/lib/logger";
 import { getBaseUrl } from "@/lib/utils";
@@ -20,7 +21,8 @@ const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID!;
 // Register all handlers here
 const handlers: WebhookHandler[] = [
   wbReferralServiceHandler,
-  qrMerchantHandler, // NEW HANDLER
+  qrMerchantHandler,
+  bountyHandler,
   subscriptionHandler,
   carRentalHandler, 
   supportHandler,
