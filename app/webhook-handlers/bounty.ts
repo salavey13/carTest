@@ -1,0 +1,56 @@
+import { WebhookHandler } from "./types";
+import { sendComplexMessage } from "./actions/sendComplexMessage"; // Using the cooler one
+import { logger } from "@/lib/logger";
+
+export const bountyHandler: WebhookHandler = {
+  // Catch both the "mutation" bounties and the "pure donation" love
+  canHandle: (invoice) => invoice.type === "bounty_request" || invoice.type === "donation_pure",
+
+  handle: async (invoice, userId, userData, totalAmount, supabase, telegramToken, adminChatId) => {
+    logger.info(`[Bounty Handler] Processing ${invoice.type} from ${userId}`);
+
+    // 1. Update Invoice Status to PAID (Critical for the Bounty Board to see it)
+    const { error: updateError } = await supabase
+      .from("invoices")
+      .update({ status: "paid", updated_at: new Date().toISOString() })
+      .eq("id", invoice.id);
+
+    if (updateError) {
+      logger.error(`[Bounty Handler] Failed to mark invoice ${invoice.id} as paid:`, updateError);
+    }
+
+    // 2. Notify the User (With Vibe)
+    const isMutation = invoice.type === "bounty_request";
+    
+    const userMsg = isMutation
+      ? `🚀 **Баунти Активировано!**\n\nВаша задача: "${invoice.metadata?.bounty_title}" добавлена в очередь.\nСумма поддержки: ${totalAmount} XTR.\n\nАрхитектор скоро рассмотрит заявку.`
+      : `💖 **Спасибо за Поддержку!**\n\nВаши ${totalAmount} XTR получены. Вайб повышается!`;
+
+    // Use imageQuery to add flavor automatically
+    await sendComplexMessage(
+      userId, 
+      userMsg, 
+      [], 
+      { imageQuery: isMutation ? "cyberpunk laboratory" : "neon heart", parseMode: "Markdown" }
+    );
+
+    // 3. Notify the Architect (You)
+    const adminTitle = isMutation ? "🧬 НОВАЯ МУТАЦИЯ (Bounty)" : "💖 ДОНАТ (Love)";
+    const bountyDetails = isMutation
+      ? `\n**Задача:** ${invoice.metadata?.bounty_title}\n**Описание:** ${invoice.metadata?.bounty_desc}`
+      : `\n**Сообщение:** ${invoice.metadata?.bounty_desc || "Без сообщения"}`;
+
+    const adminMsg = `${adminTitle}\n` +
+                     `**От:** ${userData.username || userId} (${userId})\n` +
+                     `**Сумма:** ${totalAmount} XTR` +
+                     bountyDetails;
+
+    // Send to Admin Chat with a cool image
+    await sendComplexMessage(
+      adminChatId, 
+      adminMsg, 
+      [], 
+      { imageQuery: isMutation ? "blueprint code" : "treasure chest", parseMode: "Markdown" }
+    );
+  },
+};
