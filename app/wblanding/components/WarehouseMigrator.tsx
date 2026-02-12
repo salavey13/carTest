@@ -8,8 +8,8 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { 
-  Loader2, FileSpreadsheet, Database, Trash2, 
-  ShieldQuestion, User, Sparkles, Building2, UploadCloud, Warehouse
+  Loader2, Database, Trash2, 
+  ShieldQuestion, User, Sparkles, Building2, UploadCloud, Warehouse, Eye
 } from "lucide-react";
 import { uploadWarehouseCsv, getUserCrews } from "@/app/wb/actions";
 import { useAppContext } from "@/contexts/AppContext";
@@ -17,6 +17,7 @@ import { parse } from "papaparse";
 import * as XLSX from 'xlsx';
 
 // --- CONFIG ---
+const MAX_LOGS = 50;
 
 const normalizeHeader = (header: string): string => 
   (header || "").toString().toLowerCase().trim().replace(/\s+/g, '');
@@ -27,8 +28,8 @@ const HEADER_KEYWORDS: Record<string, string> = {
   'sku': 'id', 
   'vendorcode': 'id', 
   'vendor': 'id',
-  'вашsku': 'id', // "Ваш SKU *"
-  
+  'вашsku': 'id',
+
   // Quantity
   'количество': 'quantity', 
   'stock': 'quantity', 
@@ -36,7 +37,7 @@ const HEADER_KEYWORDS: Record<string, string> = {
   'доступно': 'quantity', 
   'вналичии': 'quantity',
   'свободныйостаток': 'quantity',
-  'доступнодлязаказа': 'quantity', // "Доступно для заказа *"
+  'доступнодлязаказа': 'quantity',
 
   // Warehouse (NEW)
   'склад': 'warehouse',
@@ -69,12 +70,13 @@ const detectColumnType = (header: string): string | undefined => {
   return undefined;
 };
 
+// --- TYPES ---
 interface ParsedItem {
   id: string;
   quantity: number;
   make: string;
   model: string;
-  specs: Record<string, any>;
+  specs: Record<string, string>;
   warehouse?: string;
 }
 
@@ -83,8 +85,12 @@ interface CrewInfo {
   name: string;
 }
 
-// --- COMPONENT ---
+interface RawRow {
+  [key: string]: string | number | null | undefined;
+  warehouse?: string;
+}
 
+// --- COMPONENT ---
 export function WarehouseMigrator() {
   const { dbUser } = useAppContext();
   
@@ -93,7 +99,7 @@ export function WarehouseMigrator() {
   const [logs, setLogs] = useState<{msg: string, type: string}[]>([]);
   
   // Source Data State
-  const [rawRows, setRawRows] = useState<any[]>([]); // Stores all parsed rows
+  const [rawRows, setRawRows] = useState<RawRow[]>([]); // Stores all parsed rows
   const [availableWarehouses, setAvailableWarehouses] = useState<string[]>([]); // Detected warehouses
   const [selectedSourceWarehouse, setSelectedSourceWarehouse] = useState<string>(""); // Selected source filter
   
@@ -101,28 +107,170 @@ export function WarehouseMigrator() {
   const [userCrews, setUserCrews] = useState<CrewInfo[]>([]);
   const [targetCrewId, setTargetCrewId] = useState<string>('personal');
 
+  // logging util
+  const addLog = useCallback((msg: string, type: string = 'info') => {
+    setLogs(prev => [...prev.slice(-MAX_LOGS), { msg, type }]);
+  }, []);
+
   useEffect(() => {
-    if (dbUser?.user_id) getUserCrews(dbUser.user_id).then(setUserCrews);
-  }, [dbUser]);
+    if (dbUser?.user_id) getUserCrews(dbUser.user_id).then(setUserCrews).catch(e => {
+      console.error(e);
+      addLog("Failed to load crews", "error");
+    });
+  }, [dbUser, addLog]);
+
+  // Unified JSON rows processor (used by CSV and XLSX branches)
+  const processJsonRows = useCallback((jsonData: Record<string, unknown>[]) => {
+    const warehouseSet = new Set<string>();
+    const processedRows: RawRow[] = [];
+
+    jsonData.forEach((row) => {
+      const cleanRow: RawRow = {};
+      Object.keys(row).forEach(key => {
+        const type = detectColumnType(key);
+        const cleanKey = type || normalizeHeader(key);
+        let val = row[key];
+
+        if (typeof val === 'string') {
+          val = val.replace(/\n/g, ' ').trim();
+        }
+
+        cleanRow[cleanKey] = val as string | number | null | undefined;
+      });
+
+      if (typeof cleanRow.warehouse === 'string' && cleanRow.warehouse.length > 0) {
+        warehouseSet.add(String(cleanRow.warehouse));
+      }
+
+      processedRows.push(cleanRow);
+    });
+
+    setRawRows(processedRows);
+
+    if (warehouseSet.size > 1) {
+      const whList = Array.from(warehouseSet);
+      setAvailableWarehouses(whList);
+      setSelectedSourceWarehouse(whList[0]);
+      addLog(`Detected ${whList.length} warehouses. Please select one.`, 'info');
+      toast.info(`Found ${whList.length} warehouses. Select one to proceed.`);
+    } else if (warehouseSet.size === 1) {
+      const single = Array.from(warehouseSet)[0];
+      setAvailableWarehouses([single]);
+      setSelectedSourceWarehouse(single);
+      addLog(`Detected single warehouse: ${single}`, 'success');
+    } else {
+      setAvailableWarehouses([]);
+      setSelectedSourceWarehouse("");
+      addLog(`No warehouse column found. Processing all rows.`, 'info');
+    }
+  }, [addLog]);
+
+  // --- FILE UPLOAD HANDLER ---
+  const handleFileUpload = useCallback((file: File) => {
+    if (!file) return;
+    addLog(`Reading: ${file.name}...`, 'info');
+    setRawRows([]); // Reset
+    setAvailableWarehouses([]); // Reset
+    setSelectedSourceWarehouse("");
+    setCsvData("");
+
+    const isCsv = file.name.toLowerCase().endsWith('.csv');
+
+    if (isCsv) {
+      parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (h) => detectColumnType(h) || normalizeHeader(h),
+        complete: (res) => {
+          // papaparse returns array of objects, headers are already transformed
+          processJsonRows(res.data as Record<string, unknown>[]);
+        },
+        error: (err) => {
+          console.error(err);
+          addLog("CSV parse failed", "error");
+          toast.error("Failed to parse CSV");
+        }
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'array', raw: false });
+
+        // Find best sheet & header row like original logic (scan up to 50 rows)
+        let bestSheetName: string | null = null;
+        let bestHeaderRow: number = -1;
+        let maxScore = 0;
+
+        workbook.SheetNames.forEach((sheetName) => {
+          const sheet = workbook.Sheets[sheetName];
+          const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+          if (!rows || rows.length === 0) return;
+
+          for (let i = 0; i < Math.min(50, rows.length); i++) {
+            const row = rows[i];
+            let currentScore = 0;
+            // evaluate how many header keywords are present
+            row.forEach(cell => {
+              const type = detectColumnType(String(cell));
+              if (type) currentScore++;
+            });
+
+            if (currentScore > maxScore && currentScore >= 2) {
+              maxScore = currentScore;
+              bestSheetName = sheetName;
+              bestHeaderRow = i;
+            }
+          }
+        });
+
+        if (!bestSheetName || maxScore < 2) {
+          throw new Error("Could not detect data headers.");
+        }
+
+        addLog(`Found headers in sheet "${bestSheetName}" at row ${bestHeaderRow + 1}`, 'success');
+
+        // Use detected header row as range to convert sheet into JSON objects (keys from header row)
+        const sheet = workbook.Sheets[bestSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(sheet, { range: bestHeaderRow, defval: "", raw: false });
+
+        // Now normalize keys and extract warehouses
+        processJsonRows(jsonData as Record<string, unknown>[]);
+      } catch (err: any) {
+        console.error(err);
+        addLog(`Error: ${err?.message || String(err)}`, 'error');
+        toast.error("Failed to parse file");
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  }, [addLog, processJsonRows]);
+
+  // Drag & Drop
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files[0]) handleFileUpload(e.dataTransfer.files[0]);
+  }, [handleFileUpload]);
 
   // --- FILTERING LOGIC ---
   // When user selects a warehouse or rawRows change, filter data and generate CSV
   useEffect(() => {
     if (rawRows.length === 0) return;
 
-    // Filter rows
     const filtered = selectedSourceWarehouse 
       ? rawRows.filter(r => r.warehouse === selectedSourceWarehouse)
       : rawRows;
 
-    // Convert back to CSV for display
     if (filtered.length > 0) {
       const headers = Object.keys(filtered[0]);
       const csvString = [
         headers.join(','),
         ...filtered.map(row => 
           headers.map(h => {
-            let val = row[h] || "";
+            let val = (row as any)[h] ?? "";
             if (typeof val === 'string' && (val.includes(',') || val.includes('"') || val.includes('\n'))) {
               val = `"${val.replace(/"/g, '""')}"`;
             }
@@ -146,155 +294,51 @@ export function WarehouseMigrator() {
       transformHeader: (h) => detectColumnType(h) || normalizeHeader(h),
     });
 
-    return result.data.map((row: any) => {
+    const seenIds = new Set<string>();
+
+    return (result.data as any[]).map((row: any) => {
       const item: Partial<ParsedItem> = { specs: {} };
-      
+
+      // Normalize ID
       if (row.id) item.id = String(row.id).toLowerCase().trim();
-      if (row.quantity) item.quantity = parseInt(String(row.quantity).replace(/[^\d.-]/g, ''), 10) || 0;
+
+      // Quantity: support "1.234,56" and "1,234.56" by replacing comma to dot and stripping other chars
+      if (row.quantity !== undefined && row.quantity !== null && String(row.quantity).toString().trim() !== '') {
+        const raw = String(row.quantity).replace(/\s/g, '').replace(',', '.').replace(/[^\d.-]/g, '');
+        const val = Number(raw);
+        item.quantity = Number.isFinite(val) ? Math.round(val) : 0;
+      }
+
       if (row.model) item.model = String(row.model);
       if (row.make) item.make = String(row.make);
-      if (row.size) item.specs.size = String(row.size);
-      if (row.season) item.specs.season = String(row.season);
-      if (row.color) item.specs.color = String(row.color);
+      if (row.size) (item.specs as any).size = String(row.size);
+      if (row.season) (item.specs as any).season = String(row.season);
+      if (row.color) (item.specs as any).color = String(row.color);
 
       if (!item.id) return null;
+
+      // dedupe
+      if (seenIds.has(item.id)) {
+        addLog(`Duplicate ID skipped: ${item.id}`, 'info');
+        return null;
+      }
+      seenIds.add(item.id);
+
       item.make = item.make || "Unknown";
       item.model = item.model || item.id;
-      item.quantity = item.quantity || 0;
-      
+      item.quantity = item.quantity ?? 0;
+
       return item as ParsedItem;
     }).filter(Boolean) as ParsedItem[];
-  }, [csvData]);
-
-  const addLog = (msg: string, type: string = 'info') => setLogs(prev => [...prev.slice(-20), { msg, type }]);
-
-  // --- FILE UPLOAD HANDLER ---
-  const handleFileUpload = useCallback((file: File) => {
-    if (!file) return;
-    addLog(`Reading: ${file.name}...`, 'info');
-    setRawRows([]); // Reset
-    setAvailableWarehouses([]); // Reset
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'array', raw: false });
-
-        let bestSheetName: string | null = null;
-        let bestHeaderRow: number = -1;
-        let bestHeaders: string[] = [];
-        let maxScore = 0;
-
-        workbook.SheetNames.forEach((sheetName) => {
-          const sheet = workbook.Sheets[sheetName];
-          const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-          
-          if (rows.length === 0) return;
-
-          for (let i = 0; i < Math.min(50, rows.length); i++) {
-            const row = rows[i];
-            let currentScore = 0;
-            const detectedHeaders: string[] = [];
-            
-            row.forEach(cell => {
-              const type = detectColumnType(String(cell));
-              if (type) {
-                currentScore++;
-                detectedHeaders.push(type);
-              } else {
-                detectedHeaders.push(normalizeHeader(String(cell)));
-              }
-            });
-
-            if (currentScore > maxScore && currentScore >= 2) {
-              maxScore = currentScore;
-              bestSheetName = sheetName;
-              bestHeaderRow = i;
-              bestHeaders = detectedHeaders;
-            }
-          }
-        });
-
-        if (!bestSheetName || maxScore < 2) {
-          throw new Error("Could not detect data headers.");
-        }
-
-        addLog(`Found headers in sheet "${bestSheetName}" at row ${bestHeaderRow + 1}`, 'success');
-
-        // 2. Parse to JSON using detected headers
-        const sheet = workbook.Sheets[bestSheetName];
-        // We use header: 1 to manually map because sheet_to_json with header:1 is safer for dynamic header rows
-        // But easier: use sheet_to_json with range.
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { 
-            range: bestHeaderRow, 
-            defval: "",
-            raw: false 
-        });
-
-        // 3. Normalize Keys and Extract Warehouses
-        const warehouseSet = new Set<string>();
-        const processedRows: any[] = [];
-
-        jsonData.forEach((row: any) => {
-            const cleanRow: any = {};
-            // Map original keys to our normalized keys
-            Object.keys(row).forEach(key => {
-                const type = detectColumnType(key);
-                const cleanKey = type || normalizeHeader(key);
-                let val = row[key];
-                
-                // Clean up newlines in values (common in warehouse names)
-                if (typeof val === 'string') val = val.replace(/\n/g, ' ').trim();
-                
-                cleanRow[cleanKey] = val;
-            });
-
-            // Extract Warehouse if present
-            if (cleanRow.warehouse) {
-                warehouseSet.add(cleanRow.warehouse);
-            }
-            
-            processedRows.push(cleanRow);
-        });
-
-        setRawRows(processedRows);
-
-        // 4. Handle Warehouse Logic
-        if (warehouseSet.size > 1) {
-            const whList = Array.from(warehouseSet);
-            setAvailableWarehouses(whList);
-            setSelectedSourceWarehouse(whList[0]); // Auto-select first
-            addLog(`Detected ${whList.length} warehouses. Please select one.`, 'info');
-            toast.info(`Found ${whList.length} warehouses. Select one to proceed.`);
-        } else if (warehouseSet.size === 1) {
-            setAvailableWarehouses(Array.from(warehouseSet));
-            setSelectedSourceWarehouse(Array.from(warehouseSet)[0]);
-            addLog(`Detected single warehouse: ${Array.from(warehouseSet)[0]}`, 'success');
-        } else {
-            // No warehouse column
-            setAvailableWarehouses([]);
-            setSelectedSourceWarehouse("");
-            addLog(`No warehouse column found. Processing all rows.`, 'info');
-        }
-
-      } catch (err: any) {
-        console.error(err);
-        addLog(`Error: ${err.message}`, 'error');
-        toast.error("Failed to parse file");
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  }, []);
-
-  // Drag & Drop
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    if (e.dataTransfer.files[0]) handleFileUpload(e.dataTransfer.files[0]);
-  }, [handleFileUpload]);
+  }, [csvData, addLog]);
 
   // --- MIGRATION HANDLER ---
   const handleMigration = async () => {
+    if (!dbUser?.user_id) {
+      toast.error("User not initialized");
+      return;
+    }
+
     if (parsedItems.length === 0) return toast.error("Нет данных");
     
     setIsMigrating(true);
@@ -316,15 +360,19 @@ export function WarehouseMigrator() {
       }));
 
       try {
-        const res = await uploadWarehouseCsv(payload, dbUser?.user_id);
-        if (res.success && res.stats) {
-          stats.created += res.stats.created;
-          stats.updated += res.stats.updated;
-          stats.denied += res.stats.denied;
-          addLog(`Batch ${Math.floor(i/BATCH_SIZE)+1}: +${res.stats.created} new, ~${res.stats.updated} upd`, 'success');
-        } else throw new Error(res.error);
+        const res = await uploadWarehouseCsv(payload, dbUser.user_id);
+        if (res && res.success) {
+          const s = res.stats ?? { created: 0, updated: 0, denied: 0 };
+          stats.created += s.created;
+          stats.updated += s.updated;
+          stats.denied += s.denied;
+          addLog(`Batch ${Math.floor(i/BATCH_SIZE)+1}: +${s.created} new, ~${s.updated} upd`, 'success');
+        } else {
+          const errMsg = (res && res.error) ? String(res.error) : 'Unknown upload error';
+          addLog(`Batch ${Math.floor(i/BATCH_SIZE)+1}: ${errMsg}`, 'error');
+        }
       } catch (e: any) {
-        addLog(`Error batch ${Math.floor(i/BATCH_SIZE)+1}: ${e.message}`, 'error');
+        addLog(`Error batch ${Math.floor(i/BATCH_SIZE)+1}: ${e?.message || String(e)}`, 'error');
       }
     }
 
@@ -332,11 +380,14 @@ export function WarehouseMigrator() {
     setIsMigrating(false);
   };
 
+  // Preview first 10 items
+  const previewItems = parsedItems.slice(0, 10);
+
   return (
     <Card className="bg-card border border-border shadow-2xl w-full max-w-3xl mx-auto backdrop-blur-md">
       <CardHeader>
         <CardTitle className="text-brand-cyan font-orbitron flex items-center gap-2 text-xl">
-          <Database className="w-5 h-5" /> SMART MIGRATOR V4
+          <Database className="w-5 h-5" /> SMART MIGRATOR V5
         </CardTitle>
         <CardDescription className="text-muted-foreground text-xs font-mono">
           MULTI-WAREHOUSE FILTER • AUTO-DETECT HEADERS
@@ -406,6 +457,23 @@ SKU-001; 10; Одеяло 2x2; ИвановскийТекстиль; leto`}
             disabled={isMigrating}
           />
         </div>
+
+        {/* Preview */}
+        {previewItems.length > 0 && (
+          <div className="border rounded p-3 text-xs font-mono space-y-2">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Eye className="w-4 h-4"/> Preview (first {previewItems.length})
+            </div>
+            {previewItems.map(it => (
+              <div key={it.id} className="text-[12px]">
+                <span className="font-mono">{it.id}</span> — qty: <b>{it.quantity}</b> — {it.make} / {it.model}
+                {Object.keys(it.specs).length > 0 && (
+                  <div className="text-[11px] text-muted-foreground">specs: {Object.entries(it.specs).map(([k,v]) => `${k}:${v}`).join(', ')}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Stats */}
         {csvData && (
