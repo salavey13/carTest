@@ -16,7 +16,7 @@ import {
   CyberFitnessProfile,
   DailyActivityRecord, 
 } from "@/hooks/cyberFitnessSupabase";
-import { format, startOfWeek, addDays } from 'date-fns';
+import { format, subDays, parseISO, isValid } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Sparkles, ExternalLink, GitBranch, Orbit } from "lucide-react";
 
@@ -26,19 +26,18 @@ const CHART_COLORS = [
   'hsl(var(--brand-orange))'
 ];
 
-const DEFAULT_WEEKLY_ACTIVITY_TEMPLATE: Array<DailyActivityRecord & { name: string; value: number; label: string }> = 
+const buildRollingActivityTemplate = (anchorDate: Date): Array<DailyActivityRecord & { name: string; value: number; label: string }> =>
   Array.from({ length: 7 }).map((_, i) => {
-   const dayOfWeek = startOfWeek(new Date(), { weekStartsOn: 1 }); 
-   const date = addDays(dayOfWeek, i);
-   return {
-     name: format(date, 'EEE', { locale: ru }).substring(0, 2).toUpperCase(), 
-     value: 0, 
-     label: '0 VP', 
-     date: format(date, 'yyyy-MM-dd'), 
-     filesExtracted: 0, tokensProcessed: 0, kworkRequestsSent: 0,
-     prsCreated: 0, branchesUpdated: 0, focusTimeMinutes: 0,
-   };
-});
+    const date = subDays(anchorDate, 6 - i);
+    return {
+      name: format(date, 'EEE', { locale: ru }).substring(0, 2).toUpperCase(),
+      value: 0,
+      label: '0 VP',
+      date: format(date, 'yyyy-MM-dd'),
+      filesExtracted: 0, tokensProcessed: 0, kworkRequestsSent: 0,
+      prsCreated: 0, branchesUpdated: 0, focusTimeMinutes: 0,
+    };
+  });
 
 const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png";
 const FEATURED_QUEST_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250510_035401-e6d0b2d8-9f28-4516-a5c7-fe729b31f736.jpg"; // Consider localizing alt text if needed
@@ -147,32 +146,58 @@ export default function Home() {
       );
   }
 
-  const chartReadyWeeklyActivity = DEFAULT_WEEKLY_ACTIVITY_TEMPLATE.map(templateDay => {
-    const logEntry = cyberProfile?.dailyActivityLog?.find(
-      log => log.date === templateDay.date
-    );
-    if (logEntry) {
-        const vibePoints = 
-            (logEntry.filesExtracted * 0.1) +       
-            (logEntry.tokensProcessed * 0.001) +   
-            (logEntry.kworkRequestsSent * 5) +      
-            (logEntry.prsCreated * 50) +           
-            (logEntry.branchesUpdated * 20) +       
-            ((logEntry.focusTimeMinutes || 0) * 0.5); 
-        return {
-            ...templateDay, 
-            value: vibePoints, 
-            label: `${vibePoints.toFixed(0)} VP`, 
-            filesExtracted: logEntry.filesExtracted,
-            tokensProcessed: logEntry.tokensProcessed,
-            kworkRequestsSent: logEntry.kworkRequestsSent,
-            prsCreated: logEntry.prsCreated,
-            branchesUpdated: logEntry.branchesUpdated,
-            focusTimeMinutes: logEntry.focusTimeMinutes || 0,
-        };
+  const sortedActivityLog = [...(cyberProfile?.dailyActivityLog || [])]
+    .filter((entry) => isValid(parseISO(`${entry.date}T00:00:00`)))
+    .sort((a, b) => parseISO(`${a.date}T00:00:00`).getTime() - parseISO(`${b.date}T00:00:00`).getTime());
+
+  const lastSevenLoggedDays = sortedActivityLog.slice(-7).map((entry) => parseISO(`${entry.date}T00:00:00`));
+  const chartDateWindow: Date[] = [...lastSevenLoggedDays];
+
+  if (chartDateWindow.length > 0) {
+    while (chartDateWindow.length < 7) {
+      chartDateWindow.unshift(subDays(chartDateWindow[0], 1));
     }
-    return templateDay; 
-});
+  } else {
+    chartDateWindow.push(...buildRollingActivityTemplate(new Date()).map((d) => parseISO(`${d.date}T00:00:00`)));
+  }
+
+  const chartTemplate = chartDateWindow.map((date) => ({
+    name: format(date, 'EEE', { locale: ru }).substring(0, 2).toUpperCase(),
+    value: 0,
+    label: '0 VP',
+    date: format(date, 'yyyy-MM-dd'),
+    filesExtracted: 0,
+    tokensProcessed: 0,
+    kworkRequestsSent: 0,
+    prsCreated: 0,
+    branchesUpdated: 0,
+    focusTimeMinutes: 0,
+  }));
+
+  const chartReadyWeeklyActivity = chartTemplate.map((templateDay) => {
+    const logEntry = cyberProfile?.dailyActivityLog?.find((log) => log.date === templateDay.date);
+    if (logEntry) {
+      const vibePoints =
+        (logEntry.filesExtracted * 0.1) +
+        (logEntry.tokensProcessed * 0.001) +
+        (logEntry.kworkRequestsSent * 5) +
+        (logEntry.prsCreated * 50) +
+        (logEntry.branchesUpdated * 20) +
+        ((logEntry.focusTimeMinutes || 0) * 0.5);
+      return {
+        ...templateDay,
+        value: vibePoints,
+        label: `${vibePoints.toFixed(0)} VP`,
+        filesExtracted: logEntry.filesExtracted,
+        tokensProcessed: logEntry.tokensProcessed,
+        kworkRequestsSent: logEntry.kworkRequestsSent,
+        prsCreated: logEntry.prsCreated,
+        branchesUpdated: logEntry.branchesUpdated,
+        focusTimeMinutes: logEntry.focusTimeMinutes || 0,
+      };
+    }
+    return templateDay;
+  });
 
   const totalKiloVibes = cyberProfile?.kiloVibes || 0;
   const focusTimeHours = parseFloat((cyberProfile?.focusTimeHours || 0).toFixed(1));
