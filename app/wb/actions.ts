@@ -388,7 +388,7 @@ export async function uploadWarehouseCsv(
 */
 
 // Вспомогательная функция для получения ID команд пользователя
-async function getUserCrewIds(userId: string): Promise<string[]> {
+export async function getUserCrewIds(userId: string): Promise<string[]> {
   const { data: memberships } = await supabaseAdmin
     .from("crew_members")
     .select("crew_id")

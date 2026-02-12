@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { uploadWarehouseCsv } from "@/app/wb/actions";
 import { useAppContext } from "@/contexts/AppContext";
-import { getUserCrews } from "@/app/rentals/actions"; // Предполагаем existence, или передаем из контекста
+import { getUserCrewIds } from "@/app/wb/actions";
 import { parse } from "papaparse";
 
 // Нормализация заголовков
@@ -58,7 +58,7 @@ export function WarehouseMigrator() {
   // Загрузка команд пользователя
   useEffect(() => {
     if (dbUser?.user_id) {
-      getUserCrews(dbUser.user_id).then(res => {
+      getUserCrewIds(dbUser.user_id).then(res => {
         if (res.data) {
           setUserCrews(res.data.map((c: any) => ({ id: c.crew_id, name: c.crew_name || c.name })));
         }
