@@ -404,7 +404,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
     pathname?.startsWith(p)
-  ) || pathname === "/";
+  );
 
   useEffect(() => {
     setShowHeaderAndFooter(

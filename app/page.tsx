@@ -189,6 +189,11 @@ export default function Home() {
           <div>
             <h1 className="text-xl sm:text-2xl font-orbitron font-bold text-brand-cyan cyber-text" data-text={`Агент: ${userNameDisplay}`}>Агент: <span className="text-brand-pink glitch" data-text={userNameDisplay}>{userNameDisplay}</span></h1>
             <p className="text-muted-foreground font-mono text-xs sm:text-sm mt-0.5">Когнитивная ОС {osVersionDisplay} | Уровень: <span className="text-brand-yellow font-semibold">{currentLevel}</span></p>
+            <Button asChild variant="link" className="h-auto p-0 text-xs font-mono text-brand-cyan hover:text-brand-pink">
+              <a href="https://chatgpt.com/codex" target="_blank" rel="noopener noreferrer">
+                chatgpt.com/codex
+              </a>
+            </Button>
           </div>
           <Link href="/profile" className="transition-transform duration-200 hover:scale-110">
             <Image src={dbUser?.avatar_url || telegramUser?.photo_url || PLACEHOLDER_AVATAR} alt={`Кибер-аватар агента ${userNameDisplay}`} width={52} height={52} className="avatar-cyber w-11 h-11 sm:w-13 sm:h-13" priority />
