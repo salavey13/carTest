@@ -18,6 +18,7 @@ import {
 } from "@/hooks/cyberFitnessSupabase";
 import { format, startOfWeek, addDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { Sparkles, ExternalLink, GitBranch, Orbit } from "lucide-react";
 
 const CHART_COLORS = [
   'hsl(var(--brand-purple))', 'hsl(var(--brand-pink))', 'hsl(var(--brand-cyan))',
@@ -189,16 +190,48 @@ export default function Home() {
           <div>
             <h1 className="text-xl sm:text-2xl font-orbitron font-bold text-brand-cyan cyber-text" data-text={`Агент: ${userNameDisplay}`}>Агент: <span className="text-brand-pink glitch" data-text={userNameDisplay}>{userNameDisplay}</span></h1>
             <p className="text-muted-foreground font-mono text-xs sm:text-sm mt-0.5">Когнитивная ОС {osVersionDisplay} | Уровень: <span className="text-brand-yellow font-semibold">{currentLevel}</span></p>
-            <Button asChild variant="link" className="h-auto p-0 text-xs font-mono text-brand-cyan hover:text-brand-pink">
-              <a href="https://chatgpt.com/codex" target="_blank" rel="noopener noreferrer">
-                chatgpt.com/codex
-              </a>
-            </Button>
+            <p className="text-[11px] font-mono text-muted-foreground mt-1">Открой новый стек инструментов ниже ↓</p>
           </div>
           <Link href="/profile" className="transition-transform duration-200 hover:scale-110">
             <Image src={dbUser?.avatar_url || telegramUser?.photo_url || PLACEHOLDER_AVATAR} alt={`Кибер-аватар агента ${userNameDisplay}`} width={52} height={52} className="avatar-cyber w-11 h-11 sm:w-13 sm:h-13" priority />
           </Link>
         </motion.div>
+
+        <motion.div variants={itemVariants}>
+          <Card className="border-brand-cyan/30 bg-dark-card/70 backdrop-blur-sm">
+            <CardHeader className="pb-2 pt-3 px-4 md:px-5">
+              <CardTitle className="text-base sm:text-lg font-orbitron text-brand-cyan flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-brand-pink" /> THE NEW ERA
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm font-mono">
+                Новая эра инструментов: пиши, собирай и запускай быстрее — с прозрачным потоком от идеи до релиза.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-4 md:px-5 pb-4 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <Button asChild variant="outline" className="justify-between border-brand-cyan/40 hover:border-brand-cyan hover:bg-brand-cyan/10">
+                  <a href="https://chatgpt.com/codex" target="_blank" rel="noopener noreferrer">
+                    <span className="inline-flex items-center"><ExternalLink className="mr-2 h-4 w-4" />Codex</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">chatgpt.com</span>
+                  </a>
+                </Button>
+                <Button asChild variant="outline" className="justify-between border-brand-pink/40 hover:border-brand-pink hover:bg-brand-pink/10">
+                  <Link href="/nexus">
+                    <span className="inline-flex items-center"><Orbit className="mr-2 h-4 w-4" />Nexus</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">внутри платформы</span>
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="justify-between border-brand-yellow/40 hover:border-brand-yellow hover:bg-brand-yellow/10">
+                  <Link href="/repo-xml">
+                    <span className="inline-flex items-center"><GitBranch className="mr-2 h-4 w-4" />Repo XML</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">dev flow</span>
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
         <motion.div variants={itemVariants}>
           <Card className="featured-quest-card group">
             <CardHeader className="flex flex-row items-center justify-between pb-2 pt-3 px-4 md:px-5">
