@@ -266,93 +266,90 @@ This entire feature page (`/jumpstart`), built around the innovative **'Product 
 
 ---
 
-## Want Your Own Engine? (Advanced Setup)
+## Want Your Own Engine? (Updated: 5-step launch)
 
-This section is for developers who want to fork the project, run it locally, deploy their own instance, or contribute via the traditional Git workflow.
+Good news: the self-host flow is now intentionally simple.
 
-### Prerequisites
+### The shortest path
 
--   [Node.js](https://nodejs.org/) (v18+ recommended)
--   [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
--   [Git](https://git-scm.com/)
--   A Supabase account and project.
--   Your *own* Telegram Bot Token.
--   Your *own* API Keys for AI services (Google AI Studio/Gemini, Coze).
--   Your *own* GitHub Personal Access Token (classic or fine-grained with `repo` scope).
+1. **Fork** this repository to your GitHub account.
+2. **Connect your fork to your own Codex workflow** (ChatGPT Codex/local Codex usage).
+3. **Import the fork into Vercel** and create your own deployment.
+4. **Initialize Supabase** by running:
+   - `supabase/migrations/20240101000000_init.sql`
+5. **Set environment variables** in Vercel (or your runtime).
 
-### Installation
+That’s enough to run your own production baseline.
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/salavey13/carTest.git
-    cd carTest
-    ```
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    # or
-    yarn install
-    ```
-3.  **Set up environment variables:**
-    *   Create a `.env.local` file in the root directory by copying `.env.example` (if it exists) or creating it manually.
-    *   Fill in the required values as described in the [Configuration](#configuration) section below using *your own keys and project details*.
-4.  **Set up Supabase:**
-    *   In your Supabase project, run the necessary SQL migrations. Check the `/supabase/migrations` folder (if present) or examine `/types/database.types.ts` and database interactions (e.g., in `/hooks/supabase.ts`, `/app/**/actions.ts`) to understand the required tables (e.g., `users`, `ai_requests`, `invoices`, etc.). You might need to create these manually if migrations aren't provided.
-    *   Configure Supabase Auth settings.
-    *   Set up required Storage buckets (e.g., `carpix`, `about` - check code for usage) and configure their policies (e.g., public access if needed).
-    *   Create required database functions (RPC) if used (e.g., `search_cars`, `get_recent_paid_selfdev_invoices`). Check `/hooks/supabase.ts` or `/app/**/actions.ts` for function calls.
-    *   Enable Row Level Security (RLS) on your tables and define appropriate policies for security.
+### Required environment variables
 
-### Running Locally
-
-```bash
-npm run dev
-# or
-yarn dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-**Note:** For full Telegram Mini App functionality testing (including receiving user data from Telegram), you'll need to:
-1.  Deploy your local instance to the web using a tunneling service like `ngrok`.
-2.  Configure your Telegram Bot's Mini App URL (via [@BotFather](https://t.me/BotFather)) to point to your `ngrok` HTTPS URL.
-
-### Configuration
-
-Create a `.env.local` file in the project root and add the following variables with *your own credentials*. **Never commit this file to Git.**
+Create `.env.local` for local work (or configure Vercel env vars):
 
 ```env
-# Supabase (YOUR Project Credentials)
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-public-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key # Used server-side only
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 
-# Telegram (YOUR Bot Credentials)
+# Telegram
 TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
-ADMIN_CHAT_ID=your_personal_telegram_chat_id # For receiving admin notifications
+ADMIN_CHAT_ID=your_personal_telegram_chat_id
 
-# GitHub (YOUR Personal Access Token)
-# Needs 'repo' scope for accessing repositories
-GITHUB_TOKEN=ghp_yourgithubpersonalaccesstoken
+# GitHub/Codex flow
+GITHUB_TOKEN=ghp_yourgithubtoken
 
-# AI Services (YOUR API Keys)
-GEMINI_API_KEY=your_google_ai_studio_or_gemini_api_key
-# COZE_API_KEY=your_coze_api_key # Add if using Coze
-# COZE_BOT_ID=your_coze_bot_id
-# COZE_USER_ID=your_coze_user_id # Usually '29032...'
+# AI Provider
+GEMINI_API_KEY=your_gemini_api_key
 
-# Deployment URL (Required for Webhooks, Links in messages)
-# Vercel automatically sets NEXT_PUBLIC_VERCEL_URL.
-# If deploying elsewhere, set NEXT_PUBLIC_SITE_URL.
-# Example: NEXT_PUBLIC_SITE_URL=https://your-app-domain.com
-
-# Mock User (Optional: For development outside Telegram environment)
-# Set to true to simulate a Telegram user without the actual WebApp context
-# NEXT_PUBLIC_USE_MOCK_USER=false
-# MOCK_USER_DETAILS='{"id":123456,"first_name":"Mock","last_name":"User","username":"mockuser","language_code":"en"}' # Example
+# Public URL
+NEXT_PUBLIC_SITE_URL=https://your-app.vercel.app
 ```
 
-**Security Reminder:** Keep your `.env.local` file secure and out of version control.
+### Local run (optional)
+
+```bash
+git clone https://github.com/YOUR_USERNAME/carTest.git
+cd carTest
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Notes
+
+- Apply additional migrations from `supabase/migrations/*` as you enable specific modules.
+- For Telegram Mini App testing on localhost, use an HTTPS tunnel (e.g., ngrok) and set the bot webapp URL.
+- Never commit real secrets to Git.
+
+### Upstream-safe fork model (for you + your friend)
+
+Use this model so your friend can run his own Codex+Vercel instance **and** still receive your updates.
+
+1. Keep your repository as the **upstream source** (original project).
+2. Friend creates a fork (`friend/carTest`) and adds remotes locally:
+   ```bash
+   git remote -v
+   git remote add upstream https://github.com/<YOUR_USERNAME>/carTest.git
+   ```
+3. Friend does day-to-day work in his own fork/branches and opens PRs to his fork’s `main`.
+4. To receive your new changes, friend regularly syncs from upstream:
+   ```bash
+   git checkout main
+   git fetch upstream
+   git merge upstream/main
+   # or: git rebase upstream/main
+   git push origin main
+   ```
+5. If friend wants to contribute back to you, he opens PRs from `friend/<branch>` into `upstream/main` (your repo).
+6. Once you merge his PR upstream, **everyone** using this upstream-sync model can pull the same updates.
+
+This gives two-way collaboration:
+- you publish stable changes upstream,
+- friend can pull upstream updates,
+- you can merge friend improvements back for all downstream forks.
+
 
 ---
 
