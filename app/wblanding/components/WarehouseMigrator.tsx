@@ -9,53 +9,63 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { 
   Loader2, FileSpreadsheet, Database, Trash2, 
-  ShieldQuestion, User, Sparkles, Building2, UploadCloud, FileX
+  ShieldQuestion, User, Sparkles, Building2, UploadCloud
 } from "lucide-react";
 import { uploadWarehouseCsv, getUserCrews } from "@/app/wb/actions";
 import { useAppContext } from "@/contexts/AppContext";
 import { parse } from "papaparse";
-import * as XLSX from 'xlsx'; // NEW: Import SheetJS
+import * as XLSX from 'xlsx';
 
 // --- CONFIG ---
 
 const normalizeHeader = (header: string): string => 
-  (header || "").toString().toLowerCase().trim().replace(/[^a-zа-яё0-9]/g, '');
+  (header || "").toString().toLowerCase().trim().replace(/\s+/g, '');
 
-// Расширенная карта для WB / Ozon / Common
-const COLUMN_MAP: Record<string, string> = {
-  // ID
+// Map keys: "Normalized Header Keyword" -> "System Field"
+const HEADER_KEYWORDS: Record<string, string> = {
+  // ID (Priority match)
   'артикул': 'id', 
-  'id': 'id', 
   'sku': 'id', 
-  'vendorcode': 'id',
-  'артикулпродавца': 'id', // Ozon specific (often merged header)
-  'артикул продавца': 'id', // Ozon specific
-
+  'vendorcode': 'id', 
+  'vendor': 'id',
+  
   // Quantity
   'количество': 'quantity', 
-  'quantity': 'quantity', 
   'stock': 'quantity', 
   'остаток': 'quantity',
-  'вналичии': 'quantity', // WB specific
-  'доступно': 'quantity', // Ozon specific
-  'свободныйостаток': 'quantity', // WB report specific
+  'доступно': 'quantity', // "Доступно для заказа"
+  'вналичии': 'quantity',
+  'свободныйостаток': 'quantity',
 
   // Name/Model
   'название': 'model', 
-  'model': 'model', 
-  'name': 'model',
+  'name': 'model', 
+  'model': 'model',
   'наименование': 'model',
-  'subject': 'model', // WB specific
+  'subject': 'model', 
 
   // Make/Brand
   'бренд': 'make', 
-  'make': 'make', 
-  'brand': 'make',
+  'brand': 'make', 
+  'make': 'make',
 
   // Specs
-  'размер': 'size', 'size': 'size',
-  'сезон': 'season', 'season': 'season',
-  'цвет': 'color', 'color': 'color',
+  'размер': 'size', 
+  'сезон': 'season', 
+  'цвет': 'color',
+};
+
+// Helper to detect column type from header text
+const detectColumnType = (header: string): string | undefined => {
+  const h = normalizeHeader(header);
+  // Check exact matches first
+  if (HEADER_KEYWORDS[h]) return HEADER_KEYWORDS[h];
+  
+  // Check partial matches (e.g. "ваш sku *" contains "sku")
+  for (const [keyword, type] of Object.entries(HEADER_KEYWORDS)) {
+    if (h.includes(keyword)) return type;
+  }
+  return undefined;
 };
 
 interface ParsedItem {
@@ -83,39 +93,42 @@ export function WarehouseMigrator() {
   const [userCrews, setUserCrews] = useState<CrewInfo[]>([]);
   const [targetCrewId, setTargetCrewId] = useState<string>('personal');
 
-  // Load crews
   useEffect(() => {
-    if (dbUser?.user_id) {
-      getUserCrews(dbUser.user_id).then(crews => setUserCrews(crews));
-    }
+    if (dbUser?.user_id) getUserCrews(dbUser.user_id).then(setUserCrews);
   }, [dbUser]);
 
-  // --- PARSING LOGIC ---
+  // --- PARSING LOGIC (CSV) ---
   const parsedItems = useMemo(() => {
     if (!csvData.trim()) return [];
 
     const result = parse(csvData, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: normalizeHeader,
+      transformHeader: (h) => {
+        // Use the smart detector for CSV parsing as well
+        const type = detectColumnType(h);
+        return type || normalizeHeader(h); // Fallback to normalized header
+      },
     });
 
     return result.data.map((row: any) => {
       const item: Partial<ParsedItem> = { specs: {} };
       
-      Object.keys(row).forEach(key => {
-        const systemKey = COLUMN_MAP[key];
-        const value = row[key];
-        if (!value) return;
-
-        switch(systemKey) {
-          case 'id': item.id = String(value).toLowerCase().trim(); break;
-          case 'quantity': item.quantity = parseInt(String(value).replace(/[^\d.-]/g, ''), 10) || 0; break;
-          case 'model': item.model = String(value); break;
-          case 'make': item.make = String(value); break;
-          case 'size': case 'season': case 'color': item.specs![systemKey] = String(value); break;
-        }
-      });
+      // We iterate over the TYPES detected (e.g., row['id'], row['quantity'])
+      // But we need to be careful: multiple columns might map to 'id' in CSV if we aren't careful.
+      // Let's map back from our known types.
+      
+      // Logic: find the column index that matches the type
+      // However, Papaparse already renamed headers.
+      // So we just look for 'id', 'quantity', etc.
+      
+      if (row.id) item.id = String(row.id).toLowerCase().trim();
+      if (row.quantity) item.quantity = parseInt(String(row.quantity).replace(/[^\d.-]/g, ''), 10) || 0;
+      if (row.model) item.model = String(row.model);
+      if (row.make) item.make = String(row.make);
+      if (row.size) item.specs.size = String(row.size);
+      if (row.season) item.specs.season = String(row.season);
+      if (row.color) item.specs.color = String(row.color);
 
       if (!item.id) return null;
       item.make = item.make || "Unknown";
@@ -126,89 +139,90 @@ export function WarehouseMigrator() {
     }).filter(Boolean) as ParsedItem[];
   }, [csvData]);
 
-  const addLog = (msg: string, type: string = 'info') => {
-    setLogs(prev => [...prev.slice(-20), { msg, type }]);
-  };
+  const addLog = (msg: string, type: string = 'info') => setLogs(prev => [...prev.slice(-20), { msg, type }]);
 
   // --- FILE UPLOAD HANDLER (XLSX/CSV) ---
   const handleFileUpload = useCallback((file: File) => {
     if (!file) return;
-
-    addLog(`Reading file: ${file.name}...`, 'info');
+    addLog(`Reading: ${file.name}...`, 'info');
 
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const data = e.target?.result;
-        
-        // 1. Parse Workbook
-        const workbook = XLSX.read(data, { type: 'array' });
-        
-        // 2. Find the first sheet with data
+        const workbook = XLSX.read(data, { type: 'array', raw: false });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
 
-        // 3. Convert to JSON (Array of Arrays) to find header row
+        // 1. Convert to Array of Arrays to find header
         const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
         
-        if (rows.length === 0) throw new Error("Empty file");
+        if (rows.length === 0) throw new Error("Empty sheet");
 
-        // 4. SMART HEADER DETECTION
+        // 2. SMART HEADER DETECTION
         let headerRowIndex = -1;
-        const knownHeaders = Object.keys(COLUMN_MAP);
+        let maxScore = 0;
 
-        // Look through first 15 rows to find the one that looks like a header
-        for (let i = 0; i < Math.min(15, rows.length); i++) {
+        // Scan first 20 rows
+        for (let i = 0; i < Math.min(20, rows.length); i++) {
           const row = rows[i];
-          const cleanRow = row.map(normalizeHeader);
+          let currentScore = 0;
           
-          // Score how many known headers are in this row
-          const score = cleanRow.filter(h => knownHeaders.includes(h)).length;
-          
-          if (score >= 2) { // If we found at least 2 known columns (e.g., ID + Name)
+          // Calculate score based on how many keywords match in this row
+          row.forEach(cell => {
+            const type = detectColumnType(String(cell));
+            if (type) currentScore++;
+          });
+
+          // If this row has more matching keywords than previous max, it's likely the header
+          // Threshold: at least 2 matching columns to avoid false positives
+          if (currentScore > maxScore && currentScore >= 2) {
+            maxScore = currentScore;
             headerRowIndex = i;
-            break;
           }
         }
 
         if (headerRowIndex === -1) {
-          // Fallback: use first row
-          addLog("Warning: Could not auto-detect headers, using row 1.", 'error');
-          headerRowIndex = 0;
-        } else {
-          addLog(`Detected headers at row ${headerRowIndex + 1}`, 'success');
+          throw new Error("Could not find headers. Check the file format.");
         }
 
-        // 5. Extract Data starting from header row
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { 
-          range: headerRowIndex, // Start from detected header
-          defval: "" 
-        });
+        addLog(`Headers found at row ${headerRowIndex + 1} (Score: ${maxScore})`, 'success');
 
-        // 6. Convert back to CSV format for our existing logic
-        // We convert to CSV so the user can see/edit the data in the textarea
-        const csvString = parse.unparse(jsonData);
+        // 3. Convert specific range to CSV
+        // We use sheet_to_csv starting from the detected header row
+        // To do this, we manually slice the sheet range or just generate CSV from the row index
+        
+        // Easiest robust way: generate CSV from the rows array starting from header
+        // But to keep formatting simple, let's just generate CSV for the user to see
+        
+        const csvRows = rows.slice(headerRowIndex);
+        // Simple CSV generation (manual join to avoid extra dependencies)
+        const csvString = csvRows.map(row => 
+          row.map(cell => {
+            // Escape quotes and wrap in quotes if contains comma/newline
+            let s = String(cell).replace(/"/g, '""');
+            if (s.search(/(|,|\n|")/g) >= 0) s = `"${s}"`;
+            return s;
+          }).join(',')
+        ).join('\n');
+
         setCsvData(csvString);
-        toast.success(`Parsed ${jsonData.length} rows from Excel`);
+        toast.success(`Detected ${maxScore} columns. Ready to import.`);
 
       } catch (err: any) {
         console.error(err);
-        addLog(`Error parsing file: ${err.message}`, 'error');
-        toast.error("Failed to parse file");
+        addLog(`Error: ${err.message}`, 'error');
+        toast.error("Parsing failed");
       }
     };
-    
     reader.readAsArrayBuffer(file);
   }, []);
 
-  // Drag & Drop Handlers
+  // Drag & Drop
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileUpload(file);
+    if (e.dataTransfer.files[0]) handleFileUpload(e.dataTransfer.files[0]);
   }, [handleFileUpload]);
-
-  const handleDragOver = (e: React.DragEvent) => e.preventDefault();
 
   // --- MIGRATION HANDLER ---
   const handleMigration = async () => {
@@ -216,14 +230,13 @@ export function WarehouseMigrator() {
     
     setIsMigrating(true);
     setLogs([]);
-    addLog(`Start processing ${parsedItems.length} items...`, 'info');
+    addLog(`Processing ${parsedItems.length} items...`, 'info');
 
     const BATCH_SIZE = 20;
-    let totalCreated = 0, totalUpdated = 0, totalDenied = 0;
+    let stats = { created: 0, updated: 0, denied: 0 };
 
     for (let i = 0; i < parsedItems.length; i += BATCH_SIZE) {
       const batch = parsedItems.slice(i, i + BATCH_SIZE);
-      
       const payload = batch.map(item => ({
         "Артикул": item.id,
         "Количество": item.quantity,
@@ -236,29 +249,25 @@ export function WarehouseMigrator() {
       try {
         const res = await uploadWarehouseCsv(payload, dbUser?.user_id);
         if (res.success && res.stats) {
-          totalCreated += res.stats.created;
-          totalUpdated += res.stats.updated;
-          totalDenied += res.stats.denied;
-          addLog(`Batch OK: ${res.stats.created} new, ${res.stats.updated} upd, ${res.stats.denied} denied`, 'success');
-        } else {
-          throw new Error(res.error);
-        }
+          stats.created += res.stats.created;
+          stats.updated += res.stats.updated;
+          stats.denied += res.stats.denied;
+          addLog(`Batch ${Math.floor(i/BATCH_SIZE)+1}: +${res.stats.created} new, ~${res.stats.updated} upd`, 'success');
+        } else throw new Error(res.error);
       } catch (e: any) {
-        addLog(`Batch Error: ${e.message}`, 'error');
+        addLog(`Error batch ${Math.floor(i/BATCH_SIZE)+1}: ${e.message}`, 'error');
       }
     }
 
-    toast.success(`Done! Created: ${totalCreated}, Updated: ${totalUpdated}, Denied: ${totalDenied}`);
+    toast.success(`Complete! Created: ${stats.created}, Updated: ${stats.updated}`);
     setIsMigrating(false);
   };
 
-  // --- UI ---
   return (
     <Card className="bg-black/90 border border-brand-cyan/20 shadow-2xl w-full max-w-3xl mx-auto backdrop-blur-md">
       <CardHeader>
         <CardTitle className="text-brand-cyan font-orbitron flex items-center gap-2 text-xl">
-          <Database className="w-5 h-5" />
-          SMART MIGRATOR V3
+          <Database className="w-5 h-5" /> SMART MIGRATOR V3
         </CardTitle>
         <CardDescription className="text-gray-500 text-xs font-mono">
           AUTO-DETECT HEADERS • XLSX SUPPORT • WB/OZON READY
@@ -273,52 +282,32 @@ export function WarehouseMigrator() {
               <ShieldQuestion className="w-3 h-3"/> Target Inventory
             </label>
             <Select value={targetCrewId} onValueChange={setTargetCrewId}>
-              <SelectTrigger className="bg-black border-input">
-                <SelectValue placeholder="Select destination" />
-              </SelectTrigger>
+              <SelectTrigger className="bg-black border-input"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="personal">
-                  <div className="flex items-center gap-2"><User className="w-4 h-4 text-blue-400"/> Personal</div>
-                </SelectItem>
-                {userCrews.map(crew => (
-                  <SelectItem key={crew.id} value={crew.id}>
-                    <div className="flex items-center gap-2"><Building2 className="w-4 h-4 text-purple-400"/> {crew.name}</div>
-                  </SelectItem>
-                ))}
+                <SelectItem value="personal"><div className="flex items-center gap-2"><User className="w-4 h-4 text-blue-400"/> Personal</div></SelectItem>
+                {userCrews.map(crew => <SelectItem key={crew.id} value={crew.id}><Building2 className="inline w-4 h-4 text-purple-400 mr-2"/> {crew.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="flex items-end text-[10px] text-muted-foreground">
-            Files exported from Wildberries or Ozon are automatically detected.
+            Supports complex headers (e.g., "Ваш SKU *", "Доступно для заказа").
           </div>
         </div>
 
-        {/* DROP ZONE & INPUT */}
-        <div 
-          onDrop={handleDrop} 
-          onDragOver={handleDragOver}
-          className="relative border-2 border-dashed border-border rounded-lg transition-colors hover:border-brand-cyan/50 group"
-        >
-           <input 
-              type="file" 
-              accept=".xlsx,.xls,.csv" 
-              onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-            />
-           <div className="p-4 flex flex-col items-center justify-center gap-2 text-center pointer-events-none">
-             <UploadCloud className="w-8 h-8 text-muted-foreground group-hover:text-brand-cyan transition-colors"/>
-             <div className="text-xs text-muted-foreground font-mono">
-                Drop <span className="text-brand-cyan font-bold">XLSX</span> / CSV here or click to browse
-             </div>
-           </div>
+        {/* Drop Zone */}
+        <div onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} className="relative border-2 border-dashed border-border rounded-lg transition-colors hover:border-brand-cyan/50 group">
+          <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"/>
+          <div className="p-4 flex flex-col items-center justify-center gap-2 text-center pointer-events-none">
+            <UploadCloud className="w-8 h-8 text-muted-foreground group-hover:text-brand-cyan transition-colors"/>
+            <div className="text-xs text-muted-foreground font-mono">Drop <span className="text-brand-cyan font-bold">XLSX</span> / CSV here</div>
+          </div>
         </div>
 
-        {/* Textarea (Editable) */}
+        {/* Textarea */}
         <div className="space-y-2">
           <Textarea 
             placeholder={`Артикул; Количество; Название; Бренд; Сезон
-SKU-001; 10; Одеяло 2x2; ИвановскийТекстиль; leto
-SKU-002; 5; Подушка; DreamSoft; zima`}
+SKU-001; 10; Одеяло 2x2; ИвановскийТекстиль; leto`}
             className="font-mono bg-black border-gray-700 text-green-300 h-48 text-xs leading-relaxed focus:border-brand-cyan transition-all"
             value={csvData}
             onChange={(e) => setCsvData(e.target.value)}
@@ -326,42 +315,20 @@ SKU-002; 5; Подушка; DreamSoft; zima`}
           />
         </div>
 
-        {/* Preview Stats */}
+        {/* Stats */}
         {csvData && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex justify-between items-center text-xs font-mono p-2 bg-brand-cyan/5 border border-brand-cyan/20 rounded"
-          >
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-3 h-3 text-brand-cyan"/>
-              <span className="text-brand-cyan">Detected: {parsedItems.length} rows</span>
-            </div>
-            <div className="text-muted-foreground">
-              Sample ID: <span className="text-white">{parsedItems[0]?.id || 'N/A'}</span>
-            </div>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-between items-center text-xs font-mono p-2 bg-brand-cyan/5 border border-brand-cyan/20 rounded">
+            <div className="flex items-center gap-2"><Sparkles className="w-3 h-3 text-brand-cyan"/><span className="text-brand-cyan">Detected: {parsedItems.length} rows</span></div>
+            <div className="text-muted-foreground">Sample ID: <span className="text-white">{parsedItems[0]?.id || 'N/A'}</span></div>
           </motion.div>
         )}
 
-        {/* Logs Terminal */}
+        {/* Logs */}
         <div className="bg-black border border-gray-800 rounded-md p-3 h-28 overflow-y-auto font-mono text-[10px] shadow-inner relative">
-          {logs.length === 0 && !isMigrating && (
-            <div className="absolute inset-0 flex items-center justify-center text-gray-600 pointer-events-none">
-              <span className="animate-pulse">_system_ready_</span>
-            </div>
-          )}
+          {logs.length === 0 && !isMigrating && <div className="absolute inset-0 flex items-center justify-center text-gray-600"><span className="animate-pulse">_waiting_for_input_</span></div>}
           <AnimatePresence>
             {logs.map((log, i) => (
-              <motion.div 
-                key={i} 
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`mb-0.5 ${
-                  log.type === 'success' ? 'text-green-400' : 
-                  log.type === 'error' ? 'text-red-400' : 
-                  'text-gray-400'
-                }`}
-              >
+              <motion.div key={i} initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className={`mb-0.5 ${log.type === 'success' ? 'text-green-400' : log.type === 'error' ? 'text-red-400' : 'text-gray-400'}`}>
                 {`> ${log.msg}`}
               </motion.div>
             ))}
@@ -371,26 +338,10 @@ SKU-002; 5; Подушка; DreamSoft; zima`}
 
         {/* Actions */}
         <div className="flex gap-3">
-          <Button 
-            onClick={handleMigration} 
-            disabled={isMigrating || parsedItems.length === 0}
-            className="flex-1 bg-gradient-to-r from-brand-cyan to-blue-600 text-white hover:from-brand-cyan/80 hover:to-blue-700 font-bold font-mono py-6 shadow-lg"
-          >
-            {isMigrating ? (
-              <><Loader2 className="animate-spin mr-2" /> PROCESSING...</>
-            ) : (
-              <><Database className="mr-2 w-5 h-5" /> IMPORT DATA</>
-            )}
+          <Button onClick={handleMigration} disabled={isMigrating || parsedItems.length === 0} className="flex-1 bg-gradient-to-r from-brand-cyan to-blue-600 text-white hover:from-brand-cyan/80 hover:to-blue-700 font-bold font-mono py-6 shadow-lg">
+            {isMigrating ? <><Loader2 className="animate-spin mr-2" /> PROCESSING...</> : <><Database className="mr-2 w-5 h-5" /> IMPORT DATA</>}
           </Button>
-          
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={() => { setCsvData(''); setLogs([]); }}
-            className="border-red-500/30 text-red-400 hover:bg-red-950 hover:text-red-300"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          <Button variant="outline" size="icon" onClick={() => { setCsvData(''); setLogs([]); }} className="border-red-500/30 text-red-400 hover:bg-red-950"><Trash2 className="w-4 h-4" /></Button>
         </div>
       </CardContent>
     </Card>
