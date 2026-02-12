@@ -116,7 +116,7 @@ export default function HomePage() {
         <div className="absolute inset-0 z-0">
           <video autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover brightness-[0.5] saturate-125">
             <source
-              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-b2e07838-518b-4ab9-80dc-981ee86c24b7.mp4"
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/2_5219998213838247718.mp4"
               type="video/mp4"
             />
             Your browser does not support the video tag.
