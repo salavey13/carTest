@@ -271,6 +271,35 @@ export default function ProfilePage() {
           allDisplayableAchievements.push(unlockedAch);
       }
   });
+
+  const cyberMarketsAchievementIds = new Set([
+    'leads_first_csv_upload',
+    'leads_first_scrape_success',
+    'leads_ai_pipeline_used',
+    'leads_filter_master',
+    'leads_role_commander',
+    'wb_crew_first_launch',
+    'wb_crew_recruiter',
+    'wb_xlsx_alchemist',
+    'wb_migrator_online',
+    'wb_audit_initiated',
+    'wb_audit_completed',
+    'wb_report_dispatcher',
+    'wb_tip_patron',
+    'wb_fix_bounty',
+    'wb_market_orchestrator',
+  ]);
+
+  const isCyberMarketsAchievement = (achievement: Achievement) =>
+    cyberMarketsAchievementIds.has(achievement.id) ||
+    achievement.id.startsWith('leads_') ||
+    achievement.id.startsWith('wb_');
+
+  const cyberMarketsAchievements = allDisplayableAchievements.filter(isCyberMarketsAchievement);
+  const cyberVibeAchievements = allDisplayableAchievements.filter((achievement) => !isCyberMarketsAchievement(achievement));
+
+  const unlockedCyberMarketsCount = cyberMarketsAchievements.filter((achievement) => userAchievements.includes(achievement.id)).length;
+  const unlockedCyberVibeCount = cyberVibeAchievements.filter((achievement) => userAchievements.includes(achievement.id)).length;
   
   const integrationItems = [
     {id: "github" as keyof typeof integrations, label: "GitHub (Токен для PR/веток)", icon: "FaGithub"},
@@ -278,6 +307,47 @@ export default function ProfilePage() {
     {id: "supabase" as keyof typeof integrations, label: "Supabase (База данных & Auth)", icon: "FaDatabase"},
     {id: "aistudio" as keyof typeof integrations, label: "AI Studio (OpenAI/Gemini/Claude)", icon: "FaRobot"}, 
   ];
+
+  const renderAchievementGroup = (groupTitle: string, groupData: Achievement[], accentClass: string) => {
+    if (groupData.length === 0) return null;
+
+    return (
+      <div className="space-y-2">
+        <h3 className={cn("text-sm font-orbitron tracking-wide uppercase", accentClass)}>{groupTitle}</h3>
+        <div className="space-y-2">
+          {groupData
+            .sort((a,b) => {
+              const aUnlocked = userAchievements.includes(a.id);
+              const bUnlocked = userAchievements.includes(b.id);
+              if (aUnlocked && !bUnlocked) return -1;
+              if (!aUnlocked && bUnlocked) return 1;
+              return a.name.localeCompare(b.name);
+            })
+            .map((achievement) => {
+              const isUnlocked = userAchievements.includes(achievement.id);
+              return (
+                <div key={achievement.id} className={cn(
+                  "p-3.5 bg-dark-bg/70 border rounded-lg transform transition-all duration-200 ease-out",
+                  isUnlocked ? "border-neon-lime/60 hover:scale-[1.02] hover:shadow-md hover:shadow-neon-lime/30" : "border-muted/30 opacity-60 grayscale-[70%]"
+                )}>
+                  <div className="flex items-center mb-1">
+                    <span className={cn("text-2xl mr-3")}>
+                      <VibeContentRenderer content={`::${achievement.icon || 'FaMedal'} className='${isUnlocked ? '' : 'opacity-50'}'::`} />
+                    </span>
+                    <h4 className={cn("text-md font-orbitron font-semibold", isUnlocked ? "text-neon-lime" : "text-muted-foreground")}>{achievement.name}</h4>
+                    {!isUnlocked && <FaLock className="ml-auto text-xs text-gray-500" />}
+                  </div>
+                  <p className="text-xs text-muted-foreground font-mono ml-9">{achievement.description}</p>
+                  {achievement.kiloVibesAward && isUnlocked && (
+                    <p className="text-xs text-brand-yellow font-mono ml-9 mt-1">+ {achievement.kiloVibesAward.toLocaleString()} KiloVibes</p>
+                  )}
+                </div>
+              );
+            })}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pb-16">
@@ -368,6 +438,14 @@ export default function ProfilePage() {
                 <VibeContentRenderer content="::FaStar::" />Достижения Агента ({userAchievements.length} / {allDisplayableAchievements.length})
               </h2>
               <div className="p-4 bg-dark-bg/80 rounded-lg border border-neon-lime/40 space-y-2 shadow-md">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono mb-2">
+                  <div className="rounded-md border border-brand-cyan/40 bg-brand-cyan/10 p-2">
+                    <span className="text-brand-cyan">CyberVibe:</span> {unlockedCyberVibeCount}/{cyberVibeAchievements.length}
+                  </div>
+                  <div className="rounded-md border border-brand-pink/40 bg-brand-pink/10 p-2">
+                    <span className="text-brand-pink">CyberMarkets:</span> {unlockedCyberMarketsCount}/{cyberMarketsAchievements.length}
+                  </div>
+                </div>
                 {allDisplayableAchievements.length > 0 ? (
                   allDisplayableAchievements.slice(0,5).map((ach) => { 
                     const isUnlocked = userAchievements.includes(ach.id);
@@ -515,38 +593,20 @@ export default function ProfilePage() {
         titleClassName="text-neon-lime"
         cancelButtonClassName="text-muted-foreground hover:bg-muted/50"
       >
-        <div className="max-h-96 overflow-y-auto simple-scrollbar pr-2 space-y-3">
+        <div className="max-h-96 overflow-y-auto simple-scrollbar pr-2 space-y-4">
             {allDisplayableAchievements.length > 0 ? (
-                allDisplayableAchievements
-                  .sort((a,b) => { 
-                      const aUnlocked = userAchievements.includes(a.id);
-                      const bUnlocked = userAchievements.includes(b.id);
-                      if (aUnlocked && !bUnlocked) return -1;
-                      if (!aUnlocked && bUnlocked) return 1;
-                      return a.name.localeCompare(b.name);
-                  })
-                  .map((achievement) => {
-                    const isUnlocked = userAchievements.includes(achievement.id);
-                    return (
-                        <div key={achievement.id} className={cn(
-                            "p-3.5 bg-dark-bg/70 border rounded-lg transform transition-all duration-200 ease-out",
-                            isUnlocked ? "border-neon-lime/60 hover:scale-[1.02] hover:shadow-md hover:shadow-neon-lime/30" : "border-muted/30 opacity-60 grayscale-[70%]"
-                            )}
-                        >
-                            <div className="flex items-center mb-1">
-                                <span className={cn("text-2xl mr-3")}>
-                                    <VibeContentRenderer content={`::${achievement.icon || 'FaMedal'} className='${isUnlocked ? '' : 'opacity-50'}'::`} />
-                                </span>
-                                <h4 className={cn("text-md font-orbitron font-semibold", isUnlocked ? "text-neon-lime" : "text-muted-foreground")}>{achievement.name}</h4>
-                                {!isUnlocked && <FaLock className="ml-auto text-xs text-gray-500" />}
-                            </div>
-                            <p className="text-xs text-muted-foreground font-mono ml-9">{achievement.description}</p>
-                             {achievement.kiloVibesAward && isUnlocked && (
-                                <p className="text-xs text-brand-yellow font-mono ml-9 mt-1">+ {achievement.kiloVibesAward.toLocaleString()} KiloVibes</p>
-                             )}
-                        </div>
-                    );
-                })
+              <>
+                {renderAchievementGroup(
+                  `CyberVibe Core (${unlockedCyberVibeCount}/${cyberVibeAchievements.length})`,
+                  cyberVibeAchievements,
+                  "text-brand-cyan"
+                )}
+                {renderAchievementGroup(
+                  `CyberMarkets Ops (${unlockedCyberMarketsCount}/${cyberMarketsAchievements.length})`,
+                  cyberMarketsAchievements,
+                  "text-brand-pink"
+                )}
+              </>
             ) : (
                  <p className="font-mono text-sm text-muted-foreground text-center py-4">Список достижений пуст.</p>
             )}

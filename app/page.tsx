@@ -16,8 +16,9 @@ import {
   CyberFitnessProfile,
   DailyActivityRecord, 
 } from "@/hooks/cyberFitnessSupabase";
-import { format, startOfWeek, addDays } from 'date-fns';
+import { format, subDays, parseISO, isValid } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { Sparkles, ExternalLink, GitBranch, Orbit } from "lucide-react";
 
 const CHART_COLORS = [
   'hsl(var(--brand-purple))', 'hsl(var(--brand-pink))', 'hsl(var(--brand-cyan))',
@@ -25,19 +26,18 @@ const CHART_COLORS = [
   'hsl(var(--brand-orange))'
 ];
 
-const DEFAULT_WEEKLY_ACTIVITY_TEMPLATE: Array<DailyActivityRecord & { name: string; value: number; label: string }> = 
+const buildRollingActivityTemplate = (anchorDate: Date): Array<DailyActivityRecord & { name: string; value: number; label: string }> =>
   Array.from({ length: 7 }).map((_, i) => {
-   const dayOfWeek = startOfWeek(new Date(), { weekStartsOn: 1 }); 
-   const date = addDays(dayOfWeek, i);
-   return {
-     name: format(date, 'EEE', { locale: ru }).substring(0, 2).toUpperCase(), 
-     value: 0, 
-     label: '0 VP', 
-     date: format(date, 'yyyy-MM-dd'), 
-     filesExtracted: 0, tokensProcessed: 0, kworkRequestsSent: 0,
-     prsCreated: 0, branchesUpdated: 0, focusTimeMinutes: 0,
-   };
-});
+    const date = subDays(anchorDate, 6 - i);
+    return {
+      name: format(date, 'EEE', { locale: ru }).substring(0, 2).toUpperCase(),
+      value: 0,
+      label: '0 VP',
+      date: format(date, 'yyyy-MM-dd'),
+      filesExtracted: 0, tokensProcessed: 0, kworkRequestsSent: 0,
+      prsCreated: 0, branchesUpdated: 0, focusTimeMinutes: 0,
+    };
+  });
 
 const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png";
 const FEATURED_QUEST_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250510_035401-e6d0b2d8-9f28-4516-a5c7-fe729b31f736.jpg"; // Consider localizing alt text if needed
@@ -146,32 +146,58 @@ export default function Home() {
       );
   }
 
-  const chartReadyWeeklyActivity = DEFAULT_WEEKLY_ACTIVITY_TEMPLATE.map(templateDay => {
-    const logEntry = cyberProfile?.dailyActivityLog?.find(
-      log => log.date === templateDay.date
-    );
-    if (logEntry) {
-        const vibePoints = 
-            (logEntry.filesExtracted * 0.1) +       
-            (logEntry.tokensProcessed * 0.001) +   
-            (logEntry.kworkRequestsSent * 5) +      
-            (logEntry.prsCreated * 50) +           
-            (logEntry.branchesUpdated * 20) +       
-            ((logEntry.focusTimeMinutes || 0) * 0.5); 
-        return {
-            ...templateDay, 
-            value: vibePoints, 
-            label: `${vibePoints.toFixed(0)} VP`, 
-            filesExtracted: logEntry.filesExtracted,
-            tokensProcessed: logEntry.tokensProcessed,
-            kworkRequestsSent: logEntry.kworkRequestsSent,
-            prsCreated: logEntry.prsCreated,
-            branchesUpdated: logEntry.branchesUpdated,
-            focusTimeMinutes: logEntry.focusTimeMinutes || 0,
-        };
+  const sortedActivityLog = [...(cyberProfile?.dailyActivityLog || [])]
+    .filter((entry) => isValid(parseISO(`${entry.date}T00:00:00`)))
+    .sort((a, b) => parseISO(`${a.date}T00:00:00`).getTime() - parseISO(`${b.date}T00:00:00`).getTime());
+
+  const lastSevenLoggedDays = sortedActivityLog.slice(-7).map((entry) => parseISO(`${entry.date}T00:00:00`));
+  const chartDateWindow: Date[] = [...lastSevenLoggedDays];
+
+  if (chartDateWindow.length > 0) {
+    while (chartDateWindow.length < 7) {
+      chartDateWindow.unshift(subDays(chartDateWindow[0], 1));
     }
-    return templateDay; 
-});
+  } else {
+    chartDateWindow.push(...buildRollingActivityTemplate(new Date()).map((d) => parseISO(`${d.date}T00:00:00`)));
+  }
+
+  const chartTemplate = chartDateWindow.map((date) => ({
+    name: format(date, 'EEE', { locale: ru }).substring(0, 2).toUpperCase(),
+    value: 0,
+    label: '0 VP',
+    date: format(date, 'yyyy-MM-dd'),
+    filesExtracted: 0,
+    tokensProcessed: 0,
+    kworkRequestsSent: 0,
+    prsCreated: 0,
+    branchesUpdated: 0,
+    focusTimeMinutes: 0,
+  }));
+
+  const chartReadyWeeklyActivity = chartTemplate.map((templateDay) => {
+    const logEntry = cyberProfile?.dailyActivityLog?.find((log) => log.date === templateDay.date);
+    if (logEntry) {
+      const vibePoints =
+        (logEntry.filesExtracted * 0.1) +
+        (logEntry.tokensProcessed * 0.001) +
+        (logEntry.kworkRequestsSent * 5) +
+        (logEntry.prsCreated * 50) +
+        (logEntry.branchesUpdated * 20) +
+        ((logEntry.focusTimeMinutes || 0) * 0.5);
+      return {
+        ...templateDay,
+        value: vibePoints,
+        label: `${vibePoints.toFixed(0)} VP`,
+        filesExtracted: logEntry.filesExtracted,
+        tokensProcessed: logEntry.tokensProcessed,
+        kworkRequestsSent: logEntry.kworkRequestsSent,
+        prsCreated: logEntry.prsCreated,
+        branchesUpdated: logEntry.branchesUpdated,
+        focusTimeMinutes: logEntry.focusTimeMinutes || 0,
+      };
+    }
+    return templateDay;
+  });
 
   const totalKiloVibes = cyberProfile?.kiloVibes || 0;
   const focusTimeHours = parseFloat((cyberProfile?.focusTimeHours || 0).toFixed(1));
@@ -189,11 +215,48 @@ export default function Home() {
           <div>
             <h1 className="text-xl sm:text-2xl font-orbitron font-bold text-brand-cyan cyber-text" data-text={`Агент: ${userNameDisplay}`}>Агент: <span className="text-brand-pink glitch" data-text={userNameDisplay}>{userNameDisplay}</span></h1>
             <p className="text-muted-foreground font-mono text-xs sm:text-sm mt-0.5">Когнитивная ОС {osVersionDisplay} | Уровень: <span className="text-brand-yellow font-semibold">{currentLevel}</span></p>
+            <p className="text-[11px] font-mono text-muted-foreground mt-1">Открой новый стек инструментов ниже ↓</p>
           </div>
           <Link href="/profile" className="transition-transform duration-200 hover:scale-110">
             <Image src={dbUser?.avatar_url || telegramUser?.photo_url || PLACEHOLDER_AVATAR} alt={`Кибер-аватар агента ${userNameDisplay}`} width={52} height={52} className="avatar-cyber w-11 h-11 sm:w-13 sm:h-13" priority />
           </Link>
         </motion.div>
+
+        <motion.div variants={itemVariants}>
+          <Card className="border-brand-cyan/30 bg-dark-card/70 backdrop-blur-sm">
+            <CardHeader className="pb-2 pt-3 px-4 md:px-5">
+              <CardTitle className="text-base sm:text-lg font-orbitron text-brand-cyan flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-brand-pink" /> THE NEW ERA
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm font-mono">
+                Новая эра инструментов: пиши, собирай и запускай быстрее — с прозрачным потоком от идеи до релиза.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-4 md:px-5 pb-4 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <Button asChild variant="outline" className="justify-between border-brand-cyan/40 hover:border-brand-cyan hover:bg-brand-cyan/10">
+                  <a href="https://chatgpt.com/codex" target="_blank" rel="noopener noreferrer">
+                    <span className="inline-flex items-center"><ExternalLink className="mr-2 h-4 w-4" />Codex</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">chatgpt.com</span>
+                  </a>
+                </Button>
+                <Button asChild variant="outline" className="justify-between border-brand-pink/40 hover:border-brand-pink hover:bg-brand-pink/10">
+                  <Link href="/nexus">
+                    <span className="inline-flex items-center"><Orbit className="mr-2 h-4 w-4" />Nexus</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">внутри платформы</span>
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="justify-between border-brand-yellow/40 hover:border-brand-yellow hover:bg-brand-yellow/10">
+                  <Link href="/repo-xml">
+                    <span className="inline-flex items-center"><GitBranch className="mr-2 h-4 w-4" />Repo XML</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">dev flow</span>
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
         <motion.div variants={itemVariants}>
           <Card className="featured-quest-card group">
             <CardHeader className="flex flex-row items-center justify-between pb-2 pt-3 px-4 md:px-5">
