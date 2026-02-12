@@ -3,8 +3,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { FaFacebook, FaInstagram, FaTwitter } from "react-icons/fa6";
-
 import { BikeShowcase } from "@/components/BikeShowcase";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -20,7 +18,7 @@ const InfoItem = ({ icon, children }: { icon: string; children: React.ReactNode 
 );
 
 const StepItem = ({ num, title, icon, children }: { num: string; title: string; icon: string; children: React.ReactNode }) => (
-  <div className="relative h-full min-w-[300px] snap-center rounded-2xl border border-border/60 bg-card/50 p-6 text-center backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/20">
+  <div className="relative h-full w-full min-w-0 rounded-2xl border border-border/60 bg-card/50 p-6 text-center backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/20">
     <div className="absolute -top-4 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full bg-primary font-orbitron font-bold text-primary-foreground">
       {num}
     </div>
@@ -106,12 +104,9 @@ export default function HomePage() {
 
       <section className="relative flex min-h-[760px] items-center justify-center overflow-hidden px-4 pb-14 pt-28 text-white sm:pt-32">
         <div className="absolute inset-0 z-0">
-          <video autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover brightness-[0.4] saturate-150">
-            <source src="https://videos.pexels.com/video-files/2519660/2519660-hd_1920_1080_25fps.mp4" type="video/mp4" />
-            Your browser does not support the video tag.
-          </video>
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/65 to-black/45" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(255,106,0,0.30),transparent_45%)]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-black via-zinc-900 to-black" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/65 to-black/50" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_25%,rgba(255,106,0,0.28),transparent_44%)]" />
         </div>
 
         <motion.div
@@ -125,7 +120,7 @@ export default function HomePage() {
             <span>VIPBIKE PRO RENTAL EXPERIENCE</span>
           </div>
 
-          <h1 className="bg-gradient-to-r from-brand-red-orange via-brand-yellow to-brand-deep-indigo bg-clip-text font-orbitron text-5xl font-black uppercase leading-none tracking-tight text-transparent text-shadow-neon sm:text-6xl md:text-7xl lg:text-8xl">
+          <h1 className="font-orbitron text-5xl font-black uppercase leading-[0.95] tracking-tight text-white drop-shadow-[0_10px_30px_rgba(0,0,0,0.75)] sm:text-6xl md:text-7xl lg:text-8xl">
             <span className="block drop-shadow-lg">Больше чем аренда.</span>
             <span className="block drop-shadow-lg">Твоя байк-сцена.</span>
           </h1>
@@ -242,7 +237,7 @@ export default function HomePage() {
 
         <section>
           <h2 className="mb-10 text-center font-orbitron text-4xl">Как это работает</h2>
-          <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 lg:grid lg:grid-cols-4 lg:overflow-visible">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StepItem num="1" title="Бронь" icon="::FaCalendarCheck::">
               Выберите модель в нашем{" "}
               <Link href="/rent-bike" className="text-accent-text hover:underline">
@@ -270,28 +265,28 @@ export default function HomePage() {
           className="mx-auto max-w-3xl"
         >
           <h2 className="mb-10 text-center font-orbitron text-4xl">Частые вопросы</h2>
-          <Accordion type="single" collapsible className="w-full rounded-2xl border border-border/60 bg-card/40 px-4">
+          <Accordion type="single" collapsible className="w-full rounded-2xl border border-border/60 bg-card/40 px-4 text-sm">
             <AccordionItem value="item-1">
-              <AccordionTrigger>Можно ли арендовать мотоцикл без категории "А"?</AccordionTrigger>
-              <AccordionContent>
+              <AccordionTrigger className="text-base">Можно ли арендовать мотоцикл без категории "А"?</AccordionTrigger>
+              <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
                 Да! У нас есть парк скутеров, для управления которыми достаточно категории "B" или "M". Для всех остальных мотоциклов категория "А" обязательна.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-2">
-              <AccordionTrigger>Что будет, если я попаду в ДТП?</AccordionTrigger>
-              <AccordionContent>
+              <AccordionTrigger className="text-base">Что будет, если я попаду в ДТП?</AccordionTrigger>
+              <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
                 Все мотоциклы застрахованы по ОСАГО. Ваша финансовая ответственность ограничена суммой залога, если нет серьезных нарушений с вашей стороны. Главное — немедленно связаться с нами.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-3">
-              <AccordionTrigger>Что входит в стоимость аренды?</AccordionTrigger>
-              <AccordionContent>
+              <AccordionTrigger className="text-base">Что входит в стоимость аренды?</AccordionTrigger>
+              <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
                 В стоимость входит аренда мотоцикла на 24 часа, полис ОСАГО и полный комплект защитной экипировки. Пробег обычно ограничен (например, 300 км/сутки), превышение оплачивается отдельно.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-4">
-              <AccordionTrigger>У вас есть свой сервис?</AccordionTrigger>
-              <AccordionContent>
+              <AccordionTrigger className="text-base">У вас есть свой сервис?</AccordionTrigger>
+              <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
                 Да, на нашей новой локации работает полноценный сервис. Вы можете пригнать своего верного друга к нам на обслуживание или ремонт.
               </AccordionContent>
             </AccordionItem>
@@ -299,55 +294,6 @@ export default function HomePage() {
         </motion.section>
       </div>
 
-      <footer className="border-t border-border/50 bg-card py-12 px-4">
-        <div className="container mx-auto grid max-w-7xl grid-cols-1 gap-8 md:grid-cols-4">
-          <div>
-            <h3 className="mb-4 font-orbitron text-xl">VIPBIKE</h3>
-            <p className="text-muted-foreground">Лидеры проката мотоциклов в Нижнем Новгороде.</p>
-          </div>
-          <div>
-            <h3 className="mb-4 font-orbitron text-xl">Ссылки</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link href="/rent-bike" className="text-accent-text hover:underline">
-                  Каталог
-                </Link>
-              </li>
-              <li>
-                <Link href="/rentals" className="text-accent-text hover:underline">
-                  Мои аренды
-                </Link>
-              </li>
-              <li>
-                <Link href="/vipbikerental" className="text-accent-text hover:underline">
-                  VIP bike
-                </Link>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="mb-4 font-orbitron text-xl">Контакты</h3>
-            <p className="text-muted-foreground">Стригинский переулок 13Б, Нижний Новгород</p>
-            <p className="text-muted-foreground">Тел: +7 (XXX) XXX-XX-XX</p>
-            <p className="text-muted-foreground">Email: info@vipbike.ru</p>
-          </div>
-          <div>
-            <h3 className="mb-4 font-orbitron text-xl">Социальные сети</h3>
-            <div className="flex space-x-4">
-              <a href="#" className="text-accent-text transition-colors hover:text-primary" aria-label="Facebook">
-                <FaFacebook size={24} />
-              </a>
-              <a href="#" className="text-accent-text transition-colors hover:text-primary" aria-label="Instagram">
-                <FaInstagram size={24} />
-              </a>
-              <a href="#" className="text-accent-text transition-colors hover:text-primary" aria-label="Twitter">
-                <FaTwitter size={24} />
-              </a>
-            </div>
-          </div>
-        </div>
-        <div className="container mx-auto mt-8 max-w-7xl text-center text-muted-foreground">© 2025 VIPBIKE. Все права защищены.</div>
-      </footer>
     </div>
   );
 }
