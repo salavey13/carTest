@@ -307,6 +307,7 @@ async function verifyAdmin(userId: string | undefined): Promise<boolean> {
   return user.status === "admin";
 }
 
+/* deprecated - admin status not required 
 export async function uploadWarehouseCsv(
   batch: any[],
   userId: string | undefined
@@ -379,6 +380,179 @@ export async function uploadWarehouseCsv(
     if (error) throw error;
 
     return { success: true, message: `Upserted ${itemsToUpsert.length} items.` };
+  } catch (error: any) {
+    console.error("Upload error:", error);
+    return { success: false, error: error?.message || "Unknown upload error" };
+  }
+}
+*/
+
+// Вспомогательная функция для получения ID команд (используется в uploadWarehouseCsv)
+export async function getUserCrewIds(userId: string): Promise<string[]> {
+  const { data: memberships } = await supabaseAdmin
+    .from("crew_members")
+    .select("crew_id")
+    .eq("user_id", userId);
+  
+  return (memberships || []).map(m => m.crew_id);
+}
+
+// НОВАЯ функция для UI: возвращает ID и Имена команд
+export async function getUserCrews(userId: string): Promise<{ id: string; name: string }[]> {
+  if (!userId) return [];
+
+  // Supabase Magic: делаем join через select('crew_id, crews(name)')
+  // Это работает, так как у нас есть Foreign Key crew_members.crew_id -> crews.id
+  const { data, error } = await supabaseAdmin
+    .from("crew_members")
+    .select(`
+      crew_id,
+      crews ( name )
+    `)
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error("Error fetching user crews:", error);
+    return [];
+  }
+
+  // Преобразуем плоский результат в удобный массив { id, name }
+  return (data || []).map((m: any) => ({
+    id: m.crew_id,
+    name: m.crews?.name || "Unknown Crew"
+  }));
+}
+
+export async function uploadWarehouseCsv(
+  batch: any[],
+  userId: string | undefined
+): Promise<{ success: boolean; message?: string; error?: string; stats?: { updated: number; created: number; denied: number } }> {
+  
+  // Убираем требование админства. Доступ есть у всех авторизованных.
+  if (!userId) {
+    return { success: false, error: "Authorization required." };
+  }
+
+  if (!batch || batch.length === 0) {
+    return { success: false, error: "Empty batch provided." };
+  }
+
+  try {
+    // 1. Получаем команды пользователя один раз для всего батча
+    const userCrewIds = await getUserCrewIds(userId);
+
+    // 2. Собираем ID товаров для проверки существования
+    const itemIds = batch.map((row: any) => (row["Артикул"] || row["id"])?.toString().toLowerCase()).filter(Boolean);
+    
+    // Если ID нет, пропускаем
+    if (itemIds.length === 0) return { success: false, error: "No valid IDs found in batch." };
+
+    const { data: existingItems } = await supabaseAdmin
+      .from("cars")
+      .select("id, owner_id, crew_id, specs")
+      .in("id", itemIds);
+
+    const existingMap = new Map(existingItems?.map(i => [i.id, i]));
+
+    let updatedCount = 0;
+    let createdCount = 0;
+    let deniedCount = 0;
+
+    const itemsToUpsert: any[] = [];
+
+    for (const row of batch) {
+      const rawId = (row["Артикул"] || row["id"])?.toString();
+      if (!rawId) continue;
+
+      const itemId = rawId.toLowerCase();
+      const existing = existingMap.get(itemId);
+
+      // --- ПРОВЕРКА ПРАВ ДОСТУПА ---
+      if (existing) {
+        // Товар существует. Проверяем права на обновление.
+        const isOwner = existing.owner_id === userId;
+        const isCrewMember = existing.crew_id ? userCrewIds.includes(existing.crew_id) : false;
+        
+        // Если передан owner_id в row (хак из мигратора), игнорируем его для обновления, права только на основе existing
+        const canUpdate = isOwner || isCrewMember;
+
+        if (!canUpdate) {
+          console.warn(`Access denied for user ${userId} on item ${itemId}`);
+          deniedCount++;
+          continue; // Пропускаем строку
+        }
+
+        // Обновление
+        const quantity = parseInt(row["Количество"] || row.quantity || "0", 10) || 0;
+        let specs = existing.specs || {};
+        
+        // Обновляем локации
+        if (!Array.isArray(specs.warehouse_locations)) specs.warehouse_locations = [];
+        specs.warehouse_locations = [{ voxel_id: "IMPORT", quantity }];
+        
+        itemsToUpsert.push({
+          id: itemId,
+          make: row.make || existing.make || "Imported",
+          model: row.model || existing.model || rawId,
+          description: row.description || existing.description,
+          type: "wb_item",
+          specs,
+          // owner_id и crew_id не меняем при обновлении (сохраняем старые)
+        });
+        updatedCount++;
+
+      } else {
+        // --- СОЗДАНИЕ НОВОГО ТОВАРА ---
+        // Новый товар. Назначаем владельца.
+        
+        // Если в row передан crew_id (из мигратора), и юзер в этой команде -> ок
+        // Иначе назначаем user_id как owner_id
+        let targetCrewId = row["target_crew_id"]; // Кастомное поле из UI
+        let targetOwnerId = userId;
+
+        // Валидация: юзер может создать товар в команде только если он в ней состоит
+        if (targetCrewId && !userCrewIds.includes(targetCrewId)) {
+            console.warn(`User ${userId} tried to create item in crew ${targetCrewId} without membership.`);
+            targetCrewId = null; // Фоллбэк на личный склад
+        }
+
+        const quantity = parseInt(row["Количество"] || row.quantity || "0", 10) || 0;
+        const specs: any = { 
+          warehouse_locations: [{ voxel_id: "IMPORT", quantity }],
+          size: row.size,
+          season: row.season,
+          color: row.color
+        };
+
+        itemsToUpsert.push({
+          id: itemId,
+          make: row.make || "Unknown",
+          model: row.model || rawId,
+          description: row.description || `Imported Item ${rawId}`,
+          type: "wb_item",
+          specs,
+          owner_id: targetOwnerId,
+          crew_id: targetCrewId || null,
+          image_url: `/api/images/${itemId}.jpg`,
+        });
+        createdCount++;
+      }
+    }
+
+    if (itemsToUpsert.length > 0) {
+      const { error: upsertError } = await supabaseAdmin
+        .from("cars")
+        .upsert(itemsToUpsert, { onConflict: "id" });
+      
+      if (upsertError) throw upsertError;
+    }
+
+    return { 
+      success: true, 
+      message: `Processed: ${itemsToUpsert.length} items.`,
+      stats: { updated: updatedCount, created: createdCount, denied: deniedCount }
+    };
+
   } catch (error: any) {
     console.error("Upload error:", error);
     return { success: false, error: error?.message || "Unknown upload error" };

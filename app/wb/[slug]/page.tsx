@@ -348,25 +348,14 @@ export default function CrewWarehousePage() {
         {/* СТАТИСТИКА */}
         <div className="p-2 bg-white dark:bg-gray-800 border-b">
           <WarehouseStats
-            itemsCount={localItems.reduce((s, it) => s + (it.total_quantity || 0), 0)}
-            uniqueIds={localItems.length}
-            score={score} 
-            level={level} 
-            streak={streak} 
-            dailyStreak={dailyStreak}
-            offloadUnits={offloadCount} 
-            onloadUnits={onloadCount}
-            totalDelta={offloadCount + onloadCount + editCount}
-            salary={offloadCount * 50}
-            achievements={achievements}
-            sessionDuration={sessionDuration}
-            errorCount={errorCount}
-            bossMode={bossMode}
-            bossTimer={bossTimer}
-            leaderboard={leaderboard}
-            efficiency={efficiency}
-            avgTimePerItem={avgTimePerItem}
-          />
+  activeShift={activeShift}  // Required for red recording state
+  slug={slug}
+  userId={dbUser?.user_id}
+  offloadUnits={offloadCount}
+  sessionDuration={sessionDuration}
+  errorCount={errorCount}
+  ratePerUnit={50} // Or fetch from crew settings
+/>
         </div>
 
         {/* НИЖНИЕ КНОПКИ */}
