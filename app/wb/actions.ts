@@ -387,7 +387,7 @@ export async function uploadWarehouseCsv(
 }
 */
 
-// Вспомогательная функция для получения ID команд пользователя
+// Вспомогательная функция для получения ID команд (используется в uploadWarehouseCsv)
 export async function getUserCrewIds(userId: string): Promise<string[]> {
   const { data: memberships } = await supabaseAdmin
     .from("crew_members")
@@ -395,6 +395,32 @@ export async function getUserCrewIds(userId: string): Promise<string[]> {
     .eq("user_id", userId);
   
   return (memberships || []).map(m => m.crew_id);
+}
+
+// НОВАЯ функция для UI: возвращает ID и Имена команд
+export async function getUserCrews(userId: string): Promise<{ id: string; name: string }[]> {
+  if (!userId) return [];
+
+  // Supabase Magic: делаем join через select('crew_id, crews(name)')
+  // Это работает, так как у нас есть Foreign Key crew_members.crew_id -> crews.id
+  const { data, error } = await supabaseAdmin
+    .from("crew_members")
+    .select(`
+      crew_id,
+      crews ( name )
+    `)
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error("Error fetching user crews:", error);
+    return [];
+  }
+
+  // Преобразуем плоский результат в удобный массив { id, name }
+  return (data || []).map((m: any) => ({
+    id: m.crew_id,
+    name: m.crews?.name || "Unknown Crew"
+  }));
 }
 
 export async function uploadWarehouseCsv(
