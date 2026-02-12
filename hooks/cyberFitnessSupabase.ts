@@ -174,6 +174,30 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
         p.featuresUsed?.lead_assigned_to_carry_ever === true &&
         p.featuresUsed?.lead_assigned_to_support_ever === true
     },
+
+    // WB Landing / CyberMarkets Achievements
+    { id: "wb_crew_first_launch", name: "Штаб Развернут", description: "Создан первый складской crew в WB Landing.", icon: "FaWarehouse", kiloVibesAward: 35, checkCondition: (p) => p.featuresUsed?.wb_crew_created === true },
+    { id: "wb_crew_recruiter", name: "Вербовщик Синдиката", description: "Отправлено первое приглашение в складскую команду.", icon: "FaUserPlus", kiloVibesAward: 20, checkCondition: (p) => p.featuresUsed?.wb_crew_invite_sent === true },
+    { id: "wb_xlsx_alchemist", name: "Алхимик XLSX", description: "Загружен XLSX-файл для аудита или миграции данных.", icon: "FaFileExcel", kiloVibesAward: 30, checkCondition: (p) => p.featuresUsed?.wb_xlsx_uploaded === true || p.featuresUsed?.wb_audit_xlsx_uploaded === true },
+    { id: "wb_migrator_online", name: "Мигратор Онлайн", description: "Выполнена успешная миграция склада из файла.", icon: "FaTruckFast", kiloVibesAward: 40, checkCondition: (p) => p.featuresUsed?.wb_migration_completed === true },
+    { id: "wb_audit_initiated", name: "Диагност Потерь", description: "Запущен аудит склада в WB Landing.", icon: "FaMagnifyingGlassChart", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.wb_audit_started === true },
+    { id: "wb_audit_completed", name: "Ревизор Матрицы", description: "Аудит склада доведён до финального расчёта.", icon: "FaClipboardCheck", kiloVibesAward: 45, checkCondition: (p) => p.featuresUsed?.wb_audit_completed === true },
+    { id: "wb_report_dispatcher", name: "Диспетчер Отчётов", description: "Отчёт аудита отправлен в Telegram.", icon: "FaPaperPlane", kiloVibesAward: 30, checkCondition: (p) => p.featuresUsed?.wb_audit_report_sent === true },
+    { id: "wb_tip_patron", name: "Патрон Системы", description: "Отправлен TIP/поддержка архитектора на WB Landing.", icon: "FaHeart", kiloVibesAward: 20, checkCondition: (p) => p.featuresUsed?.wb_tip_sent === true },
+    { id: "wb_fix_bounty", name: "Охотник за Багами", description: "Создан первый FIX/Feature bounty-запрос.", icon: "FaBug", kiloVibesAward: 35, checkCondition: (p) => p.featuresUsed?.wb_fix_request_sent === true },
+    {
+      id: "wb_market_orchestrator",
+      name: "Оркестратор КиберМаркетов",
+      description: "Собран полный WB-цикл: crew + миграция + аудит + отчёт + bounty.",
+      icon: "FaCrown",
+      kiloVibesAward: 120,
+      checkCondition: (p) =>
+        p.featuresUsed?.wb_crew_created === true &&
+        p.featuresUsed?.wb_migration_completed === true &&
+        p.featuresUsed?.wb_audit_completed === true &&
+        p.featuresUsed?.wb_audit_report_sent === true &&
+        p.featuresUsed?.wb_fix_request_sent === true,
+    },
 ];
 
 const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({

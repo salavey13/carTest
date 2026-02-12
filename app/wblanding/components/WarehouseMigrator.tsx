@@ -15,6 +15,7 @@ import { uploadWarehouseCsv, getUserCrews } from "@/app/wb/actions";
 import { useAppContext } from "@/contexts/AppContext";
 import { parse } from "papaparse";
 import * as XLSX from 'xlsx';
+import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 
 // --- CONFIG ---
 const MAX_LOGS = 50;
@@ -175,6 +176,10 @@ export function WarehouseMigrator() {
     setCsvData("");
 
     const isCsv = file.name.toLowerCase().endsWith('.csv');
+    if (dbUser?.user_id) {
+      const featureName = isCsv ? 'wb_csv_uploaded' : 'wb_xlsx_uploaded';
+      checkAndUnlockFeatureAchievement(dbUser.user_id, featureName, true).catch(() => null);
+    }
 
     if (isCsv) {
       parse(file, {
@@ -247,7 +252,7 @@ export function WarehouseMigrator() {
     };
 
     reader.readAsArrayBuffer(file);
-  }, [addLog, processJsonRows]);
+  }, [addLog, processJsonRows, dbUser?.user_id]);
 
   // Drag & Drop
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -377,6 +382,7 @@ export function WarehouseMigrator() {
     }
 
     toast.success(`Complete! Created: ${stats.created}, Updated: ${stats.updated}`);
+    await checkAndUnlockFeatureAchievement(dbUser.user_id, 'wb_migration_completed', true);
     setIsMigrating(false);
   };
 

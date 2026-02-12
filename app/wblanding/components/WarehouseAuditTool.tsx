@@ -26,6 +26,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
+import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 
 type ValidationState = { type: 'error' | 'warning' | null; message: string } | null;
 
@@ -241,6 +242,9 @@ export const WarehouseAuditTool = () => {
       const result = await parseWorkbookForAudit(file);
       setAutofillSummary(result);
       applyAutoDetectedData(result.suggested);
+      if (dbUser?.user_id) {
+        await checkAndUnlockFeatureAchievement(dbUser.user_id, 'wb_audit_xlsx_uploaded', true);
+      }
       toast.success(`AI-аудит заполнен (${result.confidence}% confidence)`);
     } catch (error) {
       console.error(error);

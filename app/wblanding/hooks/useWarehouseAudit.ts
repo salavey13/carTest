@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMessage';
 import { supabaseAdmin } from '@/hooks/supabase';
+import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 
 // ============= Enhanced Interfaces =============
 export interface EnhancedAuditAnswers {
@@ -412,6 +413,9 @@ export const useWarehouseAudit = (userId: string | undefined) => {
       setRoadmap(smartRoadmap);
       setShowResult(true);
       trackAuditEvent('audit_completed', { totalLosses: result.total });
+      if (userId) {
+        checkAndUnlockFeatureAchievement(userId, 'wb_audit_completed', true).catch(() => null);
+      }
       
       // Clear progress after completion
       clearProgress();
@@ -444,7 +448,10 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     setLastCompletedAudit(null);
 
     trackAuditEvent('audit_started', { preservedAnswers: shouldPreserveAnswers });
-  }, [answers, questions, trackAuditEvent]);
+    if (userId) {
+      checkAndUnlockFeatureAchievement(userId, 'wb_audit_started', true).catch(() => null);
+    }
+  }, [answers, questions, trackAuditEvent, userId]);
 
   const resumeAudit = useCallback(() => {
     trackAuditEvent('audit_resumed', { step });
@@ -530,6 +537,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
         icon: '📨',
         duration: 5000,
       });
+      await checkAndUnlockFeatureAchievement(userId, 'wb_audit_report_sent', true);
       
       trackAuditEvent('report_sent', { totalLosses: result.total });
     } catch (error) {
@@ -596,6 +604,9 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     setStep(questions.length);
     setShowResult(true);
     setCurrentAnswer('');
+    if (userId) {
+      checkAndUnlockFeatureAchievement(userId, 'wb_audit_completed', true).catch(() => null);
+    }
 
     clearProgress();
 
@@ -603,7 +614,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
       totalLosses: result.total,
       fields: Object.keys(detected),
     });
-  }, [answers, calcLosses, clearProgress, generateRoadmap, questions.length, trackAuditEvent]);
+  }, [answers, calcLosses, clearProgress, generateRoadmap, questions.length, trackAuditEvent, userId]);
 
   return {
     step,
