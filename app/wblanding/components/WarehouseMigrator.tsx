@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { 
   Loader2, FileSpreadsheet, Database, Trash2, 
-  ShieldQuestion, User, Sparkles, Building2, UploadCloud
+  ShieldQuestion, User, Sparkles, Building2, UploadCloud, AlertCircle
 } from "lucide-react";
 import { uploadWarehouseCsv, getUserCrews } from "@/app/wb/actions";
 import { useAppContext } from "@/contexts/AppContext";
@@ -23,7 +23,7 @@ const normalizeHeader = (header: string): string =>
 
 // Map keys: "Normalized Header Keyword" -> "System Field"
 const HEADER_KEYWORDS: Record<string, string> = {
-  // ID (Priority match)
+  // ID
   'артикул': 'id', 
   'sku': 'id', 
   'vendorcode': 'id', 
@@ -33,7 +33,7 @@ const HEADER_KEYWORDS: Record<string, string> = {
   'количество': 'quantity', 
   'stock': 'quantity', 
   'остаток': 'quantity',
-  'доступно': 'quantity', // "Доступно для заказа"
+  'доступно': 'quantity', 
   'вналичии': 'quantity',
   'свободныйостаток': 'quantity',
 
@@ -55,13 +55,10 @@ const HEADER_KEYWORDS: Record<string, string> = {
   'цвет': 'color',
 };
 
-// Helper to detect column type from header text
 const detectColumnType = (header: string): string | undefined => {
   const h = normalizeHeader(header);
-  // Check exact matches first
   if (HEADER_KEYWORDS[h]) return HEADER_KEYWORDS[h];
   
-  // Check partial matches (e.g. "ваш sku *" contains "sku")
   for (const [keyword, type] of Object.entries(HEADER_KEYWORDS)) {
     if (h.includes(keyword)) return type;
   }
@@ -104,23 +101,11 @@ export function WarehouseMigrator() {
     const result = parse(csvData, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: (h) => {
-        // Use the smart detector for CSV parsing as well
-        const type = detectColumnType(h);
-        return type || normalizeHeader(h); // Fallback to normalized header
-      },
+      transformHeader: (h) => detectColumnType(h) || normalizeHeader(h),
     });
 
     return result.data.map((row: any) => {
       const item: Partial<ParsedItem> = { specs: {} };
-      
-      // We iterate over the TYPES detected (e.g., row['id'], row['quantity'])
-      // But we need to be careful: multiple columns might map to 'id' in CSV if we aren't careful.
-      // Let's map back from our known types.
-      
-      // Logic: find the column index that matches the type
-      // However, Papaparse already renamed headers.
-      // So we just look for 'id', 'quantity', etc.
       
       if (row.id) item.id = String(row.id).toLowerCase().trim();
       if (row.quantity) item.quantity = parseInt(String(row.quantity).replace(/[^\d.-]/g, ''), 10) || 0;
@@ -141,7 +126,7 @@ export function WarehouseMigrator() {
 
   const addLog = (msg: string, type: string = 'info') => setLogs(prev => [...prev.slice(-20), { msg, type }]);
 
-  // --- FILE UPLOAD HANDLER (XLSX/CSV) ---
+  // --- FILE UPLOAD HANDLER (ROBUST) ---
   const handleFileUpload = useCallback((file: File) => {
     if (!file) return;
     addLog(`Reading: ${file.name}...`, 'info');
@@ -151,68 +136,66 @@ export function WarehouseMigrator() {
       try {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'array', raw: false });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
 
-        // 1. Convert to Array of Arrays to find header
-        const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-        
-        if (rows.length === 0) throw new Error("Empty sheet");
-
-        // 2. SMART HEADER DETECTION
-        let headerRowIndex = -1;
+        // 1. SEARCH ACROSS ALL SHEETS & DEEP ROWS
+        let bestSheetName: string | null = null;
+        let bestHeaderRow: number = -1;
         let maxScore = 0;
 
-        // Scan first 20 rows
-        for (let i = 0; i < Math.min(20, rows.length); i++) {
-          const row = rows[i];
-          let currentScore = 0;
+        // Iterate all sheets
+        workbook.SheetNames.forEach((sheetName) => {
+          const sheet = workbook.Sheets[sheetName];
+          const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
           
-          // Calculate score based on how many keywords match in this row
-          row.forEach(cell => {
-            const type = detectColumnType(String(cell));
-            if (type) currentScore++;
+          if (rows.length === 0) return;
+
+          // Iterate deep into rows (up to 50) to find headers
+          for (let i = 0; i < Math.min(50, rows.length); i++) {
+            const row = rows[i];
+            let currentScore = 0;
+            
+            row.forEach(cell => {
+              if (detectColumnType(String(cell))) currentScore++;
+            });
+
+            // Logic: Find the row with the MOST matches (minimum 2 to avoid false positives)
+            if (currentScore > maxScore && currentScore >= 2) {
+              maxScore = currentScore;
+              bestSheetName = sheetName;
+              bestHeaderRow = i;
+            }
           });
+        });
 
-          // If this row has more matching keywords than previous max, it's likely the header
-          // Threshold: at least 2 matching columns to avoid false positives
-          if (currentScore > maxScore && currentScore >= 2) {
-            maxScore = currentScore;
-            headerRowIndex = i;
-          }
+        if (!bestSheetName || maxScore < 2) {
+          throw new Error("Could not detect data headers. Ensure columns like 'Артикул' or 'Количество' exist.");
         }
 
-        if (headerRowIndex === -1) {
-          throw new Error("Could not find headers. Check the file format.");
-        }
+        addLog(`Found headers in sheet "${bestSheetName}" at row ${bestHeaderRow + 1}`, 'success');
 
-        addLog(`Headers found at row ${headerRowIndex + 1} (Score: ${maxScore})`, 'success');
-
-        // 3. Convert specific range to CSV
-        // We use sheet_to_csv starting from the detected header row
-        // To do this, we manually slice the sheet range or just generate CSV from the row index
+        // 2. PROCESS BEST SHEET
+        const sheet = workbook.Sheets[bestSheetName];
+        const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
         
-        // Easiest robust way: generate CSV from the rows array starting from header
-        // But to keep formatting simple, let's just generate CSV for the user to see
+        // Slice data starting from header
+        const csvRows = rows.slice(bestHeaderRow);
         
-        const csvRows = rows.slice(headerRowIndex);
-        // Simple CSV generation (manual join to avoid extra dependencies)
+        // Convert back to CSV string for the UI
         const csvString = csvRows.map(row => 
           row.map(cell => {
-            // Escape quotes and wrap in quotes if contains comma/newline
             let s = String(cell).replace(/"/g, '""');
-            if (s.search(/(|,|\n|")/g) >= 0) s = `"${s}"`;
+            if (s.search(/("|,|\n)/g) >= 0) s = `"${s}"`;
             return s;
           }).join(',')
         ).join('\n');
 
         setCsvData(csvString);
-        toast.success(`Detected ${maxScore} columns. Ready to import.`);
+        toast.success(`Parsed ${maxScore} key columns successfully.`);
 
       } catch (err: any) {
         console.error(err);
         addLog(`Error: ${err.message}`, 'error');
-        toast.error("Parsing failed");
+        toast.error("Failed to parse file");
       }
     };
     reader.readAsArrayBuffer(file);
@@ -264,42 +247,48 @@ export function WarehouseMigrator() {
   };
 
   return (
-    <Card className="bg-black/90 border border-brand-cyan/20 shadow-2xl w-full max-w-3xl mx-auto backdrop-blur-md">
+    <Card className="bg-card border border-border shadow-2xl w-full max-w-3xl mx-auto backdrop-blur-md">
       <CardHeader>
         <CardTitle className="text-brand-cyan font-orbitron flex items-center gap-2 text-xl">
           <Database className="w-5 h-5" /> SMART MIGRATOR V3
         </CardTitle>
-        <CardDescription className="text-gray-500 text-xs font-mono">
-          AUTO-DETECT HEADERS • XLSX SUPPORT • WB/OZON READY
+        <CardDescription className="text-muted-foreground text-xs font-mono">
+          AUTO-DETECT HEADERS (DEEP SCAN) • LIGHT/DARK MODE
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         
         {/* Permission Selector */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-background/30 rounded border border-border/50">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded border border-border">
           <div className="space-y-1">
             <label className="text-xs font-mono text-muted-foreground flex items-center gap-1">
               <ShieldQuestion className="w-3 h-3"/> Target Inventory
             </label>
             <Select value={targetCrewId} onValueChange={setTargetCrewId}>
-              <SelectTrigger className="bg-black border-input"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="bg-background border-input"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="personal"><div className="flex items-center gap-2"><User className="w-4 h-4 text-blue-400"/> Personal</div></SelectItem>
-                {userCrews.map(crew => <SelectItem key={crew.id} value={crew.id}><Building2 className="inline w-4 h-4 text-purple-400 mr-2"/> {crew.name}</SelectItem>)}
+                <SelectItem value="personal"><div className="flex items-center gap-2"><User className="w-4 h-4 text-blue-500"/> Personal</div></SelectItem>
+                {userCrews.map(crew => <SelectItem key={crew.id} value={crew.id}><Building2 className="inline w-4 h-4 text-purple-500 mr-2"/> {crew.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="flex items-end text-[10px] text-muted-foreground">
-            Supports complex headers (e.g., "Ваш SKU *", "Доступно для заказа").
+            Detects headers anywhere in the first 50 rows. Supports XLSX/CSV.
           </div>
         </div>
 
         {/* Drop Zone */}
-        <div onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} className="relative border-2 border-dashed border-border rounded-lg transition-colors hover:border-brand-cyan/50 group">
+        <div 
+          onDrop={handleDrop} 
+          onDragOver={(e) => e.preventDefault()} 
+          className="relative border-2 border-dashed border-border rounded-lg transition-colors hover:border-brand-cyan/50 hover:bg-muted/20 group cursor-pointer"
+        >
           <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"/>
-          <div className="p-4 flex flex-col items-center justify-center gap-2 text-center pointer-events-none">
+          <div className="p-6 flex flex-col items-center justify-center gap-2 text-center pointer-events-none">
             <UploadCloud className="w-8 h-8 text-muted-foreground group-hover:text-brand-cyan transition-colors"/>
-            <div className="text-xs text-muted-foreground font-mono">Drop <span className="text-brand-cyan font-bold">XLSX</span> / CSV here</div>
+            <div className="text-xs text-muted-foreground font-mono">
+              Drop <span className="text-brand-cyan font-bold">XLSX</span> / CSV here
+            </div>
           </div>
         </div>
 
@@ -308,7 +297,7 @@ export function WarehouseMigrator() {
           <Textarea 
             placeholder={`Артикул; Количество; Название; Бренд; Сезон
 SKU-001; 10; Одеяло 2x2; ИвановскийТекстиль; leto`}
-            className="font-mono bg-black border-gray-700 text-green-300 h-48 text-xs leading-relaxed focus:border-brand-cyan transition-all"
+            className="font-mono bg-background border-input text-foreground h-48 text-xs leading-relaxed focus:border-brand-cyan transition-all dark:bg-zinc-900"
             value={csvData}
             onChange={(e) => setCsvData(e.target.value)}
             disabled={isMigrating}
@@ -317,31 +306,50 @@ SKU-001; 10; Одеяло 2x2; ИвановскийТекстиль; leto`}
 
         {/* Stats */}
         {csvData && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-between items-center text-xs font-mono p-2 bg-brand-cyan/5 border border-brand-cyan/20 rounded">
-            <div className="flex items-center gap-2"><Sparkles className="w-3 h-3 text-brand-cyan"/><span className="text-brand-cyan">Detected: {parsedItems.length} rows</span></div>
-            <div className="text-muted-foreground">Sample ID: <span className="text-white">{parsedItems[0]?.id || 'N/A'}</span></div>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-between items-center text-xs font-mono p-2 bg-brand-cyan/10 border border-brand-cyan/20 rounded text-brand-cyan">
+            <div className="flex items-center gap-2"><Sparkles className="w-3 h-3"/><span>Detected: {parsedItems.length} rows</span></div>
+            <div className="opacity-70">Sample ID: <span className="font-bold">{parsedItems[0]?.id || 'N/A'}</span></div>
           </motion.div>
         )}
 
-        {/* Logs */}
-        <div className="bg-black border border-gray-800 rounded-md p-3 h-28 overflow-y-auto font-mono text-[10px] shadow-inner relative">
-          {logs.length === 0 && !isMigrating && <div className="absolute inset-0 flex items-center justify-center text-gray-600"><span className="animate-pulse">_waiting_for_input_</span></div>}
+        {/* Logs Terminal - Theme Aware */}
+        <div className="bg-muted/50 dark:bg-black border border-border rounded-md p-3 h-28 overflow-y-auto font-mono text-[10px] shadow-inner relative">
+          {logs.length === 0 && !isMigrating && (
+            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+              <span className="animate-pulse">_system_ready_</span>
+            </div>
+          )}
           <AnimatePresence>
             {logs.map((log, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className={`mb-0.5 ${log.type === 'success' ? 'text-green-400' : log.type === 'error' ? 'text-red-400' : 'text-gray-400'}`}>
+              <motion.div 
+                key={i} 
+                initial={{ opacity: 0, y: -5 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                className={`mb-0.5 ${
+                  log.type === 'success' ? 'text-green-600 dark:text-green-400' : 
+                  log.type === 'error' ? 'text-red-600 dark:text-red-400' : 
+                  'text-muted-foreground'
+                }`}
+              >
                 {`> ${log.msg}`}
               </motion.div>
             ))}
           </AnimatePresence>
-          {isMigrating && <span className="text-green-500 animate-pulse">_</span>}
+          {isMigrating && <span className="text-brand-cyan animate-pulse">_</span>}
         </div>
 
         {/* Actions */}
         <div className="flex gap-3">
-          <Button onClick={handleMigration} disabled={isMigrating || parsedItems.length === 0} className="flex-1 bg-gradient-to-r from-brand-cyan to-blue-600 text-white hover:from-brand-cyan/80 hover:to-blue-700 font-bold font-mono py-6 shadow-lg">
+          <Button 
+            onClick={handleMigration} 
+            disabled={isMigrating || parsedItems.length === 0} 
+            className="flex-1 bg-gradient-to-r from-brand-cyan to-blue-600 text-white hover:from-brand-cyan/90 hover:to-blue-700 font-bold font-mono py-6 shadow-lg dark:shadow-brand-cyan/20"
+          >
             {isMigrating ? <><Loader2 className="animate-spin mr-2" /> PROCESSING...</> : <><Database className="mr-2 w-5 h-5" /> IMPORT DATA</>}
           </Button>
-          <Button variant="outline" size="icon" onClick={() => { setCsvData(''); setLogs([]); }} className="border-red-500/30 text-red-400 hover:bg-red-950"><Trash2 className="w-4 h-4" /></Button>
+          <Button variant="outline" size="icon" onClick={() => { setCsvData(''); setLogs([]); }} className="border-red-500/30 text-red-500 hover:bg-red-500/10">
+            <Trash2 className="w-4 h-4" />
+          </Button>
         </div>
       </CardContent>
     </Card>
