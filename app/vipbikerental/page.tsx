@@ -3,12 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
+
 import { BikeShowcase } from "@/components/BikeShowcase";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+
+type ServiceItem = { icon: string; text: string };
 
 const InfoItem = ({ icon, children }: { icon: string; children: React.ReactNode }) => (
   <div className="flex items-start gap-3">
@@ -18,13 +21,13 @@ const InfoItem = ({ icon, children }: { icon: string; children: React.ReactNode 
 );
 
 const StepItem = ({ num, title, icon, children }: { num: string; title: string; icon: string; children: React.ReactNode }) => (
-  <div className="relative h-full w-full min-w-0 rounded-2xl border border-border/60 bg-card/50 p-6 text-center backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/20">
+  <div className="relative h-full w-full min-w-0 rounded-2xl border border-border/60 bg-card/60 p-6 text-center backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/20">
     <div className="absolute -top-4 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full bg-primary font-orbitron font-bold text-primary-foreground">
       {num}
     </div>
     <VibeContentRenderer content={icon} className="mx-auto my-4 text-4xl text-primary" />
     <h4 className="mb-2 font-orbitron text-lg">{title}</h4>
-    <p className="text-sm text-muted-foreground">{children}</p>
+    <p className="text-sm leading-relaxed text-muted-foreground">{children}</p>
   </div>
 );
 
@@ -37,20 +40,20 @@ const ServiceCard = ({
 }: {
   title: string;
   icon: string;
-  items: { icon: string; text: string }[];
+  items: ServiceItem[];
   imageUrl?: string;
   borderColorClass?: string;
 }) => (
-  <Card className={cn("group relative overflow-hidden border bg-black", borderColorClass || "border-border")}>
+  <Card className={cn("group relative overflow-hidden border bg-black", borderColorClass || "border-border")}> 
     {imageUrl && (
       <Image
         src={imageUrl}
         alt={title}
         fill
-        className="absolute inset-0 object-cover opacity-40 transition-opacity duration-300 group-hover:opacity-50"
+        className="absolute inset-0 object-cover opacity-40 transition-opacity duration-300 group-hover:opacity-55"
       />
     )}
-    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent/10" />
+    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent/10" />
     <div className="relative flex h-full flex-col p-6">
       <CardHeader className="mb-4 p-0">
         <CardTitle className={cn("flex items-center gap-3 text-2xl", borderColorClass?.replace("border-", "text-"))}>
@@ -69,87 +72,95 @@ const ServiceCard = ({
   </Card>
 );
 
-const actionCards = [
+const quickActions = [
   {
-    title: "Быстрый старт",
-    desc: "Сразу к каталогу — выбирайте байк по стилю и сценарию поездки.",
-    href: "/rent-bike",
-    cta: "Открыть каталог",
+    title: "Каталог байков",
     icon: "::FaMotorcycle::",
+    text: "Подбор модели под стиль езды, бюджет и маршрут.",
+    href: "/rent-bike",
+    cta: "Открыть",
   },
   {
-    title: "Контроль аренды",
-    desc: "Отслеживайте свои текущие и завершенные сделки в центре управления.",
+    title: "Контроль сделок",
+    icon: "::FaTicket::",
+    text: "Проверка статусов, подтверждений и активных аренд.",
     href: "/rentals",
     cta: "Мои аренды",
-    icon: "::FaTicket::",
   },
   {
-    title: "Сделка по ID",
-    desc: "Уже есть номер аренды? Быстро откройте карточку и продолжайте оформление.",
-    href: "/rentals",
-    cta: "Найти аренду",
-    icon: "::FaMagnifyingGlass::",
+    title: "Быстрый вход",
+    icon: "::FaBolt::",
+    text: "Прямой сценарий: выбрать → подтвердить → поехать.",
+    href: "/rent-bike",
+    cta: "Старт",
   },
+];
+
+const heroMetrics = [
+  "::FaStopwatch:: Быстрая онлайн-бронь",
+  "::FaShieldHeart:: ОСАГО + экип",
+  "::FaMapLocationDot:: Центр выдачи в городе",
+  "::FaHeadset:: Поддержка на маршруте",
 ];
 
 export default function HomePage() {
   const { scrollYProgress } = useScroll();
-  const y = useTransform(scrollYProgress, [0, 1], [0, -100]);
+  const y = useTransform(scrollYProgress, [0, 1], [0, -90]);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background text-foreground dark">
-      <div className="pointer-events-none fixed inset-0 z-[-2] bg-[radial-gradient(circle_at_top,rgba(255,106,0,0.15),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(119,0,255,0.12),transparent_40%)]" />
-      <div className="pointer-events-none fixed inset-0 z-[-3] bg-[linear-gradient(to_bottom,rgba(0,0,0,0.35),transparent_30%)]" />
+      <div className="pointer-events-none fixed inset-0 z-[-2] bg-[radial-gradient(circle_at_top,rgba(255,106,0,0.14),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(119,0,255,0.10),transparent_42%)]" />
+      <div className="pointer-events-none fixed inset-0 z-[-3] bg-[linear-gradient(to_bottom,rgba(0,0,0,0.45),transparent_35%)]" />
 
       <section className="relative flex min-h-[760px] items-center justify-center overflow-hidden px-4 pb-14 pt-28 text-white sm:pt-32">
         <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-black via-zinc-900 to-black" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/65 to-black/50" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_25%,rgba(255,106,0,0.28),transparent_44%)]" />
+          <video autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover brightness-[0.5] saturate-125">
+            <source
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-b2e07838-518b-4ab9-80dc-981ee86c24b7.mp4"
+              type="video/mp4"
+            />
+            Your browser does not support the video tag.
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-black/55" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_23%,rgba(255,106,0,0.25),transparent_42%)]" />
         </div>
 
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.75 }}
+          transition={{ duration: 0.7 }}
           className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center text-center"
         >
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/40 px-4 py-2 text-sm text-white/90 backdrop-blur-sm">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/45 px-4 py-2 text-sm text-white/90 backdrop-blur-sm">
             <VibeContentRenderer content="::FaBolt::" className="text-brand-yellow" />
-            <span>VIPBIKE PRO RENTAL EXPERIENCE</span>
+            <span>VIPBIKE RENTAL ECOSYSTEM</span>
           </div>
 
-          <h1 className="font-orbitron text-5xl font-black uppercase leading-[0.95] tracking-tight text-white drop-shadow-[0_10px_30px_rgba(0,0,0,0.75)] sm:text-6xl md:text-7xl lg:text-8xl">
-            <span className="block drop-shadow-lg">Больше чем аренда.</span>
-            <span className="block drop-shadow-lg">Твоя байк-сцена.</span>
+          <h1 className="font-orbitron text-5xl font-black uppercase leading-[0.9] tracking-tight text-white drop-shadow-[0_8px_22px_rgba(0,0,0,0.75)] sm:text-6xl md:text-7xl lg:text-8xl">
+            <span className="block">Скорость. Контроль.</span>
+            <span className="block text-brand-yellow">Твой путь на байке.</span>
           </h1>
 
-          <p className="mx-auto mt-6 max-w-3xl text-base font-light text-white/85 sm:text-lg md:text-xl">
-            От импульсной городской поездки до длинного уикенда — VIPBIKE закрывает весь цикл: выбор техники,
-            бронь, экип, сопровождение и удобное управление сделкой онлайн.
+          <p className="mx-auto mt-6 max-w-3xl text-base font-light text-white/90 sm:text-lg md:text-xl">
+            Премиальный прокат в Нижнем Новгороде: от первого выбора модели до возврата — всё организовано в одном
+            потоке с онлайн-навигацией по аренде.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <Button asChild size="lg" variant="accent" className="font-orbitron text-base shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-accent/60">
+            <Button asChild size="lg" variant="accent" className="font-orbitron text-base shadow-lg shadow-accent/35 transition-all hover:scale-105 hover:shadow-accent/70">
               <Link href="/rent-bike">
                 <VibeContentRenderer content="::FaMotorcycle className='mr-2':: Выбрать байк" />
               </Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="border-white/50 bg-black/20 font-orbitron text-white backdrop-blur-sm hover:bg-white hover:text-black">
+            <Button asChild size="lg" variant="outline" className="border-white/55 bg-black/25 font-orbitron text-white backdrop-blur-sm hover:bg-white hover:text-black">
               <Link href="/rentals">
                 <VibeContentRenderer content="::FaTicket className='mr-2':: Мои аренды" />
               </Link>
             </Button>
           </div>
 
-          <div className="mt-8 grid w-full max-w-4xl grid-cols-2 gap-3 text-left sm:grid-cols-4">
-            {[
-              "::FaStopwatch:: Бронь за пару минут",
-              "::FaShieldHeart:: Экип + ОСАГО",
-              "::FaRoute:: Прокат под маршрут",
-              "::FaHeadset:: Поддержка 7 дней",
-            ].map((chip) => (
+          <div className="mt-8 grid w-full max-w-4xl grid-cols-1 gap-3 text-left sm:grid-cols-2 lg:grid-cols-4">
+            {heroMetrics.map((chip) => (
               <div key={chip} className="rounded-xl border border-white/20 bg-black/35 px-3 py-2 text-sm text-white/90 backdrop-blur-sm">
                 <VibeContentRenderer content={chip} />
               </div>
@@ -165,15 +176,18 @@ export default function HomePage() {
       <div className="container mx-auto max-w-7xl space-y-20 px-4 py-16 sm:space-y-24 sm:py-24">
         <section>
           <div className="mb-8 text-center">
-            <h2 className="font-orbitron text-3xl sm:text-4xl">Прокат уже умный. Мы сделали его быстрее.</h2>
+            <h2 className="font-orbitron text-3xl sm:text-4xl">Уже внедрённый rental-флоу — в один клик</h2>
             <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
-              В системе уже есть всё для прозрачной аренды: поиск сделок по ID, статусы, управление ролями арендатора и владельца.
-              Ниже — короткий путь к этим возможностям.
+              На платформе уже реализованы ключевые инструменты аренды. Ниже — прямые входы в рабочие сценарии, чтобы
+              пользователь сразу попадал в полезные действия.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {actionCards.map((card) => (
-              <Card key={card.title} className="border-border/70 bg-card/60 backdrop-blur-sm transition-all hover:-translate-y-1 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/20">
+            {quickActions.map((card) => (
+              <Card
+                key={card.title}
+                className="border-border/70 bg-card/60 backdrop-blur-sm transition-all hover:-translate-y-1 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/20"
+              >
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-xl">
                     <VibeContentRenderer content={card.icon} className="text-primary" />
@@ -181,7 +195,7 @@ export default function HomePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="mb-5 text-sm text-muted-foreground">{card.desc}</p>
+                  <p className="mb-5 text-sm text-muted-foreground">{card.text}</p>
                   <Button asChild variant="outline" className="w-full">
                     <Link href={card.href}>{card.cta}</Link>
                   </Button>
@@ -293,7 +307,6 @@ export default function HomePage() {
           </Accordion>
         </motion.section>
       </div>
-
     </div>
   );
 }
