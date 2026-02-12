@@ -119,3 +119,27 @@ If you modify setup, onboarding, or runtime assumptions, update these files toge
 - optionally `.env.example` when env requirements change
 
 Keeping these aligned is mandatory for maintainability.
+
+
+---
+
+## 8) Fork + upstream collaboration model
+
+When documenting or guiding contributors, prefer this Git model:
+
+- canonical repo = upstream source of truth
+- each contributor works in personal fork
+- contributors add `upstream` remote and sync regularly
+- improvements flow back via PRs into upstream
+
+Reference sync commands:
+
+```bash
+git remote add upstream https://github.com/<UPSTREAM_OWNER>/carTest.git
+git checkout main
+git fetch upstream
+git merge upstream/main
+git push origin main
+```
+
+This keeps forks independent for private deploys (own Codex/Vercel/env) while still receiving upstream improvements.

@@ -323,6 +323,34 @@ Open [http://localhost:3000](http://localhost:3000).
 - For Telegram Mini App testing on localhost, use an HTTPS tunnel (e.g., ngrok) and set the bot webapp URL.
 - Never commit real secrets to Git.
 
+### Upstream-safe fork model (for you + your friend)
+
+Use this model so your friend can run his own Codex+Vercel instance **and** still receive your updates.
+
+1. Keep your repository as the **upstream source** (original project).
+2. Friend creates a fork (`friend/carTest`) and adds remotes locally:
+   ```bash
+   git remote -v
+   git remote add upstream https://github.com/<YOUR_USERNAME>/carTest.git
+   ```
+3. Friend does day-to-day work in his own fork/branches and opens PRs to his fork’s `main`.
+4. To receive your new changes, friend regularly syncs from upstream:
+   ```bash
+   git checkout main
+   git fetch upstream
+   git merge upstream/main
+   # or: git rebase upstream/main
+   git push origin main
+   ```
+5. If friend wants to contribute back to you, he opens PRs from `friend/<branch>` into `upstream/main` (your repo).
+6. Once you merge his PR upstream, **everyone** using this upstream-sync model can pull the same updates.
+
+This gives two-way collaboration:
+- you publish stable changes upstream,
+- friend can pull upstream updates,
+- you can merge friend improvements back for all downstream forks.
+
+
 ---
 
 ## Technology Stack

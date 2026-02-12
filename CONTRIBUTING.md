@@ -64,3 +64,25 @@
 
 ## Contact / Support
 Для вопросов: @salavey13 в Telegram или открывай issue.
+
+---
+
+## 3) Модель совместной работы (upstream ↔ forks)
+
+Рекомендуемый подход:
+- `upstream` (основной репозиторий) = источник правды
+- каждый участник работает в своём fork
+- обновления из upstream подтягиваются в fork регулярно
+
+Базовые команды синхронизации:
+
+```bash
+git remote add upstream https://github.com/<UPSTREAM_OWNER>/carTest.git
+git checkout main
+git fetch upstream
+git merge upstream/main
+git push origin main
+```
+
+Если ты хочешь, чтобы твои изменения попали всем, открывай PR из fork в upstream.
+После merge любой другой fork может получить их через sync с upstream.
