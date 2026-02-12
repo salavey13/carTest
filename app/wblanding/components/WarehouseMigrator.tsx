@@ -198,9 +198,9 @@ export function WarehouseMigrator() {
         {/* Input Area */}
         <div className="space-y-2">
           <Textarea 
-            placeholder="Артикул; Количество; Название; Бренд; Сезон
+            placeholder={`Артикул; Количество; Название; Бренд; Сезон
 SKU-001; 10; Одеяло 2x2; ИвановскийТекстиль; leto
-SKU-002; 5; Подушка; DreamSoft; zima"
+SKU-002; 5; Подушка; DreamSoft; zima`}
             className="font-mono bg-black border-gray-700 text-green-300 h-48 text-xs leading-relaxed focus:border-brand-cyan transition-all"
             value={csvData}
             onChange={(e) => setCsvData(e.target.value)}
