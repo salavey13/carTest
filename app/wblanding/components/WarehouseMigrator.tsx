@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { 
   Loader2, FileSpreadsheet, Database, Trash2, 
-  ShieldQuestion, User, Sparkles, Building2, UploadCloud
+  ShieldQuestion, User, Sparkles, Building2, UploadCloud, Warehouse
 } from "lucide-react";
 import { uploadWarehouseCsv, getUserCrews } from "@/app/wb/actions";
 import { useAppContext } from "@/contexts/AppContext";
@@ -27,6 +27,7 @@ const HEADER_KEYWORDS: Record<string, string> = {
   'sku': 'id', 
   'vendorcode': 'id', 
   'vendor': 'id',
+  'вашsku': 'id', // "Ваш SKU *"
   
   // Quantity
   'количество': 'quantity', 
@@ -35,13 +36,17 @@ const HEADER_KEYWORDS: Record<string, string> = {
   'доступно': 'quantity', 
   'вналичии': 'quantity',
   'свободныйостаток': 'quantity',
+  'доступнодлязаказа': 'quantity', // "Доступно для заказа *"
+
+  // Warehouse (NEW)
+  'склад': 'warehouse',
 
   // Name/Model
   'название': 'model', 
   'name': 'model', 
   'model': 'model',
   'наименование': 'model',
-  'subject': 'model', 
+  'названиетовара': 'model',
 
   // Make/Brand
   'бренд': 'make', 
@@ -70,6 +75,7 @@ interface ParsedItem {
   make: string;
   model: string;
   specs: Record<string, any>;
+  warehouse?: string;
 }
 
 interface CrewInfo {
@@ -86,6 +92,12 @@ export function WarehouseMigrator() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [logs, setLogs] = useState<{msg: string, type: string}[]>([]);
   
+  // Source Data State
+  const [rawRows, setRawRows] = useState<any[]>([]); // Stores all parsed rows
+  const [availableWarehouses, setAvailableWarehouses] = useState<string[]>([]); // Detected warehouses
+  const [selectedSourceWarehouse, setSelectedSourceWarehouse] = useState<string>(""); // Selected source filter
+  
+  // Destination State
   const [userCrews, setUserCrews] = useState<CrewInfo[]>([]);
   const [targetCrewId, setTargetCrewId] = useState<string>('personal');
 
@@ -93,7 +105,38 @@ export function WarehouseMigrator() {
     if (dbUser?.user_id) getUserCrews(dbUser.user_id).then(setUserCrews);
   }, [dbUser]);
 
-  // --- PARSING LOGIC (CSV) ---
+  // --- FILTERING LOGIC ---
+  // When user selects a warehouse or rawRows change, filter data and generate CSV
+  useEffect(() => {
+    if (rawRows.length === 0) return;
+
+    // Filter rows
+    const filtered = selectedSourceWarehouse 
+      ? rawRows.filter(r => r.warehouse === selectedSourceWarehouse)
+      : rawRows;
+
+    // Convert back to CSV for display
+    if (filtered.length > 0) {
+      const headers = Object.keys(filtered[0]);
+      const csvString = [
+        headers.join(','),
+        ...filtered.map(row => 
+          headers.map(h => {
+            let val = row[h] || "";
+            if (typeof val === 'string' && (val.includes(',') || val.includes('"') || val.includes('\n'))) {
+              val = `"${val.replace(/"/g, '""')}"`;
+            }
+            return val;
+          }).join(',')
+        )
+      ].join('\n');
+      setCsvData(csvString);
+    } else {
+      setCsvData('');
+    }
+  }, [selectedSourceWarehouse, rawRows]);
+
+  // --- PARSING LOGIC (CSV Display -> Items) ---
   const parsedItems = useMemo(() => {
     if (!csvData.trim()) return [];
 
@@ -125,10 +168,12 @@ export function WarehouseMigrator() {
 
   const addLog = (msg: string, type: string = 'info') => setLogs(prev => [...prev.slice(-20), { msg, type }]);
 
-  // --- FILE UPLOAD HANDLER (ROBUST) ---
+  // --- FILE UPLOAD HANDLER ---
   const handleFileUpload = useCallback((file: File) => {
     if (!file) return;
     addLog(`Reading: ${file.name}...`, 'info');
+    setRawRows([]); // Reset
+    setAvailableWarehouses([]); // Reset
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -136,61 +181,102 @@ export function WarehouseMigrator() {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'array', raw: false });
 
-        // 1. SEARCH ACROSS ALL SHEETS & DEEP ROWS
         let bestSheetName: string | null = null;
         let bestHeaderRow: number = -1;
+        let bestHeaders: string[] = [];
         let maxScore = 0;
 
-        // Iterate all sheets
         workbook.SheetNames.forEach((sheetName) => {
           const sheet = workbook.Sheets[sheetName];
           const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
           
           if (rows.length === 0) return;
 
-          // Iterate deep into rows (up to 50) to find headers
           for (let i = 0; i < Math.min(50, rows.length); i++) {
             const row = rows[i];
             let currentScore = 0;
+            const detectedHeaders: string[] = [];
             
             row.forEach(cell => {
-              if (detectColumnType(String(cell))) currentScore++;
+              const type = detectColumnType(String(cell));
+              if (type) {
+                currentScore++;
+                detectedHeaders.push(type);
+              } else {
+                detectedHeaders.push(normalizeHeader(String(cell)));
+              }
             });
 
-            // Logic: Find the row with the MOST matches (minimum 2 to avoid false positives)
             if (currentScore > maxScore && currentScore >= 2) {
               maxScore = currentScore;
               bestSheetName = sheetName;
               bestHeaderRow = i;
+              bestHeaders = detectedHeaders;
             }
-          } 
-          // FIX: Removed extra ')' here that caused the syntax error
+          }
         });
 
         if (!bestSheetName || maxScore < 2) {
-          throw new Error("Could not detect data headers. Ensure columns like 'Артикул' or 'Количество' exist.");
+          throw new Error("Could not detect data headers.");
         }
 
         addLog(`Found headers in sheet "${bestSheetName}" at row ${bestHeaderRow + 1}`, 'success');
 
-        // 2. PROCESS BEST SHEET
+        // 2. Parse to JSON using detected headers
         const sheet = workbook.Sheets[bestSheetName];
-        const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-        
-        // Slice data starting from header
-        const csvRows = rows.slice(bestHeaderRow);
-        
-        // Convert back to CSV string for the UI
-        const csvString = csvRows.map(row => 
-          row.map(cell => {
-            let s = String(cell).replace(/"/g, '""');
-            if (s.search(/("|,|\n)/g) >= 0) s = `"${s}"`;
-            return s;
-          }).join(',')
-        ).join('\n');
+        // We use header: 1 to manually map because sheet_to_json with header:1 is safer for dynamic header rows
+        // But easier: use sheet_to_json with range.
+        const jsonData = XLSX.utils.sheet_to_json(sheet, { 
+            range: bestHeaderRow, 
+            defval: "",
+            raw: false 
+        });
 
-        setCsvData(csvString);
-        toast.success(`Parsed ${maxScore} key columns successfully.`);
+        // 3. Normalize Keys and Extract Warehouses
+        const warehouseSet = new Set<string>();
+        const processedRows: any[] = [];
+
+        jsonData.forEach((row: any) => {
+            const cleanRow: any = {};
+            // Map original keys to our normalized keys
+            Object.keys(row).forEach(key => {
+                const type = detectColumnType(key);
+                const cleanKey = type || normalizeHeader(key);
+                let val = row[key];
+                
+                // Clean up newlines in values (common in warehouse names)
+                if (typeof val === 'string') val = val.replace(/\n/g, ' ').trim();
+                
+                cleanRow[cleanKey] = val;
+            });
+
+            // Extract Warehouse if present
+            if (cleanRow.warehouse) {
+                warehouseSet.add(cleanRow.warehouse);
+            }
+            
+            processedRows.push(cleanRow);
+        });
+
+        setRawRows(processedRows);
+
+        // 4. Handle Warehouse Logic
+        if (warehouseSet.size > 1) {
+            const whList = Array.from(warehouseSet);
+            setAvailableWarehouses(whList);
+            setSelectedSourceWarehouse(whList[0]); // Auto-select first
+            addLog(`Detected ${whList.length} warehouses. Please select one.`, 'info');
+            toast.info(`Found ${whList.length} warehouses. Select one to proceed.`);
+        } else if (warehouseSet.size === 1) {
+            setAvailableWarehouses(Array.from(warehouseSet));
+            setSelectedSourceWarehouse(Array.from(warehouseSet)[0]);
+            addLog(`Detected single warehouse: ${Array.from(warehouseSet)[0]}`, 'success');
+        } else {
+            // No warehouse column
+            setAvailableWarehouses([]);
+            setSelectedSourceWarehouse("");
+            addLog(`No warehouse column found. Processing all rows.`, 'info');
+        }
 
       } catch (err: any) {
         console.error(err);
@@ -250,31 +336,48 @@ export function WarehouseMigrator() {
     <Card className="bg-card border border-border shadow-2xl w-full max-w-3xl mx-auto backdrop-blur-md">
       <CardHeader>
         <CardTitle className="text-brand-cyan font-orbitron flex items-center gap-2 text-xl">
-          <Database className="w-5 h-5" /> SMART MIGRATOR V3
+          <Database className="w-5 h-5" /> SMART MIGRATOR V4
         </CardTitle>
         <CardDescription className="text-muted-foreground text-xs font-mono">
-          AUTO-DETECT HEADERS (DEEP SCAN) • LIGHT/DARK MODE
+          MULTI-WAREHOUSE FILTER • AUTO-DETECT HEADERS
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         
-        {/* Permission Selector */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded border border-border">
-          <div className="space-y-1">
+        {/* Selectors Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Source Warehouse Selector (Dynamic) */}
+            {availableWarehouses.length > 1 && (
+                <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded">
+                    <label className="text-xs font-mono text-orange-500 flex items-center gap-1 mb-2">
+                    <Warehouse className="w-3 h-3"/> Source Warehouse (Detected)
+                    </label>
+                    <Select value={selectedSourceWarehouse} onValueChange={setSelectedSourceWarehouse}>
+                    <SelectTrigger className="bg-background border-input">
+                        <SelectValue placeholder="Select warehouse..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {availableWarehouses.map(wh => (
+                        <SelectItem key={wh} value={wh}>{wh}</SelectItem>
+                        ))}
+                    </SelectContent>
+                    </Select>
+                </div>
+            )}
+
+            {/* Target Inventory Selector */}
+            <div className={`space-y-1 ${availableWarehouses.length <= 1 ? 'md:col-span-2' : ''} p-4 bg-muted/50 rounded border border-border`}>
             <label className="text-xs font-mono text-muted-foreground flex items-center gap-1">
-              <ShieldQuestion className="w-3 h-3"/> Target Inventory
+                <ShieldQuestion className="w-3 h-3"/> Target Inventory (System)
             </label>
             <Select value={targetCrewId} onValueChange={setTargetCrewId}>
-              <SelectTrigger className="bg-background border-input"><SelectValue /></SelectTrigger>
-              <SelectContent>
+                <SelectTrigger className="bg-background border-input"><SelectValue /></SelectTrigger>
+                <SelectContent>
                 <SelectItem value="personal"><div className="flex items-center gap-2"><User className="w-4 h-4 text-blue-500"/> Personal</div></SelectItem>
                 {userCrews.map(crew => <SelectItem key={crew.id} value={crew.id}><Building2 className="inline w-4 h-4 text-purple-500 mr-2"/> {crew.name}</SelectItem>)}
-              </SelectContent>
+                </SelectContent>
             </Select>
-          </div>
-          <div className="flex items-end text-[10px] text-muted-foreground">
-            Detects headers anywhere in the first 50 rows. Supports XLSX/CSV.
-          </div>
+            </div>
         </div>
 
         {/* Drop Zone */}
@@ -307,7 +410,7 @@ SKU-001; 10; Одеяло 2x2; ИвановскийТекстиль; leto`}
         {/* Stats */}
         {csvData && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-between items-center text-xs font-mono p-2 bg-brand-cyan/10 border border-brand-cyan/20 rounded text-brand-cyan">
-            <div className="flex items-center gap-2"><Sparkles className="w-3 h-3"/><span>Detected: {parsedItems.length} rows</span></div>
+            <div className="flex items-center gap-2"><Sparkles className="w-3 h-3"/><span>Ready: {parsedItems.length} items</span></div>
             <div className="opacity-70">Sample ID: <span className="font-bold">{parsedItems[0]?.id || 'N/A'}</span></div>
           </motion.div>
         )}
@@ -347,7 +450,7 @@ SKU-001; 10; Одеяло 2x2; ИвановскийТекстиль; leto`}
           >
             {isMigrating ? <><Loader2 className="animate-spin mr-2" /> PROCESSING...</> : <><Database className="mr-2 w-5 h-5" /> IMPORT DATA</>}
           </Button>
-          <Button variant="outline" size="icon" onClick={() => { setCsvData(''); setLogs([]); }} className="border-red-500/30 text-red-500 hover:bg-red-500/10">
+          <Button variant="outline" size="icon" onClick={() => { setCsvData(''); setLogs([]); setRawRows([]); setAvailableWarehouses([]); }} className="border-red-500/30 text-red-500 hover:bg-red-500/10">
             <Trash2 className="w-4 h-4" />
           </Button>
         </div>
