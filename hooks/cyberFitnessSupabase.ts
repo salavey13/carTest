@@ -639,48 +639,47 @@ export const updateUserCyberFitnessProfile = async (
 export const logCyberFitnessAction = async (
   userId: string,
   actionType: 'filesExtracted' | 'tokensProcessed' | 'kworkRequestSent' | 'prCreated' | 'branchUpdated' | 'featureUsed' | 'focusTimeAdded',
-  countOrDetails: number | { featureName: string; featureValue?: string | number | boolean } | { minutes: number } 
+  countOrDetails: number | { featureName: string; featureValue?: string | number | boolean } | { minutes: number }
 ): Promise<{ success: boolean; error?: string; newAchievements?: Achievement[] }> => {
   if (!userId) {
     logger.warn("[CyberFitness LogAction] User ID (string) is missing.");
     return { success: false, error: "User ID is required." };
   }
 
-  // --- 1. ВЫЧИСЛЯЕМ ДЕЛЬТУ KV ---
   let kiloVibesDelta = 0;
   let featureKey: string | null = null;
-  let featureVal: any = null;
+  let featureVal: string | number | boolean | null = null;
 
   if (actionType === 'filesExtracted' && typeof countOrDetails === 'number') {
     kiloVibesDelta = countOrDetails * 0.1;
-    featureKey = 'totalFilesExtracted'; // Обновим счетчик в featuresUsed для истории
-    featureVal = countOrDetails; 
-  } 
+    featureKey = 'totalFilesExtracted';
+    featureVal = countOrDetails;
+  }
   else if (actionType === 'tokensProcessed' && typeof countOrDetails === 'number') {
     kiloVibesDelta = countOrDetails * 0.001;
     featureKey = 'lastTokensCount';
     featureVal = countOrDetails;
-  } 
+  }
   else if (actionType === 'kworkRequestSent' && typeof countOrDetails === 'number') {
     kiloVibesDelta = countOrDetails * 5;
     featureKey = 'totalKworkRequests';
     featureVal = countOrDetails;
-  } 
+  }
   else if (actionType === 'prCreated' && typeof countOrDetails === 'number') {
     kiloVibesDelta = countOrDetails * 50;
     featureKey = 'lastPrTs';
     featureVal = new Date().toISOString();
-  } 
+  }
   else if (actionType === 'branchUpdated' && typeof countOrDetails === 'number') {
     kiloVibesDelta = countOrDetails * 20;
     featureKey = 'lastBranchUpdateTs';
     featureVal = new Date().toISOString();
-  } 
+  }
   else if (actionType === 'featureUsed' && typeof countOrDetails === 'object' && 'featureName' in countOrDetails) {
-    kiloVibesDelta = 5; // Бонус за использование фичи
+    kiloVibesDelta = 5;
     featureKey = countOrDetails.featureName;
     featureVal = countOrDetails.featureValue ?? true;
-  } 
+  }
   else if (actionType === 'focusTimeAdded' && typeof countOrDetails === 'object' && 'minutes' in countOrDetails) {
     kiloVibesDelta = countOrDetails.minutes * 0.5;
     featureKey = 'lastFocusMinutes';
@@ -688,41 +687,78 @@ export const logCyberFitnessAction = async (
   }
 
   try {
-    // --- 2. АТОМАРНЫЙ ВЫЗОВ RPC ---
-    // Это "Suckerpunch" по гонке данных. База сама заблокирует строку и прибавит дельту.
     const { data: newMetadata, error: rpcError } = await supabaseAdmin.rpc('update_user_cyber_stats', {
       p_user_id: userId,
       p_kv_delta: kiloVibesDelta,
-      p_gv_delta: 0, // В Студии GV пока не майним
-      p_new_achievement: null, // Достижения проверим после апдейта
+      p_gv_delta: 0,
+      p_new_achievement: null,
       p_feature_key: featureKey,
-      p_feature_val: JSON.stringify(featureVal)
+      p_feature_val: featureVal
     });
 
     if (rpcError) throw rpcError;
 
-    // --- 3. ПОСТ-ОБРАБОТКА (Daily Log & Achievements) ---
-    // Чтобы не усложнять RPC, Daily Log обновим отдельно или оставим как есть.
-    // Но так как KV теперь в безопасности (атомарны), затирание профиля прекратится.
-    
-    const profile = getCyberFitnessProfile(userId, newMetadata);
-    
-    // Проверяем, не открылись ли новые ачивки на основе нового баланса KV
-    const newlyUnlocked: Achievement[] = [];
-    for (const ach of ALL_ACHIEVEMENTS) {
-        if (!ach.isQuest && !ach.isDynamic && !profile.achievements.includes(ach.id) && ach.checkCondition(profile)) {
-            // Если условие выполнено, делаем еще один быстрый вызов RPC, чтобы добавить ID ачивки
-            await supabaseAdmin.rpc('update_user_cyber_stats', {
-                p_user_id: userId,
-                p_new_achievement: ach.id,
-                p_kv_delta: ach.kiloVibesAward || 0
-            });
-            newlyUnlocked.push(ach);
-        }
+    const profileAfterRpc = getCyberFitnessProfile(userId, newMetadata);
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const updatedDailyLog = [...(profileAfterRpc.dailyActivityLog || [])];
+
+    const existingEntryIndex = updatedDailyLog.findIndex((entry) => entry.date === todayStr);
+    const entry = existingEntryIndex >= 0
+      ? { ...updatedDailyLog[existingEntryIndex] }
+      : {
+          date: todayStr,
+          filesExtracted: 0,
+          tokensProcessed: 0,
+          kworkRequestsSent: 0,
+          prsCreated: 0,
+          branchesUpdated: 0,
+          focusTimeMinutes: 0,
+        };
+
+    const profileUpdates: Partial<CyberFitnessProfile> & { dynamicAchievementsToAdd?: Achievement[] } = {
+      lastActivityTimestamp: new Date().toISOString(),
+    };
+
+    if (actionType === 'filesExtracted' && typeof countOrDetails === 'number') {
+      entry.filesExtracted += countOrDetails;
+      profileUpdates.totalFilesExtracted = countOrDetails;
+    } else if (actionType === 'tokensProcessed' && typeof countOrDetails === 'number') {
+      entry.tokensProcessed += countOrDetails;
+      profileUpdates.totalTokensProcessed = countOrDetails;
+    } else if (actionType === 'kworkRequestSent' && typeof countOrDetails === 'number') {
+      entry.kworkRequestsSent += countOrDetails;
+      profileUpdates.totalKworkRequestsSent = countOrDetails;
+    } else if (actionType === 'prCreated' && typeof countOrDetails === 'number') {
+      entry.prsCreated += countOrDetails;
+      profileUpdates.totalPrsCreated = countOrDetails;
+    } else if (actionType === 'branchUpdated' && typeof countOrDetails === 'number') {
+      entry.branchesUpdated += countOrDetails;
+      profileUpdates.totalBranchesUpdated = countOrDetails;
+    } else if (actionType === 'focusTimeAdded' && typeof countOrDetails === 'object' && 'minutes' in countOrDetails) {
+      entry.focusTimeMinutes = (entry.focusTimeMinutes || 0) + countOrDetails.minutes;
+      profileUpdates.focusTimeHours = countOrDetails.minutes / 60;
     }
 
-    logger.info(`[CyberFitness LogAction EXIT] Atomic update ok. KV Delta: ${kiloVibesDelta}`);
-    return { success: true, newAchievements: newlyUnlocked };
+    if (existingEntryIndex >= 0) {
+      updatedDailyLog[existingEntryIndex] = entry;
+    } else {
+      updatedDailyLog.push(entry);
+    }
+
+    const normalizedDailyLog = updatedDailyLog
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-MAX_DAILY_LOG_ENTRIES);
+
+    profileUpdates.dailyActivityLog = normalizedDailyLog;
+
+    const updateResult = await updateUserCyberFitnessProfile(userId, profileUpdates);
+    if (!updateResult.success) {
+      logger.error(`[CyberFitness LogAction] Failed to persist daily/totals after RPC for ${userId}: ${updateResult.error}`);
+      return { success: false, error: updateResult.error || 'Failed to persist daily activity updates.' };
+    }
+
+    logger.info(`[CyberFitness LogAction EXIT] Action '${actionType}' logged for ${userId}. KV Delta: ${kiloVibesDelta}`);
+    return { success: true, newAchievements: updateResult.newAchievements || [] };
 
   } catch (e: any) {
     logger.error(`[CyberFitness LogAction CATCH] Exception for ${userId}:`, e);
