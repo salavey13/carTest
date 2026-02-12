@@ -1,14 +1,30 @@
-# TL;DR — Быстрый старт (вставь в начало README)
+# TL;DR — Быстрый запуск своей версии
 
-oneSitePls — Telegram-first dev studio: запускай Mini App, извлекай код, отправляй задачу AI → получай PR.  
-Работает на Next.js + Supabase, использует Telegram Stars (XTR) как внутр. валюту.
+oneSitePls/carTest теперь разворачивается максимально просто: **форк → Codex → Vercel → Supabase init.sql**.
 
-## Быстрые шаги (непосредственно сейчас)
-1. Клонируй репо: `git clone https://github.com/salavey13/carTest.git`
-2. Установи зависимости: `npm install`
-3. Создай `.env.local` из `.env.example` и заполните ключи (Supabase, Telegram, GITHUB_TOKEN, AI keys).
-4. Запусти dev: `npm run dev`
-5. Открой Telegram: @oneSitePlsBot → Supervibe Studio (`/repo-xml`), нажми **Fetch Files** и попробуй создать PR через Mini App.
-6. Хочешь тестить WebApp локально — используй ngrok и пропиши URL бота (см. секцию "Telegram WebApp" в README).
+## Быстрые шаги
+1. Сделай **fork** репозитория в свой GitHub.
+2. Подключи форк к своему рабочему процессу в **Codex** (чатовый/локальный флоу).
+3. Импортируй форк в **Vercel** и создай проект.
+4. В Supabase выполни минимум: `supabase/migrations/20240101000000_init.sql`.
+5. В Vercel добавь env-переменные (минимум):
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `TELEGRAM_BOT_TOKEN`
+   - `ADMIN_CHAT_ID`
+   - `GITHUB_TOKEN`
+   - `GEMINI_API_KEY`
+   - `NEXT_PUBLIC_SITE_URL`
+6. Deploy → открой свой домен и проверь ключевые страницы: `/`, `/nexus`, `/repo-xml`.
 
-Если ты non-dev — открой бот, опиши задачу, попроси AI, выбери файлы и создай PR. Для девов — см. `CONTRIBUTING.md`.
+## Локально (опционально)
+```bash
+git clone https://github.com/<YOUR_USERNAME>/carTest.git
+cd carTest
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+Для полного контекста см. `README.MD`, `CONTRIBUTING.md`, `AGENTS.md`.
