@@ -28,3 +28,17 @@ npm run dev
 ```
 
 Для полного контекста см. `README.MD`, `CONTRIBUTING.md`, `AGENTS.md`.
+
+
+## Как не потерять обновления from upstream
+После fork добавь upstream и периодически подтягивай изменения:
+
+```bash
+git remote add upstream https://github.com/<UPSTREAM_OWNER>/carTest.git
+git checkout main
+git fetch upstream
+git merge upstream/main
+git push origin main
+```
+
+Так ты сохраняешь свой независимый деплой, но остаёшься в актуальном состоянии по апдейтам оригинального репо.
