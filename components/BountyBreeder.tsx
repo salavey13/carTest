@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FaBug, FaHeart, FaBolt, FaRocket } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import Confetti from 'react-dom-confetti';
+import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 
 const confettiConfig = { angle: 90, spread: 360, startVelocity: 40, elementCount: 70, dragFriction: 0.12, duration: 3000, stagger: 3, width: "10px", height: "10px", colors: ["#a864fd", "#29cdff", "#78ff44", "#ff718d", "#fdff6a"] };
 
@@ -39,6 +40,9 @@ export default function BountyBreeder() {
       );
 
       if (result.success) {
+        if (dbUser?.user_id) {
+          await checkAndUnlockFeatureAchievement(dbUser.user_id, mode === 'love' ? 'wb_tip_sent' : 'wb_fix_request_sent', true);
+        }
         toast.success(mode === 'love' ? "Спасибо за поддержку! 💖" : "Баунти создано! Счет в Telegram. 🚀");
         setShowConfetti(true);
         setTimeout(() => { setShowConfetti(false); if(mode === 'mutate') { setBountyTitle(""); setBountyDesc(""); } }, 1000);

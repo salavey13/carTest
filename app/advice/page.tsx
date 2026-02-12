@@ -4,9 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { fetchArticles, fetchArticleSections, updateUserMetadata, fetchUserData } from "@/hooks/supabase";
 import type { Database } from "@/types/database.types";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBookOpen, faArrowLeft, faSpinner, faCheckCircle, faStopCircle, faPaperPlane, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
-import { faTelegram } from "@fortawesome/free-brands-svg-icons";
+import { BookOpen, Loader2, CircleCheck, CircleStop, Send, TriangleAlert, MessageCircle } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { debugLogger } from "@/lib/debugLogger";
 import { cn } from "@/lib/utils";
@@ -216,7 +214,7 @@ export default function AdvicePage() {
   if (showGlobalLoading) {
     return (
       <div className="flex justify-center items-center h-screen pt-36 bg-black">
-        <FontAwesomeIcon icon={faSpinner} spin size="3x" className="text-brand-green" />
+        <Loader2 className="text-brand-green w-12 h-12 animate-spin" />
       </div>
     );
   }
@@ -224,7 +222,7 @@ export default function AdvicePage() {
    if (!isAuthenticated) {
      return (
        <div className="p-6 pt-32 text-center text-brand-pink">
-         <FontAwesomeIcon icon={faTriangleExclamation} size="2x" className="mb-2" />
+         <TriangleAlert className="mb-2 w-8 h-8 mx-auto" />
          <p className="font-semibold text-xl">Ошибка Авторизации</p>
          <p className="text-gray-400">{error || "Не удалось подтвердить пользователя. Попробуйте перезапустить приложение."}</p>
        </div>
@@ -234,7 +232,7 @@ export default function AdvicePage() {
   if (error && !selectedArticle && !isLoadingArticles) {
     return (
        <div className="p-6 pt-32 text-center text-brand-pink bg-black/50 rounded-lg shadow-lg border border-brand-pink/30 mx-4">
-         <FontAwesomeIcon icon={faTriangleExclamation} className="mr-2 text-2xl" />
+         <TriangleAlert className="mr-2 text-2xl inline-block" />
          <p className="font-semibold text-xl mt-2">Ошибка загрузки данных</p>
          <p className="text-gray-400 mt-1">{error}</p>
        </div>
@@ -255,7 +253,7 @@ export default function AdvicePage() {
             </h1>
             {isLoadingArticles ? (
                  <div className="flex justify-center items-center pt-16">
-                     <FontAwesomeIcon icon={faSpinner} spin size="2x" className="text-brand-blue" />
+                     <Loader2 className="text-brand-blue w-8 h-8 animate-spin" />
                  </div>
              ) : articles.length === 0 ? (
                <p className="text-center text-gray-500 dark:text-gray-400 mt-10 text-lg">Пока нет доступных статей.</p>
@@ -272,7 +270,7 @@ export default function AdvicePage() {
                       )}
                     >
                       <h2 className="text-lg md:text-xl font-semibold text-brand-blue flex items-center">
-                         <FontAwesomeIcon icon={faBookOpen} className="mr-3 text-brand-blue/70 w-5 h-5" />
+                         <BookOpen className="mr-3 text-brand-blue/70 w-5 h-5" />
                          {article.title}
                       </h2>
                       {article.description && (
@@ -294,11 +292,11 @@ export default function AdvicePage() {
 
             {isLoadingSections ? (
                <div className="flex justify-center items-center py-16">
-                 <FontAwesomeIcon icon={faSpinner} spin size="3x" className="text-brand-blue"/>
+                 <Loader2 className="text-brand-blue w-12 h-12 animate-spin"/>
                </div>
             ) : error && sections.length === 0 ? (
                <div className="p-4 my-6 text-brand-pink bg-pink-900/20 border border-brand-pink/40 rounded-lg shadow-md text-center">
-                  <FontAwesomeIcon icon={faTriangleExclamation} className="mr-2 text-xl" />
+                  <TriangleAlert className="mr-2 text-xl inline-block" />
                   <p className="mt-1">{error}</p>
                </div>
             ) : (
@@ -306,7 +304,7 @@ export default function AdvicePage() {
                  {userId && sections.length > 0 && (
                    <div className="my-8 p-5 bg-gradient-to-r from-blue-900/30 via-purple-900/20 to-blue-900/30 border border-brand-purple/40 rounded-lg shadow-lg text-center">
                     <h3 className="text-xl font-semibold mb-3 flex items-center justify-center text-brand-purple">
-                        <FontAwesomeIcon icon={faTelegram} className="mr-2 text-brand-blue" />
+                        <MessageCircle className="mr-2 text-brand-blue w-5 h-5" />
                         Часовая Рассылка
                     </h3>
                      <p className="text-sm text-gray-300 mb-4">
@@ -326,16 +324,16 @@ export default function AdvicePage() {
                               : 'bg-green-600 hover:bg-green-700 text-white focus:ring-green-500 shadow-green-500/30 hover:shadow-green-500/50'
                       )}
                     >
-                      {isUpdatingBroadcast ? (<FontAwesomeIcon icon={faSpinner} spin />)
-                       : broadcastEnabled ? (<FontAwesomeIcon icon={faStopCircle} />)
-                       : (<FontAwesomeIcon icon={faPaperPlane} />)}
+                      {isUpdatingBroadcast ? (<Loader2 className="animate-spin" />)
+                       : broadcastEnabled ? (<CircleStop />)
+                       : (<Send />)}
                       <span>
                         {isUpdatingBroadcast ? 'Обновление...' : broadcastEnabled ? 'Отключить рассылку' : 'Развлеки меня'}
                       </span>
                     </button>
                     {broadcastEnabled && !isUpdatingBroadcast && (
                        <p className="text-xs text-brand-green mt-3 flex items-center justify-center">
-                         <FontAwesomeIcon icon={faCheckCircle} className="mr-1" /> Рассылка активна для этой статьи.
+                         <CircleCheck className="mr-1 w-4 h-4" /> Рассылка активна для этой статьи.
                        </p>
                      )}
                      {error && !isUpdatingBroadcast && !isLoadingSections && (

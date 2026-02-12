@@ -217,7 +217,7 @@ export function useCrewWarehouse(slug: string) {
             p_gv_delta: gvEarned,
             p_kv_delta: kvEarned,
             p_feature_key: `last_wh_action`,
-            p_feature_val: JSON.stringify({ type: actionType, qty: Math.abs(delta), ts: new Date().toISOString() })
+            p_feature_val: { type: actionType, qty: Math.abs(delta), ts: new Date().toISOString() }
         });
       })();
     },

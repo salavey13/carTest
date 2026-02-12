@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 import { Label } from "@/components/ui/label";
 import { FaFlagCheckered, FaUserPlus, FaUsers, FaWarehouse } from 'react-icons/fa6';
 import { Loader2, ArrowRight } from 'lucide-react';
@@ -41,6 +42,7 @@ export const CrewCreationForm = () => {
       
       if (result.success && result.data) {
         toast.success(`Штаб "${result.data.name}" развернут!`);
+        await checkAndUnlockFeatureAchievement(dbUser.user_id, 'wb_crew_created', true);
         await refreshDbUser(); 
         await notifyAdmin(`🎉 New Crew: ${result.data.name} by ${dbUser.username}`);
         await sendComplexMessage(dbUser.user_id, `🎉 Склад "${result.data.name}" готов.`, []);
@@ -52,6 +54,9 @@ export const CrewCreationForm = () => {
 
   const handleInvite = () => {
     if (!userCrewInfo) return;
+    if (dbUser?.user_id) {
+      checkAndUnlockFeatureAchievement(dbUser.user_id, 'wb_crew_invite_sent', true).catch(() => null);
+    }
     // FIX: Correct link
     const inviteUrl = `https://t.me/oneBikePlsBot/sklad?startapp=crew_${userCrewInfo.slug}_join_crew`;
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=Вступай в команду склада ${userCrewInfo.name}!`;
