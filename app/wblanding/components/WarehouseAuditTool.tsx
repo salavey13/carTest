@@ -285,7 +285,7 @@ export const WarehouseAuditTool = () => {
           </label>
 
           <Button
-            onClick={() => startAudit()}
+            onClick={() => startAudit({ preserveAnswers: Boolean(autofillSummary) })}
             className="h-auto rounded-2xl bg-white text-black hover:bg-zinc-200 py-4 sm:py-5 text-base sm:text-lg font-bold"
           >
             Ручной ввод <ArrowRight className="ml-2 w-5 h-5" />
