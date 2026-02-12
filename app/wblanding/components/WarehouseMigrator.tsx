@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { 
   Loader2, FileSpreadsheet, Database, Trash2, 
-  ShieldQuestion, User, Sparkles, Building2, UploadCloud, AlertCircle
+  ShieldQuestion, User, Sparkles, Building2, UploadCloud
 } from "lucide-react";
 import { uploadWarehouseCsv, getUserCrews } from "@/app/wb/actions";
 import { useAppContext } from "@/contexts/AppContext";
@@ -21,7 +21,6 @@ import * as XLSX from 'xlsx';
 const normalizeHeader = (header: string): string => 
   (header || "").toString().toLowerCase().trim().replace(/\s+/g, '');
 
-// Map keys: "Normalized Header Keyword" -> "System Field"
 const HEADER_KEYWORDS: Record<string, string> = {
   // ID
   'артикул': 'id', 
@@ -164,7 +163,8 @@ export function WarehouseMigrator() {
               bestSheetName = sheetName;
               bestHeaderRow = i;
             }
-          });
+          } 
+          // FIX: Removed extra ')' here that caused the syntax error
         });
 
         if (!bestSheetName || maxScore < 2) {
@@ -312,7 +312,7 @@ SKU-001; 10; Одеяло 2x2; ИвановскийТекстиль; leto`}
           </motion.div>
         )}
 
-        {/* Logs Terminal - Theme Aware */}
+        {/* Logs Terminal */}
         <div className="bg-muted/50 dark:bg-black border border-border rounded-md p-3 h-28 overflow-y-auto font-mono text-[10px] shadow-inner relative">
           {logs.length === 0 && !isMigrating && (
             <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
