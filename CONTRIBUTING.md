@@ -4,6 +4,13 @@
 
 ---
 
+
+## 0) Быстрый self-host (обновлено)
+Если нужен свой инстанс, базовый путь: **fork → Codex → Vercel → Supabase init.sql**.
+Подробно: `README.MD`, `docs/README_TLDR.md`, `AGENTS.md`.
+
+---
+
 ## 1) Самый лёгкий — через Telegram (рекомендовано для большинства)
 1. Открой @oneSitePlsBot в Telegram.  
 2. Запусти Mini App **Supervibe Studio** (`/repo-xml`).  
