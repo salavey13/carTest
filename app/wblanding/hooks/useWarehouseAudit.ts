@@ -424,18 +424,27 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     }
   }, [answers, currentAnswer, questions, step, validateAnswer, calcLosses, generateRoadmap, trackAuditEvent, userId, saveProgress, clearProgress]);
 
-  const startAudit = useCallback(() => {
+  const startAudit = useCallback((options?: { preserveAnswers?: boolean }) => {
+    const shouldPreserveAnswers = options?.preserveAnswers === true;
+
     setStep(1);
-    setAnswers({});
-    setCurrentAnswer('');
+    if (!shouldPreserveAnswers) {
+      setAnswers({});
+      setCurrentAnswer('');
+    } else {
+      const firstQuestionValue = answers[questions[1]?.id as keyof EnhancedAuditAnswers];
+      setCurrentAnswer(firstQuestionValue !== undefined && firstQuestionValue !== null ? String(firstQuestionValue) : '');
+    }
+
     setBreakdown(null);
     setShowResult(false);
     setIsSending(false);
     setRoadmap([]);
     setHasCompletedAudit(false);
     setLastCompletedAudit(null);
-    trackAuditEvent('audit_started', {});
-  }, [trackAuditEvent]);
+
+    trackAuditEvent('audit_started', { preservedAnswers: shouldPreserveAnswers });
+  }, [answers, questions, trackAuditEvent]);
 
   const resumeAudit = useCallback(() => {
     trackAuditEvent('audit_resumed', { step });
