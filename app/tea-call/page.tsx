@@ -38,7 +38,10 @@ import {
   ChevronUp,
   Copy,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  Send,
+  Type,
+  Flame
 } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
@@ -50,7 +53,7 @@ type LogEntry = {
   id: string;
   message: string;
   timestamp: Date;
-  type: 'info' | 'success' | 'warning' | 'error' | 'command';
+  type: 'info' | 'success' | 'warning' | 'error' | 'command' | 'improvisation';
   meta?: {
     originator?: string;
     commandType?: string;
@@ -69,7 +72,7 @@ type CommandButton = {
   variant: 'primary' | 'danger' | 'secondary';
   priority: number;
   cooldown: number;
-  magicLevel: number; // 1-5 stars
+  magicLevel: number;
 };
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -77,13 +80,13 @@ const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9
 const COMMANDS: CommandButton[] = [
   {
     id: 'tea',
-    label: 'Вызвать за чаем',
+    label: 'Чай',
     shortLabel: 'Чай',
-    icon: <Coffee className="w-5 h-5" />,
+    icon: <Coffee className="w-4 h-4" />,
     color: 'text-amber-400',
     bgGradient: 'from-amber-500/20 via-orange-500/20 to-amber-600/20',
     message: 'просит принести чай. ☕️',
-    description: 'Классика. Надежно. Вкусно.',
+    description: 'Классика',
     variant: 'primary',
     priority: 1,
     cooldown: 3000,
@@ -91,13 +94,13 @@ const COMMANDS: CommandButton[] = [
   },
   {
     id: 'urgent',
-    label: 'Срочный вызов',
+    label: 'SOS',
     shortLabel: 'SOS',
-    icon: <AlertTriangle className="w-5 h-5" />,
+    icon: <AlertTriangle className="w-4 h-4" />,
     color: 'text-rose-400',
     bgGradient: 'from-rose-500/20 via-red-500/20 to-rose-600/20',
-    message: 'ТРЕБУЕТ чая СРОЧНО! 🚨',
-    description: 'Когда терпеть нельзя.',
+    message: 'ТРЕБУЕТ внимания СРОЧНО! 🚨',
+    description: 'Срочно',
     variant: 'danger',
     priority: 3,
     cooldown: 8000,
@@ -105,13 +108,13 @@ const COMMANDS: CommandButton[] = [
   },
   {
     id: 'broadcast',
-    label: 'Оповестить всех',
+    label: 'Всем',
     shortLabel: 'Всем',
-    icon: <Radio className="w-5 h-5" />,
+    icon: <Radio className="w-4 h-4" />,
     color: 'text-cyan-400',
     bgGradient: 'from-cyan-500/20 via-blue-500/20 to-cyan-600/20',
-    message: 'объявляет чайную паузу для всех! 🫖',
-    description: 'Массовый охват. Максимальный эффект.',
+    message: 'объявляет общее собрание! 🫖',
+    description: 'Оповещение',
     variant: 'secondary',
     priority: 2,
     cooldown: 12000,
@@ -119,7 +122,7 @@ const COMMANDS: CommandButton[] = [
   }
 ];
 
-// Smooth ticker using requestAnimationFrame
+// Smooth ticker
 const MagicTicker = ({ items, speed = 50 }: { items: string[], speed?: number }) => {
   const [position, setPosition] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -176,27 +179,8 @@ const useCooldown = () => {
     return (cooldowns[id] || 0) > Date.now();
   }, [cooldowns]);
 
-  const getRemainingTime = useCallback((id: string) => {
-    const remaining = (cooldowns[id] || 0) - Date.now();
-    return Math.max(0, Math.ceil(remaining / 1000));
-  }, [cooldowns]);
-
-  return { startCooldown, isOnCooldown, getRemainingTime };
+  return { startCooldown, isOnCooldown };
 };
-
-const MagicStars = ({ level }: { level: number }) => (
-  <div className="flex gap-0.5">
-    {[1, 2, 3, 4, 5].map((star) => (
-      <Sparkles 
-        key={star} 
-        className={cn(
-          "w-3 h-3 transition-all duration-300",
-          star <= level ? "text-brand-gold fill-brand-gold" : "text-muted-foreground/20"
-        )}
-      />
-    ))}
-  </div>
-);
 
 export default function TeaCallPage() {
   const { dbUser, isAuthenticated } = useAppContext();
@@ -212,30 +196,32 @@ export default function TeaCallPage() {
   } = dbUser || {};
 
   const fullName = [firstName, lastName].filter(Boolean).join(' ') || username || 'Неизвестный';
-  const isAdmin = status === 'admin' || role === 'vprAdmin' || role === 'admin';
 
   const [isSending, setIsSending] = useState<string | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [mdContent, setMdContent] = useState<string>("");
   const [isLoadingMd, setIsLoadingMd] = useState(false);
-  const [activeGlow, setActiveGlow] = useState<number>(0);
   const [showExtender, setShowExtender] = useState(false);
   const [copied, setCopied] = useState(false);
   
+  // Improvisation State
+  const [improvisationText, setImprovisationText] = useState("");
+  const [isImprovising, setIsImprovising] = useState(false);
+  
   const logsEndRef = useRef<HTMLDivElement>(null);
   const logsContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const { startCooldown, isOnCooldown, getRemainingTime } = useCooldown();
+  const { startCooldown, isOnCooldown } = useCooldown();
 
   const tickerItems = [
-    "✨ Добавь свою кнопку через инструкцию",
-    "🚀 Расширяй функционал без кода",
-    "🎨 Кастомизируй сообщения",
-    "⚡ Автоматизируй рутину",
-    "🔮 Создай свой магический интерфейс",
-    "📱 Работает в Telegram и Web",
-    "🛠️ Zero-code конфигурация"
+    "✨ Напиши любой запрос — сработает как заклинание",
+    "🚀 Импровизируй без границ",
+    "🎨 Быстрые кнопки — лишь шаблоны",
+    "⚡ Твоя воля — закон",
+    "🔮 Введи команду в терминал",
+    "🛠️ Создай свой интерфейс"
   ];
 
   useEffect(() => {
@@ -249,21 +235,14 @@ export default function TeaCallPage() {
   }, [logs]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveGlow((prev) => (prev + 1) % COMMANDS.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
     const timer = setTimeout(() => {
       if (isAuthenticated && dbUser) {
-        addLog(`🔐 Сессия инициализирована`, 'info');
+        addLog(`🔐 Сессия активна`, 'info');
         setTimeout(() => {
-          addLog(`👋 Добро пожаловать, ${firstName || username}!`, 'success');
+          addLog(`👋 ${firstName || username}, готов к магии`, 'success');
         }, 300);
       } else {
-        addLog('⚡ Гостевой доступ активирован', 'warning');
+        addLog('⚡ Гостевой режим', 'warning');
       }
     }, 200);
     return () => clearTimeout(timer);
@@ -295,12 +274,36 @@ export default function TeaCallPage() {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const text = await response.text();
       setMdContent(text);
-      addLog('📖 Инструкции загружены', 'success');
+      addLog('📖 Гримуар загружен', 'success');
     } catch (error) {
-      setMdContent("# ⚠️ Ошибка загрузки\nПроверьте соединение или попробуйте позже.");
-      addLog('❌ Ошибка загрузки инструкций', 'error');
+      setMdContent("# ⚠️ Ошибка\nНет связи с библиотекой.");
+      addLog('❌ Ошибка загрузки', 'error');
     } finally {
       setIsLoadingMd(false);
+    }
+  };
+
+  // --- IMPROVISATION LOGIC ---
+  const handleCastImprovisation = async () => {
+    if (!improvisationText.trim() || isImprovising) return;
+
+    setIsImprovising(true);
+    const message = `🔮 *ИМПРОВИЗАЦИЯ*\n_${fullName}_ (@${username}):\n\n"${improvisationText}"`;
+    
+    addLog(`▶ Колдовство: "${improvisationText.substring(0, 30)}..."`, 'improvisation');
+
+    try {
+      const result = await notifyAdmin(message);
+      if (result?.success) {
+        addLog(`✓ Воля отправлена во Вселенную`, 'success');
+        setImprovisationText("");
+      } else {
+        addLog(`✗ Помехи в эфире`, 'error');
+      }
+    } catch (err) {
+      addLog(`✗ Магический провал`, 'error');
+    } finally {
+      setTimeout(() => setIsImprovising(false), 500);
     }
   };
 
@@ -312,7 +315,7 @@ export default function TeaCallPage() {
     
     const personalizedMessage = `👤 *${fullName}* (@${username}) ${command.message}`;
     
-    addLog(`▶ ${command.label}...`, 'command', {
+    addLog(`▶ Заклинание: ${command.label}`, 'command', {
       meta: { commandType: command.id }
     });
 
@@ -322,12 +325,12 @@ export default function TeaCallPage() {
         : await notifyAdmin(personalizedMessage);
 
       if (result?.success) {
-        addLog(`✓ Успешно: ${command.label}`, 'success');
+        addLog(`✓ Успех: ${command.label}`, 'success');
       } else {
         addLog(`✗ Ошибка: ${command.label}`, 'error');
       }
     } catch (err) {
-      addLog(`✗ Системная ошибка`, 'error');
+      addLog(`✗ Системный сбой`, 'error');
     } finally {
       setTimeout(() => setIsSending(null), 300);
     }
@@ -335,24 +338,30 @@ export default function TeaCallPage() {
 
   const copyCommandTemplate = useCallback(() => {
     const template = `{
-  id: 'my_custom_command',
-  label: 'Моя Кнопка',
-  icon: <Zap className="w-5 h-5" />,
-  color: 'text-purple-400',
-  message: 'творит магию! ✨',
-  magicLevel: 5
+  id: 'my_spell',
+  label: 'Моё Заклинание',
+  icon: <Zap className="w-4 h-4" />,
+  message: 'колдует! ✨'
 }`;
     navigator.clipboard.writeText(template);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    addLog('📋 Шаблон команды скопирован!', 'success');
+    addLog('📋 Свиток скопирован', 'success');
   }, [addLog]);
 
   const stats = useMemo(() => ({
     total: logs.filter(l => l.type === 'success').length,
-    commands: logs.filter(l => l.type === 'command').length,
+    commands: logs.filter(l => l.type === 'command' || l.type === 'improvisation').length,
     uptime: Math.floor(logs.length * 1.5)
   }), [logs]);
+
+  // Handle Enter key in textarea
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleCastImprovisation();
+    }
+  };
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-background text-foreground relative overflow-hidden flex flex-col pt-16 sm:pt-20">
@@ -361,18 +370,13 @@ export default function TeaCallPage() {
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808005_1px,transparent_1px),linear-gradient(to_bottom,#80808005_1px,transparent_1px)] bg-[size:20px_20px] sm:bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_40%,transparent_100%)]" />
         
         <motion.div
-          animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.25, 0.1] }}
+          animate={{ scale: [1, 1.2, 1], opacity: [0.15, 0.3, 0.15] }}
           transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-0 left-1/4 w-96 h-96 bg-brand-red-orange/20 rounded-full blur-[100px]"
-        />
-        <motion.div
-          animate={{ scale: [1, 1.3, 1], opacity: [0.08, 0.2, 0.08] }}
-          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 5 }}
-          className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-brand-deep-indigo/20 rounded-full blur-[120px]"
+          className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-brand-cyan/10 rounded-full blur-[120px]"
         />
       </div>
 
-      {/* Top Ticker - Smooth */}
+      {/* Top Ticker */}
       <div className="relative z-20 bg-background/80 backdrop-blur-md border-b border-border/50 py-2">
         <MagicTicker items={tickerItems} speed={30} />
       </div>
@@ -384,149 +388,156 @@ export default function TeaCallPage() {
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-4 sm:mb-6 text-center sm:text-left"
+          className="mb-6 sm:mb-8 text-center"
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-cyan/10 border border-brand-cyan/20 text-brand-cyan text-xs font-mono mb-2">
             <Terminal className="w-3 h-3" />
-            <span>TERMINAL v2.0</span>
+            <span>IMPROVISATION TERMINAL</span>
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
           </div>
-          <h1 className="font-orbitron font-bold text-2xl sm:text-3xl lg:text-4xl bg-gradient-to-r from-brand-gold via-brand-red-orange to-brand-cyan bg-clip-text text-transparent">
-            Панель Управления
+          <h1 className="font-orbitron font-bold text-3xl sm:text-4xl bg-gradient-to-r from-brand-cyan via-brand-gold to-brand-red-orange bg-clip-text text-transparent">
+            Точка Входа
           </h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            Удаленное управление администрацией через магические кнопки
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 max-w-md mx-auto">
+            Опиши свою волю. Система исполнит.
           </p>
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-          {/* Main Panel */}
+          
+          {/* Main Interaction Panel */}
           <div className="lg:col-span-8 space-y-4 sm:space-y-6">
             
-            {/* Commands Grid */}
-            <div className="relative overflow-hidden rounded-2xl border border-border bg-card/50 backdrop-blur-xl shadow-xl">
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-brand-red-orange via-brand-gold to-brand-cyan" />
+            {/* The Input Core - Entry Point for Improvisation */}
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="relative overflow-hidden rounded-2xl border border-brand-cyan/30 bg-card/70 backdrop-blur-xl shadow-2xl"
+            >
+              {/* Glowing Top Border */}
+              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-brand-cyan to-transparent" />
               
-              <div className="p-4 sm:p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-orbitron font-bold text-base sm:text-lg flex items-center gap-2">
-                    <Wand2 className="w-4 h-4 sm:w-5 sm:h-5 text-brand-gold" />
-                    Магические Кнопки
-                  </h2>
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {COMMANDS.length} активных
-                  </span>
-                </div>
+              <div className="p-5 sm:p-8">
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-3 text-brand-cyan">
+                    <div className="p-2 rounded-lg bg-brand-cyan/10 border border-brand-cyan/20">
+                      <Type className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="font-orbitron font-bold">Поле Импровизации</h2>
+                      <p className="text-xs text-muted-foreground">Введи команду на естественном языке</p>
+                    </div>
+                  </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {COMMANDS.map((cmd, idx) => {
-                    const cooldownActive = isOnCooldown(cmd.id);
-                    const remaining = getRemainingTime(cmd.id);
-                    const isActive = activeGlow === idx && !cooldownActive;
+                  <div className="relative group">
+                    <textarea
+                      ref={inputRef}
+                      value={improvisationText}
+                      onChange={(e) => setImprovisationText(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Например: Напомни админу про таблицу в 15:00..."
+                      disabled={isImprovising}
+                      className={cn(
+                        "w-full h-24 p-4 rounded-xl bg-background/80 border border-border/50",
+                        "focus:border-brand-cyan/50 focus:ring-1 focus:ring-brand-cyan/20 focus:outline-none",
+                        "font-mono text-sm text-foreground placeholder:text-muted-foreground/40 resize-none transition-all",
+                        "disabled:opacity-50 disabled:cursor-not-allowed"
+                      )}
+                    />
                     
-                    return (
-                      <motion.button
-                        key={cmd.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.1 }}
-                        whileHover={!cooldownActive ? { y: -4, scale: 1.02 } : {}}
-                        whileTap={!cooldownActive ? { scale: 0.98 } : {}}
-                        onClick={() => executeCommand(cmd)}
-                        disabled={!!isSending || cooldownActive}
+                    {/* Character count & send button */}
+                    <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                       <AnimatePresence>
+                        {improvisationText.length > 0 && (
+                          <motion.span 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="text-[10px] text-muted-foreground font-mono"
+                          >
+                            {improvisationText.length} / 500
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+
+                      <Button
+                        onClick={handleCastImprovisation}
+                        disabled={!improvisationText.trim() || isImprovising}
+                        size="sm"
                         className={cn(
-                          "group relative overflow-hidden rounded-xl border text-left transition-all duration-300",
-                          "p-4 sm:p-5",
-                          isActive 
-                            ? "border-brand-gold/50 shadow-[0_0_20px_rgba(249,172,103,0.15)]" 
-                            : "border-border/50 hover:border-brand-gold/30",
-                          cooldownActive && "opacity-50 cursor-not-allowed"
+                          "bg-brand-cyan text-black hover:bg-brand-cyan/90 font-bold transition-all",
+                          "disabled:bg-muted disabled:text-muted-foreground"
                         )}
                       >
-                        {/* Background */}
-                        <div className={cn(
-                          "absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500",
-                          cmd.bgGradient
-                        )} />
-                        
-                        {/* Cooldown */}
-                        {cooldownActive && (
-                          <div className="absolute inset-0 bg-background/90 backdrop-blur-sm flex items-center justify-center z-10">
-                            <div className="text-center">
-                              <Clock className="w-6 h-6 text-muted-foreground mx-auto mb-1 animate-pulse" />
-                              <span className="font-mono text-lg font-bold text-muted-foreground">
-                                {remaining}s
-                              </span>
-                            </div>
-                          </div>
+                        {isImprovising ? (
+                          <Sparkles className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4" />
                         )}
-                        
-                        <div className="relative z-10">
-                          <div className="flex items-start justify-between mb-3">
-                            <motion.div 
-                              className={cn(
-                                "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-white shadow-lg",
-                                cmd.color.replace('text-', 'bg-').replace('400', '500')
-                              )}
-                              whileHover={{ rotate: 360 }}
-                              transition={{ duration: 0.6 }}
-                            >
-                              {isSending === cmd.id ? (
-                                <Sparkles className="w-5 h-5 animate-spin" />
-                              ) : (
-                                cmd.icon
-                              )}
-                            </motion.div>
-                            <MagicStars level={cmd.magicLevel} />
-                          </div>
-                          
-                          <h3 className="font-bold text-sm sm:text-base text-card-foreground mb-1">
-                            {cmd.label}
-                          </h3>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed">
-                            {cmd.description}
-                          </p>
-                          
-                          <div className="mt-3 flex items-center gap-2">
-                            <div className={cn(
-                              "w-2 h-2 rounded-full",
-                              cmd.priority === 3 ? "bg-red-500 animate-pulse" :
-                              cmd.priority === 2 ? "bg-yellow-500" : "bg-green-500"
-                            )} />
-                            <span className="text-[10px] text-muted-foreground font-mono">
-                              Приоритет: {cmd.priority}
-                            </span>
-                          </div>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
+                        <span className="ml-2 hidden sm:inline">Cast</span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Quick Spells (Formerly Magic Buttons) */}
+                  <div className="pt-2">
+                    <div className="flex items-center justify-between mb-2 px-1">
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider font-mono">Быстрые заклинания</span>
+                      <span className="text-[10px] text-muted-foreground/50">или выбери шаблон</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {COMMANDS.map((cmd) => {
+                        const cooldownActive = isOnCooldown(cmd.id);
+                        return (
+                          <motion.button
+                            key={cmd.id}
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.97 }}
+                            onClick={() => executeCommand(cmd)}
+                            disabled={!!isSending || cooldownActive}
+                            className={cn(
+                              "flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-mono transition-all",
+                              "bg-muted/30 hover:bg-muted/50 border-border/50 hover:border-brand-gold/30",
+                              cmd.color,
+                              "disabled:opacity-50 disabled:cursor-not-allowed"
+                            )}
+                          >
+                            {isSending === cmd.id ? (
+                              <Sparkles className="w-4 h-4 animate-spin" />
+                            ) : (
+                              cmd.icon
+                            )}
+                            <span>{cmd.label}</span>
+                            {cooldownActive && (
+                              <Clock className="w-3 h-3 ml-1 text-muted-foreground animate-pulse" />
+                            )}
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
-            {/* System Extender - The Persuasion Section */}
+            {/* Extender / Education Section */}
             <motion.div
               initial={false}
-              animate={{ height: showExtender ? 'auto' : 'auto' }}
               className="relative overflow-hidden rounded-2xl border border-dashed border-brand-yellow/30 bg-gradient-to-br from-brand-yellow/5 via-transparent to-brand-gold/5 backdrop-blur-sm"
             >
               <button
                 onClick={() => setShowExtender(!showExtender)}
-                className="w-full p-4 sm:p-6 text-left group"
+                className="w-full p-4 sm:p-5 text-left group"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-brand-yellow/10 border border-brand-yellow/20">
-                      <Plus className="w-5 h-5 text-brand-yellow" />
+                      <GitBranch className="w-5 h-5 text-brand-yellow" />
                     </div>
                     <div>
-                      <h3 className="font-orbitron font-bold text-sm sm:text-base text-foreground group-hover:text-brand-yellow transition-colors">
-                        Расширить систему
+                      <h3 className="font-orbitron font-bold text-sm text-foreground group-hover:text-brand-yellow transition-colors">
+                        Кристаллизация Воли
                       </h3>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground">
-                        Добавь свои собственные магические кнопки
-                      </p>
+                      <p className="text-xs text-muted-foreground">Часто используешь? Сделай кнопкой</p>
                     </div>
                   </div>
                   <motion.div
@@ -544,111 +555,42 @@ export default function TeaCallPage() {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="px-4 sm:px-6 pb-4 sm:pb-6 space-y-4"
+                    className="px-4 sm:px-5 pb-5 space-y-4 text-sm"
                   >
                     <div className="h-px bg-gradient-to-r from-transparent via-brand-yellow/30 to-transparent" />
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      <span className="text-brand-yellow font-semibold">Концепция:</span> Импровизация — это поток. Но если паттерн повторяется, его стоит "застыть" в коде. 
+                      Так "Принеси чаю" превращается в кнопку, экономя время.
+                    </p>
                     
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm">
-                      <div className="flex items-start gap-2 p-3 rounded-lg bg-background/50 border border-border/50">
-                        <Code2 className="w-4 h-4 text-brand-cyan shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-semibold text-foreground">Zero-code</span>
-                          <p className="text-muted-foreground">Добавляй кнопки без программирования</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2 p-3 rounded-lg bg-background/50 border border-border/50">
-                        <Palette className="w-4 h-4 text-brand-pink shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-semibold text-foreground">Кастомизация</span>
-                          <p className="text-muted-foreground">Свои иконки, цвета и сообщения</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2 p-3 rounded-lg bg-background/50 border border-border/50">
-                        <GitBranch className="w-4 h-4 text-brand-gold shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-semibold text-foreground">Версионирование</span>
-                          <p className="text-muted-foreground">GitHub хранит историю изменений</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2 p-3 rounded-lg bg-background/50 border border-border/50">
-                        <Layers className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-semibold text-foreground">Масштабирование</span>
-                          <p className="text-muted-foreground">От 1 кнопки до целой панели</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex gap-2">
                       <Button
                         onClick={fetchInstructions}
-                        className="flex-1 bg-brand-yellow text-black hover:bg-brand-yellow/90 font-bold group"
+                        size="sm"
+                        variant="outline"
+                        className="border-brand-yellow/30 text-brand-yellow hover:bg-brand-yellow/10"
                       >
-                        <FileCode className="w-4 h-4 mr-2 group-hover:animate-pulse" />
-                        Открыть инструкцию
-                        <ExternalLink className="w-3 h-3 ml-2 opacity-50" />
+                        <FileCode className="w-4 h-4 mr-2" />
+                        Как создать кнопку
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="ghost"
+                        size="sm"
                         onClick={copyCommandTemplate}
-                        className="border-brand-cyan/30 text-brand-cyan hover:bg-brand-cyan/10"
+                        className="text-muted-foreground"
                       >
-                        {copied ? <CheckCircle2 className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+                        {copied ? <CheckCircle2 className="w-4 h-4 mr-2 text-green-500" /> : <Copy className="w-4 h-4 mr-2" />}
                         Скопировать шаблон
                       </Button>
-                    </div>
-
-                    <div className="p-3 rounded-lg bg-brand-gold/5 border border-brand-gold/20">
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        <span className="text-brand-gold font-semibold">💡 Профессиональный совет:</span> Начни с копирования существующей кнопки и измени сообщение. 
-                        Через 5 минут у тебя будет своя персональная команда! Все изменения автоматически деплоятся через GitHub.
-                      </p>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </motion.div>
 
-            {/* Developer Card */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="relative overflow-hidden rounded-xl border border-border bg-card/50 backdrop-blur-md p-4 sm:p-5 group hover:border-brand-yellow/30 transition-colors"
-            >
-              <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                <Bot className="w-24 h-24 text-brand-yellow" />
-              </div>
-              
-              <div className="relative z-10 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                <div className="bg-gradient-to-br from-brand-yellow/20 to-brand-red-orange/20 p-3 rounded-xl border border-brand-yellow/20 shrink-0">
-                  <Zap className="w-6 h-6 sm:w-8 sm:h-8 text-brand-yellow" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-orbitron font-bold text-sm sm:text-base text-foreground mb-1">
-                    Нужен кастомный бот или автоматизация?
-                  </h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                    Павел создает Telegram-ботов и веб-приложения. Заменю "МойСклад", 
-                    интегрирую с Ozon/Wildberries, автоматизирую процессы от 2000₽.
-                  </p>
-                </div>
-                <Button 
-                  asChild
-                  variant="outline" 
-                  size="sm"
-                  className="border-brand-yellow/30 text-brand-yellow hover:bg-brand-yellow/10 shrink-0 w-full sm:w-auto"
-                >
-                  <Link href="/wblanding" className="flex items-center justify-center gap-2">
-                    Обсудить проект
-                    <ArrowUpRight className="w-4 h-4" />
-                  </Link>
-                </Button>
-              </div>
-            </motion.div>
           </div>
 
-          {/* Sidebar */}
+          {/* Sidebar - Logs & Stats */}
           <div className="lg:col-span-4 space-y-4">
             
             {/* System Log */}
@@ -656,7 +598,7 @@ export default function TeaCallPage() {
               <div className="px-3 sm:px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
                   <History className="w-3.5 h-3.5" />
-                  <span>ЛОГ СИСТЕМЫ</span>
+                  <span>ЖУРНАЛ СОБЫТИЙ</span>
                 </div>
                 <div className="flex gap-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-red-500/60" />
@@ -667,12 +609,12 @@ export default function TeaCallPage() {
               
               <div 
                 ref={logsContainerRef}
-                className="h-[280px] sm:h-[320px] overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
+                className="h-[320px] overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
               >
                 {logs.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-muted-foreground/40 gap-2">
-                    <MousePointer2 className="w-8 h-8" />
-                    <span className="text-xs">Нажмите кнопку...</span>
+                    <Flame className="w-8 h-8" />
+                    <span className="text-xs text-center">Ждем твоей команды...</span>
                   </div>
                 ) : (
                   <AnimatePresence mode="popLayout" initial={false}>
@@ -690,6 +632,7 @@ export default function TeaCallPage() {
                           log.type === 'info' && "bg-blue-500/5 border-blue-500 text-blue-600 dark:text-blue-400",
                           log.type === 'warning' && "bg-yellow-500/5 border-yellow-500 text-yellow-600 dark:text-yellow-400",
                           log.type === 'command' && "bg-purple-500/5 border-purple-500 text-purple-600 dark:text-purple-400",
+                          log.type === 'improvisation' && "bg-brand-cyan/5 border-brand-cyan text-brand-cyan",
                         )}
                       >
                         <span className="text-muted-foreground/40 font-mono shrink-0">
@@ -704,7 +647,7 @@ export default function TeaCallPage() {
               </div>
             </div>
 
-            {/* Stats */}
+            {/* Stats Grid */}
             <div className="grid grid-cols-3 gap-2">
               {[
                 { icon: TrendingUp, value: stats.total, label: 'Успех', color: 'text-brand-gold' },
@@ -717,18 +660,41 @@ export default function TeaCallPage() {
                   className="p-3 rounded-xl border border-border bg-card/40 backdrop-blur-sm text-center"
                 >
                   <stat.icon className={cn("w-4 h-4 mx-auto mb-1", stat.color)} />
-                  <div className={cn("text-lg sm:text-xl font-bold", stat.color)}>{stat.value}</div>
+                  <div className={cn("text-lg font-bold", stat.color)}>{stat.value}</div>
                   <div className="text-[10px] text-muted-foreground">{stat.label}</div>
                 </motion.div>
               ))}
             </div>
 
-            {/* Quick Tip */}
-            <div className="p-3 rounded-xl border border-brand-cyan/20 bg-brand-cyan/5">
-              <p className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed">
-                <span className="text-brand-cyan font-semibold">⌨️ Быстрая команда:</span> Нажмите на любую кнопку — админ получит уведомление с вашим именем и ID.
-              </p>
-            </div>
+             {/* Developer Card */}
+             <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="relative overflow-hidden rounded-xl border border-border bg-card/50 backdrop-blur-md p-4 group hover:border-brand-yellow/30 transition-colors"
+            >
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2 text-brand-yellow">
+                  <Zap className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase font-mono">Pro Level</span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Нужна сложная автоматизация или интеграция? Обращайся.
+                </p>
+                <Button 
+                  asChild
+                  variant="outline" 
+                  size="sm"
+                  className="border-brand-cyan/30 text-brand-cyan hover:bg-brand-cyan/10"
+                >
+                  <Link href="/wblanding" className="flex items-center justify-center gap-2">
+                    Контакты
+                    <ArrowUpRight className="w-4 h-4" />
+                  </Link>
+                </Button>
+              </div>
+            </motion.div>
+
           </div>
         </div>
       </main>
@@ -757,8 +723,8 @@ export default function TeaCallPage() {
                     <Wand2 className="w-4 h-4 sm:w-5 sm:h-5 text-brand-yellow" />
                   </div>
                   <div>
-                    <h2 className="font-orbitron font-bold text-sm sm:text-base">Магические Инструкции</h2>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground font-mono">Расширение функционала</p>
+                    <h2 className="font-orbitron font-bold text-sm sm:text-base">Гримуар Инструкций</h2>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground font-mono">Как создать кнопку</p>
                   </div>
                 </div>
                 <Button
@@ -787,10 +753,7 @@ export default function TeaCallPage() {
                 )}
               </div>
 
-              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border bg-muted/30 flex justify-between items-center shrink-0">
-                <span className="text-[10px] sm:text-xs text-muted-foreground font-mono">
-                  UTF-8 • HTTPS • Markdown
-                </span>
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border bg-muted/30 flex justify-end items-center shrink-0">
                 <Button 
                   onClick={() => setIsModalOpen(false)}
                   className="bg-brand-yellow text-black hover:bg-brand-yellow/90 text-xs sm:text-sm"
