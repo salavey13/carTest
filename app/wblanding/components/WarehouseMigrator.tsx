@@ -8,20 +8,42 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { 
-  Loader2, FileSpreadsheet, Database, AlertCircle, CheckCircle, Trash2, 
-  Layers, ShieldQuestion, User, Sparkles, Building2
+  Loader2, FileSpreadsheet, Database, Trash2, 
+  ShieldQuestion, User, Sparkles, Building2
 } from "lucide-react";
-// Импортируем НОВУЮ функцию
 import { uploadWarehouseCsv, getUserCrews } from "@/app/wb/actions";
 import { useAppContext } from "@/contexts/AppContext";
 import { parse } from "papaparse";
 
-// ... (normalizeHeader & COLUMN_MAP остаются без изменений)
+// --- CONFIG ---
+
+const normalizeHeader = (header: string): string => 
+  header.toLowerCase().trim().replace(/[^a-zа-яё0-9]/g, '');
+
+const COLUMN_MAP: Record<string, string> = {
+  'артикул': 'id', 'id': 'id', 'sku': 'id', 'vendorcode': 'id',
+  'количество': 'quantity', 'quantity': 'quantity', 'stock': 'quantity', 'остаток': 'quantity',
+  'название': 'model', 'model': 'model', 'name': 'model',
+  'бренд': 'make', 'make': 'make', 'brand': 'make',
+  'размер': 'size', 'size': 'size',
+  'сезон': 'season', 'season': 'season',
+  'цвет': 'color', 'color': 'color',
+};
+
+interface ParsedItem {
+  id: string;
+  quantity: number;
+  make: string;
+  model: string;
+  specs: Record<string, any>;
+}
 
 interface CrewInfo {
   id: string;
   name: string;
 }
+
+// --- COMPONENT ---
 
 export function WarehouseMigrator() {
   const { dbUser } = useAppContext();
@@ -34,20 +56,59 @@ export function WarehouseMigrator() {
   const [userCrews, setUserCrews] = useState<CrewInfo[]>([]);
   const [targetCrewId, setTargetCrewId] = useState<string>('personal');
 
-  // ИСПРАВЛЕННАЯ Загрузка команд пользователя
+  // Загрузка команд пользователя
   useEffect(() => {
     if (dbUser?.user_id) {
       getUserCrews(dbUser.user_id).then(crews => {
-        // getUserCrews возвращает готовый массив объектов {id, name}
         setUserCrews(crews);
       });
     }
   }, [dbUser]);
 
-  // ... (parsedItems logic remains same)
+  // --- PARSING LOGIC (RESTORED) ---
+  const parsedItems = useMemo(() => {
+    if (!csvData.trim()) return [];
 
+    const result = parse(csvData, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: normalizeHeader,
+    });
+
+    return result.data.map((row: any) => {
+      const item: Partial<ParsedItem> = { specs: {} };
+      
+      Object.keys(row).forEach(key => {
+        const systemKey = COLUMN_MAP[key];
+        const value = row[key];
+        if (!value) return;
+
+        switch(systemKey) {
+          case 'id': item.id = String(value).toLowerCase().trim(); break;
+          case 'quantity': item.quantity = parseInt(String(value).replace(/[^\d.-]/g, ''), 10) || 0; break;
+          case 'model': item.model = String(value); break;
+          case 'make': item.make = String(value); break;
+          case 'size': case 'season': case 'color': item.specs![systemKey] = String(value); break;
+        }
+      });
+
+      if (!item.id) return null;
+
+      // Fallbacks
+      item.make = item.make || "Unknown";
+      item.model = item.model || item.id;
+      item.quantity = item.quantity || 0;
+      
+      return item as ParsedItem;
+    }).filter(Boolean) as ParsedItem[];
+  }, [csvData]);
+
+  const addLog = (msg: string, type: string = 'info') => {
+    setLogs(prev => [...prev.slice(-20), { msg, type }]);
+  };
+
+  // --- MIGRATION HANDLER ---
   const handleMigration = async () => {
-    // ... (logic remains same, just ensure targetCrewId usage is correct)
     if (parsedItems.length === 0) return toast.error("Нет данных");
     
     setIsMigrating(true);
@@ -66,7 +127,6 @@ export function WarehouseMigrator() {
         "make": item.make,
         "model": item.model,
         "specs": JSON.stringify(item.specs),
-        // Если выбран 'personal', шлем null, иначе ID команды
         "target_crew_id": targetCrewId !== 'personal' ? targetCrewId : null
       }));
 
@@ -89,6 +149,7 @@ export function WarehouseMigrator() {
     setIsMigrating(false);
   };
 
+  // --- UI ---
   return (
     <Card className="bg-black/90 border border-brand-cyan/20 shadow-2xl w-full max-w-3xl mx-auto backdrop-blur-md">
       <CardHeader>
