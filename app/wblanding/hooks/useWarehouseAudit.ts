@@ -6,7 +6,7 @@ import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMe
 import { supabaseAdmin } from '@/hooks/supabase';
 
 // ============= Enhanced Interfaces =============
-interface EnhancedAuditAnswers {
+export interface EnhancedAuditAnswers {
   skus: number;
   hours: number;
   penalties: number;
@@ -17,7 +17,7 @@ interface EnhancedAuditAnswers {
   staffCount: number;
 }
 
-interface CalculationBreakdown {
+export interface CalculationBreakdown {
   timeCost: number;
   penaltyCost: number;
   missedSales: number;
@@ -29,6 +29,11 @@ interface CalculationBreakdown {
   roi: number;
   paybackMonths: number;
   monthlySavings: number;
+  totalLossRatePct: number;
+  hourlyRateUsed: number;
+  industryName: string;
+  penaltyRiskMultiplier: number;
+  errorRateMultiplier: number;
 }
 
 interface RoadmapItem {
@@ -242,6 +247,11 @@ export const useWarehouseAudit = (userId: string | undefined) => {
         roi,
         paybackMonths,
         monthlySavings,
+        totalLossRatePct: Number((totalLossRate * 100).toFixed(2)),
+        hourlyRateUsed: hourlyRate,
+        industryName: multipliers.name,
+        penaltyRiskMultiplier: multipliers.penaltyRisk,
+        errorRateMultiplier: multipliers.errorRate,
       },
     };
   }, []);
@@ -527,6 +537,58 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     trackAuditEvent('audit_reset', {});
   }, [trackAuditEvent]);
 
+  const applyAutoDetectedData = useCallback((detected: Partial<EnhancedAuditAnswers>) => {
+    const merged = { ...answers, ...detected };
+    setAnswers(merged);
+
+    if (step > 0 && questions[step]) {
+      const nextValue = merged[questions[step].id as keyof EnhancedAuditAnswers];
+      if (nextValue !== undefined && nextValue !== null) {
+        setCurrentAnswer(String(nextValue));
+      }
+    }
+
+    trackAuditEvent('audit_autofill_applied', {
+      fields: Object.keys(detected),
+    });
+  }, [answers, step, questions, trackAuditEvent]);
+
+  const runAuditFromDetectedData = useCallback((detected: Partial<EnhancedAuditAnswers>) => {
+    const baseAnswers: Partial<EnhancedAuditAnswers> = {
+      skus: 1,
+      hours: 2,
+      penalties: 0,
+      stores: 1,
+      industry: 'other',
+      orderVolume: 1,
+      avgSkuValue: 1500,
+      staffCount: 1,
+    };
+
+    const normalized = {
+      ...baseAnswers,
+      ...answers,
+      ...detected,
+    };
+
+    const result = calcLosses(normalized);
+    const smartRoadmap = generateRoadmap(result.breakdown, normalized as EnhancedAuditAnswers);
+
+    setAnswers(normalized);
+    setBreakdown(result.breakdown);
+    setRoadmap(smartRoadmap);
+    setStep(questions.length);
+    setShowResult(true);
+    setCurrentAnswer('');
+
+    clearProgress();
+
+    trackAuditEvent('audit_autofill_completed', {
+      totalLosses: result.total,
+      fields: Object.keys(detected),
+    });
+  }, [answers, calcLosses, clearProgress, generateRoadmap, questions.length, trackAuditEvent]);
+
   return {
     step,
     questions,
@@ -549,5 +611,8 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     viewLastAudit,
     validateAnswer,
     trackAuditEvent,
+    applyAutoDetectedData,
+    runAuditFromDetectedData,
+    answers,
   };
 };
