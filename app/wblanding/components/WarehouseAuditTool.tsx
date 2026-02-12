@@ -359,7 +359,7 @@ export const WarehouseAuditTool = () => {
               <ul className="space-y-1.5 text-[11px] sm:text-xs text-zinc-300">
                 <li>• Время: {breakdown.hours} ч/нед × {(breakdown.hourlyRateUsed ?? 2000).toLocaleString()}₽ × 4.3 = <span className="text-white">{breakdown.timeCost.toLocaleString()}₽</span></li>
                 <li>• Штрафы: прямой ввод из отчёта/анкеты = <span className="text-white">{breakdown.penaltyCost.toLocaleString()}₽</span></li>
-                <li>• Упущенные продажи: заказы/день × 30 × (ср.чек×1.3) × loss rate <span className="text-white">{(breakdown.totalLossRatePct ?? 2)}%</span> × risk {(breakdown.penaltyRiskMultiplier ?? 1)} = <span className="text-white">{breakdown.missedSales.toLocaleString()}₽</span></li>
+                <li>• Упущенная маржа: (заказы/день × 30 × (ср.чек×1.3) × loss rate <span className="text-white">{(breakdown.totalLossRatePct ?? 2)}%</span> × risk {(breakdown.penaltyRiskMultiplier ?? 1)}) × маржа <span className="text-white">{(breakdown.contributionMarginPct ?? 35)}%</span> = <span className="text-white">{breakdown.missedSales.toLocaleString()}₽</span></li>
                 <li>• Ошибки команды: SKU × каналы × 25 × errorRate {(breakdown.errorRateMultiplier ?? 1)} × √staff = <span className="text-white">{breakdown.humanErrorCost.toLocaleString()}₽</span></li>
                 <li>• Отрасль: <span className="text-white">{(breakdown.industryName ?? "Другое")}</span>; потенциал экономии считается как <span className="text-white">65%</span> от total loss.</li>
               </ul>

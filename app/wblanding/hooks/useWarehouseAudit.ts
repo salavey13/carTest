@@ -34,6 +34,8 @@ export interface CalculationBreakdown {
   industryName: string;
   penaltyRiskMultiplier: number;
   errorRateMultiplier: number;
+  missedRevenueBeforeMargin: number;
+  contributionMarginPct: number;
 }
 
 interface RoadmapItem {
@@ -214,8 +216,11 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     
     const monthlyOrders = orderVolume * 30;
     const avgOrderValue = avgSkuValue * 1.3;
-    
-    const missedSales = Math.floor(monthlyOrders * totalLossRate * avgOrderValue * multipliers.penaltyRisk);
+
+    // Важно: считаем не "весь оборот", а потери по марже, иначе оценка завышается.
+    const contributionMargin = 0.35; // 35% консервативная маржа для e-com
+    const missedRevenueBeforeMargin = monthlyOrders * totalLossRate * avgOrderValue * multipliers.penaltyRisk;
+    const missedSales = Math.floor(missedRevenueBeforeMargin * contributionMargin);
 
     // 4. Стоимость ошибок персонала (снижена)
     const humanErrorCost = Math.floor(skus * stores * 25 * multipliers.errorRate * Math.sqrt(staffCount));
@@ -252,6 +257,8 @@ export const useWarehouseAudit = (userId: string | undefined) => {
         industryName: multipliers.name,
         penaltyRiskMultiplier: multipliers.penaltyRisk,
         errorRateMultiplier: multipliers.errorRate,
+        missedRevenueBeforeMargin: Math.floor(missedRevenueBeforeMargin),
+        contributionMarginPct: Math.round(contributionMargin * 100),
       },
     };
   }, []);
