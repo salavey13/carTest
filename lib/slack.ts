@@ -93,7 +93,11 @@ async function postViaIncomingWebhook(params: {
   text: string;
   threadTs?: string;
 }): Promise<SlackIncomingWebhookResult> {
-  const payload: Record<string, string> = { text: params.text };
+  const payload: Record<string, string | boolean> = {
+    text: params.text,
+    mrkdwn: true,
+    link_names: true,
+  };
   if (params.threadTs) payload.thread_ts = params.threadTs;
 
   const response = await fetch(params.webhookUrl, {
@@ -184,6 +188,7 @@ export async function postSlackMessage(params: {
       channel,
       text: params.text,
       mrkdwn: true,
+      link_names: true,
       thread_ts: params.threadTs,
     }),
   });
