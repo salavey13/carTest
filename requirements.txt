@@ -1,5 +1,0 @@
-tkinter
-requests
-flask
-supabase
-python-dotenv
