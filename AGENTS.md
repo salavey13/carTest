@@ -162,6 +162,20 @@ This keeps forks independent for private deploys (own Codex/Vercel/env) while st
 
 ## 9) Telegram <-> Slack Codex bridge (operator automation)
 
+## 9.1) ⚡ Auto-merge capability for operator/bot chore PRs
+
+- Workflow: `.github/workflows/auto-merge-chore-prs.yml`
+- Purpose: auto-enable squash auto-merge for safe chore-style PRs with trigger prefixes (`⚡:`, `пульс:`, `Chore: Update image`, `Chore: Update icon`).
+- Allowed PR authors include operator + bot identities (currently `salavey13` plus Codex/GitHub bot identities configured in workflow allowlist).
+- Token strategy: use default GitHub Actions `GITHUB_TOKEN` (no personal token required).
+- Notification strategy: after automerge is armed, workflow can call `POST /api/codex-bridge/callback` with `x-codex-bridge-secret` to fan out status to Slack/Telegram.
+- Workflow secrets checklist:
+  - required: `CODEX_BRIDGE_CALLBACK_SECRET`, `VERCEL_PROJECT_PRODUCTION_URL`
+  - optional Slack target override: `SLACK_CODEX_CHANNEL_ID` (not needed when incoming webhook mode is configured on server runtime)
+  - legacy endpoint (`/api/github-action-feedback`) expects `GITHUB_ACTION_SECRET` (and now accepts `ACTION_SECRET` as backward-compatible alias).
+
+When creating bridge-friendly auto-merge PRs, keep title prefix as `⚡:` to opt-in quickly and consistently.
+
 Implemented baseline: 
 - Telegram command `/codex ...` can be forwarded into Slack as `@codex ...` via server-side webhook handlers.
 - Keep this flow server-only (tokens in env, never client-side).

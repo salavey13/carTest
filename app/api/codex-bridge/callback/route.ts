@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
-import { postSlackMessage } from "@/lib/slack";
+import { getSlackBridgeConfig, postSlackMessage } from "@/lib/slack";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 
 type CallbackBody = {
@@ -67,7 +67,10 @@ export async function POST(req: NextRequest) {
       await sendComplexMessage(body.telegramChatId, message, [], { parseMode: "Markdown" });
     }
 
-    if (body.slackChannelId || body.slackThreadTs) {
+    const slackConfig = getSlackBridgeConfig();
+    const canSendToSlack = Boolean(body.slackChannelId || body.slackThreadTs || slackConfig.incomingWebhookUrl || slackConfig.defaultChannel);
+
+    if (canSendToSlack) {
       await postSlackMessage({
         text: message.replace(/\*/g, ""),
         channel: body.slackChannelId,
