@@ -81,6 +81,13 @@ That is enough to get a working autonomous baseline.
 - `GITHUB_TOKEN`
 - `GEMINI_API_KEY`
 - `NEXT_PUBLIC_SITE_URL` (or Vercel-provided domain variable)
+- `SLACK_BOT_TOKEN` (for Telegram `/codex` forwarding to Slack)
+- `SLACK_CODEX_CHANNEL_ID` (target Slack channel id for Codex tasks)
+- `SLACK_CODEX_MENTION` (optional mention prefix, default `@codex`)
+- `SLACK_INCOMING_WEBHOOK_URL` (optional; incoming webhook mode without channel id)
+- `SLACK_CLIENT_ID` + `SLACK_CLIENT_SECRET` + `SLACK_REFRESH_TOKEN` (optional for Slack OAuth token rotation)
+- `CODEX_BRIDGE_CALLBACK_SECRET` (optional secret for codex callback API)
+- `VERCEL_PROJECT_NAME` + `VERCEL_PREVIEW_DOMAIN_SUFFIX` (optional preview-link generation config)
 
 Never commit real secrets.
 
@@ -121,6 +128,7 @@ If you modify setup, onboarding, or runtime assumptions, update these files toge
 Keeping these aligned is mandatory for maintainability.
 
 Current docs style: keep setup docs practical, RU-first, and compact-but-complete in `README.MD`, with `docs/README_TLDR.md` as the extra-short variant.
+For first-time operators, keep token onboarding appendixes up-to-date (Telegram BotFather + Slack app token/channel id steps).
 
 
 ---
@@ -150,3 +158,48 @@ Browser-only fallback (no local terminal):
 - for conflicts, resolve in GitHub conflict editor or via a PR from upstream into your fork
 
 This keeps forks independent for private deploys (own Codex/Vercel/env) while still receiving upstream improvements.
+
+
+## 9) Telegram <-> Slack Codex bridge (operator automation)
+
+Implemented baseline:
+- Telegram command `/codex ...` can be forwarded into Slack as `@codex ...` via server-side webhook handlers.
+- Keep this flow server-only (tokens in env, never client-side).
+
+Recommended next iteration (bonus path):
+- add a dedicated API route for "Codex task callback" that can post results back to Slack and/or Telegram
+- include branch preview link generated from branch slug (replace `/` with `-`)
+- optionally support zero-click PR automation with title prefix `⚡: ` for auto-merge workflows
+
+When extending this automation, keep actions idempotent and authenticated (signed webhook secret).
+
+Current implementation includes `POST /api/codex-bridge/callback` with `x-codex-bridge-secret` auth and optional Telegram/Slack fan-out + preview link generation by branch slug.
+
+### Agent reply protocol for Codex bridge tasks
+When a task is executed through Telegram `/codex` -> Slack bridge, the agent should return a callback payload target to the operator so it can be posted to:
+- `https://<your-deployment-domain>/api/codex-bridge/callback`
+
+Preferred production example in this project:
+- `https://v0-car-test.vercel.app/api/codex-bridge/callback`
+
+Agent response should include:
+- callback endpoint URL
+- required auth header name: `x-codex-bridge-secret`
+- minimal JSON body with `status`, `summary`, `branch`, optional `taskPath`, optional `prUrl`, and reply targets (`telegramChatId`, `slackChannelId`, `slackThreadTs`)
+- if `branch` is present, include the expected preview URL pattern derived from branch slug (`/` -> `-`)
+
+Keep it copy-paste friendly for operators (single curl block preferred).
+MANDATORY for bridge-triggered tasks: agent must provide a ready-to-run callback call to `https://v0-car-test.vercel.app/api/codex-bridge/callback` including preview-link fields (`branch`, optional `taskPath`) and `x-codex-bridge-secret`.
+
+
+
+Slack token strategy:
+- prefer `SLACK_BOT_TOKEN` when workspace uses long-lived bot token
+- if token rotation is enabled, use `SLACK_CLIENT_ID`/`SLACK_CLIENT_SECRET`/`SLACK_REFRESH_TOKEN` and fetch access token server-side
+- never expose Slack secrets client-side
+
+
+Preview URL format note: use `https://<VERCEL_PROJECT_NAME>-git-<branch-with-slashes-replaced><VERCEL_PREVIEW_DOMAIN_SUFFIX>/<taskPath>`; suffix may start with `-` (preferred) or `.`.
+
+
+Incoming webhook mode can omit channel id: if `SLACK_INCOMING_WEBHOOK_URL` is configured, posting destination is defined by webhook itself.
