@@ -40,7 +40,7 @@
 - `NEXT_PUBLIC_SITE_URL`
 - `SLACK_BOT_TOKEN` *(для `/codex` -> Slack)*
 - `SLACK_CODEX_CHANNEL_ID` *(ID канала, куда слать Codex-задачи; нужно для `chat.postMessage` mode)*
-- `SLACK_CODEX_MENTION` *(опционально, по умолчанию `@Codex`)*
+- `SLACK_CODEX_MENTION` *(опционально, по умолчанию `@codex`)*
 - `SLACK_INCOMING_WEBHOOK_URL` *(опционально, альтернатива token+channel; канал берётся из webhook)*
 - `SLACK_CLIENT_ID` *(опционально, если используешь OAuth token rotation)*
 - `SLACK_CLIENT_SECRET` *(опционально, если используешь OAuth token rotation)*
@@ -123,14 +123,14 @@ git push origin main
 1. Пользователь пишет `/codex ...` в Telegram-бота.
 2. В `app/api/telegramWebhook` это проходит через общий `command-handler`.
 3. Новый handler отправляет сообщение в Slack через `chat.postMessage` в канал `SLACK_CODEX_CHANNEL_ID`.
-4. Текст трансформируется в формат `@Codex ...` (или другой mention через `SLACK_CODEX_MENTION`).
+4. Текст трансформируется в формат `@codex ...` (или другой mention через `SLACK_CODEX_MENTION`).
 
 Важно для тебя (что нужно настроить в Vercel secrets):
 
 Вариант A — `chat.postMessage` mode:
 - `SLACK_BOT_TOKEN` (Bot User OAuth Token, обычно `xoxb-...`)
 - `SLACK_CODEX_CHANNEL_ID` (например `C08...`, не имя `#general`)
-- опционально `SLACK_CODEX_MENTION` (если нужен не `@Codex`; для гарантированного пинга указывай Slack ID в формате `<@U...>`)
+- опционально `SLACK_CODEX_MENTION` (если нужен не `@codex`; для гарантированного пинга указывай Slack ID в формате `<@U...>`)
 
 Вариант B — Incoming Webhook mode (без channel id):
 - `SLACK_INCOMING_WEBHOOK_URL`
@@ -279,4 +279,4 @@ curl -X POST "https://v0-car-test.vercel.app/api/codex-bridge/callback" \
 ```
 /codex test slack bridge
 ```
-Ожидаемо: сообщение появится в Slack в формате `@Codex ...`.
+Ожидаемо: сообщение появится в Slack в формате `@codex ...`.
