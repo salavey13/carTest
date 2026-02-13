@@ -45,7 +45,7 @@ export async function codexCommand(chatId: number, userId: string, username: str
 
     await sendComplexMessage(
       chatId,
-      `✅ Задача отправлена в Slack как запрос к Codex.\n\n*Prompt:* ${prompt}`,
+      `✅ Задача отправлена в Slack как запрос к Codex.\n\n*Prompt:* ${prompt}\n\nДля callback добавь:\n\`telegramChatId\`: \`${chatId}\`\n\`telegramUserId\`: \`${userId}\``,
       [],
       { parseMode: "Markdown" },
     );
