@@ -21,6 +21,7 @@ import { sosCommand, handleSosPaymentChoice } from "./sos";
 import { actionsCommand, handleActionChoice } from "./actions";
 import { shiftCommand } from "./shift"; 
 import { wbCommand } from "./wb";
+import { codexCommand } from "./codex";
 
 
 
@@ -89,8 +90,7 @@ export async function handleCommand(update: any) {
             "/seed_market": () => seedMarketCommand(chatId, userIdStr),
             "/leaderboard": () => leaderboardCommand(chatId, userIdStr),
             "/board": () => leaderboardCommand(chatId, userIdStr),
-// в commandMap
-"/wb": () => wbCommand(chatId, userIdStr),
+            "/wb": () => wbCommand(chatId, userIdStr),
             "/leads": () => leadsCommand(chatId, userId),
             "/sauce": () => sauceCommand(chatId, userId),
             "/file": () => fileCommand(chatId, userId, args),
@@ -98,9 +98,10 @@ export async function handleCommand(update: any) {
             "/howto": () => howtoCommand(chatId, userId),
             "/ctx": () => ctxCommand(chatId, userId),
             "/profile": () => profileCommand(chatId, userId, username),
+            "/codex": () => codexCommand(chatId, userIdStr, username, text),
         };
 
-        const commandFunction = commandMap[command];
+        const commandFunction = commandMap[command] || (command.startsWith("/codex@") ? commandMap["/codex"] : undefined);
 
         if (commandFunction) {
             await commandFunction();
