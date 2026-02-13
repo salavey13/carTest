@@ -130,7 +130,7 @@ git push origin main
 Вариант A — `chat.postMessage` mode:
 - `SLACK_BOT_TOKEN` (Bot User OAuth Token, обычно `xoxb-...`)
 - `SLACK_CODEX_CHANNEL_ID` (например `C08...`, не имя `#general`)
-- опционально `SLACK_CODEX_MENTION` (если нужен не `@Codex`)
+- опционально `SLACK_CODEX_MENTION` (если нужен не `@Codex`; для гарантированного пинга указывай Slack ID в формате `<@U...>`)
 
 Вариант B — Incoming Webhook mode (без channel id):
 - `SLACK_INCOMING_WEBHOOK_URL`
