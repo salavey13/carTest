@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { getSlackBridgeConfig, postSlackMessage } from "@/lib/slack";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
+import { notifyAdmin } from "@/app/actions";
 
 type CallbackBody = {
   branch?: string;
@@ -10,6 +11,7 @@ type CallbackBody = {
   summary?: string;
   status?: "done" | "failed" | "in_progress" | string;
   telegramChatId?: string | number;
+  telegramUserId?: string | number;
   slackChannelId?: string;
   slackThreadTs?: string;
 };
@@ -67,6 +69,10 @@ export async function POST(req: NextRequest) {
       await sendComplexMessage(body.telegramChatId, message, [], { parseMode: "Markdown" });
     }
 
+    if (body.telegramUserId) {
+      await sendComplexMessage(body.telegramUserId, message, [], { parseMode: "Markdown" });
+    }
+
     const slackConfig = getSlackBridgeConfig();
     const canSendToSlack = Boolean(body.slackChannelId || body.slackThreadTs || slackConfig.incomingWebhookUrl || slackConfig.defaultChannel);
 
@@ -77,6 +83,17 @@ export async function POST(req: NextRequest) {
         threadTs: body.slackThreadTs,
       });
     }
+
+    await notifyAdmin([
+      "🤖 Codex bridge callback received",
+      `Status: ${body.status || "done"}`,
+      body.summary ? `Summary: ${body.summary}` : null,
+      body.branch ? `Branch: ${body.branch}` : null,
+      body.prUrl ? `PR: ${body.prUrl}` : null,
+      body.telegramChatId ? `Chat: ${body.telegramChatId}` : null,
+      body.telegramUserId ? `User: ${body.telegramUserId}` : null,
+      previewUrl ? `Preview: ${previewUrl}` : null,
+    ].filter(Boolean).join("\n"));
 
     return NextResponse.json({ ok: true, previewUrl });
   } catch (error) {

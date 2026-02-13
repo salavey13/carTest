@@ -218,7 +218,12 @@ export async function postCodexCommandToSlack(params: {
 
   const normalizedCommand = params.telegramCommandText.replace(/^\/codex(?:@[\w_]+)?\s*/i, "").trim();
   const codexPrompt = normalizedCommand.length > 0 ? `${mention} ${normalizedCommand}` : mention;
-  const text = codexPrompt.slice(0, 3500);
+  const callbackHint = {
+    telegramChatId: params.telegramChatId,
+    telegramUserId: params.telegramUserId,
+  };
+  const originLine = `TG origin: @${params.telegramUsername || "unknown"} (user ${params.telegramUserId}, chat ${params.telegramChatId})`;
+  const text = `${codexPrompt}\n\n${originLine}\nCallback payload hint: ${JSON.stringify(callbackHint)}`.slice(0, 3500);
 
   return postSlackMessage({ text });
 }
