@@ -39,8 +39,9 @@
 - `GEMINI_API_KEY`
 - `NEXT_PUBLIC_SITE_URL`
 - `SLACK_BOT_TOKEN` *(для `/codex` -> Slack)*
-- `SLACK_CODEX_CHANNEL_ID` *(ID канала, куда слать Codex-задачи)*
+- `SLACK_CODEX_CHANNEL_ID` *(ID канала, куда слать Codex-задачи; нужно для `chat.postMessage` mode)*
 - `SLACK_CODEX_MENTION` *(опционально, по умолчанию `@codex`)*
+- `SLACK_INCOMING_WEBHOOK_URL` *(опционально, альтернатива token+channel; канал берётся из webhook)*
 - `SLACK_CLIENT_ID` *(опционально, если используешь OAuth token rotation)*
 - `SLACK_CLIENT_SECRET` *(опционально, если используешь OAuth token rotation)*
 - `SLACK_REFRESH_TOKEN` *(опционально, если используешь OAuth token rotation)*
@@ -125,15 +126,22 @@ git push origin main
 4. Текст трансформируется в формат `@codex ...` (или другой mention через `SLACK_CODEX_MENTION`).
 
 Важно для тебя (что нужно настроить в Vercel secrets):
+
+Вариант A — `chat.postMessage` mode:
 - `SLACK_BOT_TOKEN` (Bot User OAuth Token, обычно `xoxb-...`)
 - `SLACK_CODEX_CHANNEL_ID` (например `C08...`, не имя `#general`)
 - опционально `SLACK_CODEX_MENTION` (если нужен не `@codex`)
 
-Чтобы токен работал, Slack app должен иметь минимум scope `chat:write` и быть добавлен в целевой канал.
+Вариант B — Incoming Webhook mode (без channel id):
+- `SLACK_INCOMING_WEBHOOK_URL`
+- опционально `SLACK_CODEX_MENTION`
+
+Чтобы token mode работал, Slack app должен иметь минимум scope `chat:write` и быть добавлен в целевой канал.
 
 Рекомендация по хранению токенов:
 - Если `xoxb` долгоживущий в твоей конфигурации — храни `SLACK_BOT_TOKEN` в Vercel env.
 - Если у тебя rotation и токен часто истекает — храни `SLACK_CLIENT_ID`/`SLACK_CLIENT_SECRET`/`SLACK_REFRESH_TOKEN`, а access token получай динамически (уже реализовано серверно).
+- Если хочешь самый простой fixed-channel вариант — используй `SLACK_INCOMING_WEBHOOK_URL` и не задавай `SLACK_CODEX_CHANNEL_ID`.
 
 
 ## Codex callback API (Telegram/Slack replies + preview link)
@@ -241,6 +249,9 @@ curl -X POST "https://v0-car-test.vercel.app/api/codex-bridge/callback" \
 
 В этом проекте мост умеет автоматически получать свежий access token через `oauth.v2.access` (grant type: `refresh_token`).
 Тогда `SLACK_BOT_TOKEN` можно не задавать.
+
+### B4b) Incoming webhook без channel id
+Если используешь incoming webhook URL, `SLACK_CODEX_CHANNEL_ID` не нужен: канал уже "зашит" в webhook.
 
 ### B4) Получить `SLACK_CODEX_CHANNEL_ID`
 Вариант через Slack UI:
