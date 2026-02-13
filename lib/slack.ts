@@ -7,6 +7,12 @@ type SlackPostMessageResponse = {
   channel?: string;
 };
 
+type SlackIncomingWebhookResult = {
+  ok: boolean;
+  status?: number;
+  error?: string;
+};
+
 type SlackOAuthAccessResponse = {
   ok: boolean;
   access_token?: string;
@@ -35,6 +41,7 @@ export function getSlackBridgeConfig() {
     clientId: process.env.SLACK_CLIENT_ID,
     clientSecret: process.env.SLACK_CLIENT_SECRET,
     refreshToken: process.env.SLACK_REFRESH_TOKEN,
+    incomingWebhookUrl: process.env.SLACK_INCOMING_WEBHOOK_URL,
   };
 }
 
@@ -79,6 +86,31 @@ async function refreshSlackAccessToken(params: {
   };
 }
 
+
+
+async function postViaIncomingWebhook(params: {
+  webhookUrl: string;
+  text: string;
+  threadTs?: string;
+}): Promise<SlackIncomingWebhookResult> {
+  const payload: Record<string, string> = { text: params.text };
+  if (params.threadTs) payload.thread_ts = params.threadTs;
+
+  const response = await fetch(params.webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify(payload),
+  });
+
+  if (response.ok) {
+    return { ok: true, status: response.status };
+  }
+
+  const bodyText = await response.text();
+  logger.error("[Slack] Incoming webhook failed", { status: response.status, bodyText });
+  return { ok: false, status: response.status, error: bodyText || `Webhook error (${response.status})` };
+}
+
 export async function getSlackAccessToken(): Promise<string | null> {
   const { staticBotToken, clientId, clientSecret, refreshToken } = getSlackBridgeConfig();
 
@@ -111,7 +143,26 @@ export async function postSlackMessage(params: {
   channel?: string;
   threadTs?: string;
 }): Promise<SlackPostResult> {
-  const { defaultChannel } = getSlackBridgeConfig();
+  const { defaultChannel, incomingWebhookUrl } = getSlackBridgeConfig();
+
+  if (incomingWebhookUrl) {
+    const webhookResult = await postViaIncomingWebhook({
+      webhookUrl: incomingWebhookUrl,
+      text: params.text,
+      threadTs: params.threadTs,
+    });
+
+    if (!webhookResult.ok) {
+      return {
+        ok: false,
+        reason: "api_error",
+        error: webhookResult.error || "Incoming webhook failed",
+      };
+    }
+
+    return { ok: true };
+  }
+
   const channel = params.channel || defaultChannel;
   const token = await getSlackAccessToken();
 
@@ -119,7 +170,7 @@ export async function postSlackMessage(params: {
     return {
       ok: false,
       reason: "not_configured",
-      error: "Slack bridge is not configured (missing token/channel or OAuth refresh config).",
+      error: "Slack bridge is not configured (set SLACK_INCOMING_WEBHOOK_URL OR token/channel OR OAuth refresh config).",
     };
   }
 

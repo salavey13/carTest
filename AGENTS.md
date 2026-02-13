@@ -84,6 +84,7 @@ That is enough to get a working autonomous baseline.
 - `SLACK_BOT_TOKEN` (for Telegram `/codex` forwarding to Slack)
 - `SLACK_CODEX_CHANNEL_ID` (target Slack channel id for Codex tasks)
 - `SLACK_CODEX_MENTION` (optional mention prefix, default `@codex`)
+- `SLACK_INCOMING_WEBHOOK_URL` (optional; incoming webhook mode without channel id)
 - `SLACK_CLIENT_ID` + `SLACK_CLIENT_SECRET` + `SLACK_REFRESH_TOKEN` (optional for Slack OAuth token rotation)
 - `CODEX_BRIDGE_CALLBACK_SECRET` (optional secret for codex callback API)
 - `VERCEL_PROJECT_NAME` + `VERCEL_PREVIEW_DOMAIN_SUFFIX` (optional preview-link generation config)
@@ -198,3 +199,6 @@ Slack token strategy:
 
 
 Preview URL format note: use `https://<VERCEL_PROJECT_NAME>-git-<branch-with-slashes-replaced><VERCEL_PREVIEW_DOMAIN_SUFFIX>/<taskPath>`; suffix may start with `-` (preferred) or `.`.
+
+
+Incoming webhook mode can omit channel id: if `SLACK_INCOMING_WEBHOOK_URL` is configured, posting destination is defined by webhook itself.
