@@ -83,7 +83,7 @@ That is enough to get a working autonomous baseline.
 - `NEXT_PUBLIC_SITE_URL` (or Vercel-provided domain variable)
 - `SLACK_BOT_TOKEN` (for Telegram `/codex` forwarding to Slack)
 - `SLACK_CODEX_CHANNEL_ID` (target Slack channel id for Codex tasks)
-- `SLACK_CODEX_MENTION` (optional mention prefix, default `@codex`)
+- `SLACK_CODEX_MENTION` (optional mention prefix, default `@Codex`)
 - `SLACK_INCOMING_WEBHOOK_URL` (optional; incoming webhook mode without channel id)
 - `SLACK_CLIENT_ID` + `SLACK_CLIENT_SECRET` + `SLACK_REFRESH_TOKEN` (optional for Slack OAuth token rotation)
 - `CODEX_BRIDGE_CALLBACK_SECRET` (optional secret for codex callback API)
@@ -162,8 +162,8 @@ This keeps forks independent for private deploys (own Codex/Vercel/env) while st
 
 ## 9) Telegram <-> Slack Codex bridge (operator automation)
 
-Implemented baseline:
-- Telegram command `/codex ...` can be forwarded into Slack as `@codex ...` via server-side webhook handlers.
+Implemented baseline: 
+- Telegram command `/codex ...` can be forwarded into Slack as `@Codex ...` via server-side webhook handlers.
 - Keep this flow server-only (tokens in env, never client-side).
 
 Recommended next iteration (bonus path):

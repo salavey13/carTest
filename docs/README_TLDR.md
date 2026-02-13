@@ -33,7 +33,7 @@ git push origin main
 - `NEXT_PUBLIC_SITE_URL`
 - `SLACK_BOT_TOKEN`
 - `SLACK_CODEX_CHANNEL_ID` (for token mode)
-- `SLACK_CODEX_MENTION` (optional, default `@codex`)
+- `SLACK_CODEX_MENTION` (optional, default `@Codex`)
 - `SLACK_INCOMING_WEBHOOK_URL` (optional alternative; channel id not required)
 - `SLACK_CLIENT_ID` + `SLACK_CLIENT_SECRET` + `SLACK_REFRESH_TOKEN` (optional, if Slack token rotation is enabled)
 - `CODEX_BRIDGE_CALLBACK_SECRET` (optional, protects callback API from unauthorized calls)
@@ -43,7 +43,7 @@ git push origin main
 ## 4) Telegram `/codex` -> Slack
 - Команда `/codex <task>` из Telegram форвардится в Slack канал.
 - Нужны env: либо `SLACK_BOT_TOKEN` + `SLACK_CODEX_CHANNEL_ID`, либо `SLACK_INCOMING_WEBHOOK_URL`.
-- Опционально: `SLACK_CODEX_MENTION` для замены `@codex`.
+- Опционально: `SLACK_CODEX_MENTION` для замены `@Codex`.
 
 
 ## 5) Codex callback API
