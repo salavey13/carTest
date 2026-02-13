@@ -20,7 +20,8 @@ export async function helpCommand(chatId: number, userId: number) {
     `\`/seed_market\` - (DEV) Засеять рынок начальными данными.\n` +
     `\`/ctx\` - Получить полный контекст проекта в виде одного файла.\n` +
     `\`/sauce\` - Показать системный промпт этого бота.\n` +
-    `\`/file [путь]\` - Найти и показать файлы по пути.`
+    `\`/file [путь]\` - Найти и показать файлы по пути.\n` +
+    `\`/codex [задача]\` - Переслать задачу в Slack-канал как запрос к Codex.`;
 
   await sendComplexMessage(chatId, helpText, []);
 }
