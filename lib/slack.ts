@@ -25,6 +25,7 @@ export type SlackPostResult =
   | { ok: true; ts?: string; channel?: string }
   | { ok: false; reason: "not_configured" | "api_error"; error: string };
 
+
 type SlackRuntimeToken = {
   accessToken: string;
   refreshToken?: string;
@@ -217,13 +218,7 @@ export async function postCodexCommandToSlack(params: {
 
   const normalizedCommand = params.telegramCommandText.replace(/^\/codex(?:@[\w_]+)?\s*/i, "").trim();
   const codexPrompt = normalizedCommand.length > 0 ? `${mention} ${normalizedCommand}` : mention;
-
-  const text = [
-    codexPrompt,
-    "🤖 *Forwarded from Telegram*",
-    `• tg_user: ${params.telegramUsername ? `@${params.telegramUsername}` : "(no username)"} (${params.telegramUserId})`,
-    `• tg_chat: ${params.telegramChatId}`,
-  ].join("\n");
+  const text = codexPrompt.slice(0, 3500);
 
   return postSlackMessage({ text });
 }
