@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 
-const GITHUB_ACTION_SECRET = process.env.GITHUB_ACTION_SECRET;
+const GITHUB_ACTION_SECRET = process.env.GITHUB_ACTION_SECRET || process.env.ACTION_SECRET;
 const ADMIN_TELEGRAM_USER_ID = process.env.ADMIN_CHAT_ID;
 
 export async function POST(request: NextRequest) {
