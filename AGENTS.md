@@ -120,6 +120,8 @@ If you modify setup, onboarding, or runtime assumptions, update these files toge
 
 Keeping these aligned is mandatory for maintainability.
 
+Current docs style: keep setup docs practical, RU-first, and compact-but-complete in `README.MD`, with `docs/README_TLDR.md` as the extra-short variant.
+
 
 ---
 
@@ -141,5 +143,10 @@ git fetch upstream
 git merge upstream/main
 git push origin main
 ```
+
+Browser-only fallback (no local terminal):
+- open your fork on GitHub
+- click **Sync fork** -> **Update branch** on `main`
+- for conflicts, resolve in GitHub conflict editor or via a PR from upstream into your fork
 
 This keeps forks independent for private deploys (own Codex/Vercel/env) while still receiving upstream improvements.
