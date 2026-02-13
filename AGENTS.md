@@ -189,6 +189,7 @@ Agent response should include:
 - if `branch` is present, include the expected preview URL pattern derived from branch slug (`/` -> `-`)
 
 Keep it copy-paste friendly for operators (single curl block preferred).
+MANDATORY for bridge-triggered tasks: agent must provide a ready-to-run callback call to `https://v0-car-test.vercel.app/api/codex-bridge/callback` including preview-link fields (`branch`, optional `taskPath`) and `x-codex-bridge-secret`.
 
 
 
