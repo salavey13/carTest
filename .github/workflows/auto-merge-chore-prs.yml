@@ -11,24 +11,54 @@ jobs:
       pull-requests: write
       contents: write
 
-    if: >
-      github.event.pull_request.user.login == 'salavey13' &&
-      (
-        startsWith(github.event.pull_request.title, 'Chore: Update image') ||
-        startsWith(github.event.pull_request.title, 'Chore: Update icon') ||
-        startsWith(github.event.pull_request.title, 'пульс:') ||
-        startsWith(github.event.pull_request.title, '⚡:')
-      ) &&
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.state == 'open'
-
     steps:
       - name: Checkout repository context
-        # ЭТОТ ШАГ РЕШАЕТ ПРОБЛЕМУ 'not a git repository'
         uses: actions/checkout@v3
+
+      - name: Validate PR eligibility (author + title + state)
+        id: eligibility
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
+          PR_STATE: ${{ github.event.pull_request.state }}
+          ALLOWED_AUTHORS: salavey13,openai-codex,github-actions[bot],copilot-swe-agent[bot]
+        run: |
+          set -euo pipefail
+
+          title_ok="false"
+          if [[ "$PR_TITLE" == Chore:\ Update\ image* ]] || \
+             [[ "$PR_TITLE" == Chore:\ Update\ icon* ]] || \
+             [[ "$PR_TITLE" == пульс:* ]] || \
+             [[ "$PR_TITLE" == ⚡:* ]]; then
+            title_ok="true"
+          fi
+
+          author_ok="false"
+          IFS=',' read -ra allowed <<< "$ALLOWED_AUTHORS"
+          for candidate in "${allowed[@]}"; do
+            if [[ "$PR_AUTHOR" == "$candidate" ]]; then
+              author_ok="true"
+              break
+            fi
+          done
+
+          eligible="false"
+          if [[ "$title_ok" == "true" && "$author_ok" == "true" && "$PR_DRAFT" == "false" && "$PR_STATE" == "open" ]]; then
+            eligible="true"
+          fi
+
+          echo "title_ok=$title_ok" >> "$GITHUB_OUTPUT"
+          echo "author_ok=$author_ok" >> "$GITHUB_OUTPUT"
+          echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
+
+          if [[ "$eligible" != "true" ]]; then
+            echo "Skipping auto-merge. author=$PR_AUTHOR title_ok=$title_ok author_ok=$author_ok draft=$PR_DRAFT state=$PR_STATE"
+          fi
 
       - name: Fetch changed files list
         id: changed_files
+        if: steps.eligibility.outputs.eligible == 'true'
         run: |
           files=$(gh pr diff ${{ github.event.pull_request.number }} --name-only)
           echo "files<<EOF" >> $GITHUB_OUTPUT
@@ -38,8 +68,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate Title, Edit PR, and Add Label
-        # Этот шаг выполняется только для наших "умных" триггеров
-        if: startsWith(github.event.pull_request.title, '⚡:') || startsWith(github.event.pull_request.title, 'пульс:')
+        if: steps.eligibility.outputs.eligible == 'true' && (startsWith(github.event.pull_request.title, '⚡:') || startsWith(github.event.pull_request.title, 'пульс:'))
         run: |
           files="${{ steps.changed_files.outputs.files }}"
           title=""
@@ -65,6 +94,7 @@ jobs:
 
       - name: Enable Auto-Merge and Store Final Title
         id: automerge
+        if: steps.eligibility.outputs.eligible == 'true'
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -72,17 +102,22 @@ jobs:
           merge-method: squash
           delete-branch-after-merge: true
 
-      - name: Send Feedback to Telegram Bot
+      - name: Send Feedback via Codex Bridge callback
         if: steps.automerge.outputs.automerge-enabled == 'true'
         run: |
-          # Используем `gh` для получения финального заголовка PR после всех изменений
           final_title=$(gh pr view ${{ github.event.pull_request.number }} --json title -q '.title')
-          
-          # Use -v for verbose output to see request details in action logs
-          curl -v -X POST "${{ secrets.VERCEL_PROJECT_PRODUCTION_URL }}/api/github-action-feedback" \
+
+          summary="✅ Auto-merge armed for #${{ github.event.pull_request.number }}: ${final_title}"
+          payload=$(jq -n \
+            --arg summary "$summary" \
+            --arg branch "${{ github.event.pull_request.head.ref }}" \
+            --arg taskPath "" \
+            --arg prUrl "${{ github.event.pull_request.html_url }}" \
+            --arg status "done" \
+            --arg slackChannelId "${{ secrets.SLACK_CODEX_CHANNEL_ID }}" \
+            '{status:$status,summary:$summary,branch:$branch,taskPath:$taskPath,prUrl:$prUrl,slackChannelId:($slackChannelId | select(length > 0))}')
+
+          curl -sS -X POST "${{ secrets.VERCEL_PROJECT_PRODUCTION_URL }}/api/codex-bridge/callback" \
           -H "Content-Type: application/json" \
-          -H "Authorization: Bearer ${{ secrets.ACTION_SECRET }}" \
-          -d '{
-            "pr_number": "${{ github.event.pull_request.number }}",
-            "pr_title": "'"$final_title"'"
-          }'
+          -H "x-codex-bridge-secret: ${{ secrets.CODEX_BRIDGE_CALLBACK_SECRET }}" \
+          -d "$payload"
