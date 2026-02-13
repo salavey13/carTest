@@ -87,6 +87,18 @@ const StyleGuideBlock: React.FC<{ content: typeof styleGuideContent.ru }> = ({ c
     </div>
 );
 
+const ComparisonBlock: React.FC<{ t: (typeof translations.ru) }> = ({ t }) => (
+    <div className="px-2 sm:px-4 py-2 space-y-3 text-sm text-card-foreground">
+        <ol className="list-decimal ml-5 space-y-2">
+            {t.comparisonItems.map((item, i) => (
+                <li key={i} className="leading-relaxed">
+                    <VibeContentRenderer content={item} />
+                </li>
+            ))}
+        </ol>
+    </div>
+);
+
 function ActualPageContent({ initialPath, initialIdea }: { initialPath: string | null; initialIdea: string | null; }) {
     const { user } = useAppContext();
     const { fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef } = useRepoXmlPageContext();
@@ -100,32 +112,8 @@ function ActualPageContent({ initialPath, initialIdea }: { initialPath: string |
     }
 
     return (
-        <div className="min-h-screen bg-background p-2 sm:p-4 pt-20 md:pt-24 text-foreground flex flex-col items-center relative overflow-x-hidden">
+        <div className="min-h-screen bg-background px-2 sm:px-4 pb-4 text-foreground flex flex-col items-center relative overflow-x-hidden">
             <main className="w-full max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
-                
-                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
-                    <Accordion type="single" collapsible  className="w-full bg-card/80 backdrop-blur-sm border border-border rounded-xl shadow-lg">
-                        <AccordionItem value="item-1" className="border-b border-border">
-                            <AccordionTrigger className="text-lg font-bold text-brand-pink hover:no-underline px-4 text-left">
-                                <VibeContentRenderer content={onboardingContent[lang].title} />
-                            </AccordionTrigger>
-                            <AccordionContent><OnboardingBlock lang={lang} /></AccordionContent>
-                        </AccordionItem>
-                        <AccordionItem value="item-2" className="border-b border-border">
-                            <AccordionTrigger className="text-lg font-bold text-brand-green hover:no-underline px-4 text-left">
-                                <VibeContentRenderer content={t.philosophyTitle} />
-                            </AccordionTrigger>
-                            <AccordionContent><PhilosophyBlock t={t} /></AccordionContent>
-                        </AccordionItem>
-                        <AccordionItem value="item-3" className="border-none">
-                            <AccordionTrigger className="text-lg font-bold text-brand-gold hover:no-underline px-4 text-left">
-                                <VibeContentRenderer content={styleGuideContent.ru.title} />
-                            </AccordionTrigger>
-                            <AccordionContent><StyleGuideBlock content={styleGuideContent.ru} /></AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
-                </motion.div>
-
                 <div className="flex flex-col gap-4 md:gap-6">
                     <motion.section id="extractor" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
                         <RepoTxtFetcher 
@@ -144,6 +132,34 @@ function ActualPageContent({ initialPath, initialIdea }: { initialPath: string |
                     </motion.section>
                 </div>
             </main>
+            <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="w-full max-w-7xl mx-auto mt-4 md:mt-6">
+                <Accordion type="single" collapsible className="w-full bg-card/80 backdrop-blur-sm border border-border rounded-xl shadow-lg">
+                    <AccordionItem value="item-1" className="border-b border-border">
+                        <AccordionTrigger className="text-lg font-bold text-brand-pink hover:no-underline px-4 text-left">
+                            <VibeContentRenderer content={onboardingContent[lang].title} />
+                        </AccordionTrigger>
+                        <AccordionContent><OnboardingBlock lang={lang} /></AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-2" className="border-b border-border">
+                        <AccordionTrigger className="text-lg font-bold text-brand-green hover:no-underline px-4 text-left">
+                            <VibeContentRenderer content={t.philosophyTitle} />
+                        </AccordionTrigger>
+                        <AccordionContent><PhilosophyBlock t={t} /></AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-3" className="border-b border-border">
+                        <AccordionTrigger className="text-lg font-bold text-brand-cyan hover:no-underline px-4 text-left">
+                            <VibeContentRenderer content={t.comparisonTitle} />
+                        </AccordionTrigger>
+                        <AccordionContent><ComparisonBlock t={t} /></AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-4" className="border-none">
+                        <AccordionTrigger className="text-lg font-bold text-brand-gold hover:no-underline px-4 text-left">
+                            <VibeContentRenderer content={styleGuideContent.ru.title} />
+                        </AccordionTrigger>
+                        <AccordionContent><StyleGuideBlock content={styleGuideContent.ru} /></AccordionContent>
+                    </AccordionItem>
+                </Accordion>
+            </motion.section>
             <AutomationBuddy />
         </div>
     );

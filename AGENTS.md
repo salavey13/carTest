@@ -187,6 +187,8 @@ Agent response should include:
 - required auth header name: `x-codex-bridge-secret`
 - minimal JSON body with `status`, `summary`, `branch`, optional `taskPath`, optional `prUrl`, and reply targets (`telegramChatId`, `slackChannelId`, `slackThreadTs`)
 - if `branch` is present, include the expected preview URL pattern derived from branch slug (`/` -> `-`)
+- use short branch names (preferred <= 24 chars) to avoid Vercel preview slug truncation
+- for bridge tasks, use the **actual current git branch name** that will be pushed when Create PR is clicked (never placeholders like `work`)
 
 Keep it copy-paste friendly for operators (single curl block preferred).
 MANDATORY for bridge-triggered tasks: agent must provide a ready-to-run callback call to `https://v0-car-test.vercel.app/api/codex-bridge/callback` including preview-link fields (`branch`, optional `taskPath`) and `x-codex-bridge-secret`.
@@ -200,6 +202,10 @@ Slack token strategy:
 
 
 Preview URL format note: use `https://<VERCEL_PROJECT_NAME>-git-<branch-with-slashes-replaced><VERCEL_PREVIEW_DOMAIN_SUFFIX>/<taskPath>`; suffix may start with `-` (preferred) or `.`.
+
+For this repo/domain, prefer concrete link previews in replies like:
+`https://v0-car-test-git-<branch-name>-salavey13s-projects.vercel.app/<taskPath>`
+(using the real current branch name, not a placeholder).
 
 
 Incoming webhook mode can omit channel id: if `SLACK_INCOMING_WEBHOOK_URL` is configured, posting destination is defined by webhook itself.
