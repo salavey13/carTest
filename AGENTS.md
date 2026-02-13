@@ -162,7 +162,7 @@ This keeps forks independent for private deploys (own Codex/Vercel/env) while st
 
 ## 9) Telegram <-> Slack Codex bridge (operator automation)
 
-Implemented baseline:
+Implemented baseline: 
 - Telegram command `/codex ...` can be forwarded into Slack as `@Codex ...` via server-side webhook handlers.
 - Keep this flow server-only (tokens in env, never client-side).
 
