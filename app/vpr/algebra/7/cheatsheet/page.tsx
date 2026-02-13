@@ -149,7 +149,7 @@ export default function Algebra7Cheatsheet() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
                 <div className="bg-slate-900 border border-slate-800 hover:border-yellow-500/50 p-6 rounded-2xl transition-all group">
                     <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Умножение</div>
                     <div className="text-2xl font-bold text-white mb-2 group-hover:text-yellow-300 transition-colors">a<sup className="text-yellow-500">n</sup> · a<sup className="text-yellow-500">m</sup></div>
@@ -172,6 +172,22 @@ export default function Algebra7Cheatsheet() {
                     <div className="h-px bg-slate-800 my-2"></div>
                     <div className="text-xl font-bold text-green-400">a<sup className="text-green-300">n·m</sup></div>
                     <p className="text-xs text-slate-400 mt-2">Умножай!</p>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 hover:border-yellow-500/50 p-6 rounded-2xl transition-all group">
+                    <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Степень произведения</div>
+                    <div className="text-2xl font-bold text-white mb-2 group-hover:text-yellow-300 transition-colors">(ab)<sup className="text-yellow-500">n</sup></div>
+                    <div className="h-px bg-slate-800 my-2"></div>
+                    <div className="text-xl font-bold text-green-400">a<sup className="text-green-300">n</sup>·b<sup className="text-green-300">n</sup></div>
+                    <p className="text-xs text-slate-400 mt-2">Одну степень — на каждый множитель.</p>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 hover:border-yellow-500/50 p-6 rounded-2xl transition-all group">
+                    <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Обратное правило</div>
+                    <div className="text-2xl font-bold text-white mb-2 group-hover:text-yellow-300 transition-colors">a<sup className="text-yellow-500">n</sup>·b<sup className="text-yellow-500">n</sup></div>
+                    <div className="h-px bg-slate-800 my-2"></div>
+                    <div className="text-xl font-bold text-green-400">(ab)<sup className="text-green-300">n</sup></div>
+                    <p className="text-xs text-slate-400 mt-2">Собирай обратно, если степени одинаковые.</p>
                 </div>
                 
                 <div className="bg-gradient-to-br from-yellow-900/20 to-slate-900 border border-yellow-500/30 p-6 rounded-2xl flex flex-col justify-center items-center text-center">
