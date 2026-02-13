@@ -1,2 +1,0 @@
-pip install -U  pyinstaller
-pyinstaller --onefile --noconsole ./dashboard.py
