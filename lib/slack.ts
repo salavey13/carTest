@@ -37,7 +37,7 @@ export function getSlackBridgeConfig() {
   return {
     staticBotToken: process.env.SLACK_BOT_TOKEN,
     defaultChannel: process.env.SLACK_CODEX_CHANNEL_ID,
-    mention: process.env.SLACK_CODEX_MENTION || "@Codex",
+    mention: process.env.SLACK_CODEX_MENTION || "@codex",
     clientId: process.env.SLACK_CLIENT_ID,
     clientSecret: process.env.SLACK_CLIENT_SECRET,
     refreshToken: process.env.SLACK_REFRESH_TOKEN,
