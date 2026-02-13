@@ -36,7 +36,7 @@ git push origin main
 - `SLACK_CODEX_MENTION` (optional, default `@codex`)
 - `SLACK_INCOMING_WEBHOOK_URL` (optional alternative; channel id not required)
 - `SLACK_CLIENT_ID` + `SLACK_CLIENT_SECRET` + `SLACK_REFRESH_TOKEN` (optional, if Slack token rotation is enabled)
-- `CODEX_BRIDGE_CALLBACK_SECRET` (optional, protects callback API)
+- `CODEX_BRIDGE_CALLBACK_SECRET` (optional, protects callback API from unauthorized calls)
 - `VERCEL_PROJECT_NAME` + `VERCEL_PREVIEW_DOMAIN_SUFFIX` (optional, preview URL generation)
 
 

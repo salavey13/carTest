@@ -153,6 +153,12 @@ git push origin main
 Авторизация:
 - header `x-codex-bridge-secret: <CODEX_BRIDGE_CALLBACK_SECRET>`
 
+
+Зачем нужен `CODEX_BRIDGE_CALLBACK_SECRET`:
+- это shared secret для защиты `POST /api/codex-bridge/callback` от чужих запросов
+- endpoint принимает callback только если header `x-codex-bridge-secret` совпадает с env
+- без этого любой, кто знает URL, мог бы спамить сообщения в Telegram/Slack от имени системы
+
 Пример payload:
 ```json
 {
