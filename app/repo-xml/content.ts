@@ -72,6 +72,11 @@ export const translations = {
   en: {
     loading: "Booting SUPERVIBE ENGINE...",
     pageTitle: "SUPERVIBE STUDIO 2.0",
+    comparisonTitle: "Repo-XML vs Codex: Same Mission, Different Entry Point",
+    comparisonItems: [
+      "<strong>Context loading:</strong> /repo-xml auto-selects and extracts files for context (no manual copy-paste). With Codex, same coding flow after context is ready.",
+      "<strong>Delivery loop:</strong> this task came Telegram → Slack bot → Codex trigger → execution. Manual step stays the same: review, test, and hit Create PR. Your button is white, mine is green 😄"
+    ],
     philosophyTitle: "Your Vibe Path: The Autonomy Slider (Karpathy + Salavey13)",
     philosophyCore: `<strong>The Goal (inspired by Andrej Karpathy): Build an Iron Man suit, not just an autonomous robot.</strong><br/>You are Tony Stark. The AI is your suit. You are always in the loop, augmented, and in control.<br/>Your core task is to make the <strong>Generation-Verification loop</strong> as fast as possible. The AI generates, but you, the human, are the verifier. A good GUI (like visual diffs) is crucial because it uses your brain's "vision GPU" to make verification instant.<br/><b>To go fast, we keep the AI on a leash.</b> Small, incremental, auditable changes are better than a 10,000-line PR you can't review.`,
     philosophyLvl0_1: `<div class="bg-muted/60 text-muted-foreground p-3 rounded-xl mb-2"><b>Lv.0 → 1 <VibeContentRenderer content="::FaBolt::" /> (Full Auto, "One-Click Fix")</b><br/>🟢 <b>Autonomy Slider:</b> <span class="text-accent">100% agent</span> → <span class="opacity-50">0% human</span><br/>Fix a broken image. Paste link → Upload replacement. <b>PR is auto-created.</b> You simply review the final result and merge. The agent handles everything.</div>`,
@@ -87,6 +92,11 @@ export const translations = {
   ru: {
     loading: "Запуск SUPERVIBE ДВИЖКА...",
     pageTitle: "SUPERVIBE СТУДИЯ 2.0",
+    comparisonTitle: "Repo-XML vs Codex: та же миссия, разный вход",
+    comparisonItems: [
+      "<strong>Контекст и файлы:</strong> в /repo-xml выбор и извлечение файлов автоматические (без ручного копипаста). Дальше поток как в Codex: задача → правки → PR.",
+      "<strong>Текущий флоу:</strong> эта задача прилетела Telegram → Slack бот → триггер Codex → выполнение. Ручной шаг тот же: протестить и нажать Create PR. У тебя кнопка белая, у меня зелёная 😄"
+    ],
     philosophyTitle: "Твой Путь Вайба: Слайдер Автономии (Karpathy + Salavey13)",
     philosophyCore: `<strong>Цель (по Карпати): Построить костюм Железного Человека, а не автономного робота.</strong><br/>Ты — Тони Старк. AI — твой костюм. Ты всегда в центре, усилен и всё контролируешь.<br/>Твоя главная задача — ускорить цикл <strong>«Генерация → Верификация»</strong>. AI предлагает, но проверяешь ТЫ. Хороший GUI (визуальный дифф) решает, потому что он использует «GPU для зрения» в твоей голове и делает проверку мгновенной.<br/><b>Чтобы двигаться быстро, мы держим AI на коротком поводке.</b> Маленькие, понятные, проверяемые изменения лучше, чем PR на 10,000 строк, который ты не сможешь проверить.`,
     philosophyLvl0_1: `<div class="bg-muted/60 text-muted-foreground p-3 rounded-xl mb-2"><b>Лв.0 → 1 <VibeContentRenderer content="::FaBolt::" /> (Полный автомат, "Фикс в один клик")</b><br/>🟢 <b>Слайдер автономии:</b> <span class="text-accent-text">100% агент</span> → <span class="opacity-50">0% человек</span><br/>Починить битую картинку. Вставил ссылку → Загрузил новую. <b>PR создается сам.</b> Ты просто смотришь на результат и мёржишь. Агент делает всё. <strong>ЛЮБОЙ</strong> может это прямо сейчас.</div>`,
