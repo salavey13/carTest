@@ -28,8 +28,8 @@ import { codexCommand } from "./codex";
 import { escapeTelegramMarkdown } from "@/lib/utils"; // Helper для Markdown escape
 
 export async function handleCommand(update: any) {
-    if (update.message?.text || update.callback_query) {
-        const text: string = update.message?.text || update.callback_query?.data;
+    if (update.message?.text || update.message?.caption || update.callback_query) {
+        const text: string = update.message?.text || update.message?.caption || update.callback_query?.data;
         const chatId: number = update.message?.chat.id || update.callback_query?.message.chat.id;
         const userId: number = update.message?.from.id || update.callback_query?.from.id;
         const userIdStr = String(userId);
@@ -98,7 +98,7 @@ export async function handleCommand(update: any) {
             "/howto": () => howtoCommand(chatId, userId),
             "/ctx": () => ctxCommand(chatId, userId),
             "/profile": () => profileCommand(chatId, userId, username),
-            "/codex": () => codexCommand(chatId, userIdStr, username, text),
+            "/codex": () => codexCommand(chatId, userIdStr, username, text, update.message?.photo || []),
         };
 
         const commandFunction = commandMap[command] || (command.startsWith("/codex@") ? commandMap["/codex"] : undefined);

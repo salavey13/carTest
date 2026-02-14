@@ -8,6 +8,10 @@ import { addRentalPhoto } from "@/app/rentals/actions";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
+function isCodexCaption(caption: string | undefined) {
+    return Boolean(caption?.trim().match(/^\/codex(?:@[\w_]+)?(?:\s|$)/i));
+}
+
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
     const R = 6371; // Radius of the earth in km
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -183,6 +187,8 @@ export async function POST(request: Request) {
 
     if (update.pre_checkout_query || update.message?.successful_payment) {
       await handleWebhookProxy(update);
+    } else if (update.message?.photo && isCodexCaption(update.message?.caption)) {
+      await handleCommand(update);
     } else if (update.message?.photo) {
       await handlePhotoMessage(update.message);
     } else if (update.message?.location) {

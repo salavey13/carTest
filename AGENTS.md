@@ -308,3 +308,26 @@ Originator rule:
 - For `/codex` tasks, include both `telegramChatId` **and** `telegramUserId` whenever known, so callback can notify chat + originator directly.
 - Branch resolution inside script: `PR_HEAD_REF` -> local git branch -> explicit `--branch`.
 
+### 9.4) Homework-photo autopilot protocol (mandatory trigger)
+
+When a bridge task contains a **homework screenshot/photo** (for example school schedule + homework list),
+the agent must switch to **CyberTutor autopilot mode** and run the complete chain defined in `books/cybertutor.md`.
+
+Required behavior for these cases:
+
+1. Trigger the local homework skills as a bundle (do not run partial flow):
+   - `skills/homework-ocr-intake/SKILL.md`
+   - `skills/homework-pdf-rag-runtime/SKILL.md`
+   - `skills/homework-solution-store-supabase/SKILL.md`
+   - notification/callback step via `scripts/codex-notify.mjs` (or equivalent callback call)
+2. Persist parsed/solved result to Supabase storage/tables according to CyberTutor flow.
+3. Hydrate and open `/homework/solution/<jobId>` and generate a readable screenshot artifact.
+4. Send callback to `POST /api/codex-bridge/callback` with:
+   - status + short summary,
+   - real resolved `branch`, optional `taskPath`, optional `prUrl`,
+   - reply targets when available: `telegramChatId`, `telegramUserId`, `slackChannelId`, `slackThreadTs`,
+   - explicit note that screenshot is attached.
+5. In agent final response for bridge-driven tasks, always include a copy-paste callback curl as fallback,
+   even if callback was already sent programmatically.
+
+Implementation source of truth for this flow: `books/cybertutor.md`.
