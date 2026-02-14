@@ -50,8 +50,8 @@ export async function validateTelegramInitData(
 
     // 6. Compute Secret Key
     const secretKey = crypto
-      .createHmac('sha256', botToken.trim())
-      .update('WebAppData')
+      .createHmac('sha256', 'WebAppData')
+      .update(botToken.trim())
       .digest();
 
     // 7. Compute Hash
