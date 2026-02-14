@@ -213,6 +213,13 @@ export async function postCodexCommandToSlack(params: {
   telegramUserId: string;
   telegramUsername?: string;
   telegramChatId: string;
+  photoUrl?: string;
+  origin?: {
+    contract?: "prompt_then_photo" | "caption";
+    telegramMessageId?: string;
+    intakeId?: string;
+    createdAt?: string;
+  };
 }) {
   const { mention } = getSlackBridgeConfig();
 
@@ -223,7 +230,18 @@ export async function postCodexCommandToSlack(params: {
     telegramUserId: params.telegramUserId,
   };
   const originLine = `TG origin: @${params.telegramUsername || "unknown"} (user ${params.telegramUserId}, chat ${params.telegramChatId})`;
-  const text = `${codexPrompt}\n\n${originLine}\nCallback payload hint: ${JSON.stringify(callbackHint)}`.slice(0, 3500);
+  const lines = [codexPrompt, "", originLine];
+
+  if (params.photoUrl) {
+    lines.push(`Homework photo: ${params.photoUrl}`);
+  }
+
+  if (params.origin) {
+    lines.push(`Origin metadata: ${JSON.stringify(params.origin)}`);
+  }
+
+  lines.push(`Callback payload hint: ${JSON.stringify(callbackHint)}`);
+  const text = lines.join("\n").slice(0, 3500);
 
   return postSlackMessage({ text });
 }

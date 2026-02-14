@@ -1,6 +1,6 @@
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
-import { postCodexCommandToSlack } from "@/lib/slack";
+import { supabaseAdmin } from "@/hooks/supabase";
 
 export async function codexCommand(chatId: number, userId: string, username: string | undefined, rawText: string) {
   const prompt = rawText.replace(/^\/codex(?:@[\w_]+)?\s*/i, "").trim();
@@ -8,7 +8,7 @@ export async function codexCommand(chatId: number, userId: string, username: str
   if (!prompt) {
     await sendComplexMessage(
       chatId,
-      "Использование: `/codex <задача>`\nПример: `/codex add slack forwarding status in webhook logs`",
+      "Использование: `/codex <задача>` + следующим сообщением фото\nИли сразу фото с подписью `/codex <задача>`.\n\nПример: `/codex solve this homework equation from the photo`",
       [],
       { parseMode: "Markdown" },
     );
@@ -16,44 +16,40 @@ export async function codexCommand(chatId: number, userId: string, username: str
   }
 
   try {
-    const slackResult = await postCodexCommandToSlack({
-      telegramCommandText: rawText,
-      telegramUserId: userId,
-      telegramUsername: username,
-      telegramChatId: String(chatId),
-    });
-
-    if (!slackResult.ok && slackResult.reason === "not_configured") {
-      await sendComplexMessage(
-        chatId,
-        "ℹ️ Slack bridge пока не настроен (нет токена/канала). Команда принята, но форвард не выполнен.",
-        [],
-        { parseMode: "Markdown" },
+    const { error: stateError } = await supabaseAdmin
+      .from("user_states")
+      .upsert(
+        {
+          user_id: userId,
+          state: "awaiting_codex_homework_photo",
+          context: {
+            codex_prompt: prompt,
+            source_command: rawText,
+            chat_id: String(chatId),
+            username: username || null,
+            created_at: new Date().toISOString(),
+          },
+        },
+        {
+          onConflict: "user_id",
+        },
       );
-      return;
-    }
 
-    if (!slackResult.ok) {
-      await sendComplexMessage(
-        chatId,
-        `⚠️ Задача не ушла в Slack: ${slackResult.error}`,
-        [],
-        { parseMode: "Markdown" },
-      );
-      return;
+    if (stateError) {
+      throw new Error(stateError.message);
     }
 
     await sendComplexMessage(
       chatId,
-      `✅ Задача отправлена в Slack как запрос к Codex.\n\n*Prompt:* ${prompt}\n\nДля callback добавь:\n\`telegramChatId\`: \`${chatId}\`\n\`telegramUserId\`: \`${userId}\``,
+      `📝 Принял задачу для Codex.\n\n*Prompt:* ${prompt}\n\nТеперь отправь фото домашки следующим сообщением.\nЛибо можно сразу одним сообщением: фото + подпись \`/codex <задача>\`.`,
       [],
       { parseMode: "Markdown" },
     );
   } catch (error: any) {
-    logger.error("[Codex Command] Unexpected error while forwarding to Slack", error);
+    logger.error("[Codex Command] Unexpected error while storing two-step context", error);
     await sendComplexMessage(
       chatId,
-      `⚠️ Временный сбой при отправке: ${error?.message || "Unknown error"}`,
+      `⚠️ Не удалось сохранить задачу: ${error?.message || "Unknown error"}`,
       [],
       { parseMode: "Markdown" },
     );
