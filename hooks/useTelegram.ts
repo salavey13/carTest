@@ -23,7 +23,7 @@ const MOCK_USER: WebAppUser | null = process.env.NEXT_PUBLIC_USE_MOCK_USER === '
   last_name: process.env.NEXT_PUBLIC_MOCK_USER_LAST_NAME || "User",
   username: process.env.NEXT_PUBLIC_MOCK_USER_USERNAME || "mockuser",
   language_code: process.env.NEXT_PUBLIC_MOCK_USER_LANG || "ru",
-  photo_url: process.env.NEXT_PUBLIC_MOCK_USER_PHOTO || "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png",
+  photo_url: process.env.NEXT_PUBLIC_MOCK_USER_PHOTO || "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png ",
 } : null;
 
 if (MOCK_USER) {
@@ -38,6 +38,12 @@ async function validateTelegramAuthWithApi(initDataString: string): Promise<Vali
     globalLogger.warn("[HOOK_TELEGRAM validateApi FN_WARN] FAILURE: initDataString is empty. Cannot validate.");
     return null;
   }
+  
+  // 🔥 DEBUG: Log raw initData before sending
+  globalLogger.log("🔍 INITDATA TO API (first 100 chars):", initDataString.substring(0, 100));
+  globalLogger.log("🔍 Has uppercase USER=?:", initDataString.includes('USER='));
+  globalLogger.log("🔍 Has lowercase user=?:", initDataString.includes('user='));
+  
   try {
     globalLogger.log(`[HOOK_TELEGRAM validateApi FN_CALL] Calling API '/api/validate-telegram-auth'. initData (first 60 chars): "${initDataString.substring(0, 60)}..."`);
     const response = await fetch('/api/validate-telegram-auth', { 
@@ -181,7 +187,7 @@ export function useTelegram() {
       globalLogger.log("[HOOK_TELEGRAM initialize ASYNC_FN_START] STEP 2: Starting async initialization. isMounted:", isMounted);
       if (!isMounted) {
           globalLogger.warn("[HOOK_TELEGRAM initialize ASYNC_FN_ABORT] Aborted: component unmounted before async logic could run fully.");
-          if (isMounted) { // Double check, though it should be false here
+          if (isMounted) {
             setIsAuthenticating(false); 
             setIsLoading(false);
           }
