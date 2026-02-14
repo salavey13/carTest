@@ -1,33 +1,198 @@
-here are 9 books (9 pictures of covers + 9 of 1st pages with more details, total 18 pics), all are textbooks for 7th grader russian pupils:
-algebra (alg.jpg)
-geometry (geom.jpg)
-phisics (phi.jpg)
-geography (geo.jpg)
-technology (tec.jpg)
-russian (rus.jpg)
-english (eng.jpg)
-literature (lit.jpg)
-history (his.jpg)
+# CyberTutor — operator spec (7 класс, RU-first)
 
-all uploaded to same bucket in supabase with public links like:
+## 1) Product goal
 
-https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/books_pics_7/alg.jpg
+CyberTutor — Telegram-first помощник для 7 класса:
+ученик присылает `/codex` + фото домашки, а Codex-агент сам проходит весь цикл: OCR, поиск в PDF-контексте, решение и отправка результата обратно в операторский канал.
 
-We are creating cybertutor, and preparing context to work with: 
+Ключевая цель:
+- минимальный ручной orchestration;
+- ноль офлайн batch/index jobs;
+- вся логика «на лету» в Codex runtime (task-by-task);
+- понятный короткий ответ для ученика + артефакт-скрин результата достойного качества.
 
-PDF:
-/books/geom.pdf
-Геометрия / 7 класс / 8 класс / 9 класс
+Базовый учебный контекст (подхватывается в prompt/context рантайма):
+- `/books/alg.pdf` — Алгебра, 7 класс (Макарычев Ю.Н., Миндюк Н.Г. и др., 2024);
+- `/books/geom.pdf` — Геометрия, 7–9 класс (Атанасян Л.С. и др., 2024).
 
-Автор:Атанасян Л.С., Бутузов В.Ф., Кадомцев С.Б. и др.
+---
 
-Год:2024
+## 2) Intake contract (Telegram + `/codex` + photo)
 
+### 2.1 Entry flow (strict)
 
-/books/alg.pdf
-Алгебра / 7 класс
+1. Ученик/оператор отправляет в Telegram: `/codex ...` + фото домашки.
+2. Telegram webhook принимает update и передаёт команду в bridge.
+3. Команда форвардится в Slack (с `@codex`) вместе с контекстом и медиа.
+4. Codex bot в Slack подхватывает задачу, создаёт task и запускает решение.
 
-Автор:Макарычев Ю.Н., Миндюк Н.Г. и др.
+### 2.2 Intake payload (минимум)
 
-Год:2024
+```json
+{
+  "source": "telegram",
+  "telegramChatId": "<string>",
+  "telegramUserId": "<string>",
+  "messageId": "<string|number>",
+  "command": "/codex <task>",
+  "text": "<optional>",
+  "photo": {
+    "fileId": "<telegram_file_id>",
+    "mimeType": "image/jpeg"
+  },
+  "locale": "ru-RU",
+  "grade": 7
+}
+```
+
+Routing notes:
+- `/codex` обязателен для bridge-сценария;
+- фото домашки считается главным входом;
+- если текст и фото конфликтуют, приоритет у видимого условия на фото + явная пометка uncertainty.
+
+---
+
+## 3) On-the-fly parse + PDF ragging (no offline jobs)
+
+Важно: **не использовать офлайн индексаторы, ночные precompute и отдельные parser jobs**.
+
+Вместо этого Codex делает всё внутри текущего task:
+1. OCR фото задания прямо в задаче;
+2. выделяет номер/тему/ключевые слова;
+3. поднимает `alg.pdf` и `geom.pdf` в VM-контексте;
+4. делает on-the-fly ragging/поиск по PDF (по номеру задания + ключевым фразам);
+5. читает релевантные фрагменты и решает задачу;
+6. оформляет ответ в формате для ученика (коротко, RU-first).
+
+Рекомендуемый tool pattern:
+- «skill, аналогичный picture-taking», но для PDF ragging на лету;
+- без сохранения долговременных эмбеддингов;
+- без зависимости от внешнего offline retrieval pipeline.
+
+---
+
+## 4) Solve flow on Codex side
+
+1. `/codex` задача появляется в Slack-треде.
+2. Codex бот получает фото и текстовый prompt.
+3. Делает OCR и нормализацию условия.
+4. Спинит VM runtime с доступом к PDF.
+5. Находит задачу в учебнике (по номеру/формулировке).
+6. Строит решение шагами (уровень 7 класса).
+7. Генерирует итоговый ответ + краткую проверку.
+8. Использует screenshot skill и отправляет скрин страницы результата обратно (decent quality).
+
+Качество screenshot:
+- читаемый шрифт, без сильной компрессии;
+- видны «Что дано / Решение / Ответ»;
+- без обрезания ключевых строк.
+
+---
+
+## 5) Solution output contract and callback payload examples
+
+### 5.1 Student-facing output contract
+
+```json
+{
+  "status": "completed|needs_clarification|failed",
+  "problemRestatement": "<коротко и точно>",
+  "steps": ["Шаг 1 ...", "Шаг 2 ...", "Шаг 3 ..."],
+  "finalAnswer": "<итог>",
+  "check": "<короткая проверка>",
+  "uncertaintyNote": "<если фото/условие нечитабельно>",
+  "screenshotAttached": true
+}
+```
+
+### 5.2 Callback example (completed)
+
+```bash
+curl -X POST "https://v0-car-test.vercel.app/api/codex-bridge/callback" \
+  -H "Content-Type: application/json" \
+  -H "x-codex-bridge-secret: $CODEX_BRIDGE_CALLBACK_SECRET" \
+  -d '{
+    "status": "completed",
+    "summary": "OCR + on-the-fly PDF ragging выполнены, задача решена, скрин результата приложен.",
+    "branch": "work",
+    "taskPath": "/",
+    "prUrl": "https://github.com/<owner>/carTest/pull/<id>",
+    "telegramChatId": "12345678",
+    "telegramUserId": "12345678",
+    "slackChannelId": "C12345678",
+    "slackThreadTs": "1730000000.000100"
+  }'
+```
+
+Preview example for current domain:
+`https://v0-car-test-git-work-salavey13s-projects.vercel.app/`
+
+### 5.3 Callback example (needs clarification)
+
+```bash
+curl -X POST "https://v0-car-test.vercel.app/api/codex-bridge/callback" \
+  -H "Content-Type: application/json" \
+  -H "x-codex-bridge-secret: $CODEX_BRIDGE_CALLBACK_SECRET" \
+  -d '{
+    "status": "in_progress",
+    "summary": "Нужен более чёткий снимок: OCR нечитабелен в строке с условием.",
+    "branch": "work",
+    "taskPath": "/",
+    "telegramChatId": "12345678",
+    "telegramUserId": "12345678",
+    "slackThreadTs": "1730000000.000100"
+  }'
+```
+
+---
+
+## 6) Prompting rules (concise, age-appropriate, 7th grade RU-first)
+
+1. Всегда начинай по-русски.
+2. Объяснение короткое: 3–6 шагов.
+3. Один шаг = одна мысль.
+4. Термины объясняй простыми словами.
+5. Не перегружай теорией, только нужное для решения.
+6. Обязательно блок «Ответ: ...».
+7. Если не хватает данных — сначала уточнение.
+8. Тон дружелюбный и уважительный, без сюсюканья.
+
+Шаблон:
+- «Что дано»
+- «Решение по шагам»
+- «Ответ»
+- «Проверка (коротко)»
+
+---
+
+## 7) Safety boundaries
+
+1. Не выдумывать ссылки на учебник/параграф, если их не видно в реально найденном PDF-фрагменте.
+2. Не придумывать числа/факты, которых нет в фото или условии.
+3. Если OCR сомнительный — явно написать, что нужна более чёткая фотография.
+4. Не выдавать уверенный «точный» ответ при низкой уверенности.
+5. При неоднозначности указывать варианты и просить уточнение.
+
+---
+
+## 8) Core file cross-links
+
+Текущие связанные файлы в репозитории:
+- Telegram webhook route: `app/api/telegramWebhook/route.ts`
+- `/codex` command handler: `app/webhook-handlers/commands/codex.ts`
+- Codex callback route: `app/api/codex-bridge/callback/route.ts`
+- notify script: `scripts/codex-notify.mjs`
+
+Homework API routes (целевая зона):
+- `app/api/homework/intake/route.ts`
+- `app/api/homework/parse/route.ts`
+- `app/api/homework/solve/route.ts`
+
+---
+
+## 9) Execution Changelog
+
+| Date       | Branch | Implemented capability | Known gaps |
+|------------|--------|------------------------|------------|
+| 2026-02-14 | `work` | Flow скорректирован под `/codex + photo`: Slack-triggered Codex, OCR + on-the-fly PDF ragging в runtime, решение и screenshot skill возврат. | Нужна фактическая реализация `app/api/homework/*`; нужен production-ready screenshot delivery contract в bridge. |
 
