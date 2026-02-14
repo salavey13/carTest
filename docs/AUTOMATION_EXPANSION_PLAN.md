@@ -52,6 +52,16 @@ Use available infra (GitHub, Vercel, Supabase) for autonomous operations.
 3. **Operator insight digests**
    - scheduled Slack/Telegram digest of open bridge tasks, failing previews, and pending migrations.
 
+
+## Branch resolution reliability (must-have)
+
+When building callback payloads and preview URLs, resolve branch from PR metadata first (`head.ref`) because automation runners may rewrite branch names (e.g. add `codex/` prefix).
+
+Recommended resolver order:
+1. `head.ref` from created PR
+2. `git rev-parse --abbrev-ref HEAD`
+3. operator-provided fallback
+
 ## Phase 4 — Guardrails + safety (always-on)
 
 1. Never expose secrets to client or logs.
@@ -62,6 +72,7 @@ Use available infra (GitHub, Vercel, Supabase) for autonomous operations.
 ## Required env checklist for full automation
 - `CODEX_BRIDGE_CALLBACK_SECRET`
 - `NEXT_PUBLIC_SITE_URL` or deployment base URL
+- `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (for server-side schema introspection and migration diagnostics)
 - `SLACK_BOT_TOKEN` and routing fields (`SLACK_CODEX_CHANNEL_ID` / thread metadata) OR webhook mode
 - Telegram routing (`ADMIN_CHAT_ID` or task-specific `telegramChatId`) when Telegram fan-out is needed
 
