@@ -13,9 +13,7 @@ all uploaded to same bucket in supabase with public links like:
 
 https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/books_pics_7/alg.jpg
 
-We are creating cybertutor, and preparing context to work with: extract all needed onfo about the books and find direct download links or list of websites where to download them as pdf or other digital version sutable for future RAG tasks of retrieving particular assignments by set of problem numbers;)
-
-give a table with all book info parsed from photos, deduce full links to respective photos and try to find digital version source if you can;)
+We are creating cybertutor, and preparing context to work with: 
 
 PDF:
 /books/geom.pdf
