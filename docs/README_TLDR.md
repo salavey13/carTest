@@ -75,3 +75,9 @@ git push origin main
 
 ## 8) Automation expansion roadmap
 - See `docs/AUTOMATION_EXPANSION_PLAN.md` for the full phased plan: auto callback execution, lifecycle statuses, preview health checks, and schema-level operator intelligence.
+
+
+## 9) Notification helper script
+- `node scripts/codex-notify.mjs callback ...` to send callback quickly.
+- `node scripts/codex-notify.mjs telegram ...` to ping a user/chat directly via bot token.
+- For `/codex` originator notification, send both `telegramChatId` and `telegramUserId`.

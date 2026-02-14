@@ -22,9 +22,11 @@ Stop requiring operators to manually run callback curl in normal cases.
    - If secret/routing is missing, agent must output fallback copy/paste curl.
 2. **Standard callback payload contract**
    - always include: `status`, `summary`, `branch`
-   - include when known: `taskPath`, `prUrl`, `telegramChatId`, `slackChannelId`, `slackThreadTs`
+   - include when known: `taskPath`, `prUrl`, `telegramChatId`, `telegramUserId`, `slackChannelId`, `slackThreadTs`
+   - for `/codex` tasks, notify both chat and originator (`telegramUserId`)
 3. **Result transparency**
    - final response must say whether callback was sent automatically or requires fallback manual trigger.
+4. Add local notification skill script (`scripts/codex-notify.mjs`) for callback + Telegram direct mode.
 
 ## Phase 2 — Stronger operator automation (short-term)
 
