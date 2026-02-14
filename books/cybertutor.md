@@ -196,3 +196,84 @@ Homework API routes (целевая зона):
 |------------|--------|------------------------|------------|
 | 2026-02-14 | `work` | Flow скорректирован под `/codex + photo`: Slack-triggered Codex, OCR + on-the-fly PDF ragging в runtime, решение и screenshot skill возврат. | Нужна фактическая реализация `app/api/homework/*`; нужен production-ready screenshot delivery contract в bridge. |
 
+---
+
+## 10) New local skills for execution (created)
+
+Чтобы пункты **OCR intake** и **PDF parsing/ragging** реально повторялись во время задач, добавлены локальные skill-инструкции:
+
+- `skills/homework-ocr-intake/SKILL.md`
+  - нормализует вход `/codex + photo`;
+  - фиксирует JSON-контракт для OCR-результата;
+  - задаёт строгий режим `needsClarification`, если фото сомнительное.
+
+- `skills/homework-pdf-rag-runtime/SKILL.md`
+  - задаёт on-the-fly поиск по `books/alg.pdf` и `books/geom.pdf` без offline индексов;
+  - фиксирует source-aware output контракт (`sourceHints`);
+  - добавляет guardrails против «уверенной галлюцинации».
+
+Обе skill-инструкции заточены под execution в Codex runtime, чтобы задачи решались одинаково предсказуемо.
+
+---
+
+## 11) Broader-picture task map (next implementation wave)
+
+Ниже не «узкие тикеты», а задачи с продуктовым смыслом — зачем они важны для Homework Maker как системы.
+
+### Task A — Intake reliability layer
+
+**Что делаем:**
+- добавляем `app/api/homework/intake/route.ts`;
+- связываем вход Telegram-фото с метаданными origin (`telegramChatId`, `telegramUserId`, messageId);
+- сохраняем link/id входного фото для повторного прогона.
+
+**Broader picture:**
+- это фундамент доверия: если intake теряет контекст, downstream-решение становится случайным;
+- надёжный intake = меньше ручной поддержки оператором.
+
+### Task B — Parse reliability + ambiguity protocol
+
+**Что делаем:**
+- добавляем `app/api/homework/parse/route.ts`;
+- парсим OCR в структурные assignment items;
+- вводим явный `needs_clarification` ответ для нечитаемых строк.
+
+**Broader picture:**
+- снижает риск ложных «уверенных» решений;
+- формирует человеческий UX: бот честно просит уточнение, а не фантазирует.
+
+### Task C — Runtime textbook grounding
+
+**Что делаем:**
+- добавляем `app/api/homework/solve/route.ts`;
+- используем on-the-fly PDF ragging по `alg.pdf`/`geom.pdf`;
+- возвращаем `sourceHints` в результат.
+
+**Broader picture:**
+- превращает бота из «просто LLM» в проверяемого ассистента с привязкой к учебнику;
+- важный шаг к качеству «домашка как сервис», где ответ можно объяснить и защитить.
+
+### Task D — Screenshot-ready student output
+
+**Что делаем:**
+- используем `app/homework/solution/[jobId]/page.tsx` как каноничный render-слой;
+- гарантируем блоки «Что дано / Решение / Ответ / Короткая проверка»;
+- поддерживаем аккуратный screenshot output для Telegram callback.
+
+**Broader picture:**
+- визуальный артефакт = мгновенная полезность для ученика (можно переписать в тетрадь);
+- уменьшает фрикцию и повышает retention сценария `/codex`.
+
+### Task E — Delivery trust loop
+
+**Что делаем:**
+- расширяем callback payload в bridge для image/screenshot статуса;
+- логируем статус доставки в changelog/job history.
+
+**Broader picture:**
+- закрывает цикл «получили задачу -> решили -> действительно доставили ответ»;
+- даёт оператору наблюдаемость и дебаг без ручного копания.
+
+| Date       | Branch | Implemented capability | Known gaps |
+|------------|--------|------------------------|------------|
+| 2026-02-14 | `work` | Созданы execution skills: `homework-ocr-intake` и `homework-pdf-rag-runtime`; добавлена broader-picture roadmap по задачам A–E. | Ещё не реализованы production route handlers `app/api/homework/*` и расширение callback для image payload. |
