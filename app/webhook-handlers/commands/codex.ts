@@ -2,10 +2,24 @@ import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
 import { postCodexCommandToSlack } from "@/lib/slack";
 
-export async function codexCommand(chatId: number, userId: string, username: string | undefined, rawText: string) {
+type TelegramPhotoMeta = {
+  file_id: string;
+  file_unique_id?: string;
+  width?: number;
+  height?: number;
+  file_size?: number;
+};
+
+export async function codexCommand(
+  chatId: number,
+  userId: string,
+  username: string | undefined,
+  rawText: string,
+  photos: TelegramPhotoMeta[] = [],
+) {
   const prompt = rawText.replace(/^\/codex(?:@[\w_]+)?\s*/i, "").trim();
 
-  if (!prompt) {
+  if (!prompt && photos.length === 0) {
     await sendComplexMessage(
       chatId,
       "Использование: `/codex <задача>`\nПример: `/codex add slack forwarding status in webhook logs`",
@@ -21,6 +35,7 @@ export async function codexCommand(chatId: number, userId: string, username: str
       telegramUserId: userId,
       telegramUsername: username,
       telegramChatId: String(chatId),
+      telegramPhotos: photos,
     });
 
     if (!slackResult.ok && slackResult.reason === "not_configured") {
@@ -43,9 +58,12 @@ export async function codexCommand(chatId: number, userId: string, username: str
       return;
     }
 
+    const promptPart = prompt ? `\n\n*Prompt:* ${prompt}` : "\n\n*Prompt:* _(пусто, только фото)_";
+    const photoPart = photos.length > 0 ? `\n*Photo:* ${photos.length} файл(ов)` : "";
+
     await sendComplexMessage(
       chatId,
-      `✅ Задача отправлена в Slack как запрос к Codex.\n\n*Prompt:* ${prompt}\n\nДля callback добавь:\n\`telegramChatId\`: \`${chatId}\`\n\`telegramUserId\`: \`${userId}\``,
+      `✅ Задача отправлена в Slack как запрос к Codex.${promptPart}${photoPart}\n\nДля callback добавь:\n\`telegramChatId\`: \`${chatId}\`\n\`telegramUserId\`: \`${userId}\``,
       [],
       { parseMode: "Markdown" },
     );

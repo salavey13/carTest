@@ -19,11 +19,18 @@ export type SlackPostResult =
   | { ok: true; ts?: string; channel?: string }
   | { ok: false; reason: "not_configured" | "api_error"; error: string };
 
-
 type SlackRuntimeToken = {
   accessToken: string;
   refreshToken?: string;
   expiresAt?: number;
+};
+
+type TelegramPhotoMeta = {
+  file_id: string;
+  file_unique_id?: string;
+  width?: number;
+  height?: number;
+  file_size?: number;
 };
 
 let runtimeToken: SlackRuntimeToken | null = null;
@@ -80,8 +87,6 @@ async function refreshSlackAccessToken(params: {
     expiresAt,
   };
 }
-
-
 
 export async function getSlackAccessToken(): Promise<string | null> {
   const { staticBotToken, clientId, clientSecret, refreshToken } = getSlackBridgeConfig();
@@ -189,11 +194,78 @@ export async function postSlackMessage(params: {
   return { ok: true, ts: data.ts, channel: data.channel };
 }
 
+async function fetchTelegramPhotoBuffer(fileId: string) {
+  const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!telegramToken) {
+    return { ok: false as const, error: "TELEGRAM_BOT_TOKEN is not configured" };
+  }
+
+  const fileInfoResponse = await fetch(`https://api.telegram.org/bot${telegramToken}/getFile?file_id=${encodeURIComponent(fileId)}`);
+  const fileInfo = await fileInfoResponse.json();
+
+  if (!fileInfoResponse.ok || !fileInfo?.ok || !fileInfo?.result?.file_path) {
+    return { ok: false as const, error: fileInfo?.description || `Telegram getFile failed (${fileInfoResponse.status})` };
+  }
+
+  const filePath = fileInfo.result.file_path as string;
+  const fileResponse = await fetch(`https://api.telegram.org/file/bot${telegramToken}/${filePath}`);
+  if (!fileResponse.ok) {
+    return { ok: false as const, error: `Telegram file download failed (${fileResponse.status})` };
+  }
+
+  const arrayBuffer = await fileResponse.arrayBuffer();
+  const contentType = fileResponse.headers.get("content-type") || "image/jpeg";
+  const extension = contentType.includes("png") ? "png" : "jpg";
+  const fileName = filePath.split("/").pop() || `telegram-photo-${Date.now()}.${extension}`;
+
+  return {
+    ok: true as const,
+    bytes: Buffer.from(arrayBuffer),
+    fileName,
+  };
+}
+
+async function uploadPhotoToSlack(params: {
+  channel: string;
+  threadTs?: string;
+  bytes: Buffer;
+  fileName: string;
+  title: string;
+}) {
+  const token = await getSlackAccessToken();
+  if (!token) {
+    return { ok: false as const, error: "Slack token is not configured for file upload" };
+  }
+
+  const form = new FormData();
+  form.append("channels", params.channel);
+  form.append("filename", params.fileName);
+  form.append("title", params.title);
+  if (params.threadTs) form.append("thread_ts", params.threadTs);
+  form.append("file", new Blob([params.bytes]), params.fileName);
+
+  const response = await fetch("https://slack.com/api/files.upload", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: form,
+  });
+
+  const data = await response.json();
+  if (!response.ok || !data?.ok) {
+    return { ok: false as const, error: data?.error || `files.upload failed (${response.status})` };
+  }
+
+  return { ok: true as const };
+}
+
 export async function postCodexCommandToSlack(params: {
   telegramCommandText: string;
   telegramUserId: string;
   telegramUsername?: string;
   telegramChatId: string;
+  telegramPhotos?: TelegramPhotoMeta[];
 }) {
   const { mention } = getSlackBridgeConfig();
 
@@ -203,8 +275,62 @@ export async function postCodexCommandToSlack(params: {
     telegramChatId: params.telegramChatId,
     telegramUserId: params.telegramUserId,
   };
-  const originLine = `TG origin: @${params.telegramUsername || "unknown"} (user ${params.telegramUserId}, chat ${params.telegramChatId})`;
-  const text = `${codexPrompt}\n\n${originLine}\nCallback payload hint: ${JSON.stringify(callbackHint)}`.slice(0, 3500);
 
-  return postSlackMessage({ text });
+  const photos = params.telegramPhotos || [];
+  const originLine = `TG origin: @${params.telegramUsername || "unknown"} (user ${params.telegramUserId})`;
+  const text = [
+    codexPrompt,
+    "",
+    originLine,
+    `TG chat id: ${params.telegramChatId}`,
+    photos.length > 0 ? `TG photo count: ${photos.length}` : null,
+    `Callback payload hint: ${JSON.stringify(callbackHint)}`,
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, 3500);
+
+  const messageResult = await postSlackMessage({ text });
+  if (!messageResult.ok || photos.length === 0) {
+    return messageResult;
+  }
+
+  const { defaultChannel, incomingWebhookUrl } = getSlackBridgeConfig();
+  const uploadChannel = messageResult.channel || defaultChannel;
+
+  if (!uploadChannel || incomingWebhookUrl) {
+    logger.warn("[Slack] Skipping image upload for /codex photo: no channel available or incoming webhook mode");
+    return messageResult;
+  }
+
+  const largestPhoto = [...photos].sort((a, b) => (b.file_size || 0) - (a.file_size || 0))[0];
+  const telegramImage = await fetchTelegramPhotoBuffer(largestPhoto.file_id);
+  if (!telegramImage.ok) {
+    logger.error("[Slack] Failed to download Telegram photo for /codex forwarding", telegramImage.error);
+    await postSlackMessage({
+      text: `⚠️ Couldn't attach TG image in Slack thread: ${telegramImage.error}`,
+      channel: uploadChannel,
+      threadTs: messageResult.ts,
+    });
+    return messageResult;
+  }
+
+  const uploadResult = await uploadPhotoToSlack({
+    channel: uploadChannel,
+    threadTs: messageResult.ts,
+    bytes: telegramImage.bytes,
+    fileName: telegramImage.fileName,
+    title: `tg-homework-${params.telegramChatId}`,
+  });
+
+  if (!uploadResult.ok) {
+    logger.error("[Slack] Failed to upload Telegram photo to Slack", uploadResult.error);
+    await postSlackMessage({
+      text: `⚠️ TG image upload failed: ${uploadResult.error}`,
+      channel: uploadChannel,
+      threadTs: messageResult.ts,
+    });
+  }
+
+  return messageResult;
 }
