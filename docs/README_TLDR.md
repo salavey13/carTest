@@ -69,6 +69,7 @@ git push origin main
 - Branch naming: use short lowercase branches (`fix/...`, `chore/...`, chars `a-z0-9/-`).
 - After commit + PR, send callback immediately with `branch` + `prUrl` + reply target fields (`telegramChatId`, `slackChannelId`, `slackThreadTs`).
 - For this repo previews, use: `https://v0-car-test-git-<branch-slug>-salavey13s-projects.vercel.app/<taskPath>`.
+- If PR branch differs from local branch (e.g. runner prefix like `codex/...`), use PR `head.ref` as source of truth for callback + preview URL.
 - Suffix format: prefer `-team.vercel.app` (dot-prefixed `.team.vercel.app` is also supported).
 
 

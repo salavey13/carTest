@@ -232,6 +232,19 @@ For Telegram `/codex` -> Slack tasks, treat callback delivery as part of the def
 - avoid uppercase, spaces, `_`, and very long names
 - preferred length: <= 24 chars after slash replacement to reduce Vercel truncation risk
 
+
+#### Branch source-of-truth rules (important in Codex runners)
+
+Some runners may rewrite/prefix branch names at PR time (example: local `fix/...` becomes remote `codex/fix-...`).
+To avoid preview/callback mismatch, resolve branch in this priority order:
+
+1. PR head branch from created PR metadata (`head.ref`)
+2. current git branch right before callback (`git rev-parse --abbrev-ref HEAD`)
+3. fallback: operator-provided branch name
+
+Never assume a planned branch rename succeeded unless PR metadata confirms it.
+Always build preview URL from the final resolved branch used in PR.
+
 #### Preview URL rules in callback responses
 
 - Always derive preview slug from actual branch: replace `/` -> `-`
