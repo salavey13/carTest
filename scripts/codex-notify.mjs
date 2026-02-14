@@ -6,7 +6,7 @@
  *  - through /api/codex-bridge/callback
  *
  * Examples:
- *   node scripts/codex-notify.mjs callback --status completed --summary "Done" --telegramChatId 123 --telegramUserId 456
+ *   node scripts/codex-notify.mjs callback --status completed --summary "Done" --telegramChatId 123 --telegramUserId 456 --imageUrl https://example.com/image.png
  *   node scripts/codex-notify.mjs callback-auto --summary "Done" --prUrl https://github.com/org/repo/pull/1
  *   node scripts/codex-notify.mjs telegram --chatId 123 --text "Hello"
  *   node scripts/codex-notify.mjs telegram-photo --chatId 123 --photo ./artifacts/page.png --caption "Preview"
@@ -73,6 +73,7 @@ async function runCallbackMode() {
     telegramUserId: getArg('telegramUserId', process.env.TELEGRAM_USER_ID),
     slackChannelId: getArg('slackChannelId', process.env.SLACK_CODEX_CHANNEL_ID),
     slackThreadTs: getArg('slackThreadTs', process.env.SLACK_THREAD_TS),
+    imageUrl: getArg('imageUrl'),
   };
 
   const response = await postJson(endpoint, payload, {
@@ -100,6 +101,7 @@ async function runCallbackAutoMode() {
     telegramUserId: getArg('telegramUserId', process.env.TELEGRAM_USER_ID),
     slackChannelId: getArg('slackChannelId', process.env.SLACK_CODEX_CHANNEL_ID),
     slackThreadTs: getArg('slackThreadTs', process.env.SLACK_THREAD_TS),
+    imageUrl: getArg('imageUrl'),
   };
 
   const response = await postJson(endpoint, payload, {
