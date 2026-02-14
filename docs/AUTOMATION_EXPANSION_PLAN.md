@@ -82,3 +82,34 @@ Recommended resolver order:
 - 90%+ bridge tasks end with automatic callback send (no manual operator curl).
 - preview link attached to every PR callback where branch is known.
 - callback failures are visible and retriable with clear diagnostics.
+
+
+## Next-session skill ideas (automation frontier)
+
+### 1) PR lifecycle skill (GitHub-native orchestration)
+- Auto-capture PR number/url/head ref after PR creation and propagate into callback payload automatically.
+- Post incremental updates (`started` -> `checks_passed` -> `pr_opened` -> `merged`).
+- Detect merge outcome and send final success/failure message to Slack + Telegram thread.
+
+### 2) Preview verification skill (Vercel signal loop)
+- Resolve preview URL from final PR head branch and poll health/readiness endpoint.
+- Attach screenshot links / health status to callback updates for operator confidence.
+- Auto-retry with backoff and report "still booting" vs hard-failure states.
+
+### 3) Supabase schema intelligence skill
+- With `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, collect schema/catalog metadata server-side.
+- Generate migration-aware bootstrap SQL recommendations (init + deltas + missing policies).
+- Produce change-risk report: unsafe drops, RLS gaps, index opportunities, policy drift.
+
+### 4) Incident digest skill
+- Daily/triggered digest to Telegram/Slack: failing tasks, preview regressions, callback failures, stuck PRs.
+- Include prioritized next actions and direct links (PR, preview, logs).
+
+### 5) Memory + context skill for `/codex` originators
+- Persist task context by originator (`telegramUserId`) and reuse history for follow-up tasks.
+- Include "what changed since last request" summary in callback replies.
+
+### Guardrails for all future skills
+- Keep all privileged operations server-side only.
+- Redact secrets and sensitive identifiers in outbound notifications.
+- Make each automation idempotent and retry-safe with explicit correlation IDs.
