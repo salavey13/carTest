@@ -7,6 +7,7 @@
  *
  * Examples:
  *   node scripts/codex-notify.mjs callback --status completed --summary "Done" --telegramChatId 123 --telegramUserId 456
+ *   node scripts/codex-notify.mjs callback-auto --summary "Done" --prUrl https://github.com/org/repo/pull/1
  *   node scripts/codex-notify.mjs telegram --chatId 123 --text "Hello"
  *   node scripts/codex-notify.mjs telegram-photo --chatId 123 --photo ./artifacts/page.png --caption "Preview"
  *   node scripts/codex-notify.mjs telegram-photo --chatId 123 --photoUrl https://... --caption "Preview"
@@ -80,6 +81,33 @@ async function runCallbackMode() {
   console.log(response);
 }
 
+async function runCallbackAutoMode() {
+  const endpoint = getArg('endpoint', process.env.CODEX_CALLBACK_ENDPOINT || 'https://v0-car-test.vercel.app/api/codex-bridge/callback');
+  const secret = process.env.CODEX_BRIDGE_CALLBACK_SECRET || getArg('secret');
+
+  if (!secret) {
+    console.log('callback-auto skipped: missing CODEX_BRIDGE_CALLBACK_SECRET');
+    return;
+  }
+
+  const payload = {
+    status: getArg('status', 'completed'),
+    summary: getArg('summary', 'Codex task update'),
+    branch: getArg('branch', process.env.PR_HEAD_REF || getBranchFallback()),
+    taskPath: getArg('taskPath', '/'),
+    prUrl: getArg('prUrl'),
+    telegramChatId: getArg('telegramChatId', process.env.TELEGRAM_CHAT_ID),
+    telegramUserId: getArg('telegramUserId', process.env.TELEGRAM_USER_ID),
+    slackChannelId: getArg('slackChannelId', process.env.SLACK_CODEX_CHANNEL_ID),
+    slackThreadTs: getArg('slackThreadTs', process.env.SLACK_THREAD_TS),
+  };
+
+  const response = await postJson(endpoint, payload, {
+    'x-codex-bridge-secret': secret,
+  });
+  console.log(response);
+}
+
 async function runTelegramMode() {
   const token = process.env.TELEGRAM_BOT_TOKEN || getArg('token');
   if (!token) throw new Error('Missing TELEGRAM_BOT_TOKEN (or --token)');
@@ -127,12 +155,20 @@ function runTelegramPhotoMode() {
   console.log(curl.stdout.trim());
 }
 
-if (!mode || !['callback', 'telegram', 'telegram-photo'].includes(mode)) {
-  console.error('Usage: node scripts/codex-notify.mjs <callback|telegram|telegram-photo> [--key value]');
+if (!mode || !['callback', 'callback-auto', 'telegram', 'telegram-photo'].includes(mode)) {
+  console.error('Usage: node scripts/codex-notify.mjs <callback|callback-auto|telegram|telegram-photo> [--key value]');
   process.exit(1);
 }
 
-Promise.resolve(mode === 'callback' ? runCallbackMode() : mode === 'telegram' ? runTelegramMode() : runTelegramPhotoMode())
+Promise.resolve(
+  mode === 'callback'
+    ? runCallbackMode()
+    : mode === 'callback-auto'
+      ? runCallbackAutoMode()
+      : mode === 'telegram'
+        ? runTelegramMode()
+        : runTelegramPhotoMode()
+)
   .catch((error) => {
     console.error(error.message || error);
     process.exit(1);
