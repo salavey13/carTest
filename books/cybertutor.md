@@ -15,6 +15,11 @@ CyberTutor — Telegram-first помощник для 7 класса:
 - `/books/alg.pdf` — Алгебра, 7 класс (Макарычев Ю.Н., Миндюк Н.Г. и др., 2024);
 - `/books/geom.pdf` — Геометрия, 7–9 класс (Атанасян Л.С. и др., 2024).
 
+### Важное уточнение по документации (чтобы не было недопонимания)
+
+- Все обновления «плана Homework Maker» делаем **в этом файле**: `/books/cybertutor.md`.
+- Отдельные временные заметки в `docs/*` допустимы только как черновик; source of truth для плана — `/books/cybertutor.md`.
+
 ---
 
 ## 2) Intake contract (Telegram + `/codex` + photo)
@@ -82,6 +87,15 @@ Routing notes:
 7. Генерирует итоговый ответ + краткую проверку.
 8. Использует screenshot skill и отправляет скрин страницы результата обратно (decent quality).
 
+### 4.1 Final answer page hydration (обязательный шаг)
+
+Перед отправкой результата в callback:
+1. Подготовить структурированный ответ (`Что дано / Решение / Ответ / Проверка`).
+2. Гидрировать страницу `app/homework/solution/[jobId]/page.tsx` данными конкретного `jobId`.
+3. Открыть страницу в браузере по маршруту `/homework/solution/<jobId>`.
+4. Проверить, что видны ключевые блоки без обрезки текста.
+5. Сделать screenshot и приложить как image artifact в callback/уведомление.
+
 Качество screenshot:
 - читаемый шрифт, без сильной компрессии;
 - видны «Что дано / Решение / Ответ»;
@@ -123,6 +137,8 @@ curl -X POST "https://v0-car-test.vercel.app/api/codex-bridge/callback" \
     "slackThreadTs": "1730000000.000100"
   }'
 ```
+
+Если есть скриншот, в summary добавить коротко: `Скрин решения приложен`.
 
 Preview example for current domain:
 `https://v0-car-test-git-work-salavey13s-projects.vercel.app/`
@@ -195,6 +211,7 @@ Homework API routes (целевая зона):
 | Date       | Branch | Implemented capability | Known gaps |
 |------------|--------|------------------------|------------|
 | 2026-02-14 | `work` | Flow скорректирован под `/codex + photo`: Slack-triggered Codex, OCR + on-the-fly PDF ragging в runtime, решение и screenshot skill возврат. | Нужна фактическая реализация `app/api/homework/*`; нужен production-ready screenshot delivery contract в bridge. |
+| 2026-02-14 | `work` | Уточнено, что master-план ведём в `/books/cybertutor.md`; добавлен обязательный hydration + screenshot шаг через `/homework/solution/<jobId>`. | Нужна унификация image payload в callback API для стабильной доставки в Telegram/Slack. |
 
 ---
 
@@ -211,6 +228,13 @@ Homework API routes (целевая зона):
   - задаёт on-the-fly поиск по `books/alg.pdf` и `books/geom.pdf` без offline индексов;
   - фиксирует source-aware output контракт (`sourceHints`);
   - добавляет guardrails против «уверенной галлюцинации».
+
+
+
+- `skills/homework-solution-store-supabase/SKILL.md`
+  - проверяет существование таблицы хранения решений;
+  - сохраняет решение upsert-режимом;
+  - поддерживает быстрый existence-check для same-day ответов.
 
 Обе skill-инструкции заточены под execution в Codex runtime, чтобы задачи решались одинаково предсказуемо.
 
@@ -277,3 +301,52 @@ Homework API routes (целевая зона):
 | Date       | Branch | Implemented capability | Known gaps |
 |------------|--------|------------------------|------------|
 | 2026-02-14 | `work` | Созданы execution skills: `homework-ocr-intake` и `homework-pdf-rag-runtime`; добавлена broader-picture roadmap по задачам A–E. | Ещё не реализованы production route handlers `app/api/homework/*` и расширение callback для image payload. |
+
+---
+
+## 12) Operator-ready финальный протокол (короткая версия)
+
+Чтобы ответ ученику доходил без ручной суеты, используем ровно эту последовательность:
+
+1. Принять `/codex + фото` и распарсить задание.
+2. Решить задачу с привязкой к `alg.pdf/geom.pdf`.
+3. Сохранить/гидрировать финальный ответ на странице `/homework/solution/<jobId>`.
+4. Сделать screenshot страницы решения.
+5. Отправить callback на `https://v0-car-test.vercel.app/api/codex-bridge/callback` с:
+   - `status`, `summary`, `branch`, `taskPath`, `prUrl` (если есть),
+   - reply targets originator: `telegramChatId`, `telegramUserId`, `slackChannelId`, `slackThreadTs`.
+6. В summary обязательно указать, что скрин приложен.
+
+Так оператор сразу получает и текст, и визуальный артефакт для ученика.
+
+### 12.1 Быстрый ответ по домашке за тот же день
+
+Для ускорения повторных запросов добавлен слой хранения решений в Supabase:
+- таблица: `public.homework_daily_solutions`;
+- быстрый поиск: сначала `solution_key`, затем fallback на запись за `current_date`;
+- это позволяет мгновенно вернуть уже готовое решение в `hydrateHomeworkSolution`, даже если `homework_jobs` ещё не заполнен.
+
+Инициализационный seed (пример с `13-02-final`) добавляется миграцией, чтобы демонстрация и screenshot-поток работали из коробки.
+
+
+### 12.2 Request-level fast path (без прогрузки полной цепочки)
+
+Если повторно прилетает то же ДЗ в тот же день, сначала делаем быстрый lookup в Supabase:
+1. `ensure-table` (проверка, что `homework_daily_solutions` доступна);
+2. `exists --solutionKey <jobId> --date <today>`;
+3. если запись есть — сразу открываем `/homework/solution/<jobId>` и делаем screenshot;
+4. возвращаем готовый ответ без лишнего OCR/RAG цикла.
+
+Это снижает latency на уровне request и ускоряет ответ оператору/ученику.
+
+
+### 12.3 Markdown-first storage
+
+- Полный разбор решения храним как markdown-текст в Supabase (`solution_markdown`).
+- Для обратной совместимости дублируем в `full_solution_rich`.
+- На странице решения markdown рендерится как rich-блок через `ReactMarkdown + remark-gfm`.
+
+
+### 12.4 Interwork skills (store + notify)
+
+После операций skill по Supabase (`bootstrap-table`, `exists`, `save`) рекомендуется запускать с `--notify 1`, чтобы `scripts/homework-solution-store-skill.mjs` сразу отправлял callback-обновление в bridge (через `CODEX_BRIDGE_CALLBACK_SECRET`).
