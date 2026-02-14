@@ -91,6 +91,10 @@ That is enough to get a working autonomous baseline.
 
 Never commit real secrets.
 
+Install reliability note:
+- Prefer dependency sets that do not require `onnxruntime-node` postinstall CUDA downloads in CI-like runners.
+- Avoid adding custom npm config keys in `.npmrc` that trigger `Unknown project config` warnings on `npm ci`.
+
 ---
 
 ## 5) DB migration guidance
@@ -207,6 +211,61 @@ Agent response should include:
 Keep it copy-paste friendly for operators (single curl block preferred).
 MANDATORY for bridge-triggered tasks: agent must provide a ready-to-run callback call to `https://v0-car-test.vercel.app/api/codex-bridge/callback` including preview-link fields (`branch`, optional `taskPath`) and `x-codex-bridge-secret`.
 
+Execution preference:
+- If callback auth/env context is available during task execution, agent should **send callback directly** (not only provide copy/paste).
+- If callback cannot be sent automatically (missing secret/targets), agent must clearly report why and provide fallback curl block.
+
+### 9.2) Git workflow + callback timing contract (strict)
+
+For Telegram `/codex` -> Slack tasks, treat callback delivery as part of the definition of done:
+
+1. Create/fix branch and keep branch name short and readable.
+2. Commit changes locally.
+3. Create PR.
+4. **Immediately** provide a copy-paste callback request that includes final `branch` and `prUrl`.
+
+#### Branch naming rules (for stable preview links)
+
+- preferred format: `<type>/<scope>-<short-topic>`
+  - examples: `fix/npm-onnx-install`, `chore/bridge-callback-docs`
+- allowed characters: `a-z`, `0-9`, `/`, `-`
+- avoid uppercase, spaces, `_`, and very long names
+- preferred length: <= 24 chars after slash replacement to reduce Vercel truncation risk
+
+#### Preview URL rules in callback responses
+
+- Always derive preview slug from actual branch: replace `/` -> `-`
+- Always include concrete preview example for this project domain:
+  - `https://v0-car-test-git-<branch-slug>-salavey13s-projects.vercel.app/<taskPath>`
+- If `taskPath` is omitted, use `/`
+
+#### Slack notification targeting rules
+
+- Include reply target fields whenever available:
+  - `slackChannelId`
+  - `slackThreadTs`
+  - `telegramChatId`
+- If `SLACK_INCOMING_WEBHOOK_URL` mode is used, `slackChannelId` can be omitted.
+- Keep `summary` short (1-3 lines), include status and next action.
+
+#### Canonical callback payload (agent should output this block)
+
+```bash
+curl -X POST "https://v0-car-test.vercel.app/api/codex-bridge/callback" \
+  -H "Content-Type: application/json" \
+  -H "x-codex-bridge-secret: $CODEX_BRIDGE_CALLBACK_SECRET" \
+  -d '{
+    "status": "completed",
+    "summary": "<short result summary>",
+    "branch": "<real-current-branch>",
+    "taskPath": "<optional-path-or-/>",
+    "prUrl": "<optional-pr-url>",
+    "telegramChatId": "<optional-chat-id>",
+    "slackChannelId": "<optional-channel-id>",
+    "slackThreadTs": "<optional-thread-ts>"
+  }'
+```
+
 
 
 Slack token strategy:
@@ -223,3 +282,5 @@ For this repo/domain, prefer concrete link previews in replies like:
 
 
 Incoming webhook mode can omit channel id: if `SLACK_INCOMING_WEBHOOK_URL` is configured, posting destination is defined by webhook itself.
+
+Roadmap reference: see `docs/AUTOMATION_EXPANSION_PLAN.md` for staged automation improvements (auto-callback delivery, lifecycle statuses, schema introspection, and observability).

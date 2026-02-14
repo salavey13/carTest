@@ -180,8 +180,19 @@ Preview link строится как:
 
 Suffix может быть в формате `-team.vercel.app` (рекомендуемо) или `.team.vercel.app`; код поддерживает оба варианта.
 
+
+### Bridge workflow contract (ветка -> PR -> callback)
+1. Работай в короткой ветке вида `fix/...` или `chore/...` (lowercase, `a-z0-9/-`, без `_`, лучше <= 24 символов в slug).
+2. После коммита открой PR.
+3. Сразу после PR отправь callback (в тот же Slack thread / Telegram chat): `status`, `summary`, `branch`, `taskPath`, `prUrl`, `slackThreadTs`.
+4. Preview строится только из **реального** имени ветки (`/` -> `-`), без плейсхолдеров вроде `work`.
+
+
+### Bridge automation roadmap
+- See `docs/AUTOMATION_EXPANSION_PLAN.md` for phased expansion from manual callbacks to agent-executed callbacks, lifecycle notifications, and data/deploy observability.
+
 ### Operator copy-paste callback template
-After Codex task completion, send callback to:
+After Codex task completion, send callback to (fallback mode when agent cannot send it automatically):
 - `https://v0-car-test.vercel.app/api/codex-bridge/callback`
 
 ```bash
