@@ -8,6 +8,8 @@
  * Examples:
  *   node scripts/codex-notify.mjs callback --status completed --summary "Done" --telegramChatId 123 --telegramUserId 456
  *   node scripts/codex-notify.mjs telegram --chatId 123 --text "Hello"
+ *   node scripts/codex-notify.mjs telegram-photo --chatId 123 --photo ./artifacts/page.png --caption "Preview"
+ *   node scripts/codex-notify.mjs telegram-photo --chatId 123 --photoUrl https://... --caption "Preview"
  */
 
 import { execSync, spawnSync } from 'node:child_process';
@@ -95,12 +97,42 @@ async function runTelegramMode() {
   console.log(response);
 }
 
-if (!mode || (mode !== 'callback' && mode !== 'telegram')) {
-  console.error('Usage: node scripts/codex-notify.mjs <callback|telegram> [--key value]');
+function runTelegramPhotoMode() {
+  const token = process.env.TELEGRAM_BOT_TOKEN || getArg('token');
+  if (!token) throw new Error('Missing TELEGRAM_BOT_TOKEN (or --token)');
+
+  const chatId = getArg('chatId', process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_USER_ID || process.env.ADMIN_CHAT_ID);
+  if (!chatId) throw new Error('Missing --chatId (or TELEGRAM_CHAT_ID/TELEGRAM_USER_ID/ADMIN_CHAT_ID env)');
+
+  const photo = getArg('photo');
+  const photoUrl = getArg('photoUrl');
+  if (!photo && !photoUrl) throw new Error('Missing --photo (local file path) or --photoUrl (remote image URL)');
+
+  const caption = getArg('caption', 'Codex task image update');
+  const parseMode = getArg('parseMode', 'Markdown');
+  const url = `https://api.telegram.org/bot${token}/sendPhoto`;
+
+  const photoField = photo ? `photo=@${photo}` : `photo=${photoUrl}`;
+
+  const curl = spawnSync(
+    'curl',
+    ['-sS', '-X', 'POST', url, '-F', `chat_id=${chatId}`, '-F', `caption=${caption}`, '-F', `parse_mode=${parseMode}`, '-F', photoField],
+    { encoding: 'utf8' }
+  );
+
+  if (curl.status !== 0) {
+    throw new Error(`Telegram photo send failed: ${curl.stderr || curl.stdout}`);
+  }
+
+  console.log(curl.stdout.trim());
+}
+
+if (!mode || !['callback', 'telegram', 'telegram-photo'].includes(mode)) {
+  console.error('Usage: node scripts/codex-notify.mjs <callback|telegram|telegram-photo> [--key value]');
   process.exit(1);
 }
 
-(mode === 'callback' ? runCallbackMode() : runTelegramMode())
+Promise.resolve(mode === 'callback' ? runCallbackMode() : mode === 'telegram' ? runTelegramMode() : runTelegramPhotoMode())
   .catch((error) => {
     console.error(error.message || error);
     process.exit(1);
