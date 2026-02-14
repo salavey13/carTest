@@ -1,0 +1,107 @@
+#!/usr/bin/env node
+
+/**
+ * Local operator skill: send Codex completion notifications either:
+ *  - directly to Telegram Bot API
+ *  - through /api/codex-bridge/callback
+ *
+ * Examples:
+ *   node scripts/codex-notify.mjs callback --status completed --summary "Done" --telegramChatId 123 --telegramUserId 456
+ *   node scripts/codex-notify.mjs telegram --chatId 123 --text "Hello"
+ */
+
+import { execSync, spawnSync } from 'node:child_process';
+
+const [mode, ...args] = process.argv.slice(2);
+
+function getArg(name, fallback = undefined) {
+  const idx = args.indexOf(`--${name}`);
+  if (idx === -1) return fallback;
+  return args[idx + 1];
+}
+
+function getBranchFallback() {
+  try {
+    return execSync('git rev-parse --abbrev-ref HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch {
+    return undefined;
+  }
+}
+
+async function postJson(url, body, headers = {}) {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${text}`);
+    }
+    return text;
+  } catch (fetchError) {
+    // Fallback for runner environments where Node fetch has network/proxy issues.
+    const headerArgs = Object.entries({ 'Content-Type': 'application/json', ...headers })
+      .flatMap(([k, v]) => ['-H', `${k}: ${v}`]);
+    const curl = spawnSync('curl', ['-sS', '-X', 'POST', url, ...headerArgs, '-d', JSON.stringify(body)], {
+      encoding: 'utf8',
+    });
+    if (curl.status !== 0) {
+      throw new Error(`fetch failed; curl fallback failed: ${curl.stderr || curl.stdout || fetchError}`);
+    }
+    return curl.stdout.trim();
+  }
+}
+
+async function runCallbackMode() {
+  const endpoint = getArg('endpoint', process.env.CODEX_CALLBACK_ENDPOINT || 'https://v0-car-test.vercel.app/api/codex-bridge/callback');
+  const secret = process.env.CODEX_BRIDGE_CALLBACK_SECRET || getArg('secret');
+  if (!secret) throw new Error('Missing CODEX_BRIDGE_CALLBACK_SECRET (or --secret)');
+
+  const branch = getArg('branch', process.env.PR_HEAD_REF || getBranchFallback());
+  const payload = {
+    status: getArg('status', 'completed'),
+    summary: getArg('summary', 'Codex task update'),
+    branch,
+    taskPath: getArg('taskPath', '/'),
+    prUrl: getArg('prUrl'),
+    telegramChatId: getArg('telegramChatId', process.env.TELEGRAM_CHAT_ID),
+    telegramUserId: getArg('telegramUserId', process.env.TELEGRAM_USER_ID),
+    slackChannelId: getArg('slackChannelId', process.env.SLACK_CODEX_CHANNEL_ID),
+    slackThreadTs: getArg('slackThreadTs', process.env.SLACK_THREAD_TS),
+  };
+
+  const response = await postJson(endpoint, payload, {
+    'x-codex-bridge-secret': secret,
+  });
+  console.log(response);
+}
+
+async function runTelegramMode() {
+  const token = process.env.TELEGRAM_BOT_TOKEN || getArg('token');
+  if (!token) throw new Error('Missing TELEGRAM_BOT_TOKEN (or --token)');
+
+  const chatId = getArg('chatId', process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_USER_ID);
+  if (!chatId) throw new Error('Missing --chatId (or TELEGRAM_CHAT_ID/TELEGRAM_USER_ID env)');
+
+  const text = getArg('text', 'Codex task update');
+  const response = await postJson(`https://api.telegram.org/bot${token}/sendMessage`, {
+    chat_id: chatId,
+    text,
+    parse_mode: getArg('parseMode', 'Markdown'),
+    disable_web_page_preview: true,
+  });
+  console.log(response);
+}
+
+if (!mode || (mode !== 'callback' && mode !== 'telegram')) {
+  console.error('Usage: node scripts/codex-notify.mjs <callback|telegram> [--key value]');
+  process.exit(1);
+}
+
+(mode === 'callback' ? runCallbackMode() : runTelegramMode())
+  .catch((error) => {
+    console.error(error.message || error);
+    process.exit(1);
+  });

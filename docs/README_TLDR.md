@@ -40,6 +40,11 @@ git push origin main
 - `VERCEL_PROJECT_NAME` + `VERCEL_PREVIEW_DOMAIN_SUFFIX` (optional, preview URL generation)
 
 
+
+## 3.1) Install note for restricted networks
+- Prefer: `npm install`
+- Why: project no longer depends on custom ONNX npm config keys, so `npm ci` does not emit `Unknown project config` warnings for this path.
+
 ## 4) Telegram `/codex` -> Slack
 - Команда `/codex <task>` из Telegram форвардится в Slack канал.
 - Нужны env: либо `SLACK_BOT_TOKEN` + `SLACK_CODEX_CHANNEL_ID`, либо `SLACK_INCOMING_WEBHOOK_URL`.
@@ -61,4 +66,18 @@ git push origin main
 - Endpoint: `https://v0-car-test.vercel.app/api/codex-bridge/callback`
 - Header: `x-codex-bridge-secret`
 - Include `branch` (+ optional `taskPath`) to get preview URL in response.
+- Branch naming: use short lowercase branches (`fix/...`, `chore/...`, chars `a-z0-9/-`).
+- After commit + PR, send callback immediately with `branch` + `prUrl` + reply target fields (`telegramChatId`, `slackChannelId`, `slackThreadTs`).
+- For this repo previews, use: `https://v0-car-test-git-<branch-slug>-salavey13s-projects.vercel.app/<taskPath>`.
+- If PR branch differs from local branch (e.g. runner prefix like `codex/...`), use PR `head.ref` as source of truth for callback + preview URL.
 - Suffix format: prefer `-team.vercel.app` (dot-prefixed `.team.vercel.app` is also supported).
+
+
+## 8) Automation expansion roadmap
+- See `docs/AUTOMATION_EXPANSION_PLAN.md` for the full phased plan: auto callback execution, lifecycle statuses, preview health checks, and schema-level operator intelligence.
+
+
+## 9) Notification helper script
+- `node scripts/codex-notify.mjs callback ...` to send callback quickly.
+- `node scripts/codex-notify.mjs telegram ...` to ping a user/chat directly via bot token.
+- For `/codex` originator notification, send both `telegramChatId` and `telegramUserId`.
