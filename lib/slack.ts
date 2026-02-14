@@ -7,12 +7,6 @@ type SlackPostMessageResponse = {
   channel?: string;
 };
 
-type SlackIncomingWebhookResult = {
-  ok: boolean;
-  status?: number;
-  error?: string;
-};
-
 type SlackOAuthAccessResponse = {
   ok: boolean;
   access_token?: string;
@@ -89,33 +83,6 @@ async function refreshSlackAccessToken(params: {
 
 
 
-async function postViaIncomingWebhook(params: {
-  webhookUrl: string;
-  text: string;
-  threadTs?: string;
-}): Promise<SlackIncomingWebhookResult> {
-  const payload: Record<string, string | boolean> = {
-    text: params.text,
-    mrkdwn: true,
-    link_names: true,
-  };
-  if (params.threadTs) payload.thread_ts = params.threadTs;
-
-  const response = await fetch(params.webhookUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json; charset=utf-8" },
-    body: JSON.stringify(payload),
-  });
-
-  if (response.ok) {
-    return { ok: true, status: response.status };
-  }
-
-  const bodyText = await response.text();
-  logger.error("[Slack] Incoming webhook failed", { status: response.status, bodyText });
-  return { ok: false, status: response.status, error: bodyText || `Webhook error (${response.status})` };
-}
-
 export async function getSlackAccessToken(): Promise<string | null> {
   const { staticBotToken, clientId, clientSecret, refreshToken } = getSlackBridgeConfig();
 
@@ -147,15 +114,28 @@ export async function postSlackMessage(params: {
   text: string;
   channel?: string;
   threadTs?: string;
+  blocks?: Array<Record<string, unknown>>;
 }): Promise<SlackPostResult> {
   const { defaultChannel, incomingWebhookUrl } = getSlackBridgeConfig();
 
   if (incomingWebhookUrl) {
-    const webhookResult = await postViaIncomingWebhook({
-      webhookUrl: incomingWebhookUrl,
+    const payload: Record<string, unknown> = {
       text: params.text,
-      threadTs: params.threadTs,
+      mrkdwn: true,
+      link_names: true,
+    };
+    if (params.threadTs) payload.thread_ts = params.threadTs;
+    if (params.blocks?.length) payload.blocks = params.blocks;
+
+    const response = await fetch(incomingWebhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify(payload),
     });
+
+    const webhookResult = response.ok
+      ? { ok: true, status: response.status }
+      : { ok: false, status: response.status, error: (await response.text()) || `Webhook error (${response.status})` };
 
     if (!webhookResult.ok) {
       return {
@@ -191,6 +171,7 @@ export async function postSlackMessage(params: {
       mrkdwn: true,
       link_names: true,
       thread_ts: params.threadTs,
+      blocks: params.blocks,
     }),
   });
 
