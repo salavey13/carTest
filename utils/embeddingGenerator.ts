@@ -1,5 +1,5 @@
 // /utils/embeddingGenerator.ts
-import { pipeline } from "@huggingface/transformers"
+import { pipeline } from "@xenova/transformers"
 import { supabaseAdmin } from "@/hooks/supabase"
 import { debugLogger } from "@/lib/debugLogger"
 
