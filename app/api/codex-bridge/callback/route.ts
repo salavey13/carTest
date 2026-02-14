@@ -14,6 +14,16 @@ type CallbackBody = {
   telegramUserId?: string | number;
   slackChannelId?: string;
   slackThreadTs?: string;
+  imageUrl?: string;
+  images?: string[];
+};
+
+type DeliveryStatus = {
+  target: string;
+  ok: boolean;
+  mode: "text" | "photo";
+  sentImages?: number;
+  error?: string;
 };
 
 function normalizeBranchSlug(branch: string) {
@@ -46,6 +56,54 @@ function verifySecret(req: NextRequest) {
   return got === expected;
 }
 
+function extractImageUrls(body: CallbackBody) {
+  const all = [body.imageUrl, ...(body.images || [])].filter((value): value is string => Boolean(value?.trim()));
+  return Array.from(new Set(all));
+}
+
+async function sendTelegramPhotoWithCaption(chatId: string | number, text: string, imageUrls: string[]): Promise<DeliveryStatus> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    return { target: String(chatId), ok: false, mode: "photo", sentImages: 0, error: "TELEGRAM_BOT_TOKEN is not configured" };
+  }
+
+  let sentImages = 0;
+  for (let index = 0; index < imageUrls.length; index += 1) {
+    const imageUrl = imageUrls[index];
+    const payload: Record<string, string> = {
+      chat_id: String(chatId),
+      photo: imageUrl,
+      parse_mode: "Markdown",
+      disable_web_page_preview: "true",
+    };
+
+    if (index === 0) {
+      payload.caption = text;
+    }
+
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      return {
+        target: String(chatId),
+        ok: false,
+        mode: "photo",
+        sentImages,
+        error: data?.description || `sendPhoto failed (${response.status})`,
+      };
+    }
+
+    sentImages += 1;
+  }
+
+  return { target: String(chatId), ok: true, mode: "photo", sentImages };
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!verifySecret(req)) {
@@ -54,6 +112,7 @@ export async function POST(req: NextRequest) {
 
     const body = (await req.json()) as CallbackBody;
     const previewUrl = buildPreviewUrl(body.branch, body.taskPath);
+    const imageUrls = extractImageUrls(body);
 
     const lines = [
       `*Codex update:* ${body.status || "done"}`,
@@ -64,24 +123,71 @@ export async function POST(req: NextRequest) {
     ].filter(Boolean) as string[];
 
     const message = lines.join("\n");
+    const textForSlack = message.replace(/\*/g, "");
+    const imageDelivery: {
+      telegram: DeliveryStatus[];
+      slack: DeliveryStatus | null;
+    } = {
+      telegram: [],
+      slack: null,
+    };
 
-    if (body.telegramChatId) {
-      await sendComplexMessage(body.telegramChatId, message, [], { parseMode: "Markdown" });
-    }
+    for (const target of [body.telegramChatId, body.telegramUserId]) {
+      if (!target) continue;
 
-    if (body.telegramUserId) {
-      await sendComplexMessage(body.telegramUserId, message, [], { parseMode: "Markdown" });
+      if (imageUrls.length > 0) {
+        const photoResult = await sendTelegramPhotoWithCaption(target, message, imageUrls);
+        imageDelivery.telegram.push(photoResult);
+      } else {
+        const textResult = await sendComplexMessage(target, message, [], { parseMode: "Markdown" });
+        imageDelivery.telegram.push({
+          target: String(target),
+          ok: textResult.success,
+          mode: "text",
+          error: textResult.error,
+        });
+      }
     }
 
     const slackConfig = getSlackBridgeConfig();
     const canSendToSlack = Boolean(body.slackChannelId || body.slackThreadTs || slackConfig.incomingWebhookUrl || slackConfig.defaultChannel);
 
     if (canSendToSlack) {
-      await postSlackMessage({
-        text: message.replace(/\*/g, ""),
+      const slackText = imageUrls.length > 0
+        ? `${textForSlack}\nImage: ${imageUrls[0]}`
+        : textForSlack;
+
+      const slackBlocks = imageUrls.length > 0 && !slackConfig.incomingWebhookUrl
+        ? [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: textForSlack,
+              },
+            },
+            ...imageUrls.map((url) => ({
+              type: "image",
+              image_url: url,
+              alt_text: "Codex callback image",
+            })),
+          ]
+        : undefined;
+
+      const slackResult = await postSlackMessage({
+        text: slackText,
         channel: body.slackChannelId,
         threadTs: body.slackThreadTs,
+        blocks: slackBlocks,
       });
+
+      imageDelivery.slack = {
+        target: body.slackChannelId || slackConfig.defaultChannel || "incoming_webhook",
+        ok: slackResult.ok,
+        mode: imageUrls.length > 0 ? "photo" : "text",
+        sentImages: imageUrls.length > 0 ? imageUrls.length : 0,
+        error: slackResult.ok ? undefined : slackResult.error,
+      };
     }
 
     await notifyAdmin([
@@ -93,9 +199,10 @@ export async function POST(req: NextRequest) {
       body.telegramChatId ? `Chat: ${body.telegramChatId}` : null,
       body.telegramUserId ? `User: ${body.telegramUserId}` : null,
       previewUrl ? `Preview: ${previewUrl}` : null,
+      imageUrls.length > 0 ? `Images: ${imageUrls.length}` : null,
     ].filter(Boolean).join("\n"));
 
-    return NextResponse.json({ ok: true, previewUrl });
+    return NextResponse.json({ ok: true, previewUrl, imageDelivery });
   } catch (error) {
     logger.error("[Codex Bridge Callback] error", error);
     return NextResponse.json({ ok: false, error: "Internal error" }, { status: 500 });
