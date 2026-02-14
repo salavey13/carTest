@@ -297,3 +297,14 @@ For this repo/domain, prefer concrete link previews in replies like:
 Incoming webhook mode can omit channel id: if `SLACK_INCOMING_WEBHOOK_URL` is configured, posting destination is defined by webhook itself.
 
 Roadmap reference: see `docs/AUTOMATION_EXPANSION_PLAN.md` for staged automation improvements (auto-callback delivery, lifecycle statuses, schema introspection, and observability).
+
+### 9.3) Agent notification skill (local script)
+
+Use `scripts/codex-notify.mjs` to send completion updates without manual curl construction:
+- callback mode: `node scripts/codex-notify.mjs callback ...`
+- telegram mode: `node scripts/codex-notify.mjs telegram ...`
+
+Originator rule:
+- For `/codex` tasks, include both `telegramChatId` **and** `telegramUserId` whenever known, so callback can notify chat + originator directly.
+- Branch resolution inside script: `PR_HEAD_REF` -> local git branch -> explicit `--branch`.
+

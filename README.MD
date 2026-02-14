@@ -193,6 +193,16 @@ Suffix может быть в формате `-team.vercel.app` (рекомен�
 ### Bridge automation roadmap
 - See `docs/AUTOMATION_EXPANSION_PLAN.md` for phased expansion from manual callbacks to agent-executed callbacks, lifecycle notifications, and data/deploy observability.
 
+
+### Built-in notification skill (agent/operator)
+Use local helper script:
+```bash
+node scripts/codex-notify.mjs callback --status completed --summary "Done" --telegramChatId <chat_id> --telegramUserId <originator_user_id>
+```
+Notes:
+- script resolves branch as `PR_HEAD_REF` -> current git branch -> `--branch`
+- pass both `telegramChatId` and `telegramUserId` to notify chat + originator
+
 ### Operator copy-paste callback template
 After Codex task completion, send callback to (fallback mode when agent cannot send it automatically):
 - `https://v0-car-test.vercel.app/api/codex-bridge/callback`
