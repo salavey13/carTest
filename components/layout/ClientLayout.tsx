@@ -308,7 +308,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const paramToProcess = startParamPayload || searchParams.get("tgWebAppStartParam");
+    const rawStartParam = startParamPayload || searchParams.get("tgWebAppStartParam");
+    const paramToProcess = normalizeStartParamPath(rawStartParam);
     
     if (!isAppLoading && !isAuthenticating && paramToProcess && !startParamHandledRef.current) {
       startParamHandledRef.current = true;
@@ -360,6 +361,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
           handleSyndicateReferral(refCode);
           if (pathname === '/') targetPath = '/wblanding';
           else targetPath = pathname; 
+      }
+      else if (paramToProcess.includes("/")) {
+        targetPath = `/${paramToProcess}`;
       }
       else {
         targetPath = `/${paramToProcess}`;
@@ -492,3 +496,11 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
     </ErrorOverlayProvider>
   );
 }
+const normalizeStartParamPath = (rawParam: string | null) => {
+  if (!rawParam) return null;
+  const decoded = decodeURIComponent(rawParam).trim();
+  if (!decoded) return null;
+  return decoded.replace(/^\/+/, "").replace(/\/+/g, "/");
+};
+
+

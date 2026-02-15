@@ -313,6 +313,98 @@ Originator rule:
 When a bridge task contains a **homework screenshot/photo** (for example school schedule + homework list),
 the agent must switch to **CyberTutor autopilot mode** and run the complete chain defined in `books/cybertutor.md`.
 
+
+#### 9.4.1) Strict solver rule (no "plan-only" output)
+
+For homework-photo `/codex` tasks, **planning-only answers are forbidden**.
+Agent must:
+- extract concrete tasks from photo;
+- solve every solvable item (e.g. algebra/geometry exercise numbers) with full final answers;
+- in `Дано`, include extracted problem statements from source books (verbatim or максимально близко) for each solved numbered task;
+- for non-solvable items (no full problem text in photo), explicitly mark as `needs_clarification` or "theory-only task", without fabricating.
+
+If local textbook PDFs (`books/alg.pdf`, `books/geom.pdf`) contain the numbered exercises, use them and include source hints (book + page + exercise).
+
+#### 9.4.2) Mandatory persistence verification (no false-complete)
+
+When using Supabase homework storage skill, done state requires **read-after-write verification**:
+1. save solution (`save`),
+2. run existence/read check (`exists` or select by `solution_key`),
+3. only after positive verification claim "saved to Supabase" in callback summary.
+
+If verification fails, callback status must be `failed` or `in_progress` with exact reason.
+
+#### 9.4.3) Screenshot delivery contract for homework completion
+
+Homework completion callback must include a screenshot URL (`imageUrl`) that is accessible to Telegram/Slack APIs.
+- Artifact-local paths are not enough for callback delivery.
+- Upload screenshot to public storage first (Supabase Storage), then send callback with `imageUrl`.
+- In summary explicitly mention that screenshot link is attached.
+
+#### 9.4.4) Result link preference for homework pages
+
+For `/homework/solution/<jobId>` callbacks, prefer production link in message body:
+- `https://v0-car-test.vercel.app/homework/solution/<jobId>`
+
+Preview URL may be included as secondary debug link, but production URL is primary for operator/student flow.
+
+
+#### 9.4.5) Delivery links (required with screenshot)
+
+When homework result is sent, provide not only screenshot/image but also clickable links:
+- production web URL: `https://v0-car-test.vercel.app/homework/solution/<jobId>`
+- Telegram WebApp deeplink: `https://t.me/oneBikePlsBot/app?startapp=homework/solution/<jobId>`
+
+Include at least one of these links in callback summary/text even if image delivery fails.
+
+#### 9.4.6) Screenshot engine fallback order (mandatory)
+
+For screenshot generation, use this strict fallback chain:
+1. Playwright Chromium
+2. Playwright Firefox
+3. Playwright WebKit
+4. `scripts/page-screenshot-skill.mjs` (thum.io) as last-resort readable capture
+
+If one engine crashes (e.g. Chromium SIGSEGV), immediately retry next engine and report which engine succeeded.
+
+#### 9.4.7) Agent memory diary (resurrectable hints)
+
+Maintain execution diary in `docs/AGENT_DIARY.md`.
+For each hard production lesson (bridge errors, screenshot runtime quirks, callback gotchas), append:
+- date,
+- symptom,
+- root cause,
+- fix/workaround,
+- verification command.
+
+Before starting bridge/homework tasks, quickly reread latest diary entries and apply learned mitigations.
+
+
+#### 9.4.8) ИЗО assignment solver protocol (image prompt mode)
+
+If homework includes subject `ИЗО` and asks to create/draw something:
+1. compose a detailed image-generation prompt (object/theme, composition, technique, lighting, paper texture);
+2. style target should look like **photo of a real drawing/painting in a school album**;
+3. include age-appropriate complexity (7th grade), neat but not hyper-professional;
+4. return: (a) ready prompt text, (b) short step-by-step how to redraw manually, (c) materials list.
+
+Suggested prompt structure:
+- scene subject;
+- requested technique (гуашь/акварель/карандаш);
+- "photo of sketchbook page" realism cues;
+- mild imperfections (paper grain, hand-made stroke variability).
+
+
+
+#### 9.4.9) Final response callback block policy
+
+Default behavior: **do not append** a long "Bridge callback block (copy-paste curl)" in final user-facing response
+when callback is already sent successfully via automation.
+
+Only include curl fallback when:
+- user explicitly requests it, or
+- automatic callback delivery failed / missing auth context.
+
 Required behavior for these cases:
 
 1. Trigger the local homework skills as a bundle (do not run partial flow):
@@ -330,4 +422,4 @@ Required behavior for these cases:
 5. In agent final response for bridge-driven tasks, always include a copy-paste callback curl as fallback,
    even if callback was already sent programmatically.
 
-Implementation source of truth for this flow: `books/cybertutor.md`.
+Implementation source of truth for this flow: `books/cybertutor.md` plus canonical operator contract `docs/CYBERTUTOR_RUNTIME_CONTRACT_V1.md`.

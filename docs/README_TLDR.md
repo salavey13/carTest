@@ -81,3 +81,21 @@ git push origin main
 - `node scripts/codex-notify.mjs callback ...` to send callback quickly.
 - `node scripts/codex-notify.mjs telegram ...` to ping a user/chat directly via bot token.
 - For `/codex` originator notification, send both `telegramChatId` and `telegramUserId`.
+
+
+## 10) CyberTutor homework-photo (strict)
+- No plan-only responses: solve numbered tasks from photo/PDF where possible.
+- In `Что дано`, include extracted statements from textbooks, not only task numbers.
+- Save to Supabase + verify (`save` then `exists/select`) before callback says "saved".
+- Use production homework URL in callback for students/operators.
+- Attach screenshot via public `imageUrl` (artifact path alone is not enough).
+- Telegram deeplink: `https://t.me/oneBikePlsBot/app?startapp=homework/solution/<jobId>`.
+- Screenshot fallback engines: Chromium -> Firefox -> WebKit -> thum.io.
+- ИЗО tasks: include image-generation prompt + manual redraw instructions + materials.
+- If Slack photo upload has `missing_scope`, send public photo links fallback.
+
+
+## 11) Agent memory
+- Read/update `docs/AGENT_DIARY.md` for practical runtime lessons (bridge errors, screenshot fallbacks, callback edge-cases).
+
+- Canonical CyberTutor contract: `docs/CYBERTUTOR_RUNTIME_CONTRACT_V1.md`.
