@@ -49,6 +49,27 @@ function buildPreviewUrl(branch?: string, taskPath?: string) {
   return `${base}${normalizedPath}`;
 }
 
+
+function buildTelegramHomeworkDeepLink(taskPath?: string) {
+  if (!taskPath) return null;
+  const normalizedPath = taskPath.startsWith("/") ? taskPath.slice(1) : taskPath;
+  if (!normalizedPath.startsWith("homework/solution/")) return null;
+  return `https://t.me/oneBikePlsBot/app?startapp=${normalizedPath}`;
+}
+
+function buildProductionTaskUrl(taskPath?: string) {
+  if (!taskPath) return null;
+
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    "https://v0-car-test.vercel.app";
+
+  const normalizedBase = siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`;
+  const normalizedPath = taskPath.startsWith("/") ? taskPath : `/${taskPath}`;
+  return `${normalizedBase.replace(/\/$/, "")}${normalizedPath}`;
+}
+
 function verifySecret(req: NextRequest) {
   const expected = process.env.CODEX_BRIDGE_CALLBACK_SECRET;
   if (!expected) return false;
@@ -70,10 +91,13 @@ async function sendTelegramPhotoWithCaption(chatId: string | number, text: strin
   let sentImages = 0;
   for (let index = 0; index < imageUrls.length; index += 1) {
     const imageUrl = imageUrls[index];
+    const shouldSendAsDocument = /\.png($|\?)/i.test(imageUrl);
+    const endpoint = shouldSendAsDocument ? "sendDocument" : "sendPhoto";
+    const mediaField = shouldSendAsDocument ? "document" : "photo";
+
     const payload: Record<string, string> = {
       chat_id: String(chatId),
-      photo: imageUrl,
-      parse_mode: "Markdown",
+      [mediaField]: imageUrl,
       disable_web_page_preview: "true",
     };
 
@@ -81,7 +105,7 @@ async function sendTelegramPhotoWithCaption(chatId: string | number, text: strin
       payload.caption = text;
     }
 
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+    const response = await fetch(`https://api.telegram.org/bot${token}/${endpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -92,9 +116,9 @@ async function sendTelegramPhotoWithCaption(chatId: string | number, text: strin
       return {
         target: String(chatId),
         ok: false,
-        mode: "photo",
+        mode: shouldSendAsDocument ? "photo" : "photo",
         sentImages,
-        error: data?.description || `sendPhoto failed (${response.status})`,
+        error: data?.description || `${endpoint} failed (${response.status})`,
       };
     }
 
@@ -112,18 +136,22 @@ export async function POST(req: NextRequest) {
 
     const body = (await req.json()) as CallbackBody;
     const previewUrl = buildPreviewUrl(body.branch, body.taskPath);
+    const productionTaskUrl = buildProductionTaskUrl(body.taskPath);
+    const homeworkDeepLink = buildTelegramHomeworkDeepLink(body.taskPath);
     const imageUrls = extractImageUrls(body);
 
     const lines = [
-      `*Codex update:* ${body.status || "done"}`,
-      body.summary ? `*Summary:* ${body.summary}` : null,
-      body.branch ? `*Branch:* \`${body.branch}\`` : null,
-      previewUrl ? `*Preview:* ${previewUrl}` : null,
-      body.prUrl ? `*PR:* ${body.prUrl}` : null,
+      `Codex update: ${body.status || "done"}`,
+      body.summary ? `Summary: ${body.summary}` : null,
+      body.branch ? `Branch: ${body.branch}` : null,
+      productionTaskUrl ? `Result: ${productionTaskUrl}` : null,
+      previewUrl ? `Preview: ${previewUrl}` : null,
+      homeworkDeepLink ? `Open in bot app: ${homeworkDeepLink}` : null,
+      body.prUrl ? `PR: ${body.prUrl}` : null,
     ].filter(Boolean) as string[];
 
     const message = lines.join("\n");
-    const textForSlack = message.replace(/\*/g, "");
+    const textForSlack = message;
     const imageDelivery: {
       telegram: DeliveryStatus[];
       slack: DeliveryStatus | null;
@@ -141,7 +169,7 @@ export async function POST(req: NextRequest) {
         const photoResult = await sendTelegramPhotoWithCaption(target, message, imageUrls);
         imageDelivery.telegram.push(photoResult);
       } else {
-        const textResult = await sendComplexMessage(target, message, [], { parseMode: "Markdown" });
+        const textResult = await sendComplexMessage(target, message, []);
         imageDelivery.telegram.push({
           target,
           ok: textResult.success,
@@ -209,7 +237,7 @@ export async function POST(req: NextRequest) {
       ].filter(Boolean).join("\n"));
     }
 
-    return NextResponse.json({ ok: true, previewUrl, imageDelivery });
+    return NextResponse.json({ ok: true, previewUrl, productionTaskUrl, homeworkDeepLink, imageDelivery });
   } catch (error) {
     logger.error("[Codex Bridge Callback] error", error);
     return NextResponse.json({ ok: false, error: "Internal error" }, { status: 500 });

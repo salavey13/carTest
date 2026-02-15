@@ -45,3 +45,11 @@ Expected JSON for `save --json`:
 ```
 
 `solutionMarkdown` is persisted to both `solution_markdown` and `full_solution_rich` for backwards compatibility.
+
+
+## Truthfulness guardrail (mandatory)
+After `save`, run `exists` (or equivalent select) and only then claim persistence in callback summary.
+If verification fails, report failure; do not claim successful save.
+
+## Screenshot callback note
+For homework completion callbacks, upload screenshot to public storage and pass `imageUrl` in callback payload.

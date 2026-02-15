@@ -105,6 +105,8 @@ git push origin main
 ## Полезные документы
 - Короткая версия: `docs/README_TLDR.md`
 - Правила для агентных правок: `AGENTS.md`
+- Операционный опыт/память агента: `docs/AGENT_DIARY.md`
+- Каноничный рантайм-контракт: `docs/CYBERTUTOR_RUNTIME_CONTRACT_V1.md`
 - Контрибьют: `CONTRIBUTING.md`
 
 
@@ -303,3 +305,14 @@ curl -X POST "https://v0-car-test.vercel.app/api/codex-bridge/callback" \
 /codex test slack bridge
 ```
 Ожидаемо: сообщение появится в Slack в формате `@codex ...`.
+
+
+### CyberTutor homework-photo strict mode
+- For `/codex` tasks with homework photo, agent must solve concrete numbered tasks (not just provide a plan).
+- In `Что дано`, include extracted task statements from source PDFs (not only exercise numbers).
+- Must persist solved output to Supabase and verify read-after-write before claiming success.
+- Completion callback should include production homework URL (`https://v0-car-test.vercel.app/homework/solution/<jobId>`), and screenshot must be uploaded to public storage and sent as `imageUrl`.
+- Include Telegram WebApp deeplink too: `https://t.me/oneBikePlsBot/app?startapp=homework/solution/<jobId>`.
+- Screenshot fallback order: Chromium -> Firefox -> WebKit -> thum.io (`scripts/page-screenshot-skill.mjs`).
+- For ИЗО tasks, generate a "photo-of-sketchbook" image prompt + manual redraw steps + materials list.
+- If Slack lacks file-upload scopes (`missing_scope`), bridge should send photo links fallback instead of silently dropping images.

@@ -7,6 +7,18 @@ type PageProps = {
   params: { jobId: string };
 };
 
+const detectStepTone = (step: string) => {
+  const lower = step.toLowerCase();
+  if (lower.includes("алгебра")) return { bar: "from-sky-300/80 via-cyan-300/80 to-blue-300/80", pill: "bg-sky-300/25 text-sky-50", chip: "border-sky-300/40 bg-sky-300/10 text-sky-100", label: "Алгебра" };
+  if (lower.includes("геометр")) return { bar: "from-emerald-300/80 via-teal-300/80 to-lime-300/80", pill: "bg-emerald-300/25 text-emerald-50", chip: "border-emerald-300/40 bg-emerald-300/10 text-emerald-100", label: "Геометрия" };
+  if (lower.includes("литератур")) return { bar: "from-fuchsia-300/80 via-pink-300/80 to-rose-300/80", pill: "bg-fuchsia-300/25 text-fuchsia-50", chip: "border-fuchsia-300/40 bg-fuchsia-300/10 text-fuchsia-100", label: "Литература" };
+  if (lower.includes("англий") || lower.includes("ин. язык")) return { bar: "from-indigo-300/80 via-violet-300/80 to-purple-300/80", pill: "bg-indigo-300/25 text-indigo-50", chip: "border-indigo-300/40 bg-indigo-300/10 text-indigo-100", label: "Английский" };
+  if (lower.includes("истори")) return { bar: "from-amber-300/80 via-orange-300/80 to-yellow-300/80", pill: "bg-amber-300/25 text-amber-50", chip: "border-amber-300/40 bg-amber-300/10 text-amber-100", label: "История" };
+  if (lower.includes("изо")) return { bar: "from-rose-300/80 via-red-300/80 to-orange-300/80", pill: "bg-rose-300/25 text-rose-50", chip: "border-rose-300/40 bg-rose-300/10 text-rose-100", label: "ИЗО" };
+  if (lower.includes("физкультур")) return { bar: "from-green-300/80 via-emerald-300/80 to-cyan-300/80", pill: "bg-green-300/25 text-green-50", chip: "border-green-300/40 bg-green-300/10 text-green-100", label: "Физкультура" };
+  return { bar: "from-cyan-300/80 via-violet-300/80 to-fuchsia-300/80", pill: "bg-cyan-300/25 text-cyan-50", chip: "border-cyan-300/40 bg-cyan-300/10 text-cyan-100", label: "Общее" };
+};
+
 export default async function HomeworkSolutionPage({ params }: PageProps) {
   const { jobId } = params;
   const homework = await hydrateHomeworkSolution(jobId);
@@ -46,18 +58,24 @@ export default async function HomeworkSolutionPage({ params }: PageProps) {
             </div>
 
             <ol className="space-y-3">
-              {steps.map((step, index) => (
-                <li
-                  key={`${homework?.jobId ?? jobId}-step-${index}`}
-                  className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-slate-900/85 to-slate-800/70 p-4"
-                >
-                  <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-cyan-300/80 via-violet-300/80 to-fuchsia-300/80" />
-                  <div className="flex gap-3 pl-2">
-                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-300/25 text-sm font-black text-cyan-50">{index + 1}</span>
-                    <p className="text-base leading-relaxed text-slate-100">{step}</p>
-                  </div>
-                </li>
-              ))}
+              {steps.map((step, index) => {
+                const tone = detectStepTone(step);
+                return (
+                  <li
+                    key={`${homework?.jobId ?? jobId}-step-${index}`}
+                    className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-slate-900/85 to-slate-800/70 p-4"
+                  >
+                    <div className={`absolute inset-y-0 left-0 w-1 bg-gradient-to-b ${tone.bar}`} />
+                    <div className="mb-2 pl-2">
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${tone.chip}`}>{tone.label}</span>
+                    </div>
+                    <div className="flex gap-3 pl-2">
+                      <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-black ${tone.pill}`}>{index + 1}</span>
+                      <p className="text-base leading-relaxed text-slate-100">{step}</p>
+                    </div>
+                  </li>
+                );
+              })}
             </ol>
           </article>
 

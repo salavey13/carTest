@@ -55,3 +55,11 @@ Use `needs_clarification` when:
 - No fake page numbers.
 - No confident final answer with weak snippet match.
 - If multiple reasonable interpretations exist, list options and ask for one clarifying detail.
+
+
+## Done criteria for homework-photo tasks
+- Return computed final answers for all solvable numbered items found in photo/PDF.
+- Separate unsolved items into `needs_clarification` with explicit reason.
+- Plan-only output is invalid for completion callbacks.
+
+- Include extracted statement text for each solved exercise in output `given`/`problemRestatement` (not only exercise numbers).
