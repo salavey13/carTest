@@ -14,6 +14,7 @@
  */
 
 import { execSync, spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 const [mode, ...args] = process.argv.slice(2);
 
@@ -21,6 +22,41 @@ function getArg(name, fallback = undefined) {
   const idx = args.indexOf(`--${name}`);
   if (idx === -1) return fallback;
   return args[idx + 1];
+}
+
+
+
+function uploadImageToSupabaseStorage(localPath) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) return null;
+
+  const bucket = getArg('imageBucket', 'carpix');
+  const objectName = getArg('imageObject', `cybertutor/${Date.now()}-${localPath.split('/').pop() || 'solution.png'}`);
+  const imageBytes = readFileSync(localPath);
+  const ext = (localPath.split('.').pop() || '').toLowerCase();
+  const contentType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png';
+
+  const upload = spawnSync('curl', [
+    '-sS',
+    '-X',
+    'POST',
+    `${supabaseUrl}/storage/v1/object/${bucket}/${objectName}`,
+    '-H',
+    `Authorization: Bearer ${serviceKey}`,
+    '-H',
+    `apikey: ${serviceKey}`,
+    '-H',
+    `Content-Type: ${contentType}`,
+    '--data-binary',
+    '@-',
+  ], { input: imageBytes, encoding: 'utf8' });
+
+  if (upload.status !== 0) {
+    throw new Error(`Image upload failed: ${upload.stderr || upload.stdout}`);
+  }
+
+  return `${supabaseUrl}/storage/v1/object/public/${bucket}/${objectName}`;
 }
 
 function getBranchFallback() {
@@ -73,7 +109,7 @@ async function runCallbackMode() {
     telegramUserId: getArg('telegramUserId', process.env.TELEGRAM_USER_ID),
     slackChannelId: getArg('slackChannelId', process.env.SLACK_CODEX_CHANNEL_ID),
     slackThreadTs: getArg('slackThreadTs', process.env.SLACK_THREAD_TS),
-    imageUrl: getArg('imageUrl'),
+    imageUrl: getArg('imageUrl') || (getArg('imagePath') ? uploadImageToSupabaseStorage(getArg('imagePath')) : undefined),
   };
 
   const response = await postJson(endpoint, payload, {
@@ -101,7 +137,7 @@ async function runCallbackAutoMode() {
     telegramUserId: getArg('telegramUserId', process.env.TELEGRAM_USER_ID),
     slackChannelId: getArg('slackChannelId', process.env.SLACK_CODEX_CHANNEL_ID),
     slackThreadTs: getArg('slackThreadTs', process.env.SLACK_THREAD_TS),
-    imageUrl: getArg('imageUrl'),
+    imageUrl: getArg('imageUrl') || (getArg('imagePath') ? uploadImageToSupabaseStorage(getArg('imagePath')) : undefined),
   };
 
   const response = await postJson(endpoint, payload, {

@@ -132,16 +132,18 @@ export async function POST(req: NextRequest) {
       slack: null,
     };
 
-    for (const target of [body.telegramChatId, body.telegramUserId]) {
-      if (!target) continue;
+    const uniqueTelegramTargets = Array.from(
+      new Set([body.telegramChatId, body.telegramUserId].filter(Boolean).map((value) => String(value))),
+    );
 
+    for (const target of uniqueTelegramTargets) {
       if (imageUrls.length > 0) {
         const photoResult = await sendTelegramPhotoWithCaption(target, message, imageUrls);
         imageDelivery.telegram.push(photoResult);
       } else {
         const textResult = await sendComplexMessage(target, message, [], { parseMode: "Markdown" });
         imageDelivery.telegram.push({
-          target: String(target),
+          target,
           ok: textResult.success,
           mode: "text",
           error: textResult.error,
@@ -190,17 +192,22 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    await notifyAdmin([
-      "🤖 Codex bridge callback received",
-      `Status: ${body.status || "done"}`,
-      body.summary ? `Summary: ${body.summary}` : null,
-      body.branch ? `Branch: ${body.branch}` : null,
-      body.prUrl ? `PR: ${body.prUrl}` : null,
-      body.telegramChatId ? `Chat: ${body.telegramChatId}` : null,
-      body.telegramUserId ? `User: ${body.telegramUserId}` : null,
-      previewUrl ? `Preview: ${previewUrl}` : null,
-      imageUrls.length > 0 ? `Images: ${imageUrls.length}` : null,
-    ].filter(Boolean).join("\n"));
+    const adminChatId = process.env.ADMIN_CHAT_ID;
+    const wasAlreadyDeliveredToAdmin = Boolean(adminChatId && uniqueTelegramTargets.includes(String(adminChatId)));
+
+    if (!wasAlreadyDeliveredToAdmin) {
+      await notifyAdmin([
+        "🤖 Codex bridge callback received",
+        `Status: ${body.status || "done"}`,
+        body.summary ? `Summary: ${body.summary}` : null,
+        body.branch ? `Branch: ${body.branch}` : null,
+        body.prUrl ? `PR: ${body.prUrl}` : null,
+        body.telegramChatId ? `Chat: ${body.telegramChatId}` : null,
+        body.telegramUserId ? `User: ${body.telegramUserId}` : null,
+        previewUrl ? `Preview: ${previewUrl}` : null,
+        imageUrls.length > 0 ? `Images: ${imageUrls.length}` : null,
+      ].filter(Boolean).join("\n"));
+    }
 
     return NextResponse.json({ ok: true, previewUrl, imageDelivery });
   } catch (error) {

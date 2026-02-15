@@ -292,45 +292,92 @@ export async function postCodexCommandToSlack(params: {
 
   const messageResult = await postSlackMessage({ text });
   if (!messageResult.ok || photos.length === 0) {
-    return messageResult;
+    return {
+      ...messageResult,
+      photoForwarding: {
+        attempted: photos.length,
+        uploaded: 0,
+        skippedReason: photos.length > 0 ? "message_not_sent" : undefined,
+      },
+    };
   }
 
   const { defaultChannel, incomingWebhookUrl } = getSlackBridgeConfig();
   const uploadChannel = messageResult.channel || defaultChannel;
+  const token = await getSlackAccessToken();
 
-  if (!uploadChannel || incomingWebhookUrl) {
-    logger.warn("[Slack] Skipping image upload for /codex photo: no channel available or incoming webhook mode");
-    return messageResult;
+  if (!uploadChannel || !token) {
+    const skippedReason = !uploadChannel ? "missing_channel" : "missing_token";
+    logger.warn("[Slack] Skipping image upload for /codex photo", {
+      skippedReason,
+      incomingWebhookMode: Boolean(incomingWebhookUrl),
+    });
+    return {
+      ...messageResult,
+      photoForwarding: {
+        attempted: photos.length,
+        uploaded: 0,
+        skippedReason,
+      },
+    };
   }
 
-  const largestPhoto = [...photos].sort((a, b) => (b.file_size || 0) - (a.file_size || 0))[0];
-  const telegramImage = await fetchTelegramPhotoBuffer(largestPhoto.file_id);
-  if (!telegramImage.ok) {
-    logger.error("[Slack] Failed to download Telegram photo for /codex forwarding", telegramImage.error);
+  const uniquePhotosBySource = new Map<string, TelegramPhotoMeta>();
+  for (const photo of photos) {
+    const key = photo.file_unique_id || photo.file_id;
+    const previous = uniquePhotosBySource.get(key);
+    if (!previous || (photo.file_size || 0) > (previous.file_size || 0)) {
+      uniquePhotosBySource.set(key, photo);
+    }
+  }
+  const uniquePhotos = [...uniquePhotosBySource.values()];
+
+  let uploaded = 0;
+  const uploadErrors: string[] = [];
+
+  for (const [index, photo] of uniquePhotos.entries()) {
+    const telegramImage = await fetchTelegramPhotoBuffer(photo.file_id);
+    if (!telegramImage.ok) {
+      const error = `photo ${index + 1}: ${telegramImage.error}`;
+      uploadErrors.push(error);
+      logger.error("[Slack] Failed to download Telegram photo for /codex forwarding", error);
+      continue;
+    }
+
+    const uploadResult = await uploadPhotoToSlack({
+      channel: uploadChannel,
+      threadTs: messageResult.ts,
+      bytes: telegramImage.bytes,
+      fileName: telegramImage.fileName,
+      title: `tg-homework-${params.telegramChatId}-${index + 1}`,
+    });
+
+    if (!uploadResult.ok) {
+      const error = `photo ${index + 1}: ${uploadResult.error}`;
+      uploadErrors.push(error);
+      logger.error("[Slack] Failed to upload Telegram photo to Slack", error);
+      continue;
+    }
+
+    uploaded += 1;
+  }
+
+  if (uploadErrors.length > 0) {
     await postSlackMessage({
-      text: `⚠️ Couldn't attach TG image in Slack thread: ${telegramImage.error}`,
+      text: `⚠️ TG image forwarding: ${uploaded}/${uniquePhotos.length} uploaded. Issues: ${uploadErrors.join("; ")}`,
       channel: uploadChannel,
       threadTs: messageResult.ts,
     });
-    return messageResult;
   }
 
-  const uploadResult = await uploadPhotoToSlack({
-    channel: uploadChannel,
-    threadTs: messageResult.ts,
-    bytes: telegramImage.bytes,
-    fileName: telegramImage.fileName,
-    title: `tg-homework-${params.telegramChatId}`,
-  });
-
-  if (!uploadResult.ok) {
-    logger.error("[Slack] Failed to upload Telegram photo to Slack", uploadResult.error);
-    await postSlackMessage({
-      text: `⚠️ TG image upload failed: ${uploadResult.error}`,
-      channel: uploadChannel,
-      threadTs: messageResult.ts,
-    });
-  }
-
-  return messageResult;
+  return {
+    ...messageResult,
+    photoForwarding: {
+      attempted: uniquePhotos.length,
+      uploaded,
+      skippedReason: uploaded === 0 && uploadErrors.length > 0 ? "upload_failed" : undefined,
+      uploadErrors,
+      incomingWebhookMode: Boolean(incomingWebhookUrl),
+    },
+  };
 }

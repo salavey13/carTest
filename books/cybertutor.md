@@ -212,6 +212,7 @@ Homework API routes (целевая зона):
 |------------|--------|------------------------|------------|
 | 2026-02-14 | `work` | Flow скорректирован под `/codex + photo`: Slack-triggered Codex, OCR + on-the-fly PDF ragging в runtime, решение и screenshot skill возврат. | Нужна фактическая реализация `app/api/homework/*`; нужен production-ready screenshot delivery contract в bridge. |
 | 2026-02-14 | `work` | Уточнено, что master-план ведём в `/books/cybertutor.md`; добавлен обязательный hydration + screenshot шаг через `/homework/solution/<jobId>`. | Нужна унификация image payload в callback API для стабильной доставки в Telegram/Slack. |
+| 2026-02-15 | `work` | Полировка production-flow: `09-02-final` обновлён до полного доказательства №195 (geom.pdf), callback-notify умеет `--imagePath` (авто upload в Supabase Storage -> `imageUrl`), чтобы Telegram/Slack получали именно screenshot решения. | SQL bootstrap в skill отключён по запросу оператора; миграция таблицы выполняется вручную через `supabase/migrations/20260214195500_homework_daily_solutions.sql`. |
 
 ---
 
@@ -350,3 +351,19 @@ Homework API routes (целевая зона):
 ### 12.4 Interwork skills (store + notify)
 
 После операций skill по Supabase (`bootstrap-table`, `exists`, `save`) рекомендуется запускать с `--notify 1`, чтобы `scripts/homework-solution-store-skill.mjs` сразу отправлял callback-обновление в bridge (через `CODEX_BRIDGE_CALLBACK_SECRET`).
+
+
+## 12) Creator pitch (for kids + parents)
+
+CyberTutor в текущем виде — это не «бот для списывания», а быстрый домашний навигатор:
+- ребёнок получает понятное пошаговое объяснение и короткий блок «перепиши в тетрадь»;
+- родитель видит прозрачный источник (книга/страница/номер), а не чёрный ящик;
+- оператор получает callback + screenshot и может быстро проверить качество ответа перед отправкой.
+
+Почему это работает:
+- Telegram-first вход (минимум трения);
+- on-the-fly привязка к учебникам `alg.pdf` и `geom.pdf`;
+- одинаковый контракт результата (`Что дано → Решение → Ответ → Проверка`) для стабильного качества.
+
+Идеальный UX-слоган для релиза:
+**«Быстрее сделал домашку — больше времени на жизнь. Но с пониманием, а не вслепую.»**
