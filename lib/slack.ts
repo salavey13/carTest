@@ -225,6 +225,42 @@ async function fetchTelegramPhotoBuffer(fileId: string) {
   };
 }
 
+
+async function uploadTelegramPhotoToPublicStorage(params: { bytes: Buffer; fileName: string }) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { ok: false as const, error: "Supabase storage is not configured" };
+  }
+
+  const bucket = process.env.CYBERTUTOR_SCREENSHOT_BUCKET || "codex-callback-images";
+  const objectName = `telegram-photo-forward/${Date.now()}-${params.fileName.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
+
+  const uploadResponse = await fetch(
+    `${supabaseUrl}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeURIComponent(objectName)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+        "Content-Type": "application/octet-stream",
+        "x-upsert": "true",
+      },
+      body: params.bytes,
+    },
+  );
+
+  if (!uploadResponse.ok) {
+    const err = await uploadResponse.text();
+    return { ok: false as const, error: err || `Supabase storage upload failed (${uploadResponse.status})` };
+  }
+
+  return {
+    ok: true as const,
+    url: `${supabaseUrl}/storage/v1/object/public/${bucket}/${objectName}`,
+  };
+}
+
 async function uploadPhotoToSlack(params: {
   channel: string;
   threadTs?: string;
@@ -353,6 +389,29 @@ export async function postCodexCommandToSlack(params: {
     });
 
     if (!uploadResult.ok) {
+      const missingScope = uploadResult.error?.includes("missing_scope");
+      if (missingScope) {
+        const storageResult = await uploadTelegramPhotoToPublicStorage({
+          bytes: telegramImage.bytes,
+          fileName: telegramImage.fileName,
+        });
+
+        if (storageResult.ok) {
+          uploaded += 1;
+          await postSlackMessage({
+            text: `📎 TG photo ${index + 1}: ${storageResult.url}`,
+            channel: uploadChannel,
+            threadTs: messageResult.ts,
+          });
+          continue;
+        }
+
+        const storageError = `photo ${index + 1}: missing_scope + storage_fallback_failed (${storageResult.error})`;
+        uploadErrors.push(storageError);
+        logger.error("[Slack] Failed to upload Telegram photo fallback URL to Slack", storageError);
+        continue;
+      }
+
       const error = `photo ${index + 1}: ${uploadResult.error}`;
       uploadErrors.push(error);
       logger.error("[Slack] Failed to upload Telegram photo to Slack", error);

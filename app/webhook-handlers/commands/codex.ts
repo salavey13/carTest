@@ -13,6 +13,11 @@ type TelegramPhotoMeta = {
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
 
+function shouldSendAdminPhotoFallback(userId: string) {
+  if (!ADMIN_CHAT_ID) return false;
+  return String(userId) !== String(ADMIN_CHAT_ID);
+}
+
 async function sendTelegramPhotoByFileId(params: { chatId: string; fileId: string; caption?: string }) {
   if (!TELEGRAM_BOT_TOKEN) return { ok: false as const, error: "TELEGRAM_BOT_TOKEN is not configured" };
 
@@ -23,7 +28,6 @@ async function sendTelegramPhotoByFileId(params: { chatId: string; fileId: strin
       chat_id: params.chatId,
       photo: params.fileId,
       caption: params.caption,
-      parse_mode: "Markdown",
     }),
   });
 
@@ -58,11 +62,11 @@ async function forwardCodexPhotosToAdmin(params: {
     const caption =
       index === 0
         ? [
-            "📌 *Codex photo fallback*",
-            `Reason: \`${params.reason}\``,
+            "📌 Codex photo fallback",
+            `Reason: ${params.reason}`,
             `From: @${params.telegramUsername || "unknown"} (user ${params.telegramUserId})`,
             `Chat: ${params.telegramChatId}`,
-            params.prompt ? `Prompt: ${params.prompt}` : "Prompt: _(пусто, только фото)_",
+            params.prompt ? `Prompt: ${params.prompt}` : "Prompt: (пусто, только фото)",
           ].join("\n")
         : undefined;
 
@@ -97,7 +101,6 @@ export async function codexCommand(
       chatId,
       "Использование: `/codex <задача>`\nПример: `/codex add slack forwarding status in webhook logs`",
       [],
-      { parseMode: "Markdown" },
     );
     return;
   }
@@ -112,7 +115,7 @@ export async function codexCommand(
     });
 
     if (!slackResult.ok && slackResult.reason === "not_configured") {
-      const adminForward = photos.length > 0
+      const adminForward = photos.length > 0 && shouldSendAdminPhotoFallback(userId)
         ? await forwardCodexPhotosToAdmin({
             prompt,
             photos,
@@ -124,37 +127,34 @@ export async function codexCommand(
         : null;
 
       const adminPart = adminForward
-        ? `\n*Admin photo fallback:* ${adminForward.forwarded}/${photos.length}`
+        ? `\nAdmin photo fallback: ${adminForward.forwarded}/${photos.length}`
         : "";
 
       await sendComplexMessage(
         chatId,
         `ℹ️ Slack bridge пока не настроен (нет токена/канала). Команда принята, но форвард не выполнен.${adminPart}`,
         [],
-        { parseMode: "Markdown" },
       );
       return;
     }
 
     if (!slackResult.ok) {
-      await sendComplexMessage(
-        chatId,
-        `⚠️ Задача не ушла в Slack: ${slackResult.error}`,
-        [],
-        { parseMode: "Markdown" },
-      );
+      await sendComplexMessage(chatId, `⚠️ Задача не ушла в Slack: ${slackResult.error}`, []);
       return;
     }
 
-    const promptPart = prompt ? `\n\n*Prompt:* ${prompt}` : "\n\n*Prompt:* _(пусто, только фото)_";
-    const photoPart = photos.length > 0 ? `\n*Photo:* ${photos.length} файл(ов)` : "";
+    const promptPart = prompt ? `\n\nPrompt: ${prompt}` : "\n\nPrompt: (пусто, только фото)";
+    const photoPart = photos.length > 0 ? `\nPhoto: ${photos.length} файл(ов)` : "";
     const photoForwarding = slackResult.photoForwarding;
     const forwardingPart =
       photoForwarding && photos.length > 0
-        ? `\n*Slack images:* ${photoForwarding.uploaded}/${photoForwarding.attempted}${photoForwarding.skippedReason ? ` (${photoForwarding.skippedReason})` : ""}`
+        ? `\nSlack images: ${photoForwarding.uploaded}/${photoForwarding.attempted}${photoForwarding.skippedReason ? ` (${photoForwarding.skippedReason})` : ""}`
         : "";
 
-    const shouldForwardToAdmin = photos.length > 0 && (!prompt || (photoForwarding && photoForwarding.uploaded < photoForwarding.attempted));
+    const shouldForwardToAdmin =
+      photos.length > 0 &&
+      shouldSendAdminPhotoFallback(userId) &&
+      (!prompt || (photoForwarding && photoForwarding.uploaded < photoForwarding.attempted));
     const adminForward = shouldForwardToAdmin
       ? await forwardCodexPhotosToAdmin({
           prompt,
@@ -166,21 +166,15 @@ export async function codexCommand(
         })
       : null;
 
-    const adminPart = adminForward ? `\n*Admin photo fallback:* ${adminForward.forwarded}/${photos.length}` : "";
+    const adminPart = adminForward ? `\nAdmin photo fallback: ${adminForward.forwarded}/${photos.length}` : "";
 
     await sendComplexMessage(
       chatId,
-      `✅ Задача отправлена в Slack как запрос к Codex.${promptPart}${photoPart}${forwardingPart}${adminPart}\n\nДля callback добавь:\n\`telegramChatId\`: \`${chatId}\`\n\`telegramUserId\`: \`${userId}\``,
+      `✅ Задача отправлена в Slack как запрос к Codex.${promptPart}${photoPart}${forwardingPart}${adminPart}\n\nДля callback добавь:\ntelegramChatId: ${chatId}\ntelegramUserId: ${userId}`,
       [],
-      { parseMode: "Markdown" },
     );
   } catch (error: unknown) {
     logger.error("[Codex Command] Unexpected error while forwarding to Slack", error);
-    await sendComplexMessage(
-      chatId,
-      `⚠️ Временный сбой при отправке: ${error instanceof Error ? error.message : "Unknown error"}`,
-      [],
-      { parseMode: "Markdown" },
-    );
+    await sendComplexMessage(chatId, `⚠️ Временный сбой при отправке: ${error instanceof Error ? error.message : "Unknown error"}`, []);
   }
 }

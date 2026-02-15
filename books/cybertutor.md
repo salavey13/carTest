@@ -2,6 +2,8 @@
 
 ## 1) Product goal
 
+Canonical quick contract: `docs/CYBERTUTOR_RUNTIME_CONTRACT_V1.md`.
+
 CyberTutor — Telegram-first помощник для 7 класса:
 ученик присылает `/codex` + фото домашки, а Codex-агент сам проходит весь цикл: OCR, поиск в PDF-контексте, решение и отправка результата обратно в операторский канал.
 
@@ -102,6 +104,42 @@ Routing notes:
 - без обрезания ключевых строк.
 
 ---
+
+
+
+## 4.2) No-plan-only policy (mandatory)
+
+Для homework-photo сценариев финальный результат **не может** быть "планом как решать".
+Нужно:
+1. решить все задачи, где в фото есть конкретные номера/условия и их можно восстановить из `books/alg.pdf`/`books/geom.pdf`;
+2. дать итоговые ответы по каждому пункту;
+3. если условие отсутствует/нечитаемо — пометить как `needs_clarification`, а не выдумывать;
+4. в rich-output явно разделять: `Решено` vs `Нужно уточнение`;
+5. В блоке «Что дано» обязательно приводить извлечённые формулировки задач из PDF (не только номера).
+
+Минимальный критерий done: ученик видит уже посчитанные ответы, а не только roadmap.
+
+## 4.3) Storage truthfulness contract
+
+Фраза "сохранено в Supabase" разрешена только после read-after-write проверки.
+Обязательная последовательность:
+- `save`;
+- `exists`/`select` проверка по `solution_key`;
+- только затем callback `status=completed`.
+
+Если проверка не прошла — статус не `completed`.
+
+## 4.4) Screenshot delivery contract
+
+Скриншот из локального раннера сам по себе не доставляется в Telegram/Slack.
+Обязательный путь:
+1. сделать screenshot;
+2. загрузить его в публичное хранилище (Supabase Storage);
+3. передать публичный `imageUrl` в callback (`/api/codex-bridge/callback`).
+
+Без `imageUrl` completion считается неполным для операторского bridge-flow.
+Также добавлять ссылку открытия решения: production URL + Telegram WebApp deeplink (`https://t.me/oneBikePlsBot/app?startapp=homework/solution/<jobId>`).
+
 
 ## 5) Solution output contract and callback payload examples
 
@@ -367,3 +405,25 @@ CyberTutor в текущем виде — это не «бот для списы
 
 Идеальный UX-слоган для релиза:
 **«Быстрее сделал домашку — больше времени на жизнь. Но с пониманием, а не вслепую.»**
+
+
+## 12) Screenshot fallback order (runtime resilience)
+1. Chromium
+2. Firefox
+3. WebKit
+4. thum.io fallback via `scripts/page-screenshot-skill.mjs`
+
+Логировать, какой движок сработал.
+
+
+## 13) ИЗО image-generation prompt mode
+
+When assignment contains ИЗО task (e.g., "постройка, связанная с историей народа"), generate:
+1) image-generation prompt for reference image (photo-like sketchbook drawing),
+2) short manual redraw plan for student notebook/album,
+3) materials + technique recommendation.
+
+Output must clearly separate:
+- `Prompt для генерации изображения`,
+- `Как перерисовать вручную (шаги)`,
+- `Материалы и техника`.

@@ -35,6 +35,7 @@ Return normalized JSON draft:
       "exercise": "№ 123",
       "topicHint": "линейные уравнения",
       "rawLine": "Алгебра: №123(а,б)",
+      "statementPreview": "краткий фрагмент условия, если читается",
       "confidence": 0.86
     }
   ],
@@ -59,3 +60,8 @@ Return a short RU-first clarification prompt, e.g.:
 - Never fabricate unreadable symbols or numbers.
 - Never silently merge two different subject lines.
 - Preserve `rawLine` for auditability.
+
+
+## No-plan-only handoff
+- OCR stage must preserve enough structured items (`exercise`, `subject`, `rawLine`) for solver stage to produce real solved answers, not a study plan.
+- If line contains numbered tasks (e.g. `№455,457`), keep exact numbers for textbook retrieval.
