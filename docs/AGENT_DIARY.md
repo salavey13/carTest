@@ -37,3 +37,9 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** legacy habit from earlier fragile callback stage.
 - **Fix/workaround:** default to concise final response without curl block; provide curl fallback only on explicit user request or callback failure.
 - **Verification:** check final response template against AGENTS 9.4.9 policy.
+
+## 2026-02-15 — Browser tool artifact path not readable by local callback uploader
+- **Symptom:** `node scripts/codex-notify.mjs callback --imagePath <browser-artifact>` fails with `ENOENT`.
+- **Root cause:** `mcp__browser_tools__run_playwright_script` returns `browser:/...` artifact reference that is not mounted as a regular file path for local Node scripts.
+- **Fix/workaround:** for callback image delivery, generate a local screenshot file (`artifacts/...`) via `scripts/page-screenshot-skill.mjs` (thum.io fallback) and pass that path to `--imagePath`.
+- **Verification:** callback response JSON shows `imageDelivery.telegram[].ok=true` and `imageDelivery.slack.ok=true`.
