@@ -100,6 +100,10 @@
     /* Text helpers */
     --light-text: 228 19% 15%; 
     --accent-text: 7 85% 55%; 
+
+    /* Homework solution page */
+    --homework-bg: 210 40% 98%;
+    --homework-text: 222 47% 11%;
   }
 
   .dark {
@@ -153,6 +157,10 @@
 
     --light-text: 48 43% 86%;
     --accent-text: 34 92% 70%;
+
+    /* Homework solution page */
+    --homework-bg: 228 50% 6%;
+    --homework-text: 210 40% 96%;
   }
 
   body {
