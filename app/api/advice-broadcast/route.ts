@@ -15,7 +15,7 @@ type UserMetadata = {
     remaining_section_ids: string[]; 
     last_sent_at?: string; 
   };
-  [key: string]: any; 
+  [key: string]: unknown; 
 };
 type UserWithMetadata = Database["public"]["Tables"]["users"]["Row"];
 

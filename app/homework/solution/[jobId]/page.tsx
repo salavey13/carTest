@@ -1,4 +1,4 @@
-import { BookOpenText, CheckCircle2, Lightbulb, PencilRuler, Sparkles } from "lucide-react";
+import { BookOpenText, CheckCircle2, Lightbulb, PencilRuler, Sparkles, Zap } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { hydrateHomeworkSolution } from "./actions";
@@ -7,87 +7,97 @@ type PageProps = {
   params: { jobId: string };
 };
 
-const sectionCard =
-  "rounded-3xl border border-cyan-300/20 bg-slate-900/80 p-5 shadow-[0_0_0_1px_rgba(34,211,238,0.1),0_16px_50px_rgba(2,8,23,0.6)] backdrop-blur";
-
 export default async function HomeworkSolutionPage({ params }: PageProps) {
   const { jobId } = params;
   const homework = await hydrateHomeworkSolution(jobId);
+  const steps = homework?.steps ?? ["Подождите, решение ещё формируется."];
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(15,23,42,1)_0%,rgba(2,6,23,1)_55%,rgba(1,4,16,1)_100%)] px-3 py-6 text-slate-100 sm:px-5 sm:py-9">
-      <div className="mx-auto w-full max-w-4xl space-y-5" style={{ zoom: 1.12 }}>
-        <header className="rounded-[30px] border border-cyan-300/25 bg-gradient-to-br from-cyan-400/15 via-slate-900/90 to-violet-400/15 p-6 shadow-[0_0_0_1px_rgba(34,211,238,0.16),0_22px_56px_rgba(15,23,42,0.55)]">
-          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-cyan-100">
-            <BookOpenText className="h-4 w-4" /> Homework snapshot ready
-          </p>
-          <h1 className="text-balance text-3xl font-black leading-tight text-white sm:text-4xl">
-            Решение задания #{homework?.jobId ?? jobId}
-          </h1>
-          <p className="mt-3 text-pretty text-lg leading-relaxed text-slate-200">
-            {homework?.topic ?? "Разбор задания пока не готов"}
-          </p>
+    <main className="relative min-h-screen overflow-hidden bg-[#040714] px-3 py-6 text-slate-100 sm:px-6 sm:py-10">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-20 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-cyan-400/20 blur-[110px]" />
+        <div className="absolute right-0 top-1/3 h-80 w-80 rounded-full bg-fuchsia-500/15 blur-[140px]" />
+        <div className="absolute bottom-0 left-0 h-72 w-72 rounded-full bg-emerald-400/10 blur-[120px]" />
+      </div>
+
+      <div className="relative mx-auto w-full max-w-5xl space-y-5">
+        <header className="rounded-[34px] border border-white/10 bg-white/5 p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_24px_65px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-7">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100">
+              <Zap className="h-3.5 w-3.5" /> CyberTutor
+            </span>
+            <span className="rounded-full border border-white/15 bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-200">job: {homework?.jobId ?? jobId}</span>
+            <span className="rounded-full border border-emerald-300/30 bg-emerald-300/15 px-3 py-1 text-xs font-semibold text-emerald-100">solution ready</span>
+          </div>
+
+          <h1 className="text-balance text-3xl font-black leading-tight text-white sm:text-5xl">Решение задания</h1>
+          <p className="mt-3 max-w-3xl text-pretty text-lg leading-relaxed text-slate-200">{homework?.topic ?? "Разбор задания пока не готов"}</p>
         </header>
 
-        <section className={sectionCard}>
-          <h2 className="mb-3 flex items-center gap-2 text-2xl font-extrabold text-cyan-100">
-            <Lightbulb className="h-5 w-5" /> Кратко тема
-          </h2>
-          <p className="text-lg leading-relaxed text-slate-100">{homework?.topic ?? "Тема появится после обработки"}</p>
-        </section>
+        <section className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+          <article className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_10px_45px_rgba(8,15,35,0.45)] backdrop-blur-lg sm:p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-2xl font-extrabold text-cyan-100">
+              <PencilRuler className="h-5 w-5" /> Дано и пошаговое решение
+            </h2>
 
-        <section className={sectionCard}>
-          <h2 className="mb-4 flex items-center gap-2 text-2xl font-extrabold text-cyan-100">
-            <PencilRuler className="h-5 w-5" /> Дано и пошаговое решение
-          </h2>
-          <div className="space-y-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-lg leading-relaxed text-slate-100">
-              <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Дано</p>
-              <p>{homework?.given ?? "Данные пока не загружены."}</p>
+            <div className="mb-4 rounded-2xl border border-cyan-200/20 bg-cyan-500/10 p-4">
+              <p className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-cyan-200/80">Дано</p>
+              <p className="text-base leading-relaxed text-slate-100">{homework?.given ?? "Данные пока не загружены."}</p>
             </div>
+
             <ol className="space-y-3">
-              {(homework?.steps ?? ["Подождите, решение ещё формируется."]).map((step, index) => (
+              {steps.map((step, index) => (
                 <li
                   key={`${homework?.jobId ?? jobId}-step-${index}`}
-                  className="flex gap-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3"
+                  className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-slate-900/85 to-slate-800/70 p-4"
                 >
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-300/30 text-sm font-black text-cyan-50">
-                    {index + 1}
-                  </span>
-                  <p className="text-lg leading-relaxed text-slate-50">{step}</p>
+                  <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-cyan-300/80 via-violet-300/80 to-fuchsia-300/80" />
+                  <div className="flex gap-3 pl-2">
+                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-300/25 text-sm font-black text-cyan-50">{index + 1}</span>
+                    <p className="text-base leading-relaxed text-slate-100">{step}</p>
+                  </div>
                 </li>
               ))}
             </ol>
+          </article>
+
+          <div className="space-y-4">
+            <article className="rounded-3xl border border-emerald-200/20 bg-emerald-500/10 p-5 shadow-[0_10px_40px_rgba(16,185,129,0.16)]">
+              <h2 className="mb-3 flex items-center gap-2 text-2xl font-extrabold text-emerald-100">
+                <CheckCircle2 className="h-5 w-5" /> Ответ
+              </h2>
+              <p className="text-lg font-semibold leading-relaxed text-white">{homework?.answer ?? "Ответ появится после генерации."}</p>
+            </article>
+
+            <article className="rounded-3xl border border-cyan-200/20 bg-cyan-500/10 p-5">
+              <h3 className="mb-2 flex items-center gap-2 text-lg font-black uppercase tracking-wide text-cyan-100">
+                <Lightbulb className="h-4 w-4" /> Кратко тема
+              </h3>
+              <p className="text-sm leading-relaxed text-cyan-50/95">{homework?.topic ?? "Тема появится после обработки"}</p>
+            </article>
+
+            {homework?.rewriteForNotebook ? (
+              <article className="rounded-3xl border border-fuchsia-300/20 bg-fuchsia-400/10 p-5">
+                <h3 className="mb-2 text-lg font-black uppercase tracking-wide text-fuchsia-100">Перепиши в тетрадь</h3>
+                <p className="text-sm leading-relaxed text-fuchsia-50">{homework?.rewriteForNotebook}</p>
+              </article>
+            ) : null}
           </div>
         </section>
 
-        <section className="rounded-3xl border border-violet-300/25 bg-violet-400/10 p-6 shadow-[0_0_0_1px_rgba(167,139,250,0.18)]">
+        <section className="rounded-3xl border border-violet-200/20 bg-violet-500/10 p-5 shadow-[0_10px_40px_rgba(139,92,246,0.16)] sm:p-6">
           <h2 className="mb-4 flex items-center gap-2 text-2xl font-extrabold text-violet-100">
             <Sparkles className="h-5 w-5" /> Полное решение (rich markdown)
           </h2>
-          <div className="prose prose-invert prose-lg max-w-none font-medium leading-relaxed prose-headings:font-black prose-headings:text-cyan-100 prose-h2:mt-2 prose-h2:mb-3 prose-h2:text-2xl prose-p:text-slate-100 prose-li:text-slate-100 prose-strong:text-white prose-code:text-cyan-200 prose-code:bg-slate-900/70 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-ul:space-y-1 prose-ol:space-y-1">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {homework?.fullSolutionRich ?? "## Решение\nДанные пока не готовы."}
-            </ReactMarkdown>
+          <div className="prose prose-invert prose-sm sm:prose-base max-w-none leading-relaxed prose-headings:font-black prose-headings:text-cyan-100 prose-p:text-slate-100 prose-li:text-slate-100 prose-strong:text-white prose-code:text-cyan-200 prose-code:bg-slate-900/70 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{homework?.fullSolutionRich ?? "## Решение\nДанные пока не готовы."}</ReactMarkdown>
           </div>
         </section>
 
-        <section className="rounded-3xl border border-emerald-300/30 bg-emerald-400/12 p-6 shadow-[0_0_0_1px_rgba(16,185,129,0.14)]">
-          <h2 className="mb-3 flex items-center gap-2 text-2xl font-extrabold text-emerald-100">
-            <CheckCircle2 className="h-5 w-5" /> Ответ
-          </h2>
-          <p className="text-xl font-semibold leading-relaxed text-white">{homework?.answer ?? "Ответ появится после генерации."}</p>
-        </section>
-
-        {homework?.rewriteForNotebook ? (
-          <section className="rounded-3xl border border-fuchsia-300/20 bg-fuchsia-400/10 p-5">
-            <h3 className="mb-2 text-lg font-black uppercase tracking-wide text-fuchsia-100">Перепиши в тетрадь</h3>
-            <p className="text-base leading-relaxed text-fuchsia-50">{homework?.rewriteForNotebook}</p>
-          </section>
-        ) : null}
-
-        <footer className="rounded-2xl border border-slate-700 bg-slate-900/85 p-4 text-sm leading-relaxed text-slate-300">
-          <p className="mb-2 font-bold uppercase tracking-[0.12em] text-slate-500">Источник (для проверки)</p>
+        <footer className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 text-sm leading-relaxed text-slate-300">
+          <p className="mb-2 flex items-center gap-2 font-bold uppercase tracking-[0.14em] text-slate-400">
+            <BookOpenText className="h-4 w-4" /> Источники (проверка)
+          </p>
           {(homework?.sourceHints?.length ?? 0) > 0 ? (
             <ul className="space-y-1.5">
               {(homework?.sourceHints ?? []).map((hint, index) => (

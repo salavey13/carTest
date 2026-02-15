@@ -14,6 +14,8 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 const [mode, ...args] = process.argv.slice(2);
+const MIGRATION_SQL_PATH = "supabase/migrations/20260214195500_homework_daily_solutions.sql";
+const HOMEWORK_TABLE = "homework_daily_solutions";
 
 function getArg(name, fallback = undefined) {
   const idx = args.indexOf(`--${name}`);
@@ -47,6 +49,7 @@ function curlJson({ url, method = "GET", headers = [], body }) {
   return run("curl", curlArgs);
 }
 
+
 function client() {
   const supabaseUrl = envRequired("NEXT_PUBLIC_SUPABASE_URL");
   const serviceKey = envRequired("SUPABASE_SERVICE_ROLE_KEY");
@@ -63,13 +66,15 @@ function client() {
   };
 }
 
-function maybeNotify(summary) {
+function maybeNotify(summary, options = {}) {
   if (getArg("notify", "0") !== "1") return;
 
   const branch = getArg("branch", process.env.PR_HEAD_REF || run("git", ["rev-parse", "--abbrev-ref", "HEAD"]));
   const callbackEndpoint = process.env.CODEX_CALLBACK_ENDPOINT || "https://v0-car-test.vercel.app/api/codex-bridge/callback";
   const secret = process.env.CODEX_BRIDGE_CALLBACK_SECRET;
   if (!secret) return;
+
+  const taskPath = options.taskPath || getArg("taskPath") || "/";
 
   try {
     curlJson({
@@ -80,7 +85,7 @@ function maybeNotify(summary) {
         status: "completed",
         summary,
         branch,
-        taskPath: "/homework/solution/13-02-final",
+        taskPath,
         telegramChatId: process.env.ADMIN_CHAT_ID,
         telegramUserId: process.env.TELEGRAM_USER_ID,
         slackChannelId: process.env.SLACK_CODEX_CHANNEL_ID,
@@ -105,82 +110,53 @@ function getExposedTables() {
     .sort();
 }
 
-function ensureTable({ exitOnMissing = true } = {}) {
+function tableExists() {
   const tables = getExposedTables();
-  const exists = tables.includes("homework_daily_solutions");
-
-  if (!exists) {
-    const out = {
-      ok: false,
-      reason: "missing_table",
-      table: "homework_daily_solutions",
-      action:
-        "Apply migration supabase/migrations/20260214195500_homework_daily_solutions.sql and retry.",
-    };
-    console.log(JSON.stringify(out, null, 2));
-    if (exitOnMissing) process.exit(2);
-    return false;
-  }
-
-  console.log(JSON.stringify({ ok: true, table: "homework_daily_solutions" }, null, 2));
-  return true;
+  return tables.includes(HOMEWORK_TABLE);
 }
 
-function tryBootstrapWithRpc() {
-  const { supabaseUrl, headers } = client();
-  const sql = readFileSync("supabase/migrations/20260214195500_homework_daily_solutions.sql", "utf8");
 
-  const rpcCandidates = [
-    { path: "/rest/v1/rpc/exec_sql", body: { sql } },
-    { path: "/rest/v1/rpc/execute_sql", body: { sql } },
-    { path: "/rest/v1/rpc/run_sql", body: { sql } },
-  ];
+function ensureTable({ exitOnMissing = true } = {}) {
+  const exists = tableExists();
 
-  for (const rpc of rpcCandidates) {
-    try {
-      curlJson({
-        url: `${supabaseUrl}${rpc.path}`,
-        method: "POST",
-        headers,
-        body: rpc.body,
-      });
-      return { ok: true, rpc: rpc.path };
-    } catch {
-      // continue
-    }
+  if (exists) {
+    console.log(JSON.stringify({ ok: true, table: HOMEWORK_TABLE }, null, 2));
+    return true;
   }
 
-  return { ok: false };
+  const out = {
+
+    ok: false,
+    reason: "missing_table",
+    table: HOMEWORK_TABLE,
+    migrationPath: MIGRATION_SQL_PATH,
+    action: `Apply migration ${MIGRATION_SQL_PATH} and retry.`,
+  };
+  console.log(JSON.stringify(out, null, 2));
+  if (exitOnMissing) process.exit(2);
+  return false;
 }
 
 function bootstrapTableMode() {
-  if (ensureTable({ exitOnMissing: false })) {
+  const exists = ensureTable({ exitOnMissing: false });
+  if (exists) {
     maybeNotify("Supabase homework table already exists; bootstrap skipped.");
     return;
   }
 
-  const boot = tryBootstrapWithRpc();
-  if (!boot.ok) {
-    console.log(
-      JSON.stringify(
-        {
-          ok: false,
-          reason: "rpc_bootstrap_unavailable",
-          action:
-            "Run migration manually in Supabase SQL editor: supabase/migrations/20260214195500_homework_daily_solutions.sql",
-        },
-        null,
-        2,
-      ),
-    );
-    process.exit(3);
-  }
-
-  const exists = ensureTable({ exitOnMissing: false });
-  console.log(JSON.stringify({ ok: exists, bootstrapRpc: boot.rpc }, null, 2));
-  if (exists) {
-    maybeNotify(`Supabase homework table bootstrapped via ${boot.rpc} and is ready.`);
-  }
+  console.log(
+    JSON.stringify(
+      {
+        ok: false,
+        reason: "bootstrap_disabled",
+        migrationPath: MIGRATION_SQL_PATH,
+        action: "Automatic SQL table creation is disabled. Apply migration manually in Supabase SQL editor.",
+      },
+      null,
+      2,
+    ),
+  );
+  process.exit(3);
 }
 
 function existsMode() {
@@ -188,12 +164,14 @@ function existsMode() {
   const date = getArg("date");
   if (!key) throw new Error("Missing --solutionKey");
 
+  ensureTable();
+
   const { supabaseUrl, headers } = client();
   const filters = [`solution_key=eq.${encodeURIComponent(key)}`];
   if (date) filters.push(`homework_date=eq.${encodeURIComponent(date)}`);
 
   const raw = curlJson({
-    url: `${supabaseUrl}/rest/v1/homework_daily_solutions?select=solution_key,homework_date,updated_at&${filters.join("&")}&order=updated_at.desc&limit=1`,
+    url: `${supabaseUrl}/rest/v1/${HOMEWORK_TABLE}?select=solution_key,homework_date,updated_at&${filters.join("&")}&order=updated_at.desc&limit=1`,
     headers,
   });
 
@@ -206,7 +184,7 @@ function existsMode() {
   console.log(JSON.stringify(out, null, 2));
 
   if (out.exists) {
-    maybeNotify(`Same-day homework hit found for ${key}; reusing stored answer.`);
+    maybeNotify(`Same-day homework hit found for ${key}; reusing stored answer.`, { taskPath: `/homework/solution/${key}` });
   }
 }
 
@@ -216,6 +194,8 @@ function saveMode() {
   const jsonPath = getArg("json");
   if (!key) throw new Error("Missing --solutionKey");
   if (!jsonPath) throw new Error("Missing --json path");
+
+  ensureTable();
 
   const payload = JSON.parse(readFileSync(jsonPath, "utf8"));
   const markdown = payload.solutionMarkdown || payload.solution_markdown || payload.fullSolutionRich || payload.full_solution_rich || null;
@@ -237,7 +217,7 @@ function saveMode() {
 
   const { supabaseUrl, headers } = client();
   const raw = curlJson({
-    url: `${supabaseUrl}/rest/v1/homework_daily_solutions?on_conflict=homework_date,solution_key`,
+    url: `${supabaseUrl}/rest/v1/${HOMEWORK_TABLE}?on_conflict=homework_date,solution_key`,
     method: "POST",
     headers: [...headers, "Prefer: resolution=merge-duplicates,return=representation"],
     body: row,
@@ -245,7 +225,7 @@ function saveMode() {
 
   const inserted = JSON.parse(raw || "[]");
   console.log(JSON.stringify({ ok: true, upserted: inserted[0] ?? null }, null, 2));
-  maybeNotify(`Homework answer saved to Supabase for ${key}.`);
+  maybeNotify(`Homework answer saved to Supabase for ${key}.`, { taskPath: `/homework/solution/${key}` });
 }
 
 if (!mode || !["ensure-table", "bootstrap-table", "exists", "save"].includes(mode)) {
