@@ -1,4 +1,3 @@
-// /app/sauna-rent/page.tsx
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState, useId, useCallback } from "react";
@@ -79,17 +78,17 @@ function isFriday(date: Date) {
 // Local helper components
 const StepItem: React.FC<{ num: string, title: string, icon: string, children: React.ReactNode }> = ({ num, title, icon, children }) => (
   <div className="text-center p-4">
-    <div className="relative w-16 h-16 mx-auto mb-4 flex items-center justify-center rounded-full bg-primary/10 border-2 border-primary text-primary">
+    <div className="relative w-16 h-16 mx-auto mb-4 flex items-center justify-center rounded-full bg-emerald-100 border-2 border-emerald-500 text-emerald-600">
       <VibeContentRenderer content={icon} className="w-8 h-8" />
-      <span className="absolute -top-2 -right-2 w-8 h-8 flex items-center justify-center rounded-full bg-accent text-accent-foreground font-bold">{num}</span>
+      <span className="absolute -top-2 -right-2 w-8 h-8 flex items-center justify-center rounded-full bg-copper-300 text-white font-bold">{num}</span>
     </div>
-    <h3 className="font-orbitron text-lg mb-2">{title}</h3>
-    <p className="text-sm text-muted-foreground">{children}</p>
+    <h3 className="font-orbitron text-lg mb-2 text-emerald-700">{title}</h3>
+    <p className="text-sm text-gray-600">{children}</p>
   </div>
 );
 
 // ----------------------------- page -----------------------------
-export default function ForestSPAPage() {
+export default function LesSPAPage() {
   const { dbUser, refreshDbUser } = useAppContext();
   const [showHistory, setShowHistory] = useState(false);
   
@@ -287,18 +286,24 @@ export default function ForestSPAPage() {
   ];
 
   return (
-    <div className="relative min-h-screen bg-background overflow-hidden text-foreground dark">
+    <div 
+      className="relative min-h-screen overflow-hidden text-gray-800"
+      style={{
+        backgroundColor: '#F5F5F5',
+        backgroundImage: 'linear-gradient(to bottom, #F5F5F5, #EDEDED)',
+      }}
+    >
         <section className="relative h-screen min-h-[600px] flex items-center justify-center text-center text-white p-4">
             <div className="absolute inset-0 z-0">
                 <Image 
                   src={heroImage} 
-                  alt="Forest SPA" 
+                  alt="Лес SPA" 
                   layout="fill" 
                   objectFit="cover" 
                   className="brightness-50" 
                   priority 
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-emerald-900/50 via-emerald-700/30 to-transparent"></div>
             </div>
             <motion.div 
                 initial={{ opacity: 0, y: 20 }}
@@ -307,14 +312,14 @@ export default function ForestSPAPage() {
                 className="relative z-10 flex flex-col items-center"
             >
                 <h1 className="font-orbitron font-black uppercase text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tighter leading-none">
-                    <span className="block drop-shadow-lg">Forest SPA</span>
-                    <span className="block text-primary drop-shadow-lg">Sauna & Massage</span>
+                    <span className="block drop-shadow-lg">Лес SPA</span>
+                    <span className="block text-emerald-300 drop-shadow-lg">Sauna & Massage</span>
                 </h1>
-                <p className="max-w-2xl mx-auto mt-6 text-lg md:text-xl text-foreground/80 font-light">
+                <p className="max-w-2xl mx-auto mt-6 text-lg md:text-xl text-gray-200 font-light">
                     Ultimate relaxation in Нижний Новгород: Sauna sessions with optional professional massage.
                 </p>
                 <div className="mt-8">
-                    <Button asChild size="lg" variant="accent" className="font-orbitron text-lg shadow-lg shadow-accent/30 hover:shadow-accent/50 transition-all duration-300 transform hover:scale-105">
+                    <Button asChild size="lg" className="font-orbitron text-lg bg-emerald-600 text-white shadow-lg shadow-emerald-400/50 hover:bg-emerald-700 hover:shadow-emerald-500/50 transition-all duration-300 transform hover:scale-105">
                         <Link href="#booking">
                           <VibeContentRenderer content="::FaSpa className='mr-2':: START EXPERIENCE" />
                         </Link>
@@ -326,16 +331,16 @@ export default function ForestSPAPage() {
         <motion.section style={{ y }} className="relative">
           {/* Showcase */}
           <div className="h-[80vh] w-full overflow-hidden relative">
-            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/spa-showcase.jpg" alt="Showcase" layout="fill" objectFit="cover" className="brightness-50" />
+            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/spa-showcase.jpg" alt="Showcase" layout="fill" objectFit="cover" className="brightness-75" />
           </div>
         </motion.section>
 
-        <div className="container mx-auto max-w-7xl px-4 py-16 sm:py-24 space-y-20 sm:space-y-28">
+        <div className="container mx-auto max-w-7xl px-4 py-16 sm:py-24 space-y-20 sm:space-y-28 bg-white/50 backdrop-blur-sm">
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-8 items-stretch">
                 <ServiceCard 
                     title="Requirements"
                     icon="::FaClipboardList::"
-                    borderColorClass="border-secondary text-secondary"
+                    borderColorClass="border-emerald-500 text-emerald-600"
                     items={[
                         { icon: "::FaUserClock::", text: "Age 18+" },
                         { icon: "::FaIdCard::", text: "No contraindications" },
@@ -346,7 +351,7 @@ export default function ForestSPAPage() {
                  <ServiceCard 
                     title="What you get"
                     icon="::FaGift::"
-                    borderColorClass="border-accent text-accent"
+                    borderColorClass="border-copper-400 text-copper-600"
                     imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/spa-gift.jpg"
                     items={[
                         { icon: "::FaCircleCheck::", text: "Fully serviced facilities" },
@@ -357,7 +362,7 @@ export default function ForestSPAPage() {
                 <ServiceCard 
                     title="Services"
                     icon="::FaHands::"
-                    borderColorClass="border-primary text-primary"
+                    borderColorClass="border-emerald-500 text-emerald-600"
                     imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/spa-services.jpg"
                     items={[
                         { icon: "::FaSpa::", text: "Sauna sessions" },
@@ -369,22 +374,22 @@ export default function ForestSPAPage() {
             </section>
 
             <section>
-                <h2 className="text-4xl font-orbitron text-center mb-10">Our Massagists</h2>
+                <h2 className="text-4xl font-orbitron text-center mb-10 text-emerald-700">Our Massagists</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                     {masters.map(master => (
-                        <Card key={master.id} className="bg-card/50 p-4 rounded-lg border border-border text-center relative h-full backdrop-blur-sm">
+                        <Card key={master.id} className="bg-white p-4 rounded-lg border border-copper-300 text-center relative h-full shadow-md" style={{ boxShadow: '0 4px 8px rgba(168, 94, 42, 0.2)' }}>
                             <Image src={master.imageUrl} alt={master.name} width={300} height={300} className="rounded-full mx-auto mb-4 object-cover aspect-square" />
-                            <h4 className="font-orbitron text-lg mb-2">{master.name}</h4>
-                            <p className="text-sm text-muted-foreground">{master.specialty}</p>
-                            <p className="text-sm">{master.bio}</p>
-                            <div className="mt-2">Rating: {master.rating} ★</div>
+                            <h4 className="font-orbitron text-lg mb-2 text-emerald-600">{master.name}</h4>
+                            <p className="text-sm text-gray-600">{master.specialty}</p>
+                            <p className="text-sm text-gray-500">{master.bio}</p>
+                            <div className="mt-2 text-copper-600">Rating: {master.rating} ★</div>
                         </Card>
                     ))}
                 </div>
             </section>
 
             <section>
-                <h2 className="text-4xl font-orbitron text-center mb-10">How it works</h2>
+                <h2 className="text-4xl font-orbitron text-center mb-10 text-emerald-700">How it works</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                     <StepItem num="1" title="Sauna Setup" icon="::FaCalendarCheck::">Choose date, time, extras.</StepItem>
                     <StepItem num="2" title="Massage Type" icon="::FaHands::">Select massage if desired.</StepItem>
@@ -394,33 +399,33 @@ export default function ForestSPAPage() {
             </section>
             
             <section className="max-w-3xl mx-auto">
-                <h2 className="text-4xl font-orbitron text-center mb-10">FAQ</h2>
+                <h2 className="text-4xl font-orbitron text-center mb-10 text-emerald-700">FAQ</h2>
                 <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="item-1">
-                        <AccordionTrigger>Can I book sauna and massage together?</AccordionTrigger>
-                        <AccordionContent>Yes, it's integrated as one experience.</AccordionContent>
+                        <AccordionTrigger className="text-emerald-600">Can I book sauna and massage together?</AccordionTrigger>
+                        <AccordionContent className="text-gray-600">Yes, it's integrated as one experience.</AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-2">
-                        <AccordionTrigger>How to choose massagist?</AccordionTrigger>
-                        <AccordionContent>Based on specialty, rating, and availability.</AccordionContent>
+                        <AccordionTrigger className="text-emerald-600">How to choose massagist?</AccordionTrigger>
+                        <AccordionContent className="text-gray-600">Based on specialty, rating, and availability.</AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-3">
-                        <AccordionTrigger>What if massagist is unavailable?</AccordionTrigger>
-                        <AccordionContent>System checks and suggests alternatives.</AccordionContent>
+                        <AccordionTrigger className="text-emerald-600">What if massagist is unavailable?</AccordionTrigger>
+                        <AccordionContent className="text-gray-600">System checks and suggests alternatives.</AccordionContent>
                     </AccordionItem>
                 </Accordion>
             </section>
 
             <section id="booking" className="py-10 space-y-6 scroll-mt-24">
-              <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Create Your Experience</h2>
+              <h2 className="text-3xl font-orbitron text-emerald-600 [text-shadow:0_0_12px_#04785740]">Create Your Experience</h2>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
-                  <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border">
+                  <Card className="bg-white/80 backdrop-blur-sm border-copper-300" style={{ borderImage: 'linear-gradient(to right, #B87333, #A55E2A) 1' }}>
                     <CardHeader>
-                      <CardTitle className="text-[#fff]">Booking Wizard - Step {currentStep}/4</CardTitle>
+                      <CardTitle className="text-emerald-700">Booking Wizard - Step {currentStep}/4</CardTitle>
                       <div className="flex justify-between mt-2">
                         {steps.map((step, idx) => (
-                          <div key={idx} className={`text-sm ${idx + 1 === currentStep ? 'text-[#ffd29b]' : 'text-[#d9d6cd]'}`}>
+                          <div key={idx} className={`text-sm ${idx + 1 === currentStep ? 'text-emerald-600' : 'text-gray-500'}`}>
                             {step}
                           </div>
                         ))}
@@ -438,14 +443,14 @@ export default function ForestSPAPage() {
                           >
                             {/* Step 1: Sauna */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <label className="text-xs font-mono text-[#fff]">Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label>
-                              <label className="text-xs font-mono text-[#fff]">Start Time<select value={String(startHour)} onChange={(e) => setStartHour(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">{Array.from({ length: 24 }).map((_, i) => <option key={i} value={i}>{formatHour(i)}</option>)}</select></label>
-                              <label className="text-xs font-mono text-[#fff]">Duration (hours)<input type="number" min={2} max={12} value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label>
+                              <label className="text-xs font-mono text-gray-700">Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full mt-1 p-2 rounded bg-gray-100 border border-copper-200 text-sm text-gray-800" /></label>
+                              <label className="text-xs font-mono text-gray-700">Start Time<select value={String(startHour)} onChange={(e) => setStartHour(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-gray-100 border border-copper-200 text-sm text-gray-800">{Array.from({ length: 24 }).map((_, i) => <option key={i} value={i}>{formatHour(i)}</option>)}</select></label>
+                              <label className="text-xs font-mono text-gray-700">Duration (hours)<input type="number" min={2} max={12} value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-gray-100 border border-copper-200 text-sm text-gray-800" /></label>
                               <div className="col-span-1 sm:col-span-2 mt-2">
                                 <div className="flex gap-2 flex-wrap">
-                                  <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedSaunaExtras.cinema} onChange={() => toggleSaunaExtra('cinema')} /> <span className="text-sm">Cinema + Console</span></label>
-                                  <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedSaunaExtras.parilshchik} onChange={() => toggleSaunaExtra('parilshchik')} /> <span className="text-sm">Parilshchik</span></label>
-                                  <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedSaunaExtras.shop} onChange={() => toggleSaunaExtra('shop')} /> <span className="text-sm">Shop Items</span></label>
+                                  <label className="inline-flex items-center gap-2 text-gray-700"><input type="checkbox" checked={selectedSaunaExtras.cinema} onChange={() => toggleSaunaExtra('cinema')} /> <span className="text-sm">Cinema + Console</span></label>
+                                  <label className="inline-flex items-center gap-2 text-gray-700"><input type="checkbox" checked={selectedSaunaExtras.parilshchik} onChange={() => toggleSaunaExtra('parilshchik')} /> <span className="text-sm">Parilshchik</span></label>
+                                  <label className="inline-flex items-center gap-2 text-gray-700"><input type="checkbox" checked={selectedSaunaExtras.shop} onChange={() => toggleSaunaExtra('shop')} /> <span className="text-sm">Shop Items</span></label>
                                 </div>
                               </div>
                             </div>
@@ -461,7 +466,7 @@ export default function ForestSPAPage() {
                           >
                             {/* Step 2: Massage Type */}
                             <div className="grid grid-cols-1 gap-3">
-                              <label className="text-xs font-mono text-[#fff]">Massage Type<select value={massageType} onChange={(e) => setMassageType(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">
+                              <label className="text-xs font-mono text-gray-700">Massage Type<select value={massageType} onChange={(e) => setMassageType(e.target.value)} className="w-full mt-1 p-2 rounded bg-gray-100 border border-copper-200 text-sm text-gray-800">
                                 <option value="none">No Massage</option>
                                 <option value="classic">Classic ({BASE_PRICING.classicPerHour} ₽/hr)</option>
                                 <option value="deepTissue">Deep Tissue ({BASE_PRICING.deepTissuePerHour} ₽/hr)</option>
@@ -470,9 +475,9 @@ export default function ForestSPAPage() {
                               {massageType !== 'none' && (
                                 <div className="mt-2">
                                   <div className="flex gap-2 flex-wrap">
-                                    <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedMassageExtras.oils} onChange={() => toggleMassageExtra('oils')} /> <span className="text-sm">Oils (+{BASE_PRICING.extras.oils} ₽)</span></label>
-                                    <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedMassageExtras.music} onChange={() => toggleMassageExtra('music')} /> <span className="text-sm">Music (+{BASE_PRICING.extras.music} ₽)</span></label>
-                                    <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedMassageExtras.hotStone} onChange={() => toggleMassageExtra('hotStone')} /> <span className="text-sm">Hot Stones (+{BASE_PRICING.hotStoneFlat} ₽)</span></label>
+                                    <label className="inline-flex items-center gap-2 text-gray-700"><input type="checkbox" checked={selectedMassageExtras.oils} onChange={() => toggleMassageExtra('oils')} /> <span className="text-sm">Oils (+{BASE_PRICING.extras.oils} ₽)</span></label>
+                                    <label className="inline-flex items-center gap-2 text-gray-700"><input type="checkbox" checked={selectedMassageExtras.music} onChange={() => toggleMassageExtra('music')} /> <span className="text-sm">Music (+{BASE_PRICING.extras.music} ₽)</span></label>
+                                    <label className="inline-flex items-center gap-2 text-gray-700"><input type="checkbox" checked={selectedMassageExtras.hotStone} onChange={() => toggleMassageExtra('hotStone')} /> <span className="text-sm">Hot Stones (+{BASE_PRICING.hotStoneFlat} ₽)</span></label>
                                   </div>
                                 </div>
                               )}
@@ -489,14 +494,14 @@ export default function ForestSPAPage() {
                           >
                             {/* Step 3: Choose Massagist */}
                             <div className="grid grid-cols-1 gap-3">
-                              <label className="text-xs font-mono text-[#fff]">Select Massagist<select value={selectedMaster} onChange={(e) => setSelectedMaster(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">
+                              <label className="text-xs font-mono text-gray-700">Select Massagist<select value={selectedMaster} onChange={(e) => setSelectedMaster(e.target.value)} className="w-full mt-1 p-2 rounded bg-gray-100 border border-copper-200 text-sm text-gray-800">
                                 <option value="">Any available</option>
                                 {masters.filter(m => massageType === 'none' || m.specialty.toLowerCase().includes(massageType.toLowerCase())).map(m => <option key={m.id} value={m.id}>{m.name} ({m.rating}★)</option>)}
                               </select></label>
                               {selectedMaster && (
-                                <div className="mt-2 p-2 bg-[#080707] rounded border border-[#2b1b12]">
-                                  <div className="text-sm text-[#fff]">Selected: {masters.find(m => m.id === selectedMaster)?.name}</div>
-                                  <div className="text-xs text-[#d9d6cd]">Bio: {masters.find(m => m.id === selectedMaster)?.bio}</div>
+                                <div className="mt-2 p-2 bg-gray-50 rounded border border-copper-200">
+                                  <div className="text-sm text-gray-800">Selected: {masters.find(m => m.id === selectedMaster)?.name}</div>
+                                  <div className="text-xs text-gray-600">Bio: {masters.find(m => m.id === selectedMaster)?.bio}</div>
                                 </div>
                               )}
                             </div>
@@ -512,43 +517,43 @@ export default function ForestSPAPage() {
                           >
                             {/* Step 4: Review & Confirm */}
                             <div className="space-y-2">
-                              <div className="text-sm text-[#fff]">Date: {date}</div>
-                              <div className="text-sm text-[#fff]">Time: {formatHour(startHour)} for {durationHours} hours</div>
-                              <div className="text-sm text-[#fff]">Sauna Extras: {Object.keys(selectedSaunaExtras).filter(k => selectedSaunaExtras[k]).join(", ") || "None"}</div>
-                              <div className="text-sm text-[#fff]">Massage Type: {massageType || "None"}</div>
-                              <div className="text-sm text-[#fff]">Massage Extras: {Object.keys(selectedMassageExtras).filter(k => selectedMassageExtras[k]).join(", ") || "None"}</div>
-                              <div className="text-sm text-[#fff]">Massagist: {selectedMaster ? masters.find(m => m.id === selectedMaster)?.name : "Any"}</div>
-                              <div className="text-lg font-bold text-[#fff]">Total: {totalPrice} ₽ (Stars cost: {starsCost}★, Earn: {starsEarned}★)</div>
-                              <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Additional notes" className="w-full p-3 rounded bg-[#141212] border border-[#2b1b12] text-sm h-24 text-[#fff]" />
+                              <div className="text-sm text-gray-800">Date: {date}</div>
+                              <div className="text-sm text-gray-800">Time: {formatHour(startHour)} for {durationHours} hours</div>
+                              <div className="text-sm text-gray-800">Sauna Extras: {Object.keys(selectedSaunaExtras).filter(k => selectedSaunaExtras[k]).join(", ") || "None"}</div>
+                              <div className="text-sm text-gray-800">Massage Type: {massageType || "None"}</div>
+                              <div className="text-sm text-gray-800">Massage Extras: {Object.keys(selectedMassageExtras).filter(k => selectedMassageExtras[k]).join(", ") || "None"}</div>
+                              <div className="text-sm text-gray-800">Massagist: {selectedMaster ? masters.find(m => m.id === selectedMaster)?.name : "Any"}</div>
+                              <div className="text-lg font-bold text-emerald-700">Total: {totalPrice} ₽ (Stars cost: {starsCost}★, Earn: {starsEarned}★)</div>
+                              <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Additional notes" className="w-full p-3 rounded bg-gray-100 border border-copper-200 text-sm h-24 text-gray-800" />
                             </div>
                           </motion.div>
                         )}
                       </AnimatePresence>
                       <div className="flex justify-between mt-4">
-                        <Button disabled={currentStep === 1 || isSubmitting} onClick={() => setCurrentStep(prev => prev - 1)} variant="ghost">Back</Button>
+                        <Button disabled={currentStep === 1 || isSubmitting} onClick={() => setCurrentStep(prev => prev - 1)} variant="ghost" className="text-gray-600 hover:text-emerald-600">Back</Button>
                         {currentStep < 4 ? (
-                          <Button disabled={isSubmitting} onClick={() => setCurrentStep(prev => prev + 1)}>Next</Button>
+                          <Button disabled={isSubmitting} onClick={() => setCurrentStep(prev => prev + 1)} className="bg-emerald-600 text-white hover:bg-emerald-700">Next</Button>
                         ) : (
-                          <Button disabled={isSubmitting} onClick={handleCreateBooking}>{isSubmitting ? "Booking..." : "Confirm & Book"}</Button>
+                          <Button disabled={isSubmitting} onClick={handleCreateBooking} className="bg-emerald-600 text-white hover:bg-emerald-700">{isSubmitting ? "Booking..." : "Confirm & Book"}</Button>
                         )}
                       </div>
                     </CardContent>
                   </Card>
                   {/* History */}
-                  <Button variant="ghost" onClick={() => setShowHistory(s => !s)} className="mt-4">{showHistory ? "Hide History" : "Show History"}</Button>
+                  <Button variant="ghost" onClick={() => setShowHistory(s => !s)} className="mt-4 text-gray-600 hover:text-emerald-600">{showHistory ? "Hide History" : "Show History"}</Button>
                   {showHistory && (
-                    <Card className="mt-4 bg-[#080707]/60 backdrop-blur-sm border-border">
-                      <CardHeader><CardTitle className="text-[#fff]">Booking History</CardTitle></CardHeader>
+                    <Card className="mt-4 bg-white/80 backdrop-blur-sm border-copper-300">
+                      <CardHeader><CardTitle className="text-emerald-700">Booking History</CardTitle></CardHeader>
                       <CardContent>
-                        {bookings.length === 0 ? <div className="text-sm text-[#d9d6cd]">No bookings yet.</div> : (
+                        {bookings.length === 0 ? <div className="text-sm text-gray-600">No bookings yet.</div> : (
                           <ul className="space-y-2">
                             {bookings.map((b) => (
-                              <li key={b.id} className="p-2 rounded bg-[#0b0b0b] border border-[#2b1b12]">
+                              <li key={b.id} className="p-2 rounded bg-gray-50 border border-copper-200">
                                 <div className="flex justify-between items-center">
-                                  <div className="text-sm text-[#fff]">{b.date} • {formatHour(b.startHour)} • {b.durationHours}ч {b.massageType ? `(${b.massageType})` : ''}</div>
-                                  <div className="text-sm font-semibold text-[#fff]">{b.price} ₽</div>
+                                  <div className="text-sm text-gray-800">{b.date} • {formatHour(b.startHour)} • {b.durationHours}ч {b.massageType ? `(${b.massageType})` : ''}</div>
+                                  <div className="text-sm font-semibold text-emerald-700">{b.price} ₽</div>
                                 </div>
-                                <div className="text-xs text-[#d9d6cd] mt-1">Extras: {b.extras.join(", ") || "—"} • Master: {b.masterId ? masters.find(m => m.id === b.masterId)?.name : "None"}</div>
+                                <div className="text-xs text-gray-600 mt-1">Extras: {b.extras.join(", ") || "—"} • Master: {b.masterId ? masters.find(m => m.id === b.masterId)?.name : "None"}</div>
                               </li>
                             ))}
                           </ul>
@@ -558,42 +563,42 @@ export default function ForestSPAPage() {
                   )}
                 </div>
                 {/* Aside with stars, chart, links */}
-                <aside><Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border md:sticky md:top-24"><CardHeader><CardTitle className="text-[#fff]">Star System</CardTitle></CardHeader><CardContent><p className="text-sm text-[#d9d6cd] mb-2">Your stars — internal currency. Spend on discounts or save for future bookings.</p><div className="p-3 bg-[#060606] rounded border border-[#2b1b12]"><div className="text-xs text-[#ffd29b]">Balance</div><div className="text-3xl font-bold flex items-center gap-2 text-[#fff]"><VibeContentRenderer content="::FaStar::" className="w-7 h-7 text-yellow-400" /> {starsBalance}★</div><div className="text-xs text-[#d9d6cd] mt-2">Total: accruals for actions, referrals, cleanings.</div></div><div className="mt-4"><div className="text-xs text-[#ffd29b] mb-2">Subscribe to cleaning alerts</div><p className="text-xs text-[#d9d6cd]">After rental, subscribe to short cleaning shift: paid in stars.</p><div className="mt-2 flex gap-2"><Button onClick={() => alert("TODO: send subscription to /api/notify-cleanup")} className="bg-[#ffd29b] text-[#241309] hover:bg-white">Subscribe</Button><SaunaOccupancyChart bookings={cleaningOpportunities} title="Available Cleanings Schedule" /></div></div></CardContent></Card><Card className="bg-[#070707]/60 backdrop-blur-sm border-border mt-6"><CardContent className="py-4"><h4 className="font-semibold mb-2 text-[#fff]">Quick Links</h4><ul className="text-sm list-inside space-y-2 text-[#d9d6cd]"><li><Link href="/vipbikerental" className="text-[#fff] hover:underline">VIP Bike</Link></li><li><Link href="/repo-xml" className="text-[#fff] hover:underline">/repo-xml Studio</Link></li><li><Link href="/selfdev" className="text-[#fff] hover:underline">SelfDev</Link></li></ul></CardContent></Card></aside>
+                <aside><Card className="bg-white/80 backdrop-blur-sm border-copper-300 md:sticky md:top-24"><CardHeader><CardTitle className="text-emerald-700">Star System</CardTitle></CardHeader><CardContent><p className="text-sm text-gray-600 mb-2">Your stars — internal currency. Spend on discounts or save for future bookings.</p><div className="p-3 bg-gray-50 rounded border border-copper-200"><div className="text-xs text-emerald-600">Balance</div><div className="text-3xl font-bold flex items-center gap-2 text-emerald-700"><VibeContentRenderer content="::FaStar::" className="w-7 h-7 text-copper-500" /> {starsBalance}★</div><div className="text-xs text-gray-600 mt-2">Total: accruals for actions, referrals, cleanings.</div></div><div className="mt-4"><div className="text-xs text-emerald-600 mb-2">Subscribe to cleaning alerts</div><p className="text-xs text-gray-600">After rental, subscribe to short cleaning shift: paid in stars.</p><div className="mt-2 flex gap-2"><Button onClick={() => alert("TODO: send subscription to /api/notify-cleanup")} className="bg-emerald-600 text-white hover:bg-emerald-700">Subscribe</Button><SaunaOccupancyChart bookings={cleaningOpportunities} title="Available Cleanings Schedule" /></div></div></CardContent></Card><Card className="bg-white/80 backdrop-blur-sm border-copper-300 mt-6"><CardContent className="py-4"><h4 className="font-semibold mb-2 text-emerald-700">Quick Links</h4><ul className="text-sm list-inside space-y-2 text-gray-600"><li><Link href="/vipbikerental" className="text-emerald-600 hover:underline">VIP Bike</Link></li><li><Link href="/repo-xml" className="text-emerald-600 hover:underline">/repo-xml Studio</Link></li><li><Link href="/selfdev" className="text-emerald-600 hover:underline">SelfDev</Link></li></ul></CardContent></Card></aside>
               </div>
             </section>
         </div>
 
-        <footer className="bg-card py-12 px-4">
+        <footer className="bg-gray-100 py-12 px-4">
           <div className="container mx-auto max-w-7xl grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
-              <h3 className="font-orbitron text-xl mb-4">Forest SPA</h3>
-              <p className="text-muted-foreground">Ultimate sauna and massage in Нижний Новгород.</p>
+              <h3 className="font-orbitron text-xl mb-4 text-emerald-700">Лес SPA</h3>
+              <p className="text-gray-600">Ultimate sauna and massage in Нижний Новгород.</p>
             </div>
             <div>
-              <h3 className="font-orbitron text-xl mb-4">Links</h3>
+              <h3 className="font-orbitron text-xl mb-4 text-emerald-700">Links</h3>
               <ul className="space-y-2">
-                <li><Link href="#zones" className="text-accent hover:underline">Zones</Link></li>
-                <li><Link href="#pricing" className="text-accent hover:underline">Pricing</Link></li>
-                <li><Link href="#extras" className="text-accent hover:underline">Extras</Link></li>
+                <li><Link href="#zones" className="text-copper-600 hover:underline">Zones</Link></li>
+                <li><Link href="#pricing" className="text-copper-600 hover:underline">Pricing</Link></li>
+                <li><Link href="#extras" className="text-copper-600 hover:underline">Extras</Link></li>
               </ul>
             </div>
             <div>
-              <h3 className="font-orbitron text-xl mb-4">Contacts</h3>
-              <p className="text-muted-foreground">Проспект Ленина 98, Гостиница Волна</p>
-              <p className="text-muted-foreground">Tel: +7 (XXX) XXX-XX-XX</p>
-              <p className="text-muted-foreground">Email: info@forestspa.ru</p>
+              <h3 className="font-orbitron text-xl mb-4 text-emerald-700">Contacts</h3>
+              <p className="text-gray-600">Проспект Ленина 98, Гостиница Волна</p>
+              <p className="text-gray-600">Tel: +7 (XXX) XXX-XX-XX</p>
+              <p className="text-gray-600">Email: info@forestspa.ru</p>
             </div>
             <div>
-              <h3 className="font-orbitron text-xl mb-4">Social</h3>
+              <h3 className="font-orbitron text-xl mb-4 text-emerald-700">Social</h3>
               <div className="flex space-x-4">
-                <a href="#" className="text-accent hover:text-primary"><FaFacebook size={24} /></a>
-                <a href="#" className="text-accent hover:text-primary"><FaInstagram size={24} /></a>
-                <a href="#" className="text-accent hover:text-primary"><FaTwitter size={24} /></a>
+                <a href="#" className="text-copper-600 hover:text-emerald-600"><FaFacebook size={24} /></a>
+                <a href="#" className="text-copper-600 hover:text-emerald-600"><FaInstagram size={24} /></a>
+                <a href="#" className="text-copper-600 hover:text-emerald-600"><FaTwitter size={24} /></a>
               </div>
             </div>
           </div>
-          <div className="container mx-auto max-w-7xl mt-8 text-center text-muted-foreground">
-            © 2025 Forest SPA. All rights reserved.
+          <div className="container mx-auto max-w-7xl mt-8 text-center text-gray-500">
+            © 2025 Лес SPA. All rights reserved.
           </div>
         </footer>
     </div>
