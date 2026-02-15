@@ -226,6 +226,33 @@ async function fetchTelegramPhotoBuffer(fileId: string) {
 }
 
 
+async function ensureStorageBucket(params: { supabaseUrl: string; serviceRoleKey: string; bucket: string }) {
+  const createResponse = await fetch(`${params.supabaseUrl}/storage/v1/bucket`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${params.serviceRoleKey}`,
+      apikey: params.serviceRoleKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      id: params.bucket,
+      name: params.bucket,
+      public: true,
+      file_size_limit: 20971520,
+    }),
+  });
+
+  if (createResponse.ok || createResponse.status === 409) {
+    return { ok: true as const };
+  }
+
+  const errorText = await createResponse.text();
+  return {
+    ok: false as const,
+    error: errorText || `Bucket create failed (${createResponse.status})`,
+  };
+}
+
 async function uploadTelegramPhotoToPublicStorage(params: { bytes: Buffer; fileName: string }) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -233,12 +260,17 @@ async function uploadTelegramPhotoToPublicStorage(params: { bytes: Buffer; fileN
     return { ok: false as const, error: "Supabase storage is not configured" };
   }
 
-  const bucket = process.env.CYBERTUTOR_SCREENSHOT_BUCKET || "codex-callback-images";
+  const configuredBucket = process.env.CYBERTUTOR_SCREENSHOT_BUCKET;
+  const bucketCandidates = [configuredBucket, "carpix", "codex-callback-images"]
+    .filter(Boolean)
+    .filter((bucket, index, list) => list.indexOf(bucket) === index) as string[];
+
   const objectName = `telegram-photo-forward/${Date.now()}-${params.fileName.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
 
-  const uploadResponse = await fetch(
-    `${supabaseUrl}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeURIComponent(objectName)}`,
-    {
+  for (const bucket of bucketCandidates) {
+    const uploadUrl = `${supabaseUrl}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeURIComponent(objectName)}`;
+
+    let uploadResponse = await fetch(uploadUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${serviceRoleKey}`,
@@ -247,18 +279,46 @@ async function uploadTelegramPhotoToPublicStorage(params: { bytes: Buffer; fileN
         "x-upsert": "true",
       },
       body: params.bytes,
-    },
-  );
+    });
 
-  if (!uploadResponse.ok) {
+    if (!uploadResponse.ok && uploadResponse.status === 404) {
+      const create = await ensureStorageBucket({ supabaseUrl, serviceRoleKey, bucket });
+      if (!create.ok) {
+        logger.warn("[Slack] Failed to auto-create fallback bucket for Telegram photo forwarding", {
+          bucket,
+          error: create.error,
+        });
+      } else {
+        uploadResponse = await fetch(uploadUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serviceRoleKey}`,
+            apikey: serviceRoleKey,
+            "Content-Type": "application/octet-stream",
+            "x-upsert": "true",
+          },
+          body: params.bytes,
+        });
+      }
+    }
+
+    if (uploadResponse.ok) {
+      return {
+        ok: true as const,
+        url: `${supabaseUrl}/storage/v1/object/public/${bucket}/${objectName}`,
+        bucket,
+      };
+    }
+
     const err = await uploadResponse.text();
-    return { ok: false as const, error: err || `Supabase storage upload failed (${uploadResponse.status})` };
+    logger.warn("[Slack] Telegram photo storage fallback upload failed for bucket", {
+      bucket,
+      status: uploadResponse.status,
+      error: err,
+    });
   }
 
-  return {
-    ok: true as const,
-    url: `${supabaseUrl}/storage/v1/object/public/${bucket}/${objectName}`,
-  };
+  return { ok: false as const, error: "Supabase storage upload failed for all fallback buckets" };
 }
 
 async function uploadPhotoToSlack(params: {
