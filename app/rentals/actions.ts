@@ -519,6 +519,59 @@ export async function calculateDynamicPrice(vehicleId: string, startDateIso: str
     }
 }
 
+
+export async function initiateTelegramRentalPhotoUpload(
+    rentalId: string,
+    userId: string,
+    photoType: 'start' | 'end'
+): Promise<{ success: boolean; deepLink?: string; error?: string }> {
+    noStore();
+
+    if (!rentalId || !userId) {
+        return { success: false, error: 'Missing rentalId or userId.' };
+    }
+
+    try {
+        const { data: rental, error: fetchError } = await supabaseAdmin
+            .from('rentals')
+            .select('rental_id, user_id, status')
+            .eq('rental_id', rentalId)
+            .single();
+
+        if (fetchError || !rental) {
+            return { success: false, error: 'Аренда не найдена.' };
+        }
+
+        if (rental.user_id !== userId) {
+            return { success: false, error: 'Только арендатор может отправлять фото.' };
+        }
+
+        if (photoType === 'start' && !['pending_confirmation', 'confirmed'].includes(rental.status)) {
+            return { success: false, error: 'Фото ДО доступно только до подтверждения получения.' };
+        }
+
+        if (photoType === 'end' && rental.status !== 'active') {
+            return { success: false, error: 'Фото ПОСЛЕ доступно только для активной аренды.' };
+        }
+
+        const { error: upsertError } = await supabaseAdmin.from('user_states').upsert({
+            user_id: userId,
+            state: 'awaiting_rental_photo',
+            context: { rental_id: rentalId, photo_type: photoType, source: 'webapp' },
+            expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        });
+
+        if (upsertError) throw upsertError;
+
+        const tgLink = process.env.NEXT_PUBLIC_TELEGRAM_BOT_LINK || 'https://t.me/oneBikePlsBot';
+
+        return { success: true, deepLink: tgLink.includes('startapp=') ? tgLink : `${tgLink}?startapp=rentals_${rentalId}` };
+    } catch (e: any) {
+        logger.error('[initiateTelegramRentalPhotoUpload] Error:', e);
+        return { success: false, error: e.message || 'Unknown error' };
+    }
+}
+
 export async function addRentalPhoto(rentalId: string, userId: string, photoUrl: string, photoType: 'start' | 'end') {
     noStore();
     try {

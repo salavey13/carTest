@@ -29,16 +29,32 @@ async function handlePhotoMessage(message: any) {
         .from('user_states')
         .select('*')
         .eq('user_id', userId)
-        .single();
-    
-    if (stateError || !userState || userState.state !== 'awaiting_rental_photo') {
+        .maybeSingle();
+
+    if (stateError) {
+        logger.error(`[Webhook] Failed to load user_state for user ${userId}`, stateError);
+        return;
+    }
+
+    if (!userState || userState.state !== 'awaiting_rental_photo') {
         logger.info(`[Webhook] Photo from user ${userId} received without 'awaiting_rental_photo' state. Ignoring.`);
         return;
     }
-    
+
+    if (userState.expires_at && new Date(userState.expires_at).getTime() < Date.now()) {
+        await supabaseAdmin.from('user_states').delete().eq('user_id', userId);
+        await sendComplexMessage(chatId, '⌛️ Режим загрузки фото истек. Нажмите /actions и запустите шаг снова.', [], undefined);
+        return;
+    }
+
     const { rental_id, photo_type } = userState.context as { rental_id: string, photo_type: 'start' | 'end' };
-    
-    const photo = message.photo[0]; // Telegram sends multiple sizes, 0 is the smallest
+
+    const photo = message.photo?.[message.photo.length - 1]; // берем самый большой размер
+    if (!photo?.file_id) {
+        await sendComplexMessage(chatId, '🚨 Не удалось прочитать фото. Отправьте изображение ещё раз.', [], undefined);
+        return;
+    }
+
     const fileId = photo.file_id;
 
     try {
@@ -73,7 +89,7 @@ async function handlePhotoMessage(message: any) {
 
         await supabaseAdmin.from('user_states').delete().eq('user_id', userId);
         
-        await sendComplexMessage(chatId, `📸 Фото "${photo_type === 'start' ? 'ДО' : 'ПОСЛЕ'}" успешно загружено! Владелец уведомлен.`, [], undefined);
+        await sendComplexMessage(chatId, `📸 Фото "${photo_type === 'start' ? 'ДО' : 'ПОСЛЕ'}" успешно загружено для аренды ${rental_id.slice(0, 8)}. Владелец уведомлен.`, [], undefined);
 
     } catch (error) {
         logger.error(`[Webhook Photo Handler] Error processing photo for user ${userId}:`, error);
