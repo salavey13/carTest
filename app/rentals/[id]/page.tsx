@@ -1,6 +1,6 @@
 "use client";
 
-import { getRentalDetails, addRentalPhoto, confirmVehiclePickup, confirmVehicleReturn } from '@/app/rentals/actions';
+import { getRentalDetails, addRentalPhoto, confirmVehiclePickup, confirmVehicleReturn, initiateTelegramRentalPhotoUpload } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -236,6 +236,23 @@ export default function RentalJourneyPage({ params }: { params: { id: string } }
         handleAction(() => addRentalPhoto(params.id, dbUser!.user_id, photoUrl, photoType), `Фото '${photoType === 'start' ? "ДО" : "ПОСЛЕ"}' успешно добавлено!`);
     };
 
+    const startTelegramPhotoMode = async (photoType: 'start' | 'end') => {
+        if (!dbUser?.user_id) return;
+        const toastId = toast.loading('Подготавливаем режим Telegram...');
+        const result = await initiateTelegramRentalPhotoUpload(params.id, dbUser.user_id, photoType);
+
+        if (!result.success) {
+            toast.error(result.error || 'Не удалось открыть Telegram-режим.', { id: toastId });
+            return;
+        }
+
+        toast.success(`Готово. Отправьте фото '${photoType === 'start' ? 'ДО' : 'ПОСЛЕ'}' в бота за 15 минут.`, { id: toastId });
+
+        if (result.deepLink && typeof window !== 'undefined') {
+            window.open(result.deepLink, '_blank');
+        }
+    };
+
     if (loading) return <Loading text="Загрузка деталей аренды..." />;
     if (error) return <div className="text-center p-8 text-destructive">{error}</div>;
     if (!rental) return <div className="text-center p-8 text-muted-foreground">Аренда не найдена.</div>;
@@ -245,22 +262,81 @@ export default function RentalJourneyPage({ params }: { params: { id: string } }
     const endPhotoUrl = metadata.end_photo_url;
 
     const stepsConfig = [
-        { title: "Оплата", icon: "::FaFileInvoiceDollar::", content: <p className="text-sm">Оплачено <VibeContentRenderer content="::FaCheck::" /></p>, actionContent: <p className="text-sm text-brand-yellow">Проверьте уведомления в боте для оплаты.</p> },
-        { title: "Фото 'ДО'", icon: "::FaCameraRetro::", content: startPhotoUrl ? <Image src={startPhotoUrl} alt="Start" width={150} height={150} className="rounded-lg"/> : <p className="text-sm">Шаг пропущен.</p>, actionContent: userRole === 'renter' ? <PhotoUploader onUploadConfirmed={(url) => handlePhotoUpload(url, 'start')} /> : <p className="text-sm">Ожидаем фото от арендатора...</p> },
-        { title: "Подтверждение Получения", icon: "::FaHandshake::", content: <p className="text-sm">Получено</p>, actionContent: userRole === 'owner' ? <Button onClick={() => handleAction(() => confirmVehiclePickup(params.id, dbUser!.user_id), "Получение подтверждено!")}><VibeContentRenderer content="::FaCheckCircle::" className="mr-2"/>Подтвердить</Button> : <p className="text-sm">Ожидаем подтверждения от владельца...</p> },
-        { title: "Фото 'ПОСЛЕ'", icon: "::FaCamera::", content: endPhotoUrl ? <Image src={endPhotoUrl} alt="End" width={150} height={150} className="rounded-lg"/> : <p className="text-sm">Шаг пропущен.</p>, actionContent: userRole === 'renter' ? <PhotoUploader onUploadConfirmed={(url) => handlePhotoUpload(url, 'end')} /> : <p className="text-sm">Ожидаем фото от арендатора.</p> },
-        { title: "Подтверждение Возврата", icon: "::FaFlagCheckered::", content: <p className="text-sm">Возвращено</p>, actionContent: userRole === 'owner' ? <Button onClick={() => handleAction(() => confirmVehicleReturn(params.id, dbUser!.user_id), "Возврат подтвержден!")}><VibeContentRenderer content="::FaCheckDouble::" className="mr-2"/>Подтвердить</Button> : <p className="text-sm">Ожидаем подтверждения от владельца.</p> },
-    ];
-    
-    return (
-        <div className="min-h-screen bg-background text-foreground p-4 pt-24"><div className="fixed inset-0 z-[-1] opacity-20"><Image src={rental.vehicle?.image_url || "/placeholder.svg"} alt="BG" fill className="object-cover animate-pan-zoom" /><div className="absolute inset-0 bg-background/70 backdrop-blur-sm"></div></div>
-            <div className="container mx-auto max-w-2xl relative z-10">
-                <div className="bg-card/70 backdrop-blur-xl border border-border p-6 rounded-2xl mb-8">
-                    <h1 className="text-3xl font-orbitron text-brand-cyan mb-2">Путь Арендатора</h1>
-                    <p className="text-sm font-mono text-muted-foreground mb-6">ID: {rental.rental_id}</p>
-                    {rental.vehicle && (<Link href={`/rent/${rental.vehicle.id}`} className="flex items-center gap-4 bg-card/50 p-3 rounded-lg hover:bg-card/80 transition-colors"><Image src={rental.vehicle.image_url || '/placeholder.svg'} alt={rental.vehicle.model || 'V'} width={80} height={80} className="rounded-lg object-cover aspect-square" /><div><p className="font-bold text-xl">{rental.vehicle.make} {rental.vehicle.model}</p><p className="text-muted-foreground">{rental.vehicle.type === 'bike' ? 'Мотоцикл' : 'Автомобиль'}</p></div></Link>)}
+        {
+            title: "Оплата",
+            icon: "::FaFileInvoiceDollar::",
+            content: <p className="text-sm">Оплачено <VibeContentRenderer content="::FaCheck::" /></p>,
+            actionContent: <p className="text-sm text-brand-yellow">Проверьте уведомления в боте для оплаты.</p>
+        },
+        {
+            title: "Фото 'ДО'",
+            icon: "::FaCameraRetro::",
+            content: startPhotoUrl ? <Image src={startPhotoUrl} alt="Start" width={150} height={150} className="rounded-lg"/> : <p className="text-sm">Фото пока не загружено.</p>,
+            actionContent: userRole === 'renter' ? (
+                <div className="space-y-3">
+                    <PhotoUploader onUploadConfirmed={(url) => handlePhotoUpload(url, 'start')} />
+                    <Button variant="outline" className="w-full" onClick={() => startTelegramPhotoMode('start')}>
+                        <VibeContentRenderer content="::FaTelegram::" className="mr-2" /> Отправить через Telegram-бота
+                    </Button>
                 </div>
-                <div className="relative">
+            ) : <p className="text-sm">Ожидаем фото от арендатора...</p>
+        },
+        {
+            title: "Подтверждение Получения",
+            icon: "::FaHandshake::",
+            content: <p className="text-sm">Получено</p>,
+            actionContent: userRole === 'owner'
+                ? <Button onClick={() => handleAction(() => confirmVehiclePickup(params.id, dbUser!.user_id), "Получение подтверждено!")}><VibeContentRenderer content="::FaCheckCircle::" className="mr-2"/>Подтвердить</Button>
+                : <p className="text-sm">Ожидаем подтверждения от владельца...</p>
+        },
+        {
+            title: "Фото 'ПОСЛЕ'",
+            icon: "::FaCamera::",
+            content: endPhotoUrl ? <Image src={endPhotoUrl} alt="End" width={150} height={150} className="rounded-lg"/> : <p className="text-sm">Фото пока не загружено.</p>,
+            actionContent: userRole === 'renter' ? (
+                <div className="space-y-3">
+                    <PhotoUploader onUploadConfirmed={(url) => handlePhotoUpload(url, 'end')} />
+                    <Button variant="outline" className="w-full" onClick={() => startTelegramPhotoMode('end')}>
+                        <VibeContentRenderer content="::FaTelegram::" className="mr-2" /> Отправить через Telegram-бота
+                    </Button>
+                </div>
+            ) : <p className="text-sm">Ожидаем фото от арендатора.</p>
+        },
+        {
+            title: "Подтверждение Возврата",
+            icon: "::FaFlagCheckered::",
+            content: <p className="text-sm">Возвращено</p>,
+            actionContent: userRole === 'owner'
+                ? <Button onClick={() => handleAction(() => confirmVehicleReturn(params.id, dbUser!.user_id), "Возврат подтвержден!")}><VibeContentRenderer content="::FaCheckDouble::" className="mr-2"/>Подтвердить</Button>
+                : <p className="text-sm">Ожидаем подтверждения от владельца.</p>
+        },
+    ];
+
+    return (
+        <div className="relative min-h-screen overflow-hidden bg-background px-4 pb-12 pt-24 text-foreground">
+            <div className="pointer-events-none fixed inset-0 z-[-2] bg-[radial-gradient(circle_at_top,rgba(255,106,0,0.16),transparent_40%),radial-gradient(circle_at_95%_20%,rgba(74,89,255,0.16),transparent_42%)]" />
+            <div className="fixed inset-0 z-[-3] opacity-20">
+                <Image src={rental.vehicle?.image_url || "/placeholder.svg"} alt="BG" fill className="object-cover" />
+                <div className="absolute inset-0 bg-background/75 backdrop-blur-sm" />
+            </div>
+            <div className="container relative z-10 mx-auto max-w-3xl">
+                <div className="mb-8 rounded-3xl border border-border/70 bg-card/55 p-6 backdrop-blur-xl">
+                    <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/30 px-4 py-2 text-xs text-white/90">
+                        <VibeContentRenderer content="::FaRoute::" className="text-primary" /> RENTAL EXECUTION FLOW
+                    </div>
+                    <h1 className="mb-2 font-orbitron text-3xl">Путь аренды</h1>
+                    <p className="mb-6 text-sm font-mono text-muted-foreground">ID: {rental.rental_id}</p>
+                    {rental.vehicle && (
+                        <Link href={`/rent/${rental.vehicle.id}`} className="flex items-center gap-4 rounded-xl border border-border/60 bg-card/60 p-3 transition-colors hover:bg-card/80">
+                            <Image src={rental.vehicle.image_url || '/placeholder.svg'} alt={rental.vehicle.model || 'V'} width={80} height={80} className="aspect-square rounded-lg object-cover" />
+                            <div>
+                                <p className="text-xl font-bold">{rental.vehicle.make} {rental.vehicle.model}</p>
+                                <p className="text-muted-foreground">{rental.vehicle.type === 'bike' ? 'Мотоцикл' : 'Автомобиль'}</p>
+                            </div>
+                        </Link>
+                    )}
+                </div>
+                <div className="relative rounded-3xl border border-border/70 bg-card/45 p-5 backdrop-blur-sm">
                     {stepsConfig.map((step, index) => (
                         <StepCard key={index} title={step.title} icon={step.icon} stepState={stepStates[index]} content={stepsConfig[index].content}>
                             {stepStates[index] === 'current' && stepsConfig[index].actionContent}

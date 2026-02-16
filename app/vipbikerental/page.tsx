@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
+import { useMemo } from "react";
 
 import { BikeShowcase } from "@/components/BikeShowcase";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
@@ -10,6 +11,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useAppContext } from "@/contexts/AppContext";
 
 type ServiceItem = { icon: string; text: string };
 
@@ -104,11 +106,47 @@ const heroMetrics = [
 ];
 
 export default function HomePage() {
+  const { dbUser } = useAppContext();
   const { scrollYProgress } = useScroll();
   const y = useTransform(scrollYProgress, [0, 1], [0, -90]);
 
+  const vibeProfile = useMemo(() => {
+    const surveyResults = (dbUser?.metadata?.survey_results || {}) as Record<string, string>;
+    const bikeStyle = surveyResults.bike_style || surveyResults.style || surveyResults.riding_style;
+
+    if (!bikeStyle) {
+      return {
+        badge: "::FaCompass:: Универсальный подбор",
+        title: "Подберем байк под ваш вайб за 2 минуты",
+        note: "Пройди /start в Telegram, чтобы открыть персональные рекомендации на этой странице.",
+      };
+    }
+
+    if (bikeStyle.toLowerCase().includes("спорт")) {
+      return {
+        badge: "::FaBolt:: Sport Vibe Detected",
+        title: "Твой вайб: скорость и адреналин",
+        note: "Рекомендуем начать с Supersport и быстрых слотов выдачи.",
+      };
+    }
+
+    if (bikeStyle.toLowerCase().includes("ретро") || bikeStyle.toLowerCase().includes("neo")) {
+      return {
+        badge: "::FaWandSparkles:: Neo-Retro Mode",
+        title: "Твой вайб: стиль и харизма",
+        note: "Для тебя выделили neo-retro подборку с фото-ready маршрутами.",
+      };
+    }
+
+    return {
+      badge: "::FaRoute:: Rider Profile Active",
+      title: `Твой вайб: ${bikeStyle}`,
+      note: "Используй персональный фильтр в каталоге, чтобы быстрее выбрать байк.",
+    };
+  }, [dbUser?.metadata]);
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground dark">
+    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
       <div className="pointer-events-none fixed inset-0 z-[-2] bg-[radial-gradient(circle_at_top,rgba(255,106,0,0.14),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(119,0,255,0.10),transparent_42%)]" />
       <div className="pointer-events-none fixed inset-0 z-[-3] bg-[linear-gradient(to_bottom,rgba(0,0,0,0.45),transparent_35%)]" />
 
@@ -131,9 +169,14 @@ export default function HomePage() {
           transition={{ duration: 0.7 }}
           className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center text-center"
         >
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/45 px-4 py-2 text-sm text-white/90 backdrop-blur-sm">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/45 px-4 py-2 text-sm text-white/90 backdrop-blur-sm">
             <VibeContentRenderer content="::FaBolt::" className="text-brand-yellow" />
             <span>VIPBIKE RENTAL ECOSYSTEM</span>
+          </div>
+          <div className="mb-5 w-full max-w-2xl rounded-2xl border border-white/20 bg-black/40 p-4 text-left text-sm text-white/90 backdrop-blur-sm">
+            <div className="mb-1 font-medium text-brand-yellow"><VibeContentRenderer content={vibeProfile.badge} /></div>
+            <p className="font-orbitron text-lg text-white">{vibeProfile.title}</p>
+            <p className="mt-1 text-white/80">{vibeProfile.note}</p>
           </div>
 
           <h1 className="font-orbitron text-5xl font-black uppercase leading-[0.9] tracking-tight text-white drop-shadow-[0_8px_22px_rgba(0,0,0,0.75)] sm:text-6xl md:text-7xl lg:text-8xl">
@@ -281,9 +324,9 @@ export default function HomePage() {
           <h2 className="mb-10 text-center font-orbitron text-4xl">Частые вопросы</h2>
           <Accordion type="single" collapsible className="w-full rounded-2xl border border-border/60 bg-card/40 px-4 text-sm">
             <AccordionItem value="item-1">
-              <AccordionTrigger className="text-base">Можно ли арендовать мотоцикл без категории "А"?</AccordionTrigger>
+              <AccordionTrigger className="text-base">Можно ли арендовать мотоцикл без категории «А»?</AccordionTrigger>
               <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
-                Да! У нас есть парк скутеров, для управления которыми достаточно категории "B" или "M". Для всех остальных мотоциклов категория "А" обязательна.
+                Да! У нас есть парк скутеров, для управления которыми достаточно категории «B» или «M». Для всех остальных мотоциклов категория «А» обязательна.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-2">

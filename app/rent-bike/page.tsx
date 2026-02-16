@@ -242,23 +242,28 @@ export default function RentBikePage() {
   const bookingButtonText = selectedBike ? ( isBooking ? 'БРОНИРОВАНИЕ...' : selectedBike.availability === 'taken' && selectedBike.active_booking_end ? `ЗАНЯТ ДО ${format(new Date(selectedBike.active_booking_end), 'd LLL', { locale: ru })}` : selectedBike.availability !== 'available' ? 'НЕДОСТУПЕН' : 'ЗАБРОНИРОВАТЬ' ) : 'ЗАБРОНИРОВАТЬ';
 
   return (
-    <div className="min-h-screen p-4 pt-24 overflow-hidden relative dark">
-      <div className="fixed inset-0 z-[-1] opacity-30">
-        <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg" alt="Moto Garage" fill className="object-cover animate-pan-zoom" />
-        <div className="absolute inset-0 bg-black/60"></div>
+    <div className="relative min-h-screen overflow-hidden bg-background px-4 pb-10 pt-24">
+      <div className="pointer-events-none fixed inset-0 z-[-2] bg-[radial-gradient(circle_at_top,rgba(255,106,0,0.16),transparent_38%),radial-gradient(circle_at_90%_15%,rgba(76,88,255,0.18),transparent_44%)]" />
+      <div className="fixed inset-0 z-[-3] opacity-20">
+        <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg" alt="Moto Garage" fill className="object-cover" />
+        <div className="absolute inset-0 bg-background/70" />
       </div>
       
       <div className="max-w-7xl mx-auto">
-        <motion.header initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-6">
-          <h1 className="text-5xl md:text-7xl font-bold font-orbitron text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent" data-text="MOTO-GARAGE">MOTO-GARAGE</h1>
-          <p className="text-muted-foreground font-mono mt-2">{recommendedType ? `Рекомендуем для тебя: ${recommendedType}` : "Выбери своего зверя"}</p>
+        <motion.header initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }} className="mb-6 rounded-3xl border border-border/70 bg-card/45 p-6 text-center backdrop-blur-sm">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 px-4 py-2 text-xs text-white/90">
+            <VibeContentRenderer content="::FaMotorcycle::" className="text-brand-yellow" />
+            VIPBIKE RENT FLOW
+          </div>
+          <h1 className="bg-gradient-to-r from-primary to-accent bg-clip-text font-orbitron text-4xl font-bold text-transparent md:text-6xl" data-text="MOTO-GARAGE">MOTO-GARAGE</h1>
+          <p className="mt-2 font-mono text-muted-foreground">{recommendedType ? `Рекомендуем для тебя: ${recommendedType}` : "Выбери своего зверя"}</p>
         </motion.header>
         
         {dbUser?.user_id && <ActiveRentalsTicker userId={dbUser.user_id} />}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <motion.div initial={{ opacity: 0, x: -100 }} animate={{ opacity: 1, x: 0 }} className="lg:col-span-1 space-y-6">
-            <div className="flex flex-wrap gap-2 p-2 bg-card/80 border border-border rounded-lg backdrop-blur-sm">
+            <div className="flex flex-wrap gap-2 rounded-xl border border-border/70 bg-card/60 p-2 backdrop-blur-sm">
                 {availableBikeTypes.map(type => (
                 <button key={type} onClick={() => setActiveFilter(type)}
                     className={cn( "px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 font-mono relative", activeFilter === type ? "bg-primary text-primary-foreground shadow-[0_0_10px_theme(colors.primary)]" : "bg-muted/50 text-muted-foreground hover:bg-muted" )}>
@@ -282,9 +287,10 @@ export default function RentBikePage() {
                         exit={{ opacity: 0, x: 20 }} 
                         onClick={() => handleBikeClick(bike)}
                         className={cn(
-                            "p-3 rounded-lg border-2 cursor-pointer transition-all duration-300 bg-card/70 hover:bg-card backdrop-blur-sm relative",
-                            isSelected ? "border-primary shadow-lg shadow-primary/20" : 
+                            "relative cursor-pointer rounded-xl border p-3 backdrop-blur-sm transition-all duration-300",
+                            isSelected ? "border-primary/80 bg-card/85 shadow-lg shadow-primary/20" : 
                             isActive ? "border-accent/70" : "border-border hover:border-primary/50",
+                            !isSelected && "bg-card/55 hover:bg-card/70",
                             bike.availability !== 'available' && 'opacity-50'
                         )}>
                         <div className="flex items-start gap-4">
@@ -334,7 +340,7 @@ export default function RentBikePage() {
                     animate={{ opacity: 1, scale: 1 }} 
                     exit={{ opacity: 0, scale: 0.95 }} 
                     className="sticky top-24">
-                    <div className="bg-card/80 border border-border rounded-xl shadow-2xl backdrop-blur-sm p-6">
+                    <div className="rounded-2xl border border-border/70 bg-card/65 p-6 shadow-2xl shadow-black/20 backdrop-blur-sm">
                     <motion.div layoutId={`bike-image-${selectedBike.id}`} className="relative h-64 md:h-80 w-full mb-6 rounded-lg overflow-hidden">
                         <Image src={selectedBike.image_url!} alt={selectedBike.model!} fill className="object-cover" priority />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
