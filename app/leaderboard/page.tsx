@@ -77,7 +77,7 @@ export default function LeaderboardPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background px-4 pb-16 pt-24 text-foreground dark">
+    <div className="relative min-h-screen overflow-hidden bg-background px-4 pb-16 pt-24 text-foreground">
       <div className="pointer-events-none fixed inset-0 z-[-2] bg-[radial-gradient(circle_at_top,rgba(255,106,0,0.15),transparent_40%),radial-gradient(circle_at_85%_0%,rgba(90,80,255,0.16),transparent_42%)]" />
       <div className="pointer-events-none fixed inset-0 z-[-3] opacity-25">
         <Image

@@ -572,6 +572,81 @@ export async function initiateTelegramRentalPhotoUpload(
     }
 }
 
+
+export async function archivePendingRental(
+    rentalId: string,
+    userId: string
+): Promise<{ success: boolean; error?: string }> {
+    noStore();
+
+    if (!rentalId || !userId) {
+        return { success: false, error: 'Missing rentalId or userId.' };
+    }
+
+    try {
+        const { data: rental, error: fetchError } = await supabaseAdmin
+            .from('rentals')
+            .select('rental_id, user_id, owner_id, status, payment_status, metadata')
+            .eq('rental_id', rentalId)
+            .single();
+
+        if (fetchError || !rental) {
+            return { success: false, error: 'Аренда не найдена.' };
+        }
+
+        const isParticipant = rental.user_id === userId || rental.owner_id === userId;
+        if (!isParticipant) {
+            return { success: false, error: 'Недостаточно прав для архивации.' };
+        }
+
+        if (!['pending_confirmation', 'confirmed'].includes(rental.status)) {
+            return { success: false, error: 'Архивировать можно только незавершенные тестовые аренды.' };
+        }
+
+        const currentMetadata = (rental.metadata as Record<string, any>) || {};
+        const newMetadata = {
+            ...currentMetadata,
+            archived_by: userId,
+            archived_at: new Date().toISOString(),
+            archived_reason: 'manual_cleanup',
+            archived_from_status: rental.status,
+            archived_from_payment_status: rental.payment_status,
+        };
+
+        const { error: updateError } = await supabaseAdmin
+            .from('rentals')
+            .update({
+                status: 'cancelled',
+                metadata: newMetadata,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('rental_id', rentalId);
+
+        if (updateError) throw updateError;
+
+        const { error: eventError } = await supabaseAdmin.from('events').insert({
+            rental_id: rentalId,
+            type: 'rental_archived',
+            status: 'completed',
+            created_by: userId,
+            payload: {
+                reason: 'manual_cleanup',
+                prev_status: rental.status,
+                prev_payment_status: rental.payment_status,
+            },
+        });
+
+        if (eventError) {
+            logger.error('[archivePendingRental] Rental updated but failed to create archival event:', eventError);
+        }
+
+        return { success: true };
+    } catch (e: any) {
+        logger.error('[archivePendingRental] Error:', e);
+        return { success: false, error: e.message || 'Unknown error' };
+    }
+}
+
 export async function addRentalPhoto(rentalId: string, userId: string, photoUrl: string, photoType: 'start' | 'end') {
     noStore();
     try {
