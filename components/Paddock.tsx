@@ -110,7 +110,7 @@ export function Paddock() {
   if (loading) return <Loading variant="bike" text="ЗАГРУЗКА ПАДДОКА..." />;
 
   return (
-    <div className="relative min-h-screen overflow-hidden px-4 pb-14 pt-24 dark">
+    <div className="relative min-h-screen overflow-hidden px-4 pb-14 pt-24">
       <div className="pointer-events-none fixed inset-0 z-[-2] bg-[radial-gradient(circle_at_top,rgba(255,106,0,0.13),transparent_40%),radial-gradient(circle_at_100%_20%,rgba(71,112,255,0.15),transparent_45%)]" />
 
       <div className="relative mx-auto w-full max-w-6xl">

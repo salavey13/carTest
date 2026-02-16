@@ -242,7 +242,7 @@ export default function RentBikePage() {
   const bookingButtonText = selectedBike ? ( isBooking ? 'БРОНИРОВАНИЕ...' : selectedBike.availability === 'taken' && selectedBike.active_booking_end ? `ЗАНЯТ ДО ${format(new Date(selectedBike.active_booking_end), 'd LLL', { locale: ru })}` : selectedBike.availability !== 'available' ? 'НЕДОСТУПЕН' : 'ЗАБРОНИРОВАТЬ' ) : 'ЗАБРОНИРОВАТЬ';
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background px-4 pb-10 pt-24 dark">
+    <div className="relative min-h-screen overflow-hidden bg-background px-4 pb-10 pt-24">
       <div className="pointer-events-none fixed inset-0 z-[-2] bg-[radial-gradient(circle_at_top,rgba(255,106,0,0.16),transparent_38%),radial-gradient(circle_at_90%_15%,rgba(76,88,255,0.18),transparent_44%)]" />
       <div className="fixed inset-0 z-[-3] opacity-20">
         <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg" alt="Moto Garage" fill className="object-cover" />

@@ -313,7 +313,7 @@ export default function RentalJourneyPage({ params }: { params: { id: string } }
     ];
 
     return (
-        <div className="relative min-h-screen overflow-hidden bg-background px-4 pb-12 pt-24 text-foreground dark">
+        <div className="relative min-h-screen overflow-hidden bg-background px-4 pb-12 pt-24 text-foreground">
             <div className="pointer-events-none fixed inset-0 z-[-2] bg-[radial-gradient(circle_at_top,rgba(255,106,0,0.16),transparent_40%),radial-gradient(circle_at_95%_20%,rgba(74,89,255,0.16),transparent_42%)]" />
             <div className="fixed inset-0 z-[-3] opacity-20">
                 <Image src={rental.vehicle?.image_url || "/placeholder.svg"} alt="BG" fill className="object-cover" />
