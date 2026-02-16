@@ -57,16 +57,27 @@ export default function RulesPage() {
 
       setIsFetching(true);
       try {
+        console.log('[CLIENT DEBUG] Starting fetch for calendar: /api/rules/rule-cube-basic/calendar');
         const calRes = await fetch('/api/rules/rule-cube-basic/calendar');
-        if (!calRes.ok) throw new Error('Не удалось загрузить календарь');
+        if (!calRes.ok) {
+          console.error('[CLIENT DEBUG] Calendar fetch failed with status:', calRes.status, 'body:', await calRes.text());
+          throw new Error('Не удалось загрузить календарь');
+        }
         const calData = await calRes.json();
+        console.log('[CLIENT DEBUG] Calendar data loaded:', calData);
         setCalendar(calData || []);
 
+        console.log('[CLIENT DEBUG] Starting fetch for bookings: /api/my/bookings?userId=', dbUser.user_id);
         const bookRes = await fetch(`/api/my/bookings?userId=${dbUser.user_id}`);
-        if (!bookRes.ok) throw new Error('Не удалось загрузить бронирования');
+        if (!bookRes.ok) {
+          console.error('[CLIENT DEBUG] Bookings fetch failed with status:', bookRes.status, 'body:', await bookRes.text());
+          throw new Error('Не удалось загрузить бронирования');
+        }
         const bookData = await bookRes.json();
+        console.log('[CLIENT DEBUG] Bookings data loaded:', bookData);
         setBookings(bookData || []);
       } catch (err) {
+        console.error('[CLIENT DEBUG] Fetch data error:', err.message, err.stack);
         setError('Ошибка загрузки данных. Попробуйте позже.');
       } finally {
         setIsFetching(false);
