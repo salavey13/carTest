@@ -6,7 +6,7 @@ import {
     FaUpload,
     FaCopy,
     FaSpinner,
-    FaCheckCircle,
+    FaCircleCheck,
     FaCircleInfo,
     FaTriangleExclamation,
     FaPaste,
@@ -198,7 +198,6 @@ export default function AdminAdviceUploadPage() {
     const toggleLang = useCallback(() => {
         setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en');
     }, []);
-
 
     // --- Instruction Generation Logic ---
     const handleGenerateInstructions = useCallback(() => {
@@ -406,7 +405,7 @@ export default function AdminAdviceUploadPage() {
                     {generatedInstruction && (
                          <div className="mt-4 p-3 bg-gray-800/50 rounded border border-brand-blue/20">
                              <p className="text-sm font-medium text-brand-green flex items-center gap-2">
-                                 <FaCheckCircle /> {t("Instructions generated and copied!")}
+                                 <FaCircleCheck /> {t("Instructions generated and copied!")}
                              </p>
                              <textarea
                                 readOnly
@@ -483,7 +482,7 @@ export default function AdminAdviceUploadPage() {
                      )}
                     {parsedData && !parseError && (
                          <div className="mt-4 p-3 rounded border border-yellow-500/50 bg-yellow-900/30 text-yellow-300 text-sm">
-                             <FaCheckCircle className="mr-2 text-brand-green inline" />
+                             <FaCircleCheck className="mr-2 text-brand-green inline" />
                               {t("Parsed rows. Ready to upload.", { count: parsedData.length })}
                              <div className='mt-2 text-xs opacity-80'>
                                 <p>{t("Article Preview:", { title: parsedData[0]?.article_title, slug: parsedData[0]?.article_slug })}</p>
@@ -499,7 +498,7 @@ export default function AdminAdviceUploadPage() {
                                 : 'bg-red-900/30 border-brand-pink/50 text-brand-pink'
                         )}>
                             {uploadStatus.success ? (
-                                <FaCheckCircle className="mr-2 inline" />
+                                <FaCircleCheck className="mr-2 inline" />
                             ) : (
                                 <FaTriangleExclamation className="mr-2 inline" />
                             )}
