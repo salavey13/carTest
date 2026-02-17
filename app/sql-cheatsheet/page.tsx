@@ -3,7 +3,8 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skull, Crown, Rocket, Zap, Brain, FileCode, Lightbulb, RefreshCw } from "lucide-react";
+import { Skull, Crown, Rocket, Zap, Brain, FileCode, Lightbulb } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const ETERNAL_TRUTHS = [
   {
@@ -58,7 +59,9 @@ const OLD_HABITS = [
 
 export default function SqlCheatsheet2026() {
   return (
-    <div className="min-h-screen bg-background text-foreground pt-16 sm:pt-20 pb-20 overflow-hidden">
+    <div className={cn(
+      "min-h-screen bg-background text-foreground pt-16 sm:pt-20 pb-20 overflow-hidden"
+    )}>
       <div className="fixed inset-0 bg-[radial-gradient(#22d3ee15_1px,transparent_1px)] bg-[length:40px_40px] pointer-events-none dark:bg-[radial-gradient(#67e8f915_1px,transparent_1px)]" />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -104,7 +107,7 @@ export default function SqlCheatsheet2026() {
           ))}
         </div>
 
-        {/* Old Habits → New Reality */}
+        {/* Old Habits */}
         <div className="mb-20">
           <div className="flex items-center gap-4 mb-8">
             <Skull className="w-9 h-9 text-red-500" />
