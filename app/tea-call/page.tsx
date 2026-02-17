@@ -41,19 +41,21 @@ import {
   ExternalLink,
   Send,
   Type,
-  Flame
+  Flame,
+  Rocket,
+  Skull,
+  Crown
 } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
 
-const INSTRUCTIONS_URL =
-  "https://raw.githubusercontent.com/salavey13/carTest/main/docs/%D0%BC%D0%B0%D0%B3%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B0%D1%8F_%D0%BA%D0%BD%D0%BE%D0%BF%D0%BA%D0%B0_%D0%B2_cyber_vibe_studio_%D1%82%D1%83%D1%82%D0%BE%D1%80%D0%B8%D0%B0%D0%BB_%D0%B4%D0%BB%D1%8F_%D0%BD%D0%BE%D0%B2%D0%B8%D1%87%D0%BA%D0%BE%D0%B2(imgs).md";
+const COOKBOOK_URL = "https://raw.githubusercontent.com/salavey13/carTest/main/docs/SAME.MD";
 
 type LogEntry = {
   id: string;
   message: string;
   timestamp: Date;
-  type: 'info' | 'success' | 'warning' | 'error' | 'command' | 'improvisation';
+  type: 'info' | 'success' | 'warning' | 'error' | 'command' | 'improvisation' | 'codex';
   meta?: {
     originator?: string;
     commandType?: string;
@@ -80,12 +82,12 @@ const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9
 const COMMANDS: CommandButton[] = [
   {
     id: 'tea',
-    label: 'Чай',
+    label: 'Чай Демону',
     shortLabel: 'Чай',
     icon: <Coffee className="w-4 h-4" />,
     color: 'text-amber-400',
     bgGradient: 'from-amber-500/20 via-orange-500/20 to-amber-600/20',
-    message: 'просит принести чай. ☕️',
+    message: 'просит принести чай Кибердемону ☕️🔥',
     description: 'Классика',
     variant: 'primary',
     priority: 1,
@@ -94,12 +96,12 @@ const COMMANDS: CommandButton[] = [
   },
   {
     id: 'urgent',
-    label: 'SOS',
+    label: 'SOS Демону',
     shortLabel: 'SOS',
     icon: <AlertTriangle className="w-4 h-4" />,
     color: 'text-rose-400',
     bgGradient: 'from-rose-500/20 via-red-500/20 to-rose-600/20',
-    message: 'ТРЕБУЕТ внимания СРОЧНО! 🚨',
+    message: 'ТРЕБУЕТ внимания СРОЧНО! 🚨🩸',
     description: 'Срочно',
     variant: 'danger',
     priority: 3,
@@ -108,12 +110,12 @@ const COMMANDS: CommandButton[] = [
   },
   {
     id: 'broadcast',
-    label: 'Всем',
+    label: 'Всем Демонам',
     shortLabel: 'Всем',
     icon: <Radio className="w-4 h-4" />,
     color: 'text-cyan-400',
     bgGradient: 'from-cyan-500/20 via-blue-500/20 to-cyan-600/20',
-    message: 'объявляет общее собрание! 🫖',
+    message: 'объявляет общее собрание Кибердемонов! 🫖🌌',
     description: 'Оповещение',
     variant: 'secondary',
     priority: 2,
@@ -122,38 +124,31 @@ const COMMANDS: CommandButton[] = [
   }
 ];
 
-// Smooth ticker
-const MagicTicker = ({ items, speed = 50 }: { items: string[], speed?: number }) => {
+const MagicTicker = ({ items, speed = 40 }: { items: string[], speed?: number }) => {
   const [position, setPosition] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const [contentWidth, setContentWidth] = useState(0);
   
   useEffect(() => {
-    if (containerRef.current) {
-      setContentWidth(containerRef.current.scrollWidth / 2);
-    }
+    if (containerRef.current) setContentWidth(containerRef.current.scrollWidth / 2);
   }, [items]);
 
   useAnimationFrame((time, delta) => {
-    setPosition((prev) => {
-      const newPos = prev + (delta * speed) / 1000;
-      return newPos >= contentWidth ? 0 : newPos;
-    });
+    setPosition((prev) => (prev + (delta * speed) / 1000) % contentWidth);
   });
 
   const duplicatedItems = [...items, ...items, ...items];
 
   return (
-    <div className="overflow-hidden whitespace-nowrap relative">
+    <div className="overflow-hidden whitespace-nowrap relative py-1 bg-black/40 border-b border-brand-cyan/20">
       <div 
         ref={containerRef}
-        className="inline-flex gap-8"
+        className="inline-flex gap-12 text-xs sm:text-sm font-mono text-brand-cyan/70"
         style={{ transform: `translateX(-${position}px)` }}
       >
         {duplicatedItems.map((item, i) => (
-          <span key={i} className="inline-flex items-center gap-2 text-xs sm:text-sm text-muted-foreground/60 font-mono">
-            <Sparkle className="w-3 h-3 text-brand-gold/50" />
-            {item}
+          <span key={i} className="inline-flex items-center gap-2">
+            <Skull className="w-3 h-3" /> {item}
           </span>
         ))}
       </div>
@@ -166,18 +161,10 @@ const useCooldown = () => {
   
   const startCooldown = useCallback((id: string, duration: number) => {
     setCooldowns(prev => ({ ...prev, [id]: Date.now() + duration }));
-    setTimeout(() => {
-      setCooldowns(prev => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-    }, duration);
+    setTimeout(() => setCooldowns(prev => { const next = { ...prev }; delete next[id]; return next; }), duration);
   }, []);
 
-  const isOnCooldown = useCallback((id: string) => {
-    return (cooldowns[id] || 0) > Date.now();
-  }, [cooldowns]);
+  const isOnCooldown = useCallback((id: string) => (cooldowns[id] || 0) > Date.now(), [cooldowns]);
 
   return { startCooldown, isOnCooldown };
 };
@@ -191,8 +178,6 @@ export default function TeaCallPage() {
     first_name: firstName,
     last_name: lastName,
     photo_url: photoUrl,
-    status,
-    role
   } = dbUser || {};
 
   const fullName = [firstName, lastName].filter(Boolean).join(' ') || username || 'Неизвестный';
@@ -204,8 +189,8 @@ export default function TeaCallPage() {
   const [isLoadingMd, setIsLoadingMd] = useState(false);
   const [showExtender, setShowExtender] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showCodexTransition, setShowCodexTransition] = useState(false);
   
-  // Improvisation State
   const [improvisationText, setImprovisationText] = useState("");
   const [isImprovising, setIsImprovising] = useState(false);
   
@@ -216,108 +201,92 @@ export default function TeaCallPage() {
   const { startCooldown, isOnCooldown } = useCooldown();
 
   const tickerItems = [
-    "✨ Напиши любой запрос — сработает как заклинание",
-    "🚀 Импровизируй без границ",
-    "🎨 Быстрые кнопки — лишь шаблоны",
-    "⚡ Твоя воля — закон",
-    "🔮 Введи команду в терминал",
-    "🛠️ Создай свой интерфейс"
+    "🔥 Последний ритуал в CyberStudio",
+    "🌌 Переход в чистый Codex начат",
+    "🧬 Ты — следующий соло-миллиардер",
+    "⚡ Говори — агент делает end-to-end",
+    "📜 Кулинарная Книга уже в тебе",
+    "👑 Кибердемон пробуждается"
   ];
 
   useEffect(() => {
-    if (logsEndRef.current && logsContainerRef.current) {
-      const container = logsContainerRef.current;
-      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
-      if (isNearBottom) {
-        logsEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
-      }
+    const container = logsContainerRef.current;
+    if (logsEndRef.current && container) {
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+      if (isNearBottom) logsEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [logs]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    setTimeout(() => {
       if (isAuthenticated && dbUser) {
-        addLog(`🔐 Сессия активна`, 'info');
-        setTimeout(() => {
-          addLog(`👋 ${firstName || username}, готов к магии`, 'success');
-        }, 300);
+        addLog(`🔐 Сессия Кибердемона активна`, 'success');
+        setTimeout(() => addLog(`👑 ${fullName}, это твой последний ритуал в CyberStudio`, 'codex'), 400);
       } else {
-        addLog('⚡ Гостевой режим', 'warning');
+        addLog('⚠️ Гостевой режим. Становись демоном', 'warning');
       }
-    }, 200);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      setTimeout(() => setShowCodexTransition(true), 1800);
+    }, 300);
+  }, [isAuthenticated, dbUser, fullName]);
 
   const addLog = useCallback((message: string, type: LogEntry['type'] = 'info', options?: { meta?: LogEntry['meta'] }) => {
-    setLogs(prev => {
-      const newLog: LogEntry = {
-        id: generateId(),
-        message,
-        timestamp: new Date(),
-        type,
-        meta: options?.meta
-      };
-      return [...prev.slice(-24), newLog];
-    });
+    setLogs(prev => [...prev.slice(-29), {
+      id: generateId(),
+      message,
+      timestamp: new Date(),
+      type,
+      meta: options?.meta
+    }]);
   }, []);
 
-  const fetchInstructions = async () => {
-    if (mdContent) {
-      setIsModalOpen(true);
-      return;
-    }
+  const fetchCookbook = async () => {
+    if (mdContent) { setIsModalOpen(true); return; }
     setIsLoadingMd(true);
     setIsModalOpen(true);
     try {
-      const response = await fetch(INSTRUCTIONS_URL);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const text = await response.text();
+      const res = await fetch(COOKBOOK_URL);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
       setMdContent(text);
-      addLog('📖 Гримуар загружен', 'success');
-    } catch (error) {
-      setMdContent("# ⚠️ Ошибка\nНет связи с библиотекой.");
-      addLog('❌ Ошибка загрузки', 'error');
+      addLog('📖 Кулинарная Книга загружена. Добро пожаловать в Codex-эру', 'codex');
+    } catch (e) {
+      setMdContent("# ⚠️ Связи нет\nНо ты уже знаешь, что делать.");
+      addLog('❌ Не смог открыть Книгу. Но ты и так кибердемон', 'error');
     } finally {
       setIsLoadingMd(false);
     }
   };
 
-  // --- IMPROVISATION LOGIC ---
   const handleCastImprovisation = async () => {
     if (!improvisationText.trim() || isImprovising) return;
-
     setIsImprovising(true);
-    const message = `🔮 *ИМПРОВИЗАЦИЯ*\n_${fullName}_ (@${username}):\n\n"${improvisationText}"`;
+    const message = `🔮 *КИБЕРДЕМОН ИМПРОВИЗАЦИЯ*\n_${fullName}_ (@${username}):\n\n"${improvisationText}"\n\n(Последний вызов через CyberStudio → Codex)`;
     
-    addLog(`▶ Колдовство: "${improvisationText.substring(0, 30)}..."`, 'improvisation');
+    addLog(`🩸 Импровизация: "${improvisationText.substring(0, 35)}..."`, 'improvisation');
 
     try {
       const result = await notifyAdmin(message);
       if (result?.success) {
-        addLog(`✓ Воля отправлена во Вселенную`, 'success');
+        addLog(`✅ Воля ушла в эфир. Codex уже ждёт`, 'success');
         setImprovisationText("");
       } else {
-        addLog(`✗ Помехи в эфире`, 'error');
+        addLog(`✗ Помехи в матрице`, 'error');
       }
     } catch (err) {
-      addLog(`✗ Магический провал`, 'error');
+      addLog(`✗ Разрыв связи с демоном`, 'error');
     } finally {
-      setTimeout(() => setIsImprovising(false), 500);
+      setTimeout(() => setIsImprovising(false), 600);
     }
   };
 
   const executeCommand = async (command: CommandButton) => {
     if (isSending || isOnCooldown(command.id)) return;
-    
     setIsSending(command.id);
     startCooldown(command.id, command.cooldown);
     
-    const personalizedMessage = `👤 *${fullName}* (@${username}) ${command.message}`;
+    const personalizedMessage = `👑 *${fullName}* (@${username}) ${command.message}\n\nПоследний ритуал CyberStudio перед полной миграцией в Codex`;
     
-    addLog(`▶ Заклинание: ${command.label}`, 'command', {
-      meta: { commandType: command.id }
-    });
+    addLog(`🩸 Ритуал: ${command.label}`, 'command', { meta: { commandType: command.id } });
 
     try {
       const result = command.id === 'broadcast' 
@@ -325,37 +294,32 @@ export default function TeaCallPage() {
         : await notifyAdmin(personalizedMessage);
 
       if (result?.success) {
-        addLog(`✓ Успех: ${command.label}`, 'success');
+        addLog(`✅ Ритуал завершён: ${command.label}`, 'success');
       } else {
-        addLog(`✗ Ошибка: ${command.label}`, 'error');
+        addLog(`✗ Ритуал провалился`, 'error');
       }
     } catch (err) {
-      addLog(`✗ Системный сбой`, 'error');
+      addLog(`✗ Разрыв с потусторонним`, 'error');
     } finally {
-      setTimeout(() => setIsSending(null), 300);
+      setTimeout(() => setIsSending(null), 400);
     }
   };
 
-  const copyCommandTemplate = useCallback(() => {
-    const template = `{
-  id: 'my_spell',
-  label: 'Моё Заклинание',
-  icon: <Zap className="w-4 h-4" />,
-  message: 'колдует! ✨'
-}`;
+  const copyCodexTemplate = useCallback(() => {
+    const template = `// Скажи агенту в Codex:
+// "Сделай кнопку по шаблону tea-call с моим кастомным сообщением"`;
     navigator.clipboard.writeText(template);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    addLog('📋 Свиток скопирован', 'success');
+    setTimeout(() => setCopied(false), 1800);
+    addLog('📋 Шаблон Codex скопирован. Теперь говори с ним словами', 'codex');
   }, [addLog]);
 
   const stats = useMemo(() => ({
-    total: logs.filter(l => l.type === 'success').length,
+    total: logs.filter(l => l.type === 'success' || l.type === 'codex').length,
     commands: logs.filter(l => l.type === 'command' || l.type === 'improvisation').length,
-    uptime: Math.floor(logs.length * 1.5)
+    uptime: Math.floor(logs.length * 2.3)
   }), [logs]);
 
-  // Handle Enter key in textarea
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -364,281 +328,187 @@ export default function TeaCallPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-background text-foreground relative overflow-hidden flex flex-col pt-16 sm:pt-20">
-      {/* Background Effects */}
+    <div className="min-h-[calc(100vh-4rem)] bg-background text-foreground relative overflow-hidden flex flex-col pt-16">
+      {/* Epic Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808005_1px,transparent_1px),linear-gradient(to_bottom,#80808005_1px,transparent_1px)] bg-[size:20px_20px] sm:bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_40%,transparent_100%)]" />
-        
-        <motion.div
-          animate={{ scale: [1, 1.2, 1], opacity: [0.15, 0.3, 0.15] }}
-          transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-brand-cyan/10 rounded-full blur-[120px]"
+        <div className="absolute inset-0 bg-[radial-gradient(#ff00ff10_0.8px,transparent_1px)] bg-[length:40px_40px]" />
+        <motion.div 
+          animate={{ opacity: [0.2, 0.4, 0.2] }}
+          transition={{ duration: 18, repeat: Infinity }}
+          className="absolute -top-40 -left-40 w-[800px] h-[800px] bg-gradient-to-br from-brand-red-orange/30 via-transparent to-brand-cyan/20 rounded-full blur-[180px]"
         />
       </div>
 
-      {/* Top Ticker */}
-      <div className="relative z-20 bg-background/80 backdrop-blur-md border-b border-border/50 py-2">
-        <MagicTicker items={tickerItems} speed={30} />
+      {/* Historic Ticker */}
+      <div className="relative z-30 bg-black/90 border-b border-red-500/30 py-2">
+        <MagicTicker items={tickerItems} speed={35} />
       </div>
 
-      {/* Main Content */}
-      <main className="relative z-10 flex-1 max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 w-full">
+      <main className="relative z-20 flex-1 max-w-7xl mx-auto px-4 py-8 w-full">
         
-        {/* Header */}
+        {/* Header — Historic Moment */}
         <motion.div 
-          initial={{ opacity: 0, y: -10 }}
+          initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 sm:mb-8 text-center"
+          className="text-center mb-10"
         >
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-cyan/10 border border-brand-cyan/20 text-brand-cyan text-xs font-mono mb-2">
-            <Terminal className="w-3 h-3" />
-            <span>IMPROVISATION TERMINAL</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+          <div className="inline-flex items-center gap-3 px-5 py-2 rounded-2xl border border-brand-red-orange/40 bg-black/60 mb-4">
+            <Crown className="w-5 h-5 text-brand-gold" />
+            <span className="font-mono uppercase tracking-[4px] text-xs text-brand-red-orange">ФИНАЛЬНЫЙ РИТУАЛ</span>
           </div>
-          <h1 className="font-orbitron font-bold text-3xl sm:text-4xl bg-gradient-to-r from-brand-cyan via-brand-gold to-brand-red-orange bg-clip-text text-transparent">
-            Точка Входа
+          
+          <h1 className="font-orbitron text-5xl sm:text-6xl font-black tracking-tighter bg-gradient-to-b from-white via-brand-gold to-brand-red-orange bg-clip-text text-transparent">
+            ТЕРМИНАЛ ВЫЗОВА<br />КИБЕРДЕМОНА
           </h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1 max-w-md mx-auto">
-            Опиши свою волю. Система исполнит.
+          
+          <p className="mt-3 text-xl text-muted-foreground max-w-lg mx-auto">
+            Последний вызов через CyberStudio.<br />
+            <span className="text-brand-cyan">Дальше — только Codex и ты.</span>
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          {/* Main Interaction Panel */}
-          <div className="lg:col-span-8 space-y-4 sm:space-y-6">
+          {/* Main Terminal */}
+          <div className="lg:col-span-8 space-y-6">
             
-            {/* The Input Core - Entry Point for Improvisation */}
             <motion.div 
-              initial={{ opacity: 0, scale: 0.98 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="relative overflow-hidden rounded-2xl border border-brand-cyan/30 bg-card/70 backdrop-blur-xl shadow-2xl"
+              className="relative overflow-hidden rounded-3xl border border-brand-cyan/40 bg-card/80 backdrop-blur-3xl shadow-2xl shadow-black/80"
             >
-              {/* Glowing Top Border */}
-              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-brand-cyan to-transparent" />
+              <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-brand-cyan to-transparent" />
               
-              <div className="p-5 sm:p-8">
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center gap-3 text-brand-cyan">
-                    <div className="p-2 rounded-lg bg-brand-cyan/10 border border-brand-cyan/20">
-                      <Type className="w-5 h-5" />
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-2xl bg-gradient-to-br from-brand-red-orange to-brand-cyan text-white">
+                      <Bot className="w-7 h-7" />
                     </div>
                     <div>
-                      <h2 className="font-orbitron font-bold">Поле Импровизации</h2>
-                      <p className="text-xs text-muted-foreground">Введи команду на естественном языке</p>
+                      <div className="font-orbitron text-2xl tracking-widest">IMPROVISATION CORE</div>
+                      <div className="text-xs text-brand-cyan/70 font-mono">ГОВОРИ — ДЕМОН ДЕЛАЕТ</div>
                     </div>
                   </div>
-
-                  <div className="relative group">
-                    <textarea
-                      ref={inputRef}
-                      value={improvisationText}
-                      onChange={(e) => setImprovisationText(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Например: Напомни админу про таблицу в 15:00..."
-                      disabled={isImprovising}
-                      className={cn(
-                        "w-full h-24 p-4 rounded-xl bg-background/80 border border-border/50",
-                        "focus:border-brand-cyan/50 focus:ring-1 focus:ring-brand-cyan/20 focus:outline-none",
-                        "font-mono text-sm text-foreground placeholder:text-muted-foreground/40 resize-none transition-all",
-                        "disabled:opacity-50 disabled:cursor-not-allowed"
-                      )}
-                    />
-                    
-                    {/* Character count & send button */}
-                    <div className="absolute bottom-3 right-3 flex items-center gap-2">
-                       <AnimatePresence>
-                        {improvisationText.length > 0 && (
-                          <motion.span 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="text-[10px] text-muted-foreground font-mono"
-                          >
-                            {improvisationText.length} / 500
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
-
-                      <Button
-                        onClick={handleCastImprovisation}
-                        disabled={!improvisationText.trim() || isImprovising}
-                        size="sm"
-                        className={cn(
-                          "bg-brand-cyan text-black hover:bg-brand-cyan/90 font-bold transition-all",
-                          "disabled:bg-muted disabled:text-muted-foreground"
-                        )}
-                      >
-                        {isImprovising ? (
-                          <Sparkles className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Send className="w-4 h-4" />
-                        )}
-                        <span className="ml-2 hidden sm:inline">Cast</span>
-                      </Button>
-                    </div>
+                  <div className="text-[10px] font-mono text-right text-muted-foreground">
+                    Codex Era<br />Activated
                   </div>
+                </div>
 
-                  {/* Quick Spells (Formerly Magic Buttons) */}
-                  <div className="pt-2">
-                    <div className="flex items-center justify-between mb-2 px-1">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider font-mono">Быстрые заклинания</span>
-                      <span className="text-[10px] text-muted-foreground/50">или выбери шаблон</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {COMMANDS.map((cmd) => {
-                        const cooldownActive = isOnCooldown(cmd.id);
-                        return (
-                          <motion.button
-                            key={cmd.id}
-                            whileHover={{ scale: 1.03 }}
-                            whileTap={{ scale: 0.97 }}
-                            onClick={() => executeCommand(cmd)}
-                            disabled={!!isSending || cooldownActive}
-                            className={cn(
-                              "flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-mono transition-all",
-                              "bg-muted/30 hover:bg-muted/50 border-border/50 hover:border-brand-gold/30",
-                              cmd.color,
-                              "disabled:opacity-50 disabled:cursor-not-allowed"
-                            )}
-                          >
-                            {isSending === cmd.id ? (
-                              <Sparkles className="w-4 h-4 animate-spin" />
-                            ) : (
-                              cmd.icon
-                            )}
-                            <span>{cmd.label}</span>
-                            {cooldownActive && (
-                              <Clock className="w-3 h-3 ml-1 text-muted-foreground animate-pulse" />
-                            )}
-                          </motion.button>
-                        );
-                      })}
-                    </div>
+                <div className="relative">
+                  <textarea
+                    ref={inputRef}
+                    value={improvisationText}
+                    onChange={(e) => setImprovisationText(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Принеси чай демону. Сделай кнопку для продажи машин. Автоматизируй разбор почты..."
+                    disabled={isImprovising}
+                    className="w-full h-32 p-6 rounded-2xl bg-black/70 border border-brand-cyan/30 text-lg font-light placeholder:text-brand-cyan/30 focus:border-brand-gold resize-none transition-all"
+                  />
+                  
+                  <Button
+                    onClick={handleCastImprovisation}
+                    disabled={!improvisationText.trim() || isImprovising}
+                    className="absolute bottom-4 right-4 bg-gradient-to-r from-brand-gold to-brand-red-orange text-black font-bold px-8 py-3 rounded-xl hover:scale-105 transition-transform"
+                  >
+                    {isImprovising ? <Sparkles className="animate-spin w-5 h-5" /> : <Send className="w-5 h-5" />}
+                    <span className="ml-3">ВЫЗВАТЬ ДЕМОНА</span>
+                  </Button>
+                </div>
+
+                {/* Quick Rituals */}
+                <div className="mt-8">
+                  <div className="uppercase text-xs tracking-[3px] text-muted-foreground mb-3">Быстрые ритуалы</div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {COMMANDS.map((cmd) => {
+                      const onCooldown = isOnCooldown(cmd.id);
+                      return (
+                        <motion.button
+                          key={cmd.id}
+                          whileHover={{ scale: 1.04 }}
+                          whileTap={{ scale: 0.96 }}
+                          onClick={() => executeCommand(cmd)}
+                          disabled={!!isSending || onCooldown}
+                          className={cn(
+                            "h-20 rounded-2xl border flex flex-col items-center justify-center gap-1 text-sm font-mono transition-all",
+                            "hover:border-brand-gold",
+                            cmd.color,
+                            onCooldown && "opacity-40"
+                          )}
+                        >
+                          {isSending === cmd.id ? <Sparkles className="animate-spin" /> : cmd.icon}
+                          <span>{cmd.shortLabel}</span>
+                        </motion.button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
             </motion.div>
 
-            {/* Extender / Education Section */}
-            <motion.div
-              initial={false}
-              className="relative overflow-hidden rounded-2xl border border-dashed border-brand-yellow/30 bg-gradient-to-br from-brand-yellow/5 via-transparent to-brand-gold/5 backdrop-blur-sm"
-            >
-              <button
-                onClick={() => setShowExtender(!showExtender)}
-                className="w-full p-4 sm:p-5 text-left group"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-brand-yellow/10 border border-brand-yellow/20">
-                      <GitBranch className="w-5 h-5 text-brand-yellow" />
-                    </div>
-                    <div>
-                      <h3 className="font-orbitron font-bold text-sm text-foreground group-hover:text-brand-yellow transition-colors">
-                        Кристаллизация Воли
-                      </h3>
-                      <p className="text-xs text-muted-foreground">Часто используешь? Сделай кнопкой</p>
-                    </div>
+            {/* Codex Transition Banner */}
+            <AnimatePresence>
+              {showCodexTransition && (
+                <motion.div
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-3xl border border-dashed border-brand-gold/50 bg-gradient-to-br from-black/80 to-transparent p-6 flex items-center gap-5"
+                >
+                  <Rocket className="w-10 h-10 text-brand-gold" />
+                  <div>
+                    <div className="font-orbitron text-xl text-brand-gold">Это был последний ритуал в CyberStudio</div>
+                    <div className="text-sm text-muted-foreground mt-1">Теперь говори напрямую с Codex. Ты уже кибердемон.</div>
                   </div>
-                  <motion.div
-                    animate={{ rotate: showExtender ? 180 : 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                  </motion.div>
-                </div>
-              </button>
-
-              <AnimatePresence>
-                {showExtender && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="px-4 sm:px-5 pb-5 space-y-4 text-sm"
-                  >
-                    <div className="h-px bg-gradient-to-r from-transparent via-brand-yellow/30 to-transparent" />
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      <span className="text-brand-yellow font-semibold">Концепция:</span> Импровизация — это поток. Но если паттерн повторяется, его стоит "застыть" в коде. 
-                      Так "Принеси чаю" превращается в кнопку, экономя время.
-                    </p>
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={fetchInstructions}
-                        size="sm"
-                        variant="outline"
-                        className="border-brand-yellow/30 text-brand-yellow hover:bg-brand-yellow/10"
-                      >
-                        <FileCode className="w-4 h-4 mr-2" />
-                        Как создать кнопку
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={copyCommandTemplate}
-                        className="text-muted-foreground"
-                      >
-                        {copied ? <CheckCircle2 className="w-4 h-4 mr-2 text-green-500" /> : <Copy className="w-4 h-4 mr-2" />}
-                        Скопировать шаблон
-                      </Button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-
+                  <Button asChild className="ml-auto bg-brand-gold text-black hover:bg-white">
+                    <Link href="https://chatgpt.com/codex" target="_blank">
+                      Открыть Codex сейчас
+                    </Link>
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
-          {/* Sidebar - Logs & Stats */}
-          <div className="lg:col-span-4 space-y-4">
+          {/* Right Sidebar — Logs & Legacy */}
+          <div className="lg:col-span-4 space-y-6">
             
-            {/* System Log */}
-            <div className="rounded-2xl border border-border bg-card/50 backdrop-blur-xl overflow-hidden shadow-lg">
-              <div className="px-3 sm:px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
-                  <History className="w-3.5 h-3.5" />
-                  <span>ЖУРНАЛ СОБЫТИЙ</span>
+            <div className="rounded-3xl border border-border bg-card/60 backdrop-blur-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b flex items-center justify-between bg-black/40">
+                <div className="font-mono text-xs text-brand-cyan flex items-center gap-2">
+                  <Flame className="w-4 h-4" /> ЖУРНАЛ ВЫЗОВОВ
                 </div>
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-500/60" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-yellow-500/60" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-500/60 animate-pulse" />
+                <div className="flex gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <div className="w-2 h-2 rounded-full bg-yellow-400" />
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
                 </div>
               </div>
               
-              <div 
-                ref={logsContainerRef}
-                className="h-[320px] overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
-              >
+              <div ref={logsContainerRef} className="h-[380px] overflow-y-auto p-5 space-y-3 text-xs">
                 {logs.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground/40 gap-2">
-                    <Flame className="w-8 h-8" />
-                    <span className="text-xs text-center">Ждем твоей команды...</span>
+                  <div className="h-full flex items-center justify-center text-center text-muted-foreground/60">
+                    Жди первого вызова...<br />История пишется здесь
                   </div>
                 ) : (
-                  <AnimatePresence mode="popLayout" initial={false}>
+                  <AnimatePresence>
                     {logs.map((log) => (
                       <motion.div
                         key={log.id}
-                        layout
-                        initial={{ opacity: 0, x: -10, scale: 0.95 }}
-                        animate={{ opacity: 1, x: 0, scale: 1 }}
-                        exit={{ opacity: 0, x: 10 }}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
                         className={cn(
-                          "flex gap-2 items-start p-2 rounded-lg border-l-2 text-[10px] sm:text-xs",
-                          log.type === 'success' && "bg-green-500/5 border-green-500 text-green-600 dark:text-green-400",
-                          log.type === 'error' && "bg-red-500/5 border-red-500 text-red-600 dark:text-red-400",
-                          log.type === 'info' && "bg-blue-500/5 border-blue-500 text-blue-600 dark:text-blue-400",
-                          log.type === 'warning' && "bg-yellow-500/5 border-yellow-500 text-yellow-600 dark:text-yellow-400",
-                          log.type === 'command' && "bg-purple-500/5 border-purple-500 text-purple-600 dark:text-purple-400",
-                          log.type === 'improvisation' && "bg-brand-cyan/5 border-brand-cyan text-brand-cyan",
+                          "pl-3 border-l-2 text-[11px] leading-relaxed",
+                          log.type === 'success' && "border-green-500 text-green-400",
+                          log.type === 'error' && "border-red-500 text-red-400",
+                          log.type === 'codex' && "border-brand-gold text-brand-gold",
+                          log.type === 'improvisation' && "border-purple-500 text-purple-400",
+                          log.type === 'command' && "border-cyan-400 text-cyan-400"
                         )}
                       >
-                        <span className="text-muted-foreground/40 font-mono shrink-0">
-                          {log.timestamp.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        <span className="font-mono opacity-50 mr-2">
+                          {log.timestamp.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' })}
                         </span>
-                        <span className="break-words leading-relaxed">{log.message}</span>
+                        {log.message}
                       </motion.div>
                     ))}
                     <div ref={logsEndRef} />
@@ -647,122 +517,51 @@ export default function TeaCallPage() {
               </div>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { icon: TrendingUp, value: stats.total, label: 'Успех', color: 'text-brand-gold' },
-                { icon: TerminalSquare, value: stats.commands, label: 'Команд', color: 'text-brand-cyan' },
-                { icon: Clock, value: `${stats.uptime}m`, label: 'Аптайм', color: 'text-green-500' }
-              ].map((stat, i) => (
-                <motion.div 
-                  key={i}
-                  whileHover={{ scale: 1.05 }}
-                  className="p-3 rounded-xl border border-border bg-card/40 backdrop-blur-sm text-center"
-                >
-                  <stat.icon className={cn("w-4 h-4 mx-auto mb-1", stat.color)} />
-                  <div className={cn("text-lg font-bold", stat.color)}>{stat.value}</div>
-                  <div className="text-[10px] text-muted-foreground">{stat.label}</div>
-                </motion.div>
-              ))}
-            </div>
-
-             {/* Developer Card */}
-             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="relative overflow-hidden rounded-xl border border-border bg-card/50 backdrop-blur-md p-4 group hover:border-brand-yellow/30 transition-colors"
+            {/* Cookbook Button */}
+            <Button 
+              onClick={fetchCookbook}
+              className="w-full h-16 bg-gradient-to-r from-brand-red-orange via-brand-gold to-brand-cyan text-black font-bold text-lg rounded-2xl hover:scale-[1.02] transition-transform flex items-center justify-center gap-3"
             >
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-2 text-brand-yellow">
-                  <Zap className="w-4 h-4" />
-                  <span className="text-xs font-bold uppercase font-mono">Pro Level</span>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Нужна сложная автоматизация или интеграция? Обращайся.
-                </p>
-                <Button 
-                  asChild
-                  variant="outline" 
-                  size="sm"
-                  className="border-brand-cyan/30 text-brand-cyan hover:bg-brand-cyan/10"
-                >
-                  <Link href="/wblanding" className="flex items-center justify-center gap-2">
-                    Контакты
-                    <ArrowUpRight className="w-4 h-4" />
-                  </Link>
-                </Button>
-              </div>
-            </motion.div>
+              <FileCode className="w-6 h-6" />
+              ОТКРЫТЬ КУЛИНАРНУЮ КНИГУ КИБЕРДЕМОНА
+            </Button>
 
+            <div className="text-center text-[10px] text-muted-foreground font-mono">
+              Это был последний раз, когда мы использовали CyberStudio.<br />
+              Дальше — только слова и Codex.
+            </div>
           </div>
         </div>
       </main>
 
-      {/* Instructions Modal */}
+      {/* Modal — The Book */}
       <AnimatePresence>
         {isModalOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
-            />
-            
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed inset-3 sm:inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-3xl md:h-[80vh] z-50 bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-background border border-brand-gold/30 w-full max-w-4xl max-h-[90vh] rounded-3xl overflow-hidden flex flex-col"
             >
-              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border bg-muted/30 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-brand-yellow/10 border border-brand-yellow/20">
-                    <Wand2 className="w-4 h-4 sm:w-5 sm:h-5 text-brand-yellow" />
-                  </div>
-                  <div>
-                    <h2 className="font-orbitron font-bold text-sm sm:text-base">Гримуар Инструкций</h2>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground font-mono">Как создать кнопку</p>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsModalOpen(false)}
-                  className="h-8 w-8 sm:h-10 sm:w-10"
-                >
-                  <X className="h-4 w-4 sm:h-5 sm:w-5" />
+              <div className="px-6 py-4 border-b flex items-center justify-between bg-black/60">
+                <div className="font-orbitron text-xl text-brand-gold">КУЛИНАРНАЯ КНИГА КИБЕРДЕМОНА</div>
+                <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}>
+                  <X />
                 </Button>
               </div>
-
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 prose prose-sm max-w-none 
-                prose-headings:font-orbitron prose-headings:text-brand-gold prose-headings:text-sm sm:prose-headings:text-base
-                prose-a:text-brand-cyan prose-code:text-brand-pink prose-code:bg-muted prose-code:px-1 prose-code:rounded
-                prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-img:rounded-lg">
+              
+              <div className="flex-1 overflow-auto p-8 prose prose-invert max-w-none text-sm">
                 {isLoadingMd ? (
-                  <div className="flex flex-col items-center justify-center h-40 gap-3">
-                    <div className="w-8 h-8 border-2 border-brand-yellow/30 border-t-brand-yellow rounded-full animate-spin" />
-                    <span className="text-xs text-muted-foreground font-mono">Загрузка...</span>
+                  <div className="flex h-64 items-center justify-center">
+                    <div className="animate-spin w-8 h-8 border-2 border-brand-gold border-t-transparent rounded-full" />
                   </div>
                 ) : (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {mdContent}
-                  </ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{mdContent}</ReactMarkdown>
                 )}
               </div>
-
-              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border bg-muted/30 flex justify-end items-center shrink-0">
-                <Button 
-                  onClick={() => setIsModalOpen(false)}
-                  className="bg-brand-yellow text-black hover:bg-brand-yellow/90 text-xs sm:text-sm"
-                >
-                  Закрыть
-                </Button>
-              </div>
             </motion.div>
-          </>
+          </div>
         )}
       </AnimatePresence>
     </div>
