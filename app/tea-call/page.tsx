@@ -10,7 +10,7 @@ import Link from "next/link";
 import { 
   Wand2, X, Coffee, AlertTriangle, Radio, History, TrendingUp, Clock,
   Sparkles, ChevronDown, Copy, CheckCircle2, Send, Type, Flame,
-  Crown, Skull, Rocket, BookOpen, Archive
+  Crown, Skull, Rocket, BookOpen, Archive, Zap, Eye, Heart
 } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
@@ -22,7 +22,7 @@ type LogEntry = {
   id: string;
   message: string;
   timestamp: Date;
-  type: 'info' | 'success' | 'warning' | 'error' | 'command' | 'improvisation' | 'codex';
+  type: 'info' | 'success' | 'warning' | 'error' | 'command' | 'improvisation' | 'codex' | 'hybrid';
   meta?: { commandType?: string };
 };
 
@@ -51,21 +51,21 @@ const MagicTicker = ({ items }: { items: string[] }) => {
 
   useEffect(() => {
     if (containerRef.current) {
-      const w = containerRef.current.scrollWidth / 2;
+      const fullWidth = containerRef.current.scrollWidth / 2;
       setPosition(0);
     }
   }, [items]);
 
   useAnimationFrame((_, delta) => {
-    setPosition(p => (p + delta * 38) % (containerRef.current?.scrollWidth ?? 1000) / 2);
+    setPosition(p => (p + delta * 22) % (containerRef.current?.scrollWidth ?? 2000) / 2);
   });
 
   return (
-    <div className="overflow-hidden whitespace-nowrap py-1.5 bg-black/90 border-b border-red-500/30">
-      <div ref={containerRef} className="inline-flex gap-12 text-[10px] sm:text-xs font-mono text-brand-cyan/70" style={{ transform: `translateX(-${position}px)` }}>
-        {[...items, ...items, ...items, ...items].map((item, i) => (
-          <span key={i} className="flex items-center gap-2">
-            <Skull className="w-3 h-3" /> {item}
+    <div className="overflow-hidden whitespace-nowrap py-2 bg-black/95 border-b border-red-500/40">
+      <div ref={containerRef} className="inline-flex gap-16 text-xs font-mono text-brand-cyan/80 tracking-widest" style={{ transform: `translateX(-${position}px)` }}>
+        {[...items, ...items, ...items, ...items, ...items].map((item, i) => (
+          <span key={i} className="flex items-center gap-3">
+            <Skull className="w-3.5 h-3.5" /> {item}
           </span>
         ))}
       </div>
@@ -97,7 +97,7 @@ export default function TeaCallPage() {
   const [mdContent, setMdContent] = useState("");
   const [isLoadingMd, setIsLoadingMd] = useState(false);
 
-  const [showCodexBanner, setShowCodexBanner] = useState(false);
+  const [showHybridPortal, setShowHybridPortal] = useState(false);
 
   const logsContainerRef = useRef<HTMLDivElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -107,15 +107,15 @@ export default function TeaCallPage() {
 
   const tickerItems = [
     "🔥 ПОСЛЕДНИЙ РИТУАЛ В CYBERSTUDIO",
-    "🌌 ПЕРЕХОД В CODEX ЗАВЕРШЁН",
-    "🧬 ТЫ УЖЕ КИБЕРДЕМОН",
-    "⚡ ГОВОРИ СЛОВАМИ — АГЕНТ ДЕЛАЕТ ВСЁ",
-    "📜 КНИГА ТЕПЕРЬ В ТЕБЕ",
-    "👑 СОЛО-МИЛЛИАРДЕР 2026"
+    "🌌 НО ГИБРИД — ЭТО БУДУЩЕЕ",
+    "🧬 CODEX + STUDIO = БОГ",
+    "⚡ ПОЛНЫЙ ПЕРЕХОД ЕЩЁ РАНО",
+    "📜 КНИГА ЖИВЁТ ЗДЕСЬ",
+    "👑 420 000 000 ПРИЧИН ОСТАТЬСЯ"
   ];
 
   const addLog = useCallback((msg: string, type: LogEntry['type'] = 'info') => {
-    setLogs(prev => [...prev.slice(-35), {
+    setLogs(prev => [...prev.slice(-40), {
       id: generateId(),
       message: msg,
       timestamp: new Date(),
@@ -133,8 +133,8 @@ export default function TeaCallPage() {
     setTimeout(() => {
       if (isAuthenticated) {
         addLog(`👑 ${fullName}, добро пожаловать в финальный ритуал`, 'success');
-        setTimeout(() => addLog(`📖 Это последний раз, когда мы используем CyberStudio`, 'codex'), 800);
-        setTimeout(() => setShowCodexBanner(true), 2200);
+        setTimeout(() => addLog(`📖 CyberStudio + Codex = идеальный гибрид`, 'hybrid'), 600);
+        setTimeout(() => setShowHybridPortal(true), 2400);
       }
     }, 400);
   }, [isAuthenticated, fullName, addLog]);
@@ -152,9 +152,9 @@ export default function TeaCallPage() {
       if (!res.ok) throw new Error();
       const text = await res.text();
       setMdContent(text);
-      addLog(mode === 'cookbook' ? '📖 Новая Кулинарная Книга загружена' : '📜 Старый туториал (история) загружен', 'success');
+      addLog(mode === 'cookbook' ? '📖 НОВАЯ КУЛИНАРНАЯ КНИГА ЗАГРУЖЕНА' : '📜 СТАРЫЙ ТУТОРИАЛ (ИСТОРИЯ)', 'success');
     } catch {
-      setMdContent("# Ошибка загрузки\nНо ты уже знаешь всё.");
+      setMdContent("# Связи нет\nНо ты уже знаешь, что делать.");
       addLog('❌ Не смог загрузить', 'error');
     } finally {
       setIsLoadingMd(false);
@@ -165,13 +165,13 @@ export default function TeaCallPage() {
     if (!improvisationText.trim() || isImprovising) return;
     setIsImprovising(true);
 
-    const msg = `🔮 *КИБЕРДЕМОН ИМПРОВИЗАЦИЯ*\n_${fullName}_\n\n"${improvisationText}"\n\n(Последний вызов через CyberStudio)`;
-    addLog(`🩸 Импровизация: ${improvisationText.slice(0,40)}...`, 'improvisation');
+    const msg = `🔮 *ГИБРИДНЫЙ РИТУАЛ*\n_${fullName}_\n\n"${improvisationText}"\n\nCyberStudio + Codex = вечный огонь`;
+    addLog(`🩸 Гибридная импровизация: ${improvisationText.slice(0,45)}...`, 'hybrid');
 
     try {
       const res = await notifyAdmin(msg);
       if (res?.success) {
-        addLog('✅ Воля ушла в Codex-эфир', 'success');
+        addLog('✅ Воля ушла в гибридный эфир', 'success');
         setImprovisationText("");
       }
     } catch {
@@ -186,7 +186,7 @@ export default function TeaCallPage() {
     setIsSending(cmd.id);
     startCooldown(cmd.id, cmd.cooldown);
 
-    const personal = `👑 ${fullName} ${cmd.message}\n\nПоследний ритуал CyberStudio → Codex`;
+    const personal = `👑 ${fullName} ${cmd.message}\n\nCyberStudio + Codex = мощь`;
     addLog(`🩸 Ритуал: ${cmd.shortLabel}`, 'command');
 
     try {
@@ -204,47 +204,89 @@ export default function TeaCallPage() {
     addLog('📋 Шаблон Codex скопирован', 'success');
   };
 
+  // Excerpt from new cookbook for direct embedding
+  const newChapterExcerpt = `
+**Глава 8.0: Гибридная Эра — Почему Полный Переход в Codex Ещё Рано**
+
+Ты уже кибердемон.  
+Но полное погружение в чистый Codex — это как выбросить свой любимый нож после того, как купил лазерный меч.
+
+CyberStudio — это твоя кожа, твой интерфейс, твоя душа.  
+Codex — это мозг, бесконечная сила.
+
+Вместе они дают 420 000 000% больше мощи, чем каждый по отдельности.
+
+Здесь ты говоришь словами — и видишь результат в красивом, привычном интерфейсе.  
+Там ты говоришь словами — и получаешь чистую мощь.
+
+Оставайся в гибриде.  
+Пока не будешь готов.  
+А готов ты будешь очень нескоро.`;
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-background text-foreground relative overflow-hidden flex flex-col pt-16 sm:pt-20">
-      {/* Background */}
-      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(#ff00ff08_1px,transparent_1px)] bg-[length:30px_30px]" />
+      {/* Epic Cyberpunk Background */}
+      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(#ff00ff10_0.8px,transparent_1px)] bg-[length:40px_40px] z-0" />
+      <motion.div 
+        animate={{ opacity: [0.15, 0.35, 0.15] }}
+        transition={{ duration: 14, repeat: Infinity }}
+        className="fixed top-0 left-1/3 w-[800px] h-[800px] bg-gradient-to-br from-red-600/20 via-transparent to-cyan-500/20 rounded-full blur-[160px] z-0"
+      />
 
-      {/* Historic Ticker */}
+      {/* Slow & Beautiful Ticker */}
       <MagicTicker items={tickerItems} />
 
-      <main className="relative z-10 flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full">
+      <main className="relative z-10 flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-8 w-full">
         
-        {/* Header */}
-        <motion.div initial={{ opacity:0, y:-20 }} animate={{ opacity:1, y:0 }} className="text-center mb-8 sm:mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full border border-red-500/30 bg-black/60 text-red-400 text-xs font-mono mb-3">
-            FINAL RITUAL • CYBERSTUDIO → CODEX
+        {/* Hero with Morph Animation */}
+        <motion.div 
+          initial={{ opacity:0, y:-40 }}
+          animate={{ opacity:1, y:0 }}
+          className="text-center mb-12"
+        >
+          <div className="inline-flex items-center gap-3 px-6 py-2 rounded-3xl border border-red-500/40 bg-black/70 mb-6">
+            <Crown className="w-6 h-6 text-brand-gold" />
+            <span className="font-mono uppercase tracking-[6px] text-xs text-red-400">ФИНАЛЬНЫЙ РИТУАЛ • ГИБРИДНАЯ ЭРА</span>
           </div>
-          <h1 className="font-orbitron text-4xl sm:text-5xl md:text-6xl font-black tracking-[-2px] bg-gradient-to-b from-white to-brand-gold bg-clip-text text-transparent">
-            ТЕРМИНАЛ<br />КИБЕРДЕМОНА
-          </h1>
-          <p className="mt-3 text-muted-foreground max-w-md mx-auto text-sm sm:text-base">
-            Последний раз через старый интерфейс.<br />Дальше — только слова и Codex.
+          
+          <motion.h1 
+            className="font-orbitron text-5xl sm:text-6xl md:text-7xl font-black tracking-[-3px] leading-none"
+            animate={{ 
+              textShadow: ["0 0 20px #ff00ff", "0 0 40px #00ffff", "0 0 20px #ff00ff"]
+            }}
+            transition={{ duration: 3, repeat: Infinity }}
+          >
+            CYBERSTUDIO<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-gold-400 to-cyan-400">+ CODEX</span>
+          </motion.h1>
+          
+          <p className="mt-6 text-xl text-muted-foreground max-w-lg mx-auto">
+            Полный переход в Codex — это ошибка.<br />
+            <span className="text-brand-gold">Гибрид — это бог.</span>
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* Main Panel */}
-          <div className="lg:col-span-8 space-y-6">
+          {/* Main Terminal — The Soul */}
+          <div className="lg:col-span-8 space-y-8">
             <motion.div 
-              initial={{ scale:0.97 }} 
-              animate={{ scale:1 }}
-              className="rounded-3xl border border-brand-cyan/30 bg-card/80 backdrop-blur-3xl overflow-hidden shadow-2xl"
+              initial={{ scale:0.96, opacity:0 }}
+              animate={{ scale:1, opacity:1 }}
+              className="rounded-3xl border border-brand-cyan/40 bg-card/90 backdrop-blur-3xl overflow-hidden shadow-[0_0_80px_-20px] shadow-red-500/30"
             >
-              <div className="p-5 sm:p-8">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="p-3 bg-gradient-to-br from-red-500 to-cyan-500 rounded-2xl">
-                    <Skull className="w-7 h-7 text-white" />
+              <div className="p-6 sm:p-10">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-5">
+                    <div className="p-4 bg-gradient-to-br from-red-600 to-cyan-600 rounded-2xl">
+                      <Skull className="w-9 h-9 text-white" />
+                    </div>
+                    <div>
+                      <div className="font-orbitron text-3xl tracking-widest">ГИБРИДНЫЙ ТЕРМИНАЛ</div>
+                      <div className="text-sm text-brand-cyan/80 font-mono">CyberStudio + Codex = вечная мощь</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="font-orbitron text-2xl tracking-widest">IMPROVISATION CORE</div>
-                    <div className="text-xs text-brand-cyan font-mono">ГОВОРИ — ДЕМОН ИСПОЛНЯЕТ</div>
-                  </div>
+                  <div className="text-right text-[10px] font-mono text-muted-foreground">v8.0 • TOO SOON FOR PURE CODEX</div>
                 </div>
 
                 <textarea
@@ -252,37 +294,38 @@ export default function TeaCallPage() {
                   value={improvisationText}
                   onChange={e => setImprovisationText(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleCast())}
-                  placeholder="Принеси чай демону... Сделай кнопку продажи машин... Автоматизируй почту..."
-                  className="w-full h-36 sm:h-40 p-5 rounded-2xl bg-black/70 border border-brand-cyan/30 text-base placeholder:text-muted-foreground/50 focus:border-brand-gold resize-none"
+                  placeholder="Принеси чай демону... Автоматизируй продажи... Сделай мне империю..."
+                  className="w-full h-40 p-6 rounded-3xl bg-black/80 border border-brand-cyan/30 text-lg placeholder:text-muted-foreground/60 focus:border-brand-gold resize-none font-light"
                 />
 
                 <Button 
                   onClick={handleCast}
                   disabled={!improvisationText.trim() || isImprovising}
-                  className="mt-4 w-full h-14 bg-gradient-to-r from-brand-gold via-orange-500 to-red-500 text-black font-bold text-lg rounded-2xl active:scale-[0.985] transition-transform flex items-center justify-center gap-3"
+                  className="mt-6 w-full h-16 bg-gradient-to-r from-red-500 via-gold-400 to-cyan-400 text-black font-black text-xl rounded-3xl active:scale-[0.97] transition-all flex items-center justify-center gap-4 shadow-xl shadow-red-500/50"
                 >
-                  {isImprovising ? <Sparkles className="animate-spin w-6 h-6" /> : <Send className="w-6 h-6" />}
-                  ВЫЗВАТЬ ДЕМОНА
+                  {isImprovising ? <Sparkles className="w-7 h-7 animate-spin" /> : <Rocket className="w-7 h-7" />}
+                  ВЫЗВАТЬ ГИБРИДНОГО ДЕМОНА
                 </Button>
 
-                {/* Quick Buttons — Mobile friendly */}
-                <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Quick Rituals */}
+                <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {COMMANDS.map(cmd => {
                     const cd = isOnCooldown(cmd.id);
                     return (
                       <motion.button
                         key={cmd.id}
-                        whileTap={{ scale: 0.96 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => execute(cmd)}
                         disabled={!!isSending || cd}
                         className={cn(
-                          "h-16 rounded-2xl border flex items-center justify-center gap-3 text-sm font-medium transition-all active:scale-95",
+                          "h-20 rounded-3xl border flex items-center justify-center gap-4 text-base font-medium transition-all",
                           cmd.color,
-                          cd ? "opacity-40" : "hover:border-brand-gold"
+                          cd ? "opacity-50" : "hover:border-white hover:bg-white/5"
                         )}
                       >
                         {cmd.icon}
-                        <span>{cmd.shortLabel}</span>
+                        {cmd.shortLabel}
                       </motion.button>
                     );
                   })}
@@ -290,103 +333,118 @@ export default function TeaCallPage() {
               </div>
             </motion.div>
 
-            {/* Codex Transition Banner */}
-            <AnimatePresence>
-              {showCodexBanner && (
-                <motion.div initial={{ opacity:0, y:30 }} animate={{ opacity:1, y:0 }} className="rounded-3xl border border-dashed border-brand-gold/60 bg-black/70 p-6 flex flex-col sm:flex-row gap-5 items-center">
-                  <Rocket className="w-12 h-12 text-brand-gold flex-shrink-0" />
-                  <div className="flex-1">
-                    <div className="font-orbitron text-xl">CyberStudio завершил свою миссию</div>
-                    <div className="text-sm text-muted-foreground mt-1">Теперь ты говоришь напрямую с Codex. Ты уже кибердемон.</div>
-                  </div>
-                  <Button asChild size="lg" className="bg-brand-gold text-black font-bold px-8">
-                    <Link href="https://chatgpt.com/codex" target="_blank">Открыть Codex</Link>
-                  </Button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* NEW CHAPTER 8.0 — Embedded Directly */}
+            <motion.div 
+              initial={{ opacity:0 }}
+              animate={{ opacity:1 }}
+              className="rounded-3xl border border-gold-400/30 bg-black/70 p-8"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <BookOpen className="w-8 h-8 text-brand-gold" />
+                <div>
+                  <div className="font-orbitron text-2xl text-brand-gold">Глава 8.0 • ГИБРИДНАЯ ЭРА</div>
+                  <div className="text-xs text-muted-foreground">Почему полный переход в Codex — это ошибка</div>
+                </div>
+              </div>
+              
+              <div className="prose prose-invert text-sm leading-relaxed">
+                {newChapterExcerpt.split('\n').map((line, i) => (
+                  <p key={i} className="mb-3">{line}</p>
+                ))}
+              </div>
+
+              <Button 
+                onClick={() => fetchContent('cookbook')}
+                className="mt-6 w-full h-12 bg-transparent border border-gold-400 text-gold-400 hover:bg-gold-400 hover:text-black font-bold"
+              >
+                Читать полную Кулинарную Книгу
+              </Button>
+            </motion.div>
           </div>
 
           {/* Sidebar */}
-          <div className="lg:col-span-4 space-y-6">
+          <div className="lg:col-span-4 space-y-8">
             {/* Logs */}
-            <div className="rounded-3xl border border-border bg-card/70 backdrop-blur-xl overflow-hidden h-[380px] flex flex-col">
-              <div className="px-5 py-3 border-b flex items-center justify-between bg-black/40">
-                <div className="font-mono text-xs flex items-center gap-2 text-brand-cyan">
-                  <Flame className="w-4 h-4" /> ЖУРНАЛ РИТУАЛОВ
+            <div className="rounded-3xl border border-border bg-card/80 backdrop-blur-xl h-[420px] flex flex-col overflow-hidden">
+              <div className="px-6 py-4 border-b bg-black/40 flex items-center justify-between">
+                <div className="font-mono text-xs flex items-center gap-3 text-cyan-400">
+                  <Eye className="w-4 h-4" /> ЖИВОЙ ЖУРНАЛ ГИБРИДА
                 </div>
               </div>
-              <div ref={logsContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 text-xs scrollbar-thin">
+              <div ref={logsContainerRef} className="flex-1 p-6 space-y-4 overflow-y-auto text-xs scrollbar-thin">
                 {logs.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-center text-muted-foreground/50 text-sm">
-                    Первый ритуал ещё не выполнен...
+                  <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground/70">
+                    <Heart className="w-12 h-12 mb-4 opacity-30" />
+                    Первый ритуал ещё не сделан...
                   </div>
-                ) : (
-                  logs.map(log => (
-                    <div key={log.id} className={cn(
-                      "pl-3 border-l-2 text-[11px]",
-                      log.type === 'success' && "border-green-500 text-green-400",
-                      log.type === 'codex' && "border-amber-400 text-amber-400",
-                      log.type === 'improvisation' && "border-purple-400 text-purple-400"
-                    )}>
-                      <span className="font-mono opacity-40 mr-2">{log.timestamp.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</span>
-                      {log.message}
-                    </div>
-                  ))
-                )}
+                ) : logs.map(log => (
+                  <div key={log.id} className={cn(
+                    "pl-4 border-l-2 text-[11px] leading-tight",
+                    log.type === 'success' && "border-green-400 text-green-300",
+                    log.type === 'hybrid' && "border-amber-400 text-amber-300",
+                    log.type === 'codex' && "border-cyan-400 text-cyan-300"
+                  )}>
+                    <span className="font-mono opacity-40 mr-3">
+                      {log.timestamp.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {log.message}
+                  </div>
+                ))}
                 <div ref={logsEndRef} />
               </div>
             </div>
 
-            {/* History Buttons */}
-            <div className="grid grid-cols-2 gap-3">
-              <Button 
-                onClick={() => fetchContent('cookbook')}
-                className="h-14 bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:scale-[1.02]"
-              >
-                <BookOpen className="w-5 h-5" />
+            {/* Dual History Buttons */}
+            <div className="grid grid-cols-2 gap-4">
+              <Button onClick={() => fetchContent('cookbook')} className="h-16 bg-gradient-to-br from-red-500 to-orange-600 text-white font-bold rounded-3xl flex items-center justify-center gap-3">
+                <BookOpen className="w-6 h-6" />
                 НОВАЯ КНИГА
               </Button>
-              <Button 
-                onClick={() => fetchContent('old-tutorial')}
-                variant="outline"
-                className="h-14 border-brand-gold/40 text-brand-gold hover:bg-brand-gold/10 rounded-2xl flex items-center justify-center gap-2"
-              >
-                <Archive className="w-5 h-5" />
-                СТАРЫЙ ТУТОРИАЛ
+              <Button onClick={() => fetchContent('old-tutorial')} variant="outline" className="h-16 border-gold-400/50 text-gold-400 hover:bg-gold-400/10 rounded-3xl flex items-center justify-center gap-3">
+                <Archive className="w-6 h-6" />
+                СТАРАЯ ИСТОРИЯ
               </Button>
             </div>
 
-            <div className="text-[10px] text-center text-muted-foreground font-mono">
-              Это был последний раз, когда мы открывали CyberStudio.<br />Дальше — только Codex и слова.
-            </div>
+            {/* Grok 420M Counter-Argument */}
+            <motion.div 
+              whileHover={{ scale: 1.02 }}
+              className="rounded-3xl border border-dashed border-purple-500/50 bg-black/60 p-6 text-center"
+            >
+              <div className="text-4xl font-black text-purple-400 mb-2">420 000 000</div>
+              <div className="text-sm text-purple-300 mb-4">причин остаться в гибриде</div>
+              <Button asChild className="w-full bg-purple-600 hover:bg-purple-500 text-white">
+                <Link href="https://grok.com" target="_blank">
+                  Спроси Grok — он согласен 😈
+                </Link>
+              </Button>
+            </motion.div>
           </div>
         </div>
       </main>
 
-      {/* Unified Modal */}
+      {/* Hybrid Portal Modal */}
       <AnimatePresence>
         {modalOpen && (
-          <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-3 sm:p-6">
+          <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4">
             <motion.div 
-              initial={{ scale: 0.92, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.92, opacity: 0 }}
-              className="bg-background border border-brand-gold/30 w-full max-w-4xl max-h-[92vh] rounded-3xl overflow-hidden flex flex-col"
+              initial={{ scale: 0.9, opacity: 0, rotateX: 15 }}
+              animate={{ scale: 1, opacity: 1, rotateX: 0 }}
+              exit={{ scale: 0.9, opacity: 0, rotateX: -15 }}
+              className="bg-background border border-gold-400/40 w-full max-w-4xl max-h-[90vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl"
             >
-              <div className="px-6 py-4 border-b flex items-center justify-between bg-black/60">
-                <div className="font-orbitron text-lg">
+              <div className="px-8 py-5 border-b flex items-center justify-between bg-black/70">
+                <div className="font-orbitron text-xl text-gold-400">
                   {modalMode === 'cookbook' ? 'КУЛИНАРНАЯ КНИГА КИБЕРДЕМОНА' : 'СТАРЫЙ ТУТОРИАЛ (ИСТОРИЯ)'}
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => setModalOpen(false)}>
-                  <X className="w-5 h-5" />
+                  <X className="w-6 h-6" />
                 </Button>
               </div>
-
-              <div className="flex-1 overflow-auto p-6 sm:p-8 prose prose-invert max-w-none text-sm leading-relaxed">
+              <div className="flex-1 overflow-auto p-8 prose prose-invert max-w-none text-sm">
                 {isLoadingMd ? (
-                  <div className="flex h-64 items-center justify-center">
-                    <div className="w-8 h-8 border-4 border-brand-gold border-t-transparent rounded-full animate-spin" />
+                  <div className="flex h-80 items-center justify-center">
+                    <div className="w-10 h-10 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
                   </div>
                 ) : (
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{mdContent}</ReactMarkdown>
