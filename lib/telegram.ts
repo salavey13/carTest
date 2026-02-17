@@ -1,4 +1,4 @@
-// /lib/telegram.ts
+import { validateTelegramInitData } from "@/lib/telegram-validator";
 import { logger } from "@/lib/logger"
 import type { WebAppUser } from "@/types/telegram"
 
@@ -6,11 +6,11 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL
 
 if (!TELEGRAM_BOT_TOKEN) {
-  logger.warn("Missing TELEGRAM_BOT_TOKEN. Telegram features may not work.")
+  logger.warn("⚠️  Missing TELEGRAM_BOT_TOKEN. Telegram features may not work.")
 }
 
 if (!APP_URL) {
-  logger.warn("Missing APP_URL. Webhook features may not work.")
+  logger.warn("⚠️  Missing APP_URL. Webhook features may not work.")
 }
 
 export async function setTelegramWebhook() {
@@ -19,6 +19,8 @@ export async function setTelegramWebhook() {
   }
 
   const webhookUrl = `${APP_URL}/api/telegramWebhook`
+  logger.info(`📡 Setting Telegram webhook: ${webhookUrl}`);
+  
   const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook`, {
     method: "POST",
     headers: {
@@ -34,34 +36,34 @@ export async function setTelegramWebhook() {
     throw new Error(`Failed to set webhook: ${response.statusText}`)
   }
 
-  return response.json()
+  const result = await response.json();
+  logger.info(`✅ Webhook set: ${JSON.stringify(result)}`);
+  return result;
 }
 
 export async function validateTelegramWebAppData(initData: string): Promise<boolean> {
+  if (!initData) {
+    logger.warn("⚠️  validateTelegramWebAppData: Empty initData");
+    return false;
+  }
+  if (!TELEGRAM_BOT_TOKEN) {
+    logger.error("💥 TELEGRAM_BOT_TOKEN is not configured");
+    return false;
+  }
+  
   try {
-    const data = new URLSearchParams(initData)
-    const hash = data.get("hash")
-    if (!hash) return false
-
-    // Remove hash from data before checking
-    data.delete("hash")
-
-    // Sort parameters alphabetically
-    const dataToCheck = Array.from(data.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, value]) => `${key}=${value}`)
-      .join("\n")
-
-    // Create HMAC-SHA256 hash
-    const crypto = require("crypto")
-    const secretKey = crypto.createHash("sha256").update(TELEGRAM_BOT_TOKEN!).digest()
-
-    const generatedHash = crypto.createHmac("sha256", secretKey).update(dataToCheck).digest("hex")
-
-    return generatedHash === hash
-  } catch (error) {
-    logger.error("Error validating Telegram WebApp data:", error)
-    return false
+    const result = await validateTelegramInitData(initData, TELEGRAM_BOT_TOKEN);
+    
+    if (!result.valid) {
+      logger.warn(`❌ WebApp validation failed: ${result.reason}`);
+    } else {
+      logger.info(`✅ WebApp validation passed for @${result.user?.username}`);
+    }
+    
+    return result.valid;
+  } catch (e) {
+    logger.error("💥 validateTelegramWebAppData unexpected error", e);
+    return false;
   }
 }
 
@@ -70,6 +72,8 @@ export async function sendTelegramMessage(chatId: string, text: string) {
     throw new Error("TELEGRAM_BOT_TOKEN is not configured")
   }
 
+  logger.log(`📤 Sending message to ${chatId}: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+  
   const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: "POST",
     headers: {
@@ -86,15 +90,19 @@ export async function sendTelegramMessage(chatId: string, text: string) {
     throw new Error(`Failed to send message: ${response.statusText}`)
   }
 
-  return response.json()
+  const result = await response.json();
+  logger.info(`✅ Message sent successfully (msg_id: ${result.result?.message_id})`);
+  return result;
 }
 
 export function getTelegramUser(): WebAppUser | null {
   if (typeof window === "undefined") return null
 
   const telegram = (window as any).Telegram?.WebApp
-  if (!telegram?.initDataUnsafe?.user) return null
+  if (!telegram?.initDataUnsafe?.user) {
+    logger.warn("⚠️  Telegram WebApp user not available");
+    return null
+  }
 
   return telegram.initDataUnsafe.user
 }
-
