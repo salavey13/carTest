@@ -36,6 +36,30 @@ const nextConfig = {
     }
     return config;
   },
+  async redirects() {
+    return [
+      {
+        source: '/franchize/about',
+        destination: '/franchize/vip-bike/about',
+        permanent: false,
+      },
+      {
+        source: '/franchize/contacts',
+        destination: '/franchize/vip-bike/contacts',
+        permanent: false,
+      },
+      {
+        source: '/franchize/cart',
+        destination: '/franchize/vip-bike/cart',
+        permanent: false,
+      },
+      {
+        source: '/franchize/order/:id',
+        destination: '/franchize/vip-bike/order/:id',
+        permanent: false,
+      },
+    ]
+  },
 }
 
 mergeConfig(nextConfig, userConfig)
