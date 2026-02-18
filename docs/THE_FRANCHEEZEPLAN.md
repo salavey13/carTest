@@ -260,11 +260,11 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - `AGENTS.md`
 
 ### T3 — Scaffold `/franchize/*` routes and shared actions
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Create route tree + base data loader actions, no advanced polish.
-- next_step: Build minimal pages rendering hydrated stub data.
+- status: `done`
+- updated_at: `2026-02-18T22:33:37Z`
+- owner: `codex`
+- notes: Added `app/franchize/actions.ts` with typed DTOs + safe `getFranchizeBySlug`, and scaffolded `/franchize/*` route pages with non-crashing fallback states.
+- next_step: Start T4 shell components (header/footer/floating cart/menu modal).
 - risks: route/theme conflicts with existing `ClientLayout` bike theme.
 - dependencies: T2
 - deliverables:
@@ -463,6 +463,17 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 - Added local-skills discovery follow-up (notify + supabase-related repo skills and scripts).
 - Added quick-start executor runbook at `docs/FRANCHEEZEPLAN.md` for next-session continuation.
 - Added AGENTS protocol for `continue as FRANCHEEZEPLAN_EXECUTIONER` deterministic task pickup and state updates.
+
+### 2026-02-18 — T3 execution complete (route scaffold)
+- Marked T3 `in_progress` -> `done` following dependency order.
+- Implemented franchize runtime loader/action with fallback hydration for unknown slug and cars query safety.
+- Scaffolded pages: `/franchize/[slug]`, `/franchize/cart`, `/franchize/order/[id]`, `/franchize/about`, `/franchize/contacts`.
+- Captured mobile screenshot for `/franchize/demo` to document current scaffold visual baseline.
+
+### 2026-02-18 — T3 refinement (VIP_BIKE hydration seed)
+- Replaced scaffold demo navigation target with `/franchize/vip-bike` for operator-facing testing.
+- Added detailed SQL hydration blueprint at `docs/sql/vip-bike-franchize-hydration.sql` to populate `crews.metadata.franchize` using VIP_BIKE data from existing pages/components.
+- Preserved legacy metadata compatibility by keeping top-level provider/contact keys in SQL merge section.
 
 ---
 
