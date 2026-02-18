@@ -43,3 +43,9 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** `mcp__browser_tools__run_playwright_script` returns `browser:/...` artifact reference that is not mounted as a regular file path for local Node scripts.
 - **Fix/workaround:** for callback image delivery, generate a local screenshot file (`artifacts/...`) via `scripts/page-screenshot-skill.mjs` (thum.io fallback) and pass that path to `--imagePath`.
 - **Verification:** callback response JSON shows `imageDelivery.telegram[].ok=true` and `imageDelivery.slack.ok=true`.
+
+## 2026-02-18 — Operator preference: progress screenshots in bridge updates
+- **Symptom:** operator asked for more visual/"cyberpunk" progress feel in Telegram updates.
+- **Root cause:** callback-auto often sends text-only updates unless `imageUrl` is attached.
+- **Fix/workaround:** when feasible, include screenshot URL in callback payload (public URL or service-accessible image URL) and favor periodic visual updates for visible UI tasks.
+- **Verification:** `node scripts/codex-notify.mjs callback-auto --summary "..." --imageUrl <public-image-url>` returns `imageDelivery` with sent image count > 0.

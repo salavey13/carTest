@@ -42,3 +42,6 @@ Execute franchize rollout tasks strictly one-by-one, preserving dependency order
 - No parallel task execution.
 - No destructive migration of legacy flows unless task explicitly requires it.
 - Keep `/rent-bike`, `/vipbikerental`, `/rentals` available during bridge phases.
+- Treat franchize information pages as **slug-scoped by default**:
+  - canonical: `/franchize/[slug]/about|contacts|cart|order/[id]`
+  - static `/franchize/about|contacts|cart|order/[id]` are compatibility redirects only.
