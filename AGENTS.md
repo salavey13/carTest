@@ -131,6 +131,18 @@ If you modify setup, onboarding, or runtime assumptions, update these files toge
 
 Keeping these aligned is mandatory for maintainability.
 
+### Franchise execution diary contract (mandatory)
+
+For any task related to the motorbike franchise/public storefront initiative, agents must keep
+`docs/THE_FRANCHEEZEPLAN.md` up to date as a living status board:
+
+- update the corresponding task block (`status`, `updated_at`, `owner`, `notes`, `next_step`),
+- keep dependency order accurate (execute one-by-one, not in parallel),
+- append a short dated entry in the plan's changelog/diary section after each meaningful step,
+- add new tasks using the task template when scope expands.
+
+Do not mark implementation as complete without reflecting progress in `docs/THE_FRANCHEEZEPLAN.md`.
+
 Current docs style: keep setup docs practical, RU-first, and compact-but-complete in `README.MD`, with `docs/README_TLDR.md` as the extra-short variant.
 For first-time operators, keep token onboarding appendixes up-to-date (Telegram BotFather + Slack app token/channel id steps).
 
@@ -423,3 +435,49 @@ Required behavior for these cases:
    even if callback was already sent programmatically.
 
 Implementation source of truth for this flow: `books/cybertutor.md` plus canonical operator contract `docs/CYBERTUTOR_RUNTIME_CONTRACT_V1.md`.
+
+---
+
+## 10) Local skills catalog (repo-provided)
+
+In addition to system skills, this repo provides task-focused local skills:
+
+- `skills/codex-bridge-operator/SKILL.md`
+  - Use for bridge callbacks/notifications and PR lifecycle messaging.
+- `skills/homework-ocr-intake/SKILL.md`
+  - Use for OCR intake from homework photos.
+- `skills/homework-pdf-rag-runtime/SKILL.md`
+  - Use for textbook-grounded homework solving.
+- `skills/homework-solution-store-supabase/SKILL.md`
+  - Use for Supabase persistence + read-after-write verification.
+
+### 10.1) Notify + Supabase execution hooks
+
+When task context requires notifications/callbacks:
+- use `scripts/codex-notify.mjs` (`callback-auto` preferred in mixed envs, `callback` in strict envs).
+
+When task context requires Supabase persistence checks:
+- use `scripts/homework-solution-store-skill.mjs` (`ensure-table`, `save`, then mandatory `exists`).
+
+If a skill is referenced but unavailable, state fallback and continue with repo-native scripts/actions.
+
+---
+
+## 11) FRANCHEEZEPLAN_EXECUTIONER mode (operator shortcut)
+
+Trigger phrase: `continue as FRANCHEEZEPLAN_EXECUTIONER`.
+
+When this phrase appears, follow this deterministic protocol:
+
+1. Open `docs/FRANCHEEZEPLAN.md` first, then `docs/THE_FRANCHEEZEPLAN.md`.
+2. Find the first task in ordered pipeline with `status: todo` and all dependencies marked `done`.
+3. Mark that task `in_progress` with `updated_at`, `owner`, `notes`, `next_step`, `risks`.
+4. Execute only that task scope (no parallel jumps).
+5. Run validations/screenshots required for that task.
+6. Update task to `done` (or `blocked` with reason) and append dated diary entry in section 7.
+7. Commit + PR, then include next recommended task ID in summary.
+
+Hard rules:
+- Never skip dependency order without explicitly adding a new prerequisite task.
+- If scope expands, append/insert new tasks using template before implementation.
+- Keep legacy routes operational while migrating to `/franchize/*` surfaces.
