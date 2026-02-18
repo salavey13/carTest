@@ -147,10 +147,15 @@ Add per-crew theme block in JSONB:
 Planned routes:
 - `/app/franchize/create/page.tsx`
 - `/app/franchize/[slug]/page.tsx`
-- `/app/franchize/cart/page.tsx`
-- `/app/franchize/order/[id]/page.tsx`
-- `/app/franchize/about/page.tsx`
-- `/app/franchize/contacts/page.tsx`
+- `/app/franchize/[slug]/cart/page.tsx`
+- `/app/franchize/[slug]/order/[id]/page.tsx`
+- `/app/franchize/[slug]/about/page.tsx`
+- `/app/franchize/[slug]/contacts/page.tsx`
+- legacy compatibility redirects:
+  - `/app/franchize/cart/page.tsx`
+  - `/app/franchize/order/[id]/page.tsx`
+  - `/app/franchize/about/page.tsx`
+  - `/app/franchize/contacts/page.tsx`
 
 Planned shared runtime:
 - `/app/franchize/actions.ts`
@@ -202,9 +207,9 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   "header": {
     "menuLinks": [
       { "label": "Каталог", "href": "/franchize/{slug}" },
-      { "label": "О нас", "href": "/franchize/about" },
-      { "label": "Контакты", "href": "/franchize/contacts" },
-      { "label": "Корзина", "href": "/franchize/cart" }
+      { "label": "О нас", "href": "/franchize/{slug}/about" },
+      { "label": "Контакты", "href": "/franchize/{slug}/contacts" },
+      { "label": "Корзина", "href": "/franchize/{slug}/cart" }
     ]
   },
   "footer": {
@@ -284,6 +289,53 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Slug not found returns safe empty UI (not crash).
   - Existing `/rent-bike`, `/vipbikerental`, `/rentals` remain unaffected.
 
+### T3a — Slug-in-path routing alignment and hydration mismatch fix
+- status: `done`
+- updated_at: `2026-02-18T23:27:47Z`
+- owner: `codex`
+- notes: Migrated franchize static pages into slug-scoped routes, added compatibility redirects to `vip-bike`, normalized header links to slug-aware paths, and fixed contact fallback priority in loader.
+- next_step: Start T4 shell components.
+- risks: temporary hardcoded redirect target (`vip-bike`) until multi-crew redirect strategy is introduced.
+- dependencies: T3
+- deliverables:
+  - `app/franchize/[slug]/about/page.tsx`
+  - `app/franchize/[slug]/contacts/page.tsx`
+  - `app/franchize/[slug]/cart/page.tsx`
+  - `app/franchize/[slug]/order/[id]/page.tsx`
+  - `app/franchize/about/page.tsx`
+  - `app/franchize/contacts/page.tsx`
+  - `app/franchize/cart/page.tsx`
+  - `app/franchize/order/[id]/page.tsx`
+  - `app/franchize/actions.ts`
+- implementation checklist:
+  1. Move `/about`, `/contacts`, `/cart`, `/order/[id]` rendering into `/franchize/[slug]/*`.
+  2. Keep old static paths as redirect bridges to `/franchize/vip-bike/*`.
+  3. Normalize menu link hydration to always include crew slug context.
+  4. Prioritize `metadata.franchize.contacts` over `footer` and crew fallbacks.
+- acceptance criteria:
+  - Required route shape exists and renders for `/franchize/vip-bike/*` pages.
+  - Legacy static links redirect without dead ends.
+  - Existing `/rent-bike`, `/vipbikerental`, `/rentals` remain untouched.
+
+### T3b — Plan/doc path normalization after slug migration
+- status: `done`
+- updated_at: `2026-02-18T23:42:07Z`
+- owner: `codex`
+- notes: Audited `FRANCHEEZEPLAN` docs and normalized all future-looking franchize paths to slug-scoped variants; retained explicit legacy paths only where documenting redirect bridges/history.
+- next_step: Start T4 shell components.
+- risks: documentation drift if future task blocks reintroduce non-slug routes without explicit `legacy redirect` label.
+- dependencies: T3a
+- deliverables:
+  - `docs/FRANCHEEZEPLAN.md`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Verify route map and JSON template paths use `/franchize/{slug}/...` shape.
+  2. Verify future task deliverables/checklists use slug-scoped route references.
+  3. Keep legacy static paths only in explicit compatibility/redirect notes.
+- acceptance criteria:
+  - No accidental static-path references remain in future-state sections.
+  - Legacy static paths appear only in compatibility bridge context.
+
 ### T4 — Build Pepperolli-style shell components
 - status: `todo`
 - updated_at: `-`
@@ -291,7 +343,7 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - notes: Header, footer, floating cart, menu modal baseline.
 - next_step: Wire shell components to metadata theme tokens.
 - risks: visual clash with legacy global header/footer and bottom nav.
-- dependencies: T3
+- dependencies: T3b
 - deliverables:
   - `app/franchize/components/CrewHeader.tsx`
   - `app/franchize/components/CrewFooter.tsx`
@@ -342,8 +394,8 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - risks: mismatch with existing `rentals` booking semantics.
 - dependencies: T5
 - deliverables:
-  - `/franchize/cart`
-  - `/franchize/order/[id]`
+  - `/franchize/[slug]/cart`
+  - `/franchize/[slug]/order/[id]`
 - implementation checklist:
   1. Cart page: editable quantity controls, remove row, total summary.
   2. Order page: step markers + segmented delivery mode toggle.
@@ -467,13 +519,24 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 ### 2026-02-18 — T3 execution complete (route scaffold)
 - Marked T3 `in_progress` -> `done` following dependency order.
 - Implemented franchize runtime loader/action with fallback hydration for unknown slug and cars query safety.
-- Scaffolded pages: `/franchize/[slug]`, `/franchize/cart`, `/franchize/order/[id]`, `/franchize/about`, `/franchize/contacts`.
+- Scaffolded pages: `/franchize/[slug]` plus legacy static placeholders (`/franchize/cart`, `/franchize/order/[id]`, `/franchize/about`, `/franchize/contacts`) before slug migration finalized.
 - Captured mobile screenshot for `/franchize/demo` to document current scaffold visual baseline.
 
 ### 2026-02-18 — T3 refinement (VIP_BIKE hydration seed)
 - Replaced scaffold demo navigation target with `/franchize/vip-bike` for operator-facing testing.
 - Added detailed SQL hydration blueprint at `docs/sql/vip-bike-franchize-hydration.sql` to populate `crews.metadata.franchize` using VIP_BIKE data from existing pages/components.
 - Preserved legacy metadata compatibility by keeping top-level provider/contact keys in SQL merge section.
+
+### 2026-02-18 — T3a execution complete (slug-in-path stabilization)
+- Added slug-scoped routes for about/contacts/cart/order and moved page rendering there.
+- Added backward-compatible redirects from `/franchize/about|contacts|cart` (and `/franchize/order/[id]`) to `/franchize/vip-bike/*`.
+- Updated `getFranchizeBySlug` contacts fallback order: `metadata.franchize.contacts` -> `metadata.franchize.footer` -> crew fields.
+- Normalized fallback/header menu links to include slug in franchize scoped URLs.
+
+### 2026-02-18 — T3b execution complete (doc slug consistency pass)
+- Rechecked `docs/FRANCHEEZEPLAN.md` and `docs/THE_FRANCHEEZEPLAN.md` for non-slug franchize route references.
+- Normalized target IA + JSON template + future task deliverables to `/franchize/{slug}/...` or `/franchize/[slug]/...` patterns.
+- Kept static non-slug routes only when explicitly describing compatibility redirects/history.
 
 ---
 
