@@ -86,10 +86,31 @@ function readPath<T>(obj: unknown, path: string[], fallback: T): T {
 
 const fallbackMenuLinks = (slug: string) => [
   { label: "Каталог", href: `/franchize/${slug}` },
-  { label: "О нас", href: "/franchize/about" },
-  { label: "Контакты", href: "/franchize/contacts" },
-  { label: "Корзина", href: "/franchize/cart" },
+  { label: "О нас", href: `/franchize/${slug}/about` },
+  { label: "Контакты", href: `/franchize/${slug}/contacts` },
+  { label: "Корзина", href: `/franchize/${slug}/cart` },
 ];
+
+const withSlug = (href: string, slug: string) => {
+  if (!href) {
+    return href;
+  }
+
+  if (href.includes("{slug}")) {
+    return href.replaceAll("{slug}", slug);
+  }
+
+  switch (href) {
+    case "/franchize/about":
+      return `/franchize/${slug}/about`;
+    case "/franchize/contacts":
+      return `/franchize/${slug}/contacts`;
+    case "/franchize/cart":
+      return `/franchize/${slug}/cart`;
+    default:
+      return href;
+  }
+};
 
 const emptyCrew = (slug: string): FranchizeCrewVM => ({
   id: "",
@@ -149,7 +170,10 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const franchize = (metadata.franchize ?? metadata) as UnknownRecord;
 
     const themePalette = readPath(franchize, ["theme", "palette"], defaultTheme.palette);
-    const menuLinks = readPath(franchize, ["header", "menuLinks"], fallbackMenuLinks(safeSlug));
+    const menuLinks = readPath(franchize, ["header", "menuLinks"], fallbackMenuLinks(safeSlug)).map((link) => ({
+      ...link,
+      href: withSlug(link.href, crew.slug ?? safeSlug),
+    }));
 
     const hydratedCrew: FranchizeCrewVM = {
       id: crew.id,
@@ -178,9 +202,13 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         menuLinks,
       },
       contacts: {
-        phone: readPath(franchize, ["footer", "phone"], ""),
-        email: readPath(franchize, ["footer", "email"], ""),
-        address: readPath(franchize, ["footer", "address"], crew.hq_location ?? ""),
+        phone: readPath(franchize, ["contacts", "phone"], readPath(franchize, ["footer", "phone"], "")),
+        email: readPath(franchize, ["contacts", "email"], readPath(franchize, ["footer", "email"], "")),
+        address: readPath(
+          franchize,
+          ["contacts", "address"],
+          readPath(franchize, ["footer", "address"], crew.hq_location ?? ""),
+        ),
       },
       catalog: {
         categories: readPath(franchize, ["catalog", "groupOrder"], []),

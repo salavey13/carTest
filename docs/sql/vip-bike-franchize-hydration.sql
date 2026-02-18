@@ -89,9 +89,9 @@ set
           'subtitle', 'Нижний Новгород',
           'menuLinks', jsonb_build_array(
             jsonb_build_object('label', 'Каталог', 'href', '/franchize/{slug}'),
-            jsonb_build_object('label', 'О нас', 'href', '/franchize/about'),
-            jsonb_build_object('label', 'Контакты', 'href', '/franchize/contacts'),
-            jsonb_build_object('label', 'Корзина', 'href', '/franchize/cart'),
+            jsonb_build_object('label', 'О нас', 'href', '/franchize/{slug}/about'),
+            jsonb_build_object('label', 'Контакты', 'href', '/franchize/{slug}/contacts'),
+            jsonb_build_object('label', 'Корзина', 'href', '/franchize/{slug}/cart'),
             jsonb_build_object('label', 'Мои аренды', 'href', '/rentals')
           ),
           'quickActions', jsonb_build_array(
