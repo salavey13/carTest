@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Menu, Search, User } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { FranchizeCrewVM } from "../actions";
@@ -34,7 +35,7 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
           <span>operator storefront</span>
         </div>
 
-        <div className="flex items-center justify-between gap-3">
+        <div className="grid grid-cols-[44px_1fr_88px] items-center gap-3">
           <button
             type="button"
             aria-label="Open menu"
@@ -45,16 +46,32 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="flex-1 text-center">
-            <p className="text-lg font-semibold uppercase tracking-[0.16em]" style={{ color: crew.theme.palette.textPrimary }}>
-              {crew.header.brandName}
-            </p>
-            <p className="text-xs" style={{ color: crew.theme.palette.textSecondary }}>
+          <div className="mx-auto flex flex-col items-center text-center">
+            <div
+              className="relative h-20 w-20 overflow-hidden rounded-full border"
+              style={{ borderColor: crew.theme.palette.accentMain, backgroundColor: crew.theme.palette.bgCard }}
+            >
+              {crew.header.logoUrl ? (
+                <Image
+                  src={crew.header.logoUrl}
+                  alt={`${crew.header.brandName} logo`}
+                  fill
+                  sizes="80px"
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center px-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: crew.theme.palette.accentMain }}>
+                  {crew.header.brandName}
+                </div>
+              )}
+            </div>
+            <p className="mt-2 text-[11px]" style={{ color: crew.theme.palette.textSecondary }}>
               {crew.header.tagline}
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-end gap-2">
             <span
               className="inline-flex h-11 w-11 items-center justify-center rounded-xl border"
               style={{ borderColor: crew.theme.palette.borderSoft, color: crew.theme.palette.textSecondary }}

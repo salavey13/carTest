@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { CrewFooter } from "../components/CrewFooter";
 import { CrewHeader } from "../components/CrewHeader";
 import { FloatingCartIconLink } from "../components/FloatingCartIconLink";
@@ -23,7 +24,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
         )}
 
         <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Каталог</h1>
+          <h1 className="text-xl font-semibold">Каталог (bike only)</h1>
           <span className="text-xs" style={{ color: crew.theme.palette.textSecondary }}>
             /franchize/{crew.slug || slug}
           </span>
@@ -35,24 +36,38 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
               className="col-span-2 rounded-2xl border border-dashed p-4 text-sm"
               style={{ borderColor: crew.theme.palette.borderSoft, color: crew.theme.palette.textSecondary }}
             >
-              No catalog items yet. Add cars to this crew to hydrate the catalog.
+              No bike catalog items yet. Add `type=bike` cars to this crew to hydrate the catalog.
             </div>
           ) : (
             items.map((item) => (
               <article
                 key={item.id}
                 id={`category-${item.category.toLowerCase().replace(/\s+/g, "-")}`}
-                className="rounded-2xl border p-3"
+                className="overflow-hidden rounded-2xl border"
                 style={{ borderColor: crew.theme.palette.borderSoft, backgroundColor: crew.theme.palette.bgCard }}
               >
-                <p className="text-[11px] uppercase tracking-wide" style={{ color: crew.theme.palette.accentMain }}>
-                  {item.category}
-                </p>
-                <h2 className="mt-1 text-sm font-semibold leading-5">{item.title}</h2>
-                <p className="text-xs" style={{ color: crew.theme.palette.textSecondary }}>
-                  {item.subtitle}
-                </p>
-                <p className="mt-3 text-sm font-medium">{item.pricePerDay} ₽ / day</p>
+                <div className="relative h-28 w-full">
+                  {item.imageUrl ? (
+                    <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 768px) 50vw, 280px" className="object-cover" unoptimized />
+                  ) : (
+                    <div
+                      className="flex h-full w-full items-center justify-center px-3 text-center text-xs"
+                      style={{ color: crew.theme.palette.textSecondary }}
+                    >
+                      Изображение байка скоро загрузим
+                    </div>
+                  )}
+                </div>
+                <div className="p-3">
+                  <p className="text-[11px] uppercase tracking-wide" style={{ color: crew.theme.palette.accentMain }}>
+                    {item.category}
+                  </p>
+                  <h2 className="mt-1 text-sm font-semibold leading-5">{item.title}</h2>
+                  <p className="text-xs" style={{ color: crew.theme.palette.textSecondary }}>
+                    {item.subtitle}
+                  </p>
+                  <p className="mt-3 text-sm font-medium">{item.pricePerDay} ₽ / day</p>
+                </div>
               </article>
             ))
           )}
