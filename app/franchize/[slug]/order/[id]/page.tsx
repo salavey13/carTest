@@ -12,14 +12,14 @@ export default async function FranchizeOrderPage({ params }: FranchizeOrderPageP
   const { crew } = await getFranchizeBySlug(slug);
 
   return (
-    <main className="min-h-screen" style={{ backgroundColor: crew.theme.palette.bgBase, color: crew.theme.palette.textPrimary }}>
+    <main className="min-h-screen bg-background text-foreground">
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/order/${id}`} />
       <section className="mx-auto w-full max-w-4xl px-4 py-6">
         <p className="text-xs uppercase tracking-[0.2em]" style={{ color: crew.theme.palette.accentMain }}>
           /franchize/{crew.slug || slug}/order/{id}
         </p>
         <h1 className="mt-2 text-2xl font-semibold">Franchize Order (Skeleton)</h1>
-        <p className="mt-2 text-sm" style={{ color: crew.theme.palette.textSecondary }}>
+        <p className="mt-2 text-sm text-muted-foreground">
           This page is intentionally scaffolded. Delivery mode, payment forms, and validation will be added in T6.
         </p>
       </section>
