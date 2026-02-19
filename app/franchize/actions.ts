@@ -2,6 +2,7 @@
 
 import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
+import { z } from "zod";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -60,6 +61,37 @@ export interface FranchizeBySlugResult {
   items: CatalogItemVM[];
 }
 
+export interface FranchizeConfigInput {
+  slug: string;
+  brandName: string;
+  tagline: string;
+  logoUrl: string;
+  themeMode: string;
+  bgBase: string;
+  bgCard: string;
+  accentMain: string;
+  accentMainHover: string;
+  textPrimary: string;
+  textSecondary: string;
+  borderSoft: string;
+  phone: string;
+  email: string;
+  address: string;
+  menuLinksText: string;
+  categoryOrderText: string;
+  allowPromo: boolean;
+  deliveryModesText: string;
+  defaultMode: string;
+  advancedJson: string;
+}
+
+export interface FranchizeConfigState {
+  ok: boolean;
+  message: string;
+  errors?: Record<string, string[]>;
+  data?: FranchizeConfigInput;
+}
+
 const defaultTheme: FranchizeTheme = {
   mode: "pepperolli_dark",
   palette: {
@@ -71,6 +103,59 @@ const defaultTheme: FranchizeTheme = {
     textSecondary: "#A7ABB4",
     borderSoft: "#24262E",
   },
+};
+
+const franchizeConfigSchema = z.object({
+  slug: z.string().trim().min(2, "Slug is required"),
+  brandName: z.string().trim().min(2, "Brand name is required"),
+  tagline: z.string().trim().min(2, "Tagline is required"),
+  logoUrl: z.string().trim().optional(),
+  themeMode: z.string().trim().min(2, "Theme mode is required"),
+  bgBase: z.string().trim().min(4, "bgBase is required"),
+  bgCard: z.string().trim().min(4, "bgCard is required"),
+  accentMain: z.string().trim().min(4, "accentMain is required"),
+  accentMainHover: z.string().trim().min(4, "accentMainHover is required"),
+  textPrimary: z.string().trim().min(4, "textPrimary is required"),
+  textSecondary: z.string().trim().min(4, "textSecondary is required"),
+  borderSoft: z.string().trim().min(4, "borderSoft is required"),
+  phone: z.string().trim().default(""),
+  email: z.string().trim().default(""),
+  address: z.string().trim().default(""),
+  menuLinksText: z.string().default(""),
+  categoryOrderText: z.string().default(""),
+  allowPromo: z.coerce.boolean().default(true),
+  deliveryModesText: z.string().default("pickup,delivery"),
+  defaultMode: z.string().trim().default("pickup"),
+  advancedJson: z.string().default(""),
+});
+
+const defaultFranchizeConfig: FranchizeConfigInput = {
+  slug: "",
+  brandName: "VIP BIKE",
+  tagline: "Ride the vibe",
+  logoUrl: "",
+  themeMode: defaultTheme.mode,
+  bgBase: defaultTheme.palette.bgBase,
+  bgCard: defaultTheme.palette.bgCard,
+  accentMain: defaultTheme.palette.accentMain,
+  accentMainHover: defaultTheme.palette.accentMainHover,
+  textPrimary: defaultTheme.palette.textPrimary,
+  textSecondary: defaultTheme.palette.textSecondary,
+  borderSoft: defaultTheme.palette.borderSoft,
+  phone: "",
+  email: "",
+  address: "",
+  menuLinksText: [
+    "Каталог|/franchize/{slug}",
+    "О нас|/franchize/{slug}/about",
+    "Контакты|/franchize/{slug}/contacts",
+    "Корзина|/franchize/{slug}/cart",
+  ].join("\n"),
+  categoryOrderText: "Naked, Supersport, Touring, Neo-retro",
+  allowPromo: true,
+  deliveryModesText: "pickup, delivery",
+  defaultMode: "pickup",
+  advancedJson: "",
 };
 
 function readPath<T>(obj: unknown, path: string[], fallback: T): T {
@@ -253,3 +338,186 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     return { crew: emptyCrew(safeSlug), items: [] };
   }
 }
+
+function splitCsv(text: string): string[] {
+  return text
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function parseMenuLinks(lines: string, slug: string): Array<{ label: string; href: string }> {
+  return lines
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [label, href] = line.split("|").map((value) => value.trim());
+      return {
+        label: label || "Link",
+        href: withSlug(href || `/franchize/${slug}`, slug),
+      };
+    });
+}
+
+function toFranchizeConfigInput(crew: UnknownRecord, slug: string): FranchizeConfigInput {
+  const metadata = (crew.metadata ?? {}) as UnknownRecord;
+  const franchize = (metadata.franchize ?? {}) as UnknownRecord;
+  const themePalette = readPath(franchize, ["theme", "palette"], defaultTheme.palette);
+  const menuLinks = readPath(franchize, ["header", "menuLinks"], fallbackMenuLinks(slug));
+
+  return {
+    ...defaultFranchizeConfig,
+    slug,
+    brandName: readPath(franchize, ["branding", "name"], (crew.name as string) ?? defaultFranchizeConfig.brandName),
+    tagline: readPath(franchize, ["branding", "tagline"], defaultFranchizeConfig.tagline),
+    logoUrl: readPath(franchize, ["branding", "logoUrl"], (crew.logo_url as string) ?? ""),
+    themeMode: readPath(franchize, ["theme", "mode"], defaultTheme.mode),
+    bgBase: readPath(themePalette, ["bgBase"], defaultTheme.palette.bgBase),
+    bgCard: readPath(themePalette, ["bgCard"], defaultTheme.palette.bgCard),
+    accentMain: readPath(themePalette, ["accentMain"], defaultTheme.palette.accentMain),
+    accentMainHover: readPath(themePalette, ["accentMainHover"], defaultTheme.palette.accentMainHover),
+    textPrimary: readPath(themePalette, ["textPrimary"], defaultTheme.palette.textPrimary),
+    textSecondary: readPath(themePalette, ["textSecondary"], defaultTheme.palette.textSecondary),
+    borderSoft: readPath(themePalette, ["borderSoft"], defaultTheme.palette.borderSoft),
+    phone: readPath(franchize, ["contacts", "phone"], readPath(franchize, ["footer", "phone"], "")),
+    email: readPath(franchize, ["contacts", "email"], readPath(franchize, ["footer", "email"], "")),
+    address: readPath(franchize, ["contacts", "address"], readPath(franchize, ["footer", "address"], "")),
+    menuLinksText: menuLinks
+      .map((entry) => `${readPath(entry, ["label"], "Link")}|${readPath(entry, ["href"], `/franchize/${slug}`)}`)
+      .join("\n"),
+    categoryOrderText: readPath(franchize, ["catalog", "groupOrder"], []).join(", "),
+    allowPromo: readPath(franchize, ["order", "allowPromo"], true),
+    deliveryModesText: readPath(franchize, ["order", "deliveryModes"], ["pickup", "delivery"]).join(", "),
+    defaultMode: readPath(franchize, ["order", "defaultMode"], "pickup"),
+    advancedJson: JSON.stringify(franchize, null, 2),
+  };
+}
+
+export async function loadFranchizeConfigBySlug(slug: string): Promise<FranchizeConfigState> {
+  const safeSlug = slug.trim();
+  if (!safeSlug) {
+    return { ok: false, message: "Сначала укажите slug экипажа." };
+  }
+
+  const { data: crew, error } = await supabaseAdmin.from("crews").select("id, slug, name, logo_url, metadata").eq("slug", safeSlug).maybeSingle();
+  if (error || !crew) {
+    return { ok: false, message: "Экипаж с таким slug не найден." };
+  }
+
+  return {
+    ok: true,
+    message: `Конфиг для ${safeSlug} загружен.`,
+    data: toFranchizeConfigInput(crew as UnknownRecord, safeSlug),
+  };
+}
+
+export async function saveFranchizeConfig(input: FranchizeConfigInput): Promise<FranchizeConfigState> {
+  const parsed = franchizeConfigSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: "Проверка не пройдена: проверьте обязательные поля формы.",
+      errors: parsed.error.flatten().fieldErrors,
+      data: input,
+    };
+  }
+
+  const payload = parsed.data;
+  const { data: crew, error: crewError } = await supabaseAdmin.from("crews").select("id, slug, metadata").eq("slug", payload.slug).maybeSingle();
+  if (crewError || !crew) {
+    return { ok: false, message: "Slug не найден: сохранение не выполнено.", data: payload };
+  }
+
+  let advancedOverrides: UnknownRecord = {};
+  if (payload.advancedJson.trim()) {
+    try {
+      const parsedJson = JSON.parse(payload.advancedJson) as unknown;
+      if (parsedJson && typeof parsedJson === "object") {
+        advancedOverrides = parsedJson as UnknownRecord;
+      }
+    } catch {
+      return { ok: false, message: "Advanced JSON должен быть валидным JSON-объектом.", data: payload };
+    }
+  }
+
+  const baseMetadata = ((crew as UnknownRecord).metadata ?? {}) as UnknownRecord;
+  const existingFranchize = (readPath(baseMetadata, ["franchize"], {}) ?? {}) as UnknownRecord;
+  const menuLinks = parseMenuLinks(payload.menuLinksText, payload.slug);
+
+  const sourceFranchize: UnknownRecord = {
+    ...existingFranchize,
+    ...advancedOverrides,
+  };
+
+  const franchizeMetadata: UnknownRecord = {
+    ...sourceFranchize,
+    version: readPath(sourceFranchize, ["version"], "2026-02-19-editor-v2"),
+    enabled: readPath(sourceFranchize, ["enabled"], true),
+    slug: payload.slug,
+    branding: {
+      ...(readPath(sourceFranchize, ["branding"], {}) as UnknownRecord),
+      name: payload.brandName,
+      tagline: payload.tagline,
+      logoUrl: payload.logoUrl,
+    },
+    theme: {
+      ...(readPath(sourceFranchize, ["theme"], {}) as UnknownRecord),
+      mode: payload.themeMode,
+      palette: {
+        ...(readPath(sourceFranchize, ["theme", "palette"], {}) as UnknownRecord),
+        bgBase: payload.bgBase,
+        bgCard: payload.bgCard,
+        accentMain: payload.accentMain,
+        accentMainHover: payload.accentMainHover,
+        textPrimary: payload.textPrimary,
+        textSecondary: payload.textSecondary,
+        borderSoft: payload.borderSoft,
+      },
+    },
+    header: {
+      ...(readPath(sourceFranchize, ["header"], {}) as UnknownRecord),
+      menuLinks,
+    },
+    footer: {
+      ...(readPath(sourceFranchize, ["footer"], {}) as UnknownRecord),
+      phone: payload.phone,
+      email: payload.email,
+      address: payload.address,
+    },
+    contacts: {
+      ...(readPath(sourceFranchize, ["contacts"], {}) as UnknownRecord),
+      phone: payload.phone,
+      email: payload.email,
+      address: payload.address,
+    },
+    catalog: {
+      ...(readPath(sourceFranchize, ["catalog"], {}) as UnknownRecord),
+      groupOrder: splitCsv(payload.categoryOrderText),
+    },
+    order: {
+      ...(readPath(sourceFranchize, ["order"], {}) as UnknownRecord),
+      allowPromo: payload.allowPromo,
+      deliveryModes: splitCsv(payload.deliveryModesText),
+      defaultMode: payload.defaultMode,
+    },
+  };
+
+  const mergedMetadata: UnknownRecord = {
+    ...baseMetadata,
+    franchize: franchizeMetadata,
+  };
+
+  const { error: updateError } = await supabaseAdmin.from("crews").update({ metadata: mergedMetadata }).eq("id", crew.id);
+  if (updateError) {
+    logger.error("[franchize] save config failed", updateError);
+    return { ok: false, message: "Не удалось сохранить конфиг в metadata экипажа.", data: payload };
+  }
+
+  return {
+    ok: true,
+    message: `Франшизный конфиг сохранён в crews.metadata.franchize для ${payload.slug}.`,
+    data: payload,
+  };
+}
+
