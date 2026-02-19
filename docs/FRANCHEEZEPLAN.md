@@ -34,7 +34,8 @@ Execute franchize rollout tasks strictly one-by-one, preserving dependency order
 - PR created.
 - Summary includes next recommended task ID.
 - Final operator reply includes a short RU summary block (2-6 bullets) for first-time RU teammates.
-- Final operator reply includes Tamagotchi telemetry (`mood`, `energy`, `focus`, `confidence`, `comment`) as compact operator-facing status.
+- Final operator reply includes Tamagotchi telemetry (`mood`, `energy`, `focus`, `confidence`, `comment`, `iteration_hint`, `roast_or_praise`) as compact operator-facing status.
+- RU summary should carry wake-state + motivation + next micro-step for teammate momentum.
 
 ## Notify + Supabase tool notes
 - Notifications/callbacks: `scripts/codex-notify.mjs`.
