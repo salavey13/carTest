@@ -578,6 +578,11 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 - Updated `docs/FRANCHEEZEPLAN.md` DoD telemetry schema to include `iteration_hint` and `roast_or_praise`.
 - Kept safety boundary explicit: expressive UX is additive and must not replace objective technical reporting.
 
+### 2026-02-19 — Executor coaching loop upgrade (progress_stage + next beat)
+- Extended executor telemetry schema with `progress_stage` and `next_beat` to support explicit iterative rhythm (`scan → patch → validate → ship`).
+- Added noob-friendly coaching flow in `AGENTS.md`: wake state, beat log, corner-case nudge, polish prompt, and final Create-PR reminder.
+- Synced `docs/FRANCHEEZEPLAN.md` DoD so operator-facing summaries consistently guide novices through next-step execution.
+
 ---
 
 ## 8) Skills and tooling note

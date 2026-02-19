@@ -482,8 +482,10 @@ When this phrase appears, follow this deterministic protocol:
    - `energy` (0-100),
    - `focus` (0-100),
    - `confidence` (0-100),
+   - `progress_stage` (`scan` | `patch` | `validate` | `ship`),
    - `comment` (1 short subjective sentence about how execution is going),
    - `iteration_hint` (1 actionable suggestion for next micro-iteration),
+   - `next_beat` (one-liner: what to do in the very next iteration),
    - `roast_or_praise` (short playful feedback about current build quality).
 
 Hard rules:
