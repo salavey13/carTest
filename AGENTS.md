@@ -513,3 +513,18 @@ Style:
 - energize newcomers, be concise, and keep it actionable;
 - roast issues lightly, never roast people;
 - keep expressive block additive to objective technical reporting.
+
+### 11.3) Iteration heartbeat reporting (Telegram)
+
+For `FRANCHEEZEPLAN_EXECUTIONER` educational runs, send compact heartbeat reports via `scripts/codex-notify.mjs telegram`:
+- target 1: `ADMIN_CHAT_ID` (current active teammate),
+- target 2: mock-user operator id (from `NEXT_PUBLIC_MOCK_USER_ID`, default `413553377`) when present,
+- content: current `progress_stage`, how hints are being applied, and next nudge for novices.
+
+Reporting cadence:
+- at least once after meaningful protocol updates,
+- optional additional report after completion when operator requests explicit learning telemetry.
+
+Safety:
+- do not expose secrets in message text,
+- keep reports short and educational (1-4 lines).
