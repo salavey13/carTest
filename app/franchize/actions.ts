@@ -160,7 +160,8 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const { data: cars, error: carsError } = await supabaseAdmin
       .from("cars")
       .select("id, make, model, description, image_url, daily_price, type, specs")
-      .eq("crew_id", crew.id);
+      .eq("crew_id", crew.id)
+      .ilike("type", "bike");
 
     if (carsError) {
       logger.warn("[franchize] failed to load crew cars", { safeSlug, carsError: carsError.message });
@@ -217,7 +218,13 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
 
     const items: CatalogItemVM[] = (cars ?? []).map((car) => {
       const specs = (car.specs ?? {}) as UnknownRecord;
-      const fallbackCategory = typeof specs.type === "string" ? specs.type : "Unsorted";
+      const subtype =
+        (typeof specs.subtype === "string" && specs.subtype.trim()) ||
+        (typeof specs.bike_subtype === "string" && specs.bike_subtype.trim()) ||
+        (typeof specs.segment === "string" && specs.segment.trim()) ||
+        (typeof specs.type === "string" && specs.type.trim().toLowerCase() !== "bike" && specs.type.trim()) ||
+        "Unsorted";
+
       return {
         id: car.id,
         title: `${car.make} ${car.model}`.trim(),
@@ -225,7 +232,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         description: car.description ?? "",
         imageUrl: car.image_url ?? "",
         pricePerDay: car.daily_price ?? 0,
-        category: car.type || fallbackCategory,
+        category: subtype,
       };
     });
 

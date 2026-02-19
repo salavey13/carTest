@@ -1,4 +1,7 @@
 import { getFranchizeBySlug } from "../../actions";
+import { CrewFooter } from "../../components/CrewFooter";
+import { CrewHeader } from "../../components/CrewHeader";
+import { FloatingCartIconLink } from "../../components/FloatingCartIconLink";
 
 interface FranchizeContactsPageProps {
   params: Promise<{ slug: string }>;
@@ -9,16 +12,28 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
   const { crew } = await getFranchizeBySlug(slug);
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-4 py-8 text-zinc-100">
-      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
-        <p className="text-xs uppercase tracking-[0.2em] text-amber-400">/franchize/{crew.slug || slug}/contacts</p>
-        <h1 className="mt-2 text-2xl font-semibold">Contacts</h1>
-        <div className="mt-4 space-y-2 text-sm text-zinc-300">
+    <main className="min-h-screen bg-background text-foreground">
+      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/contacts`} />
+      <section className="mx-auto w-full max-w-4xl px-4 py-6">
+        <p className="text-xs uppercase tracking-[0.2em]" style={{ color: crew.theme.palette.accentMain }}>
+          /franchize/{crew.slug || slug}/contacts
+        </p>
+        <h1 className="mt-2 text-2xl font-semibold">Контакты</h1>
+        <div className="mt-4 space-y-2 text-sm text-muted-foreground">
           <p>Phone: {crew.contacts.phone || "—"}</p>
           <p>Email: {crew.contacts.email || "—"}</p>
           <p>Address: {crew.contacts.address || "—"}</p>
         </div>
       </section>
+      <CrewFooter crew={crew} />
+      <FloatingCartIconLink
+        href={`/franchize/${crew.slug || slug}/cart`}
+        itemCount={0}
+        totalPrice={0}
+        accentColor={crew.theme.palette.accentMain}
+        textColor={crew.theme.palette.textPrimary}
+        borderColor={crew.theme.palette.borderSoft}
+      />
     </main>
   );
 }

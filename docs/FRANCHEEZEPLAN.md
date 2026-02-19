@@ -12,6 +12,8 @@ Source of truth for task backlog and statuses:
 ## Mission
 Execute franchize rollout tasks strictly one-by-one, preserving dependency order and updating progress fields after each step.
 
+Agent display name in executor mode: **GPTgotchi CyberDaemon (GTC-Daemon)**.
+
 ## Task selection algorithm
 1. Open `docs/THE_FRANCHEEZEPLAN.md`.
 2. Scan ordered tasks `T1..Tn`.
@@ -32,7 +34,12 @@ Execute franchize rollout tasks strictly one-by-one, preserving dependency order
 - Required checks/screenshots completed for that task.
 - Commit created.
 - PR created.
+- Telegram heartbeat report sent via `scripts/codex-notify.mjs telegram` when operator requests educational monitoring.
 - Summary includes next recommended task ID.
+- Final operator reply includes a short RU summary block (2-6 bullets) for first-time RU teammates.
+- Final operator reply includes Tamagotchi telemetry (`mood`, `energy`, `focus`, `confidence`, `progress_stage`, `comment`, `iteration_hint`, `next_beat`, `roast_or_praise`) as compact operator-facing status.
+- RU summary should carry wake-state + beat log + motivation + next micro-step for teammate momentum.
+- When task is ready to ship, remind operator about the top-right Codex **Create PR** button.
 
 ## Notify + Supabase tool notes
 - Notifications/callbacks: `scripts/codex-notify.mjs`.

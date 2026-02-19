@@ -49,3 +49,9 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** callback-auto often sends text-only updates unless `imageUrl` is attached.
 - **Fix/workaround:** when feasible, include screenshot URL in callback payload (public URL or service-accessible image URL) and favor periodic visual updates for visible UI tasks.
 - **Verification:** `node scripts/codex-notify.mjs callback-auto --summary "..." --imageUrl <public-image-url>` returns `imageDelivery` with sent image count > 0.
+
+## 2026-02-19 — Franchize visual QA screenshot fallback still needed
+- **Symptom:** Chromium in browser container crashed with SIGSEGV during `/franchize/vip-bike` screenshot capture.
+- **Root cause:** intermittent Chromium headless instability in current runner session.
+- **Fix/workaround:** immediately retried with Playwright Firefox and captured artifact successfully.
+- **Verification:** `mcp__browser_tools__run_playwright_script` using Firefox saved `artifacts/franchize-vip-bike-shell-v2.png`.
