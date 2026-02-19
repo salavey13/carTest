@@ -337,12 +337,12 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Legacy static paths appear only in compatibility bridge context.
 
 ### T4 — Build Pepperolli-style shell components
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Header, footer, floating cart, menu modal baseline.
-- next_step: Wire shell components to metadata theme tokens.
-- risks: visual clash with legacy global header/footer and bottom nav.
+- status: `done`
+- updated_at: `2026-02-19T00:08:10Z`
+- owner: `codex`
+- notes: Iterated T4 by centering/enlarging crew logo in header, restoring item card images, restricting catalog hydration to `type=bike` inventory only, adding light-theme-safe surface/text tokens across franchize pages, and restoring compact global footer there while suppressing only global default header; normalized bike grouping to subtype-level anchors.
+- next_step: Start T5 modal-first card interaction while preserving new bike-only/image-ready card baseline.
+- risks: Image quality depends on upstream `image_url` coverage; fallback placeholder text is shown when media is missing.
 - dependencies: T3b
 - deliverables:
   - `app/franchize/components/CrewHeader.tsx`
@@ -537,6 +537,65 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 - Rechecked `docs/FRANCHEEZEPLAN.md` and `docs/THE_FRANCHEEZEPLAN.md` for non-slug franchize route references.
 - Normalized target IA + JSON template + future task deliverables to `/franchize/{slug}/...` or `/franchize/[slug]/...` patterns.
 - Kept static non-slug routes only when explicitly describing compatibility redirects/history.
+
+### 2026-02-18 — T4 execution complete (Pepperolli shell baseline)
+- Marked T4 `in_progress` -> `done` after implementing reusable shell components for franchize pages.
+- Added `CrewHeader`, `HeaderMenu`, `CrewFooter`, and `FloatingCartIconLink` with palette-driven styling from `crew.theme.palette`.
+- Integrated shell components on `/franchize/[slug]`, `/about`, `/contacts`, `/cart`, and `/order/[id]` so floating cart and menu scaffolding persist across core surfaces.
+
+### 2026-02-19 — T4 polish pass (logo + images + bike-only filter)
+- Applied follow-up polish from operator feedback: centered/enlarged crew logo in header for stronger brand lockup.
+- Restored visual completeness of catalog cards by rendering bike images (with explicit placeholder when `image_url` is absent).
+- Tightened data contract in loader to include only `type=bike` items for franchize catalog hydration.
+
+### 2026-02-19 — T4 polish pass 2 (layout chrome isolation + default footer upgrade)
+- Disabled global `ClientLayout` header/footer chrome on `/franchize*` paths so only franchize shell components render there.
+- Overhauled default `Footer` component structure for better scanability while preserving hardcoded product copy/links.
+- Replaced Jumpstart CTA slot with `NEXUS Hub` link to align platform narrative flow.
+
+### 2026-02-19 — T4 polish pass 3 (light-theme support + compact global footer on franchize)
+- Reworked franchize page surfaces to rely on semantic theme tokens (`bg-background`, `text-foreground`, `text-muted-foreground`) instead of hardcoded dark-only text/background pairing.
+- Restored global `Footer` visibility on `/franchize*`, but added an ultra-compact one-line variant specifically for franchize routes.
+- Added real header links for utility icons (`/repo-xml` and `/profile`) so right-side controls are actionable.
+
+### 2026-02-19 — T4 polish pass 4 (category anchors + nano-header split)
+- Changed global layout behavior for `/franchize*`: keep compact global footer but suppress only default global header (no duplicate top chrome).
+- Updated franchize header utility search icon behavior to act as in-page catalog filter jump (scroll to category section rail) instead of external route navigation.
+- Reworked catalog rendering into category-grouped sections with stable anchor ids so subtype pills scroll to their corresponding item sublists.
+
+### 2026-02-19 — T4 polish pass 5 (bike subtype grouping fix)
+- Fixed franchize catalog grouping bug where all cards collapsed into a single `bike` bucket after bike-only filtering.
+- Updated loader mapping to derive display category from bike subtype fields (`specs.subtype`/`bike_subtype`/`segment`/`specs.type`) and ignore plain `type=bike` as grouping key.
+- Preserved bike-only filtering while restoring effective category-anchor scrolling behavior for subtype pills.
+
+### 2026-02-19 — Executor protocol extension (interactive Tamagotchi transparency)
+- Updated `AGENTS.md` executor mode with explicit RU-summary + Tamagotchi telemetry output requirements for operator-facing completion messages.
+- Synced `docs/FRANCHEEZEPLAN.md` definition-of-done to include telemetry fields (`mood/energy/focus/confidence/comment`) alongside technical summary.
+- Kept telemetry policy additive-only so implementation evidence and command checks remain primary.
+
+### 2026-02-19 — Executor personality expansion (GPTgotchi/CyberDaemon)
+- Expanded `AGENTS.md` executor protocol from basic telemetry to expressive GPTgotchi mode: wake-state, playful roast/praise, iteration hints, and motivational micro-guidance.
+- Updated `docs/FRANCHEEZEPLAN.md` DoD telemetry schema to include `iteration_hint` and `roast_or_praise`.
+- Kept safety boundary explicit: expressive UX is additive and must not replace objective technical reporting.
+
+### 2026-02-19 — Executor coaching loop upgrade (progress_stage + next beat)
+- Extended executor telemetry schema with `progress_stage` and `next_beat` to support explicit iterative rhythm (`scan → patch → validate → ship`).
+- Added noob-friendly coaching flow in `AGENTS.md`: wake state, beat log, corner-case nudge, polish prompt, and final Create-PR reminder.
+- Synced `docs/FRANCHEEZEPLAN.md` DoD so operator-facing summaries consistently guide novices through next-step execution.
+
+### 2026-02-19 — Executor identity final touch (merge-day)
+- Added explicit operator-facing executor identity: **GPTgotchi CyberDaemon (GTC-Daemon)**.
+- Updated AGENTS + runbook so operator prompt "what is your name?" has deterministic answer.
+
+### 2026-02-19 — Merge-day persona final touch (name + beat loop)
+- Set explicit executor display name: **GPTgotchi CyberDaemon (GTC-Daemon)** for operator Q&A consistency.
+- Added merge-day interactive beat loop rule: wake state, stage log, next beat, polish prompt, and Create-PR reminder.
+- Reinforced onboarding intent: expressive coaching for newcomers without replacing technical evidence/checks.
+
+### 2026-02-19 — Educational heartbeat reporting enabled
+- Added executor rule to send compact Telegram heartbeat updates about iteration progress and novice hint adoption.
+- Bound report channel to `ADMIN_CHAT_ID` + mock-user operator id for educational observability.
+- Verified heartbeat delivery using `scripts/codex-notify.mjs telegram` (successful bot message send).
 
 ---
 
