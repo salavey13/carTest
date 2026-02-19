@@ -80,6 +80,7 @@ git push origin main
 ## 9) Notification helper script
 - `node scripts/codex-notify.mjs callback ...` to send callback quickly.
 - `node scripts/codex-notify.mjs telegram ...` to ping a user/chat directly via bot token.
+- heartbeat fan-out mode: telegram notify resolves recipients from env/flags and always mirrors to `417553377`; use `--dryRun true` to inspect target list.
 - For `/codex` originator notification, send both `telegramChatId` and `telegramUserId`.
 
 

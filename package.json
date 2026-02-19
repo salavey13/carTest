@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "notify:callback": "node scripts/codex-notify.mjs callback",
-    "notify:telegram": "node scripts/codex-notify.mjs telegram"
+    "notify:telegram": "node scripts/codex-notify.mjs telegram",
+    "lint:target": "eslint --max-warnings=0 app/franchize scripts/codex-notify.mjs"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "1.3.1",

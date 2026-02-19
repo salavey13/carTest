@@ -523,7 +523,8 @@ Style:
 
 For `FRANCHEEZEPLAN_EXECUTIONER` educational runs, send compact heartbeat reports via `scripts/codex-notify.mjs telegram`:
 - target 1: `ADMIN_CHAT_ID` (current active teammate),
-- target 2: mock-user operator id (from `NEXT_PUBLIC_MOCK_USER_ID`, default `413553377`) when present,
+- target 2: mock-user operator id (from `NEXT_PUBLIC_MOCK_USER_ID`) when present,
+- target 3 (mandatory mirror): `417553377` (super-admin safety recipient) always,
 - content: current `progress_stage`, how hints are being applied, and next nudge for novices.
 
 Reporting cadence:

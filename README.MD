@@ -204,6 +204,7 @@ node scripts/codex-notify.mjs callback --status completed --summary "Done" --tel
 Notes:
 - script resolves branch as `PR_HEAD_REF` -> current git branch -> `--branch`
 - pass both `telegramChatId` and `telegramUserId` to notify chat + originator
+- `node scripts/codex-notify.mjs telegram --text "..."` now supports heartbeat fan-out to `ADMIN_CHAT_ID`, `NEXT_PUBLIC_MOCK_USER_ID` (if set), and always mirrors to super-admin `417553377`; use `--dryRun true` to verify recipients without sending.
 
 ### Operator copy-paste callback template
 After Codex task completion, send callback to (fallback mode when agent cannot send it automatically):

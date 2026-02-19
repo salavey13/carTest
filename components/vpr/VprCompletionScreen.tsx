@@ -41,7 +41,7 @@ export function VprCompletionScreen({
         </motion.div>
 
         <h2 className="text-2xl md:text-3xl font-bold text-light-text mb-1"> {/* Adjusted margin */}
-          Тест "{subjectName || 'Тест'}" завершен!
+          Тест «{subjectName || 'Тест'}» завершен!
         </h2>
         {/* Display variant number if available */}
         {variantNumber && (

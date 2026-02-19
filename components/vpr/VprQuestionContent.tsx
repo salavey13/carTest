@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import Image from 'next/image';
 import { Image as ImageIcon, AlertTriangle, BarChart3 } from 'lucide-react';
 
 import { SimpleChart } from './SimpleChart';
@@ -55,10 +56,13 @@ export function VprQuestionContent({
                         {data.type === 'image' && (
                             <div className="flex flex-col items-center">
                                 <div className="relative rounded-lg overflow-hidden border-2 border-white/10 shadow-2xl max-w-full">
-                                    <img
+                                    <Image
                                         src={data.url}
                                         alt={data.alt || 'Изображение'}
-                                        className="max-w-full h-auto object-contain max-h-[400px]"
+                                        width={960}
+                                        height={640}
+                                        unoptimized
+                                        className="max-h-[400px] h-auto max-w-full object-contain"
                                     />
                                 </div>
                                 {data.caption && (

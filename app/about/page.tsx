@@ -1,5 +1,6 @@
 "use client";
 import Head from "next/head";
+import Image from "next/image";
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -118,7 +119,7 @@ export default function AboutPage() {
                 <CardContent>
                    {/* Updated Russian text with links */}
                   <p className="text-sm md:text-base text-gray-300">
-                    Я — Павел Соловьёв, кибер-ветеран с 13+ годами в коде. От Java и C++ я эволюционировал до пионера AI-ассистированной разработки. Сегодня я не просто пишу код — я <strong>архитектор цифровых решений</strong>, использующий AI как "carry team lead" для автоматизации рутины и фокусировки на <strong>стратегии, UX и бизнес-логике</strong>. Мой флагман{" "}
+                    Я — Павел Соловьёв, кибер-ветеран с 13+ годами в коде. От Java и C++ я эволюционировал до пионера AI-ассистированной разработки. Сегодня я не просто пишу код — я <strong>архитектор цифровых решений</strong>, использующий AI как «carry team lead» для автоматизации рутины и фокусировки на <strong>стратегии, UX и бизнес-логике</strong>. Мой флагман{" "}
                     <a
                       href="https://github.com/salavey13/carTest"
                       target="_blank"
@@ -186,23 +187,24 @@ export default function AboutPage() {
                 <CardContent>
                    {/* Updated Russian text with link */}
                    <p className="text-sm md:text-base text-gray-300 mb-4">
-                     Мой метод VIBE — это не просто кодинг, это <strong>парадигмальный сдвиг</strong>. Это ответ на вопрос: как создавать ценность в эпоху, когда AI может генерировать код с <strong>"near-perfect accuracy"</strong>? VIBE — это <strong>AI-усиленная алхимия</strong>, где фокус смещается с написания строк кода на <strong>архитектуру системы, UX-потоки и стратегическое видение</strong>. Узнайте больше о философии в разделе{" "}
+                     Мой метод VIBE — это не просто кодинг, это <strong>парадигмальный сдвиг</strong>. Это ответ на вопрос: как создавать ценность в эпоху, когда AI может генерировать код с <strong>«near-perfect accuracy»</strong>? VIBE — это <strong>AI-усиленная алхимия</strong>, где фокус смещается с написания строк кода на <strong>архитектуру системы, UX-потоки и стратегическое видение</strong>. Узнайте больше о философии в разделе{" "}
                      <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">SelfDev</Link>.
                    </p>
                    {/* .. Image 1 */}
-                   <img
+                   <Image
                        src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/00.png"
                        alt="VIBE Methodology Visualization - AI-assisted strategy and automation"
-                       className="rounded-lg overflow-hidden shadow-[0_0_10px_#39FF14] my-4 w-full object-cover"
-                       style={{ aspectRatio: '16/9' }}
-                       loading="lazy"
+                       width={1280}
+                       height={720}
+                       unoptimized
+                       className="my-4 w-full rounded-lg object-cover shadow-[0_0_10px_#39FF14]"
                    />
                     <p className="text-sm md:text-base text-gray-300 mb-4">
-                     <strong>AI как Партнёр:</strong> Я рассматриваю AI не как инструмент, а как <strong>"God-tier genius who never sleeps"</strong> — партнёра, который берёт на себя рутинные, трудоёмкие задачи кодирования, позволяя мне и команде концентрироваться на <strong>высокоуровневом проектировании</strong>. Мы можем генерировать целые подсистемы за дни, а не недели, освобождая ресурсы для инноваций.
+                     <strong>AI как Партнёр:</strong> Я рассматриваю AI не как инструмент, а как <strong>«God-tier genius who never sleeps»</strong> — партнёра, который берёт на себя рутинные, трудоёмкие задачи кодирования, позволяя мне и команде концентрироваться на <strong>высокоуровневом проектировании</strong>. Мы можем генерировать целые подсистемы за дни, а не недели, освобождая ресурсы для инноваций.
                    </p>
                    {/* Updated Russian text with link */}
                    <p className="text-sm md:text-base text-gray-300">
-                     <strong>Больше, чем Код — Валидация Идей:</strong> VIBE выходит за рамки разработки. Зачем строить быстро, если строишь не то? Я интегрирую <strong>AI-driven business validation</strong>, чтобы <strong>"fail faster"</strong> на плохих идеях и <strong>ускорять хорошие</strong>. Используя AI для анализа рынка, поиска реальной <strong>"боли"</strong> пользователей, оценки конкурентов и тестирования MVP с минимальными затратами (как в 5-шаговом фреймворке), мы радикально <strong>снижаем риск</strong> создания продуктов, которые никому не нужны. Это не просто быстрее – это <strong>"entirely different game"</strong>, основанное на ментальных моделях из{" "}
+                     <strong>Больше, чем Код — Валидация Идей:</strong> VIBE выходит за рамки разработки. Зачем строить быстро, если строишь не то? Я интегрирую <strong>AI-driven business validation</strong>, чтобы <strong>«fail faster»</strong> на плохих идеях и <strong>ускорять хорошие</strong>. Используя AI для анализа рынка, поиска реальной <strong>«боли»</strong> пользователей, оценки конкурентов и тестирования MVP с минимальными затратами (как в 5-шаговом фреймворке), мы радикально <strong>снижаем риск</strong> создания продуктов, которые никому не нужны. Это не просто быстрее – это <strong>«entirely different game»</strong>, основанное на ментальных моделях из{" "}
                      <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>. VIBE — это сердце моих проектов, от{" "}
                      <a
                        href="https://github.com/salavey13/carTest"
@@ -249,7 +251,7 @@ export default function AboutPage() {
                     ></iframe>
                   </div>
                    <p className="text-sm md:text-base mb-4 text-gray-300">
-                    <strong>VIBE CODING:</strong> Представьте генерацию 60kb рабочего кода за 48 часов. Это сила AI-ассистированной разработки. Но с великой силой приходит великая ответственность. Без должной <strong>кибер-брони</strong>, этот "vibe" может привести к катастрофам:
+                    <strong>VIBE CODING:</strong> Представьте генерацию 60kb рабочего кода за 48 часов. Это сила AI-ассистированной разработки. Но с великой силой приходит великая ответственность. Без должной <strong>кибер-брони</strong>, этот «vibe» может привести к катастрофам:
                   </p>
                    {/* .. Existing list of risks */}
                    <ul className="list-disc list-inside space-y-2 text-sm md:text-base mb-4 text-gray-300 pl-4"> {/* Added padding */}
@@ -259,12 +261,13 @@ export default function AboutPage() {
                    </ul>
 
                   {/* .. Image 2 */}
-                  <img
+                  <Image
                       src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/11.png"
                       alt="Secure AI Development Pipeline - VIBE Coding with Security"
-                      className="rounded-lg overflow-hidden shadow-[0_0_10px_#39FF14] my-4 w-full object-cover" // Added overflow-hidden
-                      style={{ aspectRatio: '16/9' }}
-                      loading="lazy"
+                      width={1280}
+                      height={720}
+                      unoptimized
+                      className="my-4 w-full rounded-lg object-cover shadow-[0_0_10px_#39FF14]"
                   />
 
                    <p className="text-sm md:text-base mb-4 text-gray-300">
@@ -520,12 +523,13 @@ export default function AboutPage() {
                 </CardHeader>
                 <CardContent>
                    {/* .. Image 3 */}
-                  <img
+                  <Image
                       src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/22.png"
                       alt="Кибер-Гараж - AI-Powered Car Rental Ecosystem"
-                      className="rounded-lg overflow-hidden shadow-[0_0_10px_#39FF14] my-4 w-full object-cover" // Added overflow-hidden
-                      style={{ aspectRatio: '16/9' }}
-                      loading="lazy"
+                      width={1280}
+                      height={720}
+                      unoptimized
+                      className="my-4 w-full rounded-lg object-cover shadow-[0_0_10px_#39FF14]"
                   />
                    {/* Updated Russian text with links */}
                    <p className="text-sm md:text-base text-gray-300">
@@ -558,8 +562,8 @@ export default function AboutPage() {
                    <ol className="list-decimal list-inside mt-4 space-y-2 text-sm md:text-base text-gray-300 pl-4"> {/* Added padding */}
                      <li>
                        <strong>Кидай задачу боту:</strong> Открывай Telegram, находи <strong>oneSitePlsBot</strong>,
-                       скидывай ему запрос прямо с Кворка или пиши, что хочешь добавить. Например: "Добавь AR-туры на
-                       /repo-xml". Он отвечает: "Спасибо, ща разберусь!".
+                       скидывай ему запрос прямо с Кворка или пиши, что хочешь добавить. Например: «Добавь AR-туры на
+                       /repo-xml». Он отвечает: «Спасибо, ща разберусь!».
                      </li>
                      <li>
                        <strong>Спрашивай у Грока:</strong> Если лимит запросов в боте кончился, заходи на мою страничку
@@ -567,23 +571,23 @@ export default function AboutPage() {
                        <a href="/repo-xml" className="text-[#39FF14] hover:underline">
                          /repo-xml
                        </a>
-                       ). Там открывается Грок — копируй задачу, жми кнопку, и он выдаёт код с кнопкой "Скопировать".
+                       ). Там открывается Грок — копируй задачу, жми кнопку, и он выдаёт код с кнопкой «Скопировать».
                      </li>
                      <li>
                        <strong>Разбери файлы:</strong> Бери этот код, вставляй в поле на{" "}
                        <a href="/repo-xml" className="text-[#39FF14] hover:underline">
                          /repo-xml
                        </a>
-                       , жми "Разобрать файлы". Они появляются в списке — ставь галочки на нужных (например, обновил два
+                        , жми «Разобрать файлы». Они появляются в списке — ставь галочки на нужных (например, обновил два
                        файла).
                      </li>
                      <li>
-                       <strong>Создай Pull Request:</strong> Жми "Создать request" — бот сам заполнит поля (что было, что
+                       <strong>Создай Pull Request:</strong> Жми «Создать request» — бот сам заполнит поля (что было, что
                        стало, как называется). Отправляй, и вуаля — ссылка на pull request готова. Я захожу, вижу твой
-                       код, жму "Замёрджить", и изменения влетают в прод!
+                       код, жму «Замёрджить», и изменения влетают в прод!
                      </li>
                      <li>
-                       <strong>Кибер-Экстрактор:</strong> Внизу страницы есть фича — жми "Извлечь", и он сканирует все
+                       <strong>Кибер-Экстрактор:</strong> Внизу страницы есть фича — жми «Извлечь», и он сканирует все
                        файлы проекта для контекста. Потом можешь пихнуть это в Грока или oneSitePlsBot, чтобы
                        доработать. Дерево файлов тоже можно прикрутить — кидай идею!
                      </li>

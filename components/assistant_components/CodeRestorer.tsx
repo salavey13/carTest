@@ -43,7 +43,7 @@ const RestoreSkippedModal: React.FC<RestoreSkippedModalProps> = ({
                          <FaXmark />
                      </button>
                  </div>
-                <p className="text-sm text-gray-300 mb-3">Обнаружены маркеры <code className='text-xs bg-gray-700 px-1 rounded'>/* ... */</code>. Попытка автоматического восстановления из оригинальных файлов проекта:</p>
+                <p className="text-sm text-gray-300 mb-3">Обнаружены маркеры <code className='text-xs bg-gray-700 px-1 rounded'>{/* ... */}</code>. Попытка автоматического восстановления из оригинальных файлов проекта:</p>
                 <div className="text-xs mb-4 max-h-40 overflow-y-auto simple-scrollbar border border-gray-700 rounded p-2 bg-gray-900 space-y-1">
                     {issues.map(issue => ( <div key={issue.id} className="flex items-center gap-2"> {restoreStatus[issue.id] === 'pending' && <FaRotate className="animate-spin text-blue-400 flex-shrink-0" size={12}/>} {restoreStatus[issue.id] === 'success' && <FaCheck className="text-green-500 flex-shrink-0" size={12}/>} {(restoreStatus[issue.id] === 'not_found' || restoreStatus[issue.id] === 'failed_verification') && <FaPoo className="text-red-500 flex-shrink-0" size={12}/>} <code className="text-gray-400">{issue.filePath}</code> <span className='text-gray-500'>(строка ~{issue.details?.lineNumber})</span> {restoreStatus[issue.id] === 'not_found' && <span className='text-orange-400 ml-auto text-[10px]'>Не найдено в оригинале</span>} {restoreStatus[issue.id] === 'failed_verification' && <span className='text-red-400 ml-auto text-[10px]'>Ошибка проверки</span>} </div> ))}
                 </div>

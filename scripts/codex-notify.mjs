@@ -17,6 +17,7 @@ import { execSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 const [mode, ...args] = process.argv.slice(2);
+const SUPER_ADMIN_CHAT_ID = '417553377';
 
 function getArg(name, fallback = undefined) {
   const idx = args.indexOf(`--${name}`);
@@ -25,6 +26,35 @@ function getArg(name, fallback = undefined) {
 }
 
 
+
+
+function splitRecipients(raw) {
+  if (!raw) return [];
+  return String(raw)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function uniqueRecipients(values) {
+  return [...new Set(values.filter(Boolean).map((value) => String(value).trim()).filter(Boolean))];
+}
+
+function resolveHeartbeatRecipients() {
+  const explicit = splitRecipients(getArg('chatIds'));
+  const single = getArg('chatId');
+  const fallbackMock = process.env.NEXT_PUBLIC_MOCK_USER_ID || '413553377';
+
+  return uniqueRecipients([
+    ...explicit,
+    single,
+    process.env.TELEGRAM_CHAT_ID,
+    process.env.TELEGRAM_USER_ID,
+    process.env.ADMIN_CHAT_ID,
+    fallbackMock,
+    SUPER_ADMIN_CHAT_ID,
+  ]);
+}
 
 function uploadImageToSupabaseStorage(localPath) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -150,17 +180,32 @@ async function runTelegramMode() {
   const token = process.env.TELEGRAM_BOT_TOKEN || getArg('token');
   if (!token) throw new Error('Missing TELEGRAM_BOT_TOKEN (or --token)');
 
-  const chatId = getArg('chatId', process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_USER_ID);
-  if (!chatId) throw new Error('Missing --chatId (or TELEGRAM_CHAT_ID/TELEGRAM_USER_ID env)');
-
   const text = getArg('text', 'Codex task update');
-  const response = await postJson(`https://api.telegram.org/bot${token}/sendMessage`, {
-    chat_id: chatId,
-    text,
-    parse_mode: getArg('parseMode', 'Markdown'),
-    disable_web_page_preview: true,
-  });
-  console.log(response);
+  const parseMode = getArg('parseMode', 'Markdown');
+  const dryRun = getArg('dryRun', 'false') === 'true';
+
+  const recipients = resolveHeartbeatRecipients();
+  if (recipients.length === 0) {
+    throw new Error('Missing heartbeat recipients: provide --chatId/--chatIds or TELEGRAM_CHAT_ID/TELEGRAM_USER_ID/ADMIN_CHAT_ID/NEXT_PUBLIC_MOCK_USER_ID');
+  }
+
+  if (dryRun) {
+    console.log(JSON.stringify({ dryRun: true, recipients, includesSuperAdmin: recipients.includes(SUPER_ADMIN_CHAT_ID) }, null, 2));
+    return;
+  }
+
+  const results = [];
+  for (const chatId of recipients) {
+    const response = await postJson(`https://api.telegram.org/bot${token}/sendMessage`, {
+      chat_id: chatId,
+      text,
+      parse_mode: parseMode,
+      disable_web_page_preview: true,
+    });
+    results.push({ chatId, response });
+  }
+
+  console.log(JSON.stringify({ sent: results.length, recipients }, null, 2));
 }
 
 function runTelegramPhotoMode() {
