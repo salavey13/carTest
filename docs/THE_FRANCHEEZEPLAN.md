@@ -592,6 +592,11 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 - Added merge-day interactive beat loop rule: wake state, stage log, next beat, polish prompt, and Create-PR reminder.
 - Reinforced onboarding intent: expressive coaching for newcomers without replacing technical evidence/checks.
 
+### 2026-02-19 — Educational heartbeat reporting enabled
+- Added executor rule to send compact Telegram heartbeat updates about iteration progress and novice hint adoption.
+- Bound report channel to `ADMIN_CHAT_ID` + mock-user operator id for educational observability.
+- Verified heartbeat delivery using `scripts/codex-notify.mjs telegram` (successful bot message send).
+
 ---
 
 ## 8) Skills and tooling note
