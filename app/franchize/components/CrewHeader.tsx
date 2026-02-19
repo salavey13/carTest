@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Menu, Search, User } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { FranchizeCrewVM } from "../actions";
 import { HeaderMenu } from "../modals/HeaderMenu";
 
@@ -15,19 +15,12 @@ interface CrewHeaderProps {
 export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const categoryRail = useMemo(() => {
-    if (crew.catalog.categories.length > 0) {
-      return crew.catalog.categories;
-    }
-    return ["Naked", "Touring", "Supersport", "Neo-retro"];
-  }, [crew.catalog.categories]);
-
   const scrollToCatalog = () => {
     document.getElementById("catalog-sections")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/95 px-4 pb-3 pt-2 backdrop-blur">
+    <header className="z-30 border-b border-border bg-background/95 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur">
       <div className="mx-auto w-full max-w-4xl">
         <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
           <span className="font-medium tracking-[0.16em] uppercase">{crew.slug}</span>
@@ -60,7 +53,7 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"
-              aria-label="Scroll to category filters"
+              aria-label="Scroll to subtype filters"
               onClick={scrollToCatalog}
               className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border text-muted-foreground"
             >
@@ -70,19 +63,6 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
               <User className="h-5 w-5" />
             </Link>
           </div>
-        </div>
-
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-          {categoryRail.map((category) => (
-            <a
-              key={category}
-              href={`#category-${category.toLowerCase().replace(/\s+/g, "-")}`}
-              className="whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground"
-              style={{ boxShadow: `inset 0 0 0 1px ${crew.theme.palette.accentMain}33` }}
-            >
-              {category}
-            </a>
-          ))}
         </div>
       </div>
 
