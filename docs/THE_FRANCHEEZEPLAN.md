@@ -340,7 +340,7 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - status: `done`
 - updated_at: `2026-02-19T00:08:10Z`
 - owner: `codex`
-- notes: Iterated T4 by centering/enlarging crew logo in header, restoring item card images, restricting catalog hydration to `type=bike` inventory only, adding light-theme-safe surface/text tokens across franchize pages, and restoring compact global footer there while suppressing only global default header.
+- notes: Iterated T4 by centering/enlarging crew logo in header, restoring item card images, restricting catalog hydration to `type=bike` inventory only, adding light-theme-safe surface/text tokens across franchize pages, and restoring compact global footer there while suppressing only global default header; normalized bike grouping to subtype-level anchors.
 - next_step: Start T5 modal-first card interaction while preserving new bike-only/image-ready card baseline.
 - risks: Image quality depends on upstream `image_url` coverage; fallback placeholder text is shown when media is missing.
 - dependencies: T3b
@@ -562,6 +562,11 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 - Changed global layout behavior for `/franchize*`: keep compact global footer but suppress only default global header (no duplicate top chrome).
 - Updated franchize header utility search icon behavior to act as in-page catalog filter jump (scroll to category section rail) instead of external route navigation.
 - Reworked catalog rendering into category-grouped sections with stable anchor ids so subtype pills scroll to their corresponding item sublists.
+
+### 2026-02-19 — T4 polish pass 5 (bike subtype grouping fix)
+- Fixed franchize catalog grouping bug where all cards collapsed into a single `bike` bucket after bike-only filtering.
+- Updated loader mapping to derive display category from bike subtype fields (`specs.subtype`/`bike_subtype`/`segment`/`specs.type`) and ignore plain `type=bike` as grouping key.
+- Preserved bike-only filtering while restoring effective category-anchor scrolling behavior for subtype pills.
 
 ---
 
