@@ -1,14 +1,14 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMessage'; // Import your existing action
-import { notifyAdmin } from '@/app/actions'; // Import for admin notifications
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMessage';
+import { notifyAdmin } from '@/app/actions';
+import { supabaseAdmin } from '@/hooks/supabase';
 
 export async function POST(req: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase admin client is not available' }, { status: 500 });
+    }
+
     const { message, senderId } = await req.json();
 
     if (!message || !senderId) {
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Authenticate and check if sender is admin
-    const { data: senderData, error: senderError } = await supabase
+    const { data: senderData, error: senderError } = await supabaseAdmin
       .from('users')
       .select('role')
       .eq('user_id', senderId)
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch all user_ids (exclude admins or bots if needed)
-    const { data: users, error: usersError } = await supabase
+    const { data: users, error: usersError } = await supabaseAdmin
       .from('users')
       .select('user_id')
       .eq('role', 'admin'); // Optional: Only admins receiving the broadcast
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     let sentCount = 0;
 
     // Send messages in batches to avoid rate limits (e.g., 30 msgs/sec for Telegram bots)
-    for (let i = 0; i < userIds.length; i += 10) { // Batch of 10
+    for (let i = 0; i < userIds.length; i += 10) {
       const batch = userIds.slice(i, i + 10);
       await Promise.all(
         batch.map(async (userId) => {
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
           if (result.success) sentCount++;
         })
       );
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // 1s delay between batches
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
     // Notify admin about the broadcast result
