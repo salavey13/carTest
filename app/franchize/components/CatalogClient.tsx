@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { FloatingCartIconLink } from "./FloatingCartIconLink";
 import { ItemModal } from "../modals/Item";
@@ -18,6 +18,8 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [selectedOptions, setSelectedOptions] = useState({ package: "Base", duration: "1 day", perk: "Стандарт" });
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const categoryTabsRef = useRef<Record<string, HTMLAnchorElement | null>>({});
 
   const orderedCategories = useMemo(
     () => Array.from(new Set([...crew.catalog.categories, ...items.map((item) => item.category).filter(Boolean)])),
@@ -34,6 +36,55 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
         .filter((group) => group.items.length > 0),
     [items, orderedCategories],
   );
+
+  useEffect(() => {
+    setActiveCategory(itemsByCategory[0]?.category ?? null);
+  }, [itemsByCategory]);
+
+  useEffect(() => {
+    if (itemsByCategory.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntries = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+
+        if (visibleEntries.length > 0) {
+          const category = visibleEntries[0]?.target.getAttribute("data-category");
+          if (category) {
+            setActiveCategory(category);
+          }
+          return;
+        }
+
+        const passedEntries = entries
+          .filter((entry) => entry.boundingClientRect.top < 0)
+          .sort((a, b) => b.boundingClientRect.top - a.boundingClientRect.top);
+        const category = passedEntries[0]?.target.getAttribute("data-category");
+        if (category) {
+          setActiveCategory(category);
+        }
+      },
+      {
+        rootMargin: "-120px 0px -55% 0px",
+        threshold: [0, 0.2, 0.4, 0.7],
+      },
+    );
+
+    itemsByCategory.forEach((group) => {
+      const node = document.getElementById(toCategoryId(group.category));
+      if (node) observer.observe(node);
+    });
+
+    return () => observer.disconnect();
+  }, [itemsByCategory]);
+
+  useEffect(() => {
+    if (!activeCategory) return;
+    const activeTab = categoryTabsRef.current[activeCategory];
+    activeTab?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [activeCategory]);
 
   const { itemCount, totalPrice } = useMemo(() => {
     return items.reduce(
@@ -66,17 +117,27 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
           <span className="text-xs text-muted-foreground">/franchize/{crew.slug || slug}</span>
         </div>
 
-        <div className="mb-5 flex gap-2 overflow-x-auto pb-2">
-          {itemsByCategory.map((group) => (
-            <a
-              key={group.category}
-              href={`#${toCategoryId(group.category)}`}
-              className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium"
-              style={{ borderColor: crew.theme.palette.borderSoft }}
-            >
-              {group.category}
-            </a>
-          ))}
+        <div className="sticky top-[var(--franchize-header-offset,4.75rem)] z-20 -mx-4 mb-5 border-b border-border/60 bg-background/95 px-4 pb-2 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {itemsByCategory.map((group) => (
+              <a
+                key={group.category}
+                ref={(node) => {
+                  categoryTabsRef.current[group.category] = node;
+                }}
+                href={`#${toCategoryId(group.category)}`}
+                className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
+                style={{
+                  borderColor: activeCategory === group.category ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
+                  backgroundColor: activeCategory === group.category ? `${crew.theme.palette.accentMain}22` : "transparent",
+                  color: activeCategory === group.category ? crew.theme.palette.accentMain : undefined,
+                }}
+                onClick={() => setActiveCategory(group.category)}
+              >
+                {group.category}
+              </a>
+            ))}
+          </div>
         </div>
 
         {items.length === 0 ? (
@@ -86,7 +147,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
         ) : (
           <div className="space-y-6">
             {itemsByCategory.map((group) => (
-              <section key={group.category} id={toCategoryId(group.category)}>
+              <section key={group.category} id={toCategoryId(group.category)} data-category={group.category}>
                 <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em]" style={{ color: crew.theme.palette.accentMain }}>
                   {group.category}
                 </h2>
