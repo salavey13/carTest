@@ -337,12 +337,12 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Legacy static paths appear only in compatibility bridge context.
 
 ### T4 — Build Pepperolli-style shell components
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Header, footer, floating cart, menu modal baseline.
-- next_step: Wire shell components to metadata theme tokens.
-- risks: visual clash with legacy global header/footer and bottom nav.
+- status: `done`
+- updated_at: `2026-02-18T23:51:14Z`
+- owner: `codex`
+- notes: Added franchize shell primitives (header/footer/floating cart/menu modal), wired palette-driven styling, and integrated shell across slug pages.
+- next_step: Start T5 catalog modal-first UX conversion.
+- risks: Category rail anchors and floating-cart values are placeholder-level until cart state and modal interactions land in T5/T6.
 - dependencies: T3b
 - deliverables:
   - `app/franchize/components/CrewHeader.tsx`
@@ -537,6 +537,11 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 - Rechecked `docs/FRANCHEEZEPLAN.md` and `docs/THE_FRANCHEEZEPLAN.md` for non-slug franchize route references.
 - Normalized target IA + JSON template + future task deliverables to `/franchize/{slug}/...` or `/franchize/[slug]/...` patterns.
 - Kept static non-slug routes only when explicitly describing compatibility redirects/history.
+
+### 2026-02-18 — T4 execution complete (Pepperolli shell baseline)
+- Marked T4 `in_progress` -> `done` after implementing reusable shell components for franchize pages.
+- Added `CrewHeader`, `HeaderMenu`, `CrewFooter`, and `FloatingCartIconLink` with palette-driven styling from `crew.theme.palette`.
+- Integrated shell components on `/franchize/[slug]`, `/about`, `/contacts`, `/cart`, and `/order/[id]` so floating cart and menu scaffolding persist across core surfaces.
 
 ---
 
