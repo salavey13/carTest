@@ -340,7 +340,7 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - status: `done`
 - updated_at: `2026-02-19T00:08:10Z`
 - owner: `codex`
-- notes: Iterated T4 by centering/enlarging crew logo in header, restoring item card images, restricting catalog hydration to `type=bike` inventory only, adding light-theme-safe surface/text tokens across franchize pages, and restoring global footer there as compact one-line variant.
+- notes: Iterated T4 by centering/enlarging crew logo in header, restoring item card images, restricting catalog hydration to `type=bike` inventory only, adding light-theme-safe surface/text tokens across franchize pages, and restoring compact global footer there while suppressing only global default header.
 - next_step: Start T5 modal-first card interaction while preserving new bike-only/image-ready card baseline.
 - risks: Image quality depends on upstream `image_url` coverage; fallback placeholder text is shown when media is missing.
 - dependencies: T3b
@@ -557,6 +557,11 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 - Reworked franchize page surfaces to rely on semantic theme tokens (`bg-background`, `text-foreground`, `text-muted-foreground`) instead of hardcoded dark-only text/background pairing.
 - Restored global `Footer` visibility on `/franchize*`, but added an ultra-compact one-line variant specifically for franchize routes.
 - Added real header links for utility icons (`/repo-xml` and `/profile`) so right-side controls are actionable.
+
+### 2026-02-19 — T4 polish pass 4 (category anchors + nano-header split)
+- Changed global layout behavior for `/franchize*`: keep compact global footer but suppress only default global header (no duplicate top chrome).
+- Updated franchize header utility search icon behavior to act as in-page catalog filter jump (scroll to category section rail) instead of external route navigation.
+- Reworked catalog rendering into category-grouped sections with stable anchor ids so subtype pills scroll to their corresponding item sublists.
 
 ---
 
