@@ -1,4 +1,4 @@
-import { getStreamerProfile } from "../actions";
+import { getStreamerProfile } from "@/app/streamer/actions";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
