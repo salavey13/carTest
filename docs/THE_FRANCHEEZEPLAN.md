@@ -340,7 +340,7 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - status: `done`
 - updated_at: `2026-02-19T00:08:10Z`
 - owner: `codex`
-- notes: Iterated T4 by centering/enlarging crew logo in header, restoring item card images, and restricting catalog hydration to `type=bike` inventory only.
+- notes: Iterated T4 by centering/enlarging crew logo in header, restoring item card images, restricting catalog hydration to `type=bike` inventory only, and isolating franchize routes from global layout header/footer chrome.
 - next_step: Start T5 modal-first card interaction while preserving new bike-only/image-ready card baseline.
 - risks: Image quality depends on upstream `image_url` coverage; fallback placeholder text is shown when media is missing.
 - dependencies: T3b
@@ -547,6 +547,11 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 - Applied follow-up polish from operator feedback: centered/enlarged crew logo in header for stronger brand lockup.
 - Restored visual completeness of catalog cards by rendering bike images (with explicit placeholder when `image_url` is absent).
 - Tightened data contract in loader to include only `type=bike` items for franchize catalog hydration.
+
+### 2026-02-19 — T4 polish pass 2 (layout chrome isolation + default footer upgrade)
+- Disabled global `ClientLayout` header/footer chrome on `/franchize*` paths so only franchize shell components render there.
+- Overhauled default `Footer` component structure for better scanability while preserving hardcoded product copy/links.
+- Replaced Jumpstart CTA slot with `NEXUS Hub` link to align platform narrative flow.
 
 ---
 
