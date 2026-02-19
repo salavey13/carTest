@@ -98,7 +98,12 @@ export async function handleCommand(update: any) {
             "/howto": () => howtoCommand(chatId, userId),
             "/ctx": () => ctxCommand(chatId, userId),
             "/profile": () => profileCommand(chatId, userId, username),
-            "/codex": () => codexCommand(chatId, userIdStr, username, text, update.message?.photo || []),
+            "/codex": () => {
+                const bestPhotoVariant = update.message?.photo?.length
+                    ? [update.message.photo[update.message.photo.length - 1]]
+                    : [];
+                return codexCommand(chatId, userIdStr, username, text, bestPhotoVariant);
+            },
         };
 
         const commandFunction = commandMap[command] || (command.startsWith("/codex@") ? commandMap["/codex"] : undefined);
