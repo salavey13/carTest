@@ -385,6 +385,29 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Modal closes/opens reliably and maintains selected options.
   - Add-to-cart updates floating cart values immediately.
 
+
+### T5x — Executor onboarding reinforcement (RU-first telemetry + heartbeat defaults)
+- status: `done`
+- updated_at: `2026-02-19T04:05:00Z`
+- owner: `codex`
+- notes: Reinforced GPTgotchi onboarding DNA: RU telemetry keys (`энергия/фокус/уверенность`), lower-to-higher warm-up pacing, novice-friendly ship phrasing, and explicit preview-link persistence tip after PR updates.
+- next_step: Resume execution with T6 cart/order implementation.
+- risks: Overly verbose coaching could distract from hard checks if not kept compact in later iterations.
+- dependencies: T5
+- deliverables:
+  - `AGENTS.md`
+  - `docs/FRANCHEEZEPLAN.md`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Update executor telemetry schema to RU stat names for operator-facing block.
+  2. Add warm-up progression rule (start lower, increase per iteration confidence).
+  3. Add noob tip about PR preview URL stability after branch updates.
+  4. Reconfirm heartbeat target defaults include `ADMIN_CHAT_ID` and mock user id fallback.
+- acceptance criteria:
+  - RU teammates receive telemetry labels in Russian in executor responses.
+  - Final ship beat includes Create PR reminder + optional one-more-polish encouragement.
+  - Runbook + plan stay synchronized for newcomer onboarding behavior.
+
 ### T6 — Cart and order pages
 - status: `todo`
 - updated_at: `-`
@@ -598,6 +621,12 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 - Verified heartbeat delivery using `scripts/codex-notify.mjs telegram` (successful bot message send).
 
 ---
+
+### 2026-02-19 — Executor onboarding reinforcement + merged-PR context sync
+- Reviewed latest merged PRs from git history: `#949`, `#948`, `#947` (all executor/franchize continuity work) to keep coaching updates aligned with current rollout cadence.
+- Added RU-first telemetry naming (`энергия/фокус/уверенность`) and warm-up progression guidance so first-time teammates see realistic "grow while iterating" stats.
+- Added explicit noob tip: PR preview URL appears right after PR creation and remains stable across subsequent commits to the same PR branch.
+- Reaffirmed educational heartbeat targeting defaults (`ADMIN_CHAT_ID` + mock user fallback) for executor-mode progress nudges.
 
 ## 8) Skills and tooling note
 
