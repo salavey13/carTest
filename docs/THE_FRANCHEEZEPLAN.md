@@ -519,6 +519,17 @@ When adding a new task, copy this block:
 
 Insert new tasks by dependency, then renumber if needed and preserve order guarantees.
 
+### 6.1) Parallel-PR merge-safe update protocol (franchize diary)
+
+To reduce conflicts when multiple franchize tasks are developed in parallel branches:
+
+- each PR should update **only its own task block** (`Tn`) and avoid rewriting neighboring task blocks;
+- diary entries should be appended as a compact 3-4 bullet block without reformatting older entries;
+- avoid resorting/rewrapping older diary text in the same PR (format churn = conflict magnet);
+- when merging multiple active franchize PRs, rebase to latest `main` and resolve only the minimal diary hunk, keeping existing text untouched.
+
+This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polish tasks run concurrently.
+
 ---
 
 ## 7) Progress changelog / diary
