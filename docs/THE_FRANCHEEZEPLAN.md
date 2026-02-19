@@ -338,11 +338,11 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T4 — Build Pepperolli-style shell components
 - status: `done`
-- updated_at: `2026-02-18T23:51:14Z`
+- updated_at: `2026-02-19T00:08:10Z`
 - owner: `codex`
-- notes: Added franchize shell primitives (header/footer/floating cart/menu modal), wired palette-driven styling, and integrated shell across slug pages.
-- next_step: Start T5 catalog modal-first UX conversion.
-- risks: Category rail anchors and floating-cart values are placeholder-level until cart state and modal interactions land in T5/T6.
+- notes: Iterated T4 by centering/enlarging crew logo in header, restoring item card images, and restricting catalog hydration to `type=bike` inventory only.
+- next_step: Start T5 modal-first card interaction while preserving new bike-only/image-ready card baseline.
+- risks: Image quality depends on upstream `image_url` coverage; fallback placeholder text is shown when media is missing.
 - dependencies: T3b
 - deliverables:
   - `app/franchize/components/CrewHeader.tsx`
@@ -542,6 +542,11 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 - Marked T4 `in_progress` -> `done` after implementing reusable shell components for franchize pages.
 - Added `CrewHeader`, `HeaderMenu`, `CrewFooter`, and `FloatingCartIconLink` with palette-driven styling from `crew.theme.palette`.
 - Integrated shell components on `/franchize/[slug]`, `/about`, `/contacts`, `/cart`, and `/order/[id]` so floating cart and menu scaffolding persist across core surfaces.
+
+### 2026-02-19 — T4 polish pass (logo + images + bike-only filter)
+- Applied follow-up polish from operator feedback: centered/enlarged crew logo in header for stronger brand lockup.
+- Restored visual completeness of catalog cards by rendering bike images (with explicit placeholder when `image_url` is absent).
+- Tightened data contract in loader to include only `type=bike` items for franchize catalog hydration.
 
 ---
 

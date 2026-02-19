@@ -33,6 +33,7 @@ Execute franchize rollout tasks strictly one-by-one, preserving dependency order
 - Commit created.
 - PR created.
 - Summary includes next recommended task ID.
+- Final operator reply includes a short RU summary block (2-4 bullets) for first-time RU teammates.
 
 ## Notify + Supabase tool notes
 - Notifications/callbacks: `scripts/codex-notify.mjs`.

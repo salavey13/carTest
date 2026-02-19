@@ -160,7 +160,8 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const { data: cars, error: carsError } = await supabaseAdmin
       .from("cars")
       .select("id, make, model, description, image_url, daily_price, type, specs")
-      .eq("crew_id", crew.id);
+      .eq("crew_id", crew.id)
+      .ilike("type", "bike");
 
     if (carsError) {
       logger.warn("[franchize] failed to load crew cars", { safeSlug, carsError: carsError.message });
