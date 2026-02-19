@@ -22,6 +22,10 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
     return ["Naked", "Touring", "Supersport", "Neo-retro"];
   }, [crew.catalog.categories]);
 
+  const scrollToCatalog = () => {
+    document.getElementById("catalog-sections")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/95 px-4 pb-3 pt-2 backdrop-blur">
       <div className="mx-auto w-full max-w-4xl">
@@ -54,13 +58,14 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
           </div>
 
           <div className="flex items-center justify-end gap-2">
-            <Link
-              href="/repo-xml"
-              aria-label="Open operator tools"
+            <button
+              type="button"
+              aria-label="Scroll to category filters"
+              onClick={scrollToCatalog}
               className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border text-muted-foreground"
             >
               <Search className="h-5 w-5" />
-            </Link>
+            </button>
             <Link href="/profile" aria-label="Open profile" className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border text-muted-foreground">
               <User className="h-5 w-5" />
             </Link>
@@ -69,7 +74,12 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
 
         <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
           {categoryRail.map((category) => (
-            <a key={category} href={`#category-${category.toLowerCase().replace(/\s+/g, "-")}`} className="whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground">
+            <a
+              key={category}
+              href={`#category-${category.toLowerCase().replace(/\s+/g, "-")}`}
+              className="whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground"
+              style={{ boxShadow: `inset 0 0 0 1px ${crew.theme.palette.accentMain}33` }}
+            >
               {category}
             </a>
           ))}

@@ -442,7 +442,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       */}
       {isStrikeballTheme && !isTacticalMode && <StrikeballBackground />}
 
-      {showHeaderAndFooter && CurrentHeader && <CurrentHeader />}
+      {showHeaderAndFooter && !pathname?.startsWith("/franchize") && CurrentHeader && <CurrentHeader />}
       
       <main className={cn(
         "flex-1", 
