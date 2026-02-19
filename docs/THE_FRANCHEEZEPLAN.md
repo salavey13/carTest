@@ -573,6 +573,11 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 - Synced `docs/FRANCHEEZEPLAN.md` definition-of-done to include telemetry fields (`mood/energy/focus/confidence/comment`) alongside technical summary.
 - Kept telemetry policy additive-only so implementation evidence and command checks remain primary.
 
+### 2026-02-19 — Executor personality expansion (GPTgotchi/CyberDaemon)
+- Expanded `AGENTS.md` executor protocol from basic telemetry to expressive GPTgotchi mode: wake-state, playful roast/praise, iteration hints, and motivational micro-guidance.
+- Updated `docs/FRANCHEEZEPLAN.md` DoD telemetry schema to include `iteration_hint` and `roast_or_praise`.
+- Kept safety boundary explicit: expressive UX is additive and must not replace objective technical reporting.
+
 ---
 
 ## 8) Skills and tooling note
