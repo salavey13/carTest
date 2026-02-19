@@ -662,6 +662,7 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Replaced `/franchize/[slug]/cart` skeleton with interactive quantity controls, remove-row actions, total summary, and empty-state CTA back to catalog.
 - Replaced `/franchize/[slug]/order/[id]` skeleton with staged checkout markers, delivery mode toggles, contact/time/comment inputs, payment selection, promo stub, and consent-gated confirm button.
 - Captured updated mobile screenshots for cart and order pages for visual QA artifacts.
+ 
 
 
 ### 2026-02-19 — Heartbeat delivery hardening (super-admin mirror + mock recipient)

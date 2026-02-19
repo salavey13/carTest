@@ -253,7 +253,7 @@ async function ensureStorageBucket(params: { supabaseUrl: string; serviceRoleKey
   };
 }
 
-async function uploadTelegramPhotoToPublicStorage(params: { bytes: Buffer; fileName: string }) {
+async function uploadTelegramPhotoToPublicStorage(params: { bytes: Buffer; fileName: string; dedupeKey?: string }) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceRoleKey) {
@@ -265,7 +265,9 @@ async function uploadTelegramPhotoToPublicStorage(params: { bytes: Buffer; fileN
     .filter(Boolean)
     .filter((bucket, index, list) => list.indexOf(bucket) === index) as string[];
 
-  const objectName = `telegram-photo-forward/${Date.now()}-${params.fileName.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
+  const safeFileName = params.fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
+  const dedupeKey = (params.dedupeKey || safeFileName).replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 120);
+  const objectName = `telegram-photo-forward/${dedupeKey}-${safeFileName}`;
 
   for (const bucket of bucketCandidates) {
     const uploadUrl = `${supabaseUrl}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeURIComponent(objectName)}`;
@@ -454,6 +456,7 @@ export async function postCodexCommandToSlack(params: {
         const storageResult = await uploadTelegramPhotoToPublicStorage({
           bytes: telegramImage.bytes,
           fileName: telegramImage.fileName,
+          dedupeKey: photo.file_unique_id || photo.file_id,
         });
 
         if (storageResult.ok) {
