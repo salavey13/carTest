@@ -266,7 +266,7 @@ export default function RentBikePage() {
             <div className="flex flex-wrap gap-2 rounded-xl border border-border/70 bg-card/60 p-2 backdrop-blur-sm">
                 {availableBikeTypes.map(type => (
                 <button key={type} onClick={() => setActiveFilter(type)}
-                    className={cn( "px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 font-mono relative", activeFilter === type ? "bg-primary text-primary-foreground shadow-[0_0_10px_theme(colors.primary)]" : "bg-muted/50 text-muted-foreground hover:bg-muted" )}>
+                    className={cn( "px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 font-mono relative", activeFilter === type ? "bg-primary text-primary-foreground shadow-[0_0_10px_hsl(var(--primary))]" : "bg-muted/50 text-muted-foreground hover:bg-muted" )}>
                     {type}
                     {type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute -top-1 -right-1 text-accent w-3 h-3"/>}
                 </button>
