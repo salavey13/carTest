@@ -338,11 +338,11 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T4 — Build Pepperolli-style shell components
 - status: `done`
-- updated_at: `2026-02-19T00:08:10Z`
+- updated_at: `2026-02-19T20:48:00Z`
 - owner: `codex`
-- notes: Iterated T4 by centering/enlarging crew logo in header, restoring item card images, restricting catalog hydration to `type=bike` inventory only, adding light-theme-safe surface/text tokens across franchize pages, and restoring compact global footer there while suppressing only global default header; normalized bike grouping to subtype-level anchors.
-- next_step: Start T5 modal-first card interaction while preserving new bike-only/image-ready card baseline.
-- risks: Image quality depends on upstream `image_url` coverage; fallback placeholder text is shown when media is missing.
+- notes: Iterated T4 by centering/enlarging crew logo in header, restoring item card images, restricting catalog hydration to `type=bike` inventory only, adding light-theme-safe surface/text tokens across franchize pages, restoring compact global footer there while suppressing only global default header, normalizing bike grouping to subtype-level anchors, and removing duplicate subtype balloons from header so the sticky synced catalog rail is the single source of truth; added safe-area-aware top spacing and stronger top padding so franchize content does not visually collide with top chrome.
+- next_step: Start T5 modal-first card interaction while preserving synced sticky subtype rail behavior from catalog UX pass.
+- risks: Image quality depends on upstream `image_url` coverage; fallback placeholder text is shown when media is missing; sticky rail offset depends on safe-area handling across Telegram/WebView variants.
 - dependencies: T3b
 - deliverables:
   - `app/franchize/components/CrewHeader.tsx`
@@ -519,6 +519,17 @@ When adding a new task, copy this block:
 
 Insert new tasks by dependency, then renumber if needed and preserve order guarantees.
 
+### 6.1) Parallel-PR merge-safe update protocol (franchize diary)
+
+To reduce conflicts when multiple franchize tasks are developed in parallel branches:
+
+- each PR should update **only its own task block** (`Tn`) and avoid rewriting neighboring task blocks;
+- diary entries should be appended as a compact 3-4 bullet block without reformatting older entries;
+- avoid resorting/rewrapping older diary text in the same PR (format churn = conflict magnet);
+- when merging multiple active franchize PRs, rebase to latest `main` and resolve only the minimal diary hunk, keeping existing text untouched.
+
+This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polish tasks run concurrently.
+
 ---
 
 ## 7) Progress changelog / diary
@@ -671,3 +682,15 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Added recipient resolution that includes `--chatIds`, `--chatId`, env targets, and `NEXT_PUBLIC_MOCK_USER_ID` fallback.
 - Added `--dryRun true` option to verify resolved recipients without sending Telegram API requests.
 - Updated executor docs to reflect mandatory super-admin mirror target.
+
+
+### 2026-02-19 — T4 polish pass 6 (de-duplicate subtype rail + header release)
+- Removed duplicate subtype balloon rail from `CrewHeader` to avoid two competing category controls on catalog pages.
+- Released franchize crew header from sticky positioning so it can scroll offscreen while catalog subtype rail stays pinned/active.
+- Kept subtype navigation centralized in `CatalogClient` with reverse-scroll highlight sync for section awareness.
+
+
+### 2026-02-19 — T4 polish pass 7 (top spacing + safe-area offset)
+- Increased franchize header top inset using `env(safe-area-inset-top)` so top controls do not feel clipped/overlapped in Telegram-style webviews.
+- Adjusted catalog sticky rail top offset to safe-area-based value instead of legacy header-height fallback variable.
+- Added extra catalog section top padding to create cleaner separation between header border and first content block.
