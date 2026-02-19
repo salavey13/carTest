@@ -198,10 +198,10 @@ set
     || jsonb_build_object(
       'contacts',
       jsonb_build_object(
-        'primary_phone', '+7 (XXX) XXX-XX-XX',
+        'primary_phone', '+7 9200-789-888',
         'working_hours', '10:00 - 22:00 (ежедневно)',
-        'manager_sales', '—',
-        'manager_support', '—'
+        'manager_sales', '@I_O_S_NN',
+        'manager_support', '@I_O_S_NN'
       )
     )
 where c.slug = 'vip-bike';
@@ -211,3 +211,8 @@ commit;
 -- Verification helpers:
 -- select slug, metadata->'franchize'->'branding'->>'name' as brand from public.crews where slug='vip-bike';
 -- select jsonb_pretty(metadata->'franchize') from public.crews where slug='vip-bike';
+
+
+-- 4) Editor parity note:
+--    /franchize/create currently edits structured slices (branding/theme/contacts/catalog/order/header.menuLinks)
+--    and should preserve richer blocks from this payload (about/footer/promo/quickActions).
