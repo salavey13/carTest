@@ -124,7 +124,7 @@ const ReferalPage: React.FC = () => {
 
       {/* Partner Form or Dashboard */}
       <section className="max-w-4xl mx-auto p-6">
-        {isPartner ? <Dashboard /> : <PartnerForm />}
+        {isPartner ? <ReferralDashboard /> : <PartnerForm />}
       </section>
     </main>
   );

@@ -15,6 +15,7 @@ class DebugLogger {
   private maxInternalLogs = 420;
   private readonly isBrowser: boolean = typeof window !== 'undefined'; 
   private isLoggingInternally: boolean = false; 
+  private readonly debugEnabled: boolean = process.env.NEXT_PUBLIC_DEBUG_LOGS === 'true' || process.env.DEBUG_LOGS === 'true';
 
   private safelyStringify = (arg: any): string => { 
     try {
@@ -64,6 +65,10 @@ class DebugLogger {
         return;
       }
       this.isLoggingInternally = true;
+
+      if (level === 'debug' && !this.debugEnabled) {
+        return;
+      }
 
       const timestamp = Date.now();
       const argsArray = Array.isArray(args) ? args : [args];

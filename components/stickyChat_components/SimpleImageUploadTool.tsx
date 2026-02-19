@@ -158,7 +158,7 @@ export const SimpleImageUploadTool: React.FC<SimpleImageUploadToolProps> = ({ on
                         className="hidden"
                         disabled={isUploading}
                     />
-                    <p className="text-xs text-gray-400">Файл будет загружен в бакет 'about'.</p>
+                    <p className="text-xs text-gray-400">Файл будет загружен в бакет &apos;about&apos;.</p>
                 </div>
             )}
 

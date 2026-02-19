@@ -43,12 +43,12 @@ class ErrorBoundaryForOverlayInternal extends Component<ErrorBoundaryInternalPro
   constructor(props: ErrorBoundaryInternalProps) {
     super(props);
     this.state = { hasError: false, error: null, errorInfo: null };
-    const log = (typeof logger !== 'undefined' && logger && typeof logger.log === 'function') ? logger.log : console.log;
+    const log = (typeof logger !== 'undefined' && logger && typeof logger.debug === 'function') ? logger.debug : () => undefined;
     log("[ErrorBoundaryForOverlay Internal] Constructor called.");
   }
 
   static getDerivedStateFromError(error: Error): State {
-    const log = (typeof logger !== 'undefined' && logger && typeof logger.warn === 'function') ? logger.warn : console.warn;
+    const log = (typeof logger !== 'undefined' && logger && typeof logger.debug === 'function') ? logger.debug : () => undefined;
     log("[ErrorBoundaryForOverlay Internal] getDerivedStateFromError caught:", error.message);
     return { hasError: true, error: error }; // Keep errorInfo null here, cDC will populate it
   }
@@ -106,7 +106,9 @@ class ErrorBoundaryForOverlayInternal extends Component<ErrorBoundaryInternalPro
 
     try {
        context.addErrorInfo(errorDetails);
-       currentLogger.info(`${logPrefix} Error successfully reported to ErrorOverlayContext.`);
+       if (typeof currentLogger.debug === 'function') {
+         currentLogger.debug(`${logPrefix} Error successfully reported to ErrorOverlayContext.`);
+       }
     } catch (contextError: any) {
        const fatalMsg = `${logPrefix} CRITICAL: Failed to report error to ErrorOverlayContext!`;
        currentLogger.error(fatalMsg, contextError); // Use error instead of fatal

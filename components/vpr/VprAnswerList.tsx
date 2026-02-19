@@ -31,7 +31,7 @@ export function VprAnswerList({
          <AlertCircle className="h-8 w-8 mx-auto mb-3 text-white/30" />
          <p className="text-sm text-white/50">
            Для этого вопроса нет вариантов выбора.<br/>
-           (Используйте кнопку "Пропустить / Далее")
+           (Используйте кнопку «Пропустить / Далее»)
          </p>
        </div>
       );

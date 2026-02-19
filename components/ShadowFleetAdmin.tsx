@@ -5,6 +5,7 @@ import type React from "react"
 import { supabaseAdmin } from "@/hooks/supabase"
 import { useAppContext } from "@/contexts/AppContext"
 import Link from "next/link"
+import Image from "next/image"
 import { motion } from "framer-motion"
 import { toast } from "sonner"
 
@@ -184,10 +185,13 @@ function CarCard({ car }: { car: PremiumCar }) {
       className="p-6 rounded-lg bg-gray-900/80 border border-cyan-500/30 flex flex-col md:flex-row gap-6 shadow-[0_0_10px_rgba(0,255,255,0.2)] hover:shadow-cyan-500/30 transition-all"
     >
       <div className="w-full md:w-1/3">
-        <img
+        <Image
           src={car.image_url}
           alt={`${car.make} ${car.model}`}
-          className="w-full h-40 object-cover rounded-lg shadow-[0_0_8px_rgba(0,255,255,0.5)]"
+          width={640}
+          height={320}
+          unoptimized
+          className="h-40 w-full rounded-lg object-cover shadow-[0_0_8px_rgba(0,255,255,0.5)]"
         />
       </div>
       <div className="flex-1">
