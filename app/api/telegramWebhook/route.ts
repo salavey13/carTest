@@ -203,7 +203,7 @@ export async function POST(request: Request) {
 
     if (update.pre_checkout_query || update.message?.successful_payment) {
       await handleWebhookProxy(update);
-    } else if (update.message?.photo && isCodexCaption(update.message?.caption)) {
+    } else if ((update.message?.photo && isCodexCaption(update.message?.caption)) || (update.message?.document && isCodexCaption(update.message?.caption))) {
       await handleCommand(update);
     } else if (update.message?.photo) {
       await handlePhotoMessage(update.message);

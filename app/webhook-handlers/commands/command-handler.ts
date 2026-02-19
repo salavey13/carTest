@@ -102,7 +102,8 @@ export async function handleCommand(update: any) {
                 const bestPhotoVariant = update.message?.photo?.length
                     ? [update.message.photo[update.message.photo.length - 1]]
                     : [];
-                return codexCommand(chatId, userIdStr, username, text, bestPhotoVariant);
+                const documentFiles = update.message?.document ? [update.message.document] : [];
+                return codexCommand(chatId, userIdStr, username, text, bestPhotoVariant, documentFiles);
             },
         };
 

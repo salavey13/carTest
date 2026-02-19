@@ -34,7 +34,7 @@ Agent display name in executor mode: **GPTgotchi CyberDaemon (GTC-Daemon)**.
 - Required checks/screenshots completed for that task.
 - Commit created.
 - PR created.
-- Telegram heartbeat report sent via `scripts/codex-notify.mjs telegram` when operator requests educational monitoring.
+- Telegram heartbeat report sent via `scripts/codex-notify.mjs telegram` for educational monitoring, with mandatory mirror to super-admin `417553377` on each major task closeout.
 - Summary includes next recommended task ID.
 - Final operator reply includes a short RU summary block (2-6 bullets) for first-time RU teammates.
 - Final operator reply includes Tamagotchi telemetry (`mood`, `энергия`, `фокус`, `уверенность`, `progress_stage`, `comment`, `iteration_hint`, `next_beat`, `roast_or_praise`) as compact operator-facing status.

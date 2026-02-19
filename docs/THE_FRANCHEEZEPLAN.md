@@ -431,11 +431,11 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Promo input present with apply action stub.
 
 ### T7 — Franchise create form and metadata hydration
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Rich create form for header/footer/about/contacts/theme metadata.
-- next_step: add schema validation and preview capability.
+- status: `done`
+- updated_at: `2026-02-19T21:45:00Z`
+- owner: `codex`
+- notes: Implemented `/franchize/create` metadata editor with sectioned controls, RU-first copy, load-by-slug hydration preview, and server-side zod save flow that preserves existing `metadata.franchize` keys while updating structured fields.
+- next_step: Start T8 legacy route alignment and migration bridge links.
 - risks: malformed JSONB causing runtime breakage.
 - dependencies: T6
 - deliverables:
@@ -452,25 +452,30 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Missing fields safely default.
   - Validation errors are human-readable and non-destructive.
 
-### T8 — Legacy route alignment and migration bridge
+### T8 — Legacy route alignment and migration bridge (execution recipe)
 - status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Keep history pages, wire incremental navigation to new surfaces.
-- next_step: controlled redirects and operator toggles.
-- risks: breaking bookmarked deep links.
+- updated_at: `2026-02-19T23:25:00Z`
+- owner: `codex+operator`
+- notes: Prepare migration bridge from legacy routes to franchize surfaces with strict fallback safety and polish-round structure.
+- next_step: kick off T8-P0 preparation commit, then execute polish rounds in isolated micro-branches and merge sequentially.
+- risks: breaking bookmarked deep links; over-eager redirects harming legacy conversion; merge conflicts across parallel polish spikes.
 - dependencies: T7
 - deliverables:
   - selective links from `/rent-bike`, `/vipbikerental`, `/rentals`
+  - feature-flagged bridge behavior for discoverability without forced migration
+  - rollout log with polish-round outcomes
 - implementation checklist:
-  1. Add optional bridge links from legacy pages to `/franchize/[slug]`.
-  2. Introduce feature flag metadata (`franchize.enabled`).
-  3. Add singular/plural alias strategy for vip routes.
-  4. Preserve all existing workflows as fallback.
+  1. **T8-P0 (prep):** freeze route matrix + baseline screenshots + fallback rules for legacy pages.
+  2. **T8-P1 (bridge links):** add optional entry links to `/franchize/[slug]` from legacy surfaces.
+  3. **T8-P2 (flags):** introduce `franchize.enabled`-aware discoverability toggles.
+  4. **T8-P3 (aliases):** finalize singular/plural vip alias and no-dead-end routing.
+  5. **T8-P4 (polish rounds):** run polish-1 (copy), polish-2 (navigation affordances), polish-3 (QA + telemetry).
+  6. Parallel experiment policy: polish spikes may run in parallel branches, but integration into `main task branch` is sequential and acceptance-tested after each merge.
 - acceptance criteria:
   - Legacy routes remain fully usable.
   - Users can discover new franchize flow without forced migration.
   - No dead links between old/new pages.
+  - Each polish round has explicit changelog note + validation evidence.
 
 ### T9 — QA, screenshots, and rollout notes
 - status: `todo`
@@ -694,3 +699,40 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Increased franchize header top inset using `env(safe-area-inset-top)` so top controls do not feel clipped/overlapped in Telegram-style webviews.
 - Adjusted catalog sticky rail top offset to safe-area-based value instead of legacy header-height fallback variable.
 - Added extra catalog section top padding to create cleaner separation between header border and first content block.
+
+
+### 2026-02-19 — T7 execution complete (franchize create + metadata hydration)
+- Marked T7 `in_progress` -> `done` in dependency order after T6.
+- Added `/franchize/create` editor with structured sections (Branding, Theme, Header/Footer/Contacts, Catalog/Order, optional advanced JSON).
+- Added server-side `zod` validation + load-by-slug hydration preview and save action writing to `crews.metadata.franchize`.
+- Captured `/franchize/create` screenshot artifact for visual QA.
+
+
+### 2026-02-19 — T7 polish pass (RU localization + SQL hydration parity)
+- Localized `/franchize/create` operator copy to Russian ("редактор" instead of english wording) and added triple-polish QA note about global lint backlog tracking.
+- Hardened save action merge strategy: editor now keeps existing `metadata.franchize` blocks (about/footer/promo/etc.) and updates only structured form slices, so behavior matches rich SQL hydration payloads.
+- Added test SQL hydration profile for `sly13` at `docs/sql/sly13-franchize-test-hydration.sql` with cybervibe palette and metadata layout compatible with current franchize runtime.
+
+### 2026-02-19 — T7 polish pass 2 (theme-aware editor surfaces)
+- Removed inline lint backlog note from `/franchize/create` to keep operator UI focused.
+- Added dynamic light/dark-aware surface styling driven by editable theme fields (`bgBase/bgCard/text/border/accent`) so previewed form chrome follows metadata branding colors, not only text color.
+- Updated create page shell to support both light and dark app contexts similarly to other project pages.
+
+### 2026-02-19 — T7 polish pass 3 (contrast guard + bot-ready template shortcuts)
+- Fixed dark headline visibility risk in `/franchize/create` by binding title/section colors explicitly to theme-aware UI tokens and adding contrast watchdog checks.
+- Added visual palette chips (name + swatch + hex) and quick-copy shortcuts: template JSON, bot prompt, and current JSON snapshot.
+- Added UX flow for full JSON customization in advanced textarea: copy template -> ask Codex to personalize -> paste and save.
+- Extended `/codex` bridge to forward Telegram document attachments to Slack (not only text/photos), including file count in message metadata.
+
+### 2026-02-19 — T7 polish pass 4 (noob flow + staged tabs + local JSON preview)
+- Rebuilt `/franchize/create` UX into 3 noob-friendly stages (palette -> content -> AI JSON) to reduce overload from many settings.
+- Replaced scary token-first wording with human labels + original key in brackets, added live color pickers for every palette field and instant on-page preview.
+- Added local `Применить JSON локально` preview path so generated AI JSON can be tested visually before committing save to Supabase.
+- Captured both desktop and mobile screenshots for updated branding editor flow.
+
+
+### 2026-02-19 — T8 execution recipe prepared (with polish-round protocol)
+- Expanded T8 from generic todo into explicit recipe: prep + bridge links + flags + aliases + polish rounds.
+- Added "parallel spikes, sequential integration" rule to test merge-hope technique safely without violating dependency order.
+- Added acceptance requirement to log validation evidence for each polish round.
+

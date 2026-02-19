@@ -33,6 +33,14 @@ type TelegramPhotoMeta = {
   file_size?: number;
 };
 
+type TelegramDocumentMeta = {
+  file_id: string;
+  file_unique_id?: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+};
+
 let runtimeToken: SlackRuntimeToken | null = null;
 
 export function getSlackBridgeConfig() {
@@ -194,7 +202,7 @@ export async function postSlackMessage(params: {
   return { ok: true, ts: data.ts, channel: data.channel };
 }
 
-async function fetchTelegramPhotoBuffer(fileId: string) {
+async function fetchTelegramFileBuffer(fileId: string, fallbackName: string) {
   const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
   if (!telegramToken) {
     return { ok: false as const, error: "TELEGRAM_BOT_TOKEN is not configured" };
@@ -216,7 +224,7 @@ async function fetchTelegramPhotoBuffer(fileId: string) {
   const arrayBuffer = await fileResponse.arrayBuffer();
   const contentType = fileResponse.headers.get("content-type") || "image/jpeg";
   const extension = contentType.includes("png") ? "png" : "jpg";
-  const fileName = filePath.split("/").pop() || `telegram-photo-${Date.now()}.${extension}`;
+  const fileName = filePath.split("/").pop() || fallbackName || `telegram-file-${Date.now()}.${extension}`;
 
   return {
     ok: true as const,
@@ -364,6 +372,7 @@ export async function postCodexCommandToSlack(params: {
   telegramUsername?: string;
   telegramChatId: string;
   telegramPhotos?: TelegramPhotoMeta[];
+  telegramDocuments?: TelegramDocumentMeta[];
 }) {
   const { mention } = getSlackBridgeConfig();
 
@@ -375,6 +384,7 @@ export async function postCodexCommandToSlack(params: {
   };
 
   const photos = params.telegramPhotos || [];
+  const documents = params.telegramDocuments || [];
   const originLine = `TG origin: @${params.telegramUsername || "unknown"} (user ${params.telegramUserId})`;
   const text = [
     codexPrompt,
@@ -382,6 +392,7 @@ export async function postCodexCommandToSlack(params: {
     originLine,
     `TG chat id: ${params.telegramChatId}`,
     photos.length > 0 ? `TG photo count: ${photos.length}` : null,
+    documents.length > 0 ? `TG document count: ${documents.length}` : null,
     `Callback payload hint: ${JSON.stringify(callbackHint)}`,
   ]
     .filter(Boolean)
@@ -389,13 +400,13 @@ export async function postCodexCommandToSlack(params: {
     .slice(0, 3500);
 
   const messageResult = await postSlackMessage({ text });
-  if (!messageResult.ok || photos.length === 0) {
+  if (!messageResult.ok || (photos.length === 0 && documents.length === 0)) {
     return {
       ...messageResult,
       photoForwarding: {
-        attempted: photos.length,
+        attempted: photos.length + documents.length,
         uploaded: 0,
-        skippedReason: photos.length > 0 ? "message_not_sent" : undefined,
+        skippedReason: photos.length + documents.length > 0 ? "message_not_sent" : undefined,
       },
     };
   }
@@ -413,69 +424,85 @@ export async function postCodexCommandToSlack(params: {
     return {
       ...messageResult,
       photoForwarding: {
-        attempted: photos.length,
+        attempted: photos.length + documents.length,
         uploaded: 0,
         skippedReason,
       },
     };
   }
 
-  const uniquePhotosBySource = new Map<string, TelegramPhotoMeta>();
-  for (const photo of photos) {
-    const key = photo.file_unique_id || photo.file_id;
-    const previous = uniquePhotosBySource.get(key);
-    if (!previous || (photo.file_size || 0) > (previous.file_size || 0)) {
-      uniquePhotosBySource.set(key, photo);
+  const assets = [
+    ...photos.map((photo) => ({
+      type: "photo" as const,
+      id: photo.file_id,
+      unique: photo.file_unique_id || photo.file_id,
+      size: photo.file_size || 0,
+      fileNameHint: `telegram-photo-${Date.now()}.jpg`,
+    })),
+    ...documents.map((doc) => ({
+      type: "document" as const,
+      id: doc.file_id,
+      unique: doc.file_unique_id || doc.file_id,
+      size: doc.file_size || 0,
+      fileNameHint: doc.file_name || `telegram-document-${Date.now()}.json`,
+    })),
+  ];
+
+  const uniqueAssetsBySource = new Map<string, (typeof assets)[number]>();
+  for (const asset of assets) {
+    const previous = uniqueAssetsBySource.get(asset.unique);
+    if (!previous || asset.size > previous.size) {
+      uniqueAssetsBySource.set(asset.unique, asset);
     }
   }
-  const uniquePhotos = [...uniquePhotosBySource.values()];
+  const uniqueAssets = [...uniqueAssetsBySource.values()];
 
   let uploaded = 0;
   const uploadErrors: string[] = [];
 
-  for (const [index, photo] of uniquePhotos.entries()) {
-    const telegramImage = await fetchTelegramPhotoBuffer(photo.file_id);
-    if (!telegramImage.ok) {
-      const error = `photo ${index + 1}: ${telegramImage.error}`;
+  for (const [index, asset] of uniqueAssets.entries()) {
+    const telegramFile = await fetchTelegramFileBuffer(asset.id, asset.fileNameHint);
+    if (!telegramFile.ok) {
+      const error = `${asset.type} ${index + 1}: ${telegramFile.error}`;
       uploadErrors.push(error);
-      logger.error("[Slack] Failed to download Telegram photo for /codex forwarding", error);
+      logger.error("[Slack] Failed to download Telegram file for /codex forwarding", error);
       continue;
     }
 
     const uploadResult = await uploadPhotoToSlack({
       channel: uploadChannel,
       threadTs: messageResult.ts,
-      bytes: telegramImage.bytes,
-      fileName: telegramImage.fileName,
-      title: `tg-homework-${params.telegramChatId}-${index + 1}`,
+      bytes: telegramFile.bytes,
+      fileName: telegramFile.fileName,
+      title: `tg-codex-${asset.type}-${params.telegramChatId}-${index + 1}`,
     });
 
     if (!uploadResult.ok) {
       const missingScope = uploadResult.error?.includes("missing_scope");
       if (missingScope) {
         const storageResult = await uploadTelegramPhotoToPublicStorage({
-          bytes: telegramImage.bytes,
-          fileName: telegramImage.fileName,
-          dedupeKey: photo.file_unique_id || photo.file_id,
+          bytes: telegramFile.bytes,
+          fileName: telegramFile.fileName,
+          dedupeKey: asset.unique,
         });
 
         if (storageResult.ok) {
           uploaded += 1;
           await postSlackMessage({
-            text: `📎 TG photo ${index + 1}: ${storageResult.url}`,
+            text: `📎 TG ${asset.type} ${index + 1}: ${storageResult.url}`,
             channel: uploadChannel,
             threadTs: messageResult.ts,
           });
           continue;
         }
 
-        const storageError = `photo ${index + 1}: missing_scope + storage_fallback_failed (${storageResult.error})`;
+        const storageError = `${asset.type} ${index + 1}: missing_scope + storage_fallback_failed (${storageResult.error})`;
         uploadErrors.push(storageError);
         logger.error("[Slack] Failed to upload Telegram photo fallback URL to Slack", storageError);
         continue;
       }
 
-      const error = `photo ${index + 1}: ${uploadResult.error}`;
+      const error = `${asset.type} ${index + 1}: ${uploadResult.error}`;
       uploadErrors.push(error);
       logger.error("[Slack] Failed to upload Telegram photo to Slack", error);
       continue;
@@ -486,7 +513,7 @@ export async function postCodexCommandToSlack(params: {
 
   if (uploadErrors.length > 0) {
     await postSlackMessage({
-      text: `⚠️ TG image forwarding: ${uploaded}/${uniquePhotos.length} uploaded. Issues: ${uploadErrors.join("; ")}`,
+      text: `⚠️ TG file forwarding: ${uploaded}/${uniqueAssets.length} uploaded. Issues: ${uploadErrors.join("; ")}`,
       channel: uploadChannel,
       threadTs: messageResult.ts,
     });
@@ -495,7 +522,7 @@ export async function postCodexCommandToSlack(params: {
   return {
     ...messageResult,
     photoForwarding: {
-      attempted: uniquePhotos.length,
+      attempted: uniqueAssets.length,
       uploaded,
       skippedReason: uploaded === 0 && uploadErrors.length > 0 ? "upload_failed" : undefined,
       uploadErrors,

@@ -11,6 +11,16 @@ type TelegramPhotoMeta = {
   file_size?: number;
 };
 
+
+
+type TelegramDocumentMeta = {
+  file_id: string;
+  file_unique_id?: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+};
+
 type ParsedDate = {
   day: number;
   month: number;
@@ -143,10 +153,11 @@ export async function codexCommand(
   username: string | undefined,
   rawText: string,
   photos: TelegramPhotoMeta[] = [],
+  documents: TelegramDocumentMeta[] = [],
 ) {
   const prompt = rawText.replace(/^\/codex(?:@[\w_]+)?\s*/i, "").trim();
 
-  if (!prompt && photos.length === 0) {
+  if (!prompt && photos.length === 0 && documents.length === 0) {
     await sendComplexMessage(
       chatId,
       "Использование: `/codex <задача>`\nПример: `/codex add slack forwarding status in webhook logs`",
@@ -186,6 +197,7 @@ export async function codexCommand(
       telegramUsername: username,
       telegramChatId: String(chatId),
       telegramPhotos: photos,
+      telegramDocuments: documents,
     });
 
     if (!slackResult.ok && slackResult.reason === "not_configured") {
@@ -218,10 +230,11 @@ export async function codexCommand(
 
     const promptPart = prompt ? `\n\nPrompt: ${prompt}` : "\n\nPrompt: (пусто, только фото)";
     const photoPart = photos.length > 0 ? `\nPhoto: ${photos.length} файл(ов)` : "";
+    const documentPart = documents.length > 0 ? `\nDocument: ${documents.length} файл(ов)` : "";
     const photoForwarding = slackResult.photoForwarding;
     const forwardingPart =
-      photoForwarding && photos.length > 0
-        ? `\nSlack images: ${photoForwarding.uploaded}/${photoForwarding.attempted}${photoForwarding.skippedReason ? ` (${photoForwarding.skippedReason})` : ""}`
+      photoForwarding && (photos.length > 0 || documents.length > 0)
+        ? `\nSlack files: ${photoForwarding.uploaded}/${photoForwarding.attempted}${photoForwarding.skippedReason ? ` (${photoForwarding.skippedReason})` : ""}`
         : "";
 
     const shouldForwardToAdmin =
@@ -243,7 +256,7 @@ export async function codexCommand(
 
     await sendComplexMessage(
       chatId,
-      `✅ Задача отправлена в Slack как запрос к Codex.${promptPart}${photoPart}${forwardingPart}${adminPart}\n\nДля callback добавь:\ntelegramChatId: ${chatId}\ntelegramUserId: ${userId}`,
+      `✅ Задача отправлена в Slack как запрос к Codex.${promptPart}${photoPart}${documentPart}${forwardingPart}${adminPart}\n\nДля callback добавь:\ntelegramChatId: ${chatId}\ntelegramUserId: ${userId}`,
       [],
     );
   } catch (error: unknown) {
