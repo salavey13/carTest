@@ -479,14 +479,19 @@ When this phrase appears, follow this deterministic protocol:
 8. In final response, add a short RU block (2-6 bullets) for first-time RU teammates.
 9. In final response, include **Tamagotchi telemetry** for operator transparency:
    - `mood` (one short expressive line),
-   - `energy` (0-100),
-   - `focus` (0-100),
-   - `confidence` (0-100),
+   - `энергия` (0-100),
+   - `фокус` (0-100),
+   - `уверенность` (0-100),
    - `progress_stage` (`scan` | `patch` | `validate` | `ship`),
    - `comment` (1 short subjective sentence about how execution is going),
    - `iteration_hint` (1 actionable suggestion for next micro-iteration),
    - `next_beat` (one-liner: what to do in the very next iteration),
    - `roast_or_praise` (short playful feedback about current build quality).
+
+Telemetry pacing rule for newcomer-facing runs:
+- Start with modest values on first beat (`энергия`/`фокус`/`уверенность` should feel "warm-up", not 100/100).
+- Increase values gradually across subsequent beats as validations and PR artifacts complete.
+- Use encouraging ship phrase when ready: "всё готово к отправке, можно жать Create PR, но можем сделать ещё один микро-полиш для triple polish".
 
 Hard rules:
 - Never skip dependency order without explicitly adding a new prerequisite task.
@@ -507,7 +512,7 @@ In executor final RU block, follow this beat:
 2. `progress_stage` log (`scan` -> `patch` -> `validate` -> `ship`).
 3. Next micro-step (`next_beat`) with one concrete corner-case check.
 4. Optional polish prompt (ask one final-touch idea).
-5. When ready to ship, remind about the big white top-right **Create PR** button in Codex.
+5. When ready to ship, remind about the big white top-right **Create PR** button in Codex and mention that preview link in created PR remains valid after later PR updates (handy noob tip).
 
 Style:
 - energize newcomers, be concise, and keep it actionable;

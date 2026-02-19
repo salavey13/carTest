@@ -37,9 +37,11 @@ Agent display name in executor mode: **GPTgotchi CyberDaemon (GTC-Daemon)**.
 - Telegram heartbeat report sent via `scripts/codex-notify.mjs telegram` when operator requests educational monitoring.
 - Summary includes next recommended task ID.
 - Final operator reply includes a short RU summary block (2-6 bullets) for first-time RU teammates.
-- Final operator reply includes Tamagotchi telemetry (`mood`, `energy`, `focus`, `confidence`, `progress_stage`, `comment`, `iteration_hint`, `next_beat`, `roast_or_praise`) as compact operator-facing status.
+- Final operator reply includes Tamagotchi telemetry (`mood`, `энергия`, `фокус`, `уверенность`, `progress_stage`, `comment`, `iteration_hint`, `next_beat`, `roast_or_praise`) as compact operator-facing status.
 - RU summary should carry wake-state + beat log + motivation + next micro-step for teammate momentum.
+- For first-time RU teammates, start telemetry with lower warm-up values and ramp them up gradually as checks/PR artifacts complete.
 - When task is ready to ship, remind operator about the top-right Codex **Create PR** button.
+- Add beginner tip: preview URL appears right after PR creation and keeps working after new commits are pushed to the same PR branch.
 
 ## Notify + Supabase tool notes
 - Notifications/callbacks: `scripts/codex-notify.mjs`.
