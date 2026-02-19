@@ -340,7 +340,7 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - status: `done`
 - updated_at: `2026-02-19T00:08:10Z`
 - owner: `codex`
-- notes: Iterated T4 by centering/enlarging crew logo in header, restoring item card images, restricting catalog hydration to `type=bike` inventory only, and isolating franchize routes from global layout header/footer chrome.
+- notes: Iterated T4 by centering/enlarging crew logo in header, restoring item card images, restricting catalog hydration to `type=bike` inventory only, adding light-theme-safe surface/text tokens across franchize pages, and restoring global footer there as compact one-line variant.
 - next_step: Start T5 modal-first card interaction while preserving new bike-only/image-ready card baseline.
 - risks: Image quality depends on upstream `image_url` coverage; fallback placeholder text is shown when media is missing.
 - dependencies: T3b
@@ -552,6 +552,11 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 - Disabled global `ClientLayout` header/footer chrome on `/franchize*` paths so only franchize shell components render there.
 - Overhauled default `Footer` component structure for better scanability while preserving hardcoded product copy/links.
 - Replaced Jumpstart CTA slot with `NEXUS Hub` link to align platform narrative flow.
+
+### 2026-02-19 — T4 polish pass 3 (light-theme support + compact global footer on franchize)
+- Reworked franchize page surfaces to rely on semantic theme tokens (`bg-background`, `text-foreground`, `text-muted-foreground`) instead of hardcoded dark-only text/background pairing.
+- Restored global `Footer` visibility on `/franchize*`, but added an ultra-compact one-line variant specifically for franchize routes.
+- Added real header links for utility icons (`/repo-xml` and `/profile`) so right-side controls are actionable.
 
 ---
 

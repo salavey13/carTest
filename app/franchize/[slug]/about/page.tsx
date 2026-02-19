@@ -12,14 +12,14 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
   const { crew } = await getFranchizeBySlug(slug);
 
   return (
-    <main className="min-h-screen" style={{ backgroundColor: crew.theme.palette.bgBase, color: crew.theme.palette.textPrimary }}>
+    <main className="min-h-screen bg-background text-foreground">
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/about`} />
       <section className="mx-auto w-full max-w-4xl px-4 py-6">
         <p className="text-xs uppercase tracking-[0.2em]" style={{ color: crew.theme.palette.accentMain }}>
           /franchize/{crew.slug || slug}/about
         </p>
         <h1 className="mt-2 text-2xl font-semibold">О нас</h1>
-        <p className="mt-2 max-w-2xl text-sm" style={{ color: crew.theme.palette.textSecondary }}>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
           {crew.description ||
             "About page scaffold for franchize runtime. Content blocks will be hydrated from crew metadata in subsequent tasks."}
         </p>

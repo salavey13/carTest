@@ -4,10 +4,12 @@ import { motion } from "framer-motion";
 import { Gift, Heart, ExternalLink, Code, Sparkles, ShieldQuestion, FileText, Bolt, BrainCircuit, Network } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { FaGithub, FaTelegram } from "react-icons/fa6";
 
 export default function Footer() {
   const { tg, isInTelegramContext } = useAppContext();
+  const pathname = usePathname();
 
   const handleShare = () => {
     const shareUrl =
@@ -23,6 +25,17 @@ export default function Footer() {
 
     window.open(shareUrl, "_blank");
   };
+
+
+  if (pathname?.startsWith("/franchize")) {
+    return (
+      <footer className="border-t border-border bg-background/90 py-2">
+        <div className="mx-auto flex max-w-7xl items-center justify-center px-4 text-center text-[11px] text-muted-foreground">
+          oneSitePls :: Nexus-ready operator stack :: <Link href="/nexus" className="ml-1 underline-offset-2 hover:underline">/nexus</Link>
+        </div>
+      </footer>
+    );
+  }
 
   const footerLinkClass =
     "text-sm text-muted-foreground hover:text-brand-cyan font-mono flex items-center gap-1.5 transition-colors duration-200 hover:text-glow";

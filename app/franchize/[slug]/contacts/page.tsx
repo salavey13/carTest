@@ -12,14 +12,14 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
   const { crew } = await getFranchizeBySlug(slug);
 
   return (
-    <main className="min-h-screen" style={{ backgroundColor: crew.theme.palette.bgBase, color: crew.theme.palette.textPrimary }}>
+    <main className="min-h-screen bg-background text-foreground">
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/contacts`} />
       <section className="mx-auto w-full max-w-4xl px-4 py-6">
         <p className="text-xs uppercase tracking-[0.2em]" style={{ color: crew.theme.palette.accentMain }}>
           /franchize/{crew.slug || slug}/contacts
         </p>
         <h1 className="mt-2 text-2xl font-semibold">Контакты</h1>
-        <div className="mt-4 space-y-2 text-sm" style={{ color: crew.theme.palette.textSecondary }}>
+        <div className="mt-4 space-y-2 text-sm text-muted-foreground">
           <p>Phone: {crew.contacts.phone || "—"}</p>
           <p>Email: {crew.contacts.email || "—"}</p>
           <p>Address: {crew.contacts.address || "—"}</p>
