@@ -361,11 +361,11 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Menu modal shows quick links sourced from metadata.
 
 ### T5 — Catalog UX conversion to modal-first flow
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: 2-column mobile cards, category rail, item modal with options and sticky CTA.
-- next_step: Connect add-to-cart state and modal variations.
+- status: `done`
+- updated_at: `2026-02-19T03:13:59Z`
+- owner: `codex`
+- notes: Added client-rendered catalog interaction layer with category rail, click-to-open item modal (description + option chips + quick-spec panel), and add-to-cart flow that immediately updates floating cart totals.
+- next_step: Start T6 cart/order staged UX implementation.
 - risks: preserving existing booking capabilities while re-skinning.
 - dependencies: T4
 - deliverables:
@@ -619,3 +619,10 @@ For implementation phases, emit concise progress updates in this file under sect
 For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - `docs/FRANCHEEZEPLAN.md` as quick-start runbook,
 - then continue with this file (`docs/THE_FRANCHEEZEPLAN.md`) as source-of-truth task ledger.
+
+
+### 2026-02-19 — T5 execution complete (modal-first catalog)
+- Marked T5 `in_progress` -> `done` in dependency order after T4.
+- Added `CatalogClient` and `Item` modal for card-first browsing (2-column mobile grid + category rail + option chips).
+- Wired immediate floating-cart updates from modal add action and aligned cart pill colors with themed props.
+- Captured updated mobile franchize screenshot artifact for visual QA.
