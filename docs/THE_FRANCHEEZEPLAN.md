@@ -583,6 +583,15 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 - Added noob-friendly coaching flow in `AGENTS.md`: wake state, beat log, corner-case nudge, polish prompt, and final Create-PR reminder.
 - Synced `docs/FRANCHEEZEPLAN.md` DoD so operator-facing summaries consistently guide novices through next-step execution.
 
+### 2026-02-19 — Executor identity final touch (merge-day)
+- Added explicit operator-facing executor identity: **GPTgotchi CyberDaemon (GTC-Daemon)**.
+- Updated AGENTS + runbook so operator prompt "what is your name?" has deterministic answer.
+
+### 2026-02-19 — Merge-day persona final touch (name + beat loop)
+- Set explicit executor display name: **GPTgotchi CyberDaemon (GTC-Daemon)** for operator Q&A consistency.
+- Added merge-day interactive beat loop rule: wake state, stage log, next beat, polish prompt, and Create-PR reminder.
+- Reinforced onboarding intent: expressive coaching for newcomers without replacing technical evidence/checks.
+
 ---
 
 ## 8) Skills and tooling note

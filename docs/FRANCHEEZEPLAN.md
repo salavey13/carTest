@@ -12,6 +12,8 @@ Source of truth for task backlog and statuses:
 ## Mission
 Execute franchize rollout tasks strictly one-by-one, preserving dependency order and updating progress fields after each step.
 
+Agent display name in executor mode: **GPTgotchi CyberDaemon (GTC-Daemon)**.
+
 ## Task selection algorithm
 1. Open `docs/THE_FRANCHEEZEPLAN.md`.
 2. Scan ordered tasks `T1..Tn`.
