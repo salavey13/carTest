@@ -338,11 +338,11 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T4 — Build Pepperolli-style shell components
 - status: `done`
-- updated_at: `2026-02-19T20:32:00Z`
+- updated_at: `2026-02-19T20:48:00Z`
 - owner: `codex`
-- notes: Iterated T4 by centering/enlarging crew logo in header, restoring item card images, restricting catalog hydration to `type=bike` inventory only, adding light-theme-safe surface/text tokens across franchize pages, restoring compact global footer there while suppressing only global default header, normalizing bike grouping to subtype-level anchors, and removing duplicate subtype balloons from header so the sticky synced catalog rail is the single source of truth.
+- notes: Iterated T4 by centering/enlarging crew logo in header, restoring item card images, restricting catalog hydration to `type=bike` inventory only, adding light-theme-safe surface/text tokens across franchize pages, restoring compact global footer there while suppressing only global default header, normalizing bike grouping to subtype-level anchors, and removing duplicate subtype balloons from header so the sticky synced catalog rail is the single source of truth; added safe-area-aware top spacing and stronger top padding so franchize content does not visually collide with top chrome.
 - next_step: Start T5 modal-first card interaction while preserving synced sticky subtype rail behavior from catalog UX pass.
-- risks: Image quality depends on upstream `image_url` coverage; fallback placeholder text is shown when media is missing; sticky rail offset depends on shared layout header variable defaults.
+- risks: Image quality depends on upstream `image_url` coverage; fallback placeholder text is shown when media is missing; sticky rail offset depends on safe-area handling across Telegram/WebView variants.
 - dependencies: T3b
 - deliverables:
   - `app/franchize/components/CrewHeader.tsx`
@@ -677,3 +677,9 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Removed duplicate subtype balloon rail from `CrewHeader` to avoid two competing category controls on catalog pages.
 - Released franchize crew header from sticky positioning so it can scroll offscreen while catalog subtype rail stays pinned/active.
 - Kept subtype navigation centralized in `CatalogClient` with reverse-scroll highlight sync for section awareness.
+
+
+### 2026-02-19 — T4 polish pass 7 (top spacing + safe-area offset)
+- Increased franchize header top inset using `env(safe-area-inset-top)` so top controls do not feel clipped/overlapped in Telegram-style webviews.
+- Adjusted catalog sticky rail top offset to safe-area-based value instead of legacy header-height fallback variable.
+- Added extra catalog section top padding to create cleaner separation between header border and first content block.

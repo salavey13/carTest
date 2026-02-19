@@ -105,7 +105,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
 
   return (
     <>
-      <section className="mx-auto w-full max-w-4xl px-4 py-6" id="catalog-sections">
+      <section className="mx-auto w-full max-w-4xl px-4 pb-6 pt-8" id="catalog-sections">
         {!crew.isFound && (
           <p className="mb-4 rounded-xl border px-3 py-2 text-sm" style={{ borderColor: crew.theme.palette.accentMain, color: crew.theme.palette.accentMain }}>
             Crew slug was not found. Rendering safe fallback shell.
@@ -117,7 +117,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
           <span className="text-xs text-muted-foreground">/franchize/{crew.slug || slug}</span>
         </div>
 
-        <div className="sticky top-[var(--franchize-header-offset,4.75rem)] z-20 -mx-4 mb-5 border-b border-border/60 bg-background/95 px-4 pb-2 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+        <div className="sticky top-[max(env(safe-area-inset-top),0.5rem)] z-20 -mx-4 mb-5 border-b border-border/60 bg-background/95 px-4 pb-2 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/70">
           <div className="flex gap-2 overflow-x-auto pb-1">
             {itemsByCategory.map((group) => (
               <a

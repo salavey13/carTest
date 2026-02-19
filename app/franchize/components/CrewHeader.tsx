@@ -20,7 +20,7 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
   };
 
   return (
-    <header className="z-30 border-b border-border bg-background/95 px-4 pb-3 pt-2 backdrop-blur">
+    <header className="z-30 border-b border-border bg-background/95 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur">
       <div className="mx-auto w-full max-w-4xl">
         <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
           <span className="font-medium tracking-[0.16em] uppercase">{crew.slug}</span>
