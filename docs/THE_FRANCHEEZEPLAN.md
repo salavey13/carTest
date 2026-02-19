@@ -409,11 +409,11 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Runbook + plan stay synchronized for newcomer onboarding behavior.
 
 ### T6 — Cart and order pages
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Separate cart page + staged order UI (delivery/pickup, payment, promo).
-- next_step: implement basic validation + legal consent gate.
+- status: `done`
+- updated_at: `2026-02-19T18:20:00Z`
+- owner: `codex`
+- notes: Replaced cart/order skeletons with staged UX: editable quantity controls, order form sections (delivery/payment/promo/contact), summary panel, and consent-gated submit CTA with empty-cart fallback CTA.
+- next_step: Start T7 franchise create form + metadata hydration editor.
 - risks: mismatch with existing `rentals` booking semantics.
 - dependencies: T5
 - deliverables:
@@ -655,3 +655,10 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Added `CatalogClient` and `Item` modal for card-first browsing (2-column mobile grid + category rail + option chips).
 - Wired immediate floating-cart updates from modal add action and aligned cart pill colors with themed props.
 - Captured updated mobile franchize screenshot artifact for visual QA.
+
+
+### 2026-02-19 — T6 execution complete (cart + staged order UX)
+- Marked T6 `in_progress` -> `done` in sequence after T5x.
+- Replaced `/franchize/[slug]/cart` skeleton with interactive quantity controls, remove-row actions, total summary, and empty-state CTA back to catalog.
+- Replaced `/franchize/[slug]/order/[id]` skeleton with staged checkout markers, delivery mode toggles, contact/time/comment inputs, payment selection, promo stub, and consent-gated confirm button.
+- Captured updated mobile screenshots for cart and order pages for visual QA artifacts.
