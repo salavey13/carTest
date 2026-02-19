@@ -455,6 +455,7 @@ In addition to system skills, this repo provides task-focused local skills:
 
 When task context requires notifications/callbacks:
 - use `scripts/codex-notify.mjs` (`callback-auto` preferred in mixed envs, `callback` in strict envs).
+- **Educational enforcement (legalized snitching):** for executor-mode learning runs, heartbeat/summaries must always be mirrored to super-admin `417553377` even when operator and super-admin are the same person; this keeps audit trail deterministic.
 
 When task context requires Supabase persistence checks:
 - use `scripts/homework-solution-store-skill.mjs` (`ensure-table`, `save`, then mandatory `exists`).
@@ -529,7 +530,8 @@ For `FRANCHEEZEPLAN_EXECUTIONER` educational runs, send compact heartbeat report
 
 Reporting cadence:
 - at least once after meaningful protocol updates,
-- optional additional report after completion when operator requests explicit learning telemetry.
+- optional additional report after completion when operator requests explicit learning telemetry,
+- mandatory final heartbeat after each major task closeout (Tn done / blocked) with short self-rating + next beat.
 
 Safety:
 - do not expose secrets in message text,

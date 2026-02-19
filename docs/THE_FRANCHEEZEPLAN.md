@@ -452,25 +452,30 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Missing fields safely default.
   - Validation errors are human-readable and non-destructive.
 
-### T8 — Legacy route alignment and migration bridge
+### T8 — Legacy route alignment and migration bridge (execution recipe)
 - status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Keep history pages, wire incremental navigation to new surfaces.
-- next_step: controlled redirects and operator toggles.
-- risks: breaking bookmarked deep links.
+- updated_at: `2026-02-19T23:25:00Z`
+- owner: `codex+operator`
+- notes: Prepare migration bridge from legacy routes to franchize surfaces with strict fallback safety and polish-round structure.
+- next_step: kick off T8-P0 preparation commit, then execute polish rounds in isolated micro-branches and merge sequentially.
+- risks: breaking bookmarked deep links; over-eager redirects harming legacy conversion; merge conflicts across parallel polish spikes.
 - dependencies: T7
 - deliverables:
   - selective links from `/rent-bike`, `/vipbikerental`, `/rentals`
+  - feature-flagged bridge behavior for discoverability without forced migration
+  - rollout log with polish-round outcomes
 - implementation checklist:
-  1. Add optional bridge links from legacy pages to `/franchize/[slug]`.
-  2. Introduce feature flag metadata (`franchize.enabled`).
-  3. Add singular/plural alias strategy for vip routes.
-  4. Preserve all existing workflows as fallback.
+  1. **T8-P0 (prep):** freeze route matrix + baseline screenshots + fallback rules for legacy pages.
+  2. **T8-P1 (bridge links):** add optional entry links to `/franchize/[slug]` from legacy surfaces.
+  3. **T8-P2 (flags):** introduce `franchize.enabled`-aware discoverability toggles.
+  4. **T8-P3 (aliases):** finalize singular/plural vip alias and no-dead-end routing.
+  5. **T8-P4 (polish rounds):** run polish-1 (copy), polish-2 (navigation affordances), polish-3 (QA + telemetry).
+  6. Parallel experiment policy: polish spikes may run in parallel branches, but integration into `main task branch` is sequential and acceptance-tested after each merge.
 - acceptance criteria:
   - Legacy routes remain fully usable.
   - Users can discover new franchize flow without forced migration.
   - No dead links between old/new pages.
+  - Each polish round has explicit changelog note + validation evidence.
 
 ### T9 — QA, screenshots, and rollout notes
 - status: `todo`
@@ -724,4 +729,10 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Replaced scary token-first wording with human labels + original key in brackets, added live color pickers for every palette field and instant on-page preview.
 - Added local `Применить JSON локально` preview path so generated AI JSON can be tested visually before committing save to Supabase.
 - Captured both desktop and mobile screenshots for updated branding editor flow.
+
+
+### 2026-02-19 — T8 execution recipe prepared (with polish-round protocol)
+- Expanded T8 from generic todo into explicit recipe: prep + bridge links + flags + aliases + polish rounds.
+- Added "parallel spikes, sequential integration" rule to test merge-hope technique safely without violating dependency order.
+- Added acceptance requirement to log validation evidence for each polish round.
 
