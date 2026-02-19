@@ -1,6 +1,7 @@
 // /components/streamer/StreamOverlay.tsx
 "use client";
 import React from "react";
+import Image from "next/image";
 
 export type SectionType = "image" | "video" | "text";
 
@@ -100,13 +101,14 @@ export default function StreamOverlay({
           {section.type === "image" &&
             section.mediaUrl &&
             !section.greenScreen && (
-              <img
+              <Image
                 src={section.mediaUrl}
                 alt={section.title}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  console.warn("Image load failed:", section.mediaUrl, e);
-                  e.currentTarget.style.display = "none";
+                fill
+                unoptimized
+                className="h-full w-full object-cover"
+                onError={() => {
+                  console.warn("Image load failed:", section.mediaUrl);
                 }}
               />
             )}

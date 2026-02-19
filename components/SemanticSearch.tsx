@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import Link from "next/link";
+import Image from "next/image";
 
 interface CarResult {
   id: string;
@@ -132,7 +133,7 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
             {results.slice(0, compact ? 3 : results.length).map((car) => (
               <Link key={car.id} href={car.rent_link}>
                 <div className="flex items-center gap-3 text-[#00ff9d] hover:bg-[#00ff9d]/10 p-2 rounded-lg transition-all">
-                  <img src={car.image_url} alt={car.make} className="w-12 h-12 rounded-md border border-[#00ff9d]/30" />
+                  <Image src={car.image_url} alt={car.make} width={48} height={48} unoptimized className="h-12 w-12 rounded-md border border-[#00ff9d]/30 object-cover" />
                   <div className="flex-1">
                     <p className="text-sm font-mono">
                       {car.make} {car.model}

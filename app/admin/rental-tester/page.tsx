@@ -233,7 +233,7 @@ export default function RentalTesterPage() {
                     <p className="text-xs text-muted-foreground">{action.description}</p>
                   </div>
                 )) : !paymentAction && (
-                    <p className="text-xs text-muted-foreground font-mono p-2 bg-muted/50 rounded text-center">Нет доступных действий для роли "{actingAs}" в статусе "{rental.status}".</p>
+                    <p className="text-xs text-muted-foreground font-mono p-2 bg-muted/50 rounded text-center">Нет доступных действий для роли «{actingAs}» в статусе «{rental.status}».</p>
                 )}
               </div>
             </CardContent>
