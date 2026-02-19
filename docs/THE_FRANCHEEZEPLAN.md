@@ -568,6 +568,11 @@ Insert new tasks by dependency, then renumber if needed and preserve order guara
 - Updated loader mapping to derive display category from bike subtype fields (`specs.subtype`/`bike_subtype`/`segment`/`specs.type`) and ignore plain `type=bike` as grouping key.
 - Preserved bike-only filtering while restoring effective category-anchor scrolling behavior for subtype pills.
 
+### 2026-02-19 — Executor protocol extension (interactive Tamagotchi transparency)
+- Updated `AGENTS.md` executor mode with explicit RU-summary + Tamagotchi telemetry output requirements for operator-facing completion messages.
+- Synced `docs/FRANCHEEZEPLAN.md` definition-of-done to include telemetry fields (`mood/energy/focus/confidence/comment`) alongside technical summary.
+- Kept telemetry policy additive-only so implementation evidence and command checks remain primary.
+
 ---
 
 ## 8) Skills and tooling note

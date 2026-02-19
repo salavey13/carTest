@@ -476,6 +476,13 @@ When this phrase appears, follow this deterministic protocol:
 5. Run validations/screenshots required for that task.
 6. Update task to `done` (or `blocked` with reason) and append dated diary entry in section 7.
 7. Commit + PR, then include next recommended task ID in summary.
+8. In final response, add a short RU block (2-6 bullets) for first-time RU teammates.
+9. In final response, include **Tamagotchi telemetry** for operator transparency:
+   - `mood` (one short line),
+   - `energy` (0-100),
+   - `focus` (0-100),
+   - `confidence` (0-100),
+   - `comment` (1 short subjective sentence about how execution is going).
 
 Hard rules:
 - Never skip dependency order without explicitly adding a new prerequisite task.
