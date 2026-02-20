@@ -589,27 +589,54 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Contacts screen avoids email-first presentation and stays Telegram-first.
 
 ### T8.1 — Franchize booking parity + rentals control-center migration plan
-- status: `todo`
-- updated_at: `2026-02-20T00:40:00Z`
+- status: `done`
+- updated_at: `2026-02-20T12:35:00Z`
 - owner: `codex+operator`
-- notes: Gap audit confirms franchize flow still lacks booking calendar/date lock, booking persistence, promo engine, and invoice/rentals pipeline parity from legacy `/rent-bike` + `/rentals`.
-- next_step: implement booking date-range picker in franchize modal/order flow, wire createBooking path, persist cart/order payload, and draft rentals control-center component map for `/franchize/[slug]/rentals`.
-- risks: regression in booking validation, double-booking without date locks, mismatch between legacy rental statuses and franchize order states.
+- notes: Completed planning-focused parity package and split implementation into phased tracks: booking data contract, promo/invoice pipeline, and rentals control-center extraction. Added explicit pre-QA "maximum polish" backlog task (T8.6) so QA starts only after UX/copy/state consistency hardening.
+- next_step: Execute T8.6 polish backlog in sequence, then run T9 QA matrix.
+- risks: legacy `/rent-bike` remains source-of-truth for some booking mechanics until implementation phase; parity rollout needs feature-flagged smoke checks to avoid checkout regressions during transfer.
 - dependencies: T8
 - deliverables:
   - parity checklist mapped to legacy booking mechanics
   - implementation plan for promo + invoice + booking persistence
   - migration blueprint for `/rentals` UX into `/franchize/[slug]/rentals`
+  - pre-QA maximum polish backlog (`T8.6`) with dependency gating before QA
 - implementation checklist:
-  1. Port date-range calendar + disabled-booked-dates logic from legacy booking flow.
-  2. Wire `createBooking` action (or franchize-specific equivalent) with consent/validation gates.
-  3. Implement promo code application rules and reflected totals in cart/order summary.
-  4. Add invoice/rental entity creation path and route handoff into rentals dashboard.
-  5. Design phased migration for monolithic `/rentals` into franchize-scoped control center.
+  1. Freeze parity scope from legacy `/rent-bike` + `/rentals`: date-lock rules, validation gates, promo interactions, booking persistence, invoice lifecycle, status transitions.
+  2. Define implementation order with rollback notes:
+     - P1 booking calendar/date-lock + `createBooking` parity,
+     - P2 promo + totals + invoice wiring,
+     - P3 rentals control-center migration into `/franchize/[slug]/rentals`.
+  3. Define data contracts and telemetry checkpoints for each phase (request payload, expected state transition, operator-visible status text, fallback path).
+  4. Add pre-QA polish backlog task to close UX debt before screenshots/lint/build QA pass.
+  5. Keep discontinued static-page assumptions out of scope (operator confirmed those pages were intentionally removed in previous merge).
 - acceptance criteria:
-  - Franchize booking path supports real date-based availability and booking persistence.
-  - Promo + invoice logic are functional (not UI stubs).
-  - Rentals dashboard migration plan has explicit component extraction order and rollback notes.
+  - Phased parity plan is explicit, ordered, and executable without parallel ambiguity.
+  - Data/telemetry contract is documented for booking, promo, invoice, and rentals states.
+  - T8.6 exists as the mandatory pre-QA polish gate.
+
+### T8.6 — Maximum polish backlog before QA (UX/state/copy hardening)
+- status: `todo`
+- updated_at: `2026-02-20T12:35:00Z`
+- owner: `codex+operator`
+- notes: Consolidated final polish backlog to eliminate avoidable QA churn before T9 screenshot and rollout checks.
+- next_step: Execute polish items sequentially (P0 -> P4) and attach evidence per item.
+- risks: polish pass can sprawl if new feature requests slip in; keep this task strictly quality-hardening (no major feature expansion).
+- dependencies: T8.1
+- deliverables:
+  - polish checklist with completion evidence links/notes
+  - updated UX copy consistency pass for franchize shell/modals/cart/order/contacts
+  - route/state edge-case matrix with resolved behaviors
+- implementation checklist:
+  1. P0 — Copy/uniformity: normalize CTA labels, empty-state wording, and error/consent text across `/franchize/[slug]`, cart, order, contacts.
+  2. P1 — Visual consistency: align spacing/radius/token usage (header/menu/category rail/cards/modal/cart pill/footer) for light/dark-safe rendering.
+  3. P2 — Interaction reliability: confirm modal open/close, quantity updates, subtotal recalculation, and back navigation are deterministic across mobile breakpoints.
+  4. P3 — Route/state resilience: harden missing slug/item/cart/order states, add no-crash fallbacks, and verify redirect/bridge links where still active.
+  5. P4 — Operator observability: ensure status indicators are visible (loading/saving/submitting), and update rollout notes with known limitations before T9.
+- acceptance criteria:
+  - No obvious UX copy drift across franchize core surfaces.
+  - Core interactions are stable under quick user actions (tap spam/back-forward/reopen modal).
+  - T9 can start with a clean QA checklist instead of discovering basic polish issues.
 
 ### T9 — QA, screenshots, and rollout notes
 - status: `todo`
@@ -618,7 +645,7 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - notes: visual QA + route QA + release playbook.
 - next_step: produce screenshot matrix and go-live checklist.
 - risks: UI drift across mobile widths.
-- dependencies: T8.1
+- dependencies: T8.6
 - deliverables:
   - screenshots
   - route verification checklist
@@ -922,3 +949,8 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - `/rentals` banner now resolves slug from the primary rental item (active first, otherwise latest), not current user membership.
 - `/rent/[id]` back link now resolves slug by vehicle ownership lookup, with safe fallback `vip-bike`.
 
+### 2026-02-20 — T8.1 planning closeout + pre-QA maximum polish gate
+- Marked T8.1 `done` as a planning/documentation milestone (not feature implementation) per operator request to focus on prep before QA.
+- Expanded parity plan into phased execution order with explicit rollback + telemetry expectations (booking, promo, invoice, rentals).
+- Added T8.6 as mandatory pre-QA polish task to prevent avoidable churn during screenshot/lint/build QA run.
+- Updated T9 dependency from T8.1 -> T8.6 so QA starts only after polish hardening is complete.
