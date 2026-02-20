@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
-import { useFranchizeCart } from "../hooks/useFranchizeCart";
+import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 
 interface CartPageClientProps {
   crew: FranchizeCrewVM;
@@ -11,31 +10,8 @@ interface CartPageClientProps {
   items: CatalogItemVM[];
 }
 
-type CartLineVM = {
-  itemId: string;
-  qty: number;
-  item: CatalogItemVM | null;
-};
-
 export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
-  const { cart, changeItemQty, removeItem } = useFranchizeCart(slug);
-
-  const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
-
-  const cartLines = useMemo<CartLineVM[]>(() => {
-    return Object.entries(cart)
-      .filter(([, qty]) => qty > 0)
-      .map(([itemId, qty]) => ({
-        itemId,
-        qty,
-        item: itemById.get(itemId) ?? null,
-      }));
-  }, [cart, itemById]);
-
-  const realCartLines = useMemo(() => cartLines.filter((line) => line.item), [cartLines]);
-
-  const total = realCartLines.reduce((sum, line) => sum + (line.item?.pricePerDay ?? 0) * line.qty, 0);
-  const count = realCartLines.reduce((sum, line) => sum + line.qty, 0);
+  const { cartLines, changeItemQty, removeItem, subtotal, itemCount } = useFranchizeCartLines(slug, items);
 
   return (
     <section className="mx-auto w-full max-w-4xl px-4 py-6">
@@ -104,10 +80,10 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
 
           <aside className="h-fit rounded-2xl border border-border bg-card p-4">
             <p className="text-sm text-muted-foreground">Итого позиций</p>
-            <p className="text-2xl font-semibold">{count}</p>
+            <p className="text-2xl font-semibold">{itemCount}</p>
             <p className="mt-3 text-sm text-muted-foreground">Сумма за 1 день аренды</p>
             <p className="text-2xl font-semibold" style={{ color: crew.theme.palette.accentMain }}>
-              {total.toLocaleString("ru-RU")} ₽
+              {subtotal.toLocaleString("ru-RU")} ₽
             </p>
             <Link
               href={`/franchize/${slug}/order/demo-order`}
