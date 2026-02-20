@@ -258,6 +258,57 @@ export async function getUserRentals(userId: string): Promise<{ success: boolean
     }
 }
 
+
+export async function getFranchizeSlugForVehicle(vehicleId: string): Promise<{ success: boolean; slug?: string; error?: string }> {
+    noStore();
+    if (!vehicleId) return { success: false, error: "Vehicle ID is required." };
+
+    try {
+        const { data: vehicle, error: vehicleError } = await supabaseAdmin
+            .from('cars')
+            .select('crew_id')
+            .eq('id', vehicleId)
+            .maybeSingle();
+
+        if (vehicleError) throw vehicleError;
+        if (!vehicle?.crew_id) return { success: true, slug: 'vip-bike' };
+
+        const { data: crew, error: crewError } = await supabaseAdmin
+            .from('crews')
+            .select('slug')
+            .eq('id', vehicle.crew_id)
+            .maybeSingle();
+
+        if (crewError) throw crewError;
+
+        return { success: true, slug: crew?.slug || 'vip-bike' };
+    } catch (error) {
+        logger.error(`[getFranchizeSlugForVehicle] Failed for vehicle ${vehicleId}:`, error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+}
+
+export async function getFranchizeSlugForRental(rentalId: string): Promise<{ success: boolean; slug?: string; error?: string }> {
+    noStore();
+    if (!rentalId) return { success: false, error: "Rental ID is required." };
+
+    try {
+        const { data: rental, error: rentalError } = await supabaseAdmin
+            .from('rentals')
+            .select('vehicle_id')
+            .eq('rental_id', rentalId)
+            .maybeSingle();
+
+        if (rentalError) throw rentalError;
+        if (!rental?.vehicle_id) return { success: true, slug: 'vip-bike' };
+
+        return await getFranchizeSlugForVehicle(rental.vehicle_id);
+    } catch (error) {
+        logger.error(`[getFranchizeSlugForRental] Failed for rental ${rentalId}:`, error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+}
+
 export async function getTopFleets(): Promise<{ success: boolean; data?: TopFleet[]; error?: string }> {
     noStore();
     try {

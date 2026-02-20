@@ -261,6 +261,14 @@ export default function RentBikePage() {
         
         {dbUser?.user_id && <ActiveRentalsTicker userId={dbUser.user_id} />}
 
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6 rounded-2xl border border-brand-yellow/40 bg-brand-yellow/10 p-4 text-sm text-foreground backdrop-blur-sm">
+          <p className="font-medium text-brand-yellow">Franchize storefront — основной путь</p>
+          <p className="mt-1 text-foreground/85">Этот legacy-экран сохранен для обратной совместимости.</p>
+          <Link href="/franchize/vip-bike" className="mt-2 inline-flex items-center text-sm font-semibold text-brand-yellow hover:underline">
+            Перейти в /franchize/vip-bike →
+          </Link>
+        </motion.div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <motion.div initial={{ opacity: 0, x: -100 }} animate={{ opacity: 1, x: 0 }} className="lg:col-span-1 space-y-6">
             <div className="flex flex-wrap gap-2 rounded-xl border border-border/70 bg-card/60 p-2 backdrop-blur-sm">

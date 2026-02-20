@@ -63,7 +63,7 @@ const THEME_CONFIG = {
     isTransparent: true, // Allows background component to be visible
   },
   bike: {
-    paths: ["/vipbikerental", "/rent-bike", "/rent/", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals"],
+    paths: ["/vipbikerental", "/rent/", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals"],
     Header: BikeHeader,
     Footer: BikeFooter,
     BottomNav: BottomNavigationBike,
@@ -183,7 +183,7 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   "start-training": "/selfdev/gamified",
   paddock: "/paddock",
   leaderboard: "/leaderboard",
-  "rent-bike": "/rent-bike",
+  "rent-bike": "/franchize/vip-bike",
 };
 
 const BIO30_PRODUCT_PATHS: Record<string, string> = {
