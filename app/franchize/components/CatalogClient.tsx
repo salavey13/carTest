@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { FloatingCartIconLink } from "./FloatingCartIconLink";
 import { ItemModal } from "../modals/Item";
+import { useFranchizeCart } from "../hooks/useFranchizeCart";
 
 interface CatalogClientProps {
   crew: FranchizeCrewVM;
@@ -16,7 +17,7 @@ const toCategoryId = (category: string) => `category-${category.toLowerCase().re
 
 export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
-  const [cart, setCart] = useState<Record<string, number>>({});
+  const { cart, changeItemQty } = useFranchizeCart(crew.slug || slug);
   const [selectedOptions, setSelectedOptions] = useState({ package: "Base", duration: "1 day", perk: "Стандарт" });
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -229,7 +230,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
         onClose={() => setSelectedItem(null)}
         onAddToCart={() => {
           if (!selectedItem) return;
-          setCart((prev) => ({ ...prev, [selectedItem.id]: (prev[selectedItem.id] ?? 0) + 1 }));
+          changeItemQty(selectedItem.id, 1);
           setSelectedItem(null);
         }}
       />

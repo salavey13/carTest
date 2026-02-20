@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
+import { useFranchizeCart } from "../hooks/useFranchizeCart";
 
 interface OrderPageClientProps {
   crew: FranchizeCrewVM;
@@ -13,8 +14,20 @@ interface OrderPageClientProps {
 const payments = ["Карта", "Наличные", "СБП"];
 
 export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientProps) {
-  const seededItems = useMemo(() => items.slice(0, 2), [items]);
-  const subtotal = seededItems.reduce((sum, item) => sum + item.pricePerDay, 0);
+  const { cart } = useFranchizeCart(slug);
+
+  const seededItems = useMemo(
+    () =>
+      Object.entries(cart)
+        .filter(([, qty]) => qty > 0)
+        .map(([itemId, qty]) => {
+          const item = items.find((candidate) => candidate.id === itemId);
+          return item ? { item, qty } : null;
+        })
+        .filter((entry): entry is { item: CatalogItemVM; qty: number } => Boolean(entry)),
+    [cart, items],
+  );
+  const subtotal = seededItems.reduce((sum, entry) => sum + entry.item.pricePerDay * entry.qty, 0);
 
   const [deliveryMode, setDeliveryMode] = useState<"pickup" | "delivery">("pickup");
   const [payment, setPayment] = useState(payments[0]);
@@ -121,10 +134,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             {seededItems.length === 0 ? (
               <li className="text-muted-foreground">Корзина пуста — добавьте байк из каталога.</li>
             ) : (
-              seededItems.map((item) => (
-                <li key={item.id} className="flex justify-between gap-2">
-                  <span>{item.title}</span>
-                  <span>{item.pricePerDay.toLocaleString("ru-RU")} ₽</span>
+              seededItems.map((entry) => (
+                <li key={entry.item.id} className="flex justify-between gap-2">
+                  <span>
+                    {entry.item.title} × {entry.qty}
+                  </span>
+                  <span>{(entry.item.pricePerDay * entry.qty).toLocaleString("ru-RU")} ₽</span>
                 </li>
               ))
             )}

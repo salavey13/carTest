@@ -1,7 +1,7 @@
 import { getFranchizeBySlug } from "../../actions";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
-import { FloatingCartIconLink } from "../../components/FloatingCartIconLink";
+import { FranchizeFloatingCart } from "../../components/FranchizeFloatingCart";
 
 interface FranchizeAboutPageProps {
   params: Promise<{ slug: string }>;
@@ -9,7 +9,7 @@ interface FranchizeAboutPageProps {
 
 export default async function FranchizeAboutPage({ params }: FranchizeAboutPageProps) {
   const { slug } = await params;
-  const { crew } = await getFranchizeBySlug(slug);
+  const { crew, items } = await getFranchizeBySlug(slug);
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -25,10 +25,10 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
         </p>
       </section>
       <CrewFooter crew={crew} />
-      <FloatingCartIconLink
+      <FranchizeFloatingCart
+        slug={crew.slug || slug}
         href={`/franchize/${crew.slug || slug}/cart`}
-        itemCount={0}
-        totalPrice={0}
+        items={items}
         accentColor={crew.theme.palette.accentMain}
         textColor={crew.theme.palette.textPrimary}
         borderColor={crew.theme.palette.borderSoft}

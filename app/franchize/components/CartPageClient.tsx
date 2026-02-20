@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
+import { useFranchizeCart } from "../hooks/useFranchizeCart";
 
 interface CartPageClientProps {
   crew: FranchizeCrewVM;
@@ -10,29 +11,31 @@ interface CartPageClientProps {
   items: CatalogItemVM[];
 }
 
-type CartItem = CatalogItemVM & { qty: number };
+type CartLineVM = {
+  itemId: string;
+  qty: number;
+  item: CatalogItemVM | null;
+};
 
 export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
-  const initialItems = useMemo<CartItem[]>(() => {
-    return items.slice(0, 2).map((item) => ({ ...item, qty: 1 }));
-  }, [items]);
+  const { cart, changeItemQty, removeItem } = useFranchizeCart(slug);
 
-  const [cartItems, setCartItems] = useState<CartItem[]>(initialItems);
+  const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 
-  const total = cartItems.reduce((sum, item) => sum + item.pricePerDay * item.qty, 0);
-  const count = cartItems.reduce((sum, item) => sum + item.qty, 0);
+  const cartLines = useMemo<CartLineVM[]>(() => {
+    return Object.entries(cart)
+      .filter(([, qty]) => qty > 0)
+      .map(([itemId, qty]) => ({
+        itemId,
+        qty,
+        item: itemById.get(itemId) ?? null,
+      }));
+  }, [cart, itemById]);
 
-  const updateQty = (id: string, delta: number) => {
-    setCartItems((prev) =>
-      prev
-        .map((item) => (item.id === id ? { ...item, qty: Math.max(0, item.qty + delta) } : item))
-        .filter((item) => item.qty > 0),
-    );
-  };
+  const realCartLines = useMemo(() => cartLines.filter((line) => line.item), [cartLines]);
 
-  const removeItem = (id: string) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== id));
-  };
+  const total = realCartLines.reduce((sum, line) => sum + (line.item?.pricePerDay ?? 0) * line.qty, 0);
+  const count = realCartLines.reduce((sum, line) => sum + line.qty, 0);
 
   return (
     <section className="mx-auto w-full max-w-4xl px-4 py-6">
@@ -42,7 +45,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
       <h1 className="mt-2 text-2xl font-semibold">Корзина</h1>
       <p className="mt-2 text-sm text-muted-foreground">Проверьте состав заказа, количество и итог перед оформлением.</p>
 
-      {cartItems.length === 0 ? (
+      {cartLines.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-dashed border-border bg-card p-6 text-sm text-muted-foreground">
           Корзина пока пустая. Добавьте байк из каталога, чтобы перейти к оформлению.
           <div>
@@ -58,32 +61,38 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
       ) : (
         <div className="mt-6 grid gap-4 md:grid-cols-[1fr_300px]">
           <div className="space-y-3">
-            {cartItems.map((item) => (
-              <article key={item.id} className="rounded-2xl border border-border bg-card p-4">
+            {cartLines.map((line) => (
+              <article key={line.itemId} className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h2 className="text-base font-semibold">{item.title}</h2>
-                    <p className="text-xs text-muted-foreground">{item.subtitle}</p>
-                    <p className="mt-1 text-sm font-medium" style={{ color: crew.theme.palette.accentMain }}>
-                      {item.pricePerDay.toLocaleString("ru-RU")} ₽ / день
+                    <h2 className="text-base font-semibold">{line.item?.title ?? "Позиция недоступна"}</h2>
+                    <p className="text-xs text-muted-foreground">
+                      {line.item?.subtitle ?? "Этот товар был удалён или временно недоступен в каталоге."}
                     </p>
+                    {line.item ? (
+                      <p className="mt-1 text-sm font-medium" style={{ color: crew.theme.palette.accentMain }}>
+                        {line.item.pricePerDay.toLocaleString("ru-RU")} ₽ / день
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-muted-foreground">Недоступные позиции не участвуют в расчёте суммы.</p>
+                    )}
                   </div>
-                  <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => removeItem(item.id)}>
+                  <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => removeItem(line.itemId)}>
                     Удалить
                   </button>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                   <button
                     className="h-8 w-8 rounded-full border border-border"
-                    onClick={() => updateQty(item.id, -1)}
+                    onClick={() => changeItemQty(line.itemId, -1)}
                     aria-label="Уменьшить"
                   >
                     −
                   </button>
-                  <span className="min-w-7 text-center text-sm font-medium">{item.qty}</span>
+                  <span className="min-w-7 text-center text-sm font-medium">{line.qty}</span>
                   <button
                     className="h-8 w-8 rounded-full border border-border"
-                    onClick={() => updateQty(item.id, 1)}
+                    onClick={() => changeItemQty(line.itemId, 1)}
                     aria-label="Увеличить"
                   >
                     +
