@@ -83,7 +83,7 @@ export default function RentAYogForMePage() {
                 </a>
               </Link>
 
-              <Link href="/rent-bike" legacyBehavior>
+              <Link href="/franchize/vip-bike" legacyBehavior>
                 <a aria-label="Арендовать байк" className="w-full sm:w-auto">
                   <Button size="lg" variant="accent" className="font-orbitron w-full sm:w-auto">
                     <VibeContentRenderer content="::FaMotorcycle:: RENT BIKE" />
@@ -140,7 +140,7 @@ export default function RentAYogForMePage() {
                   <li>Быстрая бронь — без бумажной волокиты</li>
                 </ul>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Link href="/rent-bike"><a className="w-full sm:w-auto"><Button className="w-full">Забронировать</Button></a></Link>
+                  <Link href="/franchize/vip-bike"><a className="w-full sm:w-auto"><Button className="w-full">Забронировать</Button></a></Link>
                   <Link href="/vipbikerental"><a className="w-full sm:w-auto"><Button variant="secondary" className="w-full">Детали</Button></a></Link>
                 </div>
               </CardContent>

@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useAppContext } from "@/contexts/AppContext";
-import { createBooking, getVehicleCalendar } from "@/app/rentals/actions";
+import { createBooking, getFranchizeSlugForVehicle, getVehicleCalendar } from "@/app/rentals/actions";
 import { fetchCarById, getUserSubscription } from "@/hooks/supabase";
 import { Loading } from "@/components/Loading";
 import { ImageGallery } from "@/components/ImageGallery";
@@ -63,6 +63,7 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
   const [hasSubscription, setHasSubscription] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [franchizeSlug, setFranchizeSlug] = useState("vip-bike");
 
   useEffect(() => {
     const loadData = async () => {
@@ -113,6 +114,21 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
     checkSubscription();
   }, [dbUser]);
 
+
+  useEffect(() => {
+    const resolveFranchizeSlug = async () => {
+      if (!vehicle?.id) {
+        setFranchizeSlug("vip-bike");
+        return;
+      }
+
+      const result = await getFranchizeSlugForVehicle(vehicle.id);
+      setFranchizeSlug(result.success && result.slug ? result.slug : "vip-bike");
+    };
+
+    resolveFranchizeSlug();
+  }, [vehicle?.id]);
+
   const totalDays = date?.from && date?.to ? Math.round((date.to.getTime() - date.from.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
   const totalPrice = totalDays * (vehicle?.daily_price || 0);
   const finalPrice = hasSubscription ? Math.round(totalPrice * 0.9) : totalPrice;
@@ -158,7 +174,7 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
         <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 text-center dark">
             <VibeContentRenderer content="::FaCircleXmark::" className="text-5xl text-destructive mb-4"/>
             <p className="text-destructive font-mono text-lg">{error || "Транспорт не найден."}</p>
-            <Button onClick={() => router.push('/rent-bike')} className="mt-6">Назад в гараж</Button>
+            <Button onClick={() => router.push(`/franchize/${franchizeSlug}`)} className="mt-6">Назад в гараж</Button>
         </div>
     );
   }
