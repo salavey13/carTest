@@ -21,7 +21,7 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
         <h1 className="mt-2 text-2xl font-semibold">О нас</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
           {crew.description ||
-            "About page scaffold for franchize runtime. Content blocks will be hydrated from crew metadata in subsequent tasks."}
+            "Раздел в процессе наполнения. Подробный текст, преимущества и FAQ подгрузятся из метаданных франшизы."}
         </p>
       </section>
       <CrewFooter crew={crew} />

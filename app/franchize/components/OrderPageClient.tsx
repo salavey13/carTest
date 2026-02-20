@@ -85,6 +85,16 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       ? "Подтвердить и получить XTR-счёт"
       : "Подтвердить заказ";
 
+  const submitHint = isSubmitting
+    ? "Проверяем данные и отправляем действие оплаты. Обычно это занимает несколько секунд."
+    : isCartEmpty
+      ? "Добавьте хотя бы один байк в корзину, чтобы перейти к подтверждению."
+      : !consent
+        ? "Подтвердите согласие с условиями аренды, чтобы отправить заказ."
+        : requiresTelegram && !hasTelegramUser
+          ? "Для оплаты Stars откройте оформление из Telegram WebApp и повторите попытку."
+          : "Проверьте контакты и способ получения, затем подтверждайте заказ.";
+
   const handleSubmit = () => {
     if (!canSubmit || isSubmitting) {
       return;
@@ -263,6 +273,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           >
             {submitLabel}
           </button>
+          <p className="mt-2 text-xs text-muted-foreground">{submitHint}</p>
         </aside>
       </div>
     </section>
