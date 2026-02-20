@@ -2,7 +2,7 @@ import { getFranchizeBySlug } from "../../actions";
 import { CartPageClient } from "../../components/CartPageClient";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
-import { FloatingCartIconLink } from "../../components/FloatingCartIconLink";
+import { FranchizeFloatingCart } from "../../components/FranchizeFloatingCart";
 
 interface FranchizeCartPageProps {
   params: Promise<{ slug: string }>;
@@ -17,10 +17,10 @@ export default async function FranchizeCartPage({ params }: FranchizeCartPagePro
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/cart`} />
       <CartPageClient crew={crew} slug={crew.slug || slug} items={items} />
       <CrewFooter crew={crew} />
-      <FloatingCartIconLink
+      <FranchizeFloatingCart
+        slug={crew.slug || slug}
         href={`/franchize/${crew.slug || slug}/cart`}
-        itemCount={Math.min(items.length, 2)}
-        totalPrice={items.slice(0, 2).reduce((sum, item) => sum + item.pricePerDay, 0)}
+        items={items}
         accentColor={crew.theme.palette.accentMain}
         textColor={crew.theme.palette.textPrimary}
         borderColor={crew.theme.palette.borderSoft}
