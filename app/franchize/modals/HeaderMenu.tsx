@@ -40,6 +40,8 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
           </button>
         </div>
 
+        <p className="mb-5 text-center text-xs text-muted-foreground italic">{crew.header.tagline}</p>
+
         <div className="space-y-2">
           {crew.header.menuLinks.map((link) => {
             const isActive = activePath === link.href;

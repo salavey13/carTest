@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Menu, Search, User } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useState } from "react";
 import type { FranchizeCrewVM } from "../actions";
 import { HeaderMenu } from "../modals/HeaderMenu";
+import { FranchizeProfileButton } from "./FranchizeProfileButton";
 
 interface CrewHeaderProps {
   crew: FranchizeCrewVM;
@@ -14,20 +15,25 @@ interface CrewHeaderProps {
 
 export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-
-  const scrollToCatalog = () => {
-    document.getElementById("catalog-sections")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  const mainCatalogPath = `/franchize/${crew.slug}`;
+  const quickLinks = crew.catalog.quickLinks.length > 0 ? crew.catalog.quickLinks : crew.catalog.categories;
 
   return (
-    <header className="z-30 border-b border-border bg-background/95 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur">
-      <div className="mx-auto w-full max-w-4xl">
-        <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
-          <span className="font-medium tracking-[0.16em] uppercase">{crew.slug}</span>
-          <span>operator storefront</span>
+    <header className="z-30 border-b border-border bg-background/95 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.55rem)] backdrop-blur">
+      {crew.catalog.tickerItems.length > 0 && (
+        <div className="-mx-4 mb-2 overflow-hidden border-b border-border/70 bg-card py-1.5">
+          <div className="animate-ticker whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            {[...crew.catalog.tickerItems, ...crew.catalog.tickerItems].map((item, index) => (
+              <Link key={`${item.id}-${index}`} href={item.href} className="mx-4 inline-flex hover:text-foreground">
+                {item.text}
+              </Link>
+            ))}
+          </div>
         </div>
+      )}
 
-        <div className="grid grid-cols-[44px_1fr_88px] items-center gap-3">
+      <div className="mx-auto w-full max-w-4xl">
+        <div className="grid grid-cols-[44px_1fr_auto] items-center gap-3 pb-3">
           <button
             type="button"
             aria-label="Open menu"
@@ -37,33 +43,31 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="mx-auto flex flex-col items-center text-center">
-            <div className="relative h-20 w-20 overflow-hidden rounded-full border bg-card" style={{ borderColor: crew.theme.palette.accentMain }}>
+          <div className="relative z-10 mx-auto -mb-6 flex flex-col items-center text-center">
+            <div className="relative h-16 w-16 overflow-hidden rounded-full border bg-card shadow-lg" style={{ borderColor: crew.theme.palette.accentMain }}>
               {crew.header.logoUrl ? (
-                <Image src={crew.header.logoUrl} alt={`${crew.header.brandName} logo`} fill sizes="80px" className="object-cover" unoptimized />
+                <Image src={crew.header.logoUrl} alt={`${crew.header.brandName} logo`} fill sizes="64px" className="object-cover" unoptimized />
               ) : (
                 <div className="flex h-full w-full items-center justify-center px-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: crew.theme.palette.accentMain }}>
                   {crew.header.brandName}
                 </div>
               )}
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">{crew.header.tagline}</p>
           </div>
 
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              aria-label="Scroll to subtype filters"
-              onClick={scrollToCatalog}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border text-muted-foreground"
-            >
-              <Search className="h-5 w-5" />
-            </button>
-            <Link href="/profile" aria-label="Open profile" className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border text-muted-foreground">
-              <User className="h-5 w-5" />
-            </Link>
-          </div>
+          <FranchizeProfileButton />
         </div>
+
+        <nav className="mt-3 flex gap-5 overflow-x-auto pb-1 text-sm text-muted-foreground">
+          {quickLinks.map((linkLabel) => {
+            const sectionHref = `${mainCatalogPath}#category-${linkLabel.toLowerCase().replace(/\s+/g, "-")}`;
+            return (
+              <Link key={linkLabel} href={sectionHref} className="shrink-0 transition-colors hover:text-foreground">
+                {linkLabel}
+              </Link>
+            );
+          })}
+        </nav>
       </div>
 
       <HeaderMenu crew={crew} activePath={activePath} open={menuOpen} onOpenChange={setMenuOpen} />

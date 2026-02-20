@@ -479,6 +479,115 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Each polish round has explicit changelog note + validation evidence.
 
 
+
+### T8.2 — Pepperolli parity polish: omnipresent balloons + searchable catalog + top ticker metadata
+- status: `done`
+- updated_at: `2026-02-20T02:33:43Z`
+- owner: `codex`
+- notes: Refined franchize header/catalog parity against Pepperolli cues: removed header clutter, moved motto into menu modal, introduced omnipresent quick-link balloons in header, implemented top ticker sourced from `catalog.tickerItems`, and added full search bar with working item filtering.
+- next_step: Continue T8.1 booking parity implementation before QA.
+- risks: `catalog.quickLinks` values that do not match actual section ids will still navigate to catalog top; future enhancement can support `{label,href}` quick-link objects for custom anchors.
+- dependencies: T8
+- deliverables:
+  - `app/franchize/components/CrewHeader.tsx`
+  - `app/franchize/components/CatalogClient.tsx`
+  - `app/franchize/modals/HeaderMenu.tsx`
+  - `app/franchize/actions.ts`
+  - `docs/sql/vip-bike-franchize-hydration.sql`
+  - `docs/sql/sly13-franchize-test-hydration.sql`
+- implementation checklist:
+  1. Remove excessive storefront text from header and keep compact logo-first lockup.
+  2. Add omnipresent quick links in header for cross-page jump-back to catalog sections.
+  3. Add ticker strip at top and hydrate from SQL metadata seeds (`catalog.tickerItems`).
+  4. Add full-width catalog search input + action button and wire filtering among items.
+  5. Move tagline/motto from dense header area into menu modal.
+- acceptance criteria:
+  - Header now contains ticker + quick links and appears consistently on catalog/about/contacts.
+  - Search input visibly filters catalog items by title/subtitle/description/category.
+  - VIP-BIKE and SLY13 SQL hydration docs include demo ticker metadata entries.
+
+### T8.3 — Pepperolli parity follow-up: header cleanup + map contacts + footer alignment + route cleanup
+- status: `done`
+- updated_at: `2026-02-20T04:05:00Z`
+- owner: `codex`
+- notes: Executed requested follow-up step-by-step: removed header search icon, switched to dedicated profile component wrapper, removed catalog title/path clutter, added contact map block sourced from metadata coordinates, deleted mistakenly created unslugged franchize pages, and rebuilt footer layout closer to Pepperolli reference.
+- next_step: Continue T8.1 booking/rentals parity before QA.
+- risks: map iframe relies on metadata `contacts.map.gps`; if missing, fallback placeholder is shown until crew metadata is filled.
+- dependencies: T8.2
+- deliverables:
+  - `app/franchize/components/FranchizeProfileButton.tsx`
+  - `app/franchize/components/CrewHeader.tsx`
+  - `app/franchize/components/CatalogClient.tsx`
+  - `app/franchize/components/CrewFooter.tsx`
+  - `app/franchize/[slug]/contacts/page.tsx`
+  - `app/franchize/actions.ts`
+  - removed: `app/franchize/about/page.tsx`
+  - removed: `app/franchize/cart/page.tsx`
+  - removed: `app/franchize/contacts/page.tsx`
+  - removed: `app/franchize/order/[id]/page.tsx`
+- implementation checklist:
+  1. Header icon cleanup: remove search icon from top bar, keep profile access via dedicated component wrapper over global user widget.
+  2. Catalog cleanup: remove lingering title/path label clutter near search block.
+  3. Contacts map integration: parse `metadata.franchize.contacts.map.gps` and render embedded map with transport/directions notes.
+  4. Footer visual pass: restructure into full-width yellow slab with sectioned contacts/menu/profile/social rows and bottom info strip.
+  5. Route cleanup: delete obsolete unslugged franchize pages that were previously used as redirects.
+- acceptance criteria:
+  - Header has no search icon and still provides profile action.
+  - Catalog top area starts from search bar without extra title/path text.
+  - Contacts page includes map card and metadata-driven map context details.
+  - Footer visual hierarchy is closer to Pepperolli screenshots on mobile/desktop.
+  - Only slug-scoped franchize info/cart/order pages remain.
+
+### T8.4 — Reinvestigate car-rent VibeMap and integrate into franchize contacts
+- status: `done`
+- updated_at: `2026-02-20T05:05:00Z`
+- owner: `codex`
+- notes: Reinvestigated reusable `VibeMap`, fixed practical bugs (safe fallback image + object-fit containment + reset control + cleanup), and integrated VibeMap-driven map card into `/franchize/[slug]/contacts` using metadata coordinates instead of Yandex iframe.
+- next_step: Continue T8.1 booking/rentals parity before QA.
+- risks: static-image map calibration still depends on valid per-crew bounds; defaults target NN map preset and may require crew-specific tuning later.
+- dependencies: T8.3
+- deliverables:
+  - `components/VibeMap.tsx`
+  - `app/franchize/components/FranchizeContactsMap.tsx`
+  - `app/franchize/[slug]/contacts/page.tsx`
+  - `app/franchize/actions.ts`
+  - `docs/sql/vip-bike-franchize-hydration.sql`
+  - `docs/sql/sly13-franchize-test-hydration.sql`
+- implementation checklist:
+  1. Audit existing car-rent VibeMap behavior and identify regressions/rough edges.
+  2. Improve VibeMap resilience (fallback map image + better contain rendering + quick reset control).
+  3. Add franchize contacts map wrapper powered by VibeMap with marker from `contacts.map.gps`.
+  4. Extend contacts-map metadata contract with optional map image and bounds.
+  5. Update SQL hydration docs so VIP-BIKE/SLY13 include map image + bounds metadata.
+- acceptance criteria:
+  - Contacts page uses VibeMap component (no iframe dependency).
+  - Invalid/missing GPS data shows safe placeholder state.
+  - VibeMap has safer defaults and remains reusable on existing pages.
+
+### T8.5 — No-code map calibration tab + Telegram-first footer/contact copy cleanup
+- status: `done`
+- updated_at: `2026-02-20T06:10:00Z`
+- owner: `codex`
+- notes: Implemented dedicated map/social tab in franchize create UI (GPS/image/bounds/social links), wired save/load in server actions, removed outdated email-focused UX from franchize contacts/footer, and swapped footer auth links with crew social links to match Telegram always-online model.
+- next_step: Continue T8.1 booking/rentals parity before QA.
+- risks: existing crews without `footer.socialLinks` rely on derived fallback from footer columns/telegram.
+- dependencies: T8.4
+- deliverables:
+  - `app/franchize/create/CreateFranchizeForm.tsx`
+  - `app/franchize/actions.ts`
+  - `app/franchize/components/CrewFooter.tsx`
+  - `app/franchize/[slug]/contacts/page.tsx`
+- implementation checklist:
+  1. Add special `Карта+соцсети` stage in create form.
+  2. Expose map calibration fields (`gps`, `imageUrl`, bounds) + social links text in no-code UI.
+  3. Persist/load these fields through `saveFranchizeConfig` / `loadFranchizeConfigBySlug`.
+  4. Remove legacy email-forward UX fragments from contacts/footer surfaces.
+  5. Replace footer auth links with social links sourced from crew metadata.
+- acceptance criteria:
+  - Create form has working map calibration tab and saved values survive reload.
+  - Footer no longer shows login/register items and instead lists crew socials.
+  - Contacts screen avoids email-first presentation and stays Telegram-first.
+
 ### T8.1 — Franchize booking parity + rentals control-center migration plan
 - status: `todo`
 - updated_at: `2026-02-20T00:40:00Z`
@@ -563,6 +672,34 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+### 2026-02-20 — T8.5 execution complete (map tab + Telegram-first copy pass)
+- Added dedicated `Карта+соцсети` tab in franchize create form for no-code map calibration.
+- Wired map calibration fields and social links through config load/save action contract.
+- Updated footer to remove `Вход/Регистрация` block and show crew social links instead.
+- Removed email-first copy from franchize contact surface and kept Telegram-driven comms emphasis.
+
+### 2026-02-20 — T8.4 execution complete (VibeMap reinvestigation + contacts integration)
+- Reinvestigated reusable `components/VibeMap.tsx` from car-rent/game surfaces and fixed practical robustness issues.
+- Added fallback static map image and switched map image rendering to `object-contain` for safer calibrated overlays.
+- Added reset control to quickly restore pan/zoom state on mobile interaction drift.
+- Replaced contacts iframe approach with dedicated `FranchizeContactsMap` wrapper using VibeMap + metadata GPS marker.
+- Extended SQL hydration docs with map `imageUrl` and `bounds` metadata for VIP-BIKE and SLY13.
+
+### 2026-02-20 — T8.3 execution complete (follow-up parity sweep)
+- Removed header search icon entirely and switched right-side action to dedicated franchize profile component wrapper based on shared user widget.
+- Removed catalog clutter remnants (`Каталог (bike only)` and slug path label) so first fold starts with search.
+- Added map section to `/franchize/[slug]/contacts` using metadata coordinates (`contacts.map.gps`) and fallback state when coordinates are absent.
+- Reworked franchize footer into full-width yellow multi-section layout (contacts/menu/profile/social) with row separators + bottom strip.
+- Deleted obsolete unslugged franchize pages (`/franchize/about|contacts|cart|order/[id]`) as requested.
+
+
+### 2026-02-20 — T8.2 execution complete (Pepperolli parity polish slice)
+- Added top ticker strip in franchize header and wired content from `catalog.tickerItems` metadata.
+- Added omnipresent header quick-link balloons for catalog section recall from about/contacts surfaces.
+- Implemented full-width catalog search (input + button) with real filtering across title/subtitle/description/category.
+- Moved verbose tagline from header into `HeaderMenu` to reduce first-screen clutter and match reference rhythm.
+- Extended SQL seed docs (`vip-bike`, `sly13`) with demo ticker metadata and quick-link arrays.
 
 ### 2026-02-18 — bootstrap
 - Added full franchise execution plan with sequential tasks and status fields.
