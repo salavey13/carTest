@@ -616,11 +616,11 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - T8.6 exists as the mandatory pre-QA polish gate.
 
 ### T8.6 — Maximum polish backlog before QA (UX/state/copy hardening)
-- status: `in_progress`
-- updated_at: `2026-02-20T14:05:00Z`
+- status: `done`
+- updated_at: `2026-02-20T16:30:00Z`
 - owner: `codex+operator`
-- notes: Completed checkout hardening slice: shared cart-line source between cart/order, deterministic subtotal + line totals, empty-cart submit guard, and Telegram Stars (XTR) primary payment path with invoice dispatch action for 1% proof-of-interest tip.
-- next_step: Continue remaining P0/P3/P4 polish items (copy consistency + broader route/state edges + observability notes), then enter T9 QA matrix.
+- notes: Closed remaining polish items by normalizing RU fallback copy on `/about` and adding checkout submit-state hints for empty cart/consent/Telegram-WebApp prerequisites to keep order flow status legible before QA.
+- next_step: Start T9 QA matrix (screenshots + route smoke + lint/build evidence).
 - risks: XTR invoice flow requires Telegram auth context (`user.id`) and valid bot runtime env in deployment; keep non-Telegram fallback payment options usable.
 - dependencies: T8.1
 - deliverables:
@@ -699,6 +699,12 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+### 2026-02-20 — T8.6 execution complete (copy + submit-state observability pass)
+- Normalized `/franchize/[slug]/about` fallback description to RU-first operator copy and removed leftover English scaffold tone.
+- Added deterministic submit-hint text on checkout sidebar to surface why CTA is blocked (empty cart, missing consent, Telegram WebApp requirement).
+- Kept checkout CTA language aligned with current payment branch (`XTR` vs regular confirm) while retaining no-crash behavior for non-Telegram sessions.
+- Marked T8.6 done and opened path for T9 QA matrix.
 
 ### 2026-02-20 — T8.6 polish slice (checkout SoT + Telegram XTR payment)
 - Unified checkout/cart composition through shared cart-line derivation and removed checkout-only seeded assumptions.
