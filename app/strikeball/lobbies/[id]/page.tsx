@@ -120,7 +120,7 @@ export default function LobbyRoom() {
         name={lobby.name} mode={lobby.mode} status={lobby.status} 
         startAt={lobby.start_at} metadata={lobby.metadata}
         userMember={userMember} isAdmin={isOwner || isSystemAdmin}
-        onPdf={() => generateAndSendLobbyPdf(dbUser?.user_id!, lobby.id)} onShare={() => {}} loading={isGeneratingPdf}
+        onPdf={() => generateAndSendLobbyPdf(dbUser?.user_id!, lobby.id)} loading={isGeneratingPdf}
         onShare={handleShare}
       />
 

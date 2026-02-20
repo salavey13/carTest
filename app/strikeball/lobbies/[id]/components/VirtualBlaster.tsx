@@ -10,6 +10,7 @@ import { executeProximityBoom, fieldRepair } from "../../../actions/blaster";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
+import { Button } from "@/components/ui/button";
 
 export function VirtualBlaster({ onHit, lobbyId, userId }: any) {
   const { dbUser, refreshDbUser } = useAppContext();
