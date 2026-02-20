@@ -660,6 +660,45 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - No blocking console/runtime errors on main flows.
   - Release notes include migration and fallback instructions.
 
+### T10 — Post-QA franchize smoke automation script
+- status: `done`
+- updated_at: `2026-02-20T17:20:00Z`
+- owner: `codex`
+- notes: Added a reusable smoke-check script for canonical slug-scoped franchize routes and exposed it via `npm run qa:franchize` for quick post-deploy validation.
+- next_step: Propose next extension task for warning backlog triage outside franchize scope.
+- risks: Smoke status depends on reachable deployment URL; route health checks do not replace visual/manual UX validation.
+- dependencies: T9
+- deliverables:
+  - `scripts/franchize-qa-check.mjs`
+  - `package.json`
+- implementation checklist:
+  1. Add route smoke script with configurable base URL + slug env overrides.
+  2. Validate catalog/about/contacts/cart/order endpoints return HTTP 2xx.
+  3. Expose script as a package command for easy operator reuse.
+- acceptance criteria:
+  - `npm run qa:franchize` exits 0 when core franchize routes are healthy.
+  - Script prints actionable per-route pass/fail output for fast incident triage.
+
+### T11 — Franchize header menu overlap + button chrome cleanup
+- status: `done`
+- updated_at: `2026-02-20T18:05:00Z`
+- owner: `codex`
+- notes: Fixed menu overlay layering/viewport fit to prevent content overlap when opened, and removed border chrome from header `Меню` + `Профиль` buttons per operator feedback.
+- next_step: Re-run mobile visual pass for header/menu states and decide if close-button border should also be flattened for visual parity.
+- risks: Visual behavior may vary slightly in Telegram WebView safe-area offsets across Android shells.
+- dependencies: T10
+- deliverables:
+  - `app/franchize/components/CrewHeader.tsx`
+  - `app/franchize/components/FranchizeProfileButton.tsx`
+  - `app/franchize/modals/HeaderMenu.tsx`
+- implementation checklist:
+  1. Remove bordered chrome from open-menu and profile action wrappers.
+  2. Raise menu modal overlay z-index above sticky catalog surfaces.
+  3. Constrain modal height with safe-area-aware top offset + internal scroll.
+- acceptance criteria:
+  - Header menu modal opens without underlay controls/content visually crossing over menu surface.
+  - `Меню` and `Профиль` buttons render without border outlines in franchize header.
+
 ---
 
 ## 6) Task template for future extension
@@ -699,6 +738,18 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+### 2026-02-20 — T11 execution complete (header overlap + borderless controls)
+- Updated franchize header action buttons to borderless styling for `Меню` and `Профиль` wrappers while preserving tap area and hover feedback.
+- Raised header menu overlay stacking order and added safe-area-aware modal sizing/scroll behavior to avoid visual overlap with sticky catalog/search layers.
+- Captured refreshed mobile screenshot evidence after menu-open state validation.
+- Sent Telegram heartbeat update for task closeout with next-beat note.
+
+### 2026-02-20 — T10 execution complete (post-QA smoke automation)
+- Added `scripts/franchize-qa-check.mjs` to validate canonical slug-scoped franchize pages (`catalog/about/contacts/cart/order`) against a configurable base URL.
+- Added `npm run qa:franchize` command so operators can run a single-step post-deploy smoke pass.
+- Re-ran targeted franchize lint gate (`npm run lint:target`) and smoke verification against production URL.
+- Sent Telegram heartbeat closeout via `scripts/codex-notify.mjs telegram` with super-admin mirror recipient included.
 
 ### 2026-02-20 — T9 execution complete (QA matrix + rollout evidence)
 - Verified viewport coverage for `/franchize/vip-bike` catalog at 360x800, 390x844, 768x1024, and desktop; captured screenshot matrix artifacts.
