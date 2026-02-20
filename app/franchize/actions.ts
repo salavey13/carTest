@@ -50,9 +50,28 @@ export interface FranchizeCrewVM {
     phone: string;
     email: string;
     address: string;
+    telegram: string;
+    workingHours: string;
+    map: {
+      gps: string;
+      publicTransport: string;
+      carDirections: string;
+      imageUrl: string;
+      bounds: {
+        top: number;
+        bottom: number;
+        left: number;
+        right: number;
+      };
+    };
   };
   catalog: {
     categories: string[];
+    quickLinks: string[];
+    tickerItems: Array<{ id: string; text: string; href: string }>;
+  };
+  footer: {
+    socialLinks: Array<{ label: string; href: string }>;
   };
 }
 
@@ -77,6 +96,14 @@ export interface FranchizeConfigInput {
   phone: string;
   email: string;
   address: string;
+  telegram: string;
+  mapGps: string;
+  mapImageUrl: string;
+  mapBoundsTop: string;
+  mapBoundsBottom: string;
+  mapBoundsLeft: string;
+  mapBoundsRight: string;
+  socialLinksText: string;
   menuLinksText: string;
   categoryOrderText: string;
   allowPromo: boolean;
@@ -121,6 +148,14 @@ const franchizeConfigSchema = z.object({
   phone: z.string().trim().default(""),
   email: z.string().trim().default(""),
   address: z.string().trim().default(""),
+  telegram: z.string().trim().default(""),
+  mapGps: z.string().trim().default(""),
+  mapImageUrl: z.string().trim().default(""),
+  mapBoundsTop: z.string().trim().default("56.42"),
+  mapBoundsBottom: z.string().trim().default("56.08"),
+  mapBoundsLeft: z.string().trim().default("43.66"),
+  mapBoundsRight: z.string().trim().default("44.12"),
+  socialLinksText: z.string().default("Telegram|https://t.me/oneBikePlsBot"),
   menuLinksText: z.string().default(""),
   categoryOrderText: z.string().default(""),
   allowPromo: z.coerce.boolean().default(true),
@@ -145,6 +180,14 @@ const defaultFranchizeConfig: FranchizeConfigInput = {
   phone: "",
   email: "",
   address: "",
+  telegram: "",
+  mapGps: "56.20420451632873, 43.798582127051695",
+  mapImageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg",
+  mapBoundsTop: "56.42",
+  mapBoundsBottom: "56.08",
+  mapBoundsLeft: "43.66",
+  mapBoundsRight: "44.12",
+  socialLinksText: "Telegram|https://t.me/oneBikePlsBot",
   menuLinksText: [
     "Каталог|/franchize/{slug}",
     "О нас|/franchize/{slug}/about",
@@ -197,6 +240,45 @@ const withSlug = (href: string, slug: string) => {
   }
 };
 
+function parseSocialLinks(lines: string): Array<{ label: string; href: string }> {
+  return lines
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [label, href] = line.split("|").map((value) => value.trim());
+      return { label: label || "Social", href: href || "https://t.me/oneBikePlsBot" };
+    });
+}
+
+function extractFooterSocialLinks(franchize: UnknownRecord, fallbackTelegram: string) {
+  const explicit = readPath(franchize, ["footer", "socialLinks"], []) as Array<UnknownRecord>;
+  const fromExplicit = explicit
+    .map((item) => ({ label: readPath(item, ["label"], ""), href: readPath(item, ["href"], "") }))
+    .filter((item) => item.label && item.href);
+
+  if (fromExplicit.length > 0) return fromExplicit;
+
+  const columns = readPath(franchize, ["footer", "columns"], []) as Array<UnknownRecord>;
+  const fromColumns = columns.flatMap((column) => {
+    const items = readPath(column, ["items"], []) as Array<UnknownRecord>;
+    return items
+      .map((item) => ({
+        label: readPath(item, ["label"], readPath(item, ["value"], "")),
+        href: readPath(item, ["href"], ""),
+      }))
+      .filter((entry) => entry.label && entry.href);
+  });
+
+  if (fromColumns.length > 0) return fromColumns;
+
+  if (fallbackTelegram) {
+    return [{ label: fallbackTelegram, href: `https://t.me/${fallbackTelegram.replace("@", "")}` }];
+  }
+
+  return [{ label: "Telegram", href: "https://t.me/oneBikePlsBot" }];
+}
+
 const emptyCrew = (slug: string): FranchizeCrewVM => ({
   id: "",
   slug,
@@ -216,9 +298,28 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     phone: "",
     email: "",
     address: "",
+    telegram: "",
+    workingHours: "",
+    map: {
+      gps: "",
+      publicTransport: "",
+      carDirections: "",
+      imageUrl: "",
+      bounds: {
+        top: 56.42,
+        bottom: 56.08,
+        left: 43.66,
+        right: 44.12,
+      },
+    },
   },
   catalog: {
     categories: [],
+    quickLinks: [],
+    tickerItems: [],
+  },
+  footer: {
+    socialLinks: [],
   },
 });
 
@@ -295,9 +396,37 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
           ["contacts", "address"],
           readPath(franchize, ["footer", "address"], crew.hq_location ?? ""),
         ),
+        telegram: readPath(franchize, ["contacts", "telegram"], ""),
+        workingHours: readPath(franchize, ["contacts", "workingHours"], ""),
+        map: {
+          gps: readPath(franchize, ["contacts", "map", "gps"], ""),
+          publicTransport: readPath(franchize, ["contacts", "map", "publicTransport"], ""),
+          carDirections: readPath(franchize, ["contacts", "map", "carDirections"], ""),
+          imageUrl: readPath(franchize, ["contacts", "map", "imageUrl"], ""),
+          bounds: {
+            top: Number(readPath(franchize, ["contacts", "map", "bounds", "top"], 56.42)),
+            bottom: Number(readPath(franchize, ["contacts", "map", "bounds", "bottom"], 56.08)),
+            left: Number(readPath(franchize, ["contacts", "map", "bounds", "left"], 43.66)),
+            right: Number(readPath(franchize, ["contacts", "map", "bounds", "right"], 44.12)),
+          },
+        },
       },
       catalog: {
         categories: readPath(franchize, ["catalog", "groupOrder"], []),
+        quickLinks: readPath(franchize, ["catalog", "quickLinks"], []),
+        tickerItems: readPath(franchize, ["catalog", "tickerItems"], []).map((item: unknown, index: number) => {
+          const tickerItem = (item ?? {}) as UnknownRecord;
+          const text = readPath(tickerItem, ["text"], readPath(tickerItem, ["title"], ""));
+
+          return {
+            id: readPath(tickerItem, ["id"], `ticker-${index + 1}`),
+            text,
+            href: readPath(tickerItem, ["href"], `/franchize/${crew.slug ?? safeSlug}`),
+          };
+        }),
+      },
+      footer: {
+        socialLinks: extractFooterSocialLinks(franchize, readPath(franchize, ["contacts", "telegram"], "")),
       },
     };
 
@@ -329,7 +458,10 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
             hydratedCrew.catalog.categories.length > 0
               ? hydratedCrew.catalog.categories
               : [...new Set(items.map((item) => item.category).filter(Boolean))],
+          quickLinks: hydratedCrew.catalog.quickLinks,
+          tickerItems: hydratedCrew.catalog.tickerItems.filter((item) => item.text.trim().length > 0),
         },
+        footer: hydratedCrew.footer,
       },
       items,
     };
@@ -383,6 +515,16 @@ function toFranchizeConfigInput(crew: UnknownRecord, slug: string): FranchizeCon
     phone: readPath(franchize, ["contacts", "phone"], readPath(franchize, ["footer", "phone"], "")),
     email: readPath(franchize, ["contacts", "email"], readPath(franchize, ["footer", "email"], "")),
     address: readPath(franchize, ["contacts", "address"], readPath(franchize, ["footer", "address"], "")),
+    telegram: readPath(franchize, ["contacts", "telegram"], ""),
+    mapGps: readPath(franchize, ["contacts", "map", "gps"], ""),
+    mapImageUrl: readPath(franchize, ["contacts", "map", "imageUrl"], ""),
+    mapBoundsTop: String(readPath(franchize, ["contacts", "map", "bounds", "top"], 56.42)),
+    mapBoundsBottom: String(readPath(franchize, ["contacts", "map", "bounds", "bottom"], 56.08)),
+    mapBoundsLeft: String(readPath(franchize, ["contacts", "map", "bounds", "left"], 43.66)),
+    mapBoundsRight: String(readPath(franchize, ["contacts", "map", "bounds", "right"], 44.12)),
+    socialLinksText: extractFooterSocialLinks(franchize, readPath(franchize, ["contacts", "telegram"], ""))
+      .map((entry) => `${entry.label}|${entry.href}`)
+      .join("\n"),
     menuLinksText: menuLinks
       .map((entry) => `${readPath(entry, ["label"], "Link")}|${readPath(entry, ["href"], `/franchize/${slug}`)}`)
       .join("\n"),
@@ -484,12 +626,26 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput): Promise<
       phone: payload.phone,
       email: payload.email,
       address: payload.address,
+      socialLinks: parseSocialLinks(payload.socialLinksText),
     },
     contacts: {
       ...(readPath(sourceFranchize, ["contacts"], {}) as UnknownRecord),
       phone: payload.phone,
       email: payload.email,
       address: payload.address,
+      telegram: payload.telegram,
+      map: {
+        ...(readPath(sourceFranchize, ["contacts", "map"], {}) as UnknownRecord),
+        gps: payload.mapGps,
+        imageUrl: payload.mapImageUrl,
+        bounds: {
+          ...(readPath(sourceFranchize, ["contacts", "map", "bounds"], {}) as UnknownRecord),
+          top: Number(payload.mapBoundsTop),
+          bottom: Number(payload.mapBoundsBottom),
+          left: Number(payload.mapBoundsLeft),
+          right: Number(payload.mapBoundsRight),
+        },
+      },
     },
     catalog: {
       ...(readPath(sourceFranchize, ["catalog"], {}) as UnknownRecord),
@@ -520,4 +676,3 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput): Promise<
     data: payload,
   };
 }
-

@@ -19,6 +19,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [selectedOptions, setSelectedOptions] = useState({ package: "Base", duration: "1 day", perk: "Стандарт" });
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const categoryTabsRef = useRef<Record<string, HTMLAnchorElement | null>>({});
 
   const orderedCategories = useMemo(
@@ -26,15 +27,22 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
     [crew.catalog.categories, items],
   );
 
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return items;
+
+    const query = searchQuery.toLowerCase().trim();
+    return items.filter((item) => [item.title, item.subtitle, item.description, item.category].join(" ").toLowerCase().includes(query));
+  }, [items, searchQuery]);
+
   const itemsByCategory = useMemo(
     () =>
       orderedCategories
         .map((category) => ({
           category,
-          items: items.filter((item) => item.category === category),
+          items: filteredItems.filter((item) => item.category === category),
         }))
         .filter((group) => group.items.length > 0),
-    [items, orderedCategories],
+    [filteredItems, orderedCategories],
   );
 
   useEffect(() => {
@@ -98,6 +106,8 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
     );
   }, [cart, items]);
 
+
+
   const openItem = (item: CatalogItemVM) => {
     setSelectedItem(item);
     setSelectedOptions({ package: "Base", duration: "1 day", perk: "Стандарт" });
@@ -112,9 +122,27 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
           </p>
         )}
 
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Каталог (bike only)</h1>
-          <span className="text-xs text-muted-foreground">/franchize/{crew.slug || slug}</span>
+        <div id="catalog-search" className="relative mb-5">
+          <input
+            id="catalog-search-input"
+            type="text"
+            placeholder="Введите название байка"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="w-full rounded-full border border-border bg-muted/40 py-3 pl-5 pr-28 text-sm outline-none transition focus:border-transparent focus:ring-2"
+            style={{ boxShadow: `0 0 0 1px ${crew.theme.palette.borderSoft}` }}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const firstResult = document.querySelector("[data-catalog-item='true']") as HTMLElement | null;
+              firstResult?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+            className="absolute bottom-1 right-1 top-1 rounded-full px-5 text-sm font-semibold transition active:scale-95"
+            style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}
+          >
+            Искать
+          </button>
         </div>
 
         <div className="sticky top-[max(env(safe-area-inset-top),0.5rem)] z-20 -mx-4 mb-5 border-b border-border/60 bg-background/95 px-4 pb-2 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/70">
@@ -144,6 +172,10 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
           <div className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
             No bike catalog items yet. Add `type=bike` cars to this crew to hydrate the catalog.
           </div>
+        ) : itemsByCategory.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+            По запросу ничего не найдено. Попробуй другое название или категорию.
+          </div>
         ) : (
           <div className="space-y-6">
             {itemsByCategory.map((group) => (
@@ -153,7 +185,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                 </h2>
                 <div className="grid grid-cols-2 gap-3">
                   {group.items.map((item) => (
-                    <article key={item.id} className="overflow-hidden rounded-2xl border border-border bg-card">
+                    <article key={item.id} data-catalog-item="true" className="overflow-hidden rounded-2xl border border-border bg-card">
                       <button type="button" className="block w-full text-left" onClick={() => openItem(item)}>
                         <div className="relative h-28 w-full">
                           {item.imageUrl ? (
