@@ -194,7 +194,7 @@ export default function RulesPage() {
         </div>
       </div>
       <section className="p-4 grid gap-4">
-        {sessionTypes.map(type => <ServiceCard {...type} borderColorClass="border-blue-500" />)}
+        {sessionTypes.map(type => <ServiceCard key={type.title} {...type} borderColorClass="border-blue-500" />)}
       </section>
       <Card className="m-4">
         <CardHeader><CardTitle>{rigger.name}</CardTitle></CardHeader>
