@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 
 import { useAppContext } from "@/contexts/AppContext";
-import { archivePendingRental, getUserRentals } from "./actions";
+import { archivePendingRental, getFranchizeSlugForRental, getUserRentals } from "./actions";
 import type { UserRentalDashboard } from "@/lib/types";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -115,6 +115,7 @@ export default function RentalsPage() {
   const { dbUser, isLoading: isAppLoading } = useAppContext();
   const [rentals, setRentals] = useState<UserRentalDashboard[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [franchizeSlug, setFranchizeSlug] = useState("vip-bike");
 
   const loadRentals = async (userId: string) => {
     setIsLoadingData(true);
@@ -135,6 +136,22 @@ export default function RentalsPage() {
     }
     loadRentals(dbUser.user_id);
   }, [dbUser, isAppLoading]);
+
+
+  useEffect(() => {
+    const resolveSlug = async () => {
+      const primaryRental = rentals.find((r) => r.status === "active") || rentals[0];
+      if (!primaryRental?.rental_id) {
+        setFranchizeSlug("vip-bike");
+        return;
+      }
+
+      const result = await getFranchizeSlugForRental(primaryRental.rental_id);
+      setFranchizeSlug(result.success && result.slug ? result.slug : "vip-bike");
+    };
+
+    resolveSlug();
+  }, [rentals]);
 
   const handleArchive = async (rentalId: string) => {
     if (!dbUser?.user_id) return;
@@ -199,6 +216,14 @@ export default function RentalsPage() {
             <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Быстрый поиск по ID</p>
             <RentalSearchForm />
           </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-brand-yellow/40 bg-brand-yellow/10 p-4 text-sm backdrop-blur-sm">
+          <p className="font-medium text-brand-yellow">Franchize storefront активен</p>
+          <p className="mt-1 text-foreground/85">Каталог и оформление теперь в `/franchize/${franchizeSlug}`.</p>
+          <Link href={`/franchize/${franchizeSlug}`} className="mt-2 inline-flex items-center font-semibold text-brand-yellow hover:underline">
+            Открыть /franchize/${franchizeSlug} →
+          </Link>
         </motion.div>
 
         {isLoadingData ? (

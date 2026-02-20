@@ -453,16 +453,17 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Validation errors are human-readable and non-destructive.
 
 ### T8 — Legacy route alignment and migration bridge (execution recipe)
-- status: `todo`
-- updated_at: `2026-02-19T23:25:00Z`
-- owner: `codex+operator`
-- notes: Prepare migration bridge from legacy routes to franchize surfaces with strict fallback safety and polish-round structure.
-- next_step: kick off T8-P0 preparation commit, then execute polish rounds in isolated micro-branches and merge sequentially.
-- risks: breaking bookmarked deep links; over-eager redirects harming legacy conversion; merge conflicts across parallel polish spikes.
+- status: `done`
+- updated_at: `2026-02-20T00:06:00Z`
+- owner: `codex`
+- notes: Completed hard-cutover pass for entry links: removed bridge flag gating, replaced legacy `/rent-bike` mentions with `/franchize/vip-bike` on rider-facing surfaces, and captured parity audit notes for missing booking capabilities in franchize flow.
+- next_step: Run T8.1 parity implementation: date picking + booking persistence + promo/invoice logic + rentals migration blueprint.
+- risks: Feature parity gap remains in franchize checkout (date picker, persisted booking, promo engine, invoice pipeline).
 - dependencies: T7
 - deliverables:
   - selective links from `/rent-bike`, `/vipbikerental`, `/rentals`
-  - feature-flagged bridge behavior for discoverability without forced migration
+  - hard-cutover link map routing users to `/franchize/vip-bike` as the primary catalog path
+  - parity gap audit (booking calendar/promo/invoice/rentals control center migration)
   - rollout log with polish-round outcomes
 - implementation checklist:
   1. **T8-P0 (prep):** freeze route matrix + baseline screenshots + fallback rules for legacy pages.
@@ -477,6 +478,30 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - No dead links between old/new pages.
   - Each polish round has explicit changelog note + validation evidence.
 
+
+### T8.1 — Franchize booking parity + rentals control-center migration plan
+- status: `todo`
+- updated_at: `2026-02-20T00:40:00Z`
+- owner: `codex+operator`
+- notes: Gap audit confirms franchize flow still lacks booking calendar/date lock, booking persistence, promo engine, and invoice/rentals pipeline parity from legacy `/rent-bike` + `/rentals`.
+- next_step: implement booking date-range picker in franchize modal/order flow, wire createBooking path, persist cart/order payload, and draft rentals control-center component map for `/franchize/[slug]/rentals`.
+- risks: regression in booking validation, double-booking without date locks, mismatch between legacy rental statuses and franchize order states.
+- dependencies: T8
+- deliverables:
+  - parity checklist mapped to legacy booking mechanics
+  - implementation plan for promo + invoice + booking persistence
+  - migration blueprint for `/rentals` UX into `/franchize/[slug]/rentals`
+- implementation checklist:
+  1. Port date-range calendar + disabled-booked-dates logic from legacy booking flow.
+  2. Wire `createBooking` action (or franchize-specific equivalent) with consent/validation gates.
+  3. Implement promo code application rules and reflected totals in cart/order summary.
+  4. Add invoice/rental entity creation path and route handoff into rentals dashboard.
+  5. Design phased migration for monolithic `/rentals` into franchize-scoped control center.
+- acceptance criteria:
+  - Franchize booking path supports real date-based availability and booking persistence.
+  - Promo + invoice logic are functional (not UI stubs).
+  - Rentals dashboard migration plan has explicit component extraction order and rollback notes.
+
 ### T9 — QA, screenshots, and rollout notes
 - status: `todo`
 - updated_at: `-`
@@ -484,7 +509,7 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - notes: visual QA + route QA + release playbook.
 - next_step: produce screenshot matrix and go-live checklist.
 - risks: UI drift across mobile widths.
-- dependencies: T8
+- dependencies: T8.1
 - deliverables:
   - screenshots
   - route verification checklist
@@ -735,4 +760,28 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Expanded T8 from generic todo into explicit recipe: prep + bridge links + flags + aliases + polish rounds.
 - Added "parallel spikes, sequential integration" rule to test merge-hope technique safely without violating dependency order.
 - Added acceptance requirement to log validation evidence for each polish round.
+
+
+### 2026-02-20 — T8 execution complete (legacy-to-franchize bridge discoverability)
+- Marked T8 `in_progress` -> `done` with sequential substep execution (P0 to P2) and heartbeat notifications after each meaningful substep.
+- Added non-destructive bridge entry points on `/vipbikerental`, `/rent-bike`, and `/rentals` with feature-flag control (`NEXT_PUBLIC_FRANCHIZE_BRIDGE_ENABLED`).
+- Preserved legacy routes as primary while exposing optional `/franchize/vip-bike` transition path; no forced redirects introduced.
+- Captured refreshed baseline screenshot for bridge entry visibility on `/vipbikerental`.
+
+### 2026-02-20 — T8 hard-cutover follow-up (legacy mentions swapped + parity audit)
+- Removed env-flag dependency for franchize discoverability and switched rider-facing `/rent-bike` links to `/franchize/vip-bike`.
+- Confirmed franchize checkout is currently UI-only for promo and order submit, without booking persistence/invoice hooks.
+- Confirmed date-range booking/calendar disable logic still exists only in legacy `/rent-bike` flow and is not yet ported to franchize modal/cart/order.
+- Declared next implementation slice: parity port for booking calendar, booking create action, promo apply logic, invoice/rental pipeline, then rentals control-center migration into `/franchize/[slug]`.
+
+### 2026-02-20 — T8 hard-cutover correction pass (feedback fixes)
+- Reverted unnecessary `ClientLayout` bike-theme scope for `/franchize/vip-bike` to avoid leaking legacy bike header/footer chrome into franchize shell.
+- Kept permanent `/rent-bike` -> `/franchize/vip-bike` link replacements, but removed extra promotional CTA/card clutter added on `/vipbikerental` by previous pass.
+- Updated back-navigation on `/rentals` and `/rent/[id]` to resolve franchize target slug from `userCrewInfo.slug` with safe fallback to `vip-bike`.
+
+
+### 2026-02-20 — T8 hard-cutover correction pass 2 (crew ownership slug resolution)
+- Replaced `userCrewInfo`-based franchize link resolution with rental-item ownership resolution via server actions (`rental_id -> vehicle_id -> crew.slug`).
+- `/rentals` banner now resolves slug from the primary rental item (active first, otherwise latest), not current user membership.
+- `/rent/[id]` back link now resolves slug by vehicle ownership lookup, with safe fallback `vip-bike`.
 

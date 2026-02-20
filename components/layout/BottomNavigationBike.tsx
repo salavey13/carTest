@@ -35,7 +35,7 @@ const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
   { href: "/crews", icon: "FaUsers", label: "Crews", color: "text-brand-green" }, // оставлен зеленый для разнообразия
   { href: "/paddock", icon: "FaWarehouse", label: "Paddock", color: "text-brand-cyan", adminOnly: true }, // оставлен голубой
   { href: "/admin", icon: "FaCirclePlus", label: "Admin", color: "text-secondary" }, // indigo
-  { href: "/rent-bike", icon: "FaMotorcycle", label: "Rent", isCentralCandidate: true, centralColor: "from-primary to-accent" }, // red-orange to gold
+  { href: "/franchize/vip-bike", icon: "FaMotorcycle", label: "Rent", isCentralCandidate: true, centralColor: "from-primary to-accent" }, // red-orange to gold
 ];
 
 const navTranslations: Record<string, Record<string, string>> = {

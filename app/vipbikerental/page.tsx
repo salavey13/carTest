@@ -79,7 +79,7 @@ const quickActions = [
     title: "Каталог байков",
     icon: "::FaMotorcycle::",
     text: "Подбор модели под стиль езды, бюджет и маршрут.",
-    href: "/rent-bike",
+    href: "/franchize/vip-bike",
     cta: "Открыть",
   },
   {
@@ -93,7 +93,7 @@ const quickActions = [
     title: "Быстрый вход",
     icon: "::FaBolt::",
     text: "Прямой сценарий: выбрать → подтвердить → поехать.",
-    href: "/rent-bike",
+    href: "/franchize/vip-bike",
     cta: "Старт",
   },
 ];
@@ -104,6 +104,7 @@ const heroMetrics = [
   "::FaMapLocationDot:: Центр выдачи в городе",
   "::FaHeadset:: Поддержка на маршруте",
 ];
+
 
 export default function HomePage() {
   const { dbUser } = useAppContext();
@@ -191,7 +192,7 @@ export default function HomePage() {
 
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Button asChild size="lg" variant="accent" className="font-orbitron text-base shadow-lg shadow-accent/35 transition-all hover:scale-105 hover:shadow-accent/70">
-              <Link href="/rent-bike">
+              <Link href="/franchize/vip-bike">
                 <VibeContentRenderer content="::FaMotorcycle className='mr-2':: Выбрать байк" />
               </Link>
             </Button>
@@ -297,7 +298,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StepItem num="1" title="Бронь" icon="::FaCalendarCheck::">
               Выберите модель в нашем{" "}
-              <Link href="/rent-bike" className="text-accent-text hover:underline">
+              <Link href="/franchize/vip-bike" className="text-accent-text hover:underline">
                 каталоге
               </Link>{" "}
               и оформите бронь онлайн.

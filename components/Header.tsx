@@ -81,7 +81,7 @@ const allPages: PageInfo[] = [
   { path: "/finance-literacy-memo", name: "Finance Literacy Memo", icon: "FaDollarSign", group: "Content & Tools", color: "green", minLevel: 0},
   
   // Misc
-  { path: "/rent-bike", name: "Cyber Garage", icon: "FaMotorcycle", group: "Misc", color: "blue", minLevel: 0 },
+  { path: "/franchize/vip-bike", name: "Cyber Garage", icon: "FaMotorcycle", group: "Misc", color: "blue", minLevel: 0 },
   { path: "/crews", name: "Crews", icon: "FaUsers", group: "Misc", color: "green", minLevel: 0 },
   { path: "/paddock", name: "My Paddock", icon: "FaWarehouse", group: "Misc", color: "orange", minLevel: 0, isAdminOnly: true },
   { path: "/botbusters", name: "Bot Busters", icon: "FaRobot", group: "Misc", color: "blue", minLevel: 0},

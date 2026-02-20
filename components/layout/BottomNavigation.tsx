@@ -42,7 +42,7 @@ const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
   { href: "/paddock", icon: FaWarehouse, label: "Paddock", color: "text-brand-cyan", adminOnly: true },
   { href: "/admin", icon: FaCirclePlus, label: "Admin", color: "text-brand-pink", adminOnly: false },
   // Central item is defined here, the layout logic will place it in the middle
-  { href: "/rent-bike", icon: FaMotorcycle, label: "Rent", isCentralCandidate: true, centralColor: "from-amber-400 to-orange-500" },
+  { href: "/franchize/vip-bike", icon: FaMotorcycle, label: "Rent", isCentralCandidate: true, centralColor: "from-amber-400 to-orange-500" },
 ];
 
 const navTranslations: Record<string, Record<string, string>> = {
