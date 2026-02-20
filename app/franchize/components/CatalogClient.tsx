@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
-import { FloatingCartIconLink } from "./FloatingCartIconLink";
+import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { ItemModal } from "../modals/Item";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 
@@ -17,7 +17,7 @@ const toCategoryId = (category: string) => `category-${category.toLowerCase().re
 
 export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
-  const { cart, changeItemQty } = useFranchizeCart(crew.slug || slug);
+  const { changeItemQty } = useFranchizeCart(crew.slug || slug);
   const [selectedOptions, setSelectedOptions] = useState({ package: "Base", duration: "1 day", perk: "Стандарт" });
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -94,20 +94,6 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
     const activeTab = categoryTabsRef.current[activeCategory];
     activeTab?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   }, [activeCategory]);
-
-  const { itemCount, totalPrice } = useMemo(() => {
-    return items.reduce(
-      (acc, item) => {
-        const qty = cart[item.id] ?? 0;
-        acc.itemCount += qty;
-        acc.totalPrice += qty * item.pricePerDay;
-        return acc;
-      },
-      { itemCount: 0, totalPrice: 0 },
-    );
-  }, [cart, items]);
-
-
 
   const openItem = (item: CatalogItemVM) => {
     setSelectedItem(item);
@@ -213,10 +199,10 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
         )}
       </section>
 
-      <FloatingCartIconLink
+      <FloatingCartIconLinkBySlug
+        slug={crew.slug || slug}
         href={`/franchize/${crew.slug || slug}/cart`}
-        itemCount={itemCount}
-        totalPrice={totalPrice}
+        items={items}
         accentColor={crew.theme.palette.accentMain}
         textColor={crew.theme.palette.textPrimary}
         borderColor={crew.theme.palette.borderSoft}
