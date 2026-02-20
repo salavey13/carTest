@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 export type FranchizeCartState = Record<string, number>;
 
 const CART_STORAGE_PREFIX = "franchize-cart";
+const CART_SYNC_EVENT = "franchize-cart-sync";
 
 const sanitizeCartState = (value: unknown): FranchizeCartState => {
   if (!value || typeof value !== "object") {
@@ -31,7 +32,7 @@ export function useFranchizeCart(slug: string) {
   const storageKey = useMemo(() => getFranchizeCartStorageKey(slug), [slug]);
   const [cart, setCart] = useState<FranchizeCartState>({});
 
-  useEffect(() => {
+  const hydrateCartFromStorage = useCallback(() => {
     if (typeof window === "undefined") return;
 
     const raw = window.localStorage.getItem(storageKey);
@@ -48,8 +49,13 @@ export function useFranchizeCart(slug: string) {
   }, [storageKey]);
 
   useEffect(() => {
+    hydrateCartFromStorage();
+  }, [hydrateCartFromStorage]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(storageKey, JSON.stringify(cart));
+    window.dispatchEvent(new CustomEvent(CART_SYNC_EVENT, { detail: { storageKey } }));
   }, [cart, storageKey]);
 
   useEffect(() => {
@@ -57,21 +63,29 @@ export function useFranchizeCart(slug: string) {
 
     const onStorage = (event: StorageEvent) => {
       if (event.key !== storageKey) return;
-      if (!event.newValue) {
-        setCart({});
-        return;
-      }
-
-      try {
-        setCart(sanitizeCartState(JSON.parse(event.newValue)));
-      } catch {
-        setCart({});
-      }
+      hydrateCartFromStorage();
     };
 
+    const onCartSync = (event: Event) => {
+      const syncEvent = event as CustomEvent<{ storageKey?: string }>;
+      if (syncEvent.detail?.storageKey !== storageKey) return;
+      hydrateCartFromStorage();
+    };
+
+    const onPageRestore = () => hydrateCartFromStorage();
+
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [storageKey]);
+    window.addEventListener(CART_SYNC_EVENT, onCartSync as EventListener);
+    window.addEventListener("pageshow", onPageRestore);
+    window.addEventListener("popstate", onPageRestore);
+
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(CART_SYNC_EVENT, onCartSync as EventListener);
+      window.removeEventListener("pageshow", onPageRestore);
+      window.removeEventListener("popstate", onPageRestore);
+    };
+  }, [hydrateCartFromStorage, storageKey]);
 
   const setItemQty = useCallback((itemId: string, qty: number) => {
     setCart((prev) => {
