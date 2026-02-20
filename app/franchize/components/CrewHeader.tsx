@@ -38,7 +38,7 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
             type="button"
             aria-label="Open menu"
             onClick={() => setMenuOpen(true)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border text-foreground transition"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-card/20 text-foreground transition hover:bg-card/35"
           >
             <Menu className="h-5 w-5" />
           </button>

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { FranchizeCrewVM } from "../actions";
 
 interface HeaderMenuProps {
@@ -12,14 +14,20 @@ interface HeaderMenuProps {
 }
 
 export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuProps) {
-  if (!open) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!open || !mounted) {
     return null;
   }
 
-  return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/70 p-4" onClick={() => onOpenChange(false)}>
+  return createPortal(
+    <div className="fixed inset-0 z-[70] flex items-start justify-center bg-black/75 p-4" onClick={() => onOpenChange(false)}>
       <div
-        className="mt-16 w-full max-w-sm rounded-2xl border p-4"
+        className="mt-[calc(max(env(safe-area-inset-top),0.5rem)+0.5rem)] w-full max-w-sm max-h-[calc(100dvh-max(env(safe-area-inset-top),0.5rem)-1rem)] overflow-y-auto rounded-2xl border p-4 shadow-2xl"
         style={{
           backgroundColor: crew.theme.palette.bgCard,
           borderColor: crew.theme.palette.borderSoft,
@@ -62,6 +70,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
           })}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
