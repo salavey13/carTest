@@ -616,12 +616,12 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - T8.6 exists as the mandatory pre-QA polish gate.
 
 ### T8.6 — Maximum polish backlog before QA (UX/state/copy hardening)
-- status: `todo`
-- updated_at: `2026-02-20T12:35:00Z`
+- status: `in_progress`
+- updated_at: `2026-02-20T14:05:00Z`
 - owner: `codex+operator`
-- notes: Consolidated final polish backlog to eliminate avoidable QA churn before T9 screenshot and rollout checks.
-- next_step: Execute polish items sequentially (P0 -> P4) and attach evidence per item.
-- risks: polish pass can sprawl if new feature requests slip in; keep this task strictly quality-hardening (no major feature expansion).
+- notes: Completed checkout hardening slice: shared cart-line source between cart/order, deterministic subtotal + line totals, empty-cart submit guard, and Telegram Stars (XTR) primary payment path with invoice dispatch action for 1% proof-of-interest tip.
+- next_step: Continue remaining P0/P3/P4 polish items (copy consistency + broader route/state edges + observability notes), then enter T9 QA matrix.
+- risks: XTR invoice flow requires Telegram auth context (`user.id`) and valid bot runtime env in deployment; keep non-Telegram fallback payment options usable.
 - dependencies: T8.1
 - deliverables:
   - polish checklist with completion evidence links/notes
@@ -699,6 +699,12 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+### 2026-02-20 — T8.6 polish slice (checkout SoT + Telegram XTR payment)
+- Unified checkout/cart composition through shared cart-line derivation and removed checkout-only seeded assumptions.
+- Added empty-cart CTA/guard behavior and submit disable to prevent invalid order confirmation attempts.
+- Implemented Telegram Stars (XTR) as primary checkout payment option with server action that creates invoice metadata and sends Telegram invoice for 1% proof-of-interest tip.
+- Revalidated franchize-targeted lint and refreshed checkout screenshot evidence for the updated payment/summary UX.
 
 ### 2026-02-20 — T8.5 execution complete (map tab + Telegram-first copy pass)
 - Added dedicated `Карта+соцсети` tab in franchize create form for no-code map calibration.
