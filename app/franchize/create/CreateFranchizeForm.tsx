@@ -8,7 +8,7 @@ import {
   saveFranchizeConfig,
 } from "@/app/franchize/actions";
 
-type Stage = "palette" | "content" | "ai";
+type Stage = "palette" | "content" | "map" | "ai";
 
 const TEMPLATE_PAYLOAD = {
   instruction: "Персонализируй этот franchize JSON под владельца и бренд. Сохрани структуру ключей.",
@@ -30,7 +30,7 @@ const TEMPLATE_PAYLOAD = {
       },
     },
     header: { menuLinks: [] },
-    contacts: { phone: "+7 900 000 00 00", email: "hello@example.com", address: "Город / Онлайн" },
+    contacts: { phone: "+7 900 000 00 00", telegram: "@oneBikePlsBot", address: "Город / Онлайн", map: { gps: "56.2042,43.7985", imageUrl: "", bounds: { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 } } },
     catalog: { groupOrder: ["Основное", "Дополнительно"] },
     order: { allowPromo: true, deliveryModes: ["pickup", "delivery"], defaultMode: "pickup" },
   },
@@ -102,6 +102,14 @@ export default function CreateFranchizeForm() {
     phone: "",
     email: "",
     address: "",
+    telegram: "",
+    mapGps: "56.20420451632873, 43.798582127051695",
+    mapImageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg",
+    mapBoundsTop: "56.42",
+    mapBoundsBottom: "56.08",
+    mapBoundsLeft: "43.66",
+    mapBoundsRight: "44.12",
+    socialLinksText: "Telegram|https://t.me/oneBikePlsBot",
     menuLinksText: "Каталог|/franchize/{slug}\nО нас|/franchize/{slug}/about\nКонтакты|/franchize/{slug}/contacts\nКорзина|/franchize/{slug}/cart",
     categoryOrderText: "Naked, Supersport, Touring, Neo-retro",
     allowPromo: true,
@@ -178,6 +186,17 @@ export default function CreateFranchizeForm() {
         phone: readPath(source, ["contacts", "phone"], prev.phone),
         email: readPath(source, ["contacts", "email"], prev.email),
         address: readPath(source, ["contacts", "address"], prev.address),
+        telegram: readPath(source, ["contacts", "telegram"], prev.telegram),
+        mapGps: readPath(source, ["contacts", "map", "gps"], prev.mapGps),
+        mapImageUrl: readPath(source, ["contacts", "map", "imageUrl"], prev.mapImageUrl),
+        mapBoundsTop: String(readPath(source, ["contacts", "map", "bounds", "top"], prev.mapBoundsTop)),
+        mapBoundsBottom: String(readPath(source, ["contacts", "map", "bounds", "bottom"], prev.mapBoundsBottom)),
+        mapBoundsLeft: String(readPath(source, ["contacts", "map", "bounds", "left"], prev.mapBoundsLeft)),
+        mapBoundsRight: String(readPath(source, ["contacts", "map", "bounds", "right"], prev.mapBoundsRight)),
+        socialLinksText: readPath(source, ["footer", "socialLinks"], [])
+          .map((entry: { label?: string; href?: string }) => `${entry.label ?? ""}|${entry.href ?? ""}`)
+          .filter(Boolean)
+          .join("\n") || prev.socialLinksText,
       }));
       setMessage("JSON применён локально для предпросмотра. Если всё ок — нажимайте сохранить.");
     } catch {
@@ -271,8 +290,7 @@ export default function CreateFranchizeForm() {
           <label className="text-sm">Слоган<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.tagline} onChange={(e) => updateField("tagline", e.target.value)} /></label>
           <label className="text-sm">Логотип URL<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.logoUrl} onChange={(e) => updateField("logoUrl", e.target.value)} /></label>
           <label className="text-sm">Телефон<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.phone} onChange={(e) => updateField("phone", e.target.value)} /></label>
-          <label className="text-sm">Email<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.email} onChange={(e) => updateField("email", e.target.value)} /></label>
-          <label className="text-sm">Адрес<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.address} onChange={(e) => updateField("address", e.target.value)} /></label>
+                    <label className="text-sm">Адрес<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.address} onChange={(e) => updateField("address", e.target.value)} /></label>
           <label className="text-sm md:col-span-3">Ссылки меню (`название|ссылка`)
             <textarea className={`${inputClass} min-h-28`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.menuLinksText} onChange={(e) => updateField("menuLinksText", e.target.value)} />
           </label>
@@ -282,6 +300,24 @@ export default function CreateFranchizeForm() {
         </section>
       )}
 
+
+      {stage === "map" && (
+        <section className={`${sectionClass} grid gap-3 md:grid-cols-2`} style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
+          <h2 className="md:col-span-2 text-lg font-medium" style={{ color: ui.text }}>Карта и онлайн-каналы</h2>
+          <label className="text-sm">Telegram экипажа<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.telegram} onChange={(e) => updateField("telegram", e.target.value)} placeholder="@oneBikePlsBot" /></label>
+          <label className="text-sm">GPS (lat, lon)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapGps} onChange={(e) => updateField("mapGps", e.target.value)} placeholder="56.2042, 43.7985" /></label>
+          <label className="text-sm md:col-span-2">Map image URL (VibeMap)
+            <input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapImageUrl} onChange={(e) => updateField("mapImageUrl", e.target.value)} />
+          </label>
+          <label className="text-sm">Bounds top<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapBoundsTop} onChange={(e) => updateField("mapBoundsTop", e.target.value)} /></label>
+          <label className="text-sm">Bounds bottom<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapBoundsBottom} onChange={(e) => updateField("mapBoundsBottom", e.target.value)} /></label>
+          <label className="text-sm">Bounds left<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapBoundsLeft} onChange={(e) => updateField("mapBoundsLeft", e.target.value)} /></label>
+          <label className="text-sm">Bounds right<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapBoundsRight} onChange={(e) => updateField("mapBoundsRight", e.target.value)} /></label>
+          <label className="text-sm md:col-span-2">Соцсети (`название|ссылка`)
+            <textarea className={`${inputClass} min-h-28`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.socialLinksText} onChange={(e) => updateField("socialLinksText", e.target.value)} />
+          </label>
+        </section>
+      )}
       {stage === "ai" && (
         <section className={`${sectionClass} grid gap-3`} style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
           <h2 className="text-lg font-medium" style={{ color: ui.text }}>AI-фаза: экономим мозговое время</h2>

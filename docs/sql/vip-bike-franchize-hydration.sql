@@ -158,6 +158,8 @@ set
           'telegram', '@I_O_S_NN',
           'workingHours', '10:00 - 22:00 (ежедневно)',
           'map', jsonb_build_object(
+            'imageUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg',
+            'bounds', jsonb_build_object('top', 56.42, 'bottom', 56.08, 'left', 43.66, 'right', 44.12),
             'gps', '56.20420451632873, 43.798582127051695',
             'publicTransport', 'Ближайшие остановки и маршруты уточняйте по телефону',
             'carDirections', 'Подъезд к новой локации — см. указатели на месте'
@@ -165,6 +167,12 @@ set
         ),
         'catalog', jsonb_build_object(
           'groupOrder', jsonb_build_array('Naked', 'Supersport', 'Enduro', 'Touring', 'Neo-retro', 'Power-cruiser'),
+          'quickLinks', jsonb_build_array('23 февраля', 'Все по 549', 'Выгодное комбо', 'Cruiser week'),
+          'tickerItems', jsonb_build_array(
+            jsonb_build_object('id', 'vip-hot-weekend', 'text', '🔥 Weekend auction: -15% на cruiser пакеты', 'href', '/franchize/vip-bike#category-cruiser'),
+            jsonb_build_object('id', 'vip-auction-night', 'text', '⚡ Ночной аукцион экипа: шлем + перчатки бонусом', 'href', '/franchize/vip-bike#category-supersport'),
+            jsonb_build_object('id', 'vip-telegram-fast', 'text', '📣 Быстрый выкуп слотов через Telegram @I_O_S_NN', 'href', '/franchize/vip-bike/contacts')
+          ),
           'showTwoColumnsMobile', true,
           'useModalDetails', true,
           'promoBanners', jsonb_build_array(

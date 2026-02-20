@@ -95,6 +95,8 @@ set
           'telegram', '@SALAVEY13',
           'workingHours', 'Гибкий график по договорённости',
           'map', jsonb_build_object(
+            'imageUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg',
+            'bounds', jsonb_build_object('top', 56.42, 'bottom', 56.08, 'left', 43.66, 'right', 44.12),
             'gps', '56.3269,44.0059',
             'publicTransport', 'Основной формат — онлайн',
             'carDirections', 'Оффлайн встречи согласовываются заранее'
@@ -102,6 +104,12 @@ set
         ),
         'catalog', jsonb_build_object(
           'groupOrder', jsonb_build_array('CyberVIBE', 'Snowboard', 'Dota2', 'Labs'),
+          'quickLinks', jsonb_build_array('CyberVIBE', 'Snowboard', 'Dota2', 'Labs'),
+          'tickerItems', jsonb_build_array(
+            jsonb_build_object('id', 'sly13-cyber-sprint', 'text', '🚀 Auction sprint: 3 места на CyberVIBE разбор', 'href', '/franchize/sly13#category-cybervibe'),
+            jsonb_build_object('id', 'sly13-snow-drop', 'text', '🏂 Snow drop: пакет инструктор + видеоразбор', 'href', '/franchize/sly13#category-snowboard'),
+            jsonb_build_object('id', 'sly13-labs-open', 'text', '🧪 Labs open call: тест гипотез в мини-группе', 'href', '/franchize/sly13#category-labs')
+          ),
           'showTwoColumnsMobile', true,
           'useModalDetails', true,
           'promoBanners', jsonb_build_array(

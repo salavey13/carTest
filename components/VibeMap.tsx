@@ -8,19 +8,20 @@ import { cn } from '@/lib/utils';
 import { useState, useRef, useCallback } from 'react';
 import { Button } from './ui/button';
 import { useGesture } from '@use-gesture/react';
-import { logger } from '@/lib/debugLogger';
 import { project, PointOfInterest, MapBounds } from '@/lib/map-utils';
 
 interface VibeMapProps {
   points: PointOfInterest[];
   bounds: MapBounds;
-  imageUrl: string;
+  imageUrl?: string;
   highlightedPointId?: string | null;
   className?: string;
   isEditable?: boolean;
   onMapClick?: (coords: [number, number]) => void;
 }
 
+
+const DEFAULT_VIBE_MAP_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg";
 export function VibeMap({ 
   points, 
   bounds, 
@@ -96,8 +97,6 @@ export function VibeMap({
 
     // 1. Get the visual position of the map content relative to the viewport
     const contentRect = mapContentRef.current.getBoundingClientRect();
-    const containerRect = mapContainerRef.current.getBoundingClientRect();
-
     // 2. Get click coordinates
     const clickX = e.clientX;
     const clickY = e.clientY;
@@ -145,10 +144,10 @@ export function VibeMap({
         >
           <div className="absolute inset-0" onClick={isEditable ? handleMapClick : undefined}>
             <Image
-              src={imageUrl}
+              src={imageUrl || DEFAULT_VIBE_MAP_IMAGE}
               alt="Vibe City Map"
               fill
-              className="pointer-events-none"
+              className="pointer-events-none object-contain"
               unoptimized
               onLoadingComplete={(img) => setImageSize({ width: img.naturalWidth, height: img.naturalHeight })}
             />
@@ -257,6 +256,17 @@ export function VibeMap({
             className="w-10 h-10 rounded-full bg-black/60 hover:bg-brand-purple text-white border border-white/10 backdrop-blur-md"
           >
             <VibeContentRenderer content="::FaMinus::" />
+          </Button>
+          <Button
+            size="icon"
+            onClick={() => {
+              setViewState({ x: 0, y: 0, scale: 1 });
+              x.set(0);
+              y.set(0);
+            }}
+            className="w-10 h-10 rounded-full bg-black/60 hover:bg-brand-purple text-white border border-white/10 backdrop-blur-md"
+          >
+            <VibeContentRenderer content="::FaLocationCrosshairs::" />
           </Button>
         </div>
       </div>
