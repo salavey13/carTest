@@ -1,6 +1,7 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { createInvoice, supabaseAdmin } from "@/hooks/supabase";
+import { sendTelegramInvoice } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
 
@@ -675,4 +676,108 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput): Promise<
     message: `Франшизный конфиг сохранён в crews.metadata.franchize для ${payload.slug}.`,
     data: payload,
   };
+}
+
+const franchizeOrderInvoiceSchema = z.object({
+  slug: z.string().trim().min(1),
+  orderId: z.string().trim().min(1),
+  telegramUserId: z.string().trim().min(1),
+  recipient: z.string().trim().min(2),
+  phone: z.string().trim().min(6),
+  time: z.string().trim().min(1),
+  comment: z.string().trim().default(""),
+  payment: z.enum(["telegram_xtr", "card", "cash", "sbp"]),
+  delivery: z.enum(["pickup", "delivery"]),
+  subtotal: z.number().finite().nonnegative(),
+  cartLines: z.array(z.object({
+    itemId: z.string().trim().min(1),
+    qty: z.number().int().positive(),
+    pricePerDay: z.number().finite().nonnegative(),
+    lineTotal: z.number().finite().nonnegative(),
+  })).min(1),
+});
+
+export async function createFranchizeOrderInvoice(input: unknown): Promise<{ success: boolean; invoiceId?: string; amountXtr?: number; error?: string }> {
+  const parsed = franchizeOrderInvoiceSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Некорректный payload для XTR-счёта.",
+    };
+  }
+
+  const payload = parsed.data;
+
+  if (payload.payment !== "telegram_xtr") {
+    return {
+      success: false,
+      error: "Для этой операции поддерживается только Telegram Stars (XTR).",
+    };
+  }
+
+  const amountXtr = Math.max(1, Math.ceil(payload.subtotal * 0.01));
+  const invoiceId = `franchize_order_${payload.slug}_${payload.orderId}_${Date.now()}`;
+
+  const cartText = payload.cartLines
+    .map((line) => `• ${line.itemId} × ${line.qty}`)
+    .join("\n");
+
+  const description = [
+    `Экипаж: ${payload.slug}`,
+    `Заказ: #${payload.orderId}`,
+    `Получатель: ${payload.recipient}`,
+    `Телефон: ${payload.phone}`,
+    `Время: ${payload.time}`,
+    `Получение: ${payload.delivery === "pickup" ? "Самовывоз" : "Доставка"}`,
+    `Состав:`,
+    cartText,
+    `Subtotal: ${payload.subtotal.toLocaleString("ru-RU")} ₽`,
+    `Proof-of-interest tip: ${amountXtr} XTR (1%)`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const metadata = {
+    slug: payload.slug,
+    orderId: payload.orderId,
+    recipient: payload.recipient,
+    phone: payload.phone,
+    time: payload.time,
+    comment: payload.comment,
+    payment: payload.payment,
+    delivery: payload.delivery,
+    subtotal: payload.subtotal,
+    tipPercent: 1,
+    amountXtr,
+    cartLines: payload.cartLines,
+  };
+
+  try {
+    const invoiceRecord = await createInvoice("franchize_order", invoiceId, payload.telegramUserId, amountXtr, 0, metadata);
+    if (!invoiceRecord.success) {
+      return { success: false, error: invoiceRecord.error ?? "Не удалось создать запись счёта." };
+    }
+
+    const invoiceSent = await sendTelegramInvoice(
+      payload.telegramUserId,
+      "Franchize: подтверждение намерения",
+      description,
+      invoiceId,
+      amountXtr,
+      0,
+    );
+
+    if (!invoiceSent.success) {
+      return { success: false, error: invoiceSent.error ?? "Не удалось отправить XTR-счёт в Telegram." };
+    }
+
+    return { success: true, invoiceId, amountXtr };
+  } catch (error) {
+    logger.error("[franchize] createFranchizeOrderInvoice failed", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unexpected invoice error",
+    };
+  }
 }
