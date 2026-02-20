@@ -639,12 +639,12 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - T9 can start with a clean QA checklist instead of discovering basic polish issues.
 
 ### T9 — QA, screenshots, and rollout notes
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: visual QA + route QA + release playbook.
-- next_step: produce screenshot matrix and go-live checklist.
-- risks: UI drift across mobile widths.
+- status: `done`
+- updated_at: `2026-02-20T06:50:41Z`
+- owner: `codex`
+- notes: Completed QA matrix: captured required franchize screenshots (catalog, menu, item modal, cart, order, contacts), validated key viewport renders, executed lint/build, and confirmed slug-scoped route smoke responses are HTTP 200.
+- next_step: Start extension task for post-QA fixes (optional visual/token cleanup + warning backlog triage).
+- risks: Non-blocking global lint warnings and missing env warnings remain outside T9 scope; franchize routes still gracefully degrade to fallback data when Supabase fetch is unavailable.
 - dependencies: T8.6
 - deliverables:
   - screenshots
@@ -699,6 +699,12 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+### 2026-02-20 — T9 execution complete (QA matrix + rollout evidence)
+- Verified viewport coverage for `/franchize/vip-bike` catalog at 360x800, 390x844, 768x1024, and desktop; captured screenshot matrix artifacts.
+- Captured required franchize flow screenshots: catalog, header menu, item modal, cart, order, and contacts pages.
+- Ran `npm run lint` (pass with existing repo-wide warnings), `npm run build` (pass with non-blocking env warnings), and route smoke check via `curl` for core slug routes (`200` responses).
+- Sent executor heartbeat via `scripts/codex-notify.mjs telegram` with super-admin mirror behavior enabled by script defaults.
 
 ### 2026-02-20 — T8.6 execution complete (copy + submit-state observability pass)
 - Normalized `/franchize/[slug]/about` fallback description to RU-first operator copy and removed leftover English scaffold tone.
