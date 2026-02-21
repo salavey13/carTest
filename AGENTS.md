@@ -143,6 +143,8 @@ For any task related to the motorbike franchise/public storefront initiative, ag
 
 Do not mark implementation as complete without reflecting progress in `docs/THE_FRANCHEEZEPLAN.md`.
 
+Keyword auto-trigger rule: if a task mentions `пепперолли`, `pepperolli`, `vip-bike`, `vip bike`, `franchize`, or close variants (`франшиза`, `франчайз`), treat it as FRANCHEEZEPLAN-related even when not explicitly stated. In such cases, create/update an ad-hoc task in `docs/THE_FRANCHEEZEPLAN.md` and execute it so history stays traceable.
+
 Current docs style: keep setup docs practical, RU-first, and compact-but-complete in `README.MD`, with `docs/README_TLDR.md` as the extra-short variant.
 For first-time operators, keep token onboarding appendixes up-to-date (Telegram BotFather + Slack app token/channel id steps).
 

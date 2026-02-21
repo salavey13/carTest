@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { ChevronDown, Palette, Settings, Shield, User } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import {
@@ -28,6 +27,10 @@ function getInitials(name: string): string {
     .slice(0, 2)
     .toUpperCase();
 }
+
+const navigateTo = (href: string) => {
+  window.location.assign(href);
+};
 
 export function FranchizeProfileButton({ bgColor, textColor, borderColor }: FranchizeProfileButtonProps) {
   const { dbUser, user, userCrewInfo, isAdmin } = useAppContext();
@@ -61,42 +64,47 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
       <DropdownMenuContent align="end" className="w-56" sideOffset={8}>
         <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/profile" className="flex items-center gap-2">
-            <User className="h-4 w-4" />
-            Профиль
-          </Link>
+        <DropdownMenuItem onSelect={(event) => {
+          event.preventDefault();
+          navigateTo("/profile");
+        }}>
+          <User className="h-4 w-4" />
+          Профиль
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/settings" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Настройки
-          </Link>
+        <DropdownMenuItem onSelect={(event) => {
+          event.preventDefault();
+          navigateTo("/settings");
+        }}>
+          <Settings className="h-4 w-4" />
+          Настройки
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/crews/create" className="flex items-center gap-2">
-            <Palette className="h-4 w-4" />
-            Branding (экипаж)
-          </Link>
+        <DropdownMenuItem onSelect={(event) => {
+          event.preventDefault();
+          navigateTo("/crews/create");
+        }}>
+          <Palette className="h-4 w-4" />
+          Branding (экипаж)
         </DropdownMenuItem>
 
         {userCrewInfo?.slug && (
-          <DropdownMenuItem asChild>
-            <Link href={`/crews/${userCrewInfo.slug}`} className="flex items-center gap-2">
-              <Palette className="h-4 w-4" />
-              Мой экипаж
-            </Link>
+          <DropdownMenuItem onSelect={(event) => {
+            event.preventDefault();
+            navigateTo(`/crews/${userCrewInfo.slug}`);
+          }}>
+            <Palette className="h-4 w-4" />
+            Мой экипаж
           </DropdownMenuItem>
         )}
 
         {userIsAdmin && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/admin" className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                Admin
-              </Link>
+            <DropdownMenuItem onSelect={(event) => {
+              event.preventDefault();
+              navigateTo("/admin");
+            }}>
+              <Shield className="h-4 w-4" />
+              Admin
             </DropdownMenuItem>
           </>
         )}
