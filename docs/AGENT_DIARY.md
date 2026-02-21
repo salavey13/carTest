@@ -55,3 +55,57 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** intermittent Chromium headless instability in current runner session.
 - **Fix/workaround:** immediately retried with Playwright Firefox and captured artifact successfully.
 - **Verification:** `mcp__browser_tools__run_playwright_script` using Firefox saved `artifacts/franchize-vip-bike-shell-v2.png`.
+
+## 2026-02-21 — Franchize QA slug test matrix for polish tasks
+- **Symptom:** regressions slipped when validating only one slug/fallback dataset.
+- **Root cause:** visual/typing groups differ per crew slug; `wbitem` and `gear` distributions were not stress-tested.
+- **Fix/workaround:** run smoke checks and visual passes on `vip-bike` (baseline), `sly13` (wbitem ordering), and `antanta52.ru` (gear-heavy mix) for each catalog/header refactor.
+- **Verification:** `FRANCHIZE_QA_SLUG=vip-bike npm run qa:franchize && FRANCHIZE_QA_SLUG=sly13 npm run qa:franchize && FRANCHIZE_QA_SLUG=antanta52.ru npm run qa:franchize`.
+
+## 2026-02-21 — `codex-notify telegram` default text trap (`--message` vs `--text`)
+- **Symptom:** heartbeat command looked successful but operator received generic "Codex task update" instead of custom progress text.
+- **Root cause:** script accepted only `--text`; teammate/agent command used `--message`, so fallback default text was sent.
+- **Fix/workaround:** add `--message` alias support in `scripts/codex-notify.mjs` (`getArgAlias`) and keep backward compatibility with `--text`.
+- **Verification:** `node scripts/codex-notify.mjs telegram --message "T14 done" --chat-id "$ADMIN_CHAT_ID" --mirror-chat-id 417553377`.
+
+## 2026-02-21 — TG rental photo flow can fail when `awaiting_rental_photo` state expires
+- **Symptom:** user sends rental photo in Telegram and gets stuck/no-progress (`no active rental` context in adjacent action flow).
+- **Root cause:** photo webhook required `user_states.awaiting_rental_photo`; when state expired/lost, photo was ignored and no completed photo event was recorded.
+- **Fix/workaround:** add webhook fallback that auto-resolves likely renter rental + expected photo type from `rentals` + `events`; persist photo events with `status=completed` in both webhook and `addRentalPhoto` action.
+- **Verification:** `npx eslint app/api/telegramWebhook/route.ts app/rentals/actions.ts --max-warnings=0` and manual Telegram photo upload after clearing `user_states` still routes to inferred rental step.
+
+## 2026-02-21 — Franchize rental page build import path gotcha
+- **Symptom:** Next.js production build failed for `/franchize/[slug]/rental/[id]` with “Attempted import error … not exported from '../../../../actions'”.
+- **Root cause:** incorrect relative path depth after nesting under `[slug]/rental/[id]`; importer pointed one level too high.
+- **Fix/workaround:** use `../../../actions` from rental page and keep franchize rental surface inside crew-themed shell components.
+- **Verification:** `npm run build` completes and route `/franchize/[slug]/rental/[id]` is listed in build output.
+
+## 2026-02-21 — Franchize header can leak global theme tokens
+- **Symptom:** Header looked light while crew page used dark palette; title/body contrast looked broken on rental page screenshots.
+- **Root cause:** `CrewHeader` (and profile shell) still used Tailwind global tokens like `bg-background`, `bg-card`, `text-foreground` instead of crew metadata palette.
+- **Fix/workaround:** drive header/ticker/chips/menu/profile surfaces from `crew.theme.palette` inline styles for background/text/border colors.
+- **Verification:** open `/franchize/vip-bike/rental/demo-order` and confirm header + content contrast stay consistent with crew palette.
+
+## 2026-02-21 — Franchize header avatar should not be a dead-end link
+- **Symptom:** avatar in franchize header only navigated to `/profile`, hiding fast access to settings/admin/branding from operator flow.
+- **Root cause:** reused generic profile widget behavior not aligned with franchize operator UX expectations.
+- **Fix/workaround:** replace with dropdown menu exposing `Профиль`, `Настройки`, `Branding`, optional `Мой экипаж`, plus `Admin` only when `isAdmin()` is true.
+- **Verification:** open `/franchize/vip-bike` and confirm dropdown items render by role/context.
+
+## 2026-02-21 — Outstanding iteration performance baseline (operator feedback)
+- **Symptom:** Operator highlighted this iteration as exceptionally strong and asked to preserve the execution quality pattern.
+- **Root cause:** tight feedback loop (small scoped UX hotfixes + visible screenshots + immediate telemetry) increased trust and momentum.
+- **Fix/workaround:** keep this rhythm as default: clarify CTA intent in UI copy, ship one polished visual delta per beat, always close with concise heartbeat and next beat.
+- **Verification:** operator engagement remains high across consecutive T16 micro-iterations and merge readiness improves.
+
+## 2026-02-21 — CTA hierarchy rule for franchize rental cards
+- **Symptom:** fallback-labeled button looked as prominent as main next-step action, creating choice ambiguity.
+- **Root cause:** equal visual weight between progress CTA and context-recovery fallback CTA.
+- **Fix/workaround:** keep next-step action as primary filled button, move Telegram deep-link to low-emphasis fallback row with info-icon tooltip, remove legacy shortcut from primary action set.
+- **Verification:** `/franchize/vip-bike/rental/demo-order` shows one dominant continuation CTA and fallback link at bottom.
+
+## 2026-02-21 — Post-payment delight notification beats plain invoice follow-up
+- **Symptom:** invoice confirmation felt dry; users lacked emotional "deal is real" moment after payment.
+- **Root cause:** webhook success message was short/system-like and did not surface full order context.
+- **Fix/workaround:** send rich "You are in" notification on `franchize_order` success with order snapshot, totals, deeplinks, and image query; keep continuation CTA as first button.
+- **Verification:** trigger `franchize_order` webhook and confirm Telegram user message includes details + 3-button flow (`Продолжить оформление`, WebApp, каталог).

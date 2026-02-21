@@ -352,9 +352,19 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
           const lobbyId = paramToProcess.substring(6); 
           if (lobbyId) targetPath = `/strikeball/lobbies/${lobbyId}`;
       }
+      else if (paramToProcess.startsWith("rental-") || paramToProcess.startsWith("rentals-")) {
+          const rentalId = paramToProcess.split("-").at(-1);
+          const franchizeSlug = searchParams.get("slug") || "vip-bike";
+          if (rentalId) targetPath = `/franchize/${franchizeSlug}/rental/${rentalId}`;
+      }
       else if (paramToProcess.startsWith("rental_") || paramToProcess.startsWith("rentals_")) {
           const parts = paramToProcess.split("_");
-          if (parts.length === 2) targetPath = `/rentals/${parts[1]}`;
+          const rentalId = parts.at(-1);
+          const maybeSlug = parts.length > 2 ? parts[1] : searchParams.get("slug") || "vip-bike";
+          if (rentalId) {
+            if (parts.length > 2 || searchParams.get("slug")) targetPath = `/franchize/${maybeSlug}/rental/${rentalId}`;
+            else targetPath = `/rentals/${rentalId}`;
+          }
       }
       else if (paramToProcess.startsWith("ref_")) {
           const refCode = paramToProcess.substring(4); 
