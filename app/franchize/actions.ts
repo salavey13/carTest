@@ -4,6 +4,7 @@ import { createInvoice, supabaseAdmin } from "@/hooks/supabase";
 import { sendTelegramInvoice } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
+import { randomUUID } from "crypto";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -35,6 +36,7 @@ export interface CatalogItemVM {
   imageUrl: string;
   pricePerDay: number;
   category: string;
+  specs: Array<{ label: string; value: string }>;
 }
 
 export interface FranchizeCrewVM {
@@ -70,6 +72,14 @@ export interface FranchizeCrewVM {
     categories: string[];
     quickLinks: string[];
     tickerItems: Array<{ id: string; text: string; href: string }>;
+    showcaseGroups: Array<{
+      id: string;
+      label: string;
+      mode: "subtype" | "price";
+      subtype?: string;
+      minPrice?: number;
+      maxPrice?: number;
+    }>;
   };
   footer: {
     socialLinks: Array<{ label: string; href: string }>;
@@ -318,6 +328,7 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     categories: [],
     quickLinks: [],
     tickerItems: [],
+    showcaseGroups: [],
   },
   footer: {
     socialLinks: [],
@@ -344,11 +355,12 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       return { crew: emptyCrew(safeSlug), items: [] };
     }
 
+    const catalogTypes = ["bike", "accessories", "gear", "wbitem"];
     const { data: cars, error: carsError } = await supabaseAdmin
       .from("cars")
       .select("id, make, model, description, image_url, daily_price, type, specs")
       .eq("crew_id", crew.id)
-      .ilike("type", "bike");
+      .in("type", catalogTypes);
 
     if (carsError) {
       logger.warn("[franchize] failed to load crew cars", { safeSlug, carsError: carsError.message });
@@ -362,6 +374,23 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       ...link,
       href: withSlug(link.href, crew.slug ?? safeSlug),
     }));
+
+    const metadataShowcaseGroups = readPath(franchize, ["catalog", "showcaseGroups"], []) as Array<UnknownRecord>;
+    const defaultShowcaseGroups: FranchizeCrewVM["catalog"]["showcaseGroups"] = [
+      { id: "edition-23", label: "23rd feb edition", mode: "subtype", subtype: "bobber" },
+      { id: "sweetspot-6000", label: "Все по 6000", mode: "price", minPrice: 5600, maxPrice: 6400 },
+    ];
+    const showcaseGroups = (metadataShowcaseGroups.length > 0
+      ? metadataShowcaseGroups.map((group, index) => ({
+          id: readPath(group, ["id"], `showcase-${index + 1}`),
+          label: readPath(group, ["label"], readPath(group, ["title"], `Showcase ${index + 1}`)),
+          mode: readPath(group, ["mode"], "subtype") as "subtype" | "price",
+          subtype: readPath(group, ["subtype"], ""),
+          minPrice: Number(readPath(group, ["minPrice"], 0)),
+          maxPrice: Number(readPath(group, ["maxPrice"], 0)),
+        }))
+      : defaultShowcaseGroups)
+      .filter((group) => group.label.trim().length > 0);
 
     const hydratedCrew: FranchizeCrewVM = {
       id: crew.id,
@@ -425,6 +454,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
             href: readPath(tickerItem, ["href"], `/franchize/${crew.slug ?? safeSlug}`),
           };
         }),
+        showcaseGroups,
       },
       footer: {
         socialLinks: extractFooterSocialLinks(franchize, readPath(franchize, ["contacts", "telegram"], "")),
@@ -444,10 +474,15 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         id: car.id,
         title: `${car.make} ${car.model}`.trim(),
         subtitle: (typeof specs.subtitle === "string" ? specs.subtitle : "Ready to ride") as string,
-        description: car.description ?? "",
+        description: car.description ?? (typeof specs.description === "string" ? specs.description : "Подробности откроются в карточке"),
         imageUrl: car.image_url ?? "",
         pricePerDay: car.daily_price ?? 0,
         category: subtype,
+        specs: Object.entries(specs)
+          .filter(([, value]) => typeof value === "string" || typeof value === "number")
+          .filter(([key]) => !["subtitle", "description", "segment", "subtype", "bike_subtype", "type"].includes(key))
+          .slice(0, 4)
+          .map(([key, value]) => ({ label: key.replace(/_/g, " "), value: String(value) })),
       };
     });
 
@@ -457,10 +492,11 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         catalog: {
           categories:
             hydratedCrew.catalog.categories.length > 0
-              ? hydratedCrew.catalog.categories
-              : [...new Set(items.map((item) => item.category).filter(Boolean))],
+              ? normalizeCatalogOrder(hydratedCrew.catalog.categories)
+              : normalizeCatalogOrder(items.map((item) => item.category)),
           quickLinks: hydratedCrew.catalog.quickLinks,
           tickerItems: hydratedCrew.catalog.tickerItems.filter((item) => item.text.trim().length > 0),
+          showcaseGroups: hydratedCrew.catalog.showcaseGroups,
         },
         footer: hydratedCrew.footer,
       },
@@ -491,6 +527,13 @@ function parseMenuLinks(lines: string, slug: string): Array<{ label: string; hre
         href: withSlug(href || `/franchize/${slug}`, slug),
       };
     });
+}
+
+function normalizeCatalogOrder(categories: string[]): string[] {
+  const unique = Array.from(new Set(categories.filter(Boolean)));
+  const regular = unique.filter((category) => !category.toLowerCase().includes("wbitem"));
+  const wbItems = unique.filter((category) => category.toLowerCase().includes("wbitem"));
+  return [...regular, ...wbItems];
 }
 
 function toFranchizeConfigInput(crew: UnknownRecord, slug: string): FranchizeConfigInput {
@@ -689,11 +732,30 @@ const franchizeOrderInvoiceSchema = z.object({
   payment: z.enum(["telegram_xtr", "card", "cash", "sbp"]),
   delivery: z.enum(["pickup", "delivery"]),
   subtotal: z.number().finite().nonnegative(),
+  extrasTotal: z.number().finite().nonnegative().default(0),
+  totalAmount: z.number().finite().nonnegative().default(0),
+  extras: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1),
+        label: z.string().trim().min(1),
+        amount: z.number().finite().nonnegative(),
+      }),
+    )
+    .default([]),
   cartLines: z.array(z.object({
+    lineId: z.string().trim().min(1).optional(),
     itemId: z.string().trim().min(1),
     qty: z.number().int().positive(),
     pricePerDay: z.number().finite().nonnegative(),
     lineTotal: z.number().finite().nonnegative(),
+    options: z
+      .object({
+        package: z.string().trim().default("Base"),
+        duration: z.string().trim().default("1 day"),
+        perk: z.string().trim().default("Стандарт"),
+      })
+      .default({ package: "Base", duration: "1 day", perk: "Стандарт" }),
   })).min(1),
 });
 
@@ -716,11 +778,17 @@ export async function createFranchizeOrderInvoice(input: unknown): Promise<{ suc
     };
   }
 
-  const amountXtr = Math.max(1, Math.ceil(payload.subtotal * 0.01));
+  const effectiveTotal = payload.totalAmount > 0 ? payload.totalAmount : payload.subtotal + payload.extrasTotal;
+  const amountXtr = Math.max(1, Math.ceil(effectiveTotal * 0.01));
   const invoiceId = `franchize_order_${payload.slug}_${payload.orderId}_${Date.now()}`;
+  const rentalId = randomUUID();
+  const startParam = `rental-${rentalId}`;
+  const telegramWebappLink = `https://t.me/oneBikePlsBot/app?startapp=${startParam}`;
+  const siteBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
+  const franchizeRentalLink = `${siteBaseUrl}/franchize/${payload.slug}/rental/${rentalId}`;
 
   const cartText = payload.cartLines
-    .map((line) => `• ${line.itemId} × ${line.qty}`)
+    .map((line) => `• ${line.itemId} × ${line.qty} (${line.options.package}, ${line.options.duration}, ${line.options.perk})`)
     .join("\n");
 
   const description = [
@@ -733,7 +801,11 @@ export async function createFranchizeOrderInvoice(input: unknown): Promise<{ suc
     `Состав:`,
     cartText,
     `Subtotal: ${payload.subtotal.toLocaleString("ru-RU")} ₽`,
+    `Extras: ${payload.extrasTotal.toLocaleString("ru-RU")} ₽`,
+    `Total: ${effectiveTotal.toLocaleString("ru-RU")} ₽`,
     `Proof-of-interest tip: ${amountXtr} XTR (1%)`,
+    `WebApp: ${telegramWebappLink}`,
+    `Franchize rental card: ${franchizeRentalLink}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -748,8 +820,15 @@ export async function createFranchizeOrderInvoice(input: unknown): Promise<{ suc
     payment: payload.payment,
     delivery: payload.delivery,
     subtotal: payload.subtotal,
+    extrasTotal: payload.extrasTotal,
+    totalAmount: effectiveTotal,
     tipPercent: 1,
     amountXtr,
+    rental_id: rentalId,
+    startParam,
+    telegramWebappLink,
+    franchizeRentalLink,
+    extras: payload.extras,
     cartLines: payload.cartLines,
   };
 
@@ -780,4 +859,62 @@ export async function createFranchizeOrderInvoice(input: unknown): Promise<{ suc
       error: error instanceof Error ? error.message : "Unexpected invoice error",
     };
   }
+}
+
+export async function getFranchizeRentalCard(slug: string, rentalId: string): Promise<{
+  found: boolean;
+  rentalId: string;
+  slug: string;
+  status: string;
+  paymentStatus: string;
+  totalCost: number;
+  vehicleTitle: string;
+  telegramDeepLink: string;
+}> {
+  const safeSlug = slug.trim();
+  const safeRentalId = rentalId.trim();
+  if (!safeSlug || !safeRentalId) {
+    return {
+      found: false,
+      rentalId: safeRentalId || "-",
+      slug: safeSlug || "vip-bike",
+      status: "pending_confirmation",
+      paymentStatus: "interest_paid",
+      totalCost: 0,
+      vehicleTitle: "—",
+      telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${safeRentalId}`,
+    };
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("rentals")
+    .select("rental_id, status, payment_status, total_cost, vehicle:cars(make, model)")
+    .eq("rental_id", safeRentalId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return {
+      found: false,
+      rentalId: safeRentalId,
+      slug: safeSlug,
+      status: "pending_confirmation",
+      paymentStatus: "interest_paid",
+      totalCost: 0,
+      vehicleTitle: "—",
+      telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${safeRentalId}`,
+    };
+  }
+
+  const vehicle = data.vehicle as { make?: string; model?: string } | null;
+
+  return {
+    found: true,
+    rentalId: data.rental_id,
+    slug: safeSlug,
+    status: data.status ?? "pending_confirmation",
+    paymentStatus: data.payment_status ?? "interest_paid",
+    totalCost: Number(data.total_cost ?? 0),
+    vehicleTitle: `${vehicle?.make ?? "Vehicle"} ${vehicle?.model ?? ""}`.trim(),
+    telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${data.rental_id}`,
+  };
 }

@@ -2,24 +2,73 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-export type FranchizeCartState = Record<string, number>;
+export type FranchizeCartOptions = {
+  package: string;
+  duration: string;
+  perk: string;
+};
+
+export type FranchizeCartLine = {
+  itemId: string;
+  qty: number;
+  options: FranchizeCartOptions;
+};
+
+export type FranchizeCartState = Record<string, FranchizeCartLine>;
 
 const CART_STORAGE_PREFIX = "franchize-cart";
 const CART_SYNC_EVENT = "franchize-cart-sync";
+
+const DEFAULT_OPTIONS: FranchizeCartOptions = {
+  package: "Base",
+  duration: "1 day",
+  perk: "Стандарт",
+};
+
+export function buildCartLineId(itemId: string, options: FranchizeCartOptions) {
+  const normalized = `${options.package}|${options.duration}|${options.perk}`.toLowerCase().replace(/\s+/g, "-");
+  return `${itemId}::${normalized}`;
+}
 
 const sanitizeCartState = (value: unknown): FranchizeCartState => {
   if (!value || typeof value !== "object") {
     return {};
   }
 
-  return Object.entries(value as Record<string, unknown>).reduce<FranchizeCartState>((acc, [itemId, qty]) => {
-    if (typeof qty !== "number" || !Number.isFinite(qty)) {
+  return Object.entries(value as Record<string, unknown>).reduce<FranchizeCartState>((acc, [lineId, entry]) => {
+    // backward compatibility with old format: { [itemId]: qty }
+    if (typeof entry === "number" && Number.isFinite(entry) && Math.floor(entry) > 0) {
+      const itemId = lineId;
+      const options = { ...DEFAULT_OPTIONS };
+      const normalizedLineId = buildCartLineId(itemId, options);
+      acc[normalizedLineId] = { itemId, qty: Math.floor(entry), options };
       return acc;
     }
 
-    const normalizedQty = Math.floor(qty);
-    if (normalizedQty > 0) {
-      acc[itemId] = normalizedQty;
+    if (!entry || typeof entry !== "object") {
+      return acc;
+    }
+
+    const line = entry as Partial<FranchizeCartLine>;
+    const qty = typeof line.qty === "number" && Number.isFinite(line.qty) ? Math.floor(line.qty) : 0;
+    const itemId = typeof line.itemId === "string" ? line.itemId : "";
+    if (!itemId || qty <= 0) {
+      return acc;
+    }
+
+    const rawOptions = line.options ?? {};
+    const options: FranchizeCartOptions = {
+      package: typeof rawOptions.package === "string" ? rawOptions.package : DEFAULT_OPTIONS.package,
+      duration: typeof rawOptions.duration === "string" ? rawOptions.duration : DEFAULT_OPTIONS.duration,
+      perk: typeof rawOptions.perk === "string" ? rawOptions.perk : DEFAULT_OPTIONS.perk,
+    };
+
+    const normalizedLineId = buildCartLineId(itemId, options);
+    const prev = acc[normalizedLineId];
+    if (prev) {
+      prev.qty += qty;
+    } else {
+      acc[normalizedLineId] = { itemId, qty, options };
     }
 
     return acc;
@@ -87,49 +136,81 @@ export function useFranchizeCart(slug: string) {
     };
   }, [hydrateCartFromStorage, storageKey]);
 
-  const setItemQty = useCallback((itemId: string, qty: number) => {
+  const setLineQty = useCallback((lineId: string, qty: number) => {
     setCart((prev) => {
+      const current = prev[lineId];
+      if (!current) return prev;
+
       const normalizedQty = Math.floor(qty);
       if (normalizedQty <= 0) {
         const next = { ...prev };
-        delete next[itemId];
+        delete next[lineId];
         return next;
       }
-      return { ...prev, [itemId]: normalizedQty };
+
+      return {
+        ...prev,
+        [lineId]: {
+          ...current,
+          qty: normalizedQty,
+        },
+      };
     });
   }, []);
 
-  const changeItemQty = useCallback((itemId: string, delta: number) => {
+  const changeLineQty = useCallback((lineId: string, delta: number) => {
     setCart((prev) => {
-      const nextQty = (prev[itemId] ?? 0) + delta;
+      const current = prev[lineId];
+      if (!current) return prev;
+      const nextQty = current.qty + delta;
       if (nextQty <= 0) {
         const next = { ...prev };
-        delete next[itemId];
+        delete next[lineId];
         return next;
       }
-      return { ...prev, [itemId]: nextQty };
+      return { ...prev, [lineId]: { ...current, qty: nextQty } };
     });
   }, []);
 
-  const removeItem = useCallback((itemId: string) => {
+  const addItem = useCallback((itemId: string, options: FranchizeCartOptions, qty = 1) => {
+    const lineId = buildCartLineId(itemId, options);
     setCart((prev) => {
-      if (!(itemId in prev)) return prev;
+      const current = prev[lineId];
+      const nextQty = (current?.qty ?? 0) + qty;
+      return {
+        ...prev,
+        [lineId]: {
+          itemId,
+          qty: nextQty,
+          options,
+        },
+      };
+    });
+
+    return lineId;
+  }, []);
+
+  const removeLine = useCallback((lineId: string) => {
+    setCart((prev) => {
+      if (!(lineId in prev)) return prev;
       const next = { ...prev };
-      delete next[itemId];
+      delete next[lineId];
       return next;
     });
   }, []);
 
   const clear = useCallback(() => setCart({}), []);
 
-  const itemCount = useMemo(() => Object.values(cart).reduce((sum, qty) => sum + qty, 0), [cart]);
+  const itemCount = useMemo(() => Object.values(cart).reduce((sum, line) => sum + line.qty, 0), [cart]);
 
   return {
     cart,
     itemCount,
-    setItemQty,
-    changeItemQty,
-    removeItem,
+    addItem,
+    setLineQty,
+    changeLineQty,
+    removeLine,
     clear,
+    defaultOptions: DEFAULT_OPTIONS,
   };
 }

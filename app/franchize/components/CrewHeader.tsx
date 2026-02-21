@@ -3,7 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Menu } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { FranchizeCrewVM } from "../actions";
 import { HeaderMenu } from "../modals/HeaderMenu";
 import { FranchizeProfileButton } from "./FranchizeProfileButton";
@@ -15,11 +16,50 @@ interface CrewHeaderProps {
 
 export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const pathname = usePathname();
   const mainCatalogPath = `/franchize/${crew.slug}`;
-  const quickLinks = crew.catalog.quickLinks.length > 0 ? crew.catalog.quickLinks : crew.catalog.categories;
+  const quickLinks = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(crew.catalog.quickLinks.length > 0 ? crew.catalog.quickLinks : []),
+          ...crew.catalog.showcaseGroups.map((group) => group.label),
+          ...crew.catalog.categories,
+        ]),
+      ),
+    [crew.catalog.categories, crew.catalog.quickLinks, crew.catalog.showcaseGroups],
+  );
+
+  useEffect(() => {
+    if (pathname !== mainCatalogPath) {
+      setActiveCategory(null);
+      return;
+    }
+
+    const sections = Array.from(document.querySelectorAll<HTMLElement>("section[data-category]"));
+    if (sections.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting);
+        if (visible.length === 0) return;
+        const mostVisible = visible.sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        const category = mostVisible?.target.getAttribute("data-category");
+        if (category) {
+          setActiveCategory(category);
+        }
+      },
+      { rootMargin: "-140px 0px -45% 0px", threshold: [0.15, 0.35, 0.65, 0.9] },
+    );
+
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, [mainCatalogPath, pathname]);
 
   return (
-    <header className="z-30 border-b border-border bg-background/95 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.55rem)] backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 px-4 pb-2 pt-[max(env(safe-area-inset-top),0.55rem)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-x-0 -top-[42px] h-[42px] bg-background/90 backdrop-blur-xl" />
       {crew.catalog.tickerItems.length > 0 && (
         <div className="-mx-4 mb-2 overflow-hidden border-b border-border/70 bg-card py-1.5">
           <div className="animate-ticker whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
@@ -33,7 +73,7 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
       )}
 
       <div className="mx-auto w-full max-w-4xl">
-        <div className="grid grid-cols-[44px_1fr_auto] items-center gap-3 pb-3">
+        <div className="grid grid-cols-[44px_1fr_auto] items-center gap-3 pb-2">
           <button
             type="button"
             aria-label="Open menu"
@@ -58,11 +98,21 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
           <FranchizeProfileButton />
         </div>
 
-        <nav className="mt-3 flex gap-5 overflow-x-auto pb-1 text-sm text-muted-foreground">
+        <nav className="mt-1 flex gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] snap-x snap-mandatory">
           {quickLinks.map((linkLabel) => {
             const sectionHref = `${mainCatalogPath}#category-${linkLabel.toLowerCase().replace(/\s+/g, "-")}`;
+            const isActive = activeCategory === linkLabel;
             return (
-              <Link key={linkLabel} href={sectionHref} className="shrink-0 transition-colors hover:text-foreground">
+              <Link
+                key={linkLabel}
+                href={sectionHref}
+                className="shrink-0 snap-start rounded-full border px-3 py-1.5 text-xs font-medium tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+                style={{
+                  borderColor: isActive ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
+                  backgroundColor: isActive ? `${crew.theme.palette.accentMain}20` : "transparent",
+                  color: isActive ? crew.theme.palette.accentMain : undefined,
+                }}
+              >
                 {linkLabel}
               </Link>
             );

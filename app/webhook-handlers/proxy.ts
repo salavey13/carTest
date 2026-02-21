@@ -11,6 +11,7 @@ import { protocardPurchaseHandler } from "./protocard-purchase-handler";
 import { wbReferralServiceHandler } from "./wb-referral-service";
 import { qrMerchantHandler } from "./qr-merchant";
 import { bountyHandler } from "./bounty";
+import { franchizeOrderHandler } from "./franchize-order";
 
 import { logger } from "@/lib/logger";
 import { getBaseUrl } from "@/lib/utils";
@@ -23,6 +24,7 @@ const handlers: WebhookHandler[] = [
   wbReferralServiceHandler,
   qrMerchantHandler,
   bountyHandler,
+  franchizeOrderHandler,
   subscriptionHandler,
   carRentalHandler, 
   supportHandler,
