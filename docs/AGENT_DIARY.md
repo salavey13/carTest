@@ -116,3 +116,10 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** client-side `next/link` interaction got dropped in some portal/dropdown/webview event paths (especially after close/select handlers).
 - **Fix/workaround:** prefer deterministic navigation for these controls (`<a href>` or explicit `window.location.assign`) instead of relying on SPA link interception.
 - **Verification:** mobile Playwright flow covering header menu, footer menu, profile dropdown, and floating cart all navigates to expected routes.
+
+
+## 2026-02-21 — Back-to-catalog links need the same webview hardening
+- **Symptom:** `Вернуться в каталог` / `К каталогу` on cart/order/rental subpages could fail similarly to header/footer taps.
+- **Root cause:** same `next/link` interception fragility in webview/subpage interaction contexts.
+- **Fix/workaround:** standardize subpage recovery/back links to plain anchors for deterministic navigation.
+- **Verification:** Playwright mobile checks for cart->catalog, order->catalog, rental->catalog transitions.
