@@ -796,12 +796,12 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 
 ### T16 — Franchize rental page action controls (owner/renter parity UI)
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Expose owner/renter operational actions directly on `/franchize/[slug]/rental/[id]` (upload photo prompts, confirm pickup/return), reducing dependence on Telegram-only command UX.
-- next_step: design minimal server actions wrapper that reuses `rentals/actions.ts` without duplicating business rules.
-- risks: role checks and action idempotency must mirror Telegram command handlers exactly.
+- status: `in_progress`
+- updated_at: `2026-02-21T02:40:00Z`
+- owner: `codex`
+- notes: Started T16 with foundational franchize rental page overhaul: fixed broken action imports (`getFranchizeBySlug`/`getFranchizeRentalCard`), rebuilt `/franchize/[slug]/rental/[id]` with crew-metadata styling shell (`CrewHeader`/`CrewFooter`) and themed runtime card so post-payment handoff no longer looks like legacy fallback.
+- next_step: add role-aware owner/renter action controls (confirm pickup/return + photo prompts) directly on the franchize rental card.
+- risks: action controls still pending; lifecycle transitions remain partially Telegram-driven until server-action bindings land.
 - dependencies: T15
 - deliverables:
   - `app/franchize/[slug]/rental/[id]/page.tsx`
@@ -854,6 +854,13 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 
 ## 7) Progress changelog / diary
 
+
+
+
+### 2026-02-21 — T16 progress (franchize rental page styling + build unblock)
+- Fixed production build import path for franchize rental page (`../../../actions`), resolving missing-export errors during Next.js build.
+- Overhauled `/franchize/[slug]/rental/[id]` visuals to use crew metadata palette and shared franchize shell (`CrewHeader` + `CrewFooter`) for brand-consistent runtime UX.
+- Revalidated production build after refactor and captured fresh mobile screenshot artifact for `/franchize/vip-bike/rental/demo-order`.
 
 ### 2026-02-21 — T15 execution complete (Telegram photo fallback + completed events)
 - Fixed Telegram rental photo ingestion when `user_states.awaiting_rental_photo` is missing by auto-detecting likely renter rental context and expected photo type from status/events.
