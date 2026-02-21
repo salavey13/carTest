@@ -123,3 +123,10 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** same `next/link` interception fragility in webview/subpage interaction contexts.
 - **Fix/workaround:** standardize subpage recovery/back links to plain anchors for deterministic navigation.
 - **Verification:** Playwright mobile checks for cart->catalog, order->catalog, rental->catalog transitions.
+
+
+## 2026-02-21 — Default franchize QA slug must be `vip-bike` (not demo)
+- **Symptom:** repeated regressions/feedback because validation screenshots used fallback `demo` slug instead of real operator baseline.
+- **Root cause:** old smoke habit from empty/fallback shell testing persisted across iterations.
+- **Fix/workaround:** use `vip-bike` as default slug for franchize screenshots/smoke unless operator asks otherwise; mirror this in AGENTS + FRANCHEEZEPLAN notes.
+- **Verification:** Playwright screenshots and manual navigation checks executed against `/franchize/vip-bike/...` routes.

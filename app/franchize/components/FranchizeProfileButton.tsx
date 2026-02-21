@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { navigateWithReload } from "../lib/navigation";
 
 interface FranchizeProfileButtonProps {
   bgColor: string;
@@ -28,9 +29,6 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
-const navigateTo = (href: string) => {
-  window.location.assign(href);
-};
 
 export function FranchizeProfileButton({ bgColor, textColor, borderColor }: FranchizeProfileButtonProps) {
   const { dbUser, user, userCrewInfo, isAdmin } = useAppContext();
@@ -66,21 +64,21 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={(event) => {
           event.preventDefault();
-          navigateTo("/profile");
+          navigateWithReload("/profile");
         }}>
           <User className="h-4 w-4" />
           Профиль
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={(event) => {
           event.preventDefault();
-          navigateTo("/settings");
+          navigateWithReload("/settings");
         }}>
           <Settings className="h-4 w-4" />
           Настройки
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={(event) => {
           event.preventDefault();
-          navigateTo("/crews/create");
+          navigateWithReload("/crews/create");
         }}>
           <Palette className="h-4 w-4" />
           Branding (экипаж)
@@ -89,7 +87,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
         {userCrewInfo?.slug && (
           <DropdownMenuItem onSelect={(event) => {
             event.preventDefault();
-            navigateTo(`/crews/${userCrewInfo.slug}`);
+            navigateWithReload(`/crews/${userCrewInfo.slug}`);
           }}>
             <Palette className="h-4 w-4" />
             Мой экипаж
@@ -101,7 +99,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={(event) => {
               event.preventDefault();
-              navigateTo("/admin");
+              navigateWithReload("/admin");
             }}>
               <Shield className="h-4 w-4" />
               Admin
