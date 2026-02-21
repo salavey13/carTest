@@ -73,3 +73,9 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** photo webhook required `user_states.awaiting_rental_photo`; when state expired/lost, photo was ignored and no completed photo event was recorded.
 - **Fix/workaround:** add webhook fallback that auto-resolves likely renter rental + expected photo type from `rentals` + `events`; persist photo events with `status=completed` in both webhook and `addRentalPhoto` action.
 - **Verification:** `npx eslint app/api/telegramWebhook/route.ts app/rentals/actions.ts --max-warnings=0` and manual Telegram photo upload after clearing `user_states` still routes to inferred rental step.
+
+## 2026-02-21 — Franchize rental page build import path gotcha
+- **Symptom:** Next.js production build failed for `/franchize/[slug]/rental/[id]` with “Attempted import error … not exported from '../../../../actions'”.
+- **Root cause:** incorrect relative path depth after nesting under `[slug]/rental/[id]`; importer pointed one level too high.
+- **Fix/workaround:** use `../../../actions` from rental page and keep franchize rental surface inside crew-themed shell components.
+- **Verification:** `npm run build` completes and route `/franchize/[slug]/rental/[id]` is listed in build output.
