@@ -836,6 +836,26 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - All primary franchize navigation entry points are tappable in mobile webview context and open the expected route.
 
 
+### T16B — Subpage "back to catalog" link reliability
+- status: `done`
+- updated_at: `2026-02-21T19:05:00Z`
+- owner: `codex`
+- notes: Fixed remaining non-clickable returns from franchize subpages by replacing fragile internal `next/link` calls with deterministic anchors on cart/order/rental surfaces.
+- next_step: Continue T16 role-aware lifecycle controls implementation.
+- risks: anchor-based navigation forces full reload, but is acceptable for recovery/back-navigation actions in webview.
+- dependencies: T16A
+- deliverables:
+  - `app/franchize/components/CartPageClient.tsx`
+  - `app/franchize/components/OrderPageClient.tsx`
+  - `app/franchize/[slug]/rental/[id]/page.tsx`
+- implementation checklist:
+  1. Replace `Вернуться в каталог` links on cart/order with direct anchors.
+  2. Replace rental card `К каталогу` and follow-up action links with deterministic anchors.
+  3. Re-validate mobile subpage back-navigation flows end-to-end.
+- acceptance criteria:
+  - Back-to-catalog links on franchize subpages open catalog reliably in mobile/webview contexts.
+
+
 ### T17 — Theme mesh parity (crew palette vs global theme)
 - status: `todo`
 - updated_at: `-`
@@ -913,6 +933,12 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+
+### 2026-02-21 — T16B ad-hoc polish (subpage back-link reliability)
+- Fixed remaining flaky internal links on cart/order/rental subpages where `Вернуться в каталог` / `К каталогу` sometimes did not navigate in Telegram webview.
+- Switched those actions to direct anchor navigation and kept visual hierarchy unchanged.
+- Re-tested on mobile viewport: cart->catalog, order->catalog, rental->catalog all route correctly.
 
 
 ### 2026-02-21 — T16A ad-hoc polish (tap/click reliability sweep)
