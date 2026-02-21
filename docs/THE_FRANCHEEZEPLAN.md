@@ -797,9 +797,9 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T16 — Franchize rental page action controls (owner/renter parity UI)
 - status: `in_progress`
-- updated_at: `2026-02-21T04:00:00Z`
+- updated_at: `2026-02-21T04:40:00Z`
 - owner: `codex`
-- notes: Continued T16 with UX navigation polish: replaced header avatar direct-link with dropdown profile menu (profile/settings/branding/my crew/admin) while keeping crew-palette hotfix active for header surfaces.
+- notes: Continued T16 UX polish: clarified rental deep-link CTA semantics (Telegram fallback purpose) and upgraded checkout CTA naming/iconography to operator-grade wording on rental runtime card; header dropdown polish from previous beat preserved.
 - next_step: add role-aware owner/renter action controls (confirm pickup/return + photo prompts) directly on the franchize rental card.
 - risks: action controls still pending; lifecycle transitions remain partially Telegram-driven until server-action bindings land.
 - dependencies: T15
@@ -897,6 +897,11 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 
 
 
+
+### 2026-02-21 — T16 polish (deep-link CTA clarity + checkout rename)
+- Clarified why Telegram button exists directly in rental card UX copy: fallback entrypoint for restoring `startapp=rental-...` context when opened outside mini-app session.
+- Renamed/visual-polished checkout action to `Перейти в оформление` with icon for clearer operator intent and stronger scanability.
+- Captured fresh screenshot and reran lint/build/franchize smoke checks.
 
 ### 2026-02-21 — T16 progress (profile dropdown in franchize header)
 - Replaced franchize header avatar link with role-aware dropdown navigation: `Профиль`, `Настройки`, `Branding`, optional `Мой экипаж`, and `Admin` for admins only.
