@@ -97,3 +97,9 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** tight feedback loop (small scoped UX hotfixes + visible screenshots + immediate telemetry) increased trust and momentum.
 - **Fix/workaround:** keep this rhythm as default: clarify CTA intent in UI copy, ship one polished visual delta per beat, always close with concise heartbeat and next beat.
 - **Verification:** operator engagement remains high across consecutive T16 micro-iterations and merge readiness improves.
+
+## 2026-02-21 — CTA hierarchy rule for franchize rental cards
+- **Symptom:** fallback-labeled button looked as prominent as main next-step action, creating choice ambiguity.
+- **Root cause:** equal visual weight between progress CTA and context-recovery fallback CTA.
+- **Fix/workaround:** keep next-step action as primary filled button, move Telegram deep-link to low-emphasis fallback row with info-icon tooltip, remove legacy shortcut from primary action set.
+- **Verification:** `/franchize/vip-bike/rental/demo-order` shows one dominant continuation CTA and fallback link at bottom.
