@@ -128,6 +128,7 @@ export interface FranchizeConfigState {
   message: string;
   errors?: Record<string, string[]>;
   data?: FranchizeConfigInput;
+  canEdit?: boolean;
 }
 
 const defaultTheme: FranchizeTheme = {
@@ -536,6 +537,37 @@ function normalizeCatalogOrder(categories: string[]): string[] {
   return [...regular, ...wbItems];
 }
 
+
+async function resolveFranchizeEditorAccess(actorUserId: string | undefined, crew: { id: string; owner_id?: string | null }): Promise<boolean> {
+  if (!actorUserId) {
+    return false;
+  }
+
+  const { data: user } = await supabaseAdmin
+    .from("users")
+    .select("role, status")
+    .eq("user_id", actorUserId)
+    .maybeSingle();
+
+  const isAdmin = user?.status === "admin" || user?.role === "admin" || user?.role === "vprAdmin";
+  if (isAdmin) {
+    return true;
+  }
+
+  if (crew.owner_id && crew.owner_id === actorUserId) {
+    return true;
+  }
+
+  const { data: membership } = await supabaseAdmin
+    .from("crew_members")
+    .select("role, membership_status")
+    .eq("crew_id", crew.id)
+    .eq("user_id", actorUserId)
+    .maybeSingle();
+
+  return membership?.membership_status === "active" && membership.role === "owner";
+}
+
 function toFranchizeConfigInput(crew: UnknownRecord, slug: string): FranchizeConfigInput {
   const metadata = (crew.metadata ?? {}) as UnknownRecord;
   const franchize = (metadata.franchize ?? {}) as UnknownRecord;
@@ -580,25 +612,30 @@ function toFranchizeConfigInput(crew: UnknownRecord, slug: string): FranchizeCon
   };
 }
 
-export async function loadFranchizeConfigBySlug(slug: string): Promise<FranchizeConfigState> {
+export async function loadFranchizeConfigBySlug(slug: string, actorUserId?: string): Promise<FranchizeConfigState> {
   const safeSlug = slug.trim();
   if (!safeSlug) {
     return { ok: false, message: "Сначала укажите slug экипажа." };
   }
 
-  const { data: crew, error } = await supabaseAdmin.from("crews").select("id, slug, name, logo_url, metadata").eq("slug", safeSlug).maybeSingle();
+  const { data: crew, error } = await supabaseAdmin.from("crews").select("id, slug, name, logo_url, metadata, owner_id").eq("slug", safeSlug).maybeSingle();
   if (error || !crew) {
     return { ok: false, message: "Экипаж с таким slug не найден." };
   }
 
+  const canEdit = await resolveFranchizeEditorAccess(actorUserId, { id: crew.id, owner_id: crew.owner_id });
+
   return {
     ok: true,
-    message: `Конфиг для ${safeSlug} загружен.`,
+    message: canEdit
+      ? `Конфиг для ${safeSlug} загружен.`
+      : `Конфиг для ${safeSlug} загружен в read-only режиме.`,
     data: toFranchizeConfigInput(crew as UnknownRecord, safeSlug),
+    canEdit,
   };
 }
 
-export async function saveFranchizeConfig(input: FranchizeConfigInput): Promise<FranchizeConfigState> {
+export async function saveFranchizeConfig(input: FranchizeConfigInput, actorUserId?: string): Promise<FranchizeConfigState> {
   const parsed = franchizeConfigSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -610,9 +647,14 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput): Promise<
   }
 
   const payload = parsed.data;
-  const { data: crew, error: crewError } = await supabaseAdmin.from("crews").select("id, slug, metadata").eq("slug", payload.slug).maybeSingle();
+  const { data: crew, error: crewError } = await supabaseAdmin.from("crews").select("id, slug, metadata, owner_id").eq("slug", payload.slug).maybeSingle();
   if (crewError || !crew) {
     return { ok: false, message: "Slug не найден: сохранение не выполнено.", data: payload };
+  }
+
+  const canEdit = await resolveFranchizeEditorAccess(actorUserId, { id: crew.id, owner_id: crew.owner_id });
+  if (!canEdit) {
+    return { ok: false, message: "Недостаточно прав: сохранять может только owner экипажа или all-admin.", data: payload, canEdit: false };
   }
 
   let advancedOverrides: UnknownRecord = {};
@@ -711,13 +753,14 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput): Promise<
   const { error: updateError } = await supabaseAdmin.from("crews").update({ metadata: mergedMetadata }).eq("id", crew.id);
   if (updateError) {
     logger.error("[franchize] save config failed", updateError);
-    return { ok: false, message: "Не удалось сохранить конфиг в metadata экипажа.", data: payload };
+    return { ok: false, message: "Не удалось сохранить конфиг в metadata экипажа.", data: payload, canEdit: true };
   }
 
   return {
     ok: true,
     message: `Франшизный конфиг сохранён в crews.metadata.franchize для ${payload.slug}.`,
     data: payload,
+    canEdit: true,
   };
 }
 

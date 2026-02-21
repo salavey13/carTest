@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Menu } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { FranchizeCrewVM } from "../actions";
 import { HeaderMenu } from "../modals/HeaderMenu";
 import { FranchizeProfileButton } from "./FranchizeProfileButton";
@@ -19,6 +19,7 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [catalogLinks, setCatalogLinks] = useState<string[]>([]);
   const pathname = usePathname();
+  const router = useRouter();
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const railRef = useRef<HTMLDivElement | null>(null);
 
@@ -76,6 +77,27 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
     };
   }, [mainCatalogPath, pathname]);
 
+
+  useEffect(() => {
+    if (pathname !== mainCatalogPath || typeof window === "undefined") {
+      return;
+    }
+
+    const hash = window.location.hash?.replace("#", "");
+    if (!hash) {
+      return;
+    }
+
+    const section = document.getElementById(hash);
+    if (!section) {
+      return;
+    }
+
+    const yOffset = 76;
+    const y = section.getBoundingClientRect().top + window.scrollY - yOffset;
+    window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+  }, [mainCatalogPath, pathname]);
+
   useEffect(() => {
     if (!activeCategory || !railRef.current) {
       return;
@@ -87,6 +109,12 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
 
   const scrollToCategory = (categoryLabel: string) => {
     const targetId = toCategoryId(categoryLabel);
+
+    if (pathname !== mainCatalogPath) {
+      router.push(`${mainCatalogPath}#${targetId}`);
+      return;
+    }
+
     const section = document.getElementById(targetId);
     if (!section) {
       return;
@@ -133,7 +161,7 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
               <Menu className="h-5 w-5" />
             </button>
 
-            <div className="relative z-10 mx-auto -mb-6 flex flex-col items-center text-center">
+            <div className="relative z-10 mx-auto flex flex-col items-center text-center">
               <div className="relative h-16 w-16 overflow-hidden rounded-full border shadow-lg" style={{ borderColor: crew.theme.palette.accentMain, backgroundColor: crew.theme.palette.bgBase }}>
                 {crew.header.logoUrl ? (
                   <Image src={crew.header.logoUrl} alt={`${crew.header.brandName} logo`} fill sizes="64px" className="object-cover" unoptimized />
@@ -161,7 +189,7 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
           ref={railRef}
           className="mx-auto flex w-full max-w-4xl gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
         >
-          {catalogLinks.map((linkLabel) => {
+          {(pathname === mainCatalogPath ? catalogLinks : crew.catalog.categories).map((linkLabel) => {
             const isActive = activeCategory === linkLabel;
             return (
               <button
