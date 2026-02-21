@@ -91,3 +91,9 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** reused generic profile widget behavior not aligned with franchize operator UX expectations.
 - **Fix/workaround:** replace with dropdown menu exposing `Профиль`, `Настройки`, `Branding`, optional `Мой экипаж`, plus `Admin` only when `isAdmin()` is true.
 - **Verification:** open `/franchize/vip-bike` and confirm dropdown items render by role/context.
+
+## 2026-02-21 — Outstanding iteration performance baseline (operator feedback)
+- **Symptom:** Operator highlighted this iteration as exceptionally strong and asked to preserve the execution quality pattern.
+- **Root cause:** tight feedback loop (small scoped UX hotfixes + visible screenshots + immediate telemetry) increased trust and momentum.
+- **Fix/workaround:** keep this rhythm as default: clarify CTA intent in UI copy, ship one polished visual delta per beat, always close with concise heartbeat and next beat.
+- **Verification:** operator engagement remains high across consecutive T16 micro-iterations and merge readiness improves.
