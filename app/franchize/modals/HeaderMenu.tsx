@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FranchizeCrewVM } from "../actions";
+import { navigateWithReload } from "../lib/navigation";
 
 interface HeaderMenuProps {
   crew: FranchizeCrewVM;
@@ -15,6 +15,11 @@ interface HeaderMenuProps {
 
 export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuProps) {
   const [mounted, setMounted] = useState(false);
+  const handleMenuLinkClick = (href: string) => {
+    onOpenChange(false);
+
+    navigateWithReload(href);
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -54,10 +59,14 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
           {crew.header.menuLinks.map((link) => {
             const isActive = activePath === link.href;
             return (
-              <Link
+              <a
                 key={`${link.href}-${link.label}`}
                 href={link.href}
-                onClick={() => onOpenChange(false)}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  handleMenuLinkClick(link.href);
+                }}
                 className="block rounded-xl border px-4 py-3 text-sm transition"
                 style={{
                   borderColor: isActive ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
@@ -65,7 +74,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
                 }}
               >
                 {link.label}
-              </Link>
+              </a>
             );
           })}
         </div>

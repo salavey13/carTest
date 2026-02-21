@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { ExternalLink, Info, Sparkles } from "lucide-react";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
@@ -56,21 +55,21 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           </div>
 
           <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            <Link
+            <a
               href={`/franchize/${slug}/order/demo-order`}
               className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
               style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}
             >
               <Sparkles className="h-4 w-4" />
               Продолжить оформление
-            </Link>
-            <Link
+            </a>
+            <a
               href={`/franchize/${slug}`}
               className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm"
               style={{ borderColor: crew.theme.palette.borderSoft, color: crew.theme.palette.textPrimary }}
             >
               К каталогу
-            </Link>
+            </a>
           </div>
 
           <div className="mt-4 flex items-center justify-end gap-2 text-xs" style={{ color: crew.theme.palette.textSecondary }}>

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
+import { toCategoryId } from "../lib/navigation";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { ItemModal } from "../modals/Item";
@@ -13,7 +14,6 @@ interface CatalogClientProps {
   items: CatalogItemVM[];
 }
 
-const toCategoryId = (category: string) => `category-${category.toLowerCase().replace(/\s+/g, "-")}`;
 
 const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
   const regular = groups.filter((group) => !group.category.toLowerCase().includes("wbitem"));

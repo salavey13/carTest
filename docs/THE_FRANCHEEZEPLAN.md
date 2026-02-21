@@ -815,6 +815,72 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Core rental lifecycle can continue from franchize rental page without Telegram command roundtrip.
 
 
+### T16A — Navigation tap reliability hotfix (menu/footer/profile/cart)
+- status: `done`
+- updated_at: `2026-02-21T18:30:00Z`
+- owner: `codex`
+- notes: Fixed franchize navigation taps in Telegram/mobile runtime where Next.js client-link interactions were intermittently swallowed: switched footer/cart to direct anchors, hardened profile dropdown actions with explicit `window.location.assign`, and kept header modal link handling explicit.
+- next_step: Continue T16 role-aware rental action controls.
+- risks: Full-page navigation reload is now preferred for reliability in webview contexts; acceptable for these utility links.
+- dependencies: T16
+- deliverables:
+  - `app/franchize/components/CrewFooter.tsx`
+  - `app/franchize/components/FranchizeProfileButton.tsx`
+  - `app/franchize/components/FloatingCartIconLink.tsx`
+  - `app/franchize/modals/HeaderMenu.tsx`
+- implementation checklist:
+  1. Replace fragile client-side menu links in affected surfaces with deterministic navigation handlers/anchors.
+  2. Verify header menu, footer menu, profile dropdown, and floating cart interactions on mobile viewport.
+  3. Record ad-hoc polish task in FRANCHEEZEPLAN diary for traceability.
+- acceptance criteria:
+  - All primary franchize navigation entry points are tappable in mobile webview context and open the expected route.
+
+
+### T16B — Subpage "back to catalog" link reliability
+- status: `done`
+- updated_at: `2026-02-21T19:05:00Z`
+- owner: `codex`
+- notes: Fixed remaining non-clickable returns from franchize subpages by replacing fragile internal `next/link` calls with deterministic anchors on cart/order/rental surfaces.
+- next_step: Continue T16 role-aware lifecycle controls implementation.
+- risks: anchor-based navigation forces full reload, but is acceptable for recovery/back-navigation actions in webview.
+- dependencies: T16A
+- deliverables:
+  - `app/franchize/components/CartPageClient.tsx`
+  - `app/franchize/components/OrderPageClient.tsx`
+  - `app/franchize/[slug]/rental/[id]/page.tsx`
+- implementation checklist:
+  1. Replace `Вернуться в каталог` links on cart/order with direct anchors.
+  2. Replace rental card `К каталогу` and follow-up action links with deterministic anchors.
+  3. Re-validate mobile subpage back-navigation flows end-to-end.
+- acceptance criteria:
+  - Back-to-catalog links on franchize subpages open catalog reliably in mobile/webview contexts.
+
+
+### T16C — Unified franchize navigation pattern + sticky category rail sync
+- status: `done`
+- updated_at: `2026-02-21T19:45:00Z`
+- owner: `codex`
+- notes: Unified navigation reliability pattern via shared helper (`navigateWithReload` + `toCategoryId`) and rebuilt catalog header rail to read real rendered section order, hide empty groups, smooth-scroll to section on tap, auto-keep active pill in view, and keep only the rail sticky while top header block scrolls away.
+- next_step: Continue T16 role-aware lifecycle actions (or pick next ready planned task when operator requests generic FRANCHEEZEPLAN continuation).
+- risks: rail sync depends on section DOM (`section[data-category]`) staying stable in catalog markup.
+- dependencies: T16B
+- deliverables:
+  - `app/franchize/lib/navigation.ts`
+  - `app/franchize/components/CrewHeader.tsx`
+  - `app/franchize/components/CatalogClient.tsx`
+  - `app/franchize/modals/HeaderMenu.tsx`
+  - `app/franchize/components/FranchizeProfileButton.tsx`
+  - `AGENTS.md`
+- implementation checklist:
+  1. Introduce shared franchize navigation helper and reuse it in client navigation handlers.
+  2. Sync header category rail with rendered catalog groups (same order, no empty hardcoded groups).
+  3. Keep category pills scrollbar hidden, smooth scroll on click, and auto-scroll active pill into view while catalog is scrolled.
+  4. Make top header block scroll out while category rail stays pinned.
+  5. Lock QA default slug guidance to `vip-bike` in operator docs.
+- acceptance criteria:
+  - Category pills click-scroll correctly, active pill stays visible during catalog scroll, and rail order matches rendered groups without empty placeholders.
+
+
 ### T17 — Theme mesh parity (crew palette vs global theme)
 - status: `todo`
 - updated_at: `-`
@@ -892,6 +958,26 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+
+### 2026-02-21 — T16C ad-hoc polish (category rail + unified nav helper)
+- Added shared franchize navigation helper (`app/franchize/lib/navigation.ts`) and reused it in header modal/profile actions + category id mapping.
+- Rebuilt header category rail to derive links from rendered catalog sections (`section[data-category]`), so order now mirrors catalog and empty showcase groups are auto-hidden.
+- Implemented smooth click-scroll to chosen group, active-pill auto-scroll-into-view, hidden scrollbar rail, and split sticky behavior (top header scrolls away, pills rail stays visible).
+- Updated AGENTS with two routing hints: RU task text defaults to FRANCHEEZEPLAN and generic `FRANCHEEZEPLAN` requests should execute the next ready planned task; also set default QA slug to `vip-bike`.
+
+
+### 2026-02-21 — T16B ad-hoc polish (subpage back-link reliability)
+- Fixed remaining flaky internal links on cart/order/rental subpages where `Вернуться в каталог` / `К каталогу` sometimes did not navigate in Telegram webview.
+- Switched those actions to direct anchor navigation and kept visual hierarchy unchanged.
+- Re-tested on mobile viewport: cart->catalog, order->catalog, rental->catalog all route correctly.
+
+
+### 2026-02-21 — T16A ad-hoc polish (tap/click reliability sweep)
+- Investigated shared root cause across franchize header/footer/profile/cart: internal client-link taps were unreliable in modal/dropdown/webview surfaces.
+- Hardened routing by using deterministic navigation paths (anchors or explicit `window.location.assign`) for footer menu links, profile dropdown items, and floating cart pill.
+- Re-validated interaction flow on mobile viewport: header menu link opens `/about`, footer `Контакты` opens `/contacts`, profile dropdown opens `/settings`, cart pill opens `/cart`.
+- Added AGENTS keyword-trigger note so Pepperolli/VIP-bike/franchize requests always spawn/update an ad-hoc FRANCHEEZEPLAN task for historical continuity.
 
 
 
