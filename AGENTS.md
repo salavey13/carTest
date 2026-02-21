@@ -145,6 +145,12 @@ Do not mark implementation as complete without reflecting progress in `docs/THE_
 
 Keyword auto-trigger rule: if a task mentions `пепперолли`, `pepperolli`, `vip-bike`, `vip bike`, `franchize`, or close variants (`франшиза`, `франчайз`), treat it as FRANCHEEZEPLAN-related even when not explicitly stated. In such cases, create/update an ad-hoc task in `docs/THE_FRANCHEEZEPLAN.md` and execute it so history stays traceable.
 
+RU-intent shortcut: if task/request text is mostly in Russian, default to FRANCHEEZEPLAN routing unless clearly unrelated.
+
+Trigger shortcut: if operator message contains only/mostly `FRANCHEEZEPLAN` (or asks to continue it) without specific scope, pick the next planned ready task from `docs/THE_FRANCHEEZEPLAN.md` and execute it.
+
+QA slug rule (mandatory): for franchize visual/testing flows, use `vip-bike` as default verification slug for screenshots and smoke checks unless operator explicitly requests another slug.
+
 Current docs style: keep setup docs practical, RU-first, and compact-but-complete in `README.MD`, with `docs/README_TLDR.md` as the extra-short variant.
 For first-time operators, keep token onboarding appendixes up-to-date (Telegram BotFather + Slack app token/channel id steps).
 
