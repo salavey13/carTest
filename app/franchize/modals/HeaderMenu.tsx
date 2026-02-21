@@ -2,9 +2,9 @@
 
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import type { FranchizeCrewVM } from "../actions";
-import { navigateWithReload } from "../lib/navigation";
 
 interface HeaderMenuProps {
   crew: FranchizeCrewVM;
@@ -15,10 +15,11 @@ interface HeaderMenuProps {
 
 export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuProps) {
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
+
   const handleMenuLinkClick = (href: string) => {
     onOpenChange(false);
-
-    navigateWithReload(href);
+    router.push(href);
   };
 
   useEffect(() => {
