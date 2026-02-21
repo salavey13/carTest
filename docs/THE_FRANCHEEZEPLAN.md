@@ -797,9 +797,9 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T16 — Franchize rental page action controls (owner/renter parity UI)
 - status: `in_progress`
-- updated_at: `2026-02-21T02:40:00Z`
+- updated_at: `2026-02-21T03:10:00Z`
 - owner: `codex`
-- notes: Started T16 with foundational franchize rental page overhaul: fixed broken action imports (`getFranchizeBySlug`/`getFranchizeRentalCard`), rebuilt `/franchize/[slug]/rental/[id]` with crew-metadata styling shell (`CrewHeader`/`CrewFooter`) and themed runtime card so post-payment handoff no longer looks like legacy fallback.
+- notes: Continued T16 with pre-hotfix for header/theme mismatch: franchize header now uses crew metadata palette for background/ticker/chips/menu/profile shell, preventing global light-theme tokens from reducing contrast on dark crew runtime pages.
 - next_step: add role-aware owner/renter action controls (confirm pickup/return + photo prompts) directly on the franchize rental card.
 - risks: action controls still pending; lifecycle transitions remain partially Telegram-driven until server-action bindings land.
 - dependencies: T15
@@ -813,6 +813,45 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   3. Reflect real-time state transitions after action completion.
 - acceptance criteria:
   - Core rental lifecycle can continue from franchize rental page without Telegram command roundtrip.
+
+
+### T17 — Theme mesh parity (crew palette vs global theme)
+- status: `todo`
+- updated_at: `-`
+- owner: `unassigned`
+- notes: Formalize dual palette mapping to avoid light/dark theme collisions across franchize pages (header, cards, modals, footer) when crew palette is intentionally dark.
+- next_step: audit franchize components for `bg-background`, `text-foreground`, `bg-card`, `text-muted-foreground` usage and replace with crew palette tokens or a shared resolver.
+- risks: partial migration can create inconsistent contrast between global layout wrappers and crew-local components.
+- dependencies: T16
+- deliverables:
+  - `app/franchize/components/*`
+  - `app/franchize/modals/*`
+  - `app/franchize/[slug]/*`
+- implementation checklist:
+  1. Build a tiny palette resolver (`crewPaletteForSurface`) for consistent text/background pairs.
+  2. Migrate legacy theme utility classes in franchize shell to resolver output.
+  3. Add contrast smoke checks for light and dark crews on key slugs.
+- acceptance criteria:
+  - No franchize page shows low-contrast title/body text due to global theme token leakage.
+
+### T18 — `/franchize/create` palette UX v2 (light+dark sets)
+- status: `todo`
+- updated_at: `-`
+- owner: `unassigned`
+- notes: Extend create flow to capture richer color systems (light and dark palette sets + text colors) with clear previews and sensible defaults.
+- next_step: design compact form UX that supports advanced palette editing without overwhelming first-time operators.
+- risks: too many raw color inputs can hurt completion rate unless grouped and previewed clearly.
+- dependencies: T17
+- deliverables:
+  - `app/franchize/create/*`
+  - `app/franchize/actions.ts`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add schema fields for dual palettes (`light`, `dark`) plus semantic text tokens.
+  2. Provide preset swatches + live preview cards in create flow.
+  3. Persist palette sets and hydrate correct set by runtime mode.
+- acceptance criteria:
+  - Operators can configure readable light and dark variants in create flow with preview confidence.
 
 ---
 
@@ -856,6 +895,12 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 
 
 
+
+
+### 2026-02-21 — T16 pre-hotfix (header palette source)
+- Resolved dark/light mesh issue from QA screenshot by switching `CrewHeader` surface colors (header bg, ticker rail, menu/profile shells, balloon text) to crew metadata palette tokens.
+- Added follow-up tasks: T17 for full palette/theming parity audit and T18 for `/franchize/create` dual-palette UX expansion.
+- Captured updated `/franchize/vip-bike/rental/demo-order` screenshot after header pre-hotfix and reran lint/build/smoke checks.
 
 ### 2026-02-21 — T16 progress (franchize rental page styling + build unblock)
 - Fixed production build import path for franchize rental page (`../../../actions`), resolving missing-export errors during Next.js build.

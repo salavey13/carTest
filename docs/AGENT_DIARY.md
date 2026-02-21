@@ -79,3 +79,9 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** incorrect relative path depth after nesting under `[slug]/rental/[id]`; importer pointed one level too high.
 - **Fix/workaround:** use `../../../actions` from rental page and keep franchize rental surface inside crew-themed shell components.
 - **Verification:** `npm run build` completes and route `/franchize/[slug]/rental/[id]` is listed in build output.
+
+## 2026-02-21 — Franchize header can leak global theme tokens
+- **Symptom:** Header looked light while crew page used dark palette; title/body contrast looked broken on rental page screenshots.
+- **Root cause:** `CrewHeader` (and profile shell) still used Tailwind global tokens like `bg-background`, `bg-card`, `text-foreground` instead of crew metadata palette.
+- **Fix/workaround:** drive header/ticker/chips/menu/profile surfaces from `crew.theme.palette` inline styles for background/text/border colors.
+- **Verification:** open `/franchize/vip-bike/rental/demo-order` and confirm header + content contrast stay consistent with crew palette.
