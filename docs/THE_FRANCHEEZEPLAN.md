@@ -797,9 +797,9 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T16 — Franchize rental page action controls (owner/renter parity UI)
 - status: `in_progress`
-- updated_at: `2026-02-21T04:40:00Z`
+- updated_at: `2026-02-21T05:15:00Z`
 - owner: `codex`
-- notes: Continued T16 UX polish: clarified rental deep-link CTA semantics (Telegram fallback purpose) and upgraded checkout CTA naming/iconography to operator-grade wording on rental runtime card; header dropdown polish from previous beat preserved.
+- notes: Continued T16 UX polish: promoted main next-step CTA to congratulatory `Продолжить оформление`, moved Telegram deep-link into lightweight fallback row with info-icon hint, and removed legacy rentals button to avoid misleading click hierarchy.
 - next_step: add role-aware owner/renter action controls (confirm pickup/return + photo prompts) directly on the franchize rental card.
 - risks: action controls still pending; lifecycle transitions remain partially Telegram-driven until server-action bindings land.
 - dependencies: T15
@@ -897,6 +897,11 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 
 
 
+
+### 2026-02-21 — T16 polish (CTA hierarchy + fallback minimization)
+- Swapped action hierarchy so the primary button is now `Продолжить оформление` (main next step after invoice intent), while Telegram deep-link moved to subtle fallback row.
+- Removed `Legacy rentals` shortcut entirely to keep franchize-first flow deterministic.
+- Added celebratory deal-start badge and info-icon tooltip for fallback semantics to keep UX clear without noisy body copy.
 
 ### 2026-02-21 — T16 polish (deep-link CTA clarity + checkout rename)
 - Clarified why Telegram button exists directly in rental card UX copy: fallback entrypoint for restoring `startapp=rental-...` context when opened outside mini-app session.

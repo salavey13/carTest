@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink, ReceiptText } from "lucide-react";
+import { ExternalLink, Info, Sparkles } from "lucide-react";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
 import { CrewFooter } from "../../../components/CrewFooter";
@@ -19,6 +19,7 @@ const statusLabel: Record<string, string> = {
 export default async function FranchizeRentalPage({ params }: FranchizeRentalPageProps) {
   const { slug, id } = await params;
   const [{ crew }, rental] = await Promise.all([getFranchizeBySlug(slug), getFranchizeRentalCard(slug, id)]);
+  const dealStarted = rental.found || rental.paymentStatus === "interest_paid";
 
   return (
     <main className="min-h-screen" style={{ backgroundColor: crew.theme.palette.bgBase, color: crew.theme.palette.textPrimary }}>
@@ -35,6 +36,16 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             : "Сделка пока не найдена. Проверь ссылку и дождись синхронизации после оплаты XTR."}
         </p>
 
+        {dealStarted && (
+          <div
+            className="mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
+            style={{ borderColor: crew.theme.palette.accentMain, color: crew.theme.palette.accentMain }}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Deal is starting for real — продолжаем оформление 🚀
+          </div>
+        )}
+
         <section className="mt-6 rounded-3xl border p-4 shadow-[0_18px_30px_rgba(0,0,0,0.35)]" style={{ borderColor: crew.theme.palette.borderSoft, backgroundColor: crew.theme.palette.bgCard }}>
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             <p><span style={{ color: crew.theme.palette.textSecondary }}>Rental ID:</span> {rental.rentalId}</p>
@@ -44,20 +55,15 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             <p className="sm:col-span-2"><span style={{ color: crew.theme.palette.textSecondary }}>Транспорт:</span> {rental.vehicleTitle}</p>
           </div>
 
-          <div className="mt-2 rounded-xl border px-3 py-2 text-xs" style={{ borderColor: crew.theme.palette.borderSoft, color: crew.theme.palette.textSecondary }}>
-            Кнопка Telegram нужна как deep-link fallback: если карточку открыли вне мини-аппа (браузер/уведомление), она вернёт в контекст
-            <code className="ml-1">startapp=rental-...</code>.
-          </div>
-
           <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            <a
-              href={rental.telegramDeepLink}
+            <Link
+              href={`/franchize/${slug}/order/demo-order`}
               className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
               style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}
             >
-              <ExternalLink className="h-4 w-4" />
-              Открыть в Telegram (fallback)
-            </a>
+              <Sparkles className="h-4 w-4" />
+              Продолжить оформление
+            </Link>
             <Link
               href={`/franchize/${slug}`}
               className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm"
@@ -65,21 +71,24 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             >
               К каталогу
             </Link>
-            <Link
-              href={`/franchize/${slug}/order/demo-order`}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm"
-              style={{ borderColor: crew.theme.palette.borderSoft, color: crew.theme.palette.textPrimary }}
+          </div>
+
+          <div className="mt-4 flex items-center justify-end gap-2 text-xs" style={{ color: crew.theme.palette.textSecondary }}>
+            <span
+              className="inline-flex h-6 w-6 items-center justify-center rounded-full border"
+              style={{ borderColor: crew.theme.palette.borderSoft }}
+              title="Deep-link fallback: если карточка открылась вне Telegram mini-app, вернёт в контекст startapp=rental-..."
+              aria-label="Информация о Telegram fallback"
             >
-              <ReceiptText className="h-4 w-4" />
-              Перейти в оформление
-            </Link>
-            <Link
-              href={`/rentals/${id}`}
-              className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm"
-              style={{ borderColor: crew.theme.palette.borderSoft, color: crew.theme.palette.textSecondary }}
+              <Info className="h-3.5 w-3.5" />
+            </span>
+            <a
+              href={rental.telegramDeepLink}
+              className="inline-flex items-center gap-1 underline-offset-2 hover:underline"
             >
-              Legacy rentals (fallback)
-            </Link>
+              <ExternalLink className="h-3.5 w-3.5" />
+              Открыть в Telegram (fallback)
+            </a>
           </div>
         </section>
       </section>
