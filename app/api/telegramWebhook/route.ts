@@ -36,9 +36,66 @@ async function handlePhotoMessage(message: any) {
         return;
     }
 
-    if (!userState || userState.state !== 'awaiting_rental_photo') {
-        logger.info(`[Webhook] Photo from user ${userId} received without 'awaiting_rental_photo' state. Ignoring.`);
-        return;
+    let rentalIdFromState: string | null = null;
+    let photoTypeFromState: 'start' | 'end' | null = null;
+
+    if (userState && userState.state === 'awaiting_rental_photo') {
+        const context = userState.context as { rental_id?: string; photo_type?: 'start' | 'end' };
+        rentalIdFromState = context?.rental_id ?? null;
+        photoTypeFromState = context?.photo_type ?? null;
+    }
+
+    if (!rentalIdFromState || !photoTypeFromState) {
+        const { data: rentals, error: rentalsError } = await supabaseAdmin
+            .from('rentals')
+            .select('rental_id, status, created_at')
+            .eq('user_id', userId)
+            .in('status', ['pending_confirmation', 'confirmed', 'active'])
+            .order('created_at', { ascending: false })
+            .limit(12);
+
+        if (rentalsError) {
+            logger.error(`[Webhook] Failed to auto-resolve rental for photo message ${userId}`, rentalsError);
+            await sendComplexMessage(chatId, '🚨 Не удалось определить активную аренду. Нажмите /actions и выберите шаг с фото.', [], undefined);
+            return;
+        }
+
+        let resolved: { rental_id: string; photo_type: 'start' | 'end' } | null = null;
+        for (const rental of rentals ?? []) {
+            const { data: events } = await supabaseAdmin
+                .from('events')
+                .select('type, status')
+                .eq('rental_id', rental.rental_id);
+
+            const hasCompletedStart = (events || []).some((e) => e.type === 'photo_start' && e.status === 'completed');
+            const hasCompletedEnd = (events || []).some((e) => e.type === 'photo_end' && e.status === 'completed');
+
+            if (rental.status === 'active' && !hasCompletedEnd) {
+                resolved = { rental_id: rental.rental_id, photo_type: 'end' };
+                break;
+            }
+
+            if ((rental.status === 'pending_confirmation' || rental.status === 'confirmed') && !hasCompletedStart) {
+                resolved = { rental_id: rental.rental_id, photo_type: 'start' };
+                break;
+            }
+        }
+
+        if (!resolved) {
+            logger.info(`[Webhook] Photo from user ${userId} received without resolvable rental context.`);
+            await sendComplexMessage(chatId, '🤔 Не удалось найти шаг с ожидаемым фото. Откройте /actions и выберите нужное действие.', [], undefined);
+            return;
+        }
+
+        rentalIdFromState = resolved.rental_id;
+        photoTypeFromState = resolved.photo_type;
+
+        await supabaseAdmin.from('user_states').upsert({
+            user_id: userId,
+            state: 'awaiting_rental_photo',
+            context: resolved,
+            expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        });
     }
 
     if (userState.expires_at && new Date(userState.expires_at).getTime() < Date.now()) {
@@ -47,7 +104,8 @@ async function handlePhotoMessage(message: any) {
         return;
     }
 
-    const { rental_id, photo_type } = userState.context as { rental_id: string, photo_type: 'start' | 'end' };
+    const rental_id = rentalIdFromState;
+    const photo_type = photoTypeFromState;
 
     const photo = message.photo?.[message.photo.length - 1]; // берем самый большой размер
     if (!photo?.file_id) {
@@ -79,6 +137,7 @@ async function handlePhotoMessage(message: any) {
         const { error: eventError } = await supabaseAdmin.from('events').insert({
           rental_id: rental_id,
           type: `photo_${photo_type}`,
+          status: 'completed',
           created_by: userId,
           payload: { photo_url: uploadResult.url }
         });

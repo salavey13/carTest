@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { ItemModal } from "../modals/Item";
@@ -15,13 +15,23 @@ interface CatalogClientProps {
 
 const toCategoryId = (category: string) => `category-${category.toLowerCase().replace(/\s+/g, "-")}`;
 
+const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
+  const regular = groups.filter((group) => !group.category.toLowerCase().includes("wbitem"));
+  const wbItems = groups.filter((group) => group.category.toLowerCase().includes("wbitem"));
+  return [...regular, ...wbItems];
+};
+
+const cardVariants = [
+  "border border-border bg-card",
+  "border border-amber-500/35 bg-gradient-to-b from-card to-background shadow-[0_12px_28px_rgba(217,154,0,0.08)]",
+  "border border-border bg-card shadow-[0_0_0_1px_rgba(217,154,0,0.12),0_16px_26px_rgba(0,0,0,0.45)]",
+] as const;
+
 export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
-  const { changeItemQty } = useFranchizeCart(crew.slug || slug);
+  const { addItem } = useFranchizeCart(crew.slug || slug);
   const [selectedOptions, setSelectedOptions] = useState({ package: "Base", duration: "1 day", perk: "Стандарт" });
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const categoryTabsRef = useRef<Record<string, HTMLAnchorElement | null>>({});
 
   const orderedCategories = useMemo(
     () => Array.from(new Set([...crew.catalog.categories, ...items.map((item) => item.category).filter(Boolean)])),
@@ -35,65 +45,35 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
     return items.filter((item) => [item.title, item.subtitle, item.description, item.category].join(" ").toLowerCase().includes(query));
   }, [items, searchQuery]);
 
-  const itemsByCategory = useMemo(
-    () =>
-      orderedCategories
-        .map((category) => ({
-          category,
-          items: filteredItems.filter((item) => item.category === category),
-        }))
-        .filter((group) => group.items.length > 0),
-    [filteredItems, orderedCategories],
-  );
+  const itemsByCategory = useMemo(() => {
+    const grouped = orderedCategories
+      .map((category) => ({
+        category,
+        items: filteredItems.filter((item) => item.category === category),
+      }))
+      .filter((group) => group.items.length > 0);
 
-  useEffect(() => {
-    setActiveCategory(itemsByCategory[0]?.category ?? null);
-  }, [itemsByCategory]);
-
-  useEffect(() => {
-    if (itemsByCategory.length === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visibleEntries = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-
-        if (visibleEntries.length > 0) {
-          const category = visibleEntries[0]?.target.getAttribute("data-category");
-          if (category) {
-            setActiveCategory(category);
+    const showcaseGroups = crew.catalog.showcaseGroups
+      .map((group) => {
+        const showcaseItems = filteredItems.filter((item) => {
+          if (group.mode === "subtype") {
+            return item.category.toLowerCase().includes((group.subtype ?? "").toLowerCase());
           }
-          return;
-        }
 
-        const passedEntries = entries
-          .filter((entry) => entry.boundingClientRect.top < 0)
-          .sort((a, b) => b.boundingClientRect.top - a.boundingClientRect.top);
-        const category = passedEntries[0]?.target.getAttribute("data-category");
-        if (category) {
-          setActiveCategory(category);
-        }
-      },
-      {
-        rootMargin: "-120px 0px -55% 0px",
-        threshold: [0, 0.2, 0.4, 0.7],
-      },
-    );
+          const minPrice = group.minPrice ?? Number.NEGATIVE_INFINITY;
+          const maxPrice = group.maxPrice ?? Number.POSITIVE_INFINITY;
+          return item.pricePerDay >= minPrice && item.pricePerDay <= maxPrice;
+        });
 
-    itemsByCategory.forEach((group) => {
-      const node = document.getElementById(toCategoryId(group.category));
-      if (node) observer.observe(node);
-    });
+        return {
+          category: group.label,
+          items: showcaseItems,
+        };
+      })
+      .filter((group) => group.items.length > 0);
 
-    return () => observer.disconnect();
-  }, [itemsByCategory]);
-
-  useEffect(() => {
-    if (!activeCategory) return;
-    const activeTab = categoryTabsRef.current[activeCategory];
-    activeTab?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-  }, [activeCategory]);
+    return sortWbItemLast([...showcaseGroups, ...grouped]);
+  }, [crew.catalog.showcaseGroups, filteredItems, orderedCategories]);
 
   const openItem = (item: CatalogItemVM) => {
     setSelectedItem(item);
@@ -132,32 +112,9 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
           </button>
         </div>
 
-        <div className="sticky top-[max(env(safe-area-inset-top),0.5rem)] z-20 -mx-4 mb-5 border-b border-border/60 bg-background/95 px-4 pb-2 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {itemsByCategory.map((group) => (
-              <a
-                key={group.category}
-                ref={(node) => {
-                  categoryTabsRef.current[group.category] = node;
-                }}
-                href={`#${toCategoryId(group.category)}`}
-                className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
-                style={{
-                  borderColor: activeCategory === group.category ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
-                  backgroundColor: activeCategory === group.category ? `${crew.theme.palette.accentMain}22` : "transparent",
-                  color: activeCategory === group.category ? crew.theme.palette.accentMain : undefined,
-                }}
-                onClick={() => setActiveCategory(group.category)}
-              >
-                {group.category}
-              </a>
-            ))}
-          </div>
-        </div>
-
         {items.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-            No bike catalog items yet. Add `type=bike` cars to this crew to hydrate the catalog.
+            Каталог пуст. Добавь позиции типов `bike`, `accessories`, `gear` или `wbitem`, чтобы наполнить витрину.
           </div>
         ) : itemsByCategory.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
@@ -172,7 +129,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                 </h2>
                 <div className="grid grid-cols-2 gap-3">
                   {group.items.map((item) => (
-                    <article key={item.id} data-catalog-item="true" className="overflow-hidden rounded-2xl border border-border bg-card">
+                    <article key={item.id} data-catalog-item="true" className={`group overflow-hidden rounded-2xl ${cardVariants[Math.abs(item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)) % cardVariants.length]}`}>
                       <button type="button" className="block w-full text-left" onClick={() => openItem(item)}>
                         <div className="relative h-28 w-full">
                           {item.imageUrl ? (
@@ -182,11 +139,19 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                           )}
                         </div>
                         <div className="p-3">
+                          {item.category.toLowerCase().includes("bobber") && (
+                            <span
+                              className="mb-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
+                              style={{ backgroundColor: `${crew.theme.palette.accentMain}dd`, color: "#16130A" }}
+                            >
+                              Хит 🔥
+                            </span>
+                          )}
                           <h3 className="mt-1 text-sm font-semibold leading-5">{item.title}</h3>
-                          <p className="text-xs text-muted-foreground">{item.subtitle}</p>
+                          <p className="text-xs text-muted-foreground">{item.description || item.subtitle}</p>
                           <p className="mt-2 text-sm font-medium">{item.pricePerDay} ₽ / day</p>
-                          <span className="mt-2 inline-flex rounded-lg px-2 py-1 text-xs font-medium" style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}>
-                            Подробнее
+                          <span className="mt-2 inline-flex w-full items-center justify-center rounded-full px-2 py-2 text-xs font-semibold" style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}>
+                            {item.pricePerDay >= 6000 ? "Выбрать" : "Добавить"}
                           </span>
                         </div>
                       </button>
@@ -216,7 +181,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
         onClose={() => setSelectedItem(null)}
         onAddToCart={() => {
           if (!selectedItem) return;
-          changeItemQty(selectedItem.id, 1);
+          addItem(selectedItem.id, selectedOptions, 1);
           setSelectedItem(null);
         }}
       />

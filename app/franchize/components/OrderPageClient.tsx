@@ -24,6 +24,12 @@ const payments = [
 
 type PaymentMethod = (typeof payments)[number]["id"];
 
+const orderExtras = [
+  { id: "priority-prep", label: "Приоритетная подготовка", amount: 1200 },
+  { id: "full-insurance", label: "Расширенная страховка", amount: 1800 },
+  { id: "hotel-dropoff", label: "Доставка к отелю", amount: 900 },
+] as const;
+
 type CheckoutPayload = {
   orderId: string;
   recipient: string;
@@ -32,11 +38,20 @@ type CheckoutPayload = {
   comment: string;
   payment: PaymentMethod;
   delivery: "pickup" | "delivery";
+  extras: Array<{ id: string; label: string; amount: number }>;
+  extrasTotal: number;
+  totalAmount: number;
   cartLines: Array<{
+    lineId: string;
     itemId: string;
     qty: number;
     pricePerDay: number;
     lineTotal: number;
+    options: {
+      package: string;
+      duration: string;
+      perk: string;
+    };
   }>;
 };
 
@@ -52,9 +67,19 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const [time, setTime] = useState("");
   const [comment, setComment] = useState("");
   const [promo, setPromo] = useState("");
+  const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   const [consent, setConsent] = useState(false);
 
   const isCartEmpty = cartLines.length === 0;
+  const selectedExtraItems = useMemo(
+    () => orderExtras.filter((extra) => selectedExtras.includes(extra.id)),
+    [selectedExtras],
+  );
+  const extrasTotal = useMemo(
+    () => selectedExtraItems.reduce((sum, extra) => sum + extra.amount, 0),
+    [selectedExtraItems],
+  );
+  const totalAmount = subtotal + extrasTotal;
   const isValidForm = recipient.trim().length > 1 && phone.trim().length > 5 && time.trim().length > 0 && consent;
   const requiresTelegram = payment === "telegram_xtr";
   const hasTelegramUser = Boolean(user?.id);
@@ -69,14 +94,19 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       comment: comment.trim(),
       payment,
       delivery: deliveryMode,
+      extras: selectedExtraItems.map((extra) => ({ id: extra.id, label: extra.label, amount: extra.amount })),
+      extrasTotal,
+      totalAmount,
       cartLines: cartLines.map((line) => ({
+        lineId: line.lineId,
         itemId: line.itemId,
         qty: line.qty,
         pricePerDay: line.pricePerDay,
         lineTotal: line.lineTotal,
+        options: line.options,
       })),
     }),
-    [cartLines, comment, deliveryMode, orderId, payment, phone, recipient, time],
+    [cartLines, comment, deliveryMode, extrasTotal, orderId, payment, phone, recipient, selectedExtraItems, time, totalAmount],
   );
 
   const submitLabel = isSubmitting
@@ -93,7 +123,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         ? "Подтвердите согласие с условиями аренды, чтобы отправить заказ."
         : requiresTelegram && !hasTelegramUser
           ? "Для оплаты Stars откройте оформление из Telegram WebApp и повторите попытку."
-          : "Проверьте контакты и способ получения, затем подтверждайте заказ.";
+          : payment === "telegram_xtr"
+            ? "XTR-счёт будет рассчитан как 1% от полной суммы (с учётом доп. опций)."
+            : "Проверьте контакты и способ получения, затем подтверждайте заказ.";
 
   const handleSubmit = () => {
     if (!canSubmit || isSubmitting) {
@@ -118,6 +150,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           payment: submitPayload.payment,
           delivery: submitPayload.delivery,
           subtotal,
+          extrasTotal: submitPayload.extrasTotal,
+          totalAmount: submitPayload.totalAmount,
+          extras: submitPayload.extras,
           cartLines: submitPayload.cartLines,
         });
 
@@ -126,7 +161,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           return;
         }
 
-        toast.success("XTR-счёт отправлен в Telegram. Проверьте чат и завершите оплату ⭐");
+        toast.success("XTR-счёт отправлен в Telegram. После оплаты откроется franchize rental flow ⭐");
         return;
       }
 
@@ -222,6 +257,35 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             </div>
           </div>
 
+
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <p className="text-sm font-medium">Доп. опции к заказу</p>
+            <div className="mt-3 space-y-2">
+              {orderExtras.map((extra) => {
+                const checked = selectedExtras.includes(extra.id);
+                return (
+                  <button
+                    key={extra.id}
+                    type="button"
+                    onClick={() =>
+                      setSelectedExtras((prev) =>
+                        checked ? prev.filter((id) => id !== extra.id) : [...prev, extra.id],
+                      )
+                    }
+                    className="flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm"
+                    style={{
+                      borderColor: checked ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
+                      backgroundColor: checked ? `${crew.theme.palette.accentMain}1a` : undefined,
+                    }}
+                  >
+                    <span>{extra.label}</span>
+                    <span className="font-semibold" style={{ color: crew.theme.palette.accentMain }}>+{extra.amount.toLocaleString("ru-RU")} ₽</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <label className="flex items-start gap-2 rounded-xl border border-border bg-card p-3 text-sm">
             <input type="checkbox" className="mt-0.5" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span>Согласен с условиями аренды и обработкой персональных данных.</span>
@@ -245,9 +309,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           ) : (
             <ul className="mt-2 space-y-2 text-sm">
               {cartLines.map((line) => (
-                <li key={line.itemId} className="flex justify-between gap-2">
+                <li key={line.lineId} className="flex justify-between gap-2">
                   <span>
                     {line.item?.title ?? "Позиция недоступна"} × {line.qty}
+                    <span className="block text-[11px] text-muted-foreground">{line.options.package} · {line.options.duration} · {line.options.perk}</span>
                   </span>
                   <span>{line.lineTotal.toLocaleString("ru-RU")} ₽</span>
                 </li>
@@ -258,9 +323,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <div className="mt-3 border-t border-border pt-3 text-sm">
             <p className="flex justify-between"><span>Получение</span><span>{deliveryMode === "pickup" ? "Самовывоз" : "Доставка"}</span></p>
             <p className="mt-1 flex justify-between"><span>Оплата</span><span>{payments.find((item) => item.id === payment)?.label ?? payment}</span></p>
+            <p className="mt-2 flex justify-between"><span>Подытог</span><span>{subtotal.toLocaleString("ru-RU")} ₽</span></p>
+            <p className="mt-1 flex justify-between"><span>Доп. опции</span><span>{extrasTotal.toLocaleString("ru-RU")} ₽</span></p>
             <p className="mt-2 flex justify-between text-base font-semibold" style={{ color: crew.theme.palette.accentMain }}>
               <span>Итого</span>
-              <span>{subtotal.toLocaleString("ru-RU")} ₽</span>
+              <span>{totalAmount.toLocaleString("ru-RU")} ₽</span>
             </p>
           </div>
 

@@ -699,6 +699,160 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Header menu modal opens without underlay controls/content visually crossing over menu surface.
   - `Меню` and `Профиль` buttons render without border outlines in franchize header.
 
+
+### T12 — Pepperolli card polish + unified sticky group balloons refactor
+- status: `done`
+- updated_at: `2026-02-21T00:45:00Z`
+- owner: `codex`
+- notes: Unified top section/group balloons into `CrewHeader` for all franchize pages, extended blur safe-area cap (`-42px`) with hidden rail scrollbars, and rebuilt catalog card styling with Pepperolli-like variants, dynamic badges, and mixed CTA text (`Добавить`/`Выбрать`). Expanded catalog hydration beyond `bike` to include `accessories`, `gear`, and `wbitem`, then added dynamic showcase groups (`23rd feb edition`, `Все по 6000`) rendered ahead of base categories.
+- next_step: Optional T13 can tune exact card copy truncation and modal/button behavior parity using production Supabase data once network/env is available.
+- risks: Supabase network/env in local runner failed (`fetch failed`), so dynamic multi-type hydration and group distribution were validated on fallback shell only.
+- dependencies: T11
+- deliverables:
+  - `app/franchize/actions.ts`
+  - `app/franchize/components/CrewHeader.tsx`
+  - `app/franchize/components/CatalogClient.tsx`
+- implementation checklist:
+  1. Remove duplicate top balloons source and keep a single sticky rail in header for all franchize routes.
+  2. Extend top blur beyond viewport cutout and suppress horizontal rail scrollbar chrome.
+  3. Add card visual variants, dynamic HIT badge behavior, description fallback cleanup, and CTA text split.
+  4. Expand supported catalog types + add synthetic showcase groups for richer roster rails.
+- acceptance criteria:
+  - Header owns a single top balloon rail and it is visible across catalog/about/contacts/cart.
+  - Sticky blur cap removes camera-cutout gap on mobile while avoiding scrollbars in balloon rails.
+  - Catalog cards show variant chrome + dynamic CTA labels and no hardcoded stale description behavior.
+  - Catalog hydration includes non-bike types and displays synthetic showcase groups when matches exist.
+
+
+
+### T13 — Modal truncation/specs + deterministic balloon rails + order extras polish
+- status: `done`
+- updated_at: `2026-02-21T01:35:00Z`
+- owner: `codex`
+- notes: Added 3-line expandable description behavior in item modal (Pepperolli-style), rendered real item specs from metadata, stabilized top balloon rail active-state selection via deterministic intersection logic, enforced `wbitem` subgroup ordering last, and expanded order flow totals with selectable extras included in sidebar total + XTR invoice 1% calculation/details.
+- next_step: Start T14 functional closeout for modal-selected extras persistence into cart line identity and rental CRM transition statuses.
+- risks: local runner cannot fetch Supabase live catalog (`fetch failed`), so modal/specs behavior was verified on fallback shell and production smoke checks by slug.
+- dependencies: T12
+- deliverables:
+  - `app/franchize/actions.ts`
+  - `app/franchize/components/CrewHeader.tsx`
+  - `app/franchize/components/CatalogClient.tsx`
+  - `app/franchize/modals/Item.tsx`
+  - `app/franchize/components/OrderPageClient.tsx`
+- implementation checklist:
+  1. Limit modal description to 3 lines on open, with explicit show more/less toggle.
+  2. Surface real bike specs from `cars.specs` in modal instead of static placeholder copy.
+  3. Remove jerkiness in top balloon rail selection by using deterministic visible-section scoring and stable active chip highlight.
+  4. Keep `wbitem` subgroup hard-pinned to the end of rendered catalog groups.
+  5. Add order extras to final amount and ensure XTR invoice tip uses 1% of full total with payload metadata.
+- acceptance criteria:
+  - Modal opens with compact 3-line description and expandable details.
+  - Specs block shows meaningful metadata for available fields.
+  - Balloon rail keeps stable active group state while scrolling category sections.
+  - `wbitem` groups render last.
+  - Checkout summary and XTR invoice include extras in total/tip calculation.
+
+### T14 — Final franchize perfection pass (cart line options -> rental handoff)
+- status: `done`
+- updated_at: `2026-02-21T02:05:00Z`
+- owner: `codex`
+- notes: Implemented cart-line option persistence (`itemId+optionHash`), wired totals from structured cart lines across cart/order/floating widget, created franchize rental card route, and moved deep-link flow toward franchize rental pages. Added webhook handler for `franchize_order` to upsert rentals as hot leads on successful XTR payment and notify renter/owner/admin with franchize links.
+- next_step: Start T15 for richer post-payment lifecycle automation (owner acceptance, photo checklist bridge, events parity with legacy rentals).
+- risks: webhook flow depends on invoice metadata consistency and existing users/cars ownership links in Supabase; local fallback shell still limits full live validation.
+- dependencies: T13
+- deliverables:
+  - `app/franchize/hooks/useFranchizeCart.ts`
+  - `app/franchize/hooks/useFranchizeCartLines.ts`
+  - `app/franchize/modals/Item.tsx`
+  - `app/franchize/components/CartPageClient.tsx`
+  - `app/franchize/components/OrderPageClient.tsx`
+- implementation checklist:
+  1. Store modal options as structured cart line payload.
+  2. Recalculate cart/order totals from structured line-level extras.
+  3. Attach order->rental transition hook after successful XTR payment.
+- acceptance criteria:
+  - cart and order totals stay consistent across reloads with optioned lines.
+  - successful XTR confirmation marks lead as hot and advances rental flow stage.
+
+
+### T15 — Franchize rental lifecycle parity (post-hot-lead automation)
+- status: `done`
+- updated_at: `2026-02-21T02:40:00Z`
+- owner: `codex`
+- notes: Investigated post-hot-lead stuck flow (`no active rental` on TG photo). Implemented auto-resolve fallback in Telegram photo webhook: when `awaiting_rental_photo` state is missing, backend now detects relevant renter rental by status/events and infers expected photo type (`start`/`end`). Also marked photo events as `completed` in both webhook and server action paths so owner confirmation gates are unblocked.
+- next_step: Start T16 for full franchize rental card action parity (owner confirm + photo workflow controls directly on franchize rental page).
+- risks: auto-resolve photo fallback currently targets renter-side rentals (`user_id`) and depends on accurate event history for inference.
+- dependencies: T14
+- deliverables:
+  - `app/api/telegramWebhook/route.ts`
+  - `app/rentals/actions.ts`
+- implementation checklist:
+  1. Add resilient fallback for Telegram photo uploads without explicit `user_states` session.
+  2. Ensure photo events are persisted with `status=completed` so action gates can progress.
+  3. Keep compatibility with existing `/actions` command flow.
+- acceptance criteria:
+  - Sending a rental photo from Telegram no longer hard-fails with `no active rental` when session state was lost.
+  - Owner-side pickup/return confirmations can detect uploaded photos via completed events.
+
+
+### T16 — Franchize rental page action controls (owner/renter parity UI)
+- status: `in_progress`
+- updated_at: `2026-02-21T07:05:00Z`
+- owner: `codex`
+- notes: Continued T16 with post-payment delight: franchize-order webhook now sends celebratory "You are in" rich notification with full order snapshot, deeplinks/buttons, and image query so paid users immediately feel the deal is real.
+- next_step: add role-aware owner/renter action controls (confirm pickup/return + photo prompts) directly on the franchize rental card.
+- risks: action controls still pending; lifecycle transitions remain partially Telegram-driven until server-action bindings land.
+- dependencies: T15
+- deliverables:
+  - `app/franchize/[slug]/rental/[id]/page.tsx`
+  - `app/franchize/actions.ts`
+  - `app/rentals/actions.ts`
+- implementation checklist:
+  1. Render role-aware action buttons on franchize rental page.
+  2. Add server action bindings for pickup/return/photo initiation.
+  3. Reflect real-time state transitions after action completion.
+- acceptance criteria:
+  - Core rental lifecycle can continue from franchize rental page without Telegram command roundtrip.
+
+
+### T17 — Theme mesh parity (crew palette vs global theme)
+- status: `todo`
+- updated_at: `-`
+- owner: `unassigned`
+- notes: Formalize dual palette mapping to avoid light/dark theme collisions across franchize pages (header, cards, modals, footer) when crew palette is intentionally dark.
+- next_step: audit franchize components for `bg-background`, `text-foreground`, `bg-card`, `text-muted-foreground` usage and replace with crew palette tokens or a shared resolver.
+- risks: partial migration can create inconsistent contrast between global layout wrappers and crew-local components.
+- dependencies: T16
+- deliverables:
+  - `app/franchize/components/*`
+  - `app/franchize/modals/*`
+  - `app/franchize/[slug]/*`
+- implementation checklist:
+  1. Build a tiny palette resolver (`crewPaletteForSurface`) for consistent text/background pairs.
+  2. Migrate legacy theme utility classes in franchize shell to resolver output.
+  3. Add contrast smoke checks for light and dark crews on key slugs.
+- acceptance criteria:
+  - No franchize page shows low-contrast title/body text due to global theme token leakage.
+
+### T18 — `/franchize/create` palette UX v2 (light+dark sets)
+- status: `todo`
+- updated_at: `-`
+- owner: `unassigned`
+- notes: Extend create flow to capture richer color systems (light and dark palette sets + text colors) with clear previews and sensible defaults.
+- next_step: design compact form UX that supports advanced palette editing without overwhelming first-time operators.
+- risks: too many raw color inputs can hurt completion rate unless grouped and previewed clearly.
+- dependencies: T17
+- deliverables:
+  - `app/franchize/create/*`
+  - `app/franchize/actions.ts`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add schema fields for dual palettes (`light`, `dark`) plus semantic text tokens.
+  2. Provide preset swatches + live preview cards in create flow.
+  3. Persist palette sets and hydrate correct set by runtime mode.
+- acceptance criteria:
+  - Operators can configure readable light and dark variants in create flow with preview confidence.
+
 ---
 
 ## 6) Task template for future extension
@@ -738,6 +892,70 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+
+
+
+
+
+### 2026-02-21 — T16 polish (post-payment "You are in" notification)
+- Upgraded `franchize_order` success notification to rich celebratory payload with full order details (recipient/phone/delivery/slot/cart/extras/totals), deep links, and visual image query.
+- Kept primary continuation CTA first in notification keyboard and preserved Telegram deep-link as dedicated secondary action.
+- Added owner/admin message refinements with richer totals breakdown for faster operator verification.
+
+### 2026-02-21 — T16 polish (CTA hierarchy + fallback minimization)
+- Swapped action hierarchy so the primary button is now `Продолжить оформление` (main next step after invoice intent), while Telegram deep-link moved to subtle fallback row.
+- Removed `Legacy rentals` shortcut entirely to keep franchize-first flow deterministic.
+- Added celebratory deal-start badge and info-icon tooltip for fallback semantics to keep UX clear without noisy body copy.
+
+### 2026-02-21 — T16 polish (deep-link CTA clarity + checkout rename)
+- Clarified why Telegram button exists directly in rental card UX copy: fallback entrypoint for restoring `startapp=rental-...` context when opened outside mini-app session.
+- Renamed/visual-polished checkout action to `Перейти в оформление` with icon for clearer operator intent and stronger scanability.
+- Captured fresh screenshot and reran lint/build/franchize smoke checks.
+
+### 2026-02-21 — T16 progress (profile dropdown in franchize header)
+- Replaced franchize header avatar link with role-aware dropdown navigation: `Профиль`, `Настройки`, `Branding`, optional `Мой экипаж`, and `Admin` for admins only.
+- Kept dropdown shell palette-bound to crew metadata to avoid global theme contrast regressions.
+- Clarified next beat: role-bound rental action controls remain pending in T16 scope.
+
+### 2026-02-21 — T16 pre-hotfix (header palette source)
+- Resolved dark/light mesh issue from QA screenshot by switching `CrewHeader` surface colors (header bg, ticker rail, menu/profile shells, balloon text) to crew metadata palette tokens.
+- Added follow-up tasks: T17 for full palette/theming parity audit and T18 for `/franchize/create` dual-palette UX expansion.
+- Captured updated `/franchize/vip-bike/rental/demo-order` screenshot after header pre-hotfix and reran lint/build/smoke checks.
+
+### 2026-02-21 — T16 progress (franchize rental page styling + build unblock)
+- Fixed production build import path for franchize rental page (`../../../actions`), resolving missing-export errors during Next.js build.
+- Overhauled `/franchize/[slug]/rental/[id]` visuals to use crew metadata palette and shared franchize shell (`CrewHeader` + `CrewFooter`) for brand-consistent runtime UX.
+- Revalidated production build after refactor and captured fresh mobile screenshot artifact for `/franchize/vip-bike/rental/demo-order`.
+
+### 2026-02-21 — T15 execution complete (Telegram photo fallback + completed events)
+- Fixed Telegram rental photo ingestion when `user_states.awaiting_rental_photo` is missing by auto-detecting likely renter rental context and expected photo type from status/events.
+- Prevented stuck return/pickup confirmations by saving `photo_start`/`photo_end` events with `status=completed` in both webhook and `addRentalPhoto` paths.
+- Kept `/actions` compatibility while reducing fragile dependency on short-lived chat session state.
+
+
+### 2026-02-21 — T14 execution complete (cart-line persistence + franchize rental handoff)
+- Migrated franchize cart storage to structured cart lines with option hash (`itemId::package|duration|perk`) and backward-compatible hydration from legacy qty-only storage.
+- Unified cart/order/floating totals on line-level pricing so option selections persist and affect totals consistently.
+- Extended invoice metadata with generated `rental_id` + deep links and introduced `/franchize/[slug]/rental/[id]` runtime page as the new handoff surface.
+- Added `franchize_order` webhook handler to upsert `rentals` as confirmed hot leads after successful XTR payment and notify renter/owner/admin with franchize-first links.
+- Updated startapp routing in `ClientLayout` to resolve `rental-<uuid>` toward franchize rental pages before falling back to legacy routes.
+
+
+### 2026-02-21 — T13 execution complete (modal/specs + smooth rails + extras totals)
+- Updated item modal UX to open with 3-line description clamp and explicit `Показать ещё.../Скрыть` toggle for long texts.
+- Replaced static quick-spec copy with parsed `cars.specs` metadata cards (with fallback values) to match VIP motorbike rental context.
+- Stabilized header balloon rail active-state behavior with deterministic intersection scoring and visual selected state, while keeping scrollbar chrome hidden.
+- Hard-pinned `wbitem` subgroup ordering to render at the end of catalog grouping.
+- Added selectable checkout extras and included them in final total + XTR invoice 1% tip calculation/metadata.
+
+
+### 2026-02-21 — T12 execution complete (pepperolli card polish + top balloons refactor)
+- Moved section/group balloon rail ownership into `CrewHeader` so it now persists across all `/franchize/[slug]/*` pages and removed duplicate in-catalog sticky rail source.
+- Extended top header blur with a `-42px` safe-area cap and applied scrollbarless horizontal rails to avoid camera-cutout visual gap on phones.
+- Refined catalog cards with mixed visual variants, dynamic `Хит 🔥` badge logic for bobber-like entries, richer description rendering, and split CTA labels (`Добавить` vs `Выбрать`).
+- Expanded catalog query scope to include `bike`, `accessories`, `gear`, `wbitem` plus dynamic showcase groups (`23rd feb edition`, `Все по 6000`) for roster-style duplication.
+- Captured updated mobile screenshot artifact and sent execution closeout telemetry attempt via notify script (env-dependent).
 
 ### 2026-02-20 — T11 execution complete (header overlap + borderless controls)
 - Updated franchize header action buttons to borderless styling for `Меню` and `Профиль` wrappers while preserving tap area and hover feedback.
