@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { ChevronRight, MapPin, Phone, Send } from "lucide-react";
 import type { FranchizeCrewVM } from "../actions";
 
@@ -38,10 +37,10 @@ export function CrewFooter({ crew }: CrewFooterProps) {
           <ul className="mt-5 space-y-1 text-base">
             {crew.header.menuLinks.map((link) => (
               <li key={`${link.href}-${link.label}`} className="border-b" style={{ borderColor: border }}>
-                <Link href={link.href} className="flex items-center gap-2 py-3">
+                <a href={link.href} className="flex items-center gap-2 py-3">
                   <ChevronRight className="h-4 w-4" />
                   <span>{link.label}</span>
-                </Link>
+                </a>
               </li>
             ))}
           </ul>
@@ -52,10 +51,10 @@ export function CrewFooter({ crew }: CrewFooterProps) {
           <ul className="mt-5 grid gap-1 text-base md:grid-cols-2">
             {socialLinks.map((item) => (
               <li key={`${item.label}-${item.href}`} className="border-b" style={{ borderColor: border }}>
-                <Link href={item.href} className="flex items-center gap-2 py-3" target="_blank" rel="noreferrer">
+                <a href={item.href} className="flex items-center gap-2 py-3" target="_blank" rel="noreferrer">
                   <Send className="h-4 w-4" />
                   <span>{item.label}</span>
-                </Link>
+                </a>
               </li>
             ))}
           </ul>

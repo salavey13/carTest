@@ -815,6 +815,27 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Core rental lifecycle can continue from franchize rental page without Telegram command roundtrip.
 
 
+### T16A — Navigation tap reliability hotfix (menu/footer/profile/cart)
+- status: `done`
+- updated_at: `2026-02-21T18:30:00Z`
+- owner: `codex`
+- notes: Fixed franchize navigation taps in Telegram/mobile runtime where Next.js client-link interactions were intermittently swallowed: switched footer/cart to direct anchors, hardened profile dropdown actions with explicit `window.location.assign`, and kept header modal link handling explicit.
+- next_step: Continue T16 role-aware rental action controls.
+- risks: Full-page navigation reload is now preferred for reliability in webview contexts; acceptable for these utility links.
+- dependencies: T16
+- deliverables:
+  - `app/franchize/components/CrewFooter.tsx`
+  - `app/franchize/components/FranchizeProfileButton.tsx`
+  - `app/franchize/components/FloatingCartIconLink.tsx`
+  - `app/franchize/modals/HeaderMenu.tsx`
+- implementation checklist:
+  1. Replace fragile client-side menu links in affected surfaces with deterministic navigation handlers/anchors.
+  2. Verify header menu, footer menu, profile dropdown, and floating cart interactions on mobile viewport.
+  3. Record ad-hoc polish task in FRANCHEEZEPLAN diary for traceability.
+- acceptance criteria:
+  - All primary franchize navigation entry points are tappable in mobile webview context and open the expected route.
+
+
 ### T17 — Theme mesh parity (crew palette vs global theme)
 - status: `todo`
 - updated_at: `-`
@@ -892,6 +913,13 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+
+### 2026-02-21 — T16A ad-hoc polish (tap/click reliability sweep)
+- Investigated shared root cause across franchize header/footer/profile/cart: internal client-link taps were unreliable in modal/dropdown/webview surfaces.
+- Hardened routing by using deterministic navigation paths (anchors or explicit `window.location.assign`) for footer menu links, profile dropdown items, and floating cart pill.
+- Re-validated interaction flow on mobile viewport: header menu link opens `/about`, footer `Контакты` opens `/contacts`, profile dropdown opens `/settings`, cart pill opens `/cart`.
+- Added AGENTS keyword-trigger note so Pepperolli/VIP-bike/franchize requests always spawn/update an ad-hoc FRANCHEEZEPLAN task for historical continuity.
 
 
 

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { ArrowUp, ShoppingCart } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -29,7 +28,7 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
         <ArrowUp className="h-4 w-4" />
       </button>
 
-      <Link href={href} className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-2" style={{ borderColor: accentColor, color: contrastTextColor }}>
+      <a href={href} className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-2" style={{ borderColor: accentColor, color: contrastTextColor }}>
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: accentColor, color: "#16130A" }}>
           <ShoppingCart className="h-4 w-4" />
         </span>
@@ -43,7 +42,7 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
             </span>
           </>
         )}
-      </Link>
+      </a>
     </div>
   );
 }
