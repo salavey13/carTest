@@ -85,3 +85,9 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** `CrewHeader` (and profile shell) still used Tailwind global tokens like `bg-background`, `bg-card`, `text-foreground` instead of crew metadata palette.
 - **Fix/workaround:** drive header/ticker/chips/menu/profile surfaces from `crew.theme.palette` inline styles for background/text/border colors.
 - **Verification:** open `/franchize/vip-bike/rental/demo-order` and confirm header + content contrast stay consistent with crew palette.
+
+## 2026-02-21 — Franchize header avatar should not be a dead-end link
+- **Symptom:** avatar in franchize header only navigated to `/profile`, hiding fast access to settings/admin/branding from operator flow.
+- **Root cause:** reused generic profile widget behavior not aligned with franchize operator UX expectations.
+- **Fix/workaround:** replace with dropdown menu exposing `Профиль`, `Настройки`, `Branding`, optional `Мой экипаж`, plus `Admin` only when `isAdmin()` is true.
+- **Verification:** open `/franchize/vip-bike` and confirm dropdown items render by role/context.
