@@ -109,3 +109,24 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** webhook success message was short/system-like and did not surface full order context.
 - **Fix/workaround:** send rich "You are in" notification on `franchize_order` success with order snapshot, totals, deeplinks, and image query; keep continuation CTA as first button.
 - **Verification:** trigger `franchize_order` webhook and confirm Telegram user message includes details + 3-button flow (`Продолжить оформление`, WebApp, каталог).
+
+
+## 2026-02-21 — Franchize webview tap reliability (Link vs direct navigation)
+- **Symptom:** in Telegram/mobile runtime, franchize internal links in modal/footer/dropdown/cart looked tappable but did not navigate.
+- **Root cause:** client-side `next/link` interaction got dropped in some portal/dropdown/webview event paths (especially after close/select handlers).
+- **Fix/workaround:** prefer deterministic navigation for these controls (`<a href>` or explicit `window.location.assign`) instead of relying on SPA link interception.
+- **Verification:** mobile Playwright flow covering header menu, footer menu, profile dropdown, and floating cart all navigates to expected routes.
+
+
+## 2026-02-21 — Back-to-catalog links need the same webview hardening
+- **Symptom:** `Вернуться в каталог` / `К каталогу` on cart/order/rental subpages could fail similarly to header/footer taps.
+- **Root cause:** same `next/link` interception fragility in webview/subpage interaction contexts.
+- **Fix/workaround:** standardize subpage recovery/back links to plain anchors for deterministic navigation.
+- **Verification:** Playwright mobile checks for cart->catalog, order->catalog, rental->catalog transitions.
+
+
+## 2026-02-21 — Default franchize QA slug must be `vip-bike` (not demo)
+- **Symptom:** repeated regressions/feedback because validation screenshots used fallback `demo` slug instead of real operator baseline.
+- **Root cause:** old smoke habit from empty/fallback shell testing persisted across iterations.
+- **Fix/workaround:** use `vip-bike` as default slug for franchize screenshots/smoke unless operator asks otherwise; mirror this in AGENTS + FRANCHEEZEPLAN notes.
+- **Verification:** Playwright screenshots and manual navigation checks executed against `/franchize/vip-bike/...` routes.
