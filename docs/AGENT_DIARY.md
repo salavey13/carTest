@@ -103,3 +103,9 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** equal visual weight between progress CTA and context-recovery fallback CTA.
 - **Fix/workaround:** keep next-step action as primary filled button, move Telegram deep-link to low-emphasis fallback row with info-icon tooltip, remove legacy shortcut from primary action set.
 - **Verification:** `/franchize/vip-bike/rental/demo-order` shows one dominant continuation CTA and fallback link at bottom.
+
+## 2026-02-21 — Post-payment delight notification beats plain invoice follow-up
+- **Symptom:** invoice confirmation felt dry; users lacked emotional "deal is real" moment after payment.
+- **Root cause:** webhook success message was short/system-like and did not surface full order context.
+- **Fix/workaround:** send rich "You are in" notification on `franchize_order` success with order snapshot, totals, deeplinks, and image query; keep continuation CTA as first button.
+- **Verification:** trigger `franchize_order` webhook and confirm Telegram user message includes details + 3-button flow (`Продолжить оформление`, WebApp, каталог).

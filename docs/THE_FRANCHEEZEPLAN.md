@@ -797,9 +797,9 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T16 — Franchize rental page action controls (owner/renter parity UI)
 - status: `in_progress`
-- updated_at: `2026-02-21T05:15:00Z`
+- updated_at: `2026-02-21T07:05:00Z`
 - owner: `codex`
-- notes: Continued T16 UX polish: promoted main next-step CTA to congratulatory `Продолжить оформление`, moved Telegram deep-link into lightweight fallback row with info-icon hint, and removed legacy rentals button to avoid misleading click hierarchy.
+- notes: Continued T16 with post-payment delight: franchize-order webhook now sends celebratory "You are in" rich notification with full order snapshot, deeplinks/buttons, and image query so paid users immediately feel the deal is real.
 - next_step: add role-aware owner/renter action controls (confirm pickup/return + photo prompts) directly on the franchize rental card.
 - risks: action controls still pending; lifecycle transitions remain partially Telegram-driven until server-action bindings land.
 - dependencies: T15
@@ -897,6 +897,11 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 
 
 
+
+### 2026-02-21 — T16 polish (post-payment "You are in" notification)
+- Upgraded `franchize_order` success notification to rich celebratory payload with full order details (recipient/phone/delivery/slot/cart/extras/totals), deep links, and visual image query.
+- Kept primary continuation CTA first in notification keyboard and preserved Telegram deep-link as dedicated secondary action.
+- Added owner/admin message refinements with richer totals breakdown for faster operator verification.
 
 ### 2026-02-21 — T16 polish (CTA hierarchy + fallback minimization)
 - Swapped action hierarchy so the primary button is now `Продолжить оформление` (main next step after invoice intent), while Telegram deep-link moved to subtle fallback row.
