@@ -881,6 +881,27 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Category pills click-scroll correctly, active pill stays visible during catalog scroll, and rail order matches rendered groups without empty placeholders.
 
 
+
+### T16D — Item modal action reliability (scroll lock + add-to-cart tap hardening)
+- status: `done`
+- updated_at: `2026-02-21T20:15:00Z`
+- owner: `codex`
+- notes: Completed ad-hoc reliability pass for catalog item modal: background scroll stays locked while modal is open, modal body scrolls independently, and add-to-cart CTA now handles touch/click with guarded handler to avoid swallowed taps in webview contexts.
+- next_step: Continue T16 role-aware lifecycle actions, then start T17 theme mesh parity.
+- risks: Touch + click event dedupe must remain stable across mobile browsers; keep regression checks on quantity increments.
+- dependencies: T16C
+- deliverables:
+  - `app/franchize/modals/Item.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Keep page background non-scrollable during modal open without trapping modal content scroll.
+  2. Harden modal add-to-cart CTA press handling for Telegram/mobile webview gestures.
+  3. Record this as an ad-hoc task + diary note for franchise traceability.
+- acceptance criteria:
+  - Modal content scrolls internally while page background remains static.
+  - `Добавить` in modal consistently adds a line to cart from mobile/webview tap interactions.
+
+
 ### T17 — Theme mesh parity (crew palette vs global theme)
 - status: `todo`
 - updated_at: `-`
@@ -1327,3 +1348,11 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Expanded parity plan into phased execution order with explicit rollback + telemetry expectations (booking, promo, invoice, rentals).
 - Added T8.6 as mandatory pre-QA polish task to prevent avoidable churn during screenshot/lint/build QA run.
 - Updated T9 dependency from T8.1 -> T8.6 so QA starts only after polish hardening is complete.
+
+
+## 2026-02-21 — Item modal had mixed scroll contexts and flaky add CTA taps
+- **Symptom:** in `/franchize/vip-bike` item modal, dragging scrolled page background instead of modal body; operator also reported `Добавить` occasionally doing nothing in webview gesture flow.
+- **Root cause:** modal shell lacked strict body-scroll lock and CTA relied on plain click-only path, which can be dropped in some touch/webview gesture sequences.
+- **Fix/workaround:** enforced `document.body` overflow lock for open modal lifecycle, made modal body the dedicated `overflow-y-auto` container, and added guarded add-to-cart press handler with explicit event `preventDefault/stopPropagation` for reliable mobile taps.
+- **Verification:** `npm run lint -- --file app/franchize/modals/Item.tsx` + manual `/franchize/vip-bike` modal interaction pass.
+
