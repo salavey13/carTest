@@ -106,6 +106,7 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
           <FranchizeProfileButton
             bgColor={`${crew.theme.palette.bgBase}CC`}
             textColor={crew.theme.palette.textPrimary}
+            borderColor={crew.theme.palette.borderSoft}
           />
         </div>
 

@@ -797,9 +797,9 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T16 — Franchize rental page action controls (owner/renter parity UI)
 - status: `in_progress`
-- updated_at: `2026-02-21T03:10:00Z`
+- updated_at: `2026-02-21T04:00:00Z`
 - owner: `codex`
-- notes: Continued T16 with pre-hotfix for header/theme mismatch: franchize header now uses crew metadata palette for background/ticker/chips/menu/profile shell, preventing global light-theme tokens from reducing contrast on dark crew runtime pages.
+- notes: Continued T16 with UX navigation polish: replaced header avatar direct-link with dropdown profile menu (profile/settings/branding/my crew/admin) while keeping crew-palette hotfix active for header surfaces.
 - next_step: add role-aware owner/renter action controls (confirm pickup/return + photo prompts) directly on the franchize rental card.
 - risks: action controls still pending; lifecycle transitions remain partially Telegram-driven until server-action bindings land.
 - dependencies: T15
@@ -896,6 +896,12 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 
 
 
+
+
+### 2026-02-21 — T16 progress (profile dropdown in franchize header)
+- Replaced franchize header avatar link with role-aware dropdown navigation: `Профиль`, `Настройки`, `Branding`, optional `Мой экипаж`, and `Admin` for admins only.
+- Kept dropdown shell palette-bound to crew metadata to avoid global theme contrast regressions.
+- Clarified next beat: role-bound rental action controls remain pending in T16 scope.
 
 ### 2026-02-21 — T16 pre-hotfix (header palette source)
 - Resolved dark/light mesh issue from QA screenshot by switching `CrewHeader` surface colors (header bg, ticker rail, menu/profile shells, balloon text) to crew metadata palette tokens.
