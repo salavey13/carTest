@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useAppContext } from "@/contexts/AppContext";
 
 import {
   type FranchizeConfigInput,
@@ -118,8 +119,11 @@ export default function CreateFranchizeForm() {
     advancedJson: "",
   });
   const [message, setMessage] = useState("Укажите slug, подберите цвета, проверьте локально и сохраните.");
+  const [canEdit, setCanEdit] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [stage, setStage] = useState<Stage>("palette");
+  const { dbUser, user } = useAppContext();
+  const actorUserId = dbUser?.user_id ?? (user?.id ? String(user.id) : "");
 
   const isDark = useMemo(() => form.themeMode.toLowerCase().includes("dark"), [form.themeMode]);
 
@@ -206,18 +210,25 @@ export default function CreateFranchizeForm() {
 
   const onLoad = () => {
     startTransition(async () => {
-      const result = await loadFranchizeConfigBySlug(form.slug);
+      const result = await loadFranchizeConfigBySlug(form.slug, actorUserId);
       if (!result.ok || !result.data) return setMessage(result.message);
       setForm(result.data);
+      setCanEdit(Boolean(result.canEdit));
       setMessage(result.message);
     });
   };
 
   const onSave = () => {
     startTransition(async () => {
-      const result = await saveFranchizeConfig(form);
+      if (!actorUserId || !canEdit) {
+        setMessage("Режим read-only: сохранять могут только owner экипажа или all-admin.");
+        return;
+      }
+
+      const result = await saveFranchizeConfig(form, actorUserId);
       setMessage(result.message);
       if (result.data) setForm(result.data);
+      if (typeof result.canEdit === "boolean") setCanEdit(result.canEdit);
     });
   };
 
@@ -230,6 +241,7 @@ export default function CreateFranchizeForm() {
         <p className="text-xs uppercase tracking-[0.14em]" style={{ color: ui.accent }}>{form.brandName || "Franchize"}</p>
         <h1 className="mt-1 text-2xl font-semibold" style={{ color: ui.text }}>Брендинг-редактор франшизы</h1>
         <p className="mt-1 text-sm" style={{ color: ui.muted }}>Поток из трёх фаз: цвета → тексты/контакты → AI JSON.</p>
+        <p className="mt-2 text-xs" style={{ color: ui.muted }}>Чужие данные доступны в read-only после загрузки. Сохранять может только owner экипажа или all-admin.</p>
       </div>
 
       <div className="grid gap-2 sm:grid-cols-3">
@@ -332,7 +344,7 @@ export default function CreateFranchizeForm() {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60" style={{ backgroundColor: ui.accent, color: ui.accentText }} disabled={isPending} onClick={onSave}>Сохранить в Supabase</button>
+        <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60" style={{ backgroundColor: ui.accent, color: ui.accentText }} disabled={isPending || !canEdit} onClick={onSave}>{canEdit ? "Сохранить в Supabase" : "Read-only"}</button>
         <p className="text-sm" style={{ color: ui.muted }}>{isPending ? "Обрабатываю..." : message}</p>
       </div>
     </div>

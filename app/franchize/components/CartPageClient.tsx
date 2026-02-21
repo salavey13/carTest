@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 
@@ -24,13 +25,13 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
         <div className="mt-6 rounded-2xl border border-dashed border-border bg-card p-6 text-sm text-muted-foreground">
           Корзина пока пустая. Добавьте байк из каталога, чтобы перейти к оформлению.
           <div>
-            <a
+            <Link
               href={`/franchize/${slug}`}
               className="mt-4 inline-flex font-medium underline-offset-4 hover:underline"
               style={{ color: crew.theme.palette.accentMain }}
             >
               Вернуться в каталог
-            </a>
+            </Link>
           </div>
         </div>
       ) : (
@@ -85,13 +86,13 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
             <p className="text-2xl font-semibold" style={{ color: crew.theme.palette.accentMain }}>
               {subtotal.toLocaleString("ru-RU")} ₽
             </p>
-            <a
+            <Link
               href={`/franchize/${slug}/order/demo-order`}
               className="mt-4 inline-flex w-full justify-center rounded-xl px-4 py-3 text-sm font-semibold"
               style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}
             >
               Перейти к оформлению
-            </a>
+            </Link>
           </aside>
         </div>
       )}

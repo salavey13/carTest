@@ -902,6 +902,36 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - `Добавить` in modal consistently adds a line to cart from mobile/webview tap interactions.
 
 
+### T16E — Header/logo/nav regression hotfix (ticker offset + SPA links + branding ACL)
+- status: `done`
+- updated_at: `2026-02-21T21:35:00Z`
+- owner: `codex`
+- notes: Fixed header logo vertical drift caused by ticker offset, restored SPA-fast internal franchize navigation (menu/footer/cart/profile) to avoid hard reload re-auth feel, repaired profile branding link (`/franchize/create`), enabled category rail on franchize subpages with jump-back-to-catalog section scroll, and enforced branding editor ACL (`read-only for чужие`, save for crew owner/all-admin).
+- next_step: Continue T16 role-aware lifecycle controls or start T17 palette mesh cleanup.
+- risks: category jump relies on section ids generated from category labels (`toCategoryId`) remaining stable.
+- dependencies: T16D
+- deliverables:
+  - `app/franchize/components/CrewHeader.tsx`
+  - `app/franchize/components/CrewFooter.tsx`
+  - `app/franchize/components/FranchizeProfileButton.tsx`
+  - `app/franchize/components/FloatingCartIconLink.tsx`
+  - `app/franchize/components/CartPageClient.tsx`
+  - `app/franchize/components/OrderPageClient.tsx`
+  - `app/franchize/modals/HeaderMenu.tsx`
+  - `app/franchize/create/CreateFranchizeForm.tsx`
+  - `app/franchize/actions.ts`
+- implementation checklist:
+  1. Remove logo downshift and profile wrapper border chrome in franchize header.
+  2. Keep subsection pills visible on subpages and route to catalog section anchors.
+  3. Restore client-side internal navigation to avoid full-page reloads.
+  4. Lock branding save permissions to owner/all-admin while keeping read-only load for others.
+- acceptance criteria:
+  - Header logo stays aligned with/without ticker.
+  - Subpage category pills route to catalog and scroll to target section.
+  - Franchize menu/footer/cart/profile internal links navigate without forced hard reload.
+  - Branding editor exposes read-only mode for non-owners and blocks unauthorized saves.
+
+
 ### T17 — Theme mesh parity (crew palette vs global theme)
 - status: `todo`
 - updated_at: `-`
@@ -1356,3 +1386,10 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - **Fix/workaround:** enforced `document.body` overflow lock for open modal lifecycle, made modal body the dedicated `overflow-y-auto` container, and added guarded add-to-cart press handler with explicit event `preventDefault/stopPropagation` for reliable mobile taps.
 - **Verification:** `npm run lint -- --file app/franchize/modals/Item.tsx` + manual `/franchize/vip-bike` modal interaction pass.
 
+
+
+## 2026-02-21 — Regression pass: ticker/logo alignment + SPA nav restore + branding ACL
+- **Symptom:** logo in franchize header visually dropped below baseline after ticker changes; subpage category links became unavailable; forced full reload navigation caused perceived re-login on each route, and branding menu link pointed to `/crews/create`.
+- **Root cause:** previous reliability patch replaced internal Next routing with hard reload anchors and left header logo container with negative bottom margin while ticker was enabled.
+- **Fix/workaround:** removed logo negative offset, kept category rail available on subpages with `catalog#section` jump behavior, switched franchize internal nav handlers back to client routing (`router.push`/`Link`), corrected branding path to `/franchize/create`, and added server-side permission gate so only crew owner/all-admin can save while others stay read-only.
+- **Verification:** `npm run lint -- --file app/franchize/components/CrewHeader.tsx --file app/franchize/components/CrewFooter.tsx --file app/franchize/components/FranchizeProfileButton.tsx --file app/franchize/create/CreateFranchizeForm.tsx --file app/franchize/actions.ts`.

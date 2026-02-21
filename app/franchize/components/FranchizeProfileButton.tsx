@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { ChevronDown, Palette, Settings, Shield, User } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   DropdownMenu,
@@ -11,7 +12,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { navigateWithReload } from "../lib/navigation";
 
 interface FranchizeProfileButtonProps {
   bgColor: string;
@@ -32,6 +32,7 @@ function getInitials(name: string): string {
 
 export function FranchizeProfileButton({ bgColor, textColor, borderColor }: FranchizeProfileButtonProps) {
   const { dbUser, user, userCrewInfo, isAdmin } = useAppContext();
+  const router = useRouter();
   const effectiveUser = dbUser || user;
   const displayName = effectiveUser?.username || effectiveUser?.full_name || effectiveUser?.first_name || "Operator";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
@@ -43,8 +44,8 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
         <button
           type="button"
           aria-label="Профиль и навигация"
-          className="inline-flex h-11 items-center gap-2 rounded-xl border px-2 transition"
-          style={{ backgroundColor: bgColor, color: textColor, borderColor }}
+          className="inline-flex h-11 items-center gap-2 rounded-xl px-2 transition"
+          style={{ backgroundColor: bgColor, color: textColor }}
         >
           <span className="relative block h-8 w-8 overflow-hidden rounded-full border" style={{ borderColor }}>
             {avatarUrl ? (
@@ -64,21 +65,21 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={(event) => {
           event.preventDefault();
-          navigateWithReload("/profile");
+          router.push("/profile");
         }}>
           <User className="h-4 w-4" />
           Профиль
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={(event) => {
           event.preventDefault();
-          navigateWithReload("/settings");
+          router.push("/settings");
         }}>
           <Settings className="h-4 w-4" />
           Настройки
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={(event) => {
           event.preventDefault();
-          navigateWithReload("/crews/create");
+          router.push("/franchize/create");
         }}>
           <Palette className="h-4 w-4" />
           Branding (экипаж)
@@ -87,7 +88,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
         {userCrewInfo?.slug && (
           <DropdownMenuItem onSelect={(event) => {
             event.preventDefault();
-            navigateWithReload(`/crews/${userCrewInfo.slug}`);
+            router.push(`/crews/${userCrewInfo.slug}`);
           }}>
             <Palette className="h-4 w-4" />
             Мой экипаж
@@ -99,7 +100,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={(event) => {
               event.preventDefault();
-              navigateWithReload("/admin");
+              router.push("/admin");
             }}>
               <Shield className="h-4 w-4" />
               Admin
