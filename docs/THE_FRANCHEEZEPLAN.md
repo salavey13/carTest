@@ -776,24 +776,43 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 
 ### T15 — Franchize rental lifecycle parity (post-hot-lead automation)
+- status: `done`
+- updated_at: `2026-02-21T02:40:00Z`
+- owner: `codex`
+- notes: Investigated post-hot-lead stuck flow (`no active rental` on TG photo). Implemented auto-resolve fallback in Telegram photo webhook: when `awaiting_rental_photo` state is missing, backend now detects relevant renter rental by status/events and infers expected photo type (`start`/`end`). Also marked photo events as `completed` in both webhook and server action paths so owner confirmation gates are unblocked.
+- next_step: Start T16 for full franchize rental card action parity (owner confirm + photo workflow controls directly on franchize rental page).
+- risks: auto-resolve photo fallback currently targets renter-side rentals (`user_id`) and depends on accurate event history for inference.
+- dependencies: T14
+- deliverables:
+  - `app/api/telegramWebhook/route.ts`
+  - `app/rentals/actions.ts`
+- implementation checklist:
+  1. Add resilient fallback for Telegram photo uploads without explicit `user_states` session.
+  2. Ensure photo events are persisted with `status=completed` so action gates can progress.
+  3. Keep compatibility with existing `/actions` command flow.
+- acceptance criteria:
+  - Sending a rental photo from Telegram no longer hard-fails with `no active rental` when session state was lost.
+  - Owner-side pickup/return confirmations can detect uploaded photos via completed events.
+
+
+### T16 — Franchize rental page action controls (owner/renter parity UI)
 - status: `todo`
 - updated_at: `-`
 - owner: `unassigned`
-- notes: Continue after T14 by adding owner-approval + photo checklist flow parity between `/franchize/[slug]/rental/[id]` and legacy `/rentals/[id]` operational pipeline.
-- next_step: map minimal event/state machine bridge from legacy rental actions to franchize route surface.
-- risks: careful reuse of existing `events` and Telegram command handlers needed to avoid logic duplication.
-- dependencies: T14
+- notes: Expose owner/renter operational actions directly on `/franchize/[slug]/rental/[id]` (upload photo prompts, confirm pickup/return), reducing dependence on Telegram-only command UX.
+- next_step: design minimal server actions wrapper that reuses `rentals/actions.ts` without duplicating business rules.
+- risks: role checks and action idempotency must mirror Telegram command handlers exactly.
+- dependencies: T15
 - deliverables:
   - `app/franchize/[slug]/rental/[id]/page.tsx`
+  - `app/franchize/actions.ts`
   - `app/rentals/actions.ts`
-  - `app/webhook-handlers/franchize-order.ts`
 - implementation checklist:
-  1. Add owner confirmation action on franchize rental card.
-  2. Bridge photo ДО/ПОСЛЕ checklist events to existing rental event model.
-  3. Reflect lifecycle statuses on franchize rental card in near real-time.
+  1. Render role-aware action buttons on franchize rental page.
+  2. Add server action bindings for pickup/return/photo initiation.
+  3. Reflect real-time state transitions after action completion.
 - acceptance criteria:
-  - Franchize rental card supports same critical operational steps as legacy rentals page.
-  - Payment-confirmed hot lead can progress to active rental without leaving franchize surface.
+  - Core rental lifecycle can continue from franchize rental page without Telegram command roundtrip.
 
 ---
 
@@ -834,6 +853,12 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+
+### 2026-02-21 — T15 execution complete (Telegram photo fallback + completed events)
+- Fixed Telegram rental photo ingestion when `user_states.awaiting_rental_photo` is missing by auto-detecting likely renter rental context and expected photo type from status/events.
+- Prevented stuck return/pickup confirmations by saving `photo_start`/`photo_end` events with `status=completed` in both webhook and `addRentalPhoto` paths.
+- Kept `/actions` compatibility while reducing fragile dependency on short-lived chat session state.
 
 
 ### 2026-02-21 — T14 execution complete (cart-line persistence + franchize rental handoff)
