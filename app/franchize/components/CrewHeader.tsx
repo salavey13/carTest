@@ -58,13 +58,20 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
   }, [mainCatalogPath, pathname]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 px-4 pb-2 pt-[max(env(safe-area-inset-top),0.55rem)] backdrop-blur-xl">
-      <div className="pointer-events-none absolute inset-x-0 -top-[42px] h-[42px] bg-background/90 backdrop-blur-xl" />
+    <header
+      className="sticky top-0 z-40 border-b px-4 pb-2 pt-[max(env(safe-area-inset-top),0.55rem)] backdrop-blur-xl"
+      style={{
+        borderColor: crew.theme.palette.borderSoft,
+        backgroundColor: `${crew.theme.palette.bgCard}E0`,
+        color: crew.theme.palette.textPrimary,
+      }}
+    >
+      <div className="pointer-events-none absolute inset-x-0 -top-[42px] h-[42px] backdrop-blur-xl" style={{ backgroundColor: `${crew.theme.palette.bgCard}EB` }} />
       {crew.catalog.tickerItems.length > 0 && (
-        <div className="-mx-4 mb-2 overflow-hidden border-b border-border/70 bg-card py-1.5">
-          <div className="animate-ticker whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        <div className="-mx-4 mb-2 overflow-hidden border-b py-1.5" style={{ borderColor: crew.theme.palette.borderSoft, backgroundColor: `${crew.theme.palette.bgBase}F0` }}>
+          <div className="animate-ticker whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: crew.theme.palette.textSecondary }}>
             {[...crew.catalog.tickerItems, ...crew.catalog.tickerItems].map((item, index) => (
-              <Link key={`${item.id}-${index}`} href={item.href} className="mx-4 inline-flex hover:text-foreground">
+              <Link key={`${item.id}-${index}`} href={item.href} className="mx-4 inline-flex transition-opacity hover:opacity-90" style={{ color: crew.theme.palette.textSecondary }}>
                 {item.text}
               </Link>
             ))}
@@ -78,13 +85,14 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
             type="button"
             aria-label="Open menu"
             onClick={() => setMenuOpen(true)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-card/20 text-foreground transition hover:bg-card/35"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl transition"
+            style={{ backgroundColor: `${crew.theme.palette.bgBase}CC`, color: crew.theme.palette.textPrimary }}
           >
             <Menu className="h-5 w-5" />
           </button>
 
           <div className="relative z-10 mx-auto -mb-6 flex flex-col items-center text-center">
-            <div className="relative h-16 w-16 overflow-hidden rounded-full border bg-card shadow-lg" style={{ borderColor: crew.theme.palette.accentMain }}>
+            <div className="relative h-16 w-16 overflow-hidden rounded-full border shadow-lg" style={{ borderColor: crew.theme.palette.accentMain, backgroundColor: crew.theme.palette.bgBase }}>
               {crew.header.logoUrl ? (
                 <Image src={crew.header.logoUrl} alt={`${crew.header.brandName} logo`} fill sizes="64px" className="object-cover" unoptimized />
               ) : (
@@ -95,7 +103,10 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
             </div>
           </div>
 
-          <FranchizeProfileButton />
+          <FranchizeProfileButton
+            bgColor={`${crew.theme.palette.bgBase}CC`}
+            textColor={crew.theme.palette.textPrimary}
+          />
         </div>
 
         <nav className="mt-1 flex gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] snap-x snap-mandatory">
@@ -106,11 +117,11 @@ export function CrewHeader({ crew, activePath }: CrewHeaderProps) {
               <Link
                 key={linkLabel}
                 href={sectionHref}
-                className="shrink-0 snap-start rounded-full border px-3 py-1.5 text-xs font-medium tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+                className="shrink-0 snap-start rounded-full border px-3 py-1.5 text-xs font-medium tracking-wide transition-colors"
                 style={{
                   borderColor: isActive ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
                   backgroundColor: isActive ? `${crew.theme.palette.accentMain}20` : "transparent",
-                  color: isActive ? crew.theme.palette.accentMain : undefined,
+                  color: isActive ? crew.theme.palette.accentMain : crew.theme.palette.textSecondary,
                 }}
               >
                 {linkLabel}
