@@ -9,6 +9,7 @@
  *   node scripts/codex-notify.mjs callback --status completed --summary "Done" --telegramChatId 123 --telegramUserId 456 --imageUrl https://example.com/image.png
  *   node scripts/codex-notify.mjs callback-auto --summary "Done" --prUrl https://github.com/org/repo/pull/1
  *   node scripts/codex-notify.mjs telegram --chatId 123 --text "Hello"
+ *   node scripts/codex-notify.mjs telegram --chatId 123 --message "Hello"   # alias for --text
  *   node scripts/codex-notify.mjs telegram-photo --chatId 123 --photo ./artifacts/page.png --caption "Preview"
  *   node scripts/codex-notify.mjs telegram-photo --chatId 123 --photoUrl https://... --caption "Preview"
  */
@@ -23,6 +24,16 @@ function getArg(name, fallback = undefined) {
   const idx = args.indexOf(`--${name}`);
   if (idx === -1) return fallback;
   return args[idx + 1];
+}
+
+function getArgAlias(primary, aliases = [], fallback = undefined) {
+  const primaryValue = getArg(primary);
+  if (primaryValue !== undefined) return primaryValue;
+  for (const alias of aliases) {
+    const value = getArg(alias);
+    if (value !== undefined) return value;
+  }
+  return fallback;
 }
 
 
@@ -180,7 +191,7 @@ async function runTelegramMode() {
   const token = process.env.TELEGRAM_BOT_TOKEN || getArg('token');
   if (!token) throw new Error('Missing TELEGRAM_BOT_TOKEN (or --token)');
 
-  const text = getArg('text', 'Codex task update');
+  const text = getArgAlias('text', ['message'], 'Codex task update');
   const parseMode = getArg('parseMode', 'Markdown');
   const dryRun = getArg('dryRun', 'false') === 'true';
 

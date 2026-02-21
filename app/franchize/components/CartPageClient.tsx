@@ -11,7 +11,7 @@ interface CartPageClientProps {
 }
 
 export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
-  const { cartLines, changeItemQty, removeItem, subtotal, itemCount } = useFranchizeCartLines(slug, items);
+  const { cartLines, changeLineQty, removeLine, subtotal, itemCount } = useFranchizeCartLines(slug, items);
 
   return (
     <section className="mx-auto w-full max-w-4xl px-4 py-6">
@@ -44,6 +44,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
                     <h2 className="text-base font-semibold">{line.item?.title ?? "Позиция недоступна"}</h2>
                     <p className="text-xs text-muted-foreground">
                       {line.item?.subtitle ?? "Этот товар был удалён или временно недоступен в каталоге."}
+                    <span className="mt-1 block text-[11px] text-muted-foreground">{line.options.package} · {line.options.duration} · {line.options.perk}</span>
                     </p>
                     {line.item ? (
                       <p className="mt-1 text-sm font-medium" style={{ color: crew.theme.palette.accentMain }}>
@@ -53,14 +54,14 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
                       <p className="mt-1 text-xs text-muted-foreground">Недоступные позиции не участвуют в расчёте суммы.</p>
                     )}
                   </div>
-                  <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => removeItem(line.itemId)}>
+                  <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => removeLine(line.lineId)}>
                     Удалить
                   </button>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                   <button
                     className="h-8 w-8 rounded-full border border-border"
-                    onClick={() => changeItemQty(line.itemId, -1)}
+                    onClick={() => changeLineQty(line.lineId, -1)}
                     aria-label="Уменьшить"
                   >
                     −
@@ -68,7 +69,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
                   <span className="min-w-7 text-center text-sm font-medium">{line.qty}</span>
                   <button
                     className="h-8 w-8 rounded-full border border-border"
-                    onClick={() => changeItemQty(line.itemId, 1)}
+                    onClick={() => changeLineQty(line.lineId, 1)}
                     aria-label="Увеличить"
                   >
                     +

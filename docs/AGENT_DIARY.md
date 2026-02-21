@@ -55,3 +55,15 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** intermittent Chromium headless instability in current runner session.
 - **Fix/workaround:** immediately retried with Playwright Firefox and captured artifact successfully.
 - **Verification:** `mcp__browser_tools__run_playwright_script` using Firefox saved `artifacts/franchize-vip-bike-shell-v2.png`.
+
+## 2026-02-21 — Franchize QA slug test matrix for polish tasks
+- **Symptom:** regressions slipped when validating only one slug/fallback dataset.
+- **Root cause:** visual/typing groups differ per crew slug; `wbitem` and `gear` distributions were not stress-tested.
+- **Fix/workaround:** run smoke checks and visual passes on `vip-bike` (baseline), `sly13` (wbitem ordering), and `antanta52.ru` (gear-heavy mix) for each catalog/header refactor.
+- **Verification:** `FRANCHIZE_QA_SLUG=vip-bike npm run qa:franchize && FRANCHIZE_QA_SLUG=sly13 npm run qa:franchize && FRANCHIZE_QA_SLUG=antanta52.ru npm run qa:franchize`.
+
+## 2026-02-21 — `codex-notify telegram` default text trap (`--message` vs `--text`)
+- **Symptom:** heartbeat command looked successful but operator received generic "Codex task update" instead of custom progress text.
+- **Root cause:** script accepted only `--text`; teammate/agent command used `--message`, so fallback default text was sent.
+- **Fix/workaround:** add `--message` alias support in `scripts/codex-notify.mjs` (`getArgAlias`) and keep backward compatibility with `--text`.
+- **Verification:** `node scripts/codex-notify.mjs telegram --message "T14 done" --chat-id "$ADMIN_CHAT_ID" --mirror-chat-id 417553377`.
