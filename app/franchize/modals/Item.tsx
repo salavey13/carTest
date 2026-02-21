@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import { Info, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { MouseEvent, TouchEvent } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
 
 interface ItemModalProps {
@@ -64,10 +65,22 @@ function OptionChips({
 
 export function ItemModal({ item, theme, options, onChangeOption, onClose, onAddToCart }: ItemModalProps) {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const lastAddPressAtRef = useRef(0);
 
   useEffect(() => {
     setDescriptionExpanded(false);
   }, [item?.id]);
+
+  useEffect(() => {
+    if (!item) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [item]);
 
   if (!item) {
     return null;
@@ -84,10 +97,23 @@ export function ItemModal({ item, theme, options, onChangeOption, onClose, onAdd
     item.description ||
     "Этот байк уже подготовлен к аренде: технический чек выполнен, документы готовы, выдача без очереди.";
 
+  const handleAddButtonPress = (event: MouseEvent<HTMLButtonElement> | TouchEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const now = Date.now();
+    if (now - lastAddPressAtRef.current < 350) {
+      return;
+    }
+
+    lastAddPressAtRef.current = now;
+    onAddToCart();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 md:items-center" role="dialog" aria-modal="true">
-      <div className="max-h-[92vh] w-full max-w-lg overflow-hidden rounded-3xl border border-border bg-card">
-        <div className="relative h-52 w-full">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/60 p-3 md:items-center" role="dialog" aria-modal="true">
+      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-border bg-card">
+        <div className="relative h-52 w-full shrink-0">
           {item.imageUrl ? (
             <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 768px) 100vw, 520px" className="object-cover" unoptimized />
           ) : (
@@ -104,7 +130,7 @@ export function ItemModal({ item, theme, options, onChangeOption, onClose, onAdd
           </button>
         </div>
 
-        <div className="space-y-4 p-4">
+        <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 [-webkit-overflow-scrolling:touch]">
           <div>
             <h3 className="text-lg font-semibold">{item.title}</h3>
             <p className="text-sm text-muted-foreground">{item.subtitle}</p>
@@ -140,13 +166,14 @@ export function ItemModal({ item, theme, options, onChangeOption, onClose, onAdd
           <OptionChips title="Комплект" options={perkOptions} selected={options.perk} onSelect={(v) => onChangeOption("perk", v)} accentColor={theme.palette.accentMain} />
         </div>
 
-        <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-border bg-card p-3">
+        <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-border bg-card p-3">
           <button type="button" onClick={onClose} className="rounded-xl border border-border px-3 py-2 text-sm font-medium">
             Закрыть
           </button>
           <button
             type="button"
-            onClick={onAddToCart}
+            onClick={handleAddButtonPress}
+            onTouchEnd={handleAddButtonPress}
             className="rounded-xl px-3 py-2 text-sm font-semibold"
             style={{ backgroundColor: theme.palette.accentMain, color: "#16130A" }}
           >
