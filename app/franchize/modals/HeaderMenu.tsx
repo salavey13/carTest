@@ -15,6 +15,11 @@ interface HeaderMenuProps {
 
 export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuProps) {
   const [mounted, setMounted] = useState(false);
+  const handleMenuLinkClick = (href: string) => {
+    onOpenChange(false);
+
+    window.location.assign(href);
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -57,7 +62,11 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
               <Link
                 key={`${link.href}-${link.label}`}
                 href={link.href}
-                onClick={() => onOpenChange(false)}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  handleMenuLinkClick(link.href);
+                }}
                 className="block rounded-xl border px-4 py-3 text-sm transition"
                 style={{
                   borderColor: isActive ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
