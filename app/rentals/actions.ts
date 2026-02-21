@@ -719,7 +719,7 @@ export async function addRentalPhoto(rentalId: string, userId: string, photoUrl:
         if (updateError) throw updateError;
         
         const { error: eventError } = await supabaseAdmin.from('events').insert({ 
-            rental_id: rentalId, type: `photo_${photoType}`, created_by: userId, payload: { photo_url: photoUrl } 
+            rental_id: rentalId, type: `photo_${photoType}`, status: 'completed', created_by: userId, payload: { photo_url: photoUrl } 
         });
 
         if(eventError) logger.error(`[addRentalPhoto] Rental updated but failed to create event for rental ${rentalId}:`, eventError);
