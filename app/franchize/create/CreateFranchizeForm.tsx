@@ -9,7 +9,7 @@ import {
   saveFranchizeConfig,
 } from "@/app/franchize/actions";
 
-type Stage = "palette" | "content" | "map" | "ai";
+type Stage = "palette" | "content" | "map" | "ai" | "ops";
 
 const TEMPLATE_PAYLOAD = {
   instruction: "Персонализируй этот franchize JSON под владельца и бренд. Сохрани структуру ключей.",
@@ -169,6 +169,51 @@ export default function CreateFranchizeForm() {
     ],
     [form.lightBgCard, form.lightTextPrimary, form.lightTextSecondary, form.lightAccentMain],
   );
+  const launchChecks = useMemo(
+    () => {
+      const hasSlug = form.slug.trim().length >= 3;
+      const hasBrand = form.brandName.trim().length >= 3;
+      const hasTagline = form.tagline.trim().length >= 4;
+      const hasContacts = form.phone.trim().length >= 6 && form.telegram.trim().length >= 2;
+      const hasMap = form.mapGps.includes(",") && form.mapImageUrl.startsWith("http");
+      const hasMenuLinks = form.menuLinksText.includes("/franchize/{slug}");
+      const hasCategories = form.categoryOrderText.split(",").map((x) => x.trim()).filter(Boolean).length >= 3;
+      const darkContrastPass = contrastRatio(form.bgCard, form.textPrimary);
+      const lightContrastPass = contrastRatio(form.lightBgCard, form.lightTextPrimary);
+      const hasContrast = (darkContrastPass ?? 0) >= 4.5 && (lightContrastPass ?? 0) >= 4.5;
+      const checks = [
+        { id: "slug", label: "Crew slug + brand identity", done: hasSlug && hasBrand && hasTagline, hint: "Задайте slug, название и читаемый слоган." },
+        { id: "contacts", label: "Telegram-first контакты", done: hasContacts, hint: "Добавьте телефон + Telegram @handle." },
+        { id: "map", label: "VibeMap комплект", done: hasMap, hint: "Проверьте GPS и map image URL." },
+        { id: "menu", label: "Маршрутная сетка /franchize/{slug}", done: hasMenuLinks, hint: "В menu links должна быть canonical ссылка /franchize/{slug}." },
+        { id: "catalog", label: "Каталог готов к запуску", done: hasCategories, hint: "Укажите минимум 3 категории для rail/filter UX." },
+        { id: "contrast", label: "Контраст dark/light", done: hasContrast, hint: "Цель: контраст 4.5+ для главного текста в dark и light." },
+      ];
+      const doneCount = checks.filter((item) => item.done).length;
+      const score = Math.round((doneCount / checks.length) * 100);
+      return {
+        checks,
+        score,
+        doneCount,
+        blockers: checks.filter((item) => !item.done),
+      };
+    },
+    [
+      form.slug,
+      form.brandName,
+      form.tagline,
+      form.phone,
+      form.telegram,
+      form.mapGps,
+      form.mapImageUrl,
+      form.menuLinksText,
+      form.categoryOrderText,
+      form.bgCard,
+      form.textPrimary,
+      form.lightBgCard,
+      form.lightTextPrimary,
+    ],
+  );
 
 
   const paletteRows: Array<{ label: string; keyName: keyof FranchizeConfigInput }> = [
@@ -281,11 +326,13 @@ export default function CreateFranchizeForm() {
         <p className="mt-2 text-xs" style={{ color: ui.muted }}>Чужие данные доступны в read-only после загрузки. Сохранять может только owner экипажа или all-admin.</p>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         {[
           ["palette", "Фаза 1: Цвета"],
           ["content", "Фаза 2: Контент"],
-          ["ai", "Фаза 3: AI JSON"],
+          ["map", "Фаза 3: Карта"],
+          ["ai", "Фаза 4: AI JSON"],
+          ["ops", "Launch cockpit"],
         ].map(([value, label]) => (
           <button
             key={value}
@@ -399,6 +446,67 @@ export default function CreateFranchizeForm() {
           </div>
           <textarea className={`${inputClass} min-h-[420px] font-mono text-xs`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.advancedJson} onChange={(e) => updateField("advancedJson", e.target.value)} />
           <p className="text-sm" style={{ color: ui.muted }}>Сначала тестируете локально (кнопка выше), потом сохраняете в Supabase.</p>
+        </section>
+      )}
+
+      {stage === "ops" && (
+        <section className={`${sectionClass} grid gap-3`} style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
+          <div className="rounded-2xl border p-4" style={{ borderColor: ui.border, backgroundColor: ui.cardBg }}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em]" style={{ color: ui.accent }}>Franchize launch cockpit</p>
+                <h2 className="mt-1 text-lg font-semibold">Сводный readiness score</h2>
+              </div>
+              <span className="rounded-full px-3 py-1 text-sm font-semibold" style={{ backgroundColor: `${ui.accent}22`, color: ui.accent }}>
+                {launchChecks.score}%
+              </span>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full" style={{ backgroundColor: `${ui.border}88` }}>
+              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${launchChecks.score}%`, background: `linear-gradient(90deg, ${ui.accent}, ${form.accentMainHover})` }} />
+            </div>
+            <p className="mt-2 text-xs" style={{ color: ui.muted }}>
+              Пройдено {launchChecks.doneCount} из {launchChecks.checks.length} launch-checkов. Цель перед релизом: 100%.
+            </p>
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="rounded-2xl border p-4" style={{ borderColor: ui.border, backgroundColor: ui.cardBg }}>
+              <h3 className="text-sm font-semibold uppercase tracking-[0.14em]" style={{ color: ui.accent }}>Launch checks</h3>
+              <ul className="mt-3 space-y-2 text-sm">
+                {launchChecks.checks.map((check) => (
+                  <li key={check.id} className="rounded-xl border px-3 py-2" style={{ borderColor: check.done ? `${ui.accent}88` : ui.border, backgroundColor: check.done ? `${ui.accent}15` : ui.sectionBg }}>
+                    <p className="font-medium" style={{ color: check.done ? ui.text : ui.muted }}>{check.done ? "✅" : "⚠️"} {check.label}</p>
+                    {!check.done ? <p className="mt-1 text-xs" style={{ color: ui.muted }}>{check.hint}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="rounded-2xl border p-4" style={{ borderColor: ui.border, backgroundColor: ui.cardBg }}>
+              <h3 className="text-sm font-semibold uppercase tracking-[0.14em]" style={{ color: ui.accent }}>Execution surfaces</h3>
+              <p className="mt-2 text-xs" style={{ color: ui.muted }}>Быстрые переходы по каноническому маршруту: каталог → инфо → контакты → корзина.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {[
+                  { label: "Каталог", href: `/franchize/${form.slug || "vip-bike"}` },
+                  { label: "О нас", href: `/franchize/${form.slug || "vip-bike"}/about` },
+                  { label: "Контакты", href: `/franchize/${form.slug || "vip-bike"}/contacts` },
+                  { label: "Корзина", href: `/franchize/${form.slug || "vip-bike"}/cart` },
+                ].map((item) => (
+                  <a key={item.href} href={item.href} className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90" style={{ borderColor: ui.border, color: ui.text }}>
+                    {item.label}
+                  </a>
+                ))}
+              </div>
+              <div className="mt-4 rounded-xl border p-3" style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
+                <p className="text-xs uppercase tracking-[0.12em]" style={{ color: ui.accent }}>Next strategic beat</p>
+                <p className="mt-1 text-sm" style={{ color: ui.muted }}>
+                  {launchChecks.blockers[0]
+                    ? `Закройте первым: ${launchChecks.blockers[0].label}. Потом прогоните smoke на /franchize/${form.slug || "vip-bike"}.`
+                    : "Конфиг готов к launch. Следом можно идти в QA smoke + скриншоты и ship в PR."}
+                </p>
+              </div>
+            </div>
+          </div>
         </section>
       )}
 
