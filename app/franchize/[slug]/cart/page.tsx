@@ -3,6 +3,7 @@ import { CartPageClient } from "../../components/CartPageClient";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { FranchizeFloatingCart } from "../../components/FranchizeFloatingCart";
+import { crewPaletteForSurface } from "../../lib/theme";
 
 interface FranchizeCartPageProps {
   params: Promise<{ slug: string }>;
@@ -11,9 +12,10 @@ interface FranchizeCartPageProps {
 export default async function FranchizeCartPage({ params }: FranchizeCartPageProps) {
   const { slug } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
+  const surface = crewPaletteForSurface(crew.theme);
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen" style={surface.page}>
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/cart`} />
       <CartPageClient crew={crew} slug={crew.slug || slug} items={items} />
       <CrewFooter crew={crew} />

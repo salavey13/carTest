@@ -8,6 +8,46 @@ import { randomUUID } from "crypto";
 
 type UnknownRecord = Record<string, unknown>;
 
+type ThemePaletteCandidate = Partial<FranchizeTheme["palette"]> & {
+  light?: Partial<FranchizeTheme["palette"]>;
+  dark?: Partial<FranchizeTheme["palette"]>;
+};
+
+function resolvePaletteByMode(franchize: UnknownRecord): FranchizeTheme["palette"] {
+  const mode = readPath(franchize, ["theme", "mode"], defaultTheme.mode).toLowerCase();
+  const paletteCandidate = readPath(franchize, ["theme", "palette"], {}) as ThemePaletteCandidate;
+  const palettesCandidate = readPath(franchize, ["theme", "palettes"], {}) as ThemePaletteCandidate;
+
+  const explicitFlatPalette = (
+    typeof paletteCandidate.bgBase === "string" &&
+    typeof paletteCandidate.bgCard === "string" &&
+    typeof paletteCandidate.accentMain === "string"
+  )
+    ? paletteCandidate
+    : undefined;
+
+  const modeBucket = mode.includes("light") ? "light" : "dark";
+  const nestedByMode = readPath(paletteCandidate, [modeBucket], {}) as Partial<FranchizeTheme["palette"]>;
+  const nestedFromPalettes = readPath(palettesCandidate, [modeBucket], {}) as Partial<FranchizeTheme["palette"]>;
+
+  const source = {
+    ...explicitFlatPalette,
+    ...nestedFromPalettes,
+    ...nestedByMode,
+  } as Partial<FranchizeTheme["palette"]>;
+
+  return {
+    bgBase: readPath(source, ["bgBase"], defaultTheme.palette.bgBase),
+    bgCard: readPath(source, ["bgCard"], defaultTheme.palette.bgCard),
+    accentMain: readPath(source, ["accentMain"], defaultTheme.palette.accentMain),
+    accentMainHover: readPath(source, ["accentMainHover"], defaultTheme.palette.accentMainHover),
+    textPrimary: readPath(source, ["textPrimary"], defaultTheme.palette.textPrimary),
+    textSecondary: readPath(source, ["textSecondary"], defaultTheme.palette.textSecondary),
+    borderSoft: readPath(source, ["borderSoft"], defaultTheme.palette.borderSoft),
+  };
+}
+
+
 export interface FranchizeTheme {
   mode: string;
   palette: {
@@ -104,6 +144,13 @@ export interface FranchizeConfigInput {
   textPrimary: string;
   textSecondary: string;
   borderSoft: string;
+  lightBgBase: string;
+  lightBgCard: string;
+  lightAccentMain: string;
+  lightAccentMainHover: string;
+  lightTextPrimary: string;
+  lightTextSecondary: string;
+  lightBorderSoft: string;
   phone: string;
   email: string;
   address: string;
@@ -157,6 +204,13 @@ const franchizeConfigSchema = z.object({
   textPrimary: z.string().trim().min(4, "textPrimary is required"),
   textSecondary: z.string().trim().min(4, "textSecondary is required"),
   borderSoft: z.string().trim().min(4, "borderSoft is required"),
+  lightBgBase: z.string().trim().min(4, "lightBgBase is required"),
+  lightBgCard: z.string().trim().min(4, "lightBgCard is required"),
+  lightAccentMain: z.string().trim().min(4, "lightAccentMain is required"),
+  lightAccentMainHover: z.string().trim().min(4, "lightAccentMainHover is required"),
+  lightTextPrimary: z.string().trim().min(4, "lightTextPrimary is required"),
+  lightTextSecondary: z.string().trim().min(4, "lightTextSecondary is required"),
+  lightBorderSoft: z.string().trim().min(4, "lightBorderSoft is required"),
   phone: z.string().trim().default(""),
   email: z.string().trim().default(""),
   address: z.string().trim().default(""),
@@ -189,6 +243,13 @@ const defaultFranchizeConfig: FranchizeConfigInput = {
   textPrimary: defaultTheme.palette.textPrimary,
   textSecondary: defaultTheme.palette.textSecondary,
   borderSoft: defaultTheme.palette.borderSoft,
+  lightBgBase: "#F6F6F7",
+  lightBgCard: "#FFFFFF",
+  lightAccentMain: "#C78900",
+  lightAccentMainHover: "#D99A00",
+  lightTextPrimary: "#1A1B1F",
+  lightTextSecondary: "#4B5160",
+  lightBorderSoft: "#D4D8E1",
   phone: "",
   email: "",
   address: "",
@@ -370,7 +431,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const metadata = ((crew as UnknownRecord).metadata ?? {}) as UnknownRecord;
     const franchize = (metadata.franchize ?? metadata) as UnknownRecord;
 
-    const themePalette = readPath(franchize, ["theme", "palette"], defaultTheme.palette);
+    const themePalette = resolvePaletteByMode(franchize);
     const menuLinks = readPath(franchize, ["header", "menuLinks"], fallbackMenuLinks(safeSlug)).map((link) => ({
       ...link,
       href: withSlug(link.href, crew.slug ?? safeSlug),
@@ -403,15 +464,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       isFound: true,
       theme: {
         mode: readPath(franchize, ["theme", "mode"], defaultTheme.mode),
-        palette: {
-          bgBase: readPath(themePalette, ["bgBase"], defaultTheme.palette.bgBase),
-          bgCard: readPath(themePalette, ["bgCard"], defaultTheme.palette.bgCard),
-          accentMain: readPath(themePalette, ["accentMain"], defaultTheme.palette.accentMain),
-          accentMainHover: readPath(themePalette, ["accentMainHover"], defaultTheme.palette.accentMainHover),
-          textPrimary: readPath(themePalette, ["textPrimary"], defaultTheme.palette.textPrimary),
-          textSecondary: readPath(themePalette, ["textSecondary"], defaultTheme.palette.textSecondary),
-          borderSoft: readPath(themePalette, ["borderSoft"], defaultTheme.palette.borderSoft),
-        },
+        palette: themePalette,
       },
       header: {
         brandName: readPath(franchize, ["branding", "name"], crew.name ?? "Franchize"),
@@ -571,7 +624,16 @@ async function resolveFranchizeEditorAccess(actorUserId: string | undefined, cre
 function toFranchizeConfigInput(crew: UnknownRecord, slug: string): FranchizeConfigInput {
   const metadata = (crew.metadata ?? {}) as UnknownRecord;
   const franchize = (metadata.franchize ?? {}) as UnknownRecord;
-  const themePalette = readPath(franchize, ["theme", "palette"], defaultTheme.palette);
+  const themePalette = resolvePaletteByMode(franchize);
+  const lightPalette = {
+    bgBase: readPath(franchize, ["theme", "palettes", "light", "bgBase"], readPath(franchize, ["theme", "palette", "light", "bgBase"], defaultFranchizeConfig.lightBgBase)),
+    bgCard: readPath(franchize, ["theme", "palettes", "light", "bgCard"], readPath(franchize, ["theme", "palette", "light", "bgCard"], defaultFranchizeConfig.lightBgCard)),
+    accentMain: readPath(franchize, ["theme", "palettes", "light", "accentMain"], readPath(franchize, ["theme", "palette", "light", "accentMain"], defaultFranchizeConfig.lightAccentMain)),
+    accentMainHover: readPath(franchize, ["theme", "palettes", "light", "accentMainHover"], readPath(franchize, ["theme", "palette", "light", "accentMainHover"], defaultFranchizeConfig.lightAccentMainHover)),
+    textPrimary: readPath(franchize, ["theme", "palettes", "light", "textPrimary"], readPath(franchize, ["theme", "palette", "light", "textPrimary"], defaultFranchizeConfig.lightTextPrimary)),
+    textSecondary: readPath(franchize, ["theme", "palettes", "light", "textSecondary"], readPath(franchize, ["theme", "palette", "light", "textSecondary"], defaultFranchizeConfig.lightTextSecondary)),
+    borderSoft: readPath(franchize, ["theme", "palettes", "light", "borderSoft"], readPath(franchize, ["theme", "palette", "light", "borderSoft"], defaultFranchizeConfig.lightBorderSoft)),
+  };
   const menuLinks = readPath(franchize, ["header", "menuLinks"], fallbackMenuLinks(slug));
 
   return {
@@ -588,6 +650,13 @@ function toFranchizeConfigInput(crew: UnknownRecord, slug: string): FranchizeCon
     textPrimary: readPath(themePalette, ["textPrimary"], defaultTheme.palette.textPrimary),
     textSecondary: readPath(themePalette, ["textSecondary"], defaultTheme.palette.textSecondary),
     borderSoft: readPath(themePalette, ["borderSoft"], defaultTheme.palette.borderSoft),
+    lightBgBase: lightPalette.bgBase,
+    lightBgCard: lightPalette.bgCard,
+    lightAccentMain: lightPalette.accentMain,
+    lightAccentMainHover: lightPalette.accentMainHover,
+    lightTextPrimary: lightPalette.textPrimary,
+    lightTextSecondary: lightPalette.textSecondary,
+    lightBorderSoft: lightPalette.borderSoft,
     phone: readPath(franchize, ["contacts", "phone"], readPath(franchize, ["footer", "phone"], "")),
     email: readPath(franchize, ["contacts", "email"], readPath(franchize, ["footer", "email"], "")),
     address: readPath(franchize, ["contacts", "address"], readPath(franchize, ["footer", "address"], "")),
@@ -694,13 +763,36 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput, actorUser
       mode: payload.themeMode,
       palette: {
         ...(readPath(sourceFranchize, ["theme", "palette"], {}) as UnknownRecord),
-        bgBase: payload.bgBase,
-        bgCard: payload.bgCard,
-        accentMain: payload.accentMain,
-        accentMainHover: payload.accentMainHover,
-        textPrimary: payload.textPrimary,
-        textSecondary: payload.textSecondary,
-        borderSoft: payload.borderSoft,
+        bgBase: payload.themeMode.toLowerCase().includes("light") ? payload.lightBgBase : payload.bgBase,
+        bgCard: payload.themeMode.toLowerCase().includes("light") ? payload.lightBgCard : payload.bgCard,
+        accentMain: payload.themeMode.toLowerCase().includes("light") ? payload.lightAccentMain : payload.accentMain,
+        accentMainHover: payload.themeMode.toLowerCase().includes("light") ? payload.lightAccentMainHover : payload.accentMainHover,
+        textPrimary: payload.themeMode.toLowerCase().includes("light") ? payload.lightTextPrimary : payload.textPrimary,
+        textSecondary: payload.themeMode.toLowerCase().includes("light") ? payload.lightTextSecondary : payload.textSecondary,
+        borderSoft: payload.themeMode.toLowerCase().includes("light") ? payload.lightBorderSoft : payload.borderSoft,
+      },
+      palettes: {
+        ...(readPath(sourceFranchize, ["theme", "palettes"], {}) as UnknownRecord),
+        dark: {
+          ...(readPath(sourceFranchize, ["theme", "palettes", "dark"], {}) as UnknownRecord),
+          bgBase: payload.bgBase,
+          bgCard: payload.bgCard,
+          accentMain: payload.accentMain,
+          accentMainHover: payload.accentMainHover,
+          textPrimary: payload.textPrimary,
+          textSecondary: payload.textSecondary,
+          borderSoft: payload.borderSoft,
+        },
+        light: {
+          ...(readPath(sourceFranchize, ["theme", "palettes", "light"], {}) as UnknownRecord),
+          bgBase: payload.lightBgBase,
+          bgCard: payload.lightBgCard,
+          accentMain: payload.lightAccentMain,
+          accentMainHover: payload.lightAccentMainHover,
+          textPrimary: payload.lightTextPrimary,
+          textSecondary: payload.lightTextSecondary,
+          borderSoft: payload.lightBorderSoft,
+        },
       },
     },
     header: {
@@ -912,6 +1004,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   paymentStatus: string;
   totalCost: number;
   vehicleTitle: string;
+  renterId: string;
+  ownerId: string;
   telegramDeepLink: string;
 }> {
   const safeSlug = slug.trim();
@@ -925,13 +1019,15 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       paymentStatus: "interest_paid",
       totalCost: 0,
       vehicleTitle: "—",
+      renterId: "",
+      ownerId: "",
       telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${safeRentalId}`,
     };
   }
 
   const { data, error } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id, status, payment_status, total_cost, vehicle:cars(make, model)")
+    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, vehicle:cars(make, model)")
     .eq("rental_id", safeRentalId)
     .maybeSingle();
 
@@ -944,6 +1040,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       paymentStatus: "interest_paid",
       totalCost: 0,
       vehicleTitle: "—",
+      renterId: "",
+      ownerId: "",
       telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${safeRentalId}`,
     };
   }
@@ -958,6 +1056,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     paymentStatus: data.payment_status ?? "interest_paid",
     totalCost: Number(data.total_cost ?? 0),
     vehicleTitle: `${vehicle?.make ?? "Vehicle"} ${vehicle?.model ?? ""}`.trim(),
+    renterId: data.user_id ?? "",
+    ownerId: data.owner_id ?? "",
     telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${data.rental_id}`,
   };
 }

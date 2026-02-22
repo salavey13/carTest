@@ -79,6 +79,26 @@ set
             'warning', '#E0A200',
             'error', '#E35B5B'
           ),
+          'palettes', jsonb_build_object(
+            'dark', jsonb_build_object(
+              'bgBase', '#0B0C10',
+              'bgCard', '#111217',
+              'accentMain', '#D99A00',
+              'accentMainHover', '#E2A812',
+              'textPrimary', '#F2F2F3',
+              'textSecondary', '#A7ABB4',
+              'borderSoft', '#24262E'
+            ),
+            'light', jsonb_build_object(
+              'bgBase', '#F6F6F7',
+              'bgCard', '#FFFFFF',
+              'accentMain', '#C78900',
+              'accentMainHover', '#D99A00',
+              'textPrimary', '#1A1B1F',
+              'textSecondary', '#4B5160',
+              'borderSoft', '#D4D8E1'
+            )
+          ),
           'radius', jsonb_build_object('card', 18, 'button', 14, 'pill', 999, 'sm', 10, 'md', 14, 'lg', 18),
           'spacing', jsonb_build_object('section', 24, 'card', 14, 'stackSm', 12, 'stackMd', 16, 'stackLg', 24),
           'effects', jsonb_build_object('accentGlow', true, 'cardLift', true)

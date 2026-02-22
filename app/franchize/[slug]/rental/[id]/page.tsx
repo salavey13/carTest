@@ -2,6 +2,7 @@ import { ExternalLink, Info, Sparkles } from "lucide-react";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
 import { CrewFooter } from "../../../components/CrewFooter";
+import { FranchizeRentalLifecycleActions } from "../../../components/FranchizeRentalLifecycleActions";
 
 interface FranchizeRentalPageProps {
   params: Promise<{ slug: string; id: string }>;
@@ -71,6 +72,17 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               К каталогу
             </a>
           </div>
+
+
+
+          <FranchizeRentalLifecycleActions
+            rentalId={rental.rentalId}
+            ownerId={rental.ownerId}
+            renterId={rental.renterId}
+            status={rental.status}
+            paymentStatus={rental.paymentStatus}
+            palette={crew.theme.palette}
+          />
 
           <div className="mt-4 flex items-center justify-end gap-2 text-xs" style={{ color: crew.theme.palette.textSecondary }}>
             <span
