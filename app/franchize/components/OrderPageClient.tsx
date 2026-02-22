@@ -7,6 +7,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { createFranchizeOrderInvoice } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
+import { crewPaletteForSurface } from "../lib/theme";
 
 interface OrderPageClientProps {
   crew: FranchizeCrewVM;
@@ -69,6 +70,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const [promo, setPromo] = useState("");
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   const [consent, setConsent] = useState(false);
+  const surface = crewPaletteForSurface(crew.theme);
+  const fieldStyle = {
+    borderColor: crew.theme.palette.borderSoft,
+    backgroundColor: `${crew.theme.palette.bgBase}a8`,
+    color: crew.theme.palette.textPrimary,
+  };
 
   const isCartEmpty = cartLines.length === 0;
   const selectedExtraItems = useMemo(
@@ -178,14 +185,14 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       </p>
       <h1 className="mt-2 text-2xl font-semibold">Оформление заказа</h1>
 
-      <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+      <div className="mt-4 flex items-center gap-2 text-xs" style={surface.mutedText}>
         {[
           ["1", "Корзина"],
           ["2", "Контакты"],
           ["3", "Подтверждение"],
         ].map(([step, label], index) => (
           <div key={step} className="flex items-center gap-2">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border">{step}</span>
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border" style={{ borderColor: crew.theme.palette.borderSoft }}>{step}</span>
             <span>{label}</span>
             {index < 2 ? <span className="mx-1">→</span> : null}
           </div>
@@ -194,7 +201,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
       <div className="mt-6 grid gap-4 md:grid-cols-[1fr_300px]">
         <div className="space-y-4">
-          <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="rounded-2xl border p-4" style={surface.card}>
             <p className="text-sm font-medium">Способ получения</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {[
@@ -217,17 +224,17 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             </div>
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="rounded-2xl border p-4" style={surface.card}>
             <p className="text-sm font-medium">Данные получателя</p>
             <div className="mt-3 space-y-3">
-              <input className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Имя и фамилия" value={recipient} onChange={(e) => setRecipient(e.target.value)} />
-              <input className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Телефон" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              <input className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Удобное время" value={time} onChange={(e) => setTime(e.target.value)} />
-              <textarea className="min-h-20 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Комментарий к заказу" value={comment} onChange={(e) => setComment(e.target.value)} />
+              <input className="w-full rounded-xl border px-3 py-2 text-sm" style={fieldStyle} placeholder="Имя и фамилия" value={recipient} onChange={(e) => setRecipient(e.target.value)} />
+              <input className="w-full rounded-xl border px-3 py-2 text-sm" style={fieldStyle} placeholder="Телефон" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input className="w-full rounded-xl border px-3 py-2 text-sm" style={fieldStyle} placeholder="Удобное время" value={time} onChange={(e) => setTime(e.target.value)} />
+              <textarea className="min-h-20 w-full rounded-xl border px-3 py-2 text-sm" style={fieldStyle} placeholder="Комментарий к заказу" value={comment} onChange={(e) => setComment(e.target.value)} />
             </div>
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="rounded-2xl border p-4" style={surface.card}>
             <p className="text-sm font-medium">Оплата и промокод</p>
             <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
               {payments.map((item) => (
@@ -242,23 +249,23 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                   }}
                 >
                   <p className="font-medium">{item.label}</p>
-                  <p className="text-xs text-muted-foreground">{item.description}</p>
+                  <p className="text-xs" style={surface.mutedText}>{item.description}</p>
                 </button>
               ))}
             </div>
             {requiresTelegram && !hasTelegramUser ? (
-              <p className="mt-2 text-xs text-muted-foreground">Для оплаты в Stars откройте оформление из Telegram WebApp.</p>
+              <p className="mt-2 text-xs" style={surface.mutedText}>Для оплаты в Stars откройте оформление из Telegram WebApp.</p>
             ) : null}
             <div className="mt-3 flex gap-2">
-              <input className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Промокод" value={promo} onChange={(e) => setPromo(e.target.value)} />
-              <button type="button" className="rounded-xl border border-border px-3 text-sm">
+              <input className="w-full rounded-xl border px-3 py-2 text-sm" style={fieldStyle} placeholder="Промокод" value={promo} onChange={(e) => setPromo(e.target.value)} />
+              <button type="button" className="rounded-xl border px-3 text-sm" style={{ borderColor: crew.theme.palette.borderSoft }}>
                 Применить
               </button>
             </div>
           </div>
 
 
-          <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="rounded-2xl border p-4" style={surface.card}>
             <p className="text-sm font-medium">Доп. опции к заказу</p>
             <div className="mt-3 space-y-2">
               {orderExtras.map((extra) => {
@@ -286,17 +293,17 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             </div>
           </div>
 
-          <label className="flex items-start gap-2 rounded-xl border border-border bg-card p-3 text-sm">
+          <label className="flex items-start gap-2 rounded-xl border p-3 text-sm" style={surface.card}>
             <input type="checkbox" className="mt-0.5" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span>Согласен с условиями аренды и обработкой персональных данных.</span>
           </label>
         </div>
 
-        <aside className="h-fit rounded-2xl border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Заказ #{orderId}</p>
+        <aside className="h-fit rounded-2xl border p-4" style={surface.card}>
+          <p className="text-sm" style={surface.mutedText}>Заказ #{orderId}</p>
 
           {isCartEmpty ? (
-            <div className="mt-3 rounded-xl border border-dashed border-border p-3 text-sm text-muted-foreground">
+            <div className="mt-3 rounded-xl border border-dashed p-3 text-sm" style={surface.subtleCard}>
               <p>Корзина пуста — добавьте байк из каталога перед оформлением.</p>
               <Link
                 href={`/franchize/${slug}`}
@@ -312,7 +319,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 <li key={line.lineId} className="flex justify-between gap-2">
                   <span>
                     {line.item?.title ?? "Позиция недоступна"} × {line.qty}
-                    <span className="block text-[11px] text-muted-foreground">{line.options.package} · {line.options.duration} · {line.options.perk}</span>
+                    <span className="block text-[11px]" style={surface.mutedText}>{line.options.package} · {line.options.duration} · {line.options.perk}</span>
                   </span>
                   <span>{line.lineTotal.toLocaleString("ru-RU")} ₽</span>
                 </li>
@@ -320,7 +327,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             </ul>
           )}
 
-          <div className="mt-3 border-t border-border pt-3 text-sm">
+          <div className="mt-3 border-t pt-3 text-sm" style={{ borderColor: crew.theme.palette.borderSoft }}>
             <p className="flex justify-between"><span>Получение</span><span>{deliveryMode === "pickup" ? "Самовывоз" : "Доставка"}</span></p>
             <p className="mt-1 flex justify-between"><span>Оплата</span><span>{payments.find((item) => item.id === payment)?.label ?? payment}</span></p>
             <p className="mt-2 flex justify-between"><span>Подытог</span><span>{subtotal.toLocaleString("ru-RU")} ₽</span></p>
@@ -340,7 +347,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           >
             {submitLabel}
           </button>
-          <p className="mt-2 text-xs text-muted-foreground">{submitHint}</p>
+          <p className="mt-2 text-xs" style={surface.mutedText}>{submitHint}</p>
         </aside>
       </div>
     </section>

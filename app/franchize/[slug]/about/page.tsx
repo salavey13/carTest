@@ -34,6 +34,7 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
         accentColor={crew.theme.palette.accentMain}
         textColor={crew.theme.palette.textPrimary}
         borderColor={crew.theme.palette.borderSoft}
+        theme={crew.theme}
       />
     </main>
   );
