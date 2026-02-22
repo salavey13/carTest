@@ -22,7 +22,7 @@ set
           'centerLogoInHeader', true
         ),
         'theme', jsonb_build_object(
-          'mode', 'cyberdawn_dark',
+          'mode', 'cyberdawn_light',
           'palette', jsonb_build_object(
             'bgBase', '#090B12',
             'bgCard', '#101726',
@@ -40,6 +40,26 @@ set
             'success', '#62D88A',
             'warning', '#F2C14E',
             'error', '#FF6B7A'
+          ),
+          'palettes', jsonb_build_object(
+            'dark', jsonb_build_object(
+              'bgBase', '#090B12',
+              'bgCard', '#101726',
+              'accentMain', '#7CFFB2',
+              'accentMainHover', '#9CFFD0',
+              'textPrimary', '#EAF2FF',
+              'textSecondary', '#9EB2D1',
+              'borderSoft', '#26354F'
+            ),
+            'light', jsonb_build_object(
+              'bgBase', '#F4F9FF',
+              'bgCard', '#FFFFFF',
+              'accentMain', '#168A5C',
+              'accentMainHover', '#1FA46E',
+              'textPrimary', '#0D1B2A',
+              'textSecondary', '#36506E',
+              'borderSoft', '#C4D7EA'
+            )
           ),
           'radius', jsonb_build_object('card', 18, 'button', 14, 'pill', 999, 'sm', 10, 'md', 14, 'lg', 18),
           'spacing', jsonb_build_object('section', 24, 'card', 14, 'stackSm', 12, 'stackMd', 16, 'stackLg', 24),
