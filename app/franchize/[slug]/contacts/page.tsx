@@ -16,7 +16,7 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/contacts`} />
+      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/contacts`} groupLinks={items.map((item) => item.category)} />
 
       <section className="mx-auto w-full max-w-4xl px-4 py-6">
         <h1 className="text-2xl font-semibold">Контакты</h1>

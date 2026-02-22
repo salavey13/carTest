@@ -15,7 +15,7 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/about`} />
+      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/about`} groupLinks={items.map((item) => item.category)} />
       <section className="mx-auto w-full max-w-4xl px-4 py-6">
         <p className="text-xs uppercase tracking-[0.2em]" style={{ color: crew.theme.palette.accentMain }}>
           /franchize/{crew.slug || slug}/about

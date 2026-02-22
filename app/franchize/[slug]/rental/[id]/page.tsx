@@ -18,12 +18,12 @@ const statusLabel: Record<string, string> = {
 
 export default async function FranchizeRentalPage({ params }: FranchizeRentalPageProps) {
   const { slug, id } = await params;
-  const [{ crew }, rental] = await Promise.all([getFranchizeBySlug(slug), getFranchizeRentalCard(slug, id)]);
+  const [{ crew, items }, rental] = await Promise.all([getFranchizeBySlug(slug), getFranchizeRentalCard(slug, id)]);
   const dealStarted = rental.found || rental.paymentStatus === "interest_paid";
 
   return (
     <main className="min-h-screen" style={{ backgroundColor: crew.theme.palette.bgBase, color: crew.theme.palette.textPrimary }}>
-      <CrewHeader crew={crew} activePath={`/franchize/${slug}/rental/${id}`} />
+      <CrewHeader crew={crew} activePath={`/franchize/${slug}/rental/${id}`} groupLinks={items.map((item) => item.category)} />
 
       <section className="mx-auto w-full max-w-4xl px-4 pb-8 pt-10">
         <p className="text-xs uppercase tracking-[0.2em]" style={{ color: crew.theme.palette.accentMain }}>
