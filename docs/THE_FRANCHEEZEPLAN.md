@@ -1149,6 +1149,25 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - `/franchize/vip-bike/order/demo-order` shows progress meter reflecting completion state before submit.
   - Badge/readiness chips stay readable in dark/light crew palettes.
 
+### T27 — Checkout copilot expansion (blockers + guided next action)
+- status: `done`
+- updated_at: `2026-02-22T04:47:09Z`
+- owner: `codex`
+- notes: Expanded order sidebar into a larger copilot module: readiness progress bar, active blockers list, and guided “next action” jump to the first fixable missing field.
+- next_step: Start T28 for post-submit celebratory layer + success-state continuity if operator wants an even larger narrative pass.
+- risks: Sidebar density increased; future additions should keep typography compact and avoid pushing totals below fold on short viewports.
+- dependencies: T26
+- deliverables:
+  - `app/franchize/components/OrderPageClient.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add readiness percentage bar tied to milestone completion.
+  2. Add blocker inventory sourced from real form/cart/telegram state.
+  3. Add guided next-action button that focuses first unresolved field.
+- acceptance criteria:
+  - `/franchize/vip-bike/order/demo-order` sidebar shows both progress and blocker state with clear next-step guidance.
+  - Guided action focuses the relevant unresolved field without changing checkout logic.
+
 
 ---
 
@@ -1189,6 +1208,13 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+### 2026-02-22 — T27 completion (checkout copilot expansion)
+- Upgraded the order sidebar from tiny status chip to a larger `Checkout copilot` module with readiness %, blocker inventory, and guided UX messaging.
+- Added dynamic blocker detection for cart/contact/consent and Telegram Stars context, so users can see exactly what blocks submission.
+- Added next-action helper button that focuses the first unresolved field (`recipient`, `phone`, `time`, `consent`) for faster completion.
+- Kept the whole pass visual/assistive only: checkout payload creation and submit permissions remain unchanged.
+- Next beat: T28 can add post-submit delight continuity so success feels as polished as pre-submit guidance.
 
 ### 2026-02-22 — T26 completion (checkout micro-delight readiness meter)
 - Added a compact `Checkout vibe` meter in order sidebar with three milestones (cart/contact/consent) so readiness is visible before submit.
