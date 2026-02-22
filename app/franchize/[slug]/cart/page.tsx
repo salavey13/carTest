@@ -16,7 +16,7 @@ export default async function FranchizeCartPage({ params }: FranchizeCartPagePro
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/cart`} />
+      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/cart`} groupLinks={items.map((item) => item.category)} />
       <CartPageClient crew={crew} slug={crew.slug || slug} items={items} />
       <CrewFooter crew={crew} />
       <FranchizeFloatingCart
