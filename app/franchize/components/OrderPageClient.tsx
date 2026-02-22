@@ -91,6 +91,15 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const requiresTelegram = payment === "telegram_xtr";
   const hasTelegramUser = Boolean(user?.id);
   const canSubmit = isValidForm && !isCartEmpty && (!requiresTelegram || hasTelegramUser);
+  const checkoutMilestones = useMemo(
+    () => [
+      { id: "cart", label: "Байк выбран", done: !isCartEmpty },
+      { id: "contact", label: "Контакт заполнен", done: recipient.trim().length > 1 && phone.trim().length > 5 && time.trim().length > 0 },
+      { id: "consent", label: "Условия подтверждены", done: consent },
+    ],
+    [consent, isCartEmpty, phone, recipient, time],
+  );
+  const completedMilestones = checkoutMilestones.filter((step) => step.done).length;
 
   const submitPayload = useMemo<CheckoutPayload>(
     () => ({
@@ -304,6 +313,39 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
         <aside className="h-fit rounded-2xl border p-4" style={surface.card}>
           <p className="text-sm" style={surface.mutedText}>Заказ #{orderId}</p>
+          <div className="mt-3 rounded-xl border px-3 py-2" style={{ ...surface.subtleCard, borderColor: crew.theme.palette.borderSoft }}>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs uppercase tracking-[0.18em]" style={surface.mutedText}>Checkout vibe</p>
+              <span
+                className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                style={{
+                  color: completedMilestones === checkoutMilestones.length ? crew.theme.palette.accentTextOn : crew.theme.palette.accentMain,
+                  backgroundColor:
+                    completedMilestones === checkoutMilestones.length
+                      ? crew.theme.palette.accentMain
+                      : `${crew.theme.palette.accentMain}1f`,
+                }}
+              >
+                {completedMilestones === checkoutMilestones.length ? "Готово ✨" : `${completedMilestones}/${checkoutMilestones.length}`}
+              </span>
+            </div>
+            <ul className="mt-2 space-y-1.5 text-xs">
+              {checkoutMilestones.map((step) => (
+                <li key={step.id} className="flex items-center gap-2" style={{ color: step.done ? crew.theme.palette.textPrimary : crew.theme.palette.textSecondary }}>
+                  <span
+                    className="inline-flex h-4 w-4 items-center justify-center rounded-full border text-[10px]"
+                    style={{
+                      borderColor: step.done ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
+                      color: step.done ? crew.theme.palette.accentMain : crew.theme.palette.textMuted,
+                    }}
+                  >
+                    {step.done ? "✓" : "•"}
+                  </span>
+                  <span>{step.label}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
 
           {isCartEmpty ? (
             <div className="mt-3 rounded-xl border border-dashed p-3 text-sm" style={surface.subtleCard}>
