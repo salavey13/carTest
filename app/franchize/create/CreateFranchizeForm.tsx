@@ -29,6 +29,10 @@ const TEMPLATE_PAYLOAD = {
         textPrimary: "#F2F2F3",
         textSecondary: "#A7ABB4",
       },
+      palettes: {
+        dark: { bgBase: "#0B0C10", bgCard: "#111217", borderSoft: "#24262E", accentMain: "#D99A00", accentMainHover: "#E2A812", textPrimary: "#F2F2F3", textSecondary: "#A7ABB4" },
+        light: { bgBase: "#F6F6F7", bgCard: "#FFFFFF", borderSoft: "#D4D8E1", accentMain: "#C78900", accentMainHover: "#D99A00", textPrimary: "#1A1B1F", textSecondary: "#4B5160" },
+      },
     },
     header: { menuLinks: [] },
     contacts: { phone: "+7 900 000 00 00", telegram: "@oneBikePlsBot", address: "Город / Онлайн", map: { gps: "56.2042,43.7985", imageUrl: "", bounds: { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 } } },
@@ -100,6 +104,13 @@ export default function CreateFranchizeForm() {
     textPrimary: "#F2F2F3",
     textSecondary: "#A7ABB4",
     borderSoft: "#24262E",
+    lightBgBase: "#F6F6F7",
+    lightBgCard: "#FFFFFF",
+    lightAccentMain: "#C78900",
+    lightAccentMainHover: "#D99A00",
+    lightTextPrimary: "#1A1B1F",
+    lightTextSecondary: "#4B5160",
+    lightBorderSoft: "#D4D8E1",
     phone: "",
     email: "",
     address: "",
@@ -150,6 +161,15 @@ export default function CreateFranchizeForm() {
     ],
     [form.bgCard, form.textPrimary, form.textSecondary, form.accentMain],
   );
+  const lightContrastChecks = useMemo(
+    () => [
+      { label: "Light заголовки", ratio: contrastRatio(form.lightBgCard, form.lightTextPrimary) },
+      { label: "Light вторичный текст", ratio: contrastRatio(form.lightBgCard, form.lightTextSecondary) },
+      { label: "Light кнопка акцента", ratio: contrastRatio(form.lightAccentMain, "#16130A") },
+    ],
+    [form.lightBgCard, form.lightTextPrimary, form.lightTextSecondary, form.lightAccentMain],
+  );
+
 
   const paletteRows: Array<{ label: string; keyName: keyof FranchizeConfigInput }> = [
     { label: "Фон страницы", keyName: "bgBase" },
@@ -159,6 +179,16 @@ export default function CreateFranchizeForm() {
     { label: "Основной цвет кнопок (hover)", keyName: "accentMainHover" },
     { label: "Главный текст", keyName: "textPrimary" },
     { label: "Вторичный текст", keyName: "textSecondary" },
+  ];
+
+  const lightPaletteRows: Array<{ label: string; keyName: keyof FranchizeConfigInput }> = [
+    { label: "Light фон страницы", keyName: "lightBgBase" },
+    { label: "Light фон карточек", keyName: "lightBgCard" },
+    { label: "Light границы", keyName: "lightBorderSoft" },
+    { label: "Light основной цвет кнопок", keyName: "lightAccentMain" },
+    { label: "Light основной цвет кнопок (hover)", keyName: "lightAccentMainHover" },
+    { label: "Light главный текст", keyName: "lightTextPrimary" },
+    { label: "Light вторичный текст", keyName: "lightTextSecondary" },
   ];
 
   const updateField = <K extends keyof FranchizeConfigInput>(key: K, value: FranchizeConfigInput[K]) => {
@@ -187,6 +217,13 @@ export default function CreateFranchizeForm() {
         accentMainHover: readPath(source, ["theme", "palette", "accentMainHover"], prev.accentMainHover),
         textPrimary: readPath(source, ["theme", "palette", "textPrimary"], prev.textPrimary),
         textSecondary: readPath(source, ["theme", "palette", "textSecondary"], prev.textSecondary),
+        lightBgBase: readPath(source, ["theme", "palettes", "light", "bgBase"], prev.lightBgBase),
+        lightBgCard: readPath(source, ["theme", "palettes", "light", "bgCard"], prev.lightBgCard),
+        lightBorderSoft: readPath(source, ["theme", "palettes", "light", "borderSoft"], prev.lightBorderSoft),
+        lightAccentMain: readPath(source, ["theme", "palettes", "light", "accentMain"], prev.lightAccentMain),
+        lightAccentMainHover: readPath(source, ["theme", "palettes", "light", "accentMainHover"], prev.lightAccentMainHover),
+        lightTextPrimary: readPath(source, ["theme", "palettes", "light", "textPrimary"], prev.lightTextPrimary),
+        lightTextSecondary: readPath(source, ["theme", "palettes", "light", "textSecondary"], prev.lightTextSecondary),
         phone: readPath(source, ["contacts", "phone"], prev.phone),
         email: readPath(source, ["contacts", "email"], prev.email),
         address: readPath(source, ["contacts", "address"], prev.address),
@@ -288,9 +325,31 @@ export default function CreateFranchizeForm() {
               </div>
             ))}
           </div>
+
+          <h3 className="text-base font-medium" style={{ color: ui.text }}>Light palette (дневной режим)</h3>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {lightPaletteRows.map((row) => (
+              <div key={row.keyName} className="rounded-xl border p-3" style={{ borderColor: ui.border }}>
+                <p className="text-sm font-medium">{row.label} <span style={{ color: ui.muted }}>({row.keyName})</span></p>
+                <div className="mt-2 flex items-center gap-2">
+                  <input type="color" value={String(form[row.keyName])} onChange={(e) => updateField(row.keyName, e.target.value)} className="h-9 w-12 rounded border" style={{ borderColor: ui.border }} />
+                  <input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={String(form[row.keyName])} onChange={(e) => updateField(row.keyName, e.target.value)} />
+                </div>
+                <div className="mt-2 h-8 rounded border" style={{ borderColor: ui.border, backgroundColor: String(form[row.keyName]) }} />
+              </div>
+            ))}
+          </div>
+          <div className="rounded-xl border p-3" style={{ borderColor: form.lightBorderSoft, backgroundColor: form.lightBgBase, color: form.lightTextPrimary }}>
+            <p className="text-xs uppercase tracking-[0.12em]" style={{ color: form.lightAccentMain }}>Light preview</p>
+            <div className="mt-2 rounded-lg border p-3" style={{ borderColor: form.lightBorderSoft, backgroundColor: form.lightBgCard }}>
+              <h4 className="font-semibold" style={{ color: form.lightTextPrimary }}>Карточка в светлой теме</h4>
+              <p className="mt-1 text-sm" style={{ color: form.lightTextSecondary }}>Проверьте читаемость текста и заметность CTA.</p>
+              <button type="button" className="mt-2 rounded-lg px-3 py-2 text-sm font-semibold" style={{ backgroundColor: form.lightAccentMain, color: "#16130A" }}>Light action</button>
+            </div>
+          </div>
           <div className="rounded-xl border p-3 text-sm" style={{ borderColor: ui.border, backgroundColor: ui.inputBg }}>
             <p className="font-semibold">Контраст-предупреждения</p>
-            <ul className="mt-2 space-y-1">{contrastChecks.map((check) => <li key={check.label}>{check.label}: {check.ratio ? check.ratio.toFixed(2) : "n/a"} — {contrastLabel(check.ratio)}</li>)}</ul>
+            <ul className="mt-2 space-y-1">{contrastChecks.map((check) => <li key={check.label}>{check.label}: {check.ratio ? check.ratio.toFixed(2) : "n/a"} — {contrastLabel(check.ratio)}</li>)}{lightContrastChecks.map((check) => <li key={check.label}>{check.label}: {check.ratio ? check.ratio.toFixed(2) : "n/a"} — {contrastLabel(check.ratio)}</li>)}</ul>
           </div>
         </section>
       )}

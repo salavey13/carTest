@@ -796,12 +796,12 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 
 ### T16 — Franchize rental page action controls (owner/renter parity UI)
-- status: `in_progress`
-- updated_at: `2026-02-21T07:05:00Z`
+- status: `done`
+- updated_at: `2026-02-21T21:28:38Z`
 - owner: `codex`
-- notes: Continued T16 with post-payment delight: franchize-order webhook now sends celebratory "You are in" rich notification with full order snapshot, deeplinks/buttons, and image query so paid users immediately feel the deal is real.
-- next_step: add role-aware owner/renter action controls (confirm pickup/return + photo prompts) directly on the franchize rental card.
-- risks: action controls still pending; lifecycle transitions remain partially Telegram-driven until server-action bindings land.
+- notes: Finished role-aware lifecycle controls on franchize rental card: owner sees confirm pickup/return actions, renter sees Telegram photo DO/POСЛЕ launchers, and runtime card now receives owner/renter ids from `getFranchizeRentalCard` so actions are guarded by actual participant role.
+- next_step: Start T17 theme mesh parity audit (crew palette vs global theme tokens).
+- risks: Status badge/actions refresh still relies on page reload after server action completion; can be improved with optimistic/state re-fetch pass in follow-up polish.
 - dependencies: T15
 - deliverables:
   - `app/franchize/[slug]/rental/[id]/page.tsx`
@@ -933,12 +933,12 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 
 ### T17 — Theme mesh parity (crew palette vs global theme)
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Formalize dual palette mapping to avoid light/dark theme collisions across franchize pages (header, cards, modals, footer) when crew palette is intentionally dark.
-- next_step: audit franchize components for `bg-background`, `text-foreground`, `bg-card`, `text-muted-foreground` usage and replace with crew palette tokens or a shared resolver.
-- risks: partial migration can create inconsistent contrast between global layout wrappers and crew-local components.
+- status: `done`
+- updated_at: `2026-02-21T21:47:16Z`
+- owner: `codex`
+- notes: Added shared `crewPaletteForSurface` resolver + migrated slug-scoped about/cart/contacts/order page wrappers from global theme tokens to crew-bound styles; extended franchize loader to resolve palette by mode from `theme.palette` and new `theme.palettes.{dark|light}` blocks to prevent contrast collisions.
+- next_step: Start T18 (`/franchize/create` palette UX v2) and expose dual palette editing presets in form UI.
+- risks: Several deeper franchize client components still carry generic utility tokens (`text-muted-foreground`, `bg-card`) and should be fully migrated during T18 polishing.
 - dependencies: T16
 - deliverables:
   - `app/franchize/components/*`
@@ -952,12 +952,12 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - No franchize page shows low-contrast title/body text due to global theme token leakage.
 
 ### T18 — `/franchize/create` palette UX v2 (light+dark sets)
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Extend create flow to capture richer color systems (light and dark palette sets + text colors) with clear previews and sensible defaults.
-- next_step: design compact form UX that supports advanced palette editing without overwhelming first-time operators.
-- risks: too many raw color inputs can hurt completion rate unless grouped and previewed clearly.
+- status: `done`
+- updated_at: `2026-02-21T22:05:00Z`
+- owner: `codex`
+- notes: Extended create form with dedicated Light palette controls + live preview/contrast checks, added dual-palette fields to config schema, and persist/hydrate support for `theme.palettes.dark|light` while keeping backward compatibility with legacy flat palette.
+- next_step: Start next extension task to migrate remaining franchize client components/modals to surface resolver and reduce leftover global token usage.
+- risks: Advanced JSON local apply currently reads light palette from `theme.palettes.light`; malformed custom JSON may still bypass preset ergonomics.
 - dependencies: T17
 - deliverables:
   - `app/franchize/create/*`
@@ -1009,6 +1009,24 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+### 2026-02-21 — T18 completion (`/franchize/create` dual palette UX)
+- Added Light palette fieldset in create form (7 semantic tokens) with separate preview card and additional contrast diagnostics.
+- Extended `FranchizeConfigInput`/validation/defaults to carry both dark (existing) and light palette tokens.
+- Updated save pipeline to persist `theme.palettes.dark|light` and sync active `theme.palette` based on selected `theme.mode`.
+- Updated load/apply logic so editor hydrates light palette values from metadata and keeps legacy compatibility.
+
+### 2026-02-21 — T17 completion (palette resolver + dual-palette seed support)
+- Added `crewPaletteForSurface` helper and applied it to `/franchize/[slug]/about|cart|contacts|order/[id]` page shells to stop leaking global `bg-background/text-foreground` tokens into crew-themed surfaces.
+- Extended `getFranchizeBySlug` palette hydration to resolve by theme mode from either flat `theme.palette` or dual `theme.palettes.dark/light` metadata.
+- Updated demo SQL hydration seeds (`vip-bike`, `sly13`) with explicit dual palette sets; `sly13` now defaults to a light-mode variant while preserving dark palette fallback.
+- Next beat: T18 form UX should expose both palette sets in `/franchize/create` for no-code operators.
+
+### 2026-02-21 — T16 completion (rental lifecycle controls on franchize card)
+- Added role-aware control panel directly in `/franchize/[slug]/rental/[id]`: owner actions (confirm pickup/return) and renter actions (open Telegram photo flow for start/end).
+- Extended `getFranchizeRentalCard` payload with `ownerId`/`renterId` so UI can deterministically gate controls by participant role.
+- Kept Telegram-first flow by reusing existing rental server actions (`confirmVehiclePickup`, `confirmVehicleReturn`, `initiateTelegramRentalPhotoUpload`) instead of duplicating lifecycle logic.
+- Next beat: begin T17 palette resolver migration to prevent crew dark palette clashes with global light/dark tokens.
 
 
 ### 2026-02-21 — T16C ad-hoc polish (category rail + unified nav helper)
