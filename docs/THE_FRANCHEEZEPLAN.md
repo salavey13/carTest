@@ -1087,6 +1087,50 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - No remaining `bg-card/from-card/to-background` utility variant usage in franchize catalog cards.
   - `/franchize/vip-bike` page shell uses crew theme page tokens instead of global background/text utility classes.
 
+### T24 — Catalog interaction-state polish (focus/hover contrast parity)
+- status: `done`
+- updated_at: `2026-02-22T06:25:00Z`
+- owner: `codex`
+- notes: Added crew-theme-based interaction ring helper and applied it to catalog search field, search CTA, and card trigger buttons so keyboard/tap focus state stays visible in both light and dark palettes.
+- next_step: Start T25 for cross-surface interaction-state parity in modal/cart/order controls if operator asks for deeper accessibility polish.
+- risks: Ring visibility still depends on crew accent contrast; extremely low-contrast custom accent colors may require guardrails in create form validation.
+- dependencies: T23
+- deliverables:
+  - `app/franchize/lib/theme.ts`
+  - `app/franchize/components/CatalogClient.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add reusable palette-driven interaction ring style helper in franchize theme utilities.
+  2. Apply focus ring styles to catalog search input and `Искать` CTA.
+  3. Apply focus ring to catalog tile trigger button so keyboard navigation remains visually clear.
+- acceptance criteria:
+  - `/franchize/vip-bike` catalog controls show visible focus state in light/dark palettes using crew accent instead of global theme defaults.
+  - Interaction polish is additive and does not alter existing add-to-cart/modal behavior.
+
+
+### T25 — Cross-surface interaction-state parity (modal/cart/order controls)
+- status: `done`
+- updated_at: `2026-02-22T07:10:00Z`
+- owner: `codex`
+- notes: Completed one-go interaction-state styling sweep across Item modal, cart controls, and order form/actions using a shared palette-aware focus outline helper and subtle hover/press transitions.
+- next_step: Start T26 with richer “interesting stuff” pass (micro-delight: contextual badges/animated CTA hints on franchize checkout surfaces) if operator wants further vibe uplift.
+- risks: Outline contrast still depends on crew accent quality; super-low-contrast custom accents may need future guardrails in `/franchize/create` validation.
+- dependencies: T24
+- deliverables:
+  - `app/franchize/lib/theme.ts`
+  - `app/franchize/modals/Item.tsx`
+  - `app/franchize/components/CartPageClient.tsx`
+  - `app/franchize/components/OrderPageClient.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add reusable palette-driven focus outline helper for keyboard-visible controls.
+  2. Apply consistent focus/hover/active interaction states to modal actions + option chips.
+  3. Apply same interaction treatment to cart quantity/remove/checkout actions and order form/actions.
+- acceptance criteria:
+  - `/franchize/vip-bike/cart`, `/franchize/vip-bike/order/demo-order`, and item modal controls show visible focus states without falling back to global theme defaults.
+  - Interaction-state changes are visual-only and do not alter booking/cart logic.
+
+
 ---
 
 ## 6) Task template for future extension
@@ -1126,6 +1170,20 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+
+### 2026-02-22 — T25 completion (one-go interaction-state styling sweep)
+- Added shared `focusRingOutlineStyle(theme)` helper and applied it to modal/cart/order actionable controls for consistent keyboard-visible focus.
+- Polished controls with subtle hover/press transitions so tactile feedback remains clear in both dark and light crew palettes.
+- Kept checkout/cart/modal behavior unchanged while improving perceived UX responsiveness across high-traffic franchize surfaces.
+- Next beat: T26 can ship “interesting stuff” (micro-delight cues around checkout progression) if operator wants extra vibe boost.
+
+
+### 2026-02-22 — T24 completion (catalog interaction-state polish)
+- Added `interactionRingStyle(theme)` helper in franchize theme utilities to keep focus ring color tied to crew accent tokens.
+- Wired focus-state visuals for catalog search input + `Искать` button and catalog item trigger buttons in `CatalogClient`.
+- Kept behavior unchanged (same modal open/add-to-cart flow) while making keyboard/tap focus affordances visible on `vip-bike` storefront.
+- Next beat: optional T25 can extend the same interaction-state parity to modal/cart/order actionable controls.
 
 
 ### 2026-02-22 — T23 completion (catalog tile token isolation)

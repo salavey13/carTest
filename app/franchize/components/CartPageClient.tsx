@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
-import { crewPaletteForSurface } from "../lib/theme";
+import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
 
 interface CartPageClientProps {
   crew: FranchizeCrewVM;
@@ -29,8 +29,8 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
           <div>
             <Link
               href={`/franchize/${slug}`}
-              className="mt-4 inline-flex font-medium underline-offset-4 hover:underline"
-              style={{ color: crew.theme.palette.accentMain }}
+              className="mt-4 inline-flex font-medium underline-offset-4 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+              style={{ color: crew.theme.palette.accentMain, ...focusRingOutlineStyle(crew.theme) }}
             >
               Вернуться в каталог
             </Link>
@@ -56,14 +56,14 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
                       <p className="mt-1 text-xs" style={surface.mutedText}>Недоступные позиции не участвуют в расчёте суммы.</p>
                     )}
                   </div>
-                  <button className="text-xs" style={surface.mutedText} onClick={() => removeLine(line.lineId)}>
+                  <button className="rounded-md px-1 text-xs transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...surface.mutedText, ...focusRingOutlineStyle(crew.theme) }} onClick={() => removeLine(line.lineId)}>
                     Удалить
                   </button>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                   <button
-                    className="h-8 w-8 rounded-full border"
-                    style={{ borderColor: crew.theme.palette.borderSoft }}
+                    className="h-8 w-8 rounded-full border transition hover:opacity-90 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                    style={{ borderColor: crew.theme.palette.borderSoft, ...focusRingOutlineStyle(crew.theme) }}
                     onClick={() => changeLineQty(line.lineId, -1)}
                     aria-label="Уменьшить"
                   >
@@ -71,8 +71,8 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
                   </button>
                   <span className="min-w-7 text-center text-sm font-medium">{line.qty}</span>
                   <button
-                    className="h-8 w-8 rounded-full border"
-                    style={{ borderColor: crew.theme.palette.borderSoft }}
+                    className="h-8 w-8 rounded-full border transition hover:opacity-90 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                    style={{ borderColor: crew.theme.palette.borderSoft, ...focusRingOutlineStyle(crew.theme) }}
                     onClick={() => changeLineQty(line.lineId, 1)}
                     aria-label="Увеличить"
                   >
@@ -92,8 +92,8 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
             </p>
             <Link
               href={`/franchize/${slug}/order/demo-order`}
-              className="mt-4 inline-flex w-full justify-center rounded-xl px-4 py-3 text-sm font-semibold"
-              style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}
+              className="mt-4 inline-flex w-full justify-center rounded-xl px-4 py-3 text-sm font-semibold transition hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+              style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A", ...focusRingOutlineStyle(crew.theme) }}
             >
               Перейти к оформлению
             </Link>

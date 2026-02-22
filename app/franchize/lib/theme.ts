@@ -80,3 +80,16 @@ export function floatingCartOverlayBackground(theme: FranchizeTheme) {
   const alpha = theme.mode === "light" ? 0.9 : 0.94;
   return withAlpha(theme.palette.bgCard, alpha);
 }
+
+export function interactionRingStyle(theme: FranchizeTheme) {
+  return {
+    boxShadow: `0 0 0 2px ${withAlpha(theme.palette.accentMain, 0.72)}`,
+  };
+}
+
+
+export function focusRingOutlineStyle(theme: FranchizeTheme) {
+  return {
+    outlineColor: withAlpha(theme.palette.accentMain, 0.78),
+  };
+}
