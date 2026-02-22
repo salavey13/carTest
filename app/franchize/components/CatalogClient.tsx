@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import { toCategoryId } from "../lib/navigation";
-import { catalogCardVariantStyles, crewPaletteForSurface } from "../lib/theme";
+import { catalogCardVariantStyles, crewPaletteForSurface, interactionRingStyle } from "../lib/theme";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { ItemModal } from "../modals/Item";
@@ -28,6 +28,9 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const { addItem } = useFranchizeCart(crew.slug || slug);
   const [selectedOptions, setSelectedOptions] = useState({ package: "Base", duration: "1 day", perk: "Стандарт" });
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [searchCtaFocused, setSearchCtaFocused] = useState(false);
+  const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
 
   const orderedCategories = useMemo(
     () => Array.from(new Set([...crew.catalog.categories, ...items.map((item) => item.category).filter(Boolean)])),
@@ -93,11 +96,14 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             className="w-full rounded-full border py-3 pl-5 pr-28 text-sm outline-none transition focus:border-transparent focus:ring-2"
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             style={{
               boxShadow: `0 0 0 1px ${crew.theme.palette.borderSoft}`,
               borderColor: crew.theme.palette.borderSoft,
               backgroundColor: `${crew.theme.palette.bgCard}99`,
               color: crew.theme.palette.textPrimary,
+              ...(searchFocused ? interactionRingStyle(crew.theme) : {}),
             }}
           />
           <button
@@ -107,7 +113,13 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
               firstResult?.scrollIntoView({ behavior: "smooth", block: "center" });
             }}
             className="absolute bottom-1 right-1 top-1 rounded-full px-5 text-sm font-semibold transition active:scale-95"
-            style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}
+            onFocus={() => setSearchCtaFocused(true)}
+            onBlur={() => setSearchCtaFocused(false)}
+            style={{
+              backgroundColor: crew.theme.palette.accentMain,
+              color: "#16130A",
+              ...(searchCtaFocused ? interactionRingStyle(crew.theme) : {}),
+            }}
           >
             Искать
           </button>
@@ -136,7 +148,14 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                       className="group overflow-hidden rounded-2xl border"
                       style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
                     >
-                      <button type="button" className="block w-full text-left" onClick={() => openItem(item)}>
+                      <button
+                        type="button"
+                        className="block w-full text-left"
+                        onClick={() => openItem(item)}
+                        onFocus={() => setFocusedItemId(item.id)}
+                        onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
+                        style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
+                      >
                         <div className="relative h-28 w-full">
                           {item.imageUrl ? (
                             <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 768px) 50vw, 280px" className="object-cover" unoptimized />

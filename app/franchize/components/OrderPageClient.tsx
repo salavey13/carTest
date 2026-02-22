@@ -7,7 +7,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { createFranchizeOrderInvoice } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
-import { crewPaletteForSurface } from "../lib/theme";
+import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
 
 interface OrderPageClientProps {
   crew: FranchizeCrewVM;
@@ -212,10 +212,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                   key={value}
                   type="button"
                   onClick={() => setDeliveryMode(value as "pickup" | "delivery")}
-                  className="rounded-xl border px-3 py-2 text-sm"
+                  className="rounded-xl border px-3 py-2 text-sm transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
                     borderColor: deliveryMode === value ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
                     color: deliveryMode === value ? crew.theme.palette.accentMain : undefined,
+                    ...focusRingOutlineStyle(crew.theme),
                   }}
                 >
                   {label}
@@ -227,10 +228,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <div className="rounded-2xl border p-4" style={surface.card}>
             <p className="text-sm font-medium">Данные получателя</p>
             <div className="mt-3 space-y-3">
-              <input className="w-full rounded-xl border px-3 py-2 text-sm" style={fieldStyle} placeholder="Имя и фамилия" value={recipient} onChange={(e) => setRecipient(e.target.value)} />
-              <input className="w-full rounded-xl border px-3 py-2 text-sm" style={fieldStyle} placeholder="Телефон" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              <input className="w-full rounded-xl border px-3 py-2 text-sm" style={fieldStyle} placeholder="Удобное время" value={time} onChange={(e) => setTime(e.target.value)} />
-              <textarea className="min-h-20 w-full rounded-xl border px-3 py-2 text-sm" style={fieldStyle} placeholder="Комментарий к заказу" value={comment} onChange={(e) => setComment(e.target.value)} />
+              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Имя и фамилия" value={recipient} onChange={(e) => setRecipient(e.target.value)} />
+              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Телефон" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Удобное время" value={time} onChange={(e) => setTime(e.target.value)} />
+              <textarea className="min-h-20 w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Комментарий к заказу" value={comment} onChange={(e) => setComment(e.target.value)} />
             </div>
           </div>
 
@@ -242,10 +243,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                   key={item.id}
                   type="button"
                   onClick={() => setPayment(item.id)}
-                  className="rounded-xl border px-3 py-2 text-left text-sm"
+                  className="rounded-xl border px-3 py-2 text-left text-sm transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
                     borderColor: payment === item.id ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
                     color: payment === item.id ? crew.theme.palette.accentMain : undefined,
+                    ...focusRingOutlineStyle(crew.theme),
                   }}
                 >
                   <p className="font-medium">{item.label}</p>
@@ -257,8 +259,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               <p className="mt-2 text-xs" style={surface.mutedText}>Для оплаты в Stars откройте оформление из Telegram WebApp.</p>
             ) : null}
             <div className="mt-3 flex gap-2">
-              <input className="w-full rounded-xl border px-3 py-2 text-sm" style={fieldStyle} placeholder="Промокод" value={promo} onChange={(e) => setPromo(e.target.value)} />
-              <button type="button" className="rounded-xl border px-3 text-sm" style={{ borderColor: crew.theme.palette.borderSoft }}>
+              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Промокод" value={promo} onChange={(e) => setPromo(e.target.value)} />
+              <button type="button" className="rounded-xl border px-3 text-sm transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ borderColor: crew.theme.palette.borderSoft, ...focusRingOutlineStyle(crew.theme) }}>
                 Применить
               </button>
             </div>
@@ -279,10 +281,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                         checked ? prev.filter((id) => id !== extra.id) : [...prev, extra.id],
                       )
                     }
-                    className="flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm"
+                    className="flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                     style={{
                       borderColor: checked ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
                       backgroundColor: checked ? `${crew.theme.palette.accentMain}1a` : undefined,
+                      ...focusRingOutlineStyle(crew.theme),
                     }}
                   >
                     <span>{extra.label}</span>
@@ -307,8 +310,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               <p>Корзина пуста — добавьте байк из каталога перед оформлением.</p>
               <Link
                 href={`/franchize/${slug}`}
-                className="mt-3 inline-flex font-medium underline-offset-4 hover:underline"
-                style={{ color: crew.theme.palette.accentMain }}
+                className="mt-3 inline-flex font-medium underline-offset-4 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                style={{ color: crew.theme.palette.accentMain, ...focusRingOutlineStyle(crew.theme) }}
               >
                 Вернуться в каталог
               </Link>
@@ -341,8 +344,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <button
             type="button"
             disabled={!canSubmit || isSubmitting}
-            className="mt-4 w-full rounded-xl px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}
+            className="mt-4 w-full rounded-xl px-4 py-3 text-sm font-semibold transition hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A", ...focusRingOutlineStyle(crew.theme) }}
             onClick={handleSubmit}
           >
             {submitLabel}
