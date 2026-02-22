@@ -16,7 +16,7 @@ export default async function FranchizeOrderPage({ params }: FranchizeOrderPageP
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/order/${id}`} />
+      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/order/${id}`} groupLinks={items.map((item) => item.category)} />
       <OrderPageClient crew={crew} slug={crew.slug || slug} orderId={id} items={items} />
       <CrewFooter crew={crew} />
       <FranchizeFloatingCart

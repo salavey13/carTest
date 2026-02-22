@@ -40,7 +40,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
         <div className="mt-6 grid gap-4 md:grid-cols-[1fr_300px]">
           <div className="space-y-3">
             {cartLines.map((line) => (
-              <article key={line.itemId} className="rounded-2xl border p-4" style={surface.card}>
+              <article key={line.lineId} className="rounded-2xl border p-4" style={surface.card}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-base font-semibold">{line.item?.title ?? "Позиция недоступна"}</h2>

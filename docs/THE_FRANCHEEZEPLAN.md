@@ -1321,6 +1321,32 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Very long titles are clipped consistently without layout blowups.
   - Active-window + priority impact visible campaign order in `/franchize/vip-bike`.
 
+
+
+### T35 — Regression hotfix: SPA links + campaign rail restyle + cart add reliability
+- status: `done`
+- updated_at: `2026-02-22T13:00:00Z`
+- owner: `codex`
+- notes: Restored internal franchize navigation to true SPA transitions (without full page reload), restyled campaign promo cards away from full-black blocks, unified visible groups rail behavior across subpages, and added direct catalog add-to-cart CTA to remove tap ambiguity. Correction pass moved groups rail strictly into header container and fed shared item-based group links on every franchize subpage.
+- next_step: Re-run `/franchize/vip-bike` smoke checks and confirm header group balloons are visible on all `/franchize/[slug]/*` routes.
+- risks: Mixed webview runtimes may still handle touch and click differently; keep both modal and inline add paths covered in smoke checks.
+- dependencies: T34
+- deliverables:
+  - `app/franchize/components/CrewHeader.tsx`
+  - `app/franchize/components/CatalogClient.tsx`
+  - `app/franchize/components/CartPageClient.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Replace internal ticker/promo anchors with SPA-safe `next/link` while preserving external target behavior.
+  2. Replace dark promo strip visuals with colorful campaign cards for storefront parity.
+  3. Keep group rail consistent across catalog and subpages by sharing fallback group source.
+  4. Add explicit `+ В корзину` inline CTA in catalog cards and keep modal add flow intact.
+- acceptance criteria:
+  - Internal franchize links navigate client-side without forced full reload.
+  - Campaign cards no longer render as full-black promo blocks on catalog.
+  - Group rail uses one consistent list model across `/franchize/[slug]` and subpages.
+  - Clicking catalog `+ В корзину` immediately increments floating cart counter.
+
 ---
 
 ## 6) Task template for future extension
@@ -1878,3 +1904,17 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Hardened corner-cases requested by operator: empty `href` now falls back to `/franchize/{slug}#catalog-sections`, and very long titles are clipped to avoid rail overflow.
 - Upgraded catalog rail from static first-3 cards to a rotating window so extra campaigns can be showcased without bloating page height.
 - Updated branding editor hints/defaults and SQL hydration examples to include the extended campaign fields for immediate operator testing.
+
+
+### 2026-02-22 — T35 completion (navigation/cart regression hotfix pass)
+- Switched franchize ticker and campaign promo links to SPA-safe `next/link` for internal routes while keeping external links in new tab mode.
+- Restyled promo/ad cards to colorful gradients (instead of black slabs) to match storefront campaign look-and-feel.
+- Unified group rail source so subpages and catalog share one category/group list baseline.
+- Added explicit `+ В корзину` inline CTA on catalog cards and stabilized cart row keys by `lineId` for option-specific lines.
+
+
+### 2026-02-22 — T35 correction pass (groups rail moved into header on all franchize pages)
+- Moved groups/category balloon rail inside `CrewHeader` block (single sticky header container), instead of detached strip below header.
+- Added `groupLinks` prop to `CrewHeader` and passed item-derived category links from all franchize routes (`catalog/about/contacts/cart/order/rental`) so rail stays consistent everywhere.
+- Kept catalog intersection observer highlight logic on main page while preserving fallback groups on subpages.
+- Re-ran targeted lint and refreshed `/franchize/vip-bike` screenshot evidence after correction.

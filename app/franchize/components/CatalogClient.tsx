@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toCategoryId } from "../lib/navigation";
 import { catalogCardVariantStyles, crewPaletteForSurface, interactionRingStyle } from "../lib/theme";
@@ -132,6 +133,18 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
     }
     return windowed;
   }, [campaignIndex, promoModules]);
+
+
+
+  const promoGradientByIndex = (index: number) => {
+    const gradients = [
+      `linear-gradient(130deg, ${crew.theme.palette.accentMain}E0, #FF7F50D0)`,
+      `linear-gradient(130deg, #8B5CF6D9, ${crew.theme.palette.accentMain}D8)`,
+      `linear-gradient(130deg, #22C55ED1, #06B6D4CC)`,
+    ];
+
+    return gradients[index % gradients.length];
+  };
 
   const orderedCategories = useMemo(
     () => Array.from(new Set([...crew.catalog.categories, ...items.map((item) => item.category).filter(Boolean)])),
@@ -279,31 +292,38 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
 
         {promoModules.length > 0 && (
           <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {visiblePromoModules.map((module) => (
-              <a
-                key={module.id}
-                title={module.title}
-                href={module.href}
-                className="rounded-2xl border p-3 transition hover:opacity-95"
-                style={{
-                  borderColor: crew.theme.palette.borderSoft,
-                  background: `linear-gradient(140deg, ${crew.theme.palette.bgCard}, ${crew.theme.palette.bgBase})`,
-                }}
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: crew.theme.palette.accentMain }}>
-                  {module.badge}
-                </p>
-                <p className="mt-1 text-sm font-medium leading-5" style={{ color: crew.theme.palette.textPrimary }}>
-                  {module.title}
-                </p>
-                {module.subtitle ? (
-                  <p className="mt-1 text-xs" style={{ color: crew.theme.palette.textSecondary }}>{module.subtitle}</p>
-                ) : null}
-                <p className="mt-2 text-xs" style={{ color: crew.theme.palette.textSecondary }}>
-                  {module.ctaLabel} →
-                </p>
-              </a>
-            ))}
+            {visiblePromoModules.map((module, index) => {
+              const isExternal = /^(https?:|mailto:|tel:)/.test(module.href);
+
+              return (
+                <Link
+                  key={module.id}
+                  title={module.title}
+                  href={module.href}
+                  className="rounded-2xl border p-3 transition hover:opacity-95"
+                  style={{
+                    borderColor: crew.theme.palette.borderSoft,
+                    background: promoGradientByIndex(index),
+                  }}
+                  prefetch={!isExternal}
+                  target={isExternal ? "_blank" : undefined}
+                  rel={isExternal ? "noreferrer noopener" : undefined}
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "#16130A" }}>
+                    {module.badge}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold leading-5" style={{ color: "#16130A" }}>
+                    {module.title}
+                  </p>
+                  {module.subtitle ? (
+                    <p className="mt-1 text-xs" style={{ color: "#2A1A0D" }}>{module.subtitle}</p>
+                  ) : null}
+                  <p className="mt-2 text-xs font-semibold" style={{ color: "#16130A" }}>
+                    {module.ctaLabel} →
+                  </p>
+                </Link>
+              );
+            })}
           </div>
         )}
 
@@ -399,9 +419,31 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                           <h3 className="mt-1 text-sm font-semibold leading-5">{item.title}</h3>
                           <p className="text-xs" style={surface.mutedText}>{item.description || item.subtitle}</p>
                           <p className="mt-2 text-sm font-medium">{item.pricePerDay} ₽ / day</p>
-                          <span className="mt-2 inline-flex w-full items-center justify-center rounded-full px-2 py-2 text-xs font-semibold" style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}>
-                            {item.pricePerDay >= 6000 ? "Выбрать" : "Добавить"}
-                          </span>
+                          <div className="mt-2 flex gap-2">
+                            <span className="inline-flex flex-1 items-center justify-center rounded-full px-2 py-2 text-xs font-semibold" style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}>
+                              {item.pricePerDay >= 6000 ? "Выбрать" : "Добавить"}
+                            </span>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              className="rounded-full border px-3 py-2 text-xs font-semibold"
+                              style={{ borderColor: crew.theme.palette.borderSoft, color: crew.theme.palette.textPrimary, backgroundColor: `${crew.theme.palette.bgBase}CC` }}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                addItem(item.id, { package: "Base", duration: "1 day", perk: "Стандарт" }, 1);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  addItem(item.id, { package: "Base", duration: "1 day", perk: "Стандарт" }, 1);
+                                }
+                              }}
+                            >
+                              + В корзину
+                            </span>
+                          </div>
                         </div>
                       </button>
                     </article>

@@ -15,7 +15,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}`} />
+      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}`} groupLinks={items.map((item) => item.category)} />
       <CatalogClient crew={crew} slug={slug} items={items} />
       <CrewFooter crew={crew} />
     </main>
