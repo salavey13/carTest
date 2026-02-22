@@ -1187,6 +1187,86 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - `/franchize/create` exposes a separate cockpit surface with launch score + blockers, not tied to order-page micro-polish.
   - Cockpit provides immediate navigation to slug-scoped execution routes.
 
+### T29 — Pepperolli parity audit pass (VIP-bike subtle conversion gaps)
+- status: `done`
+- updated_at: `2026-02-22T06:30:00Z`
+- owner: `codex`
+- notes: Compared production `/franchize/vip-bike` against `пепперолли.рф` and shipped missing subtle conversion layer: compact promo modules below search to mirror campaign-first scanning used on Pepperolli catalog.
+- next_step: Start T30 for checkout urgency badges + sticky "clear search" and per-section item counters.
+- risks: Promo modules currently hydrate from ticker entries and depend on metadata quality; richer media tiles can be added later via dedicated promo JSON block.
+- dependencies: T28
+- deliverables:
+  - `app/franchize/components/CatalogClient.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Run visual comparison between current VIP-bike storefront and Pepperolli production page.
+  2. Identify subtle conversion differences beyond known auction ticker and popup ad (campaign cards density, scan rhythm, CTA framing).
+  3. Implement first high-impact parity improvement with minimal invasive diff.
+- acceptance criteria:
+  - `/franchize/vip-bike` shows campaign promo modules under search, improving first-screen scan rhythm.
+  - Existing catalog, category rail, modal flow, and cart CTA behavior remain unchanged.
+
+
+### T30 — Conversion micro-helpers pass (search reset + section density cues)
+- status: `done`
+- updated_at: `2026-02-22T07:20:00Z`
+- owner: `codex`
+- notes: Addressed follow-up parity comments by adding sticky search reset affordance and per-section item counters to improve catalog scannability/conversion confidence.
+- next_step: Start T31 for optional checkout urgency copy pass if operator wants deeper parity with food-commerce pacing.
+- risks: Section counters reflect filtered results and can fluctuate during search; this is intentional but should be monitored for user clarity.
+- dependencies: T29
+- deliverables:
+  - `app/franchize/components/CatalogClient.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add explicit search reset action near `Искать` CTA for rapid catalog recovery.
+  2. Add per-category item count chips in section headers.
+  3. Keep modal/cart/order interactions unchanged.
+- acceptance criteria:
+  - `/franchize/vip-bike` search field supports one-tap `Сброс` while preserving existing search CTA behavior.
+  - Category headers display visible result counts (`N шт.`) matching current filtered state.
+
+
+
+### T31 — Catalog quick-filter energy pass (non-order anti-boring step)
+- status: `done`
+- updated_at: `2026-02-22T08:00:00Z`
+- owner: `codex`
+- notes: Implemented high-signal quick filter chips on catalog (`Все`, `До 5000`, `Премиум 7000+`, `Для новичка`) to boost exploration speed without touching order modal/checkout UI.
+- next_step: Start T32 if needed for richer promo tiles (image-backed cards + scheduled campaign windows).
+- risks: "Для новичка" currently uses lightweight heuristics based on title/category text and may need metadata-backed tags later.
+- dependencies: T30
+- deliverables:
+  - `app/franchize/components/CatalogClient.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add non-invasive quick-filter chip rail under promo modules.
+  2. Keep search + quick filter composable so users can combine both.
+  3. Keep modal/cart/order flows untouched.
+- acceptance criteria:
+  - `/franchize/vip-bike` exposes quick filter chips with clear active state.
+  - Filtered item list updates immediately while preserving existing section rendering and item modal actions.
+
+
+
+### T32 — Smart quick-filter stabilization (counts + unified reset)
+- status: `done`
+- updated_at: `2026-02-22T08:40:00Z`
+- owner: `codex`
+- notes: Refined quick-filter layer with centralized config, live per-filter counts, and one-tap `Сбросить всё` to reduce friction and make filter state transparent.
+- next_step: Start T33 for image-backed promo cards with scheduling metadata if operator wants the next non-modal excitement beat.
+- risks: "Для новичка" still uses heuristic text matching and should be replaced by explicit metadata tags when available.
+- dependencies: T31
+- deliverables:
+  - `app/franchize/components/CatalogClient.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Centralize quick-filter definitions and remove ad-hoc casting.
+  2. Add dynamic counts per filter based on active search subset.
+  3. Add global reset action to clear search + filter state in one tap.
+- acceptance criteria:
+  - `/franchize/vip-bike` shows `label · count` for each quick filter.
+  - `Сбросить всё` appears when any filter/search is active and restores baseline catalog state.
 
 ---
 
@@ -1234,6 +1314,37 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 - Added blocker-oriented checklist cards with hints plus quick jump links to canonical `/franchize/{slug}` execution surfaces.
 - This pass translates dispersed runbook ideas into one operational panel for faster franchise sandbox launch decisions.
 - Next beat: T29 can wire this cockpit to automated QA smoke + screenshot evidence generation.
+
+
+
+### 2026-02-22 — T32 completion (quick-filter stabilization + global reset)
+- Addressed feedback on previous quick-filter pass by cleaning implementation and reducing interaction ambiguity.
+- Added live counts to each quick filter chip so users can see expected result volume before tapping.
+- Added `Сбросить всё` action to clear both search and chip filter in one motion.
+- Kept scope catalog-only and non-destructive: no modal/cart/order logic changes.
+- Next beat: T33 can move promo cards from text-only to image-backed campaign blocks.
+
+### 2026-02-22 — T31 completion (quick-filter energy pass, no order-modal changes)
+- Responded to operator feedback ("order modal is boring") by focusing next beat on catalog energy, not checkout surfaces.
+- Added quick filter chips for high-intent browsing: all, budget, premium, and newbie-friendly presets.
+- Combined quick-filter and text search logic so filters stack naturally without breaking existing catalog behavior.
+- Preserved item modal flow, cart pill, and order routes unchanged; this is a safe conversion-oriented catalog enhancement.
+- Next beat: T32 can add image-backed promo tiles with scheduling for campaign precision.
+
+### 2026-02-22 — T30 completion (search reset + section density cues)
+- Closed follow-up review feedback from T29 by shipping practical conversion helpers instead of purely visual additions.
+- Added one-tap `Сброс` action inside catalog search so operators/users can quickly recover full inventory after narrow queries.
+- Added per-section count chips (`N шт.`) in catalog group headers to improve scan confidence and communicate filtered inventory density.
+- Preserved existing modal-first item interaction, floating cart behavior, and checkout flow with no route/data-model churn.
+- Next beat: T31 can add checkout urgency nudge copy if we want one more parity sweep.
+
+
+### 2026-02-22 — T29 completion (Pepperolli subtle-gap audit + promo module pass)
+- Performed side-by-side check of `v0-car-test.vercel.app/franchize/vip-bike` and `пепперолли.рф` to isolate subtle conversion gaps (beyond auction ticker and homepage ad popup already noted by operator).
+- Found our catalog had weaker campaign density right below search compared to Pepperolli's immediate promo card stack.
+- Added compact promo modules (3 max) under search, hydrated from ticker metadata, with concise CTA copy and dark/accent styling aligned to existing crew theme.
+- Kept change additive: no route churn, no modal/cart behavior changes, no inventory schema changes.
+- Next beat: T30 should add local conversion helpers (search clear affordance + category item counts + checkout urgency badges).
 
 ### 2026-02-22 — T27 completion (checkout copilot expansion)
 - Upgraded the order sidebar from tiny status chip to a larger `Checkout copilot` module with readiness %, blocker inventory, and guided UX messaging.
