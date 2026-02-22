@@ -1108,6 +1108,29 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Interaction polish is additive and does not alter existing add-to-cart/modal behavior.
 
 
+### T25 — Cross-surface interaction-state parity (modal/cart/order controls)
+- status: `done`
+- updated_at: `2026-02-22T07:10:00Z`
+- owner: `codex`
+- notes: Completed one-go interaction-state styling sweep across Item modal, cart controls, and order form/actions using a shared palette-aware focus outline helper and subtle hover/press transitions.
+- next_step: Start T26 with richer “interesting stuff” pass (micro-delight: contextual badges/animated CTA hints on franchize checkout surfaces) if operator wants further vibe uplift.
+- risks: Outline contrast still depends on crew accent quality; super-low-contrast custom accents may need future guardrails in `/franchize/create` validation.
+- dependencies: T24
+- deliverables:
+  - `app/franchize/lib/theme.ts`
+  - `app/franchize/modals/Item.tsx`
+  - `app/franchize/components/CartPageClient.tsx`
+  - `app/franchize/components/OrderPageClient.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add reusable palette-driven focus outline helper for keyboard-visible controls.
+  2. Apply consistent focus/hover/active interaction states to modal actions + option chips.
+  3. Apply same interaction treatment to cart quantity/remove/checkout actions and order form/actions.
+- acceptance criteria:
+  - `/franchize/vip-bike/cart`, `/franchize/vip-bike/order/demo-order`, and item modal controls show visible focus states without falling back to global theme defaults.
+  - Interaction-state changes are visual-only and do not alter booking/cart logic.
+
+
 ---
 
 ## 6) Task template for future extension
@@ -1147,6 +1170,13 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+
+### 2026-02-22 — T25 completion (one-go interaction-state styling sweep)
+- Added shared `focusRingOutlineStyle(theme)` helper and applied it to modal/cart/order actionable controls for consistent keyboard-visible focus.
+- Polished controls with subtle hover/press transitions so tactile feedback remains clear in both dark and light crew palettes.
+- Kept checkout/cart/modal behavior unchanged while improving perceived UX responsiveness across high-traffic franchize surfaces.
+- Next beat: T26 can ship “interesting stuff” (micro-delight cues around checkout progression) if operator wants extra vibe boost.
 
 
 ### 2026-02-22 — T24 completion (catalog interaction-state polish)
