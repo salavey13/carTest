@@ -195,7 +195,11 @@ set
           'showTwoColumnsMobile', true,
           'useModalDetails', true,
           'promoBanners', jsonb_build_array(
-            jsonb_build_object('id', 'summer-2025', 'title', 'Промокод ЛЕТО2025', 'subtitle', '-10% на первую аренду', 'code', 'ЛЕТО2025')
+            jsonb_build_object('id', 'summer-2025', 'title', 'Промокод ЛЕТО2025 для длинного летнего маршрута по набережной и центру города', 'subtitle', '-10% на первую аренду', 'code', 'ЛЕТО2025', 'activeFrom', '2026-02-01', 'activeTo', '2026-12-31', 'priority', 90, 'ctaLabel', 'Забрать скидку')
+          ),
+          'adCards', jsonb_build_array(
+            jsonb_build_object('id', 'helmet-upgrade', 'title', 'PRO экипировка', 'subtitle', 'Добавь комплект защиты к аренде', 'href', '', 'imageUrl', '', 'badge', 'Safety', 'activeFrom', '2026-02-01', 'activeTo', '2026-12-31', 'priority', 70, 'ctaLabel', 'Смотреть детали'),
+            jsonb_build_object('id', 'photo-ride', 'title', 'Photo ride add-on', 'subtitle', 'Контент-съёмка + маршрут от куратора', 'href', '/franchize/{slug}/contacts', 'imageUrl', '', 'badge', 'Boost', 'activeFrom', '2026-02-01', 'activeTo', '2026-12-31', 'priority', 60, 'ctaLabel', 'Открыть')
           ),
           'floatingCart', jsonb_build_object('showOn', jsonb_build_array('catalog', 'about', 'contacts', 'order'), 'showScrollTopButton', true)
         ),
@@ -204,7 +208,7 @@ set
           'promoPlaceholder', 'Введите промокод',
           'deliveryModes', jsonb_build_array('pickup', 'delivery'),
           'defaultMode', 'pickup',
-          'paymentOptions', jsonb_build_array('card_online', 'cash_on_pickup', 'sbp'),
+          'paymentOptions', jsonb_build_array('telegram_xtr', 'card', 'sbp', 'cash'),
           'consentText', 'Я согласен с условиями аренды и обработкой персональных данных.'
         )
       )
