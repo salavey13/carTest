@@ -1268,6 +1268,59 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - `/franchize/vip-bike` shows `label · count` for each quick filter.
   - `Сбросить всё` appears when any filter/search is active and restores baseline catalog state.
 
+
+
+### T33 — Crew metadata promo/ad control + payment options pass (branding editor)
+- status: `done`
+- updated_at: `2026-02-22T09:45:00Z`
+- owner: `codex`
+- notes: Added promo/ad card editing fields in `/franchize/create`, wired load/save to `crews.metadata.franchize.catalog`, switched catalog promo render to metadata-backed promos/ads, and expanded editable payment options list beyond Telegram XTR.
+- next_step: Start T34 for storefront visual parity gap audit + final cloning checklist.
+- risks: Textarea CSV/pipe format is operator-friendly but still manual; future iteration can move to row-based UI editor.
+- dependencies: T32
+- deliverables:
+  - `app/franchize/actions.ts`
+  - `app/franchize/create/CreateFranchizeForm.tsx`
+  - `app/franchize/components/CatalogClient.tsx`
+  - `docs/sql/vip-bike-franchize-hydration.sql`
+  - `docs/sql/sly13-franchize-test-hydration.sql`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add config fields to load/save `catalog.promoBanners` and `catalog.adCards` from metadata.
+  2. Expose editable controls for promos/ads in branding editor.
+  3. Read order payment options from metadata and make them editable (`telegram_xtr`, `card`, `sbp`, `cash`, etc.).
+  4. Update SQL hydration docs so both VIP_BIKE and SLY13 seeds contain promo/ad samples and expanded payment options.
+- acceptance criteria:
+  - Branding page can edit and save promo/ad metadata without raw JSON-only fallback.
+  - Catalog promo strip reads metadata `promoBanners/adCards` before ticker fallback.
+  - SQL docs in `docs/sql/*` reflect the new metadata contract and payment options list.
+
+
+### T34 — Campaign intelligence rail (schedule + priority + resilient CTA fallback)
+- status: `done`
+- updated_at: `2026-02-22T11:10:00Z`
+- owner: `codex`
+- notes: Upgraded promo/ad layer from static tiles to campaign engine with scheduling windows, priority sorting, CTA labels, long-title clipping, resilient href fallback for empty links, and lightweight auto-rotation window.
+- next_step: Start T35 for analytics hooks (campaign impression/click telemetry + operator dashboard counters).
+- risks: Date parsing expects ISO-like values in metadata; invalid dates gracefully treated as always active.
+- dependencies: T33
+- deliverables:
+  - `app/franchize/actions.ts`
+  - `app/franchize/components/CatalogClient.tsx`
+  - `app/franchize/create/CreateFranchizeForm.tsx`
+  - `docs/sql/vip-bike-franchize-hydration.sql`
+  - `docs/sql/sly13-franchize-test-hydration.sql`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Extend promo/ad metadata contract with `activeFrom`, `activeTo`, `priority`, `ctaLabel`.
+  2. Add parser-level sanitization for empty href and overlong title.
+  3. Render only active campaigns and sort by priority before fallback to ticker.
+  4. Add rotating visible window in catalog promo rail for richer campaign density.
+- acceptance criteria:
+  - Empty `href` campaign no longer breaks navigation and safely opens catalog anchor.
+  - Very long titles are clipped consistently without layout blowups.
+  - Active-window + priority impact visible campaign order in `/franchize/vip-bike`.
+
 ---
 
 ## 6) Task template for future extension
@@ -1810,3 +1863,18 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - **Root cause:** previous reliability patch replaced internal Next routing with hard reload anchors and left header logo container with negative bottom margin while ticker was enabled.
 - **Fix/workaround:** removed logo negative offset, kept category rail available on subpages with `catalog#section` jump behavior, switched franchize internal nav handlers back to client routing (`router.push`/`Link`), corrected branding path to `/franchize/create`, and added server-side permission gate so only crew owner/all-admin can save while others stay read-only.
 - **Verification:** `npm run lint -- --file app/franchize/components/CrewHeader.tsx --file app/franchize/components/CrewFooter.tsx --file app/franchize/components/FranchizeProfileButton.tsx --file app/franchize/create/CreateFranchizeForm.tsx --file app/franchize/actions.ts`.
+
+
+### 2026-02-22 — T33 completion (promo/ad metadata controls + payment options)
+- Added non-JSON controls in `/franchize/create` for `catalog.promoBanners` and `catalog.adCards` so operator can edit campaign content directly from branding flow.
+- Wired server load/save mapping in `app/franchize/actions.ts` to round-trip promo/ad rows into `crews.metadata.franchize.catalog`.
+- Updated catalog promo rail rendering to prioritize metadata promos/ads, with ticker fallback preserved for backward compatibility.
+- Extended order settings in branding config with editable `paymentOptions` CSV to support non-XTR methods (`card`, `sbp`, `cash`) without code edits.
+- Synced both SQL hydration docs with `adCards` sample payload and normalized payment options list to new keys.
+
+
+### 2026-02-22 — T34 completion (campaign intelligence rail)
+- Added schedule-aware campaign metadata (`activeFrom/activeTo`), priority sorting, and per-card CTA labels for both promo and ad sources.
+- Hardened corner-cases requested by operator: empty `href` now falls back to `/franchize/{slug}#catalog-sections`, and very long titles are clipped to avoid rail overflow.
+- Upgraded catalog rail from static first-3 cards to a rotating window so extra campaigns can be showcased without bloating page height.
+- Updated branding editor hints/defaults and SQL hydration examples to include the extended campaign fields for immediate operator testing.
