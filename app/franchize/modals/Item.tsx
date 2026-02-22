@@ -5,7 +5,7 @@ import { Info, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent, TouchEvent } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
-import { crewPaletteForSurface } from "../lib/theme";
+import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
 
 interface ItemModalProps {
   item: CatalogItemVM | null;
@@ -31,6 +31,7 @@ function OptionChips({
   onSelect,
   accentColor,
   mutedTextColor,
+  focusRingStyle,
 }: {
   title: string;
   options: string[];
@@ -38,6 +39,7 @@ function OptionChips({
   onSelect: (value: string) => void;
   accentColor: string;
   mutedTextColor: string;
+  focusRingStyle: { outlineColor: string };
 }) {
   return (
     <div>
@@ -50,11 +52,12 @@ function OptionChips({
               key={option}
               type="button"
               onClick={() => onSelect(option)}
-              className="rounded-full border px-3 py-1.5 text-xs transition"
+              className="rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
               style={{
                 borderColor: isActive ? accentColor : undefined,
                 backgroundColor: isActive ? accentColor : undefined,
                 color: isActive ? "#16130A" : undefined,
+                ...focusRingStyle,
               }}
             >
               {option}
@@ -127,8 +130,9 @@ export function ItemModal({ item, theme, options, onChangeOption, onClose, onAdd
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white"
+            className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             aria-label="Close"
+            style={focusRingOutlineStyle(theme)}
           >
             <X className="h-4 w-4" />
           </button>
@@ -142,8 +146,8 @@ export function ItemModal({ item, theme, options, onChangeOption, onClose, onAdd
             {descriptionText.length > 120 && (
               <button
                 type="button"
-                className="mt-1 text-sm font-medium"
-                style={{ color: theme.palette.accentMain }}
+                className="mt-1 text-sm font-medium transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                style={{ color: theme.palette.accentMain, ...focusRingOutlineStyle(theme) }}
                 onClick={() => setDescriptionExpanded((prev) => !prev)}
               >
                 {descriptionExpanded ? "Скрыть" : "Показать ещё..."}
@@ -165,21 +169,21 @@ export function ItemModal({ item, theme, options, onChangeOption, onClose, onAdd
             </div>
           </div>
 
-          <OptionChips title="Пакет" options={packageOptions} selected={options.package} onSelect={(v) => onChangeOption("package", v)} accentColor={theme.palette.accentMain} mutedTextColor={theme.palette.textSecondary} />
-          <OptionChips title="Срок" options={durationOptions} selected={options.duration} onSelect={(v) => onChangeOption("duration", v)} accentColor={theme.palette.accentMain} mutedTextColor={theme.palette.textSecondary} />
-          <OptionChips title="Комплект" options={perkOptions} selected={options.perk} onSelect={(v) => onChangeOption("perk", v)} accentColor={theme.palette.accentMain} mutedTextColor={theme.palette.textSecondary} />
+          <OptionChips title="Пакет" options={packageOptions} selected={options.package} onSelect={(v) => onChangeOption("package", v)} accentColor={theme.palette.accentMain} mutedTextColor={theme.palette.textSecondary} focusRingStyle={focusRingOutlineStyle(theme)} />
+          <OptionChips title="Срок" options={durationOptions} selected={options.duration} onSelect={(v) => onChangeOption("duration", v)} accentColor={theme.palette.accentMain} mutedTextColor={theme.palette.textSecondary} focusRingStyle={focusRingOutlineStyle(theme)} />
+          <OptionChips title="Комплект" options={perkOptions} selected={options.perk} onSelect={(v) => onChangeOption("perk", v)} accentColor={theme.palette.accentMain} mutedTextColor={theme.palette.textSecondary} focusRingStyle={focusRingOutlineStyle(theme)} />
         </div>
 
         <div className="grid shrink-0 grid-cols-2 gap-2 border-t p-3" style={surface.card}>
-          <button type="button" onClick={onClose} className="rounded-xl border px-3 py-2 text-sm font-medium" style={surface.subtleCard}>
+          <button type="button" onClick={onClose} className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...surface.subtleCard, ...focusRingOutlineStyle(theme) }}>
             Закрыть
           </button>
           <button
             type="button"
             onClick={handleAddButtonPress}
             onTouchEnd={handleAddButtonPress}
-            className="rounded-xl px-3 py-2 text-sm font-semibold"
-            style={{ backgroundColor: theme.palette.accentMain, color: "#16130A" }}
+            className="rounded-xl px-3 py-2 text-sm font-semibold transition hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            style={{ backgroundColor: theme.palette.accentMain, color: "#16130A", ...focusRingOutlineStyle(theme) }}
           >
             Добавить • {item.pricePerDay} ₽
           </button>

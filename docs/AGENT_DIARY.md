@@ -136,3 +136,9 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** removed Tailwind default focus ring utilities without replacing them by palette-aware interaction styles.
 - **Fix/workaround:** add shared `interactionRingStyle(theme)` helper and apply it to search input/CTA and catalog card trigger buttons.
 - **Verification:** `npm run lint -- app/franchize/components/CatalogClient.tsx app/franchize/lib/theme.ts`
+
+## 2026-02-22 — Shared focus helper keeps interaction polish fast and safe
+- **Symptom:** polishing modal/cart/order controls one-by-one caused inconsistent focus visibility and style drift.
+- **Root cause:** each surface implemented its own control styles with no shared focus-outline primitive.
+- **Fix/workaround:** add `focusRingOutlineStyle(theme)` and reuse across interactive controls; pair with light hover/active transitions for tactile parity.
+- **Verification:** `npx eslint app/franchize/modals/Item.tsx app/franchize/components/CartPageClient.tsx app/franchize/components/OrderPageClient.tsx app/franchize/lib/theme.ts`

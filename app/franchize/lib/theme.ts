@@ -86,3 +86,10 @@ export function interactionRingStyle(theme: FranchizeTheme) {
     boxShadow: `0 0 0 2px ${withAlpha(theme.palette.accentMain, 0.72)}`,
   };
 }
+
+
+export function focusRingOutlineStyle(theme: FranchizeTheme) {
+  return {
+    outlineColor: withAlpha(theme.palette.accentMain, 0.78),
+  };
+}
