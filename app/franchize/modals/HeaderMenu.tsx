@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import type { FranchizeCrewVM } from "../actions";
+import { crewPaletteForSurface } from "../lib/theme";
 
 interface HeaderMenuProps {
   crew: FranchizeCrewVM;
@@ -16,6 +17,7 @@ interface HeaderMenuProps {
 export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuProps) {
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
+  const surface = crewPaletteForSurface(crew.theme);
 
   const handleMenuLinkClick = (href: string) => {
     onOpenChange(false);
@@ -54,7 +56,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
           </button>
         </div>
 
-        <p className="mb-5 text-center text-xs text-muted-foreground italic">{crew.header.tagline}</p>
+        <p className="mb-5 text-center text-xs italic" style={surface.mutedText}>{crew.header.tagline}</p>
 
         <div className="space-y-2">
           {crew.header.menuLinks.map((link) => {

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import { toCategoryId } from "../lib/navigation";
+import { crewPaletteForSurface } from "../lib/theme";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { ItemModal } from "../modals/Item";
@@ -28,6 +29,7 @@ const cardVariants = [
 ] as const;
 
 export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
+  const surface = crewPaletteForSurface(crew.theme);
   const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
   const { addItem } = useFranchizeCart(crew.slug || slug);
   const [selectedOptions, setSelectedOptions] = useState({ package: "Base", duration: "1 day", perk: "Стандарт" });
@@ -96,8 +98,13 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
             placeholder="Введите название байка"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full rounded-full border border-border bg-muted/40 py-3 pl-5 pr-28 text-sm outline-none transition focus:border-transparent focus:ring-2"
-            style={{ boxShadow: `0 0 0 1px ${crew.theme.palette.borderSoft}` }}
+            className="w-full rounded-full border py-3 pl-5 pr-28 text-sm outline-none transition focus:border-transparent focus:ring-2"
+            style={{
+              boxShadow: `0 0 0 1px ${crew.theme.palette.borderSoft}`,
+              borderColor: crew.theme.palette.borderSoft,
+              backgroundColor: `${crew.theme.palette.bgCard}99`,
+              color: crew.theme.palette.textPrimary,
+            }}
           />
           <button
             type="button"
@@ -113,11 +120,11 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
         </div>
 
         {items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+          <div className="rounded-2xl border border-dashed p-4 text-sm" style={surface.mutedText}>
             Каталог пуст. Добавь позиции типов `bike`, `accessories`, `gear` или `wbitem`, чтобы наполнить витрину.
           </div>
         ) : itemsByCategory.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+          <div className="rounded-2xl border border-dashed p-4 text-sm" style={surface.mutedText}>
             По запросу ничего не найдено. Попробуй другое название или категорию.
           </div>
         ) : (
@@ -135,7 +142,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                           {item.imageUrl ? (
                             <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 768px) 50vw, 280px" className="object-cover" unoptimized />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs text-muted-foreground">Изображение байка скоро загрузим</div>
+                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Изображение байка скоро загрузим</div>
                           )}
                         </div>
                         <div className="p-3">
@@ -148,7 +155,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                             </span>
                           )}
                           <h3 className="mt-1 text-sm font-semibold leading-5">{item.title}</h3>
-                          <p className="text-xs text-muted-foreground">{item.description || item.subtitle}</p>
+                          <p className="text-xs" style={surface.mutedText}>{item.description || item.subtitle}</p>
                           <p className="mt-2 text-sm font-medium">{item.pricePerDay} ₽ / day</p>
                           <span className="mt-2 inline-flex w-full items-center justify-center rounded-full px-2 py-2 text-xs font-semibold" style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}>
                             {item.pricePerDay >= 6000 ? "Выбрать" : "Добавить"}
@@ -171,6 +178,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
         accentColor={crew.theme.palette.accentMain}
         textColor={crew.theme.palette.textPrimary}
         borderColor={crew.theme.palette.borderSoft}
+        theme={crew.theme}
       />
 
       <ItemModal

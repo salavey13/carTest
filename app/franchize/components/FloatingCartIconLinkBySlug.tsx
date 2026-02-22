@@ -1,7 +1,8 @@
 "use client";
 
-import type { CatalogItemVM } from "../actions";
+import type { CatalogItemVM, FranchizeTheme } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
+import { floatingCartOverlayBackground } from "../lib/theme";
 import { FloatingCartIconLink } from "./FloatingCartIconLink";
 
 interface FloatingCartIconLinkBySlugProps {
@@ -11,9 +12,10 @@ interface FloatingCartIconLinkBySlugProps {
   accentColor: string;
   textColor: string;
   borderColor: string;
+  theme: FranchizeTheme;
 }
 
-export function FloatingCartIconLinkBySlug({ slug, href, items, accentColor, textColor, borderColor }: FloatingCartIconLinkBySlugProps) {
+export function FloatingCartIconLinkBySlug({ slug, href, items, accentColor, textColor, borderColor, theme }: FloatingCartIconLinkBySlugProps) {
   const { itemCount, subtotal } = useFranchizeCartLines(slug, items);
 
   return (
@@ -24,6 +26,7 @@ export function FloatingCartIconLinkBySlug({ slug, href, items, accentColor, tex
       accentColor={accentColor}
       textColor={textColor}
       borderColor={borderColor}
+      backgroundColor={floatingCartOverlayBackground(theme)}
     />
   );
 }

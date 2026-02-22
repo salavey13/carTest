@@ -1,6 +1,6 @@
 "use client";
 
-import type { CatalogItemVM } from "../actions";
+import type { CatalogItemVM, FranchizeTheme } from "../actions";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 
 interface FranchizeFloatingCartProps {
@@ -10,9 +10,10 @@ interface FranchizeFloatingCartProps {
   accentColor: string;
   textColor: string;
   borderColor: string;
+  theme: FranchizeTheme;
 }
 
-export function FranchizeFloatingCart({ slug, href, items, accentColor, textColor, borderColor }: FranchizeFloatingCartProps) {
+export function FranchizeFloatingCart({ slug, href, items, accentColor, textColor, borderColor, theme }: FranchizeFloatingCartProps) {
   return (
     <FloatingCartIconLinkBySlug
       slug={slug}
@@ -21,6 +22,7 @@ export function FranchizeFloatingCart({ slug, href, items, accentColor, textColo
       accentColor={accentColor}
       textColor={textColor}
       borderColor={borderColor}
+      theme={theme}
     />
   );
 }

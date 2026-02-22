@@ -52,3 +52,9 @@ export function crewPaletteForSurface(theme: FranchizeTheme) {
     },
   };
 }
+
+
+export function floatingCartOverlayBackground(theme: FranchizeTheme) {
+  const alpha = theme.mode === "light" ? 0.9 : 0.94;
+  return withAlpha(theme.palette.bgCard, alpha);
+}
