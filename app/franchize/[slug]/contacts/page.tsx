@@ -3,6 +3,7 @@ import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { FranchizeFloatingCart } from "../../components/FranchizeFloatingCart";
 import { FranchizeContactsMap } from "../../components/FranchizeContactsMap";
+import { crewPaletteForSurface } from "../../lib/theme";
 
 interface FranchizeContactsPageProps {
   params: Promise<{ slug: string }>;
@@ -11,24 +12,25 @@ interface FranchizeContactsPageProps {
 export default async function FranchizeContactsPage({ params }: FranchizeContactsPageProps) {
   const { slug } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
+  const surface = crewPaletteForSurface(crew.theme);
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen" style={surface.page}>
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/contacts`} />
 
       <section className="mx-auto w-full max-w-4xl px-4 py-6">
         <h1 className="text-2xl font-semibold">Контакты</h1>
 
-        <div className="mt-4 rounded-2xl border border-border bg-card p-4">
-          <div className="space-y-2 text-sm text-muted-foreground">
+        <div className="mt-4 rounded-2xl border p-4" style={surface.card}>
+          <div className="space-y-2 text-sm" style={surface.mutedText}>
             <p>Адрес: {crew.contacts.address || "—"}</p>
             <p>Телефон: {crew.contacts.phone || "—"}</p>
             <p>Telegram: {crew.contacts.telegram || "—"}</p>
             {crew.contacts.workingHours && <p>Часы работы: {crew.contacts.workingHours}</p>}
           </div>
 
-          {crew.contacts.map.publicTransport && <p className="mt-3 text-xs text-muted-foreground">Транспорт: {crew.contacts.map.publicTransport}</p>}
-          {crew.contacts.map.carDirections && <p className="mt-1 text-xs text-muted-foreground">Как добраться: {crew.contacts.map.carDirections}</p>}
+          {crew.contacts.map.publicTransport && <p className="mt-3 text-xs" style={surface.mutedText}>Транспорт: {crew.contacts.map.publicTransport}</p>}
+          {crew.contacts.map.carDirections && <p className="mt-1 text-xs" style={surface.mutedText}>Как добраться: {crew.contacts.map.carDirections}</p>}
         </div>
 
         <div className="mt-4">
