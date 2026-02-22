@@ -970,6 +970,101 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - acceptance criteria:
   - Operators can configure readable light and dark variants in create flow with preview confidence.
 
+
+### T19 — Surface token cleanup for franchize modal/menu/cart floating controls
+- status: `done`
+- updated_at: `2026-02-22T00:20:00Z`
+- owner: `codex`
+- notes: Replaced remaining global muted/card token leakage in critical franchize overlays (item modal + header menu + floating cart chip) with crew palette-backed styles so light/dark crew themes stay readable without depending on global app theme utilities.
+- next_step: Start T20 to migrate remaining catalog/cart/order utility token classes to `crewPaletteForSurface` primitives for complete theme isolation.
+- risks: Floating cart background currently uses fixed dark translucent fill tuned for Pepperolli look; future task should derive this from palette mode for fully brand-native light crews.
+- dependencies: T18
+- deliverables:
+  - `app/franchize/modals/Item.tsx`
+  - `app/franchize/modals/HeaderMenu.tsx`
+  - `app/franchize/components/FloatingCartIconLink.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Import and apply `crewPaletteForSurface` in item modal containers and muted text blocks.
+  2. Migrate menu tagline muted color from global utility token to crew palette resolver.
+  3. Remove `bg-card/text-muted-foreground` dependency in floating cart button/chip shell styles.
+- acceptance criteria:
+  - Item modal/content text remains readable under both dark and light crew palettes without global token fallback.
+  - Header menu tagline and floating cart empty state color inherit crew palette semantics.
+
+
+### T20 — Floating cart palette-mode background polish
+- status: `done`
+- updated_at: `2026-02-22T04:05:00Z`
+- owner: `codex`
+- notes: Reworked floating cart shell background to derive from crew palette mode via shared theme helper, removing hardcoded dark RGBA fallback and restoring explicit `textColor` usage.
+- next_step: Start T21 to continue migrating remaining catalog/cart/order utility tokens to resolver-driven semantic styles.
+- risks: Other components still include legacy utility tokens (`text-muted-foreground` etc.) and can still create contrast drift in edge custom themes until T21 cleanup.
+- dependencies: T19
+- deliverables:
+  - `app/franchize/lib/theme.ts`
+  - `app/franchize/components/FloatingCartIconLink.tsx`
+  - `app/franchize/components/FloatingCartIconLinkBySlug.tsx`
+  - `app/franchize/components/FranchizeFloatingCart.tsx`
+  - `app/franchize/components/CatalogClient.tsx`
+  - `app/franchize/[slug]/about/page.tsx`
+  - `app/franchize/[slug]/cart/page.tsx`
+  - `app/franchize/[slug]/contacts/page.tsx`
+  - `app/franchize/[slug]/order/[id]/page.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add helper to resolve floating cart overlay background from `theme.mode` + crew palette.
+  2. Thread `theme` into floating cart wrapper props and compute background once near bridge component.
+  3. Remove fixed `rgba(11,12,16,0.94)` from floating cart UI component.
+- acceptance criteria:
+  - Floating cart shell background adapts to crew palette mode (dark/light) and no longer depends on hardcoded dark RGBA.
+  - Floating cart text/icon contrast remains readable under both palette modes on `vip-bike` smoke page.
+
+
+### T21 — Token hotspot cleanup in catalog/cart/map + modal chips
+- status: `done`
+- updated_at: `2026-02-22T05:00:00Z`
+- owner: `codex`
+- notes: Continued theme-polish by removing several high-visibility utility-token hotspots from catalog empty/search states, cart blocks, contacts map placeholders, and item modal option headers; moved them to resolver/palette-backed inline styles for predictable crew contrast.
+- next_step: Start T22 and finish the same migration sweep inside `OrderPageClient` sections (still the largest token-leak area).
+- risks: Contacts map currently uses neutral dark-safe fallback colors without direct crew theme props; should be upgraded to explicit themed props in a follow-up for full palette parity.
+- dependencies: T20
+- deliverables:
+  - `app/franchize/components/CatalogClient.tsx`
+  - `app/franchize/components/CartPageClient.tsx`
+  - `app/franchize/components/FranchizeContactsMap.tsx`
+  - `app/franchize/modals/Item.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Apply `crewPaletteForSurface` to cart copy/cards/summary surfaces and remove key `text-muted-foreground/bg-card/border-border` dependencies.
+  2. Replace catalog search/empty state muted utility usage with palette-resolver style tokens.
+  3. Replace modal option-chip section label muted utility class with explicit palette text token.
+- acceptance criteria:
+  - Cart/catalog fallback text remains readable on `vip-bike` in light/dark theme modes without relying on global utility token palette.
+  - Item modal option headers follow crew text-secondary color instead of global muted class.
+
+
+### T22 — Order flow theme token parity + contacts map theme bridge
+- status: `done`
+- updated_at: `2026-02-22T05:35:00Z`
+- owner: `codex`
+- notes: Finished the largest remaining theme hotspot by migrating `OrderPageClient` away from global utility token leakage and added explicit `theme` bridge for contacts map fallback/frame styles.
+- next_step: Start T23 for optional card-variant/token cleanup inside catalog tiles (remaining `bg-card/from-card/to-background` classes).
+- risks: Catalog card variants still include utility background classes by design; should be migrated to semantic style variants in T23 for full token isolation.
+- dependencies: T21
+- deliverables:
+  - `app/franchize/components/OrderPageClient.tsx`
+  - `app/franchize/components/FranchizeContactsMap.tsx`
+  - `app/franchize/[slug]/contacts/page.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Apply `crewPaletteForSurface` in order flow blocks (section cards, fields, summary, muted hints).
+  2. Replace `text-muted-foreground/bg-card/border-border/bg-background` usage in order page controls with palette-based styles.
+  3. Thread crew theme into contacts map component for fallback/frame color parity.
+- acceptance criteria:
+  - `/franchize/vip-bike/order/demo-order` reads correctly in themed mode without global utility token dependence on major order sections.
+  - contacts map placeholder/frame colors inherit crew palette when theme is provided.
+
 ---
 
 ## 6) Task template for future extension
@@ -1009,6 +1104,34 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+
+### 2026-02-22 — T22 completion (order flow token parity + contacts map bridge)
+- Migrated `OrderPageClient` section cards/inputs/muted labels/summary blocks from global utility token classes to `crewPaletteForSurface` + palette-driven border/input styles.
+- Kept order CTA/payment selection behavior unchanged while improving theme readability consistency for light/dark crew palettes.
+- Added optional `theme` prop to `FranchizeContactsMap` and wired it from contacts page so fallback/frame colors follow crew palette tokens.
+- Next beat: T23 should tackle remaining catalog tile utility background classes for complete storefront token isolation.
+
+
+### 2026-02-22 — T21 completion (token hotspot cleanup)
+- Migrated cart page headline/empty state/cards/summary/muted copy to `crewPaletteForSurface` styles and explicit border tokens.
+- Migrated catalog search input + empty blocks + fallback description copy away from global muted utility token defaults.
+- Updated item modal option-chip section headers to use crew `textSecondary` token.
+- Next beat: T22 should finish `OrderPageClient` utility-token migration and run another vip-bike light-mode readability sweep.
+
+
+### 2026-02-22 — T20 completion (floating cart palette-mode background)
+- Added `floatingCartOverlayBackground(theme)` helper in franchize theme lib so cart shell translucency is derived from crew palette + mode.
+- Threaded `theme` through floating cart wrappers and removed hardcoded dark RGBA from `FloatingCartIconLink`.
+- Restored direct usage of `textColor` prop for icon/label contrast instead of shadowing it as an unused argument.
+- Next beat: continue with T21 and migrate remaining `text-muted-foreground/bg-card` hotspots in catalog/cart/order components.
+
+
+### 2026-02-22 — T19 completion (surface token cleanup for overlays)
+- Updated `Item` modal surfaces/muted text/spec cards to use `crewPaletteForSurface` styles instead of global `bg-card/text-muted-foreground` classes.
+- Updated `HeaderMenu` tagline muted text to resolver-driven palette color to keep copy readable in custom crew themes.
+- Updated `FloatingCartIconLink` shell/empty state styling to remove reliance on global theme card/muted utility tokens.
+- Next beat: continue with T20 and migrate remaining catalog/cart/order utility-token hotspots.
 
 ### 2026-02-21 — T18 completion (`/franchize/create` dual palette UX)
 - Added Light palette fieldset in create form (7 semantic tokens) with separate preview card and additional contrast diagnostics.

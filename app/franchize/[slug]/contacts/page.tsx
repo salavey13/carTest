@@ -39,6 +39,7 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
             address={crew.contacts.address}
             mapImageUrl={crew.contacts.map.imageUrl}
             mapBounds={crew.contacts.map.bounds}
+            theme={crew.theme}
           />
         </div>
       </section>
@@ -51,6 +52,7 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
         accentColor={crew.theme.palette.accentMain}
         textColor={crew.theme.palette.textPrimary}
         borderColor={crew.theme.palette.borderSoft}
+        theme={crew.theme}
       />
     </main>
   );

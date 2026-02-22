@@ -26,6 +26,7 @@ export default async function FranchizeOrderPage({ params }: FranchizeOrderPageP
         accentColor={crew.theme.palette.accentMain}
         textColor={crew.theme.palette.textPrimary}
         borderColor={crew.theme.palette.borderSoft}
+        theme={crew.theme}
       />
     </main>
   );

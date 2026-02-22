@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { ArrowUp, ShoppingCart } from "lucide-react";
-import { useTheme } from "next-themes";
 
 interface FloatingCartIconLinkProps {
   href: string;
@@ -11,12 +10,11 @@ interface FloatingCartIconLinkProps {
   accentColor: string;
   textColor: string;
   borderColor: string;
+  backgroundColor: string;
 }
 
-export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor, textColor, borderColor }: FloatingCartIconLinkProps) {
+export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor, textColor, borderColor, backgroundColor }: FloatingCartIconLinkProps) {
   const isCartEmpty = itemCount === 0;
-  const { resolvedTheme } = useTheme();
-  const contrastTextColor = resolvedTheme === "light" ? "#111111" : textColor;
 
   return (
     <div className="fixed bottom-6 right-4 z-30 flex items-center gap-2">
@@ -24,17 +22,17 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
         type="button"
         aria-label="Scroll to top"
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-card" style={{ borderColor, color: contrastTextColor }}
+        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border" style={{ borderColor, color: textColor, backgroundColor }}
       >
         <ArrowUp className="h-4 w-4" />
       </button>
 
-      <Link href={href} className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-2" style={{ borderColor: accentColor, color: contrastTextColor }}>
+      <Link href={href} className="inline-flex items-center gap-2 rounded-full border px-3 py-2" style={{ borderColor: accentColor, color: textColor, backgroundColor }}>
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: accentColor, color: "#16130A" }}>
           <ShoppingCart className="h-4 w-4" />
         </span>
         {isCartEmpty ? (
-          <span className="text-sm font-medium text-muted-foreground">0 ₽ / 0</span>
+          <span className="text-sm font-medium" style={{ color: textColor }}>0 ₽ / 0</span>
         ) : (
           <>
             <span className="text-sm font-medium">{totalPrice.toLocaleString("ru-RU")} ₽</span>
