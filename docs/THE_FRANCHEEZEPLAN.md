@@ -1130,6 +1130,63 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - `/franchize/vip-bike/cart`, `/franchize/vip-bike/order/demo-order`, and item modal controls show visible focus states without falling back to global theme defaults.
   - Interaction-state changes are visual-only and do not alter booking/cart logic.
 
+### T26 — Checkout micro-delight pass (readiness meter + vibe badge)
+- status: `done`
+- updated_at: `2026-02-22T04:39:40Z`
+- owner: `codex`
+- notes: Added compact checkout readiness meter (cart/contact/consent) with accent badge (`N/3` -> `Готово ✨`) in order sidebar; visual-only micro-delight with no submit/cart logic changes.
+- next_step: Start T27 for optional animated empty-state CTA pulse + post-payment celebration cues if operator wants one more vibe layer.
+- risks: Sidebar now contains one extra compact module; if future widgets are added, spacing should be rebalanced on narrow devices.
+- dependencies: T25
+- deliverables:
+  - `app/franchize/components/OrderPageClient.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add compact milestone meter (`cart/contact/consent`) to sidebar summary.
+  2. Add small status badge (`N/3` -> `Готово ✨`) with crew-accent-based contrast.
+  3. Keep behavior visual-only with no submit/cart logic changes.
+- acceptance criteria:
+  - `/franchize/vip-bike/order/demo-order` shows progress meter reflecting completion state before submit.
+  - Badge/readiness chips stay readable in dark/light crew palettes.
+
+### T27 — Checkout copilot expansion (blockers + guided next action)
+- status: `done`
+- updated_at: `2026-02-22T04:47:09Z`
+- owner: `codex`
+- notes: Expanded order sidebar into a larger copilot module: readiness progress bar, active blockers list, and guided “next action” jump to the first fixable missing field.
+- next_step: Start T28 for post-submit celebratory layer + success-state continuity if operator wants an even larger narrative pass.
+- risks: Sidebar density increased; future additions should keep typography compact and avoid pushing totals below fold on short viewports.
+- dependencies: T26
+- deliverables:
+  - `app/franchize/components/OrderPageClient.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add readiness percentage bar tied to milestone completion.
+  2. Add blocker inventory sourced from real form/cart/telegram state.
+  3. Add guided next-action button that focuses first unresolved field.
+- acceptance criteria:
+  - `/franchize/vip-bike/order/demo-order` sidebar shows both progress and blocker state with clear next-step guidance.
+  - Guided action focuses the relevant unresolved field without changing checkout logic.
+
+### T28 — Franchize launch cockpit (distilled strategy -> execution panel)
+- status: `done`
+- updated_at: `2026-02-22T04:55:32Z`
+- owner: `codex`
+- notes: Built a new high-impact launch cockpit inside `/franchize/create`: readiness scoring, launch-check matrix, blockers, and canonical execution-surface jump links derived from franchize docs/runbook priorities.
+- next_step: Start T29 for cross-route QA automation from the same cockpit (one-click smoke + screenshot checklist) if operator wants next-level ops tooling.
+- risks: Cockpit metrics are heuristic and form-driven; future iteration can connect live route health probes and persisted QA snapshots.
+- dependencies: T27
+- deliverables:
+  - `app/franchize/create/CreateFranchizeForm.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add dedicated `Launch cockpit` stage to create form navigation.
+  2. Compute readiness score from core franchize launch constraints (identity/contacts/map/routes/catalog/contrast).
+  3. Render blocker-aware check cards and canonical route jump links for operator execution flow.
+- acceptance criteria:
+  - `/franchize/create` exposes a separate cockpit surface with launch score + blockers, not tied to order-page micro-polish.
+  - Cockpit provides immediate navigation to slug-scoped execution routes.
+
 
 ---
 
@@ -1170,6 +1227,27 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+### 2026-02-22 — T28 completion (launch cockpit inside franchize create)
+- Shifted focus away from order-page micropolish and shipped a broader operator capability: a dedicated `Launch cockpit` stage in `/franchize/create`.
+- Added readiness score engine that distills core rollout constraints into 6 checks (identity, contacts, map kit, canonical routes, catalog readiness, contrast).
+- Added blocker-oriented checklist cards with hints plus quick jump links to canonical `/franchize/{slug}` execution surfaces.
+- This pass translates dispersed runbook ideas into one operational panel for faster franchise sandbox launch decisions.
+- Next beat: T29 can wire this cockpit to automated QA smoke + screenshot evidence generation.
+
+### 2026-02-22 — T27 completion (checkout copilot expansion)
+- Upgraded the order sidebar from tiny status chip to a larger `Checkout copilot` module with readiness %, blocker inventory, and guided UX messaging.
+- Added dynamic blocker detection for cart/contact/consent and Telegram Stars context, so users can see exactly what blocks submission.
+- Added next-action helper button that focuses the first unresolved field (`recipient`, `phone`, `time`, `consent`) for faster completion.
+- Kept the whole pass visual/assistive only: checkout payload creation and submit permissions remain unchanged.
+- Next beat: T28 can add post-submit delight continuity so success feels as polished as pre-submit guidance.
+
+### 2026-02-22 — T26 completion (checkout micro-delight readiness meter)
+- Added a compact `Checkout vibe` meter in order sidebar with three milestones (cart/contact/consent) so readiness is visible before submit.
+- Added accent badge that transitions from progress fraction (`N/3`) to `Готово ✨` once all milestones are complete.
+- Kept change visual-only: submit eligibility, payment flow, and cart totals remain unchanged.
+- Captured updated mobile screenshot on `/franchize/vip-bike/order/demo-order` after applying the sidebar polish.
+- Next beat: optional T27 can add tiny celebratory motion states after successful submit for extra delight.
 
 
 ### 2026-02-22 — T25 completion (one-go interaction-state styling sweep)

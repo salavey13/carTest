@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
@@ -70,6 +70,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const [promo, setPromo] = useState("");
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   const [consent, setConsent] = useState(false);
+  const recipientRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const timeRef = useRef<HTMLInputElement>(null);
+  const consentRef = useRef<HTMLInputElement>(null);
   const surface = crewPaletteForSurface(crew.theme);
   const fieldStyle = {
     borderColor: crew.theme.palette.borderSoft,
@@ -91,6 +95,28 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const requiresTelegram = payment === "telegram_xtr";
   const hasTelegramUser = Boolean(user?.id);
   const canSubmit = isValidForm && !isCartEmpty && (!requiresTelegram || hasTelegramUser);
+  const checkoutMilestones = useMemo(
+    () => [
+      { id: "cart", label: "Байк выбран", done: !isCartEmpty },
+      { id: "contact", label: "Контакт заполнен", done: recipient.trim().length > 1 && phone.trim().length > 5 && time.trim().length > 0 },
+      { id: "consent", label: "Условия подтверждены", done: consent },
+    ],
+    [consent, isCartEmpty, phone, recipient, time],
+  );
+  const completedMilestones = checkoutMilestones.filter((step) => step.done).length;
+  const readinessPercent = Math.round((completedMilestones / checkoutMilestones.length) * 100);
+  const checkoutBlockers = useMemo(
+    () => [
+      { id: "cart", label: "Добавьте хотя бы один байк в корзину", active: isCartEmpty },
+      { id: "recipient", label: "Укажите имя получателя", active: recipient.trim().length <= 1 },
+      { id: "phone", label: "Добавьте контактный номер", active: phone.trim().length <= 5 },
+      { id: "time", label: "Выберите удобное время", active: time.trim().length === 0 },
+      { id: "consent", label: "Подтвердите условия аренды", active: !consent },
+      { id: "telegram", label: "Для Stars откройте страницу через Telegram WebApp", active: requiresTelegram && !hasTelegramUser },
+    ].filter((item) => item.active),
+    [consent, hasTelegramUser, isCartEmpty, phone, recipient, requiresTelegram, time],
+  );
+  const nextAction = checkoutBlockers[0];
 
   const submitPayload = useMemo<CheckoutPayload>(
     () => ({
@@ -178,6 +204,24 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     });
   };
 
+  const focusBlockerControl = (blockerId: string) => {
+    if (blockerId === "recipient") {
+      recipientRef.current?.focus();
+      return;
+    }
+    if (blockerId === "phone") {
+      phoneRef.current?.focus();
+      return;
+    }
+    if (blockerId === "time") {
+      timeRef.current?.focus();
+      return;
+    }
+    if (blockerId === "consent") {
+      consentRef.current?.focus();
+    }
+  };
+
   return (
     <section className="mx-auto w-full max-w-4xl px-4 py-6">
       <p className="text-xs uppercase tracking-[0.2em]" style={{ color: crew.theme.palette.accentMain }}>
@@ -228,9 +272,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <div className="rounded-2xl border p-4" style={surface.card}>
             <p className="text-sm font-medium">Данные получателя</p>
             <div className="mt-3 space-y-3">
-              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Имя и фамилия" value={recipient} onChange={(e) => setRecipient(e.target.value)} />
-              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Телефон" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Удобное время" value={time} onChange={(e) => setTime(e.target.value)} />
+              <input ref={recipientRef} className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Имя и фамилия" value={recipient} onChange={(e) => setRecipient(e.target.value)} />
+              <input ref={phoneRef} className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Телефон" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input ref={timeRef} className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Удобное время" value={time} onChange={(e) => setTime(e.target.value)} />
               <textarea className="min-h-20 w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Комментарий к заказу" value={comment} onChange={(e) => setComment(e.target.value)} />
             </div>
           </div>
@@ -297,13 +341,91 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           </div>
 
           <label className="flex items-start gap-2 rounded-xl border p-3 text-sm" style={surface.card}>
-            <input type="checkbox" className="mt-0.5" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <input ref={consentRef} type="checkbox" className="mt-0.5" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span>Согласен с условиями аренды и обработкой персональных данных.</span>
           </label>
         </div>
 
         <aside className="h-fit rounded-2xl border p-4" style={surface.card}>
           <p className="text-sm" style={surface.mutedText}>Заказ #{orderId}</p>
+          <div className="mt-3 rounded-xl border px-3 py-2" style={{ ...surface.subtleCard, borderColor: crew.theme.palette.borderSoft }}>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs uppercase tracking-[0.18em]" style={surface.mutedText}>Checkout vibe</p>
+              <span
+                className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                style={{
+                  color: completedMilestones === checkoutMilestones.length ? crew.theme.palette.accentTextOn : crew.theme.palette.accentMain,
+                  backgroundColor:
+                    completedMilestones === checkoutMilestones.length
+                      ? crew.theme.palette.accentMain
+                      : `${crew.theme.palette.accentMain}1f`,
+                }}
+              >
+                {completedMilestones === checkoutMilestones.length ? "Готово ✨" : `${completedMilestones}/${checkoutMilestones.length}`}
+              </span>
+            </div>
+            <ul className="mt-2 space-y-1.5 text-xs">
+              {checkoutMilestones.map((step) => (
+                <li key={step.id} className="flex items-center gap-2" style={{ color: step.done ? crew.theme.palette.textPrimary : crew.theme.palette.textSecondary }}>
+                  <span
+                    className="inline-flex h-4 w-4 items-center justify-center rounded-full border text-[10px]"
+                    style={{
+                      borderColor: step.done ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
+                      color: step.done ? crew.theme.palette.accentMain : crew.theme.palette.textMuted,
+                    }}
+                  >
+                    {step.done ? "✓" : "•"}
+                  </span>
+                  <span>{step.label}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: `${crew.theme.palette.borderSoft}80` }}>
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${readinessPercent}%`,
+                  background: `linear-gradient(90deg, ${crew.theme.palette.accentMain} 0%, ${crew.theme.palette.accentMainHover} 100%)`,
+                }}
+              />
+            </div>
+            <p className="mt-2 text-[11px]" style={surface.mutedText}>Готовность к подтверждению: {readinessPercent}%</p>
+          </div>
+
+          <div className="mt-3 rounded-xl border p-3" style={{ ...surface.subtleCard, borderColor: crew.theme.palette.borderSoft }}>
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: crew.theme.palette.accentMain }}>Checkout copilot</p>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `${crew.theme.palette.accentMain}1f`, color: crew.theme.palette.accentMain }}>
+                {checkoutBlockers.length === 0 ? "ready" : `${checkoutBlockers.length} blockers`}
+              </span>
+            </div>
+            {checkoutBlockers.length === 0 ? (
+              <p className="mt-2 text-xs" style={{ color: crew.theme.palette.textSecondary }}>
+                Всё собрано. Проверьте способ оплаты и жмите подтверждение 🚀
+              </p>
+            ) : (
+              <ul className="mt-2 space-y-1.5 text-xs">
+                {checkoutBlockers.map((blocker) => (
+                  <li key={blocker.id} className="flex items-center gap-2" style={{ color: crew.theme.palette.textSecondary }}>
+                    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px]" style={{ backgroundColor: `${crew.theme.palette.accentMain}1f`, color: crew.theme.palette.accentMain }}>
+                      !
+                    </span>
+                    <span>{blocker.label}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {nextAction && ["recipient", "phone", "time", "consent"].includes(nextAction.id) ? (
+              <button
+                type="button"
+                onClick={() => focusBlockerControl(nextAction.id)}
+                className="mt-3 w-full rounded-lg border px-3 py-2 text-xs font-medium transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                style={{ borderColor: crew.theme.palette.accentMain, color: crew.theme.palette.accentMain, ...focusRingOutlineStyle(crew.theme) }}
+              >
+                Исправить следующий шаг
+              </button>
+            ) : null}
+          </div>
 
           {isCartEmpty ? (
             <div className="mt-3 rounded-xl border border-dashed p-3 text-sm" style={surface.subtleCard}>
