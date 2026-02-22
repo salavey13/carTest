@@ -53,6 +53,28 @@ export function crewPaletteForSurface(theme: FranchizeTheme) {
   };
 }
 
+export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: number) {
+  const palette = theme.palette;
+  const variants = [
+    {
+      borderColor: palette.borderSoft,
+      backgroundColor: palette.bgCard,
+    },
+    {
+      borderColor: withAlpha(palette.accentMain, 0.35),
+      backgroundImage: `linear-gradient(to bottom, ${withAlpha(palette.bgCard, 0.96)}, ${theme.palette.bgBase})`,
+      boxShadow: `0 12px 28px ${withAlpha(palette.accentMain, 0.08)}`,
+    },
+    {
+      borderColor: palette.borderSoft,
+      backgroundColor: palette.bgCard,
+      boxShadow: `0 0 0 1px ${withAlpha(palette.accentMain, 0.12)}, 0 16px 26px ${withAlpha("#000000", 0.45)}`,
+    },
+  ] as const;
+
+  return variants[Math.abs(variantIndex) % variants.length];
+}
+
 
 export function floatingCartOverlayBackground(theme: FranchizeTheme) {
   const alpha = theme.mode === "light" ? 0.9 : 0.94;

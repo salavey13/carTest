@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import { toCategoryId } from "../lib/navigation";
-import { crewPaletteForSurface } from "../lib/theme";
+import { catalogCardVariantStyles, crewPaletteForSurface } from "../lib/theme";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { ItemModal } from "../modals/Item";
@@ -21,12 +21,6 @@ const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
   const wbItems = groups.filter((group) => group.category.toLowerCase().includes("wbitem"));
   return [...regular, ...wbItems];
 };
-
-const cardVariants = [
-  "border border-border bg-card",
-  "border border-amber-500/35 bg-gradient-to-b from-card to-background shadow-[0_12px_28px_rgba(217,154,0,0.08)]",
-  "border border-border bg-card shadow-[0_0_0_1px_rgba(217,154,0,0.12),0_16px_26px_rgba(0,0,0,0.45)]",
-] as const;
 
 export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const surface = crewPaletteForSurface(crew.theme);
@@ -136,7 +130,12 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                 </h2>
                 <div className="grid grid-cols-2 gap-3">
                   {group.items.map((item) => (
-                    <article key={item.id} data-catalog-item="true" className={`group overflow-hidden rounded-2xl ${cardVariants[Math.abs(item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)) % cardVariants.length]}`}>
+                    <article
+                      key={item.id}
+                      data-catalog-item="true"
+                      className="group overflow-hidden rounded-2xl border"
+                      style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
+                    >
                       <button type="button" className="block w-full text-left" onClick={() => openItem(item)}>
                         <div className="relative h-28 w-full">
                           {item.imageUrl ? (
