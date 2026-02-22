@@ -1065,6 +1065,28 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - `/franchize/vip-bike/order/demo-order` reads correctly in themed mode without global utility token dependence on major order sections.
   - contacts map placeholder/frame colors inherit crew palette when theme is provided.
 
+
+### T23 — Catalog tile token isolation (remove residual utility card variants)
+- status: `done`
+- updated_at: `2026-02-22T04:08:20Z`
+- owner: `codex`
+- notes: Replaced remaining `bg-card/from-card/to-background` tile variant classes with semantic style helpers bound to crew theme palette, and moved `/franchize/[slug]` shell off global `bg-background/text-foreground` tokens.
+- next_step: Start T24 for optional interaction polish (focus/hover contrast parity) if additional UI tuning is requested.
+- risks: Variant style parity still depends on palette contrast quality in crew metadata; very low-contrast custom palettes may need per-crew tuning.
+- dependencies: T22
+- deliverables:
+  - `app/franchize/lib/theme.ts`
+  - `app/franchize/components/CatalogClient.tsx`
+  - `app/franchize/[slug]/page.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add catalog card variant style resolver in theme lib using palette-driven border/background/shadow values.
+  2. Replace catalog tile utility variant class array with resolver-backed inline styles.
+  3. Remove global theme utility shell classes from `/franchize/[slug]` root and use `crewPaletteForSurface(theme).page`.
+- acceptance criteria:
+  - No remaining `bg-card/from-card/to-background` utility variant usage in franchize catalog cards.
+  - `/franchize/vip-bike` page shell uses crew theme page tokens instead of global background/text utility classes.
+
 ---
 
 ## 6) Task template for future extension
@@ -1104,6 +1126,13 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+
+### 2026-02-22 — T23 completion (catalog tile token isolation)
+- Added `catalogCardVariantStyles(theme, variantIndex)` helper so card variant borders/backgrounds/shadows are fully palette-driven.
+- Replaced catalog card utility class variants with semantic style resolver usage in `CatalogClient`.
+- Updated `/franchize/[slug]` page shell to use `crewPaletteForSurface(crew.theme).page` instead of global `bg-background/text-foreground` utility classes.
+- Next beat: optional T24 can target focus-ring/hover-state parity checks for contrast in extreme custom palettes.
 
 
 ### 2026-02-22 — T22 completion (order flow token parity + contacts map bridge)
