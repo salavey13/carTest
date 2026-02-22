@@ -1130,6 +1130,25 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - `/franchize/vip-bike/cart`, `/franchize/vip-bike/order/demo-order`, and item modal controls show visible focus states without falling back to global theme defaults.
   - Interaction-state changes are visual-only and do not alter booking/cart logic.
 
+### T26 — Checkout micro-delight pass (readiness meter + vibe badge)
+- status: `done`
+- updated_at: `2026-02-22T04:39:40Z`
+- owner: `codex`
+- notes: Added compact checkout readiness meter (cart/contact/consent) with accent badge (`N/3` -> `Готово ✨`) in order sidebar; visual-only micro-delight with no submit/cart logic changes.
+- next_step: Start T27 for optional animated empty-state CTA pulse + post-payment celebration cues if operator wants one more vibe layer.
+- risks: Sidebar now contains one extra compact module; if future widgets are added, spacing should be rebalanced on narrow devices.
+- dependencies: T25
+- deliverables:
+  - `app/franchize/components/OrderPageClient.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add compact milestone meter (`cart/contact/consent`) to sidebar summary.
+  2. Add small status badge (`N/3` -> `Готово ✨`) with crew-accent-based contrast.
+  3. Keep behavior visual-only with no submit/cart logic changes.
+- acceptance criteria:
+  - `/franchize/vip-bike/order/demo-order` shows progress meter reflecting completion state before submit.
+  - Badge/readiness chips stay readable in dark/light crew palettes.
+
 
 ---
 
@@ -1170,6 +1189,13 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+### 2026-02-22 — T26 completion (checkout micro-delight readiness meter)
+- Added a compact `Checkout vibe` meter in order sidebar with three milestones (cart/contact/consent) so readiness is visible before submit.
+- Added accent badge that transitions from progress fraction (`N/3`) to `Готово ✨` once all milestones are complete.
+- Kept change visual-only: submit eligibility, payment flow, and cart totals remain unchanged.
+- Captured updated mobile screenshot on `/franchize/vip-bike/order/demo-order` after applying the sidebar polish.
+- Next beat: optional T27 can add tiny celebratory motion states after successful submit for extra delight.
 
 
 ### 2026-02-22 — T25 completion (one-go interaction-state styling sweep)
