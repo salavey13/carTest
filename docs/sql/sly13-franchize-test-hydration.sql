@@ -133,7 +133,11 @@ set
           'showTwoColumnsMobile', true,
           'useModalDetails', true,
           'promoBanners', jsonb_build_array(
-            jsonb_build_object('id', 'sly13-focus', 'title', 'Код FOCUS13', 'subtitle', 'Скидка на первый разбор', 'code', 'FOCUS13')
+            jsonb_build_object('id', 'sly13-focus', 'title', 'Код FOCUS13 на длинный deep-dive разбор в стиле cybervibe roadmap session', 'subtitle', 'Скидка на первый разбор', 'code', 'FOCUS13', 'activeFrom', '2026-02-01', 'activeTo', '2026-12-31', 'priority', 85, 'ctaLabel', 'Забрать бонус')
+          ),
+          'adCards', jsonb_build_array(
+            jsonb_build_object('id', 'helmet-upgrade', 'title', 'PRO экипировка', 'subtitle', 'Добавь комплект защиты к аренде', 'href', '', 'imageUrl', '', 'badge', 'Safety', 'activeFrom', '2026-02-01', 'activeTo', '2026-12-31', 'priority', 70, 'ctaLabel', 'Смотреть детали'),
+            jsonb_build_object('id', 'photo-ride', 'title', 'Photo ride add-on', 'subtitle', 'Контент-съёмка + маршрут от куратора', 'href', '/franchize/{slug}/contacts', 'imageUrl', '', 'badge', 'Boost', 'activeFrom', '2026-02-01', 'activeTo', '2026-12-31', 'priority', 60, 'ctaLabel', 'Открыть')
           ),
           'floatingCart', jsonb_build_object('showOn', jsonb_build_array('catalog', 'about', 'contacts', 'order'), 'showScrollTopButton', true)
         ),
@@ -142,7 +146,7 @@ set
           'promoPlaceholder', 'Введите код/реф',
           'deliveryModes', jsonb_build_array('online', 'hybrid'),
           'defaultMode', 'online',
-          'paymentOptions', jsonb_build_array('xtr', 'card_online', 'sbp'),
+          'paymentOptions', jsonb_build_array('telegram_xtr', 'card', 'sbp', 'cash'),
           'consentText', 'Подтверждаю согласие на обработку данных и условия предоставления услуги.'
         )
       )

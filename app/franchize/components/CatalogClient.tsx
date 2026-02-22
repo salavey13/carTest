@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toCategoryId } from "../lib/navigation";
 import { catalogCardVariantStyles, crewPaletteForSurface, interactionRingStyle } from "../lib/theme";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
@@ -41,18 +41,97 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const [clearFocused, setClearFocused] = useState(false);
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilterKey>("all");
+  const [campaignIndex, setCampaignIndex] = useState(0);
 
   const promoModules = useMemo(() => {
-    if (crew.catalog.tickerItems.length === 0) {
-      return [];
+    const now = Date.now();
+    const parseDate = (value: string) => {
+      if (!value) return Number.NaN;
+      const ts = Date.parse(value);
+      return Number.isNaN(ts) ? Number.NaN : ts;
+    };
+
+    const campaignPool = [
+      ...(crew.catalog.promoBanners ?? []).map((item, index) => ({
+        id: `${item.id}-${index}` ,
+        title: item.title,
+        subtitle: item.subtitle,
+        href: item.href,
+        imageUrl: item.imageUrl,
+        badge: item.code || "Promo",
+        priority: item.priority ?? 50,
+        activeFrom: item.activeFrom ?? "",
+        activeTo: item.activeTo ?? "",
+        ctaLabel: item.ctaLabel || "Открыть",
+      })),
+      ...(crew.catalog.adCards ?? []).map((item, index) => ({
+        id: `${item.id}-${index}` ,
+        title: item.title,
+        subtitle: item.subtitle,
+        href: item.href,
+        imageUrl: item.imageUrl,
+        badge: item.badge || "Ad",
+        priority: item.priority ?? 40,
+        activeFrom: item.activeFrom ?? "",
+        activeTo: item.activeTo ?? "",
+        ctaLabel: item.ctaLabel || "Подробнее",
+      })),
+    ];
+
+    const activeCampaigns = campaignPool
+      .filter((item) => item.title.trim().length > 0)
+      .filter((item) => {
+        const fromTs = parseDate(item.activeFrom);
+        const toTs = parseDate(item.activeTo);
+        const afterFrom = Number.isNaN(fromTs) ? true : now >= fromTs;
+        const beforeTo = Number.isNaN(toTs) ? true : now <= toTs;
+        return afterFrom && beforeTo;
+      })
+      .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+
+    if (activeCampaigns.length > 0) {
+      return activeCampaigns.slice(0, 5).map((item) => ({
+        ...item,
+        title: item.title.length > 84 ? `${item.title.slice(0, 81)}...` : item.title,
+        href: item.href?.trim() || `/franchize/${crew.slug || slug}#catalog-sections`,
+      }));
     }
 
     return crew.catalog.tickerItems.slice(0, 3).map((item, index) => ({
       id: `${item.id}-${index}`,
       title: item.text,
-      href: item.href,
+      subtitle: "",
+      href: item.href?.trim() || `/franchize/${crew.slug || slug}#catalog-sections`,
+      imageUrl: "",
+      badge: "Promo",
+      priority: 0,
+      activeFrom: "",
+      activeTo: "",
+      ctaLabel: "Открыть",
     }));
-  }, [crew.catalog.tickerItems]);
+  }, [crew.catalog.adCards, crew.catalog.promoBanners, crew.catalog.tickerItems, crew.slug, slug]);
+
+  useEffect(() => {
+    if (promoModules.length <= 3) {
+      setCampaignIndex(0);
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setCampaignIndex((prev) => (prev + 1) % promoModules.length);
+    }, 4500);
+
+    return () => window.clearInterval(timer);
+  }, [promoModules]);
+
+  const visiblePromoModules = useMemo(() => {
+    if (promoModules.length <= 3) return promoModules;
+    const windowed = [];
+    for (let i = 0; i < 3; i += 1) {
+      windowed.push(promoModules[(campaignIndex + i) % promoModules.length]);
+    }
+    return windowed;
+  }, [campaignIndex, promoModules]);
 
   const orderedCategories = useMemo(
     () => Array.from(new Set([...crew.catalog.categories, ...items.map((item) => item.category).filter(Boolean)])),
@@ -200,9 +279,10 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
 
         {promoModules.length > 0 && (
           <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {promoModules.map((module) => (
+            {visiblePromoModules.map((module) => (
               <a
                 key={module.id}
+                title={module.title}
                 href={module.href}
                 className="rounded-2xl border p-3 transition hover:opacity-95"
                 style={{
@@ -211,13 +291,16 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                 }}
               >
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: crew.theme.palette.accentMain }}>
-                  Promo
+                  {module.badge}
                 </p>
                 <p className="mt-1 text-sm font-medium leading-5" style={{ color: crew.theme.palette.textPrimary }}>
                   {module.title}
                 </p>
+                {module.subtitle ? (
+                  <p className="mt-1 text-xs" style={{ color: crew.theme.palette.textSecondary }}>{module.subtitle}</p>
+                ) : null}
                 <p className="mt-2 text-xs" style={{ color: crew.theme.palette.textSecondary }}>
-                  Открыть подборку →
+                  {module.ctaLabel} →
                 </p>
               </a>
             ))}

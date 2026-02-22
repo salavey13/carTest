@@ -112,6 +112,8 @@ export interface FranchizeCrewVM {
     categories: string[];
     quickLinks: string[];
     tickerItems: Array<{ id: string; text: string; href: string }>;
+    promoBanners: Array<{ id: string; title: string; subtitle: string; code: string; href: string; imageUrl: string; priority: number; activeFrom: string; activeTo: string; ctaLabel: string }>;
+    adCards: Array<{ id: string; title: string; subtitle: string; href: string; imageUrl: string; badge: string; priority: number; activeFrom: string; activeTo: string; ctaLabel: string }>;
     showcaseGroups: Array<{
       id: string;
       label: string;
@@ -164,8 +166,11 @@ export interface FranchizeConfigInput {
   socialLinksText: string;
   menuLinksText: string;
   categoryOrderText: string;
+  promoBannersText: string;
+  adCardsText: string;
   allowPromo: boolean;
   deliveryModesText: string;
+  paymentOptionsText: string;
   defaultMode: string;
   advancedJson: string;
 }
@@ -224,8 +229,11 @@ const franchizeConfigSchema = z.object({
   socialLinksText: z.string().default("Telegram|https://t.me/oneBikePlsBot"),
   menuLinksText: z.string().default(""),
   categoryOrderText: z.string().default(""),
+  promoBannersText: z.string().default(""),
+  adCardsText: z.string().default(""),
   allowPromo: z.coerce.boolean().default(true),
   deliveryModesText: z.string().default("pickup,delivery"),
+  paymentOptionsText: z.string().default("telegram_xtr,card,sbp,cash"),
   defaultMode: z.string().trim().default("pickup"),
   advancedJson: z.string().default(""),
 });
@@ -268,8 +276,11 @@ const defaultFranchizeConfig: FranchizeConfigInput = {
     "Корзина|/franchize/{slug}/cart",
   ].join("\n"),
   categoryOrderText: "Naked, Supersport, Touring, Neo-retro",
+  promoBannersText: "weekend-boost|Weekend boost|Скидка 10% на выходные|WEEKEND10|/franchize/{slug}#catalog-sections||2026-02-01|2026-12-31|90|Забрать скидку",
+  adCardsText: "safety-kit|Экипировка PRO|Подбор шлема и защиты перед выдачей|/franchize/{slug}/about||Safety|2026-02-01|2026-12-31|70|Смотреть детали",
   allowPromo: true,
   deliveryModesText: "pickup, delivery",
+  paymentOptionsText: "telegram_xtr, card, sbp, cash",
   defaultMode: "pickup",
   advancedJson: "",
 };
@@ -508,6 +519,36 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
             href: readPath(tickerItem, ["href"], `/franchize/${crew.slug ?? safeSlug}`),
           };
         }),
+        promoBanners: readPath(franchize, ["catalog", "promoBanners"], []).map((item: unknown, index: number) => {
+          const banner = (item ?? {}) as UnknownRecord;
+          return {
+            id: readPath(banner, ["id"], `promo-${index + 1}`),
+            title: readPath(banner, ["title"], ""),
+            subtitle: readPath(banner, ["subtitle"], ""),
+            code: readPath(banner, ["code"], ""),
+            href: readPath(banner, ["href"], `/franchize/${crew.slug ?? safeSlug}`),
+            imageUrl: readPath(banner, ["imageUrl"], ""),
+            priority: Number(readPath(banner, ["priority"], 50)),
+            activeFrom: readPath(banner, ["activeFrom"], ""),
+            activeTo: readPath(banner, ["activeTo"], ""),
+            ctaLabel: readPath(banner, ["ctaLabel"], "Открыть"),
+          };
+        }),
+        adCards: readPath(franchize, ["catalog", "adCards"], []).map((item: unknown, index: number) => {
+          const ad = (item ?? {}) as UnknownRecord;
+          return {
+            id: readPath(ad, ["id"], `ad-${index + 1}`),
+            title: readPath(ad, ["title"], ""),
+            subtitle: readPath(ad, ["subtitle"], ""),
+            href: readPath(ad, ["href"], `/franchize/${crew.slug ?? safeSlug}`),
+            imageUrl: readPath(ad, ["imageUrl"], ""),
+            badge: readPath(ad, ["badge"], ""),
+            priority: Number(readPath(ad, ["priority"], 40)),
+            activeFrom: readPath(ad, ["activeFrom"], ""),
+            activeTo: readPath(ad, ["activeTo"], ""),
+            ctaLabel: readPath(ad, ["ctaLabel"], "Подробнее"),
+          };
+        }),
         showcaseGroups,
       },
       footer: {
@@ -550,6 +591,8 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
               : normalizeCatalogOrder(items.map((item) => item.category)),
           quickLinks: hydratedCrew.catalog.quickLinks,
           tickerItems: hydratedCrew.catalog.tickerItems.filter((item) => item.text.trim().length > 0),
+          promoBanners: hydratedCrew.catalog.promoBanners.filter((item) => item.title.trim().length > 0),
+          adCards: hydratedCrew.catalog.adCards.filter((item) => item.title.trim().length > 0),
           showcaseGroups: hydratedCrew.catalog.showcaseGroups,
         },
         footer: hydratedCrew.footer,
@@ -567,6 +610,73 @@ function splitCsv(text: string): string[] {
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function normalizeCampaignHref(href: string, slug: string): string {
+  const clean = href.trim();
+  if (!clean) {
+    return `/franchize/${slug}#catalog-sections`;
+  }
+
+  if (clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("mailto:") || clean.startsWith("tel:")) {
+    return clean;
+  }
+
+  return withSlug(clean, slug);
+}
+
+function trimCampaignTitle(title: string, fallback: string): string {
+  const normalized = title.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return fallback;
+  }
+
+  return normalized.length > 72 ? `${normalized.slice(0, 69)}...` : normalized;
+}
+
+
+function parsePromoBanners(lines: string, slug: string): Array<{ id: string; title: string; subtitle: string; code: string; href: string; imageUrl: string; activeFrom: string; activeTo: string; priority: number; ctaLabel: string }> {
+  return lines
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const [id, title, subtitle, code, href, imageUrl, activeFrom, activeTo, priority, ctaLabel] = line.split("|").map((value) => value.trim());
+      return {
+        id: id || `promo-${index + 1}`,
+        title: trimCampaignTitle(title || "", `Promo ${index + 1}`),
+        subtitle: subtitle || "",
+        code: code || "",
+        href: normalizeCampaignHref(href || "", slug),
+        imageUrl: imageUrl || "",
+        activeFrom: activeFrom || "",
+        activeTo: activeTo || "",
+        priority: Number.isFinite(Number(priority)) ? Number(priority) : 50,
+        ctaLabel: ctaLabel || "Открыть",
+      };
+    });
+}
+
+function parseAdCards(lines: string, slug: string): Array<{ id: string; title: string; subtitle: string; href: string; imageUrl: string; badge: string; activeFrom: string; activeTo: string; priority: number; ctaLabel: string }> {
+  return lines
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const [id, title, subtitle, href, imageUrl, badge, activeFrom, activeTo, priority, ctaLabel] = line.split("|").map((value) => value.trim());
+      return {
+        id: id || `ad-${index + 1}`,
+        title: trimCampaignTitle(title || "", `Ad ${index + 1}`),
+        subtitle: subtitle || "",
+        href: normalizeCampaignHref(href || "", slug),
+        imageUrl: imageUrl || "",
+        badge: badge || "Ad",
+        activeFrom: activeFrom || "",
+        activeTo: activeTo || "",
+        priority: Number.isFinite(Number(priority)) ? Number(priority) : 40,
+        ctaLabel: ctaLabel || "Подробнее",
+      };
+    });
 }
 
 function parseMenuLinks(lines: string, slug: string): Array<{ label: string; href: string }> {
@@ -674,8 +784,43 @@ function toFranchizeConfigInput(crew: UnknownRecord, slug: string): FranchizeCon
       .map((entry) => `${readPath(entry, ["label"], "Link")}|${readPath(entry, ["href"], `/franchize/${slug}`)}`)
       .join("\n"),
     categoryOrderText: readPath(franchize, ["catalog", "groupOrder"], []).join(", "),
+    promoBannersText: readPath(franchize, ["catalog", "promoBanners"], [])
+      .map((entry: unknown, index: number) => {
+        const row = (entry ?? {}) as UnknownRecord;
+        return [
+          readPath(row, ["id"], `promo-${index + 1}`),
+          readPath(row, ["title"], ""),
+          readPath(row, ["subtitle"], ""),
+          readPath(row, ["code"], ""),
+          readPath(row, ["href"], ""),
+          readPath(row, ["imageUrl"], ""),
+          readPath(row, ["activeFrom"], ""),
+          readPath(row, ["activeTo"], ""),
+          String(readPath(row, ["priority"], 50)),
+          readPath(row, ["ctaLabel"], ""),
+        ].join("|");
+      })
+      .join("\n"),
+    adCardsText: readPath(franchize, ["catalog", "adCards"], [])
+      .map((entry: unknown, index: number) => {
+        const row = (entry ?? {}) as UnknownRecord;
+        return [
+          readPath(row, ["id"], `ad-${index + 1}`),
+          readPath(row, ["title"], ""),
+          readPath(row, ["subtitle"], ""),
+          readPath(row, ["href"], ""),
+          readPath(row, ["imageUrl"], ""),
+          readPath(row, ["badge"], ""),
+          readPath(row, ["activeFrom"], ""),
+          readPath(row, ["activeTo"], ""),
+          String(readPath(row, ["priority"], 40)),
+          readPath(row, ["ctaLabel"], ""),
+        ].join("|");
+      })
+      .join("\n"),
     allowPromo: readPath(franchize, ["order", "allowPromo"], true),
     deliveryModesText: readPath(franchize, ["order", "deliveryModes"], ["pickup", "delivery"]).join(", "),
+    paymentOptionsText: readPath(franchize, ["order", "paymentOptions"], ["telegram_xtr", "card", "sbp", "cash"]).join(", "),
     defaultMode: readPath(franchize, ["order", "defaultMode"], "pickup"),
     advancedJson: JSON.stringify(franchize, null, 2),
   };
@@ -828,11 +973,14 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput, actorUser
     catalog: {
       ...(readPath(sourceFranchize, ["catalog"], {}) as UnknownRecord),
       groupOrder: splitCsv(payload.categoryOrderText),
+      promoBanners: parsePromoBanners(payload.promoBannersText, payload.slug),
+      adCards: parseAdCards(payload.adCardsText, payload.slug),
     },
     order: {
       ...(readPath(sourceFranchize, ["order"], {}) as UnknownRecord),
       allowPromo: payload.allowPromo,
       deliveryModes: splitCsv(payload.deliveryModesText),
+      paymentOptions: splitCsv(payload.paymentOptionsText),
       defaultMode: payload.defaultMode,
     },
   };

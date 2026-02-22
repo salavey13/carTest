@@ -37,7 +37,7 @@ const TEMPLATE_PAYLOAD = {
     header: { menuLinks: [] },
     contacts: { phone: "+7 900 000 00 00", telegram: "@oneBikePlsBot", address: "Город / Онлайн", map: { gps: "56.2042,43.7985", imageUrl: "", bounds: { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 } } },
     catalog: { groupOrder: ["Основное", "Дополнительно"] },
-    order: { allowPromo: true, deliveryModes: ["pickup", "delivery"], defaultMode: "pickup" },
+    order: { allowPromo: true, deliveryModes: ["pickup", "delivery"], paymentOptions: ["telegram_xtr", "card", "sbp", "cash"], defaultMode: "pickup" },
   },
 };
 
@@ -124,8 +124,11 @@ export default function CreateFranchizeForm() {
     socialLinksText: "Telegram|https://t.me/oneBikePlsBot",
     menuLinksText: "Каталог|/franchize/{slug}\nО нас|/franchize/{slug}/about\nКонтакты|/franchize/{slug}/contacts\nКорзина|/franchize/{slug}/cart",
     categoryOrderText: "Naked, Supersport, Touring, Neo-retro",
+    promoBannersText: "weekend-boost|Weekend boost|Скидка 10% на выходные|WEEKEND10|/franchize/{slug}#catalog-sections||2026-02-01|2026-12-31|90|Забрать скидку",
+    adCardsText: "safety-kit|Экипировка PRO|Подбор шлема и защиты перед выдачей|/franchize/{slug}/about||Safety|2026-02-01|2026-12-31|70|Смотреть детали",
     allowPromo: true,
     deliveryModesText: "pickup, delivery",
+    paymentOptionsText: "telegram_xtr, card, sbp, cash",
     defaultMode: "pickup",
     advancedJson: "",
   });
@@ -413,7 +416,15 @@ export default function CreateFranchizeForm() {
             <textarea className={`${inputClass} min-h-28`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.menuLinksText} onChange={(e) => updateField("menuLinksText", e.target.value)} />
           </label>
           <label className="text-sm">Категории (CSV)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.categoryOrderText} onChange={(e) => updateField("categoryOrderText", e.target.value)} /></label>
+          <label className="text-sm md:col-span-3">Promo cards (`id|title|subtitle|code|href|imageUrl|activeFrom|activeTo|priority|ctaLabel`)
+            <textarea className={`${inputClass} min-h-24`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.promoBannersText} onChange={(e) => updateField("promoBannersText", e.target.value)} />
+          </label>
+          <label className="text-sm md:col-span-3">Ad cards (`id|title|subtitle|href|imageUrl|badge|activeFrom|activeTo|priority|ctaLabel`)
+            <textarea className={`${inputClass} min-h-24`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.adCardsText} onChange={(e) => updateField("adCardsText", e.target.value)} />
+          </label>
+          <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={form.allowPromo} onChange={(e) => updateField("allowPromo", e.target.checked)} /> Разрешить промокод</label>
           <label className="text-sm">Режимы выдачи (CSV)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.deliveryModesText} onChange={(e) => updateField("deliveryModesText", e.target.value)} /></label>
+          <label className="text-sm">Оплата (CSV: telegram_xtr, card, sbp, cash ...)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.paymentOptionsText} onChange={(e) => updateField("paymentOptionsText", e.target.value)} /></label>
           <label className="text-sm">Режим по умолчанию<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.defaultMode} onChange={(e) => updateField("defaultMode", e.target.value)} /></label>
         </section>
       )}
