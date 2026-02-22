@@ -130,3 +130,9 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** old smoke habit from empty/fallback shell testing persisted across iterations.
 - **Fix/workaround:** use `vip-bike` as default slug for franchize screenshots/smoke unless operator asks otherwise; mirror this in AGENTS + FRANCHEEZEPLAN notes.
 - **Verification:** Playwright screenshots and manual navigation checks executed against `/franchize/vip-bike/...` routes.
+
+## 2026-02-22 — Franchize focus states can disappear after token cleanup
+- **Symptom:** after replacing global token classes with crew palette styles, catalog controls had weak/absent keyboard focus visibility.
+- **Root cause:** removed Tailwind default focus ring utilities without replacing them by palette-aware interaction styles.
+- **Fix/workaround:** add shared `interactionRingStyle(theme)` helper and apply it to search input/CTA and catalog card trigger buttons.
+- **Verification:** `npm run lint -- app/franchize/components/CatalogClient.tsx app/franchize/lib/theme.ts`
