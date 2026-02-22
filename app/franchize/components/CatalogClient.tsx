@@ -15,6 +15,14 @@ interface CatalogClientProps {
   items: CatalogItemVM[];
 }
 
+type QuickFilterKey = "all" | "budget" | "premium" | "newbie";
+
+const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string }> = [
+  { key: "all", label: "Все" },
+  { key: "budget", label: "До 5000" },
+  { key: "premium", label: "Премиум 7000+" },
+  { key: "newbie", label: "Для новичка" },
+];
 
 const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
   const regular = groups.filter((group) => !group.category.toLowerCase().includes("wbitem"));
@@ -30,18 +38,66 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchCtaFocused, setSearchCtaFocused] = useState(false);
+  const [clearFocused, setClearFocused] = useState(false);
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
+  const [quickFilter, setQuickFilter] = useState<QuickFilterKey>("all");
+
+  const promoModules = useMemo(() => {
+    if (crew.catalog.tickerItems.length === 0) {
+      return [];
+    }
+
+    return crew.catalog.tickerItems.slice(0, 3).map((item, index) => ({
+      id: `${item.id}-${index}`,
+      title: item.text,
+      href: item.href,
+    }));
+  }, [crew.catalog.tickerItems]);
 
   const orderedCategories = useMemo(
     () => Array.from(new Set([...crew.catalog.categories, ...items.map((item) => item.category).filter(Boolean)])),
     [crew.catalog.categories, items],
   );
 
-  const filteredItems = useMemo(() => {
-    if (!searchQuery.trim()) return items;
+  const matchesQuickFilter = (item: CatalogItemVM, filter: QuickFilterKey) => {
+    if (filter === "budget") {
+      return item.pricePerDay <= 5000;
+    }
 
+    if (filter === "premium") {
+      return item.pricePerDay >= 7000;
+    }
+
+    if (filter === "newbie") {
+      return /naked|neo|scooter|300|400/i.test(`${item.category} ${item.title}`);
+    }
+
+    return true;
+  };
+
+  const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    return items.filter((item) => [item.title, item.subtitle, item.description, item.category].join(" ").toLowerCase().includes(query));
+
+    return items.filter((item) => {
+      const matchesSearch = !query || [item.title, item.subtitle, item.description, item.category].join(" ").toLowerCase().includes(query);
+      if (!matchesSearch) {
+        return false;
+      }
+      return matchesQuickFilter(item, quickFilter);
+    });
+  }, [items, quickFilter, searchQuery]);
+
+  const quickFilterCounts = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    const searchFiltered = items.filter((item) => !query || [item.title, item.subtitle, item.description, item.category].join(" ").toLowerCase().includes(query));
+
+    return QUICK_FILTERS.reduce<Record<QuickFilterKey, number>>(
+      (acc, filter) => {
+        acc[filter.key] = searchFiltered.filter((item) => matchesQuickFilter(item, filter.key)).length;
+        return acc;
+      },
+      { all: 0, budget: 0, premium: 0, newbie: 0 },
+    );
   }, [items, searchQuery]);
 
   const itemsByCategory = useMemo(() => {
@@ -95,7 +151,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
             placeholder="Введите название байка"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full rounded-full border py-3 pl-5 pr-28 text-sm outline-none transition focus:border-transparent focus:ring-2"
+            className="w-full rounded-full border py-3 pl-5 pr-36 text-sm outline-none transition focus:border-transparent focus:ring-2"
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
             style={{
@@ -106,6 +162,23 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
               ...(searchFocused ? interactionRingStyle(crew.theme) : {}),
             }}
           />
+          {searchQuery.trim().length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute bottom-2 right-24 top-2 rounded-full px-3 text-xs font-medium transition active:scale-95"
+              onFocus={() => setClearFocused(true)}
+              onBlur={() => setClearFocused(false)}
+              style={{
+                backgroundColor: `${crew.theme.palette.bgBase}F0`,
+                color: crew.theme.palette.textSecondary,
+                border: `1px solid ${crew.theme.palette.borderSoft}`,
+                ...(clearFocused ? interactionRingStyle(crew.theme) : {}),
+              }}
+            >
+              Сброс
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -125,6 +198,66 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
           </button>
         </div>
 
+        {promoModules.length > 0 && (
+          <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {promoModules.map((module) => (
+              <a
+                key={module.id}
+                href={module.href}
+                className="rounded-2xl border p-3 transition hover:opacity-95"
+                style={{
+                  borderColor: crew.theme.palette.borderSoft,
+                  background: `linear-gradient(140deg, ${crew.theme.palette.bgCard}, ${crew.theme.palette.bgBase})`,
+                }}
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: crew.theme.palette.accentMain }}>
+                  Promo
+                </p>
+                <p className="mt-1 text-sm font-medium leading-5" style={{ color: crew.theme.palette.textPrimary }}>
+                  {module.title}
+                </p>
+                <p className="mt-2 text-xs" style={{ color: crew.theme.palette.textSecondary }}>
+                  Открыть подборку →
+                </p>
+              </a>
+            ))}
+          </div>
+        )}
+
+        <div className="mb-5 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+          {QUICK_FILTERS.map((filter) => {
+            const active = quickFilter === filter.key;
+            return (
+              <button
+                key={filter.key}
+                type="button"
+                onClick={() => setQuickFilter(filter.key)}
+                className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium"
+                style={{
+                  borderColor: active ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
+                  color: active ? "#16130A" : crew.theme.palette.textSecondary,
+                  backgroundColor: active ? crew.theme.palette.accentMain : `${crew.theme.palette.bgCard}CC`,
+                }}
+              >
+                {filter.label} · {quickFilterCounts[filter.key]}
+              </button>
+            );
+          })}
+          {(quickFilter !== "all" || searchQuery.trim().length > 0) && (
+            <button
+              type="button"
+              onClick={() => {
+                setQuickFilter("all");
+                setSearchQuery("");
+              }}
+              className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium"
+              style={{ borderColor: crew.theme.palette.borderSoft, color: crew.theme.palette.textSecondary, backgroundColor: `${crew.theme.palette.bgCard}CC` }}
+            >
+              Сбросить всё
+            </button>
+          )}
+        </div>
+
         {items.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-4 text-sm" style={surface.mutedText}>
             Каталог пуст. Добавь позиции типов `bike`, `accessories`, `gear` или `wbitem`, чтобы наполнить витрину.
@@ -136,10 +269,18 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
         ) : (
           <div className="space-y-6">
             {itemsByCategory.map((group) => (
-              <section key={group.category} id={toCategoryId(group.category)} data-category={group.category}>
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em]" style={{ color: crew.theme.palette.accentMain }}>
-                  {group.category}
-                </h2>
+              <section key={group.category} id={toCategoryId(group.category)} data-category={group.category} data-count={group.items.length}>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-semibold uppercase tracking-[0.14em]" style={{ color: crew.theme.palette.accentMain }}>
+                    {group.category}
+                  </h2>
+                  <span
+                    className="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
+                    style={{ borderColor: crew.theme.palette.borderSoft, color: crew.theme.palette.textSecondary }}
+                  >
+                    {group.items.length} шт.
+                  </span>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   {group.items.map((item) => (
                     <article
