@@ -1168,6 +1168,25 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - `/franchize/vip-bike/order/demo-order` sidebar shows both progress and blocker state with clear next-step guidance.
   - Guided action focuses the relevant unresolved field without changing checkout logic.
 
+### T28 — Franchize launch cockpit (distilled strategy -> execution panel)
+- status: `done`
+- updated_at: `2026-02-22T04:55:32Z`
+- owner: `codex`
+- notes: Built a new high-impact launch cockpit inside `/franchize/create`: readiness scoring, launch-check matrix, blockers, and canonical execution-surface jump links derived from franchize docs/runbook priorities.
+- next_step: Start T29 for cross-route QA automation from the same cockpit (one-click smoke + screenshot checklist) if operator wants next-level ops tooling.
+- risks: Cockpit metrics are heuristic and form-driven; future iteration can connect live route health probes and persisted QA snapshots.
+- dependencies: T27
+- deliverables:
+  - `app/franchize/create/CreateFranchizeForm.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add dedicated `Launch cockpit` stage to create form navigation.
+  2. Compute readiness score from core franchize launch constraints (identity/contacts/map/routes/catalog/contrast).
+  3. Render blocker-aware check cards and canonical route jump links for operator execution flow.
+- acceptance criteria:
+  - `/franchize/create` exposes a separate cockpit surface with launch score + blockers, not tied to order-page micro-polish.
+  - Cockpit provides immediate navigation to slug-scoped execution routes.
+
 
 ---
 
@@ -1208,6 +1227,13 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+### 2026-02-22 — T28 completion (launch cockpit inside franchize create)
+- Shifted focus away from order-page micropolish and shipped a broader operator capability: a dedicated `Launch cockpit` stage in `/franchize/create`.
+- Added readiness score engine that distills core rollout constraints into 6 checks (identity, contacts, map kit, canonical routes, catalog readiness, contrast).
+- Added blocker-oriented checklist cards with hints plus quick jump links to canonical `/franchize/{slug}` execution surfaces.
+- This pass translates dispersed runbook ideas into one operational panel for faster franchise sandbox launch decisions.
+- Next beat: T29 can wire this cockpit to automated QA smoke + screenshot evidence generation.
 
 ### 2026-02-22 — T27 completion (checkout copilot expansion)
 - Upgraded the order sidebar from tiny status chip to a larger `Checkout copilot` module with readiness %, blocker inventory, and guided UX messaging.
