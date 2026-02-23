@@ -142,3 +142,15 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** each surface implemented its own control styles with no shared focus-outline primitive.
 - **Fix/workaround:** add `focusRingOutlineStyle(theme)` and reuse across interactive controls; pair with light hover/active transitions for tactile parity.
 - **Verification:** `npx eslint app/franchize/modals/Item.tsx app/franchize/components/CartPageClient.tsx app/franchize/components/OrderPageClient.tsx app/franchize/lib/theme.ts`
+
+## 2026-02-22 — Telegram webview link taps: prefer deterministic navigation on franchize shell
+- **Symptom:** Header/menu/profile/footer links looked tappable but intermittently failed on mobile Telegram webview.
+- **Root cause:** SPA navigation hooks (`router.push` / dropdown `onSelect` timing) could be swallowed around overlays/portals.
+- **Fix/workaround:** use plain anchors or `window.location.assign` for franchize shell critical nav paths; keep modal-close handlers side-effect-only.
+- **Verification:** mobile smoke flow checks menu/profile/cart/back links navigate correctly.
+
+## 2026-02-22 — Cart state mismatch between floating icon and cart page
+- **Symptom:** floating cart indicator increased, but cart page sometimes appeared empty between views.
+- **Root cause:** cart state relied solely on localStorage per-client context and lacked account-level persistence/rehydration.
+- **Fix/workaround:** persist cart per slug to `users.metadata.settings.franchizeCart` and hydrate local state from metadata when local cart is empty.
+- **Verification:** add item, open `/franchize/vip-bike/cart`, reload, and confirm lines persist.

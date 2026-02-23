@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { ChevronRight, MapPin, Phone, Send } from "lucide-react";
 import type { FranchizeCrewVM } from "../actions";
 import { isExternalHref } from "../lib/navigation";
@@ -9,7 +8,7 @@ interface CrewFooterProps {
 
 export function CrewFooter({ crew }: CrewFooterProps) {
   const bg = crew.theme.palette.accentMain;
-  const text = crew.theme.palette.textPrimary;
+  const text = crew.footer.textColor || "#16130A";
   const border = "#b78609";
   const socialLinks = crew.footer.socialLinks.length > 0
     ? crew.footer.socialLinks
@@ -21,7 +20,7 @@ export function CrewFooter({ crew }: CrewFooterProps) {
     <footer className="mt-12" style={{ backgroundColor: bg, color: text }}>
       <div className="mx-auto grid w-full max-w-4xl gap-x-8 gap-y-10 px-4 py-8 md:grid-cols-2">
         <section>
-          <h3 className="text-3xl font-semibold leading-none" style={{ color: crew.theme.palette.textPrimary }}>Контакты</h3>
+          <h3 className="text-3xl font-semibold leading-none" style={{ color: text }}>Контакты</h3>
           <ul className="mt-5 space-y-1 text-base">
             <li className="flex items-center gap-3 border-b py-3" style={{ borderColor: border }}>
               <MapPin className="h-4 w-4" />
@@ -35,7 +34,7 @@ export function CrewFooter({ crew }: CrewFooterProps) {
         </section>
 
         <section>
-          <h3 className="text-3xl font-semibold leading-none" style={{ color: crew.theme.palette.textPrimary }}>Меню</h3>
+          <h3 className="text-3xl font-semibold leading-none" style={{ color: text }}>Меню</h3>
           <ul className="mt-5 space-y-1 text-base">
             {crew.header.menuLinks.map((link) => (
               <li key={`${link.href}-${link.label}`} className="border-b" style={{ borderColor: border }}>
@@ -45,10 +44,10 @@ export function CrewFooter({ crew }: CrewFooterProps) {
                     <span>{link.label}</span>
                   </a>
                 ) : (
-                  <Link href={link.href} className="flex items-center gap-2 py-3">
+                  <a href={link.href} className="flex items-center gap-2 py-3">
                     <ChevronRight className="h-4 w-4" />
                     <span>{link.label}</span>
-                  </Link>
+                  </a>
                 )}
               </li>
             ))}
@@ -56,7 +55,7 @@ export function CrewFooter({ crew }: CrewFooterProps) {
         </section>
 
         <section className="md:col-span-2">
-          <h3 className="text-3xl font-semibold leading-none" style={{ color: crew.theme.palette.textPrimary }}>Онлайн-каналы экипажа</h3>
+          <h3 className="text-3xl font-semibold leading-none" style={{ color: text }}>Онлайн-каналы экипажа</h3>
           <ul className="mt-5 grid gap-1 text-base md:grid-cols-2">
             {socialLinks.map((item) => (
               <li key={`${item.label}-${item.href}`} className="border-b" style={{ borderColor: border }}>

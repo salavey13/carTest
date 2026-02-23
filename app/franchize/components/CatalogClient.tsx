@@ -291,7 +291,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
         </div>
 
         {promoModules.length > 0 && (
-          <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="mb-5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
             {visiblePromoModules.map((module, index) => {
               const isExternal = /^(https?:|mailto:|tel:)/.test(module.href);
 
@@ -300,7 +300,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                   key={module.id}
                   title={module.title}
                   href={module.href}
-                  className="rounded-2xl border p-3 transition hover:opacity-95"
+                  className="w-[85vw] shrink-0 rounded-2xl border p-3 transition hover:opacity-95 sm:w-auto"
                   style={{
                     borderColor: crew.theme.palette.borderSoft,
                     background: promoGradientByIndex(index),
@@ -327,7 +327,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
           </div>
         )}
 
-        <div className="mb-5 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <div className="mb-5 flex gap-2 overflow-x-auto pb-1 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {QUICK_FILTERS.map((filter) => {
             const active = quickFilter === filter.key;
             return (
@@ -422,26 +422,6 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                           <div className="mt-2 flex gap-2">
                             <span className="inline-flex flex-1 items-center justify-center rounded-full px-2 py-2 text-xs font-semibold" style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}>
                               {item.pricePerDay >= 6000 ? "Выбрать" : "Добавить"}
-                            </span>
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              className="rounded-full border px-3 py-2 text-xs font-semibold"
-                              style={{ borderColor: crew.theme.palette.borderSoft, color: crew.theme.palette.textPrimary, backgroundColor: `${crew.theme.palette.bgBase}CC` }}
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                addItem(item.id, { package: "Base", duration: "1 day", perk: "Стандарт" }, 1);
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === " ") {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  addItem(item.id, { package: "Base", duration: "1 day", perk: "Стандарт" }, 1);
-                                }
-                              }}
-                            >
-                              + В корзину
                             </span>
                           </div>
                         </div>

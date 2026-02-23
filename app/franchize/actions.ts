@@ -125,6 +125,7 @@ export interface FranchizeCrewVM {
   };
   footer: {
     socialLinks: Array<{ label: string; href: string }>;
+    textColor: string;
   };
 }
 
@@ -405,6 +406,7 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
   },
   footer: {
     socialLinks: [],
+    textColor: "#16130A",
   },
 });
 
@@ -553,6 +555,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       },
       footer: {
         socialLinks: extractFooterSocialLinks(franchize, readPath(franchize, ["contacts", "telegram"], "")),
+        textColor: readPath(franchize, ["footer", "textColor"], "#16130A"),
       },
     };
 

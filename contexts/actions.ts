@@ -92,3 +92,60 @@ export async function fetchActiveGameAction(userId: string): Promise<ActiveLobby
     return null;
   }
 }
+
+export async function saveUserFranchizeCartAction(
+  userId: string,
+  slug: string,
+  cartState: Record<string, unknown>,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!userId || !slug) {
+    return { ok: false, error: "Missing userId or slug" };
+  }
+
+  try {
+    const { data: existingUser, error: fetchError } = await supabaseAdmin
+      .from("users")
+      .select("metadata")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    const existingMetadata = (existingUser?.metadata && typeof existingUser.metadata === "object")
+      ? (existingUser.metadata as Record<string, unknown>)
+      : {};
+    const existingSettings = (existingMetadata.settings && typeof existingMetadata.settings === "object")
+      ? (existingMetadata.settings as Record<string, unknown>)
+      : {};
+    const existingFranchizeCart = (existingSettings.franchizeCart && typeof existingSettings.franchizeCart === "object")
+      ? (existingSettings.franchizeCart as Record<string, unknown>)
+      : {};
+
+    const nextMetadata: Record<string, unknown> = {
+      ...existingMetadata,
+      settings: {
+        ...existingSettings,
+        franchizeCart: {
+          ...existingFranchizeCart,
+          [slug]: cartState,
+        },
+      },
+    };
+
+    const { error: updateError } = await supabaseAdmin
+      .from("users")
+      .update({ metadata: nextMetadata, updated_at: new Date().toISOString() })
+      .eq("user_id", userId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    return { ok: true };
+  } catch (error) {
+    logger.error(`[saveUserFranchizeCartAction] Failed for user ${userId}, slug ${slug}:`, error);
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
