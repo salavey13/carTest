@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ChevronRight, MapPin, Phone, Send } from "lucide-react";
 import type { FranchizeCrewVM } from "../actions";
 import { isExternalHref } from "../lib/navigation";
@@ -44,10 +45,10 @@ export function CrewFooter({ crew }: CrewFooterProps) {
                     <span>{link.label}</span>
                   </a>
                 ) : (
-                  <a href={link.href} className="flex items-center gap-2 py-3">
+                  <Link href={link.href} className="flex items-center gap-2 py-3">
                     <ChevronRight className="h-4 w-4" />
                     <span>{link.label}</span>
-                  </a>
+                  </Link>
                 )}
               </li>
             ))}

@@ -51,6 +51,7 @@ type CheckoutPayload = {
       package: string;
       duration: string;
       perk: string;
+      auction: string;
     };
   }>;
 };
@@ -443,7 +444,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 <li key={line.lineId} className="flex justify-between gap-2">
                   <span>
                     {line.item?.title ?? "Позиция недоступна"} × {line.qty}
-                    <span className="block text-[11px]" style={surface.mutedText}>{line.options.package} · {line.options.duration} · {line.options.perk}</span>
+                    <span className="block text-[11px]" style={surface.mutedText}>{line.options.package} · {line.options.duration} · {line.options.perk} · {line.options.auction}</span>
                   </span>
                   <span>{line.lineTotal.toLocaleString("ru-RU")} ₽</span>
                 </li>
