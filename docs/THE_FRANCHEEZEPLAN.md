@@ -1451,6 +1451,124 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - risks: Rentals bridge currently embeds existing `/rentals` client surface; future pass may split dedicated franchize-tailored rentals list for lighter payload.
 - dependencies: T45
 
+### T47 — Friend review intake + Pepperolli parity action-plan expansion
+- status: `done`
+- updated_at: `2026-02-23T09:15:00Z`
+- owner: `codex`
+- notes: Logged friend visual-diff praise + extracted high-signal parity deltas into an execution-ready backlog (pills, section headers, card CTA/iconography, floating cart badge overlap, softer borders). Added concrete file-level instructions and acceptance checks to reduce ambiguity before coding.
+- next_step: Execute T48 implementation pass in UI code, then run screenshot smoke on `/franchize/vip-bike`.
+- risks: Minor pixel drift can still occur due to Telegram WebView safe-area quirks and runtime crew palette differences.
+- dependencies: T46
+- deliverables:
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Convert friend review into structured task scope with explicit impacted files/components.
+  2. Preserve architecture constraints (single sticky rail source, crew theme token usage, no route regressions).
+  3. Define measurable acceptance criteria tied to visible UX outcomes.
+  4. Queue a follow-up implementation task with dependency lock to keep strict one-by-one flow.
+- acceptance criteria:
+  - Plan includes actionable, file-scoped implementation steps (not generic prose).
+  - New implementation task is dependency-linked and ready for execution without additional clarification.
+
+### T48 — Pepperolli parity implementation pass (pills/headers/cards/floating cart/borders)
+- status: `todo`
+- updated_at: `-`
+- owner: `unassigned`
+- notes: Apply the friend review UI parity deltas in franchize catalog surfaces while preserving existing modal/cart/order logic and crew-theme token architecture.
+- next_step: Set task `in_progress`, implement listed file changes, then capture screenshot proof on `/franchize/vip-bike`.
+- risks: Over-polishing typography/button heights can reduce content density on smaller Android viewports; validate 2-column card readability after changes.
+- dependencies: T47
+- deliverables:
+  - `app/franchize/components/CrewHeader.tsx`
+  - `app/franchize/components/CatalogClient.tsx`
+  - `app/franchize/components/FloatingCartIconLink.tsx`
+  - `app/franchize/lib/theme.ts`
+- implementation checklist:
+  1. **Category pills (header + quick filters):** switch from outline-dominant style to solid fills (`active=accent`, `inactive=bgCard`) with no border stroke and improved tap-target contrast.
+  2. **Section headers:** promote category titles to large bold white hierarchy (`text-2xl`, tighter tracking), keep count chips muted-solid for quick scan.
+  3. **Card pricing + CTA semantics:** make price accent-colored/bold; add `ShoppingCart` icon to `Добавить` CTA; keep `Выбрать` path for premium/high-ticket entries per existing threshold logic.
+  4. **Floating cart widget:** convert main pill to solid accent surface, force black foreground text, and move quantity into absolute overlapping white badge on top-right corner.
+  5. **Card border softness:** reduce border alpha in `catalogCardVariantStyles` so separation relies on dark-surface contrast + subtle shadow rather than visible strokes.
+  6. **Regression guardrail:** verify no breakage in sticky rail activation, modal open/add flow, and cart totals after style updates.
+- acceptance criteria:
+  - Active/inactive pills visually match Pepperolli bubble behavior (solid fill states, no outlined inactive mode).
+  - Section headers read as primary content anchors (large white uppercase) with muted count pills.
+  - Product cards show accent price and cart-icon CTA without harming text truncation/layout.
+  - Floating cart shows solid yellow pill + overlapping white counter bubble across catalog scroll states.
+  - Card borders appear visually softer than pre-pass baseline while preserving card separation.
+  - Fresh screenshot artifact documents parity pass on `vip-bike` slug.
+
+### T49 — Software-engineering hardening sweep (security/SPA/state/CSS/cart-write load)
+- status: `todo`
+- updated_at: `-`
+- owner: `unassigned`
+- notes: Apply strict engineering pass to remove architectural workarounds discovered in post-review audit: server-only admin key usage, SPA navigation integrity, cart write-throttle strategy, and context/theme maintainability. Keep embedding fallback redesign out-of-scope for this task per operator note.
+- next_step: After T48 visual parity, start with admin-key isolation (security first) and then proceed sequentially through SPA/cart/state/style substeps.
+- risks: Refactors may touch cross-cutting runtime paths (`hooks`, `contexts`, `franchize` navigation). Must preserve Telegram WebApp behavior and legacy routes while removing workaround patterns.
+- dependencies: T48
+- deliverables:
+  - `hooks/useTelegram.ts`
+  - `hooks/supabase.ts`
+  - `hooks/useFranchizeCart.ts`
+  - `app/franchize/components/*` (navigation touchpoints)
+  - `contexts/AppContext.tsx` (or split contexts)
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. **Security first:** eliminate any client import path that can bundle `SUPABASE_SERVICE_ROLE_KEY`; move privileged user-create/update logic to server actions/route handlers only.
+  2. **SPA recovery (critical):** remove full-reload navigation fallbacks (`window.location.assign`, hard `<a>` for internal routes) and restore deterministic Next.js `Link`/router transitions.
+  3. **Root-cause tap fix:** audit z-index/overlay/stopPropagation conflicts in franchize header/menu/footer/modal layers so taps work without sacrificing SPA behavior.
+  4. **Cart DB load guard:** stop high-frequency JSONB writes on every cart micro-change; keep cart local-first and persist on checkout/explicit sync points with bounded write cadence.
+  5. **Style-system cleanup:** reduce inline-style dominance in franchize surfaces by moving palette delivery to CSS variables usable via Tailwind utilities (`bg-[var(--...)]`, `text-[var(--...)]`) so focus/hover/active states remain reliable.
+  6. **Context split plan:** decompose oversized `AppContext` responsibilities into smaller logical providers (`Auth/Cart/Game`) and replace minute polling where possible with event/realtime-driven updates.
+  7. **Theme flash hardening:** bootstrap theme from early server-readable signal (cookie/session hint) to avoid white-flash first paint before async profile/theme sync completes.
+  8. **Micro-optimization rollback:** remove/avoid cargo-cult `React.memo` on trivial icon/text renderers unless profiling proves benefit.
+  9. **AI JSON resilience:** harden franchize AI-JSON parsing/validation so malformed payloads produce inline actionable errors instead of component-breaking crashes.
+  10. **Regression pack:** run focused smoke for Telegram-style navigation, modal/cart actions, and no-white-flash route transitions on `/franchize/vip-bike`.
+- acceptance criteria:
+  - No client-side bundle path can access admin/service-role Supabase credentials.
+  - Internal franchize navigation uses SPA transitions (no forced full reload workaround for same-origin routes).
+  - Cart persistence no longer performs frequent metadata writes per tiny quantity edit.
+  - Interaction-state styles (`hover/focus/active`) remain visible after theme application without inline override conflicts.
+  - Context updates avoid full-app rerenders for unrelated state and remove brittle timer-only dependency for realtime-like UX.
+  - First paint does not flash incorrect light theme before dark theme sync for known dark-pref users.
+  - AI JSON tooling reports precise validation errors without crashing franchize create flow.
+
+### T49.1 — Postpone fake embedding fallback redesign (explicitly deferred)
+- status: `todo`
+- updated_at: `-`
+- owner: `unassigned`
+- notes: Documented deferral: vector-embedding fallback redesign is intentionally excluded from current hardening wave per operator instruction ("don't bother about embeddings generation").
+- next_step: Revisit only when search relevance workstream is scheduled.
+- risks: Search quality may remain degraded in edge-failure mode until dedicated embeddings task is prioritized.
+- dependencies: T49
+- deliverables:
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Keep current scope focused on security + SPA + state reliability.
+  2. Capture explicit defer note in diary to prevent accidental silent scope creep.
+- acceptance criteria:
+  - Plan clearly states embeddings fallback redesign is deferred by instruction.
+
+### T49.2 — AGENTS context diet + archive trigger policy
+- status: `done`
+- updated_at: `2026-02-23T12:20:00Z`
+- owner: `codex`
+- notes: Added explicit memory-system policy in AGENTS so long diary context is loaded on demand only (Telegram/Slack/screenshots/homework triggers), reducing routine prompt bloat while preserving incident memory quality.
+- next_step: Continue with T48 implementation as next product-facing execution task.
+- risks: If trigger list is ignored manually, agents may still over-read diary and lose focus on small UI tasks.
+- dependencies: T47
+- deliverables:
+  - `AGENTS.md`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Keep AGENTS as constitutional rules and move historical depth to diary-on-demand behavior.
+  2. Define concrete trigger categories when diary must be read before coding.
+  3. Preserve existing diary contract (append lessons after meaningful incidents).
+- acceptance criteria:
+  - AGENTS contains explicit rule to skip full diary for routine edits.
+  - AGENTS contains explicit trigger list for mandatory diary reads.
+  - Plan diary records this context-diet update for traceability.
+
 ## 6) Task template for future extension
 
 When adding a new task, copy this block:
@@ -1488,6 +1606,30 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+### 2026-02-23 — AGENTS context diet enabled (archive triggers)
+- Added explicit memory-system policy in `AGENTS.md` so `docs/AGENT_DIARY.md` is no longer treated as default read for every task.
+- Introduced mandatory trigger list for diary reads (Telegram, Slack, screenshot engine, homework pipeline) to keep high-signal lessons accessible without context-window overload.
+- Kept chronology and safety intact: diary remains authoritative archive, but loaded only when relevant.
+- Logged as T49.2 done so plan history stays merge-traceable.
+
+### 2026-02-23 — Architecture commandments added to AGENTS + T49 scope expansion
+- Added a dedicated “Архитектурные заповеди GTC-Daemon” block in `AGENTS.md` to prevent workaround regressions (security boundary, SPA routing oath, z-index/tap root-cause debugging, race-condition discipline, CSS-variable theming, context boundaries).
+- Expanded T49 hardening checklist with additional engineering guardrails from review round 2: theme flash prevention, selective memoization (no cargo-cult `React.memo`), and robust AI JSON validation behavior.
+- Kept operator-requested deferral intact: embeddings fallback redesign remains postponed and out-of-scope for this wave.
+- Preserved ordered flow: T48 remains the immediate executable UI task; T49 remains the architectural hardening pass right after.
+
+### 2026-02-23 — Engineer review intake (architectural risk backlog added)
+- Added a dedicated hardening track after T48 to address root-cause architecture issues surfaced by strict engineering review: admin-key exposure risk, SPA navigation regressions, high-frequency cart metadata writes, CSS inline/tailwind conflicts, and oversized AppContext responsibilities.
+- Marked SPA recovery as critical path and explicitly prioritized replacement of forced full reload navigation with Next.js SPA-safe transitions plus tap-layer root-cause fixes.
+- Captured explicit deferral task for embedding fallback redesign (`T49.1`) per operator instruction to skip that stream for now.
+- Kept sequence deterministic: T48 visual parity remains next, T49 hardening starts immediately after.
+
+### 2026-02-23 — T47 completion (friend review digested into actionable parity backlog)
+- Celebrated the strong baseline feedback first (dark theme, radiuses, layout flow, dynamic theme engine) and treated review as a precision polish input rather than a rewrite request.
+- Converted friend visual-diff notes into deterministic implementation scope with file-level mapping: `CrewHeader`, `CatalogClient`, `FloatingCartIconLink`, and `lib/theme`.
+- Added explicit acceptance criteria for five UI deltas: solid pill states, stronger section hierarchy, accent price + cart icon CTA, overlapping floating badge, and softer card borders.
+- Appended T48 as a strict dependency-locked execution task so next iteration can implement with screenshot-backed verification on `/franchize/vip-bike`.
 
 ### 2026-02-22 — T28 completion (launch cockpit inside franchize create)
 - Shifted focus away from order-page micropolish and shipped a broader operator capability: a dedicated `Launch cockpit` stage in `/franchize/create`.
