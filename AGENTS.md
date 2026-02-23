@@ -55,6 +55,47 @@ When editing features, preserve this progression:
 5. **Maintain “operator UX” quality bar.**
    Fast scanability, clear CTAs, visible status, low-friction actions.
 
+### 3.1) 🧠 Архитектурные заповеди GTC-Daemon (Core Directives)
+
+Use this section as a hard filter against workaround-driven regressions.
+
+#### 🛡️ Security & Server Actions (“Окошко выдачи”)
+- Never let client modules (`"use client"`) import code paths that initialize or use admin/service-role Supabase clients.
+- All privileged DB operations must live behind server boundaries (`"use server"`, route handlers, or server-only utilities).
+- Red flag: any direct or transitive client import of files that reference `SUPABASE_SERVICE_ROLE_KEY`.
+
+#### 🚀 SPA routing oath (Next.js navigation must stay SPA)
+- Do not replace internal Next.js navigation with hard reloads (`<a href>` for internal routes, `window.location.assign`) as a tap-fix workaround.
+- If taps fail in Telegram WebApp, debug root causes first: stacking context (`z-index`), transparent overlays, pointer-events, or `stopPropagation` conflicts.
+- Fix interaction layers; keep `Link`/router transitions for same-origin app routes.
+
+#### ⏳ Latency & race-condition discipline
+- Treat mobile network lag as default reality: requests can return out of order.
+- Avoid high-frequency persistence patterns based only on `setTimeout`/`useEffect` debounce for user-critical counters (cart quantity, etc.).
+- Prefer local-first state for rapid interactions and persist at explicit checkpoints (checkout, explicit save) or through ordered/mutual-exclusion write queues.
+
+#### 🎨 Theme and style-system discipline
+- Avoid overusing inline color styles that suppress `hover/focus/active` behavior.
+- Prefer CSS variables + Tailwind utilities (`bg-[var(--...)]`, `text-[var(--...)]`, `focus:ring-[var(--...)]`) for franchize theming.
+- Validate keyboard/touch interaction states after any theme-token refactor.
+
+#### 🌗 Theme flash prevention (no white flashbang)
+- Don’t rely only on async DB fetch after mount to decide dark/light theme.
+- Keep early theme signal (cookie/server-read bootstrap) so first paint already matches expected palette.
+- Any theme sync hook should preserve first-render visual stability on slow networks.
+
+#### 🧩 State architecture boundaries
+- Avoid one oversized global context that forces app-wide rerenders for unrelated updates.
+- Split contexts by concern (auth/cart/game/runtime), and prefer event/realtime-driven updates over timer-only polling for live data.
+
+#### ⚙️ Performance realism
+- Do not apply `React.memo` blindly to tiny/cheap components.
+- Memoize only when profiling indicates rerender cost is material.
+
+#### 🧱 Input robustness (AI JSON and operator tooling)
+- Treat AI-generated JSON as untrusted input: validate and surface precise parse errors.
+- Never allow malformed JSON to crash the whole form/page; keep validation safe and recoverable.
+
 ---
 
 ## 4) Self-hosting reality (updated, simplified)
@@ -398,6 +439,25 @@ For each hard production lesson (bridge errors, screenshot runtime quirks, callb
 - verification command.
 
 Before starting bridge/homework tasks, quickly reread latest diary entries and apply learned mitigations.
+
+### 📚 Memory system: when to read archives
+
+`docs/AGENT_DIARY.md` is a long-form archive, not default per-task context.
+
+Default rule:
+- Do **not** load the full diary for routine UI/layout/component edits.
+- Keep AGENTS as the compact constitution; use diary as on-demand historical memory.
+
+Mandatory diary-read triggers (read before coding) for tasks involving:
+1. Telegram integrations (WebApp behavior, Markdown parsing, media delivery).
+2. Slack bridge/OAuth/token flows.
+3. Screenshot generation pipelines (Playwright engines, thum.io fallback).
+4. Homework ingestion/solution/storage flows (OCR, Supabase storage, callback delivery).
+
+When trigger fires:
+- read only relevant latest diary entries,
+- apply known mitigations,
+- add a new diary entry after any meaningful new incident/fix.
 
 
 #### 9.4.8) ИЗО assignment solver protocol (image prompt mode)
