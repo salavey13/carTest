@@ -57,18 +57,18 @@ export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: nu
   const palette = theme.palette;
   const variants = [
     {
-      borderColor: palette.borderSoft,
+      borderColor: withAlpha(palette.borderSoft, 0.3),
       backgroundColor: palette.bgCard,
     },
     {
-      borderColor: withAlpha(palette.accentMain, 0.35),
+      borderColor: "transparent",
       backgroundImage: `linear-gradient(to bottom, ${withAlpha(palette.bgCard, 0.96)}, ${theme.palette.bgBase})`,
-      boxShadow: `0 12px 28px ${withAlpha(palette.accentMain, 0.08)}`,
+      boxShadow: `0 8px 24px ${withAlpha(palette.accentMain, 0.05)}`,
     },
     {
-      borderColor: palette.borderSoft,
+      borderColor: "transparent",
       backgroundColor: palette.bgCard,
-      boxShadow: `0 0 0 1px ${withAlpha(palette.accentMain, 0.12)}, 0 16px 26px ${withAlpha("#000000", 0.45)}`,
+      boxShadow: `0 0 0 1px ${withAlpha(palette.accentMain, 0.08)}, 0 12px 20px ${withAlpha("#000000", 0.4)}`,
     },
   ] as const;
 

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { ChevronDown, Palette, Settings, Shield, User } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   DropdownMenu,
@@ -29,17 +30,12 @@ function getInitials(name: string): string {
 }
 
 export function FranchizeProfileButton({ bgColor, textColor, borderColor }: FranchizeProfileButtonProps) {
+  const router = useRouter();
   const { dbUser, user, userCrewInfo, isAdmin } = useAppContext();
   const effectiveUser = dbUser || user;
   const displayName = effectiveUser?.username || effectiveUser?.full_name || effectiveUser?.first_name || "Operator";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = typeof isAdmin === "function" ? isAdmin() : false;
-
-  const navigateHard = (href: string) => {
-    if (typeof window !== "undefined") {
-      window.location.assign(href);
-    }
-  };
 
   return (
     <DropdownMenu>
@@ -69,7 +65,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
         <DropdownMenuItem
           onSelect={(event) => {
             event.preventDefault();
-            navigateHard("/profile");
+            router.push("/profile");
           }}
         >
           <User className="h-4 w-4" />
@@ -78,7 +74,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
         <DropdownMenuItem
           onSelect={(event) => {
             event.preventDefault();
-            navigateHard("/settings");
+            router.push("/settings");
           }}
         >
           <Settings className="h-4 w-4" />
@@ -87,7 +83,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
         <DropdownMenuItem
           onSelect={(event) => {
             event.preventDefault();
-            navigateHard("/franchize/create");
+            router.push("/franchize/create");
           }}
         >
           <Palette className="h-4 w-4" />
@@ -98,7 +94,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
           <DropdownMenuItem
             onSelect={(event) => {
               event.preventDefault();
-              navigateHard(`/crews/${userCrewInfo.slug}`);
+              router.push(`/crews/${userCrewInfo.slug}`);
             }}
           >
             <Palette className="h-4 w-4" />
@@ -112,7 +108,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
             <DropdownMenuItem
               onSelect={(event) => {
                 event.preventDefault();
-                navigateHard("/admin");
+                router.push("/admin");
               }}
             >
               <Shield className="h-4 w-4" />

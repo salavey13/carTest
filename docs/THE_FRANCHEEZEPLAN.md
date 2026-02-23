@@ -1471,12 +1471,12 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - New implementation task is dependency-linked and ready for execution without additional clarification.
 
 ### T48 — Pepperolli parity implementation pass (pills/headers/cards/floating cart/borders)
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Apply the friend review UI parity deltas in franchize catalog surfaces while preserving existing modal/cart/order logic and crew-theme token architecture.
-- next_step: Set task `in_progress`, implement listed file changes, then capture screenshot proof on `/franchize/vip-bike`.
-- risks: Over-polishing typography/button heights can reduce content density on smaller Android viewports; validate 2-column card readability after changes.
+- status: `done`
+- updated_at: `2026-02-23T10:35:00Z`
+- owner: `codex`
+- notes: Implemented parity polish across franchize catalog surfaces: solid-filled category/quick-filter pills, stronger section title hierarchy, accent price emphasis, cart-icon CTA for Добавить, softened card borders/shadows, and floating cart pill with overlapping white quantity badge.
+- next_step: Start T49 engineering hardening sweep (security boundary first, then SPA/state/style tasks in order).
+- risks: Slight text-density increase from larger section headers; validate on smallest Android viewport during T49 smoke pass.
 - dependencies: T47
 - deliverables:
   - `app/franchize/components/CrewHeader.tsx`
@@ -1499,12 +1499,12 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - Fresh screenshot artifact documents parity pass on `vip-bike` slug.
 
 ### T49 — Software-engineering hardening sweep (security/SPA/state/CSS/cart-write load)
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Apply strict engineering pass to remove architectural workarounds discovered in post-review audit: server-only admin key usage, SPA navigation integrity, cart write-throttle strategy, and context/theme maintainability. Keep embedding fallback redesign out-of-scope for this task per operator note.
-- next_step: After T48 visual parity, start with admin-key isolation (security first) and then proceed sequentially through SPA/cart/state/style substeps.
-- risks: Refactors may touch cross-cutting runtime paths (`hooks`, `contexts`, `franchize` navigation). Must preserve Telegram WebApp behavior and legacy routes while removing workaround patterns.
+- status: `in_progress`
+- updated_at: `2026-02-23T16:20:00Z`
+- owner: `codex`
+- notes: Continued hardening pass with anti-workaround fixes plus style-system discipline: Telegram auth DB sync now server-action-only, service-role hardcoded fallback removed, SPA routing restored in franchize header/profile/menu, cart writes moved to checkpoint/page-exit queue with retry-on-failed-save, and franchize pill controls switched to CSS variable driven Tailwind utilities instead of direct inline color properties.
+- next_step: Finish remaining T49 substeps — broader franchize style-system variable migration and AppContext decomposition/realtime strategy audit, then run full regression smoke.
+- risks: Cart persistence is now safer for DB load but depends on explicit checkpoints (`/cart`, `/order/*`, pagehide); must verify no data loss in abrupt mobile-session kills.
 - dependencies: T48
 - deliverables:
   - `hooks/useTelegram.ts`
@@ -1606,6 +1606,23 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+### 2026-02-23 — T49 continuation (style-token discipline + cart save resilience)
+- Refined franchize pill styling to use CSS-variable-powered Tailwind utilities (`bg-[var(--...)]`, `text-[var(--...)]`) for category/quick-filter controls, reducing inline color dominance while preserving dynamic crew theming.
+- Added retry-safe persistence behavior in franchize cart queue: failed save responses now keep `pendingPersist` true so next checkpoint/page-exit flush can recover instead of falsely marking state persisted.
+- Kept T49 as `in_progress` intentionally: remaining scope still includes broader theme-token migration breadth and AppContext split/realtime architecture hardening.
+
+### 2026-02-23 — T49 hardening pass (security + SPA + cart-write discipline)
+- Removed the most dangerous client/server boundary leak in Telegram auth flow by replacing direct client import of `hooks/supabase` with server actions (`fetchDbUserAction`, `upsertTelegramUserAction`).
+- Deleted hardcoded `SUPABASE_SERVICE_ROLE_KEY` fallback from `hooks/supabase.ts` so service-role access now depends on runtime secret only.
+- Reverted franchize navigation back to SPA-safe transitions (`router.push` / `Link`) in header, profile dropdown, and header menu instead of `window.location.assign` / internal `<a>` workaround.
+- Reworked franchize cart persistence model: removed 350ms per-change metadata writes, added ordered flush queue with explicit checkpoint sync (`/cart`, `/order/*`) and page-exit/visibility flush handlers.
+
+### 2026-02-23 — T48 completion (Pepperolli parity pass shipped)
+- Executed visual parity sweep on `/franchize/vip-bike`: category rail + quick filters now use solid Pepperolli-style pills (active accent, inactive dark solid) without outline-dominant look.
+- Promoted catalog section headers to stronger white hierarchy and shifted count chips to muted-solid bubbles for faster scanning.
+- Updated product card semantics with accent-highlighted price and iconified `Добавить` CTA while preserving premium `Выбрать` threshold behavior.
+- Reworked floating cart to solid accent body with black foreground and overlapping white quantity badge; softened catalog card borders in theme variants for cleaner dark-surface separation.
 
 ### 2026-02-23 — AGENTS context diet enabled (archive triggers)
 - Added explicit memory-system policy in `AGENTS.md` so `docs/AGENT_DIARY.md` is no longer treated as default read for every task.
