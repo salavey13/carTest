@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Menu } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { FranchizeCrewVM } from "../actions";
 import { HeaderMenu } from "../modals/HeaderMenu";
 import { FranchizeProfileButton } from "./FranchizeProfileButton";
@@ -21,6 +21,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   const [catalogLinks, setCatalogLinks] = useState<string[]>([]);
   const [isCompact, setIsCompact] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const railRef = useRef<HTMLDivElement | null>(null);
 
@@ -131,9 +132,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
     const targetId = toCategoryId(categoryLabel);
 
     if (pathname !== mainCatalogPath) {
-      if (typeof window !== "undefined") {
-        window.location.assign(`${mainCatalogPath}#${targetId}`);
-      }
+      router.push(`${mainCatalogPath}#${targetId}`);
       return;
     }
 
@@ -205,11 +204,10 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
                   type="button"
                   data-category-pill={linkLabel}
                   onClick={() => scrollToCategory(linkLabel)}
-                  className="shrink-0 snap-start rounded-full border px-3 py-1.5 text-xs font-medium tracking-wide transition-colors"
+                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-4 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] transition-colors"
                   style={{
-                    borderColor: isActive ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
-                    backgroundColor: isActive ? `${crew.theme.palette.accentMain}20` : "transparent",
-                    color: isActive ? crew.theme.palette.accentMain : crew.theme.palette.textSecondary,
+                    ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
+                    ["--pill-text" as string]: isActive ? "#000000" : crew.theme.palette.textPrimary,
                   }}
                 >
                   {linkLabel}

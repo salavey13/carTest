@@ -5,6 +5,57 @@ import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
 import type { UserCrewInfo, ActiveLobbyInfo } from "./AppContext";
 
+
+
+export async function fetchDbUserAction(userId: string): Promise<Database["public"]["Tables"]["users"]["Row"] | null> {
+  if (!userId) return null;
+  try {
+    return await fetchUserData(userId);
+  } catch (error) {
+    logger.error(`[fetchDbUserAction] Failed for user ${userId}:`, error);
+    return null;
+  }
+}
+
+export async function upsertTelegramUserAction(payload: {
+  userId: string;
+  username?: string | null;
+  fullName?: string | null;
+  avatarUrl?: string | null;
+  languageCode?: string | null;
+}): Promise<Database["public"]["Tables"]["users"]["Row"] | null> {
+  if (!payload.userId) return null;
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("users")
+      .upsert(
+        {
+          user_id: payload.userId,
+          username: payload.username || null,
+          full_name: payload.fullName || null,
+          avatar_url: payload.avatarUrl || null,
+          language_code: payload.languageCode || null,
+          updated_at: new Date().toISOString(),
+          role: "user",
+          status: "active",
+        },
+        { onConflict: "user_id" },
+      )
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    logger.error(`[upsertTelegramUserAction] Failed for user ${payload.userId}:`, error);
+    return null;
+  }
+}
+
 /**
  * Safely reloads user data from server.
  */

@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FranchizeCrewVM } from "../actions";
@@ -56,7 +57,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
           {crew.header.menuLinks.map((link) => {
             const isActive = activePath === link.href;
             return (
-              <a
+              <Link
                 key={`${link.href}-${link.label}`}
                 href={link.href}
                 onClick={() => onOpenChange(false)}
@@ -67,7 +68,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
                 }}
               >
                 {link.label}
-              </a>
+              </Link>
             );
           })}
         </div>

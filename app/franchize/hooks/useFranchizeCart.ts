@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { saveUserFranchizeCartAction } from "@/contexts/actions";
 
@@ -83,10 +84,50 @@ const sanitizeCartState = (value: unknown): FranchizeCartState => {
 export const getFranchizeCartStorageKey = (slug: string) => `${CART_STORAGE_PREFIX}:${slug}`;
 
 export function useFranchizeCart(slug: string) {
+  const pathname = usePathname();
   const { dbUser } = useAppContext();
   const userId = dbUser?.user_id ?? null;
   const storageKey = useMemo(() => getFranchizeCartStorageKey(slug), [slug]);
   const [cart, setCart] = useState<FranchizeCartState>({});
+  const persistInFlightRef = useRef(false);
+  const queuedCartRef = useRef<FranchizeCartState | null>(null);
+  const pendingPersistRef = useRef(false);
+  const lastPersistedSnapshotRef = useRef<string>("{}");
+
+  const serializeCart = useCallback((state: FranchizeCartState) => JSON.stringify(state), []);
+
+  const persistCartSnapshot = useCallback(async (snapshot: FranchizeCartState) => {
+    if (!userId) return;
+
+    if (persistInFlightRef.current) {
+      queuedCartRef.current = snapshot;
+      return;
+    }
+
+    persistInFlightRef.current = true;
+
+    try {
+      const saveResult = await saveUserFranchizeCartAction(userId, slug, snapshot);
+      if (!saveResult.ok) {
+        pendingPersistRef.current = true;
+        return;
+      }
+      lastPersistedSnapshotRef.current = serializeCart(snapshot);
+      pendingPersistRef.current = false;
+    } finally {
+      persistInFlightRef.current = false;
+
+      const queued = queuedCartRef.current;
+      queuedCartRef.current = null;
+
+      if (queued) {
+        const queuedSnapshot = serializeCart(queued);
+        if (queuedSnapshot !== lastPersistedSnapshotRef.current) {
+          void persistCartSnapshot(queued);
+        }
+      }
+    }
+  }, [serializeCart, slug, userId]);
 
   const hydrateCartFromStorage = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -138,12 +179,44 @@ export function useFranchizeCart(slug: string) {
   useEffect(() => {
     if (!userId) return;
 
-    const timer = window.setTimeout(() => {
-      void saveUserFranchizeCartAction(userId, slug, cart);
-    }, 350);
+    const nextSnapshot = serializeCart(cart);
+    pendingPersistRef.current = nextSnapshot !== lastPersistedSnapshotRef.current;
+  }, [cart, serializeCart, userId]);
 
-    return () => window.clearTimeout(timer);
-  }, [cart, slug, userId]);
+  const flushPersistNow = useCallback(() => {
+    if (!userId || !pendingPersistRef.current) return;
+    void persistCartSnapshot(cart);
+  }, [cart, persistCartSnapshot, userId]);
+
+  useEffect(() => {
+    const isCheckoutCheckpoint = pathname === `/franchize/${slug}/cart` || pathname.startsWith(`/franchize/${slug}/order/`);
+    if (!isCheckoutCheckpoint) return;
+    flushPersistNow();
+  }, [flushPersistNow, pathname, slug]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const flushOnPageExit = () => {
+      flushPersistNow();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flushPersistNow();
+      }
+    };
+
+    window.addEventListener("beforeunload", flushOnPageExit);
+    window.addEventListener("pagehide", flushOnPageExit);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("beforeunload", flushOnPageExit);
+      window.removeEventListener("pagehide", flushOnPageExit);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [flushPersistNow]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

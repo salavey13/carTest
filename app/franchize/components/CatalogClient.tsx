@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { ShoppingCart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toCategoryId } from "../lib/navigation";
 import { catalogCardVariantStyles, crewPaletteForSurface, interactionRingStyle } from "../lib/theme";
@@ -349,11 +350,10 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                 key={filter.key}
                 type="button"
                 onClick={() => setQuickFilter(filter.key)}
-                className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium"
+                className="shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)]"
                 style={{
-                  borderColor: active ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
-                  color: active ? "#16130A" : crew.theme.palette.textSecondary,
-                  backgroundColor: active ? crew.theme.palette.accentMain : `${crew.theme.palette.bgCard}CC`,
+                  ["--quick-pill-bg" as string]: active ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
+                  ["--quick-pill-text" as string]: active ? "#000000" : crew.theme.palette.textPrimary,
                 }}
               >
                 {filter.label} · {quickFilterCounts[filter.key]}
@@ -367,8 +367,8 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                 setQuickFilter("all");
                 setSearchQuery("");
               }}
-              className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium"
-              style={{ borderColor: crew.theme.palette.borderSoft, color: crew.theme.palette.textSecondary, backgroundColor: `${crew.theme.palette.bgCard}CC` }}
+              className="shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)]"
+              style={{ ["--quick-pill-bg" as string]: crew.theme.palette.bgCard, ["--quick-pill-text" as string]: crew.theme.palette.textPrimary }}
             >
               Сбросить всё
             </button>
@@ -387,13 +387,13 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
           <div className="space-y-6">
             {itemsByCategory.map((group) => (
               <section key={group.category} id={toCategoryId(group.category)} data-category={group.category} data-count={group.items.length}>
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <h2 className="text-sm font-semibold uppercase tracking-[0.14em]" style={{ color: crew.theme.palette.accentMain }}>
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h2 className="text-2xl font-bold uppercase leading-tight tracking-tight" style={{ color: crew.theme.palette.textPrimary }}>
                     {group.category}
                   </h2>
                   <span
-                    className="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
-                    style={{ borderColor: crew.theme.palette.borderSoft, color: crew.theme.palette.textSecondary }}
+                    className="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-medium"
+                    style={{ color: crew.theme.palette.textSecondary, backgroundColor: crew.theme.palette.bgCard }}
                   >
                     {group.items.length} шт.
                   </span>
@@ -432,10 +432,23 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                           )}
                           <h3 className="mt-1 text-sm font-semibold leading-5">{item.title}</h3>
                           <p className="text-xs" style={surface.mutedText}>{item.description || item.subtitle}</p>
-                          <p className="mt-2 text-sm font-medium">{item.pricePerDay} ₽ / day</p>
+                          <p className="mt-2 text-base font-bold" style={{ color: crew.theme.palette.accentMain }}>
+                            {item.pricePerDay.toLocaleString("ru-RU")} ₽
+                            <span className="ml-1 text-xs font-normal" style={{ color: crew.theme.palette.textSecondary }}>/ day</span>
+                          </p>
                           <div className="mt-2 flex gap-2">
-                            <span className="inline-flex flex-1 items-center justify-center rounded-full px-2 py-2 text-xs font-semibold" style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}>
-                              {item.pricePerDay >= 6000 ? "Выбрать" : "Добавить"}
+                            <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-xs font-bold transition-transform active:scale-95" style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}>
+                              {item.pricePerDay >= 6000 ? (
+                                <>
+                                  <ShoppingCart className="h-4 w-4" />
+                                  Выбрать
+                                </>
+                              ) : (
+                                <>
+                                  <ShoppingCart className="h-4 w-4" />
+                                  Добавить
+                                </>
+                              )}
                             </span>
                           </div>
                         </div>
