@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { debugLogger } from "@/lib/debugLogger"; 
 import { logger as globalLogger } from "@/lib/logger"; 
-import { createOrUpdateUser as dbCreateOrUpdateUser, fetchUserData as dbFetchUserData } from "@/hooks/supabase";
+import { fetchDbUserAction, upsertTelegramUserAction } from "@/contexts/actions";
 import type { TelegramWebApp, WebAppUser, WebAppInitData } from "@/types/telegram";
 import type { Database } from "@/types/database.types";
 
@@ -111,12 +111,18 @@ export function useTelegram() {
 
       try {
          globalLogger.log(`[HOOK_TELEGRAM handleAuth FN_INFO] STEP 3: Fetching user ${userIdStr} from DB...`);
-         let userFromDb = await dbFetchUserData(userIdStr);
+         let userFromDb = await fetchDbUserAction(userIdStr);
          globalLogger.log(`[HOOK_TELEGRAM handleAuth FN_INFO] STEP 4: Fetched user ${userIdStr} from DB. User exists in DB: ${!!userFromDb}. DB Record (if any):`, userFromDb ? {id: userFromDb.user_id, username: userFromDb.username, status: userFromDb.status} : null);
 
          if (!userFromDb) {
             globalLogger.log(`[HOOK_TELEGRAM handleAuth FN_INFO] STEP 5A: User ${userIdStr} NOT found in DB. Attempting to CREATE... User data for creation:`, userToAuth);
-            userFromDb = await dbCreateOrUpdateUser(userIdStr, userToAuth);
+            userFromDb = await upsertTelegramUserAction({
+              userId: userIdStr,
+              username: userToAuth.username,
+              fullName: `${userToAuth.first_name || ""} ${userToAuth.last_name || ""}`.trim(),
+              avatarUrl: userToAuth.photo_url,
+              languageCode: userToAuth.language_code,
+            });
              if (!userFromDb) { 
                  globalLogger.error(`[HOOK_TELEGRAM handleAuth FN_ERROR] CRITICAL FAILURE: Failed to CREATE user ${userIdStr} in DB (dbCreateOrUpdateUser returned null).`);
                  throw new Error(`Failed to create user ${userIdStr} in database during authentication.`);
@@ -137,7 +143,13 @@ export function useTelegram() {
 
             if(needsUpdate) {
                 globalLogger.log(`[HOOK_TELEGRAM handleAuth FN_INFO] STEP 7B: User ${userIdStr} data differs. Attempting to UPDATE... User data for update:`, userToAuth);
-                userFromDb = await dbCreateOrUpdateUser(userIdStr, userToAuth);
+                userFromDb = await upsertTelegramUserAction({
+              userId: userIdStr,
+              username: userToAuth.username,
+              fullName: `${userToAuth.first_name || ""} ${userToAuth.last_name || ""}`.trim(),
+              avatarUrl: userToAuth.photo_url,
+              languageCode: userToAuth.language_code,
+            });
                  if (!userFromDb) { 
                      globalLogger.error(`[HOOK_TELEGRAM handleAuth FN_ERROR] CRITICAL FAILURE: Failed to UPDATE user ${userIdStr} in DB (dbCreateOrUpdateUser returned null).`);
                      throw new Error(`Failed to update user ${userIdStr} in database during authentication.`);

@@ -17,30 +17,26 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
   const isCartEmpty = itemCount === 0;
 
   return (
-    <div className="fixed bottom-6 right-4 z-30 flex items-center gap-2">
+    <div className="fixed bottom-6 right-4 z-30 flex items-center gap-3">
       <button
         type="button"
         aria-label="Scroll to top"
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border" style={{ borderColor, color: textColor, backgroundColor }}
+        className="inline-flex h-12 w-12 items-center justify-center rounded-full shadow-lg"
+        style={{ color: textColor, backgroundColor }}
       >
-        <ArrowUp className="h-4 w-4" />
+        <ArrowUp className="h-5 w-5" />
       </button>
 
-      <Link href={href} className="inline-flex items-center gap-2 rounded-full border px-3 py-2" style={{ borderColor: accentColor, color: textColor, backgroundColor }}>
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: accentColor, color: "#16130A" }}>
-          <ShoppingCart className="h-4 w-4" />
+      <Link href={href} className="relative inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 shadow-xl transition-transform active:scale-95" style={{ color: "#000000", backgroundColor: accentColor }}>
+        <ShoppingCart className="h-5 w-5" />
+        <span className="text-sm font-bold">{isCartEmpty ? "0 ₽" : `${totalPrice.toLocaleString("ru-RU")} ₽`}</span>
+        <span
+          className="absolute -right-1.5 -top-1.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-xs font-bold shadow-md"
+          style={{ backgroundColor: "#FFFFFF", borderColor: borderColor, color: "#16130A" }}
+        >
+          {itemCount}
         </span>
-        {isCartEmpty ? (
-          <span className="text-sm font-medium" style={{ color: textColor }}>0 ₽ / 0</span>
-        ) : (
-          <>
-            <span className="text-sm font-medium">{totalPrice.toLocaleString("ru-RU")} ₽</span>
-            <span className="inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: accentColor, color: "#16130A" }}>
-              {itemCount}
-            </span>
-          </>
-        )}
       </Link>
     </div>
   );
