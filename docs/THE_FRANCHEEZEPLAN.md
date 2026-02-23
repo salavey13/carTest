@@ -1349,6 +1349,89 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ---
 
+
+### T36 — Mobile filter rail scrollbar removal
+- status: `done`
+- updated_at: `2026-02-22T15:00:00Z`
+- owner: `codex`
+- notes: Hidden horizontal scrollbar visuals for quick-filter rail and promo rail on mobile while preserving horizontal swipe behavior.
+- next_step: Start T37 mobile auction ticker compaction.
+- risks: None.
+- dependencies: T35
+
+### T37 — Mobile auction/promo rail single-line ticker behavior
+- status: `done`
+- updated_at: `2026-02-22T15:00:00Z`
+- owner: `codex`
+- notes: Converted promo/auction cards to a one-line horizontal ticker behavior on mobile and kept multi-column layout on larger breakpoints.
+- next_step: Start T38 link click reliability sweep.
+- risks: Very long campaign titles can still be truncated by card width by design.
+- dependencies: T36
+
+### T38 — Header/mobile navigation click reliability hardening
+- status: `done`
+- updated_at: `2026-02-22T15:00:00Z`
+- owner: `codex`
+- notes: Replaced fragile client-side route handlers in franchize header menu/profile/footer/subpage recovery links with deterministic anchor/window navigation for Telegram webview tap reliability.
+- next_step: Start T39 cart flow parity fixes.
+- risks: Full-page navigations are intentional for reliability and can feel less SPA-like.
+- dependencies: T37
+
+### T39 — Franchize cart flow parity (remove inline bypass + fix modal add)
+- status: `done`
+- updated_at: `2026-02-22T15:00:00Z`
+- owner: `codex`
+- notes: Removed inline `+ В корзину` bypass CTA from catalog cards and fixed modal `Добавить` interaction path to ensure add-to-cart always goes through options-aware modal flow.
+- next_step: Start T40 cart persistence in users metadata.
+- risks: None.
+- dependencies: T38
+
+### T40 — Cart persistence to `users.metadata.settings.franchizeCart`
+- status: `done`
+- updated_at: `2026-02-22T15:00:00Z`
+- owner: `codex`
+- notes: Added server action + client sync to persist per-slug franchize cart state in Supabase `users.metadata.settings.franchizeCart` and hydrate local cart from metadata when local storage is empty.
+- next_step: Start T41 footer text color seed alignment.
+- risks: High-frequency cart edits can trigger many writes; debounced sync is applied.
+- dependencies: T39
+
+### T41 — Footer text color black in VIP_BIKE + SLY13 seed docs
+- status: `done`
+- updated_at: `2026-02-22T15:00:00Z`
+- owner: `codex`
+- notes: Added `footer.textColor = #16130A` in both seed SQL docs and consumed this value in franchize footer renderer.
+- next_step: Start T42 header ticker deprecation + compact-on-scroll behavior.
+- risks: Existing crews without `footer.textColor` fallback to `#16130A`.
+- dependencies: T40
+
+### T42 — Header cleanup: remove obsolete top auction ticker + compact scroll mode
+- status: `done`
+- updated_at: `2026-02-22T15:00:00Z`
+- owner: `codex`
+- notes: Removed obsolete header auction running line and added partial hide-on-scroll behavior where only category bubble rail remains visible with safe-area top offset.
+- next_step: Start T43 route shell visibility overrides.
+- risks: Compact threshold tuned for mobile; may need micro-adjustment per device.
+- dependencies: T41
+
+### T43 — Route shell override: disable BikeHeader/BikeFooter on `/vipbikerental`
+- status: `done`
+- updated_at: `2026-02-22T15:00:00Z`
+- owner: `codex`
+- notes: Updated ClientLayout theme path matching to stop injecting bike shell on `/vipbikerental`.
+- next_step: Start T44 click-testing skill + smoke pass evidence.
+- risks: `/vipbikerental` now uses default shell behavior by design.
+- dependencies: T42
+
+### T44 — Click testing skill pass for franchize mobile interactions
+- status: `done`
+- updated_at: `2026-02-22T15:25:00Z`
+- owner: `codex`
+- notes: Added reusable click smoke skill (`skills/franchize-click-smoke/SKILL.md`) and executed mobile Playwright smoke/screenshot against `/franchize/vip-bike`.
+- next_step: Queue next operator-reported UX fix as T45+ with strict dependency chain.
+- risks: Chromium may crash in container runtime; Firefox fallback works.
+- dependencies: T43
+
+
 ## 6) Task template for future extension
 
 When adding a new task, copy this block:
@@ -1918,3 +2001,8 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Added `groupLinks` prop to `CrewHeader` and passed item-derived category links from all franchize routes (`catalog/about/contacts/cart/order/rental`) so rail stays consistent everywhere.
 - Kept catalog intersection observer highlight logic on main page while preserving fallback groups on subpages.
 - Re-ran targeted lint and refreshed `/franchize/vip-bike` screenshot evidence after correction.
+
+### 2026-02-22 — T36-T44 operator hotfix closeout
+- Added and completed nine fix tasks from operator screenshot checklist (scrollbar, promo ticker behavior, link taps, back links, cart add path, metadata persistence, seed color update, compact header, shell route override).
+- Added reusable click-smoke skill `skills/franchize-click-smoke/SKILL.md` for future mobile tap regressions.
+- Captured fresh mobile screenshot evidence on `/franchize/vip-bike` after patch set.

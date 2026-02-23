@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { ChevronDown, Palette, Settings, Shield, User } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   DropdownMenu,
@@ -29,14 +28,18 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
-
 export function FranchizeProfileButton({ bgColor, textColor, borderColor }: FranchizeProfileButtonProps) {
   const { dbUser, user, userCrewInfo, isAdmin } = useAppContext();
-  const router = useRouter();
   const effectiveUser = dbUser || user;
   const displayName = effectiveUser?.username || effectiveUser?.full_name || effectiveUser?.first_name || "Operator";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = typeof isAdmin === "function" ? isAdmin() : false;
+
+  const navigateHard = (href: string) => {
+    if (typeof window !== "undefined") {
+      window.location.assign(href);
+    }
+  };
 
   return (
     <DropdownMenu>
@@ -63,33 +66,41 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
       <DropdownMenuContent align="end" className="w-56" sideOffset={8}>
         <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={(event) => {
-          event.preventDefault();
-          router.push("/profile");
-        }}>
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault();
+            navigateHard("/profile");
+          }}
+        >
           <User className="h-4 w-4" />
           Профиль
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={(event) => {
-          event.preventDefault();
-          router.push("/settings");
-        }}>
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault();
+            navigateHard("/settings");
+          }}
+        >
           <Settings className="h-4 w-4" />
           Настройки
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={(event) => {
-          event.preventDefault();
-          router.push("/franchize/create");
-        }}>
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault();
+            navigateHard("/franchize/create");
+          }}
+        >
           <Palette className="h-4 w-4" />
           Branding (экипаж)
         </DropdownMenuItem>
 
         {userCrewInfo?.slug && (
-          <DropdownMenuItem onSelect={(event) => {
-            event.preventDefault();
-            router.push(`/crews/${userCrewInfo.slug}`);
-          }}>
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              navigateHard(`/crews/${userCrewInfo.slug}`);
+            }}
+          >
             <Palette className="h-4 w-4" />
             Мой экипаж
           </DropdownMenuItem>
@@ -98,10 +109,12 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
         {userIsAdmin && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={(event) => {
-              event.preventDefault();
-              router.push("/admin");
-            }}>
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                navigateHard("/admin");
+              }}
+            >
               <Shield className="h-4 w-4" />
               Admin
             </DropdownMenuItem>

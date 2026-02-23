@@ -120,6 +120,7 @@ set
           )
         ),
         'footer', jsonb_build_object(
+          'textColor', '#16130A',
           'columns', jsonb_build_array(
             jsonb_build_object(
               'title', 'VIP BIKE RENTAL',

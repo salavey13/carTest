@@ -2,7 +2,6 @@
 
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import type { FranchizeCrewVM } from "../actions";
 import { crewPaletteForSurface } from "../lib/theme";
@@ -16,13 +15,8 @@ interface HeaderMenuProps {
 
 export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuProps) {
   const [mounted, setMounted] = useState(false);
-  const router = useRouter();
   const surface = crewPaletteForSurface(crew.theme);
 
-  const handleMenuLinkClick = (href: string) => {
-    onOpenChange(false);
-    router.push(href);
-  };
 
   useEffect(() => {
     setMounted(true);
@@ -65,11 +59,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
               <a
                 key={`${link.href}-${link.label}`}
                 href={link.href}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  handleMenuLinkClick(link.href);
-                }}
+                onClick={() => onOpenChange(false)}
                 className="block rounded-xl border px-4 py-3 text-sm transition"
                 style={{
                   borderColor: isActive ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
