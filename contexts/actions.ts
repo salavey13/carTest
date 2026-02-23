@@ -103,18 +103,13 @@ export async function saveUserFranchizeCartAction(
   }
 
   try {
-    const { data: existingUser, error: fetchError } = await supabaseAdmin
-      .from("users")
-      .select("metadata")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (fetchError) {
-      throw fetchError;
+    const currentUserData = await fetchUserData(userId);
+    if (!currentUserData) {
+      return { ok: false, error: "User not found" };
     }
 
-    const existingMetadata = (existingUser?.metadata && typeof existingUser.metadata === "object")
-      ? (existingUser.metadata as Record<string, unknown>)
+    const existingMetadata = (currentUserData.metadata && typeof currentUserData.metadata === "object")
+      ? (currentUserData.metadata as Record<string, unknown>)
       : {};
     const existingSettings = (existingMetadata.settings && typeof existingMetadata.settings === "object")
       ? (existingMetadata.settings as Record<string, unknown>)
@@ -134,13 +129,13 @@ export async function saveUserFranchizeCartAction(
       },
     };
 
-    const { error: updateError } = await supabaseAdmin
+    const updateResult = await supabaseAdmin
       .from("users")
-      .update({ metadata: nextMetadata, updated_at: new Date().toISOString() })
+      .update({ metadata: nextMetadata })
       .eq("user_id", userId);
 
-    if (updateError) {
-      throw updateError;
+    if (updateResult.error) {
+      throw updateResult.error;
     }
 
     return { ok: true };

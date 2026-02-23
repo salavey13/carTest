@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { Info, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { PointerEvent } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
 
@@ -14,8 +13,10 @@ interface ItemModalProps {
     package: string;
     duration: string;
     perk: string;
+    auction: string;
   };
-  onChangeOption: (key: "package" | "duration" | "perk", value: string) => void;
+  auctionOptions: string[];
+  onChangeOption: (key: "package" | "duration" | "perk" | "auction", value: string) => void;
   onClose: () => void;
   onAddToCart: () => void;
 }
@@ -69,7 +70,7 @@ function OptionChips({
   );
 }
 
-export function ItemModal({ item, theme, options, onChangeOption, onClose, onAddToCart }: ItemModalProps) {
+export function ItemModal({ item, theme, options, auctionOptions, onChangeOption, onClose, onAddToCart }: ItemModalProps) {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
 
   useEffect(() => {
@@ -103,7 +104,7 @@ export function ItemModal({ item, theme, options, onChangeOption, onClose, onAdd
     item.description ||
     "Этот байк уже подготовлен к аренде: технический чек выполнен, документы готовы, выдача без очереди.";
 
-  const handleAddButtonPress = (event: PointerEvent<HTMLButtonElement>) => {
+  const handleAddButtonPress = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
     onAddToCart();
@@ -164,6 +165,7 @@ export function ItemModal({ item, theme, options, onChangeOption, onClose, onAdd
           <OptionChips title="Пакет" options={packageOptions} selected={options.package} onSelect={(v) => onChangeOption("package", v)} accentColor={theme.palette.accentMain} mutedTextColor={theme.palette.textSecondary} focusRingStyle={focusRingOutlineStyle(theme)} />
           <OptionChips title="Срок" options={durationOptions} selected={options.duration} onSelect={(v) => onChangeOption("duration", v)} accentColor={theme.palette.accentMain} mutedTextColor={theme.palette.textSecondary} focusRingStyle={focusRingOutlineStyle(theme)} />
           <OptionChips title="Комплект" options={perkOptions} selected={options.perk} onSelect={(v) => onChangeOption("perk", v)} accentColor={theme.palette.accentMain} mutedTextColor={theme.palette.textSecondary} focusRingStyle={focusRingOutlineStyle(theme)} />
+          <OptionChips title="Аукцион / тик" options={auctionOptions} selected={options.auction} onSelect={(v) => onChangeOption("auction", v)} accentColor={theme.palette.accentMain} mutedTextColor={theme.palette.textSecondary} focusRingStyle={focusRingOutlineStyle(theme)} />
         </div>
 
         <div className="grid shrink-0 grid-cols-2 gap-2 border-t p-3" style={surface.card}>
@@ -172,7 +174,7 @@ export function ItemModal({ item, theme, options, onChangeOption, onClose, onAdd
           </button>
           <button
             type="button"
-            onPointerUp={handleAddButtonPress}
+            onClick={handleAddButtonPress}
             className="rounded-xl px-3 py-2 text-sm font-semibold transition hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             style={{ backgroundColor: theme.palette.accentMain, color: "#16130A", ...focusRingOutlineStyle(theme) }}
           >

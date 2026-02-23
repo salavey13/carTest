@@ -35,7 +35,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const surface = crewPaletteForSurface(crew.theme);
   const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
   const { addItem } = useFranchizeCart(crew.slug || slug);
-  const [selectedOptions, setSelectedOptions] = useState({ package: "Base", duration: "1 day", perk: "Стандарт" });
+  const [selectedOptions, setSelectedOptions] = useState({ package: "Base", duration: "1 day", perk: "Стандарт", auction: "Без аукциона" });
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchCtaFocused, setSearchCtaFocused] = useState(false);
@@ -136,6 +136,15 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
 
 
 
+
+
+  const auctionTickOptions = useMemo(() => {
+    const fromCampaigns = promoModules
+      .map((module) => module.badge?.trim() || module.title?.trim())
+      .filter((value): value is string => Boolean(value && value.length > 0));
+
+    return ["Без аукциона", ...Array.from(new Set(fromCampaigns)).slice(0, 6)];
+  }, [promoModules]);
   const promoGradientByIndex = (index: number) => {
     const gradients = [
       `linear-gradient(130deg, ${crew.theme.palette.accentMain}E0, #FF7F50D0)`,
@@ -224,7 +233,12 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
 
   const openItem = (item: CatalogItemVM) => {
     setSelectedItem(item);
-    setSelectedOptions({ package: "Base", duration: "1 day", perk: "Стандарт" });
+    setSelectedOptions({
+      package: "Base",
+      duration: "1 day",
+      perk: "Стандарт",
+      auction: auctionTickOptions[0] ?? "Без аукциона",
+    });
   };
 
   return (
@@ -449,6 +463,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
         item={selectedItem}
         theme={crew.theme}
         options={selectedOptions}
+        auctionOptions={auctionTickOptions}
         onChangeOption={(key, value) => setSelectedOptions((prev) => ({ ...prev, [key]: value }))}
         onClose={() => setSelectedItem(null)}
         onAddToCart={() => {
