@@ -63,7 +63,7 @@ const THEME_CONFIG = {
     isTransparent: true, // Allows background component to be visible
   },
   bike: {
-    paths: ["/vipbikerental", "/rent/", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals"],
+    paths: ["/rent/", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals"],
     Header: BikeHeader,
     Footer: BikeFooter,
     BottomNav: BottomNavigationBike,
@@ -512,5 +512,4 @@ const normalizeStartParamPath = (rawParam: string | null) => {
   if (!decoded) return null;
   return decoded.replace(/^\/+/, "").replace(/\/+/g, "/");
 };
-
 
