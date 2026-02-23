@@ -1431,6 +1431,25 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - risks: Chromium may crash in container runtime; Firefox fallback works.
 - dependencies: T43
 
+### T45 — Cart persistence hardening + broken navigation/social links cleanup
+- status: `done`
+- updated_at: `2026-02-23T00:00:00Z`
+- owner: `codex`
+- notes: Hardened franchize cart metadata persistence action, switched modal add CTA to click-based handler for reliable cart updates, added `/franchize/[slug]/rentals` compatibility redirect to prevent header-menu 404 for “My rents”, and normalized footer social URLs to include protocol when operators enter short domains.
+- next_step: Queue T46 for full Playwright cross-path smoke (catalog -> modal -> cart -> rentals redirect -> contacts links).
+- risks: Legacy custom menu links can still point to fully invalid domains; protocol normalization only covers common short-domain patterns.
+- dependencies: T44
+
+
+
+### T46 — Auction tick options in cart + franchize-native rentals page
+- status: `done`
+- updated_at: `2026-02-23T00:40:00Z`
+- owner: `codex`
+- notes: Added auction tick selection into item modal/cart metadata flow and surfaced selected tick on cart/order summaries; replaced temporary rentals redirect with real `/franchize/[slug]/rentals` shell page reusing rentals runtime inside franchize branding. Also fixed footer local link reliability by switching internal footer menu links to Next.js `Link` while keeping social links external-only behavior unchanged.
+- next_step: T47 can add intelligent auction recommendation scoring (price window + stock pressure + campaign schedule) instead of manual pick only.
+- risks: Rentals bridge currently embeds existing `/rentals` client surface; future pass may split dedicated franchize-tailored rentals list for lighter payload.
+- dependencies: T45
 
 ## 6) Task template for future extension
 
@@ -2006,3 +2025,18 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Added and completed nine fix tasks from operator screenshot checklist (scrollbar, promo ticker behavior, link taps, back links, cart add path, metadata persistence, seed color update, compact header, shell route override).
 - Added reusable click-smoke skill `skills/franchize-click-smoke/SKILL.md` for future mobile tap regressions.
 - Captured fresh mobile screenshot evidence on `/franchize/vip-bike` after patch set.
+
+### 2026-02-23 — T45 completion (cart + link reliability sweep)
+- Closed operator regression batch for franchize runtime: fixed modal `Добавить` handler reliability so cart count updates consistently after item modal action.
+- Hardened Supabase cart persistence flow (`users.metadata.settings.franchizeCart`) via a settings-merge style update path that reads current metadata and writes merged cart payload per slug.
+- Added compatibility route `/franchize/[slug]/rentals` -> `/rentals?slug=<slug>` to eliminate menu 404 for “My rents”.
+- Normalized social footer links to auto-prepend `https://` for common short-domain entries (`t.me`, `vk.com`, `instagram.com`, etc.) so links open instead of routing as broken relative paths.
+- Next beat: run one consolidated smoke pass with screenshot proof and capture edge-cases for malformed custom links.
+
+
+### 2026-02-23 — T46 completion (auction tick persistence + franchize rentals shell)
+- Reworked T45 follow-up per operator feedback: social links were already OK, so focus shifted to broken local footer links and franchize-native rentals route.
+- Added selectable `Аукцион / тик` option in item modal, persisted together with cart line options in `users.metadata.settings.franchizeCart`, and displayed in cart + checkout summaries.
+- Replaced temporary `/franchize/[slug]/rentals` redirect with real franchize page that keeps CrewHeader/CrewFooter and renders rentals control center inside franchize shell.
+- Restored social link parser behavior (no aggressive auto-normalization), while internal footer menu links now use client-side `Link` for reliable navigation.
+- Next beat: add “smart auction apply” assistant that preselects best tick by item category, active campaign priority, and delivery mode.

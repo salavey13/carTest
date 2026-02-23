@@ -320,10 +320,13 @@ const withSlug = (href: string, slug: string) => {
       return `/franchize/${slug}/contacts`;
     case "/franchize/cart":
       return `/franchize/${slug}/cart`;
+    case "/franchize/rentals":
+      return `/franchize/${slug}/rentals`;
     default:
       return href;
   }
 };
+
 
 function parseSocialLinks(lines: string): Array<{ label: string; href: string }> {
   return lines
@@ -1040,8 +1043,9 @@ const franchizeOrderInvoiceSchema = z.object({
         package: z.string().trim().default("Base"),
         duration: z.string().trim().default("1 day"),
         perk: z.string().trim().default("Стандарт"),
+        auction: z.string().trim().default("Без аукциона"),
       })
-      .default({ package: "Base", duration: "1 day", perk: "Стандарт" }),
+      .default({ package: "Base", duration: "1 day", perk: "Стандарт", auction: "Без аукциона" }),
   })).min(1),
 });
 
@@ -1074,7 +1078,7 @@ export async function createFranchizeOrderInvoice(input: unknown): Promise<{ suc
   const franchizeRentalLink = `${siteBaseUrl}/franchize/${payload.slug}/rental/${rentalId}`;
 
   const cartText = payload.cartLines
-    .map((line) => `• ${line.itemId} × ${line.qty} (${line.options.package}, ${line.options.duration}, ${line.options.perk})`)
+    .map((line) => `• ${line.itemId} × ${line.qty} (${line.options.package}, ${line.options.duration}, ${line.options.perk}, ${line.options.auction})`)
     .join("\n");
 
   const description = [

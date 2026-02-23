@@ -33,6 +33,7 @@ export type FranchizeCartLineVM = {
     package: string;
     duration: string;
     perk: string;
+    auction: string;
   };
 };
 

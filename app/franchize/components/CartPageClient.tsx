@@ -45,7 +45,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
                     <h2 className="text-base font-semibold">{line.item?.title ?? "Позиция недоступна"}</h2>
                     <p className="text-xs" style={surface.mutedText}>
                       {line.item?.subtitle ?? "Этот товар был удалён или временно недоступен в каталоге."}
-                    <span className="mt-1 block text-[11px]" style={surface.mutedText}>{line.options.package} · {line.options.duration} · {line.options.perk}</span>
+                    <span className="mt-1 block text-[11px]" style={surface.mutedText}>{line.options.package} · {line.options.duration} · {line.options.perk} · {line.options.auction}</span>
                     </p>
                     {line.item ? (
                       <p className="mt-1 text-sm font-medium" style={{ color: crew.theme.palette.accentMain }}>
