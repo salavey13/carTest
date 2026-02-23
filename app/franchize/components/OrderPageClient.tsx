@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
@@ -430,13 +429,13 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           {isCartEmpty ? (
             <div className="mt-3 rounded-xl border border-dashed p-3 text-sm" style={surface.subtleCard}>
               <p>Корзина пуста — добавьте байк из каталога перед оформлением.</p>
-              <Link
+              <a
                 href={`/franchize/${slug}`}
                 className="mt-3 inline-flex font-medium underline-offset-4 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                 style={{ color: crew.theme.palette.accentMain, ...focusRingOutlineStyle(crew.theme) }}
               >
                 Вернуться в каталог
-              </Link>
+              </a>
             </div>
           ) : (
             <ul className="mt-2 space-y-2 text-sm">

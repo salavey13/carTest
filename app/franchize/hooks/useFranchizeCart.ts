@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAppContext } from "@/contexts/AppContext";
+import { saveUserFranchizeCartAction } from "@/contexts/actions";
 
 export type FranchizeCartOptions = {
   package: string;
@@ -78,6 +80,8 @@ const sanitizeCartState = (value: unknown): FranchizeCartState => {
 export const getFranchizeCartStorageKey = (slug: string) => `${CART_STORAGE_PREFIX}:${slug}`;
 
 export function useFranchizeCart(slug: string) {
+  const { dbUser } = useAppContext();
+  const userId = dbUser?.user_id ?? null;
   const storageKey = useMemo(() => getFranchizeCartStorageKey(slug), [slug]);
   const [cart, setCart] = useState<FranchizeCartState>({});
 
@@ -85,17 +89,38 @@ export function useFranchizeCart(slug: string) {
     if (typeof window === "undefined") return;
 
     const raw = window.localStorage.getItem(storageKey);
+    const localState = raw ? (() => {
+      try {
+        return sanitizeCartState(JSON.parse(raw));
+      } catch {
+        return {};
+      }
+    })() : {};
+
+    const metadataState = (() => {
+      const metadata = dbUser?.metadata;
+      if (!metadata || typeof metadata !== "object") return {};
+      const settings = (metadata as Record<string, unknown>).settings;
+      if (!settings || typeof settings !== "object") return {};
+      const franchizeCart = (settings as Record<string, unknown>).franchizeCart;
+      if (!franchizeCart || typeof franchizeCart !== "object") return {};
+      const slugCart = (franchizeCart as Record<string, unknown>)[slug];
+      return sanitizeCartState(slugCart);
+    })();
+
+    if (Object.keys(localState).length === 0 && Object.keys(metadataState).length > 0) {
+      setCart(metadataState);
+      window.localStorage.setItem(storageKey, JSON.stringify(metadataState));
+      return;
+    }
+
     if (!raw) {
       setCart({});
       return;
     }
 
-    try {
-      setCart(sanitizeCartState(JSON.parse(raw)));
-    } catch {
-      setCart({});
-    }
-  }, [storageKey]);
+    setCart(localState);
+  }, [dbUser?.metadata, slug, storageKey]);
 
   useEffect(() => {
     hydrateCartFromStorage();
@@ -106,6 +131,16 @@ export function useFranchizeCart(slug: string) {
     window.localStorage.setItem(storageKey, JSON.stringify(cart));
     window.dispatchEvent(new CustomEvent(CART_SYNC_EVENT, { detail: { storageKey } }));
   }, [cart, storageKey]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const timer = window.setTimeout(() => {
+      void saveUserFranchizeCartAction(userId, slug, cart);
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [cart, slug, userId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

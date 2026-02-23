@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import { Info, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import type { MouseEvent, TouchEvent } from "react";
+import { useEffect, useState } from "react";
+import type { PointerEvent } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
 
@@ -71,7 +71,6 @@ function OptionChips({
 
 export function ItemModal({ item, theme, options, onChangeOption, onClose, onAddToCart }: ItemModalProps) {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
-  const lastAddPressAtRef = useRef(0);
 
   useEffect(() => {
     setDescriptionExpanded(false);
@@ -104,16 +103,9 @@ export function ItemModal({ item, theme, options, onChangeOption, onClose, onAdd
     item.description ||
     "Этот байк уже подготовлен к аренде: технический чек выполнен, документы готовы, выдача без очереди.";
 
-  const handleAddButtonPress = (event: MouseEvent<HTMLButtonElement> | TouchEvent<HTMLButtonElement>) => {
+  const handleAddButtonPress = (event: PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
-
-    const now = Date.now();
-    if (now - lastAddPressAtRef.current < 350) {
-      return;
-    }
-
-    lastAddPressAtRef.current = now;
     onAddToCart();
   };
 
@@ -180,8 +172,7 @@ export function ItemModal({ item, theme, options, onChangeOption, onClose, onAdd
           </button>
           <button
             type="button"
-            onClick={handleAddButtonPress}
-            onTouchEnd={handleAddButtonPress}
+            onPointerUp={handleAddButtonPress}
             className="rounded-xl px-3 py-2 text-sm font-semibold transition hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             style={{ backgroundColor: theme.palette.accentMain, color: "#16130A", ...focusRingOutlineStyle(theme) }}
           >

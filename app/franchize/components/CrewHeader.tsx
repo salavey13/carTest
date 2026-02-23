@@ -1,10 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { Menu } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import type { FranchizeCrewVM } from "../actions";
 import { HeaderMenu } from "../modals/HeaderMenu";
 import { FranchizeProfileButton } from "./FranchizeProfileButton";
@@ -20,8 +19,8 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [catalogLinks, setCatalogLinks] = useState<string[]>([]);
+  const [isCompact, setIsCompact] = useState(false);
   const pathname = usePathname();
-  const router = useRouter();
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const railRef = useRef<HTMLDivElement | null>(null);
 
@@ -37,7 +36,15 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
     return defaultGroupLinks;
   }, [catalogLinks, defaultGroupLinks, mainCatalogPath, pathname]);
 
-  const tickerItems = useMemo(() => [...crew.catalog.tickerItems, ...crew.catalog.tickerItems], [crew.catalog.tickerItems]);
+  useEffect(() => {
+    const onScroll = () => {
+      setIsCompact(window.scrollY > 36);
+    };
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     if (pathname !== mainCatalogPath) {
@@ -124,7 +131,9 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
     const targetId = toCategoryId(categoryLabel);
 
     if (pathname !== mainCatalogPath) {
-      router.push(`${mainCatalogPath}#${targetId}`);
+      if (typeof window !== "undefined") {
+        window.location.assign(`${mainCatalogPath}#${targetId}`);
+      }
       return;
     }
 
@@ -141,39 +150,17 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
 
   return (
     <header
-      className="sticky top-0 z-40 border-b px-4 pb-2 pt-[max(env(safe-area-inset-top),0.55rem)] backdrop-blur-xl"
+      className="sticky top-0 z-40 border-b px-4 pb-2 pt-[max(env(safe-area-inset-top),0.2rem)] backdrop-blur-xl"
       style={{
         borderColor: crew.theme.palette.borderSoft,
         backgroundColor: `${crew.theme.palette.bgCard}E8`,
         color: crew.theme.palette.textPrimary,
       }}
     >
-      <div className="pointer-events-none absolute inset-x-0 -top-[42px] h-[42px] backdrop-blur-xl" style={{ backgroundColor: `${crew.theme.palette.bgCard}EB` }} />
-      {crew.catalog.tickerItems.length > 0 && (
-        <div className="-mx-4 mb-2 overflow-hidden border-b py-1.5" style={{ borderColor: crew.theme.palette.borderSoft, backgroundColor: `${crew.theme.palette.bgBase}F0` }}>
-          <div className="animate-ticker whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: crew.theme.palette.textSecondary }}>
-            {tickerItems.map((item, index) => {
-              const isExternal = /^(https?:|mailto:|tel:)/.test(item.href);
-              return (
-                <Link
-                  key={`${item.id}-${index}`}
-                  href={item.href}
-                  className="mx-4 inline-flex transition-opacity hover:opacity-90"
-                  style={{ color: crew.theme.palette.textSecondary }}
-                  prefetch={!isExternal}
-                  target={isExternal ? "_blank" : undefined}
-                  rel={isExternal ? "noreferrer noopener" : undefined}
-                >
-                  {item.text}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <div className="pointer-events-none absolute inset-x-0 -top-[24px] h-[24px] backdrop-blur-xl" style={{ backgroundColor: `${crew.theme.palette.bgCard}EB` }} />
 
       <div className="mx-auto w-full max-w-4xl">
-        <div className="grid grid-cols-[44px_1fr_auto] items-center gap-3 pb-2">
+        <div className={`grid grid-cols-[44px_1fr_auto] items-center gap-3 overflow-hidden transition-all duration-300 ${isCompact ? "max-h-0 opacity-0 pb-0" : "max-h-32 opacity-100 pb-2"}`}>
           <button
             type="button"
             aria-label="Open menu"

@@ -82,6 +82,7 @@ set
           )
         ),
         'footer', jsonb_build_object(
+          'textColor', '#16130A',
           'phone', '+7 9200-789-888',
           'email', 'sly13@cybervibe.local',
           'address', 'Онлайн / Telegram @SALAVEY13',
