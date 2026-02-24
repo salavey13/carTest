@@ -1533,42 +1533,7 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - First paint does not flash incorrect light theme before dark theme sync for known dark-pref users.
   - AI JSON tooling reports precise validation errors without crashing franchize create flow.
 
-### T49.1 — Postpone fake embedding fallback redesign (explicitly deferred)
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Documented deferral: vector-embedding fallback redesign is intentionally excluded from current hardening wave per operator instruction ("don't bother about embeddings generation").
-- next_step: Revisit only when search relevance workstream is scheduled.
-- risks: Search quality may remain degraded in edge-failure mode until dedicated embeddings task is prioritized.
-- dependencies: T49
-- deliverables:
-  - `docs/THE_FRANCHEEZEPLAN.md`
-- implementation checklist:
-  1. Keep current scope focused on security + SPA + state reliability.
-  2. Capture explicit defer note in diary to prevent accidental silent scope creep.
-- acceptance criteria:
-  - Plan clearly states embeddings fallback redesign is deferred by instruction.
-
-### T49.2 — AGENTS context diet + archive trigger policy
-- status: `done`
-- updated_at: `2026-02-23T12:20:00Z`
-- owner: `codex`
-- notes: Added explicit memory-system policy in AGENTS so long diary context is loaded on demand only (Telegram/Slack/screenshots/homework triggers), reducing routine prompt bloat while preserving incident memory quality.
-- next_step: Continue with T48 implementation as next product-facing execution task.
-- risks: If trigger list is ignored manually, agents may still over-read diary and lose focus on small UI tasks.
-- dependencies: T47
-- deliverables:
-  - `AGENTS.md`
-  - `docs/THE_FRANCHEEZEPLAN.md`
-- implementation checklist:
-  1. Keep AGENTS as constitutional rules and move historical depth to diary-on-demand behavior.
-  2. Define concrete trigger categories when diary must be read before coding.
-  3. Preserve existing diary contract (append lessons after meaningful incidents).
-- acceptance criteria:
-  - AGENTS contains explicit rule to skip full diary for routine edits.
-  - AGENTS contains explicit trigger list for mandatory diary reads.
-  - Plan diary records this context-diet update for traceability.
-
+### Task T49 see in special ./T49-security_sweep.md
 ## 6) Task template for future extension
 
 When adding a new task, copy this block:
@@ -1605,7 +1570,7 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 
 ---
 
-## 7) Progress changelog / diary is in /docs/AGENT_DIARY.MD H MOVE EVERYTHING BELOW THERE PLEASE:
+## 7) Progress changelog / diary is in /docs/AGENT_DIARY.MD - MOVE EVERYTHING BELOW THERE PLEASE:
 
 ### 2026-02-23 — T49 continuation (style-token discipline + cart save resilience)
 - Refined franchize pill styling to use CSS-variable-powered Tailwind utilities (`bg-[var(--...)]`, `text-[var(--...)]`) for category/quick-filter controls, reducing inline color dominance while preserving dynamic crew theming.
