@@ -1605,7 +1605,7 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 
 ---
 
-## 7) Progress changelog / diary
+## 7) Progress changelog / diary is in /docs/AGENT_DIARY.MD H MOVE EVERYTHING BELOW THERE PLEASE:
 
 ### 2026-02-23 — T49 continuation (style-token discipline + cart save resilience)
 - Refined franchize pill styling to use CSS-variable-powered Tailwind utilities (`bg-[var(--...)]`, `text-[var(--...)]`) for category/quick-filter controls, reducing inline color dominance while preserving dynamic crew theming.
@@ -1617,6 +1617,7 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 - Deleted hardcoded `SUPABASE_SERVICE_ROLE_KEY` fallback from `hooks/supabase.ts` so service-role access now depends on runtime secret only.
 - Reverted franchize navigation back to SPA-safe transitions (`router.push` / `Link`) in header, profile dropdown, and header menu instead of `window.location.assign` / internal `<a>` workaround.
 - Reworked franchize cart persistence model: removed 350ms per-change metadata writes, added ordered flush queue with explicit checkpoint sync (`/cart`, `/order/*`) and page-exit/visibility flush handlers.
+
 
 ### 2026-02-23 — T48 completion (Pepperolli parity pass shipped)
 - Executed visual parity sweep on `/franchize/vip-bike`: category rail + quick filters now use solid Pepperolli-style pills (active accent, inactive dark solid) without outline-dominant look.
