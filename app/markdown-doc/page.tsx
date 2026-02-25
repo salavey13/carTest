@@ -3,18 +3,16 @@
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { generateAndSendDoc } from "./actions";
+import { sendMarkdownDoc } from "./actions";
+import { parseCellMarkers } from "@/lib/parseCellMarkers";
 import { useAppContext } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Send, Eye, Edit3, PlusCircle, ShieldCheck, Zap } from "lucide-react";
+import { Loader2, Send, Eye, Edit3, ShieldAlert, UserPlus, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MANAGER_ID = "6216799537";
-
-// Повторим логику парсинга на фронте для мгновенного превью
-const RU_MAP: Record<string, string> = { "красный": "red", "зеленый": "green", "зелёный": "green", "синий": "blue", "желтый": "yellow", "жёлтый": "yellow" };
-const HEX_MAP: Record<string, string> = { red: "EF4444", green: "22C55E", blue: "3B82F6", yellow: "EAB308" };
 
 export default function MarkdownDocPage() {
   const { user } = useAppContext();
@@ -23,93 +21,90 @@ export default function MarkdownDocPage() {
   const [loading, setLoading] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("cv_v5_final");
-    setMarkdown(saved || "# Отчёт\n\n| (bg-зелёный) Узел | Статус |\n|:---|:---|\n| Сервер | (красный) Ошибка |");
+    const saved = localStorage.getItem("cv_v7_final");
+    setMarkdown(saved || "# CyberVibe Report\n\n| (bg-зеленый) Система | Статус |\n|:---|:---|\n| Ядро | (синий) Работает |");
   }, []);
 
   useEffect(() => {
-    if (markdown) localStorage.setItem("cv_v5_final", markdown);
+    localStorage.setItem("cv_v7_final", markdown);
   }, [markdown]);
 
-  const onSend = async (targetId: string, label: string) => {
+  const onHandleSend = async (id: string, label: string) => {
     setLoading(label);
-    const res = await generateAndSendDoc(markdown, targetId, "CyberReport");
+    const res = await sendMarkdownDoc(markdown, id, "Report_V7");
     setLoading(null);
     if (res.success) toast.success(`Отправлено: ${label}`);
-  };
-
-  // Хелпер для извлечения текста из React children
-  const extractText = (node: any): string => {
-    if (!node) return "";
-    if (typeof node === "string") return node;
-    if (Array.isArray(node)) return node.map(extractText).join("");
-    if (node.props?.children) return extractText(node.props.children);
-    return "";
+    else toast.error(res.error);
   };
 
   return (
-    <div className="min-h-screen bg-[#050506] pt-24 pb-12 px-4">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="min-h-screen bg-[#060607] pt-24 pb-12 px-4 relative overflow-hidden">
+      {/* Background Decor */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
+      
+      <div className="max-w-6xl mx-auto space-y-6 relative z-10">
         
-        {/* Elite Header */}
-        <header className="bg-zinc-900/80 border border-white/5 p-6 rounded-[2rem] backdrop-blur-3xl shadow-2xl flex flex-col md:flex-row justify-between items-center gap-6">
+        {/* Pro Header */}
+        <header className="bg-zinc-900/80 border border-white/5 p-6 rounded-[2.5rem] backdrop-blur-3xl shadow-2xl flex flex-col xl:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center">
-              <Zap className="text-white fill-white" size={28} />
+            <div className="w-12 h-12 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <ShieldAlert className="text-white" size={24} />
             </div>
-            <div className="text-center md:text-left">
-              <h1 className="font-orbitron text-2xl font-black text-white leading-none tracking-tighter">MD PRO</h1>
-              <p className="text-[10px] text-blue-400 font-bold uppercase tracking-[0.3em] mt-2">V5.0 Precision Render</p>
+            <div className="text-center xl:text-left">
+              <h1 className="font-orbitron text-2xl font-black text-white tracking-tighter">DOCX GEN v7.0</h1>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Shared Parsing Protocol Active</p>
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-2">
-            <Button size="sm" onClick={() => onSend(user?.id?.toString() || "", "СЕБЕ")} disabled={!!loading} className="bg-white text-black rounded-xl">
-              {loading === "СЕБЕ" ? <Loader2 className="animate-spin" /> : <Send size={14} className="mr-2"/>} SELF
+          <div className="flex flex-wrap justify-center gap-3">
+            <Button variant="outline" size="sm" onClick={() => {navigator.clipboard.writeText(markdown); toast.success("Copied!");}} className="rounded-xl bg-white/5 border-white/10 hover:bg-white/10">
+              <Copy size={14} className="mr-2"/> COPY
             </Button>
-            <Button size="sm" onClick={() => onSend(MANAGER_ID, "МЕНЕДЖЕРУ")} disabled={!!loading} className="bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-600/20">
-              {loading === "МЕНЕДЖЕРУ" ? <Loader2 className="animate-spin" /> : <ShieldCheck size={14} className="mr-2"/>} MANAGER
+            <Button size="sm" onClick={() => onHandleSend(user?.id?.toString() || "", "СЕБЕ")} disabled={!!loading} className="bg-zinc-100 text-black hover:bg-white rounded-xl font-bold px-6">
+              {loading === "СЕБЕ" ? <Loader2 className="animate-spin" /> : <Send size={14} className="mr-2"/>} SEND SELF
+            </Button>
+            <Button size="sm" onClick={() => onHandleSend(MANAGER_ID, "МЕНЕДЖЕРУ")} disabled={!!loading} className="bg-indigo-600 text-white hover:bg-indigo-500 rounded-xl font-bold px-6 shadow-lg shadow-indigo-600/20">
+              {loading === "МЕНЕДЖЕРУ" ? <Loader2 className="animate-spin" /> : <UserPlus size={14} className="mr-2"/>} MANAGER
             </Button>
           </div>
         </header>
 
-        {/* Workspace */}
+        {/* Two-Column Editor */}
         <div className="grid md:grid-cols-2 gap-6 h-[60vh] md:h-[70vh]">
           {/* Editor */}
           <div className={cn("flex flex-col bg-zinc-950/50 border border-white/5 rounded-[2.5rem] overflow-hidden", activeTab === "view" && "hidden md:flex")}>
-            <div className="px-6 py-3 border-b border-white/5 bg-black/20 text-[10px] font-bold text-zinc-500 uppercase">Editor</div>
+            <div className="px-6 py-3 border-b border-white/5 bg-black/20 text-[10px] font-bold text-zinc-600 uppercase tracking-widest flex items-center gap-2">
+              <Edit3 size={12}/> Editor_Draft
+            </div>
             <textarea 
               value={markdown}
               onChange={e => setMarkdown(e.target.value)}
-              className="flex-1 p-8 bg-transparent text-zinc-300 font-mono text-sm focus:outline-none resize-none custom-scrollbar"
+              className="flex-1 p-8 bg-transparent text-zinc-300 font-mono text-sm focus:outline-none resize-none custom-scrollbar leading-relaxed"
+              placeholder="System Ready..."
             />
           </div>
 
-          {/* Preview */}
-          <div className={cn("flex flex-col bg-zinc-950/20 border border-white/5 rounded-[2.5rem] overflow-hidden backdrop-blur-sm", activeTab === "edit" && "hidden md:flex")}>
-            <div className="px-6 py-3 border-b border-white/5 bg-black/20 text-[10px] font-bold text-zinc-500 uppercase">Render</div>
-            <div className="flex-1 p-8 overflow-auto prose prose-invert max-w-none custom-scrollbar prose-sm">
+          {/* Preview - СИНХРОННЫЙ ПАРСИНГ ТУТ */}
+          <div className={cn("flex flex-col bg-zinc-950/20 border border-white/5 rounded-[2.5rem] overflow-hidden backdrop-blur-sm shadow-inner", activeTab === "edit" && "hidden md:flex")}>
+            <div className="px-6 py-3 border-b border-white/5 bg-black/20 text-[10px] font-bold text-zinc-600 uppercase tracking-widest flex items-center gap-2">
+              <Eye size={12}/> Output_Stream
+            </div>
+            <div className="flex-1 p-8 overflow-auto prose prose-invert prose-blue max-w-none custom-scrollbar prose-sm">
               <ReactMarkdown 
                 remarkPlugins={[remarkGfm]}
                 components={{
                   td: ({ children }) => {
-                    const text = extractText(children);
-                    const matches = [...text.matchAll(/\((bg-|фон-)?([a-zа-яё#0-9-]+)\)/gi)];
-                    let bg, fg, clean = text.replace(/\(.*?\)/g, "").trim();
-                    
-                    matches.forEach(m => {
-                      const isBg = m[1] === "bg-" || m[1] === "фон-";
-                      const val = m[2].toLowerCase().replace(/ё/g, "е");
-                      const hex = HEX_MAP[RU_MAP[val] || val];
-                      if (hex) { if (isBg) bg = hex; else fg = hex; }
-                    });
+                    const rawText = String(children);
+                    // Используем ту же самую синхронную функцию из /lib
+                    const { text, bg, textColor } = parseCellMarkers(rawText);
 
                     return (
                       <td className="border border-white/5 p-4 transition-all" style={{ 
-                        backgroundColor: bg ? `#${bg}44` : undefined, 
-                        color: fg ? `#${fg}` : bg ? `#${bg}` : undefined 
+                        backgroundColor: bg ? `${bg}22` : undefined, // Добавляем прозрачность для UI
+                        color: textColor || (bg ? bg : undefined),
+                        borderLeft: bg ? `4px solid ${bg}` : undefined
                       }}>
-                        {clean || " "}
+                        {text || <span className="opacity-20">empty</span>}
                       </td>
                     );
                   }
@@ -121,10 +116,10 @@ export default function MarkdownDocPage() {
           </div>
         </div>
 
-        {/* Mobile Nav */}
-        <div className="flex md:hidden fixed bottom-6 left-4 right-4 bg-zinc-900 border border-white/10 rounded-2xl p-1 z-50">
-          <button onClick={() => setActiveTab("edit")} className={cn("flex-1 py-3 rounded-xl text-xs font-bold transition-all", activeTab === "edit" ? "bg-white/10 text-white" : "text-zinc-500")}>EDITOR</button>
-          <button onClick={() => setActiveTab("view")} className={cn("flex-1 py-3 rounded-xl text-xs font-bold transition-all", activeTab === "view" ? "bg-white/10 text-white" : "text-zinc-500")}>PREVIEW</button>
+        {/* Mobile Navbar */}
+        <div className="flex md:hidden fixed bottom-6 left-4 right-4 bg-zinc-900 border border-white/10 rounded-2xl p-1 z-50 shadow-2xl">
+          <button onClick={() => setActiveTab("edit")} className={cn("flex-1 py-4 rounded-xl text-xs font-bold transition-all uppercase tracking-widest", activeTab === "edit" ? "bg-white/10 text-white shadow-inner" : "text-zinc-500")}>Edit</button>
+          <button onClick={() => setActiveTab("view")} className={cn("flex-1 py-4 rounded-xl text-xs font-bold transition-all uppercase tracking-widest", activeTab === "view" ? "bg-white/10 text-white shadow-inner" : "text-zinc-500")}>View</button>
         </div>
       </div>
     </div>
