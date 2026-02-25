@@ -67,7 +67,7 @@ export default function MarkdownDocEditor() {
     toast.info("Демо-таблица добавлена");
   };
 
-  // Рекурсивная функция для извлечения чистого текста из React-нод (фикс [object Object])
+  // Рекурсивная функция для извлечения чистого текста из React-нод
   const extractText = (node: any): string => {
     if (!node) return "";
     if (typeof node === "string") return node;
@@ -85,7 +85,7 @@ export default function MarkdownDocEditor() {
             <div className="w-12 h-12 bg-gradient-to-br from-orange-500 via-purple-600 to-cyan-500 rounded-2xl flex items-center justify-center text-3xl shadow-xl">📝</div>
             <div>
               <div className="font-orbitron text-3xl tracking-[2px] text-white">MD → DOCX</div>
-              <div className="text-xs text-emerald-400">CyberVibe Studio • v8.1</div>
+              <div className="text-xs text-emerald-400">CyberVibe Studio • v8.2</div>
             </div>
           </div>
 
@@ -119,7 +119,7 @@ export default function MarkdownDocEditor() {
             />
           </Card>
 
-          {/* Превью — текст на цветном фоне теперь виден */}
+          {/* Превью */}
           <Card className="border-zinc-800 bg-zinc-950/80 backdrop-blur-xl overflow-hidden flex flex-col">
             <div className="p-4 border-b border-zinc-800 flex items-center gap-3 bg-black/60">
               <Eye className="w-5 h-5 text-cyan-400" />
@@ -130,18 +130,18 @@ export default function MarkdownDocEditor() {
                 remarkPlugins={[remarkGfm]}
                 components={{
                   td: ({ children }) => {
-                    const rawText = extractText(children); // Рекурсивно вытаскиваем чистый текст
+                    const rawText = extractText(children);
                     const { text, bg, textColor } = parseCellMarkers(rawText);
 
                     return (
                       <td 
                         className="border border-zinc-700 p-4 font-medium"
                         style={{ 
-                          backgroundColor: bg ? `${bg}33` : undefined, // полупрозрачный фон
-                          color: textColor || (bg ? "#ffffff" : undefined) // белый текст на тёмном фоне
+                          backgroundColor: bg ? `${bg}33` : undefined, 
+                          color: textColor || (bg ? "#ffffff" : undefined) 
                         }}
                       >
-                        {children} {/* Оставляем оригинальный контент с жирным/курсивом */}
+                        {children}
                       </td>
                     );
                   },
@@ -195,7 +195,7 @@ export default function MarkdownDocEditor() {
             <div>• v1 — Первый редактор + DOCX</div>
             <div>• v2 — Удобные префиксы</div>
             <div>• v3 — Русские цвета</div>
-            <div className="text-emerald-400">• v8.1 — Широкие колонки + текст на цветном фоне</div>
+            <div className="text-emerald-400">• v8.2 — Префиксы удалены в превью, цвет на жирном тексте, широкие колонки в DOCX</div>
           </div>
 
           <div className="mt-10 text-center">
