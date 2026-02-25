@@ -5,13 +5,9 @@ import { logger } from "@/lib/logger";
 import * as docx from "docx";
 import { parseCellMarkers } from "@/lib/parseCellMarkers";
 
-const { 
-  Document, Packer, Paragraph, TextRun, HeadingLevel, 
-  Table, TableRow, TableCell, WidthType, TableLayoutType, 
-  BorderStyle, ShadingType, AlignmentType 
-} = docx;
+const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, TableLayoutType, BorderStyle, ShadingType } = docx;
 
-// Константа ширины листа А4 (минус стандартные поля) в единицах DXA
+// 9638 DXA — стандартная рабочая область A4 (210mm - 20mm поля)
 const FULL_TABLE_WIDTH = 9638;
 
 async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
@@ -23,35 +19,28 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
     const line = lines[i].trim();
     if (!line) { i++; continue; }
 
-    if (line.startsWith("#")) {
-      const level = (line.match(/^#+/)?.[0].length || 1) as 1 | 2;
-      children.push(new Paragraph({ 
-        text: line.replace(/^#+\s*/, ""), 
-        heading: level === 1 ? HeadingLevel.HEADING_1 : HeadingLevel.HEADING_2,
-        spacing: { before: 240, after: 120 }
-      }));
+    if (line.startsWith("# ")) {
+      children.push(new Paragraph({ text: line.slice(2), heading: HeadingLevel.HEADING_1 }));
+    } else if (line.startsWith("## ")) {
+      children.push(new Paragraph({ text: line.slice(3), heading: HeadingLevel.HEADING_2 }));
+    } else if (line.startsWith("### ")) {
+      children.push(new Paragraph({ text: line.slice(4), heading: HeadingLevel.HEADING_3 }));
     } 
     else if (line.startsWith("|")) {
       const tableRows: TableRow[] = [];
       let colCount = 0;
-      
-      // 1. Предварительный расчет максимального количества колонок
-      let checkI = i;
-      while (checkI < lines.length && lines[checkI].trim().startsWith("|")) {
-        if (!lines[checkI].includes("---")) {
-          const cells = lines[checkI].split("|").filter(Boolean);
-          if (cells.length > colCount) colCount = cells.length;
-        }
-        checkI++;
-      }
-
-      // Если колонок нет, пропускаем
-      if (colCount === 0) { i++; continue; }
-
-      // Вычисляем жесткую ширину ячейки в DXA
-      const cellWidth = Math.floor(FULL_TABLE_WIDTH / colCount);
-
       let isHeaderRow = true;
+
+      // Сначала определяем максимальное количество колонок в таблице
+      let tempI = i;
+      while (tempI < lines.length && lines[tempI].trim().startsWith("|")) {
+        const rowLine = lines[tempI].trim();
+        if (!rowLine.includes("---")) {
+          const rawCells = rowLine.split("|").slice(1, -1);
+          colCount = Math.max(colCount, rawCells.length);
+        }
+        tempI++;
+      }
 
       while (i < lines.length && lines[i].trim().startsWith("|")) {
         const rowLine = lines[i].trim();
@@ -59,36 +48,30 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
 
         const rawCells = rowLine.split("|").slice(1, -1);
         const rowCells = rawCells.map(raw => {
-          const { text, bg, textColor } = parseCellMarkers(raw);
+          const { text, bg, textColor } = parseCellMarkers(raw.trim());
 
           return new TableCell({
             children: [new Paragraph({ 
               children: [new TextRun({ 
                 text: text || " ", 
-                color: textColor?.replace("#", ""),
+                color: textColor?.replace("#", ""), 
                 bold: isHeaderRow 
-              })],
-              alignment: AlignmentType.LEFT // Выравнивание текста
+              })] 
             })],
             shading: bg ? { fill: bg.replace("#", ""), type: ShadingType.CLEAR } : undefined,
-            // ФИКС: Используем DXA вместо PERCENTAGE для совместимости с Google Docs/Mobile
-            width: { size: cellWidth, type: WidthType.DXA },
-            margins: { top: 120, bottom: 120, left: 120, right: 120 },
+            width: { size: Math.floor(FULL_TABLE_WIDTH / colCount), type: WidthType.DXA },
+            margins: { top: 160, bottom: 160, left: 180, right: 180 },
             borders: { 
-              top: { style: BorderStyle.SINGLE, size: 6, color: "444444" }, 
-              bottom: { style: BorderStyle.SINGLE, size: 6, color: "444444" }, 
-              left: { style: BorderStyle.SINGLE, size: 6, color: "444444" }, 
-              right: { style: BorderStyle.SINGLE, size: 6, color: "444444" } 
+              top: { style: BorderStyle.SINGLE, size: 10 }, 
+              bottom: { style: BorderStyle.SINGLE, size: 10 }, 
+              left: { style: BorderStyle.SINGLE, size: 10 }, 
+              right: { style: BorderStyle.SINGLE, size: 10 } 
             },
           });
         });
 
-        // Дозаполняем ячейки, если строка короче заголовка
         while (rowCells.length < colCount) {
-          rowCells.push(new TableCell({ 
-            children: [], 
-            width: { size: cellWidth, type: WidthType.DXA } 
-          }));
+          rowCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: " " })] })] }));
         }
         
         tableRows.push(new TableRow({ children: rowCells }));
@@ -98,44 +81,46 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
 
       children.push(new Table({
         rows: tableRows,
-        // ФИКС: Явно задаем общую ширину таблицы в DXA
         width: { size: FULL_TABLE_WIDTH, type: WidthType.DXA },
-        // ФИКС: TableLayoutType.FIXED заставляет Word соблюдать заданные размеры колонок
         layout: TableLayoutType.FIXED,
+        borders: { 
+          top: { style: BorderStyle.SINGLE }, 
+          bottom: { style: BorderStyle.SINGLE }, 
+          left: { style: BorderStyle.SINGLE }, 
+          right: { style: BorderStyle.SINGLE }, 
+          insideH: { style: BorderStyle.SINGLE }, 
+          insideV: { style: BorderStyle.SINGLE } 
+        },
       }));
       continue;
     } 
     else {
-      children.push(new Paragraph({ 
-        children: [new TextRun(line)], 
-        spacing: { after: 120 } 
-      }));
+      children.push(new Paragraph({ children: [new TextRun(line)] }));
     }
     i++;
   }
 
-  const doc = new Document({ 
-    sections: [{ 
-      properties: {
-        page: {
-          margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } // Стандартные поля 2.54см
-        }
-      },
-      children 
-    }] 
-  });
+  const doc = new Document({ sections: [{ properties: {}, children }] });
   return Packer.toBuffer(doc);
 }
 
-export async function sendMarkdownDoc(markdown: string, chatId: string, fileName = "Отчет") {
-  try {
-    const bytes = await generateDocxBytes(markdown);
-    const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
-    const name = `${fileName.replace(/\s+/g, "_")}.docx`;
+export async function generateMarkdownDocxAndSend(
+  markdownContent: string,
+  chatId: string,
+  originalFileName = "document"
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  if (!chatId) return { success: false, error: "Chat ID не передан" };
+  if (!markdownContent?.trim()) return { success: false, error: "Нет содержимого" };
 
-    return await sendTelegramDocument(chatId, blob, name, `🚀 *CyberVibe Engine v8.5*\nШирина таблиц: *Оптимизирована*`);
+  try {
+    const docxBytes = await generateDocxBytes(markdownContent);
+    const safeName = originalFileName.replace(/[^a-zA-Z0-9а-яА-ЯёЁ\s_-]/g, "_").substring(0, 60);
+    const fileName = `${safeName || "Report"}.docx`;
+    const blob = new Blob([docxBytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+
+    return await sendTelegramDocument(chatId, blob, fileName, `📄 *CyberVibe Studio v8.0*\nДокумент: \`${fileName}\``);
   } catch (e: any) {
-    logger.error("DOCX_GEN_ERROR", e);
+    logger.error("[md-doc] DOCX error:", e);
     return { success: false, error: e.message };
   }
 }

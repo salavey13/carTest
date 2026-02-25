@@ -21,7 +21,6 @@ export function parseCellMarkers(raw: string) {
   for (const m of matches) {
     const prefix = m[1] || "";
     let token = m[2].toLowerCase().replace(/ё/g, "е");
-
     const hex = COLOR_MAP[token] || (token.startsWith("#") ? token : undefined);
 
     if (hex) {
