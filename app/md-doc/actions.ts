@@ -47,8 +47,8 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
               })] 
             })],
             shading: bg ? { fill: bg, type: ShadingType.CLEAR } : undefined,
-            width: { size: 100 / colCount, type: WidthType.PERCENTAGE },
-            margins: { top: 140, bottom: 140, left: 160, right: 160 },
+            width: { size: Math.floor(10000 / colCount), type: WidthType.DXA }, // надёжная ширина
+            margins: { top: 160, bottom: 160, left: 180, right: 180 },
             borders: { top: { style: BorderStyle.SINGLE, size: 12 }, bottom: { style: BorderStyle.SINGLE, size: 12 }, left: { style: BorderStyle.SINGLE, size: 12 }, right: { style: BorderStyle.SINGLE, size: 12 } },
           });
         });
@@ -61,7 +61,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
 
       children.push(new Table({
         rows: tableRows,
-        width: { size: 100, type: WidthType.PERCENTAGE },
+        width: { size: 10000, type: WidthType.DXA }, // полная ширина страницы
         layout: TableLayoutType.FIXED,
         borders: { top: { style: BorderStyle.SINGLE }, bottom: { style: BorderStyle.SINGLE }, left: { style: BorderStyle.SINGLE }, right: { style: BorderStyle.SINGLE }, insideH: { style: BorderStyle.SINGLE }, insideV: { style: BorderStyle.SINGLE } },
       }));

@@ -180,7 +180,7 @@ export default function MarkdownDocEditor() {
             <div>• v1 — Первый редактор + DOCX</div>
             <div>• v2 — Удобные префиксы</div>
             <div>• v3 — Русские цвета</div>
-            <div className="text-emerald-400">• v7.0 — Полностью на русском, жирные заголовки, широкие колонки</div>
+            <div className="text-emerald-400">• v7.0 — Полностью на русском, широкие колонки, жирные заголовки</div>
           </div>
 
           <div className="mt-10 text-center">
