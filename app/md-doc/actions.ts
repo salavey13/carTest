@@ -26,6 +26,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
     else if (line.startsWith("|")) {
       const tableRows: TableRow[] = [];
       let colCount = 0;
+      let isFirstRow = true; // заголовок
 
       while (i < lines.length && lines[i].trim().startsWith("|")) {
         const rowLine = lines[i].trim();
@@ -38,7 +39,13 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
           const { text, bg, textColor } = parseCellMarkers(raw.trim());
 
           return new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: text || " ", color: textColor?.replace("#", "") })] })],
+            children: [new Paragraph({ 
+              children: [new TextRun({ 
+                text: text || " ", 
+                color: textColor?.replace("#", ""), 
+                bold: isFirstRow 
+              })] 
+            })],
             shading: bg ? { fill: bg, type: ShadingType.CLEAR } : undefined,
             width: { size: 100 / colCount, type: WidthType.PERCENTAGE },
             margins: { top: 140, bottom: 140, left: 160, right: 160 },
@@ -48,6 +55,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
 
         while (rowCells.length < colCount) rowCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: " " })] })] }));
         tableRows.push(new TableRow({ children: rowCells }));
+        isFirstRow = false;
         i++;
       }
 

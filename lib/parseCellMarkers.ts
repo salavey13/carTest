@@ -1,39 +1,29 @@
-export const COLOR_MAP: Record<string, string> = {
-  red: "#ef4444", красный: "#ef4444",
-  green: "#22c55e", зеленый: "#22c55e", зелёный: "#22c55e",
-  blue: "#3b82f6", синий: "#3b82f6",
-  yellow: "#eab308", желтый: "#eab308", жёлтый: "#eab308",
-  orange: "#f97316", оранжевый: "#f97316",
-  purple: "#a855f7", фиолетовый: "#a855f7",
-  emerald: "#10b981", изумрудный: "#10b981",
-  cyan: "#06b6d4", голубой: "#06b6d4",
-  amber: "#f59e0b", rose: "#f43f5e", sky: "#0ea5e9",
-  white: "#ffffff", black: "#000000",
-};
-
 export function parseCellMarkers(raw: string) {
   let text = raw.trim();
   let bg: string | undefined;
   let textColor: string | undefined;
 
-  // Ищем все вхождения (bg-цвет) или (цвет)
-  const matches = [...text.matchAll(/\((bg-|фон-)?([a-zа-яё#0-9-]+)\)/gi)];
+  const COLOR_MAP: Record<string, string> = {
+    red: "#ef4444", green: "#22c55e", blue: "#3b82f6", yellow: "#eab308",
+    amber: "#f59e0b", orange: "#f97316", pink: "#ec4899", purple: "#a855f7",
+    cyan: "#06b6d4", lime: "#84cc16", emerald: "#10b981", teal: "#14b8a6",
+    rose: "#f43f5e", violet: "#8b5cf6", indigo: "#6366f1", sky: "#0ea5e9",
+    white: "#ffffff", black: "#000000", gray: "#6b7280",
+  };
+
+  const matches = [...text.matchAll(/\((bg-)?([a-z#0-9-]+)\)/gi)];
 
   for (const m of matches) {
-    const isBg = m[1] === "bg-" || m[1] === "фон-";
-    let token = m[2].toLowerCase().replace(/ё/g, "е");
-    
-    // Получаем HEX из нашей карты
-    const hex = COLOR_MAP[token] || (token.startsWith("#") ? token : undefined);
+    const prefix = m[1] || "";
+    let token = m[2].toLowerCase();
 
-    if (hex) {
-      if (isBg) bg = hex;
-      else textColor = hex;
+    if (prefix === "bg-") {
+      bg = COLOR_MAP[token] || (token.startsWith("#") ? token : undefined);
+    } else {
+      textColor = COLOR_MAP[token] || (token.startsWith("#") ? token : undefined);
     }
   }
 
-  // Очищаем текст от маркеров
-  text = text.replace(/\((bg-|фон-)?[a-zа-яё#0-9-]+\)\s*/gi, "").trim();
-  
+  text = text.replace(/\((bg-)?[a-z#0-9-]+\)\s*/gi, "").trim();
   return { text, bg, textColor };
 }
