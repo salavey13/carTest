@@ -25,10 +25,10 @@ export default function MarkdownDocEditor() {
 
 | Задача                    | Статус                     | Приоритет                     |
 |---------------------------|----------------------------|-------------------------------|
-| (bg-green) Дизайн         | Готово                     | (amber) Высокий               |
-| Код                       | (bg-orange) В процессе     | Средний                       |
-| (red) Тестирование        | Запланировано              | (rose) Критично               |
-| Деплой                    | (bg-emerald) Готово        | (sky) Норма                   |`);
+| (bg-зелёный) Дизайн       | Готово                     | (amber) Высокий               |
+| Код                       | (bg-оранжевый) В процессе  | Средний                       |
+| (красный) Тестирование    | Запланировано              | (rose) Критично               |
+| Деплой                    | (bg-изумрудный) Готово     | (sky) Норма                   |`);
 
   const [title, setTitle] = useState("Мой_отчёт_Февраль");
   const [isSendingSelf, setIsSendingSelf] = useState(false);
@@ -62,7 +62,7 @@ export default function MarkdownDocEditor() {
   const insertDemo = () => {
     const demo = `\n\n## Новая таблица\n\n| Задача | Статус | Приоритет |
 |--------|--------|-----------|
-| (bg-red) Критично | В работе | (purple) Важно |`;
+| (bg-красный) Критично | В работе | (фиолетовый) Важно |`;
     setMarkdown(markdown + demo);
     toast.info("Демо-таблица добавлена");
   };
@@ -76,7 +76,7 @@ export default function MarkdownDocEditor() {
             <div className="w-12 h-12 bg-gradient-to-br from-orange-500 via-purple-600 to-cyan-500 rounded-2xl flex items-center justify-center text-3xl shadow-xl">📝</div>
             <div>
               <div className="font-orbitron text-3xl tracking-[2px] text-white">MD → DOCX</div>
-              <div className="text-xs text-emerald-400">CyberVibe Studio • v6.9</div>
+              <div className="text-xs text-emerald-400">CyberVibe Studio • v7.0</div>
             </div>
           </div>
 
@@ -114,7 +114,7 @@ export default function MarkdownDocEditor() {
           <Card className="border-zinc-800 bg-zinc-950/80 backdrop-blur-xl overflow-hidden flex flex-col">
             <div className="p-4 border-b border-zinc-800 flex items-center gap-3 bg-black/60">
               <Eye className="w-5 h-5 text-cyan-400" />
-              <div className="font-medium text-white">LIVE PREVIEW</div>
+              <div className="font-medium text-white">ЖИВОЕ ПРЕВЬЮ</div>
             </div>
             <div className="flex-1 overflow-auto p-8 prose prose-invert max-w-none custom-scrollbar">
               <ReactMarkdown
@@ -180,7 +180,7 @@ export default function MarkdownDocEditor() {
             <div>• v1 — Первый редактор + DOCX</div>
             <div>• v2 — Удобные префиксы</div>
             <div>• v3 — Русские цвета</div>
-            <div className="text-emerald-400">• v6.9 — Заголовки жирные + цветные, пустые ячейки, PC-полировка</div>
+            <div className="text-emerald-400">• v7.0 — Полностью на русском, жирные заголовки, широкие колонки</div>
           </div>
 
           <div className="mt-10 text-center">

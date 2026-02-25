@@ -26,7 +26,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
     else if (line.startsWith("|")) {
       const tableRows: TableRow[] = [];
       let colCount = 0;
-      let isFirstRow = true; // заголовок
+      let isHeaderRow = true;
 
       while (i < lines.length && lines[i].trim().startsWith("|")) {
         const rowLine = lines[i].trim();
@@ -43,7 +43,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
               children: [new TextRun({ 
                 text: text || " ", 
                 color: textColor?.replace("#", ""), 
-                bold: isFirstRow 
+                bold: isHeaderRow 
               })] 
             })],
             shading: bg ? { fill: bg, type: ShadingType.CLEAR } : undefined,
@@ -55,7 +55,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
 
         while (rowCells.length < colCount) rowCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: " " })] })] }));
         tableRows.push(new TableRow({ children: rowCells }));
-        isFirstRow = false;
+        isHeaderRow = false;
         i++;
       }
 
@@ -101,7 +101,7 @@ export async function generateMarkdownDocxAndSend(
       chatId,
       blob,
       fileName,
-      `📄 ${fileName}\nГотово из Markdown-редактора CyberVibe v6.9`
+      `📄 ${fileName}\nГотово из Markdown-редактора CyberVibe v7.0`
     );
 
     return result.success 
