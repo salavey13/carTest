@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { generateMarkdownDocxAndSend, parseCellMarkers } from "./actions";
+import { generateMarkdownDocxAndSend } from "./actions";
+import { parseCellMarkers } from "@/lib/parseCellMarkers";
 import { useAppContext } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,10 +25,10 @@ export default function MarkdownDocEditor() {
 
 | Задача                    | Статус                     | Приоритет                     |
 |---------------------------|----------------------------|-------------------------------|
-| (bg-зелёный) Дизайн       | Готово                     | (amber) Высокий               |
-| Код                       | (bg-оранжевый) В процессе  | Средний                       |
-| (красный) Тестирование    | Запланировано              | (rose) Критично               |
-| Деплой                    | (bg-изумрудный) Готово     | (sky) Норма                   |`);
+| (bg-green) Дизайн         | Готово                     | (amber) Высокий               |
+| Код                       | (bg-orange) В процессе     | Средний                       |
+| (red) Тестирование        | Запланировано              | (rose) Критично               |
+| Деплой                    | (bg-emerald) Готово        | (sky) Норма                   |`);
 
   const [title, setTitle] = useState("Мой_отчёт_Февраль");
   const [isSendingSelf, setIsSendingSelf] = useState(false);
@@ -61,7 +62,7 @@ export default function MarkdownDocEditor() {
   const insertDemo = () => {
     const demo = `\n\n## Новая таблица\n\n| Задача | Статус | Приоритет |
 |--------|--------|-----------|
-| (bg-красный) Критично | В работе | (фиолетовый) Важно |`;
+| (bg-red) Критично | В работе | (purple) Важно |`;
     setMarkdown(markdown + demo);
     toast.info("Демо-таблица добавлена");
   };
