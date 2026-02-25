@@ -75,7 +75,7 @@ export default function MarkdownDocEditor() {
             <div className="w-12 h-12 bg-gradient-to-br from-orange-500 via-purple-600 to-cyan-500 rounded-2xl flex items-center justify-center text-3xl shadow-xl">📝</div>
             <div>
               <div className="font-orbitron text-3xl tracking-[2px] text-white">MD → DOCX</div>
-              <div className="text-xs text-emerald-400">CyberVibe Studio • v5.1</div>
+              <div className="text-xs text-emerald-400">CyberVibe Studio • v6.9</div>
             </div>
           </div>
 
@@ -128,7 +128,7 @@ export default function MarkdownDocEditor() {
                         className="border border-zinc-700 p-4 font-medium"
                         style={{ backgroundColor: bg, color: textColor }}
                       >
-                        {text || " "}
+                        {text || <span>&nbsp;</span>}
                       </td>
                     );
                   },
@@ -166,7 +166,7 @@ export default function MarkdownDocEditor() {
             <div>• v1 — Первый редактор + DOCX</div>
             <div>• v2 — Удобные префиксы</div>
             <div>• v3 — Русские цвета</div>
-            <div className="text-emerald-400">• v5.1 — Идеальный превью + менеджер + SOTA UI для PC/large</div>
+            <div className="text-emerald-400">• v6.9 — Пустые ячейки, широкие колонки + полный фикс</div>
           </div>
 
           <div className="mt-10 text-center">
