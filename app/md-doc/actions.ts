@@ -28,7 +28,7 @@ const RUSSIAN_TO_ENGLISH: Record<string, string> = {
   "бирюзовый": "teal", "бирюз": "teal",
 };
 
-export async function parseCellMarkers(raw: string) {  // Async для server action
+export async function parseCellMarkers(raw: string) {
   let text = raw.trim();
   let bg: string | undefined;
   let textColor: string | undefined;
@@ -79,14 +79,14 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
         colCount = Math.max(colCount, rawCells.length);
 
         const rowCells = await Promise.all(rawCells.map(async raw => {
-          const { text, bg, textColor } = await parseCellMarkers(raw.trim()); // async call
+          const { text, bg, textColor } = await parseCellMarkers(raw.trim());
 
           return new TableCell({
             children: [new Paragraph({ children: [new TextRun({ text, color: textColor?.replace("#", "") })] })],
             shading: bg ? { fill: bg, type: ShadingType.CLEAR } : undefined,
             width: { size: 100 / colCount, type: WidthType.PERCENTAGE },
-            margins: { top: 100, bottom: 100, left: 100, right: 100 },
-            borders: { top: { style: BorderStyle.SINGLE, size: 8 }, bottom: { style: BorderStyle.SINGLE, size: 8 }, left: { style: BorderStyle.SINGLE, size: 8 }, right: { style: BorderStyle.SINGLE, size: 8 } },
+            margins: { top: 140, bottom: 140, left: 160, right: 160 },
+            borders: { top: { style: BorderStyle.SINGLE, size: 12 }, bottom: { style: BorderStyle.SINGLE, size: 12 }, left: { style: BorderStyle.SINGLE, size: 12 }, right: { style: BorderStyle.SINGLE, size: 12 } },
           });
         }));
 
