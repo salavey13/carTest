@@ -35,7 +35,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
       const tableRows: TableRow[] = [];
       let colCount = 0;
 
-      // 1. Предварительный расчёт количества колонок
+      // Считаем количество колонок
       let checkI = i;
       while (checkI < lines.length && lines[checkI].trim().startsWith("|")) {
         if (!lines[checkI].includes("---")) {
@@ -47,7 +47,6 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
 
       if (colCount === 0) { i++; continue; }
 
-      // Жёсткая ширина ячейки в DXA
       const cellWidth = Math.floor(FULL_TABLE_WIDTH / colCount);
       let isHeader = true;
 
@@ -103,7 +102,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
     sections: [{ 
       properties: {
         page: {
-          margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } // 2.54 см поля
+          margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
         }
       },
       children 
