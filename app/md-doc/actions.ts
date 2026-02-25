@@ -7,7 +7,7 @@ import { parseCellMarkers } from "@/lib/parseCellMarkers";
 
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, TableLayoutType, BorderStyle, ShadingType } = docx;
 
-// Надёжная ширина таблицы (9638 DXA — стандартная рабочая область A4)
+// Надёжная ширина A4 (9638 DXA — стандартная рабочая область)
 const FULL_TABLE_WIDTH = 9638;
 
 async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
@@ -105,7 +105,7 @@ export async function generateMarkdownDocxAndSend(
       chatId,
       blob,
       fileName,
-      `📄 ${fileName}\nГотово из Markdown-редактора CyberVibe v7.0`
+      `📄 ${fileName}\nГотово из Markdown-редактора CyberVibe v8.0`
     );
 
     return result.success 
