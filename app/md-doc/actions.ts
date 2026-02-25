@@ -4,133 +4,157 @@ import { sendTelegramDocument } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import * as docx from "docx";
 
-const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, TableLayoutType, BorderStyle, ShadingType, AlignmentType } = docx;
+const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, TableLayoutType, BorderStyle, ShadingType } = docx;
 
-// Расширенная палитра с поддержкой яркости для читаемости
 const COLOR_MAP: Record<string, string> = {
-  red: "FF4136", green: "2ECC40", blue: "0074D9", yellow: "FFDC00",
-  orange: "FF851B", purple: "B10DC9", cyan: "7FDBFF", lime: "01FF70",
-  emerald: "27AE60", rose: "FF4136", dark: "111111", silver: "DDDDDD"
+  red: "#ef4444", green: "#22c55e", blue: "#3b82f6", yellow: "#eab308",
+  amber: "#f59e0b", orange: "#f97316", pink: "#ec4899", purple: "#a855f7",
+  cyan: "#06b6d4", lime: "#84cc16", emerald: "#10b981", teal: "#14b8a6",
+  rose: "#f43f5e", violet: "#8b5cf6", indigo: "#6366f1", sky: "#0ea5e9",
+  white: "#ffffff", black: "#000000", gray: "#6b7280",
 };
 
 const RUSSIAN_TO_ENGLISH: Record<string, string> = {
-  "красный": "red", "зеленый": "green", "синий": "blue", "желтый": "yellow",
-  "оранжевый": "orange", "фиолетовый": "purple", "черный": "dark"
+  "красный": "red", "красн": "red",
+  "зелёный": "green", "зеленый": "green", "зелен": "green",
+  "синий": "blue", "син": "blue",
+  "желтый": "yellow", "жёлтый": "yellow", "желт": "yellow",
+  "оранжевый": "orange", "оранж": "orange",
+  "розовый": "pink", "розов": "pink",
+  "фиолетовый": "purple", "фиолет": "purple",
+  "голубой": "cyan", "голуб": "cyan",
+  "лаймовый": "lime", "лайм": "lime",
+  "изумрудный": "emerald", "изумруд": "emerald",
+  "бирюзовый": "teal", "бирюз": "teal",
 };
 
-// Функция для создания форматированного текста (Bold/Italic) внутри ячеек
-function createFormattedRuns(text: string, color?: string): TextRun[] {
-  const runs: TextRun[] = [];
-  // Упрощенный парсинг: ищем **жирный**
-  const parts = text.split(/(\*\*.*?\*\*)/g);
-  parts.forEach(part => {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      runs.push(new TextRun({ text: part.slice(2, -2), bold: true, color: color?.replace("#", "") }));
-    } else {
-      runs.push(new TextRun({ text: part, color: color?.replace("#", "") }));
-    }
-  });
-  return runs;
-}
-
-function parseCell(raw: string) {
+function parseCellMarkers(raw: string) {
   let text = raw.trim();
   let bg: string | undefined;
   let textColor: string | undefined;
 
-  const markerRegex = /\((bg-)?([a-zа-я0-9#]+)\)/gi;
-  let match;
-  while ((match = markerRegex.exec(text)) !== null) {
-    let type = match[1]; // "bg-" или undefined
-    let value = match[2].toLowerCase();
-    if (RUSSIAN_TO_ENGLISH[value]) value = RUSSIAN_TO_ENGLISH[value];
-    const hex = COLOR_MAP[value] || (value.startsWith("#") ? value : undefined);
+  // Ловим: (bg-красный), (фон-красный), (красный), (red), (bg-red)
+  const matches = [...text.matchAll(/\((bg-|фон-)?([a-zа-яё#0-9-]+)\)/gi)];
 
-    if (type === "bg-") bg = hex;
-    else textColor = hex;
+  for (const m of matches) {
+    const prefix = m[1] || "";
+    let token = m[2].toLowerCase().replace(/ё/g, "е");
+
+    const key = RUSSIAN_TO_ENGLISH[token] || token;
+
+    if (prefix === "bg-" || prefix === "фон-") {
+      bg = COLOR_MAP[key] || (key.startsWith("#") ? key : undefined);
+    } else {
+      textColor = COLOR_MAP[key] || (key.startsWith("#") ? key : undefined);
+    }
   }
-  return { 
-    cleanText: text.replace(markerRegex, "").trim(), 
-    bg, 
-    textColor 
-  };
+
+  text = text.replace(/\((bg-|фон-)?[a-zа-яё#0-9-]+\)\s*/gi, "").trim();
+  return { text, bg, textColor };
+}
+
+async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
+  const children: any[] = [];
+  const lines = markdown.split("\n");
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    if (!line) { i++; continue; }
+
+    if (line.startsWith("# ")) {
+      children.push(new Paragraph({ text: line.slice(2), heading: HeadingLevel.HEADING_1 }));
+    } else if (line.startsWith("## ")) {
+      children.push(new Paragraph({ text: line.slice(3), heading: HeadingLevel.HEADING_2 }));
+    } else if (line.startsWith("### ")) {
+      children.push(new Paragraph({ text: line.slice(4), heading: HeadingLevel.HEADING_3 }));
+    } 
+    else if (line.startsWith("|")) {
+      const tableRows: TableRow[] = [];
+      let colCount = 0;
+
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        const rowLine = lines[i].trim();
+        if (rowLine.includes("---")) { i++; continue; }
+
+        const rawCells = rowLine.split("|").slice(1, -1);
+        colCount = Math.max(colCount, rawCells.length);
+
+        const rowCells = rawCells.map(raw => {
+          const { text, bg, textColor } = parseCellMarkers(raw.trim());
+
+          return new TableCell({
+            children: [new Paragraph({
+              children: [new TextRun({ text, color: textColor?.replace("#", "") })],
+            })],
+            shading: bg ? { fill: bg, type: ShadingType.CLEAR } : undefined,
+            width: { size: 4500, type: WidthType.DXA }, // нормальная широкая колонка
+            margins: { top: 100, bottom: 100, left: 120, right: 120 },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 10 },
+              bottom: { style: BorderStyle.SINGLE, size: 10 },
+              left: { style: BorderStyle.SINGLE, size: 10 },
+              right: { style: BorderStyle.SINGLE, size: 10 },
+            },
+          });
+        });
+
+        while (rowCells.length < colCount) rowCells.push(new TableCell({ children: [] }));
+        tableRows.push(new TableRow({ children: rowCells }));
+        i++;
+      }
+
+      children.push(new Table({
+        rows: tableRows,
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        layout: TableLayoutType.FIXED,
+        columnWidths: Array(colCount).fill(4500),
+        borders: { top: { style: BorderStyle.SINGLE }, bottom: { style: BorderStyle.SINGLE }, left: { style: BorderStyle.SINGLE }, right: { style: BorderStyle.SINGLE }, insideH: { style: BorderStyle.SINGLE }, insideV: { style: BorderStyle.SINGLE } },
+      }));
+      continue;
+    } 
+    else {
+      children.push(new Paragraph({ children: [new TextRun(line)] }));
+    }
+    i++;
+  }
+
+  const doc = new Document({ sections: [{ properties: {}, children }] });
+  return Packer.toBuffer(doc);
 }
 
 export async function generateMarkdownDocxAndSend(
-  markdown: string,
+  markdownContent: string,
   chatId: string,
-  fileName = "CyberVibe_Report"
-) {
+  originalFileName = "document"
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  if (!chatId) return { success: false, error: "Chat ID не передан" };
+  if (!markdownContent?.trim()) return { success: false, error: "Нет содержимого" };
+
   try {
-    const children: any[] = [];
-    const lines = markdown.split("\n");
-    let i = 0;
-
-    while (i < lines.length) {
-      const line = lines[i].trim();
-      if (!line) { i++; continue; }
-
-      if (line.startsWith("#")) {
-        const level = line.match(/^#+/)?.[0].length || 1;
-        const text = line.replace(/^#+\s*/, "");
-        children.push(new Paragraph({
-          text,
-          heading: level === 1 ? HeadingLevel.HEADING_1 : HeadingLevel.HEADING_2,
-          spacing: { before: 400, after: 200 }
-        }));
-      } 
-      else if (line.startsWith("|")) {
-        const rows: TableRow[] = [];
-        while (i < lines.length && lines[i].trim().startsWith("|")) {
-          const rowLine = lines[i].trim();
-          if (rowLine.includes("---")) { i++; continue; }
-          
-          const cells = rowLine.split("|").slice(1, -1);
-          rows.push(new TableRow({
-            children: cells.map(c => {
-              const { cleanText, bg, textColor } = parseCell(c);
-              return new TableCell({
-                children: [new Paragraph({ children: createFormattedRuns(cleanText, textColor) })],
-                shading: bg ? { fill: bg.replace("#", ""), type: ShadingType.CLEAR } : undefined,
-                verticalAlign: AlignmentType.CENTER,
-                margins: { top: 100, bottom: 100, left: 100, right: 100 },
-                borders: { 
-                  top: { style: BorderStyle.SINGLE, size: 4, color: "E0E0E0" },
-                  bottom: { style: BorderStyle.SINGLE, size: 4, color: "E0E0E0" },
-                  left: { style: BorderStyle.SINGLE, size: 4, color: "E0E0E0" },
-                  right: { style: BorderStyle.SINGLE, size: 4, color: "E0E0E0" }
-                }
-              });
-            })
-          }));
-          i++;
-        }
-        children.push(new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE } }));
-        continue;
-      } else {
-        children.push(new Paragraph({ children: createFormattedRuns(line), spacing: { after: 150 } }));
-      }
-      i++;
-    }
-
-    const doc = new Document({ 
-      sections: [{ 
-        properties: { page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } }, 
-        children 
-      }] 
-    });
+    const docxBytes = await generateDocxBytes(markdownContent);
     
-    const buffer = await Packer.toBuffer(doc);
-    const finalName = `${fileName.replace(/\s+/g, "_")}.docx`;
-    
-    return await sendTelegramDocument(
-      chatId, 
-      new Blob([buffer]), 
-      finalName, 
-      `🚀 *CyberVibe Pro Engine*\nДокумент: \`${finalName}\` успешно сформирован.`
+    const safeName = originalFileName
+      .replace(/[^a-zA-Z0-9а-яА-ЯёЁ\s_-]/g, "_")
+      .replace(/\s+/g, "_")
+      .substring(0, 60);
+
+    const fileName = `${safeName}.docx`;
+
+    const blob = new Blob([docxBytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+
+    const result = await sendTelegramDocument(
+      chatId,
+      blob,
+      fileName,
+      `📄 ${fileName}\nГотово из Markdown-редактора CyberVibe v4.0`
     );
+
+    return result.success 
+      ? { success: true, message: `✅ ${fileName} отправлен в Telegram!` }
+      : { success: false, error: result.error || "Ошибка отправки" };
   } catch (e: any) {
-    logger.error("DOCX_GEN_ERROR", e);
+    logger.error("[md-doc] DOCX error:", e);
     return { success: false, error: e.message };
   }
 }
