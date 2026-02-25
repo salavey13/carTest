@@ -43,10 +43,10 @@ export default function MarkdownDocEditor() {
     localStorage.setItem("md-doc-draft", markdown);
   }, [markdown]);
 
-  const sendTo = async (targetChatId: string, isManager: boolean) => {
+  const sendDoc = async (targetId: string, isManager: boolean) => {
     const setLoading = isManager ? setIsSendingManager : setIsSendingSelf;
     setLoading(true);
-    const res = await generateMarkdownDocxAndSend(markdown, targetChatId, title);
+    const res = await generateMarkdownDocxAndSend(markdown, targetId, title);
     setLoading(false);
     res.success 
       ? toast.success(isManager ? "✅ Отправлено менеджеру!" : `✅ ${res.message}`)
@@ -55,7 +55,7 @@ export default function MarkdownDocEditor() {
 
   const copyMarkdown = () => {
     navigator.clipboard.writeText(markdown);
-    toast.success("Markdown скопирован в буфер!");
+    toast.success("Markdown скопирован!");
   };
 
   const insertDemo = () => {
@@ -73,7 +73,7 @@ export default function MarkdownDocEditor() {
             <div className="w-12 h-12 bg-gradient-to-br from-orange-500 via-purple-600 to-cyan-500 rounded-2xl flex items-center justify-center text-3xl shadow-xl">📝</div>
             <div>
               <div className="font-orbitron text-3xl tracking-[2px] text-white">MD → DOCX</div>
-              <div className="text-xs text-emerald-400">CyberVibe Studio • v4.1</div>
+              <div className="text-xs text-emerald-400">CyberVibe Studio • v5.0</div>
             </div>
           </div>
 
@@ -92,22 +92,12 @@ export default function MarkdownDocEditor() {
           <Card className="border-zinc-800 bg-zinc-950/80 backdrop-blur-xl overflow-hidden">
             <div className="p-4 border-b border-zinc-800 flex items-center gap-3 bg-black/60">
               <div className="text-emerald-400">✍️</div>
-              <input
-                type="text"
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                className="flex-1 bg-transparent text-white font-medium focus:outline-none"
-                placeholder="Имя файла"
-              />
+              <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="flex-1 bg-transparent text-white font-medium focus:outline-none" placeholder="Имя файла" />
             </div>
-            <Textarea
-              value={markdown}
-              onChange={e => setMarkdown(e.target.value)}
-              className="h-[520px] resize-y min-h-[400px] textarea-cyber border-0 font-mono text-sm p-6 bg-transparent"
-            />
+            <Textarea value={markdown} onChange={e => setMarkdown(e.target.value)} className="h-[520px] resize-y min-h-[400px] textarea-cyber border-0 font-mono text-sm p-6 bg-transparent" />
           </Card>
 
-          {/* Превью — теперь с русскими цветами */}
+          {/* Превью */}
           <Card className="border-zinc-800 bg-zinc-950/80 backdrop-blur-xl overflow-hidden flex flex-col">
             <div className="p-4 border-b border-zinc-800 flex items-center gap-3 bg-black/60">
               <Eye className="w-5 h-5 text-cyan-400" />
@@ -123,8 +113,11 @@ export default function MarkdownDocEditor() {
 
                     return (
                       <td 
-                        className="border border-zinc-700 p-4 font-medium"
-                        style={{ backgroundColor: bg, color: textColor }}
+                        className="border border-zinc-700 p-4 font-medium transition-all"
+                        style={{ 
+                          backgroundColor: bg,
+                          color: textColor || (bg ? "#ffffff" : undefined)
+                        }}
                       >
                         {text || " "}
                       </td>
@@ -141,17 +134,17 @@ export default function MarkdownDocEditor() {
         {/* Кнопки отправки */}
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
           <Button 
-            onClick={() => sendTo(chatId!, false)}
+            onClick={() => sendDoc(chatId!, false)}
             disabled={isSendingSelf || !chatId}
-            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white rounded-3xl py-7 px-10 text-lg flex-1 sm:flex-none flex items-center justify-center gap-3"
+            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white rounded-3xl py-7 px-12 text-lg flex-1 sm:flex-none flex items-center justify-center gap-3 shadow-xl"
           >
             {isSendingSelf ? <Loader2 className="animate-spin" /> : <Send />} Отправить себе
           </Button>
 
           <Button 
-            onClick={() => sendTo(MANAGER_CHAT_ID, true)}
+            onClick={() => sendDoc(MANAGER_CHAT_ID, true)}
             disabled={isSendingManager}
-            className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-3xl py-7 px-10 text-lg flex-1 sm:flex-none flex items-center justify-center gap-3"
+            className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-3xl py-7 px-12 text-lg flex-1 sm:flex-none flex items-center justify-center gap-3 shadow-xl"
           >
             {isSendingManager ? <Loader2 className="animate-spin" /> : <UserCheck />} Отправить менеджеру
           </Button>
@@ -163,13 +156,13 @@ export default function MarkdownDocEditor() {
           <div className="space-y-3 text-zinc-400">
             <div>• v1 — Первый редактор + DOCX</div>
             <div>• v2 — Удобные префиксы</div>
-            <div>• v3 — Русские цвета в DOCX</div>
-            <div className="text-emerald-400">• v4.1 — Русские цвета в превью + кнопка менеджеру + идеальный мобильный UI</div>
+            <div>• v3 — Русские цвета</div>
+            <div className="text-emerald-400">• v5.0 — Идеальный превью + менеджер + премиум UI</div>
           </div>
 
           <div className="mt-10 text-center">
             <a href="https://chatgpt.com/codex" target="_blank" className="text-white hover:text-cyan-400 text-lg transition-colors">
-              Хочешь новую фишку? Напиши в Codex — я добавлю за минуту 🔥
+              Хочешь следующую фишку? Напиши в Codex — я сделаю за минуту 🔥
             </a>
             <div className="text-xs text-zinc-500 mt-2">Так ты становишься тиммейтом CyberVibe</div>
           </div>
