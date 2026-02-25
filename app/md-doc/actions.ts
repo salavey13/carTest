@@ -4,7 +4,39 @@ import { sendTelegramDocument } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import * as docx from "docx";
 
-const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType } = docx;
+const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, TableLayoutType, BorderStyle, ShadingType } = docx;
+
+const COLOR_MAP: Record<string, string> = {
+  red: "#ef4444", green: "#22c55e", blue: "#3b82f6", yellow: "#eab308",
+  amber: "#f59e0b", orange: "#f97316", pink: "#ec4899", purple: "#a855f7",
+  cyan: "#06b6d4", lime: "#84cc16", emerald: "#10b981", teal: "#14b8a6",
+  rose: "#f43f5e", violet: "#8b5cf6", indigo: "#6366f1", sky: "#0ea5e9",
+  white: "#ffffff", black: "#000000", gray: "#6b7280",
+};
+
+function parseCellMarkers(cell: string): { text: string; bg?: string; textColor?: string } {
+  let text = cell.trim();
+  let bg: string | undefined;
+  let textColor: string | undefined;
+
+  // Ищем все маркеры (bg-xxx) и (color)
+  const matches = [...text.matchAll(/\((bg-[^)]+|[^)]+)\)/gi)];
+
+  for (const m of matches) {
+    const token = m[1].toLowerCase().trim();
+    if (token.startsWith("bg-")) {
+      const colorKey = token.slice(3);
+      bg = COLOR_MAP[colorKey] || (colorKey.startsWith("#") ? colorKey : undefined);
+    } else {
+      textColor = COLOR_MAP[token] || (token.startsWith("#") ? token : undefined);
+    }
+  }
+
+  // Убираем все маркеры из текста
+  text = text.replace(/\((bg-[^)]+|[^)]+)\)\s*/gi, "").trim();
+
+  return { text, bg, textColor };
+}
 
 async function generateDocxBytes(markdown: string, title = "Document"): Promise<Uint8Array> {
   const children: any[] = [];
@@ -14,7 +46,6 @@ async function generateDocxBytes(markdown: string, title = "Document"): Promise<
   while (i < lines.length) {
     const line = lines[i].trim();
 
-    // Заголовки
     if (line.startsWith("# ")) {
       children.push(new Paragraph({ text: line.slice(2), heading: HeadingLevel.HEADING_1 }));
     } else if (line.startsWith("## ")) {
@@ -22,47 +53,42 @@ async function generateDocxBytes(markdown: string, title = "Document"): Promise<
     } else if (line.startsWith("### ")) {
       children.push(new Paragraph({ text: line.slice(4), heading: HeadingLevel.HEADING_3 }));
     } 
-    // Таблицы (с поддержкой раскраски!)
+    // ТАБЛИЦЫ
     else if (line.startsWith("|")) {
-      const tableRows: docx.TableRow[] = [];
-      let headerCells: string[] = [];
+      const tableRows: TableRow[] = [];
+      let colCount = 0;
 
       while (i < lines.length && lines[i].trim().startsWith("|")) {
         const rowLine = lines[i].trim();
-        if (rowLine.includes("---")) { i++; continue; } // разделитель
+        if (rowLine.includes("---")) { i++; continue; }
 
-        const cells = rowLine.split("|").slice(1, -1).map(c => c.trim());
+        const rawCells = rowLine.split("|").slice(1, -1);
+        colCount = Math.max(colCount, rawCells.length);
 
-        if (tableRows.length === 0) {
-          headerCells = cells;
-        }
-
-        const rowCells: docx.TableCell[] = cells.map(cell => {
-          let text = cell;
-          let fill = "FFFFFF";
-
-          // Парсим цвет: {bg-red-500} или {bg:#ef4444;text-white} или {red}
-          const colorMatch = cell.match(/\{(bg-?[^;]+)?(?:; ?text-?([^}]+))?\}/);
-          if (colorMatch) {
-            text = cell.replace(/\{.*\}/, "").trim();
-            const bgPart = colorMatch[1];
-            if (bgPart) {
-              const colorMap: Record<string, string> = {
-                red: "#ef4444", green: "#22c55e", blue: "#3b82f6",
-                yellow: "#eab308", purple: "#a855f7", orange: "#f97316",
-                pink: "#ec4899", cyan: "#06b6d4",
-              };
-              let colorKey = bgPart.replace("bg-", "");
-              fill = colorMap[colorKey] || (colorKey.startsWith("#") ? colorKey : "#FFFFFF");
-            }
-          }
+        const rowCells = rawCells.map(raw => {
+          const { text, bg, textColor } = parseCellMarkers(raw.trim());
 
           return new TableCell({
-            children: [new Paragraph({ children: [new TextRun(text)] })],
-            shading: { fill, type: ShadingType.CLEAR },
-            borders: { top: { style: BorderStyle.SINGLE }, bottom: { style: BorderStyle.SINGLE }, left: { style: BorderStyle.SINGLE }, right: { style: BorderStyle.SINGLE } },
+            children: [new Paragraph({
+              children: [new TextRun({ 
+                text, 
+                color: textColor?.replace("#", "") 
+              })],
+            })],
+            shading: bg ? { fill: bg, type: ShadingType.CLEAR } : undefined,
+            width: { size: 3800, type: WidthType.DXA }, // широкие колонки
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 8 },
+              bottom: { style: BorderStyle.SINGLE, size: 8 },
+              left: { style: BorderStyle.SINGLE, size: 8 },
+              right: { style: BorderStyle.SINGLE, size: 8 },
+            },
           });
         });
+
+        while (rowCells.length < colCount) {
+          rowCells.push(new TableCell({ children: [] }));
+        }
 
         tableRows.push(new TableRow({ children: rowCells }));
         i++;
@@ -71,21 +97,26 @@ async function generateDocxBytes(markdown: string, title = "Document"): Promise<
       children.push(new Table({
         rows: tableRows,
         width: { size: 100, type: WidthType.PERCENTAGE },
-        borders: { top: { style: BorderStyle.SINGLE }, bottom: { style: BorderStyle.SINGLE }, left: { style: BorderStyle.SINGLE }, right: { style: BorderStyle.SINGLE }, insideH: { style: BorderStyle.SINGLE }, insideV: { style: BorderStyle.SINGLE } },
+        layout: TableLayoutType.FIXED,
+        columnWidths: Array(colCount).fill(3800),
+        borders: {
+          top: { style: BorderStyle.SINGLE },
+          bottom: { style: BorderStyle.SINGLE },
+          left: { style: BorderStyle.SINGLE },
+          right: { style: BorderStyle.SINGLE },
+          insideH: { style: BorderStyle.SINGLE },
+          insideV: { style: BorderStyle.SINGLE },
+        },
       }));
       continue;
     } 
-    // Обычный текст
     else if (line) {
       children.push(new Paragraph({ children: [new TextRun(line)] }));
     }
     i++;
   }
 
-  const doc = new Document({
-    sections: [{ properties: {}, children }],
-  });
-
+  const doc = new Document({ sections: [{ properties: {}, children }] });
   return Packer.toBuffer(doc);
 }
 
@@ -99,23 +130,30 @@ export async function generateMarkdownDocxAndSend(
 
   try {
     const docxBytes = await generateDocxBytes(markdownContent, originalFileName);
-    const fileName = `${originalFileName.replace(/[^a-zA-Z0-9_-]/g, "_")}.docx`;
+    
+    const safeName = originalFileName
+      .replace(/[^a-zA-Z0-9а-яА-ЯёЁ\s_-]/g, "_")
+      .replace(/\s+/g, "_")
+      .substring(0, 60);
 
-    const blob = new Blob([docxBytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+    const fileName = `${safeName}.docx`;
+
+    const blob = new Blob([docxBytes], { 
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
+    });
 
     const result = await sendTelegramDocument(
       chatId,
       blob,
       fileName,
-      `📄 Ваш DOCX готов: ${fileName}\n\nОтправлено из Markdown-редактора`
+      `📄 ${fileName}\nГотово из Markdown-редактора CyberVibe`
     );
 
-    if (result.success) {
-      return { success: true, message: `✅ ${fileName} отправлен в Telegram!` };
-    }
-    return { success: false, error: result.error || "Не удалось отправить" };
+    return result.success 
+      ? { success: true, message: `✅ ${fileName} отправлен в Telegram!` }
+      : { success: false, error: result.error || "Ошибка отправки" };
   } catch (e: any) {
-    logger.error("[md-doc] Ошибка генерации/отправки DOCX:", e);
-    return { success: false, error: e.message || "Неизвестная ошибка" };
+    logger.error("[md-doc] DOCX error:", e);
+    return { success: false, error: e.message };
   }
 }
