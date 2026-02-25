@@ -7,7 +7,7 @@ import { parseCellMarkers } from "@/lib/parseCellMarkers";
 
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, TableLayoutType, BorderStyle, ShadingType } = docx;
 
-// Надёжная ширина таблицы A4 (9638 DXA — стандартная рабочая область)
+// Надёжная ширина таблицы (9638 DXA — стандартная рабочая область A4)
 const FULL_TABLE_WIDTH = 9638;
 
 async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
