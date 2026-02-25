@@ -19,6 +19,7 @@ const RU_MAP: Record<string, string> = {
   "фиолетовый": "purple", "голубой": "cyan", "изумрудный": "emerald"
 };
 
+// ФИКС: Обязательно async для серверного файла!
 export async function parseCellData(raw: string) {
   let text = raw.trim();
   let bg: string | undefined;
@@ -62,33 +63,30 @@ export async function generateAndSendDoc(markdown: string, chatId: string, fileN
         }));
       } else if (line.startsWith("|")) {
         const rows: TableRow[] = [];
-        let maxCols = 0;
 
         while (i < lines.length && lines[i].trim().startsWith("|")) {
           const l = lines[i].trim();
           if (l.includes("---")) { i++; continue; }
           const cells = l.split("|").slice(1, -1);
-          maxCols = Math.max(maxCols, cells.length);
           
           rows.push(new TableRow({
-            children: cells.map(c => {
-              const { clean, bg, fg } = parseCellData(c);
+            children: await Promise.all(cells.map(async (c) => {
+              const { clean, bg, fg } = await parseCellData(c);
               return new TableCell({
                 children: [new Paragraph({ 
                   children: [new TextRun({ text: clean, color: fg, bold: !!fg })] 
                 })],
                 shading: bg ? { fill: bg, type: ShadingType.CLEAR } : undefined,
-                // ФИКС: Рассчитываем ширину динамически
-                width: { size: 100 / cells.length, type: WidthType.PERCENTAGE },
-                margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                width: { size: 100 / cells.length, type: WidthType.PERCENTAGE }, // Растягиваем!
+                margins: { top: 120, bottom: 120, left: 120, right: 120 },
                 borders: { 
-                  top: { style: BorderStyle.SINGLE, size: 4, color: "DBEAFE" },
-                  bottom: { style: BorderStyle.SINGLE, size: 4, color: "DBEAFE" },
-                  left: { style: BorderStyle.SINGLE, size: 4, color: "DBEAFE" },
-                  right: { style: BorderStyle.SINGLE, size: 4, color: "DBEAFE" },
+                  top: { style: BorderStyle.SINGLE, size: 4, color: "E2E8F0" },
+                  bottom: { style: BorderStyle.SINGLE, size: 4, color: "E2E8F0" },
+                  left: { style: BorderStyle.SINGLE, size: 4, color: "E2E8F0" },
+                  right: { style: BorderStyle.SINGLE, size: 4, color: "E2E8F0" },
                 }
               });
-            })
+            }))
           }));
           i++;
         }
@@ -106,11 +104,8 @@ export async function generateAndSendDoc(markdown: string, chatId: string, fileN
 
     const doc = new Document({ sections: [{ children }] });
     const buffer = await Packer.toBuffer(doc);
-    const finalName = `${fileName.replace(/\s+/g, "_")}.docx`;
-
-    return await sendTelegramDocument(chatId, new Blob([buffer]), finalName, `✅ *CyberVibe Engine Pro*\nDoc: \`${finalName}\``);
+    return await sendTelegramDocument(chatId, new Blob([buffer]), `${fileName}.docx`, `📄 *CyberVibe Pro*\nReport created.`);
   } catch (e: any) {
-    logger.error("DOCX_SEND_FAIL", e);
     return { success: false, error: e.message };
   }
 }
