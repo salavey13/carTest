@@ -19,7 +19,7 @@ const RU_MAP: Record<string, string> = {
   "фиолетовый": "purple", "голубой": "cyan", "изумрудный": "emerald"
 };
 
-function parseCellData(raw: string) {
+export async function parseCellData(raw: string) {
   let text = raw.trim();
   let bg: string | undefined;
   let fg: string | undefined;
