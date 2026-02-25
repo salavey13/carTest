@@ -1,113 +1,117 @@
 "use server";
 
-import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, ShadingType, BorderStyle } from "docx";
+import { sendTelegramDocument } from "@/app/actions";
 import { logger } from "@/lib/logger";
+import * as docx from "docx";
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, AlignmentType } = docx;
 
-// Мапа цветов для Word (Hex)
-const COLOR_MAP: Record<string, string> = {
-  red: "FF4444",
-  green: "00C851",
-  blue: "33B5E5",
-  yellow: "FFBB33",
-  orange: "FF8800",
-  purple: "AA66CC"
+// Карта HEX-цветов для Word
+const HEX_MAP: Record<string, string> = {
+  red: "FF4136", green: "2ECC40", blue: "0074D9", yellow: "FFDC00",
+  orange: "FF851B", purple: "B10DC9", cyan: "7FDBFF", lime: "01FF70",
+  emerald: "27AE60", amber: "FF851B", pink: "F012BE", gray: "AAAAAA",
+  white: "FFFFFF", black: "111111"
 };
 
-export async function sendMarkdownAsDocx(markdown: string, chatId: string) {
-  if (!TELEGRAM_BOT_TOKEN || !chatId) return { success: false, error: "Config missing" };
+const LANG_MAP: Record<string, string> = {
+  "красный": "red", "красн": "red",
+  "зеленый": "green", "зеленый": "green", "зелен": "green", "зелёный": "green",
+  "синий": "blue", "син": "blue",
+  "желтый": "yellow", "желт": "yellow", "жёлтый": "yellow",
+  "оранжевый": "orange", "оранж": "orange",
+  "фиолетовый": "purple", "фиолет": "purple",
+  "изумрудный": "emerald", "изумруд": "emerald",
+  "белый": "white", "черный": "black", "чёрный": "black"
+};
 
+function processCell(rawText: string) {
+  let text = rawText.trim();
+  let bg: string | undefined;
+  let fg: string | undefined;
+
+  // Регулярка ловит (bg-цвет), (фон-цвет) или просто (цвет)
+  const markerRegex = /\((bg-|фон-)?([a-zа-яё0-9#]+)\)/gi;
+  let match;
+  
+  while ((match = markerRegex.exec(text)) !== null) {
+    const isBg = !!match[1]; 
+    let val = match[2].toLowerCase().replace(/ё/g, "е");
+    
+    // Превращаем русский в английский ключ или оставляем hex
+    const key = LANG_MAP[val] || val;
+    const hex = HEX_MAP[key] || (val.startsWith("#") ? val.replace("#", "") : undefined);
+
+    if (hex) {
+      if (isBg) bg = hex; else fg = hex;
+    }
+  }
+
+  return {
+    cleanText: text.replace(markerRegex, "").trim(),
+    bg,
+    fg
+  };
+}
+
+export async function generateMarkdownDocxAndSend(markdown: string, chatId: string, title = "Report") {
   try {
-    const lines = markdown.split("\n");
     const children: any[] = [];
+    const lines = markdown.split("\n");
+    let i = 0;
 
-    // Базовая логика парсинга для DOCX
-    let currentTableRows: TableRow[] = [];
-
-    for (let i = 0; i < lines.length; i++) {
+    while (i < lines.length) {
       const line = lines[i].trim();
+      if (!line) { i++; continue; }
 
-      // 1. Обработка заголовков
       if (line.startsWith("#")) {
-        const level = (line.match(/^#+/) || ["#"])[0].length;
+        const level = (line.match(/^#+/)?.[0].length || 1) as 1 | 2 | 3;
         children.push(new Paragraph({
           text: line.replace(/^#+\s*/, ""),
-          heading: level === 1 ? "Heading1" : "Heading2",
-          spacing: { before: 400, after: 200 },
+          heading: level === 1 ? HeadingLevel.HEADING_1 : HeadingLevel.HEADING_2,
+          spacing: { before: 240, after: 120 }
         }));
-        continue;
-      }
-
-      // 2. Обработка таблиц (упрощенный парсер)
-      if (line.startsWith("|")) {
-        if (line.includes("---")) continue; // Пропускаем разделитель
-
-        const cells = line.split("|").filter(c => c.trim() !== "").map(c => c.trim());
-        
-        const tableRow = new TableRow({
-          children: cells.map(cellText => {
-            // Извлекаем цвет фона из (bg-color)
-            const bgMatch = cellText.match(/^\((bg-)?(\w+)\)/);
-            const colorName = bgMatch ? bgMatch[2] : null;
-            const cleanText = cellText.replace(/^\((bg-)?\w+\)\s*/, "");
-            const bgColor = colorName ? COLOR_MAP[colorName] || "F0F0F0" : undefined;
-
-            return new TableCell({
-              children: [new Paragraph({ 
-                children: [new TextRun({ text: cleanText, color: bgColor ? "FFFFFF" : "000000" })] 
-              })],
-              shading: bgColor ? { fill: bgColor, type: ShadingType.CLEAR, color: "auto" } : undefined,
-              width: { size: 100 / cells.length, type: WidthType.PERCENTAGE },
-              verticalAlign: AlignmentType.CENTER,
-            });
-          }),
-        });
-
-        currentTableRows.push(tableRow);
-
-        // Если следующая строка не таблица или это конец - сбрасываем таблицу в документ
-        if (i === lines.length - 1 || !lines[i + 1].trim().startsWith("|")) {
-          children.push(new Table({
-            rows: currentTableRows,
-            width: { size: 100, type: WidthType.PERCENTAGE },
+      } else if (line.startsWith("|")) {
+        const rows: TableRow[] = [];
+        while (i < lines.length && lines[i].trim().startsWith("|")) {
+          const l = lines[i].trim();
+          if (l.includes("---")) { i++; continue; }
+          const cells = l.split("|").slice(1, -1);
+          
+          rows.push(new TableRow({
+            children: cells.map(c => {
+              const { cleanText, bg, fg } = processCell(c);
+              return new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: cleanText, color: fg, bold: !!fg })] })],
+                shading: bg ? { fill: bg, type: ShadingType.CLEAR } : undefined,
+                verticalAlign: AlignmentType.CENTER,
+                margins: { top: 80, bottom: 80, left: 80, right: 80 },
+                borders: { 
+                    top: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
+                    bottom: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
+                    left: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
+                    right: { style: BorderStyle.SINGLE, size: 2, color: "E2E8F0" },
+                }
+              });
+            })
           }));
-          currentTableRows = [];
+          i++;
         }
+        children.push(new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE } }));
         continue;
+      } else {
+        children.push(new Paragraph({ children: [new TextRun(line)], spacing: { after: 100 } }));
       }
-
-      // 3. Обычный текст
-      if (line !== "") {
-        children.push(new Paragraph({
-          children: [new TextRun(line)],
-          spacing: { after: 120 }
-        }));
-      }
+      i++;
     }
 
     const doc = new Document({ sections: [{ children }] });
     const buffer = await Packer.toBuffer(doc);
+    const safeName = `${title.replace(/[^a-zа-я0-9]/gi, "_")}.docx`;
 
-    const formData = new FormData();
-    formData.append("chat_id", chatId);
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
-    
-    // ВАЖНО: Фикс имени файла
-    formData.append("document", blob, `Report_${Date.now()}.docx`);
-    formData.append("caption", "📄 Ваш кастомный отчет готов!");
-
-    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`, {
-      method: "POST",
-      body: formData,
-    });
-
-    const result = await response.json();
-    if (!result.ok) throw new Error(result.description);
-
-    return { success: true };
-  } catch (error: any) {
-    logger.error("Docx generation error:", error);
-    return { success: false, error: error.message };
+    return await sendTelegramDocument(chatId, new Blob([buffer]), safeName, `📄 *CyberVibe Engine v3.1*\nФайл: \`${safeName}\``);
+  } catch (e: any) {
+    logger.error("DOCX_SEND_FAIL", e);
+    return { success: false, error: e.message };
   }
 }
