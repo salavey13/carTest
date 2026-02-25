@@ -1,155 +1,196 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { generateMarkdownDocxAndSend } from "./actions";
 import { useAppContext } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Send, Eye, FileJson, Bold, Table as TableIcon, Save, Download, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Loader2, Send, Eye, Copy, PlusCircle } from "lucide-react";
 
-export default function MarkdownProEditor() {
+const COLOR_MAP: Record<string, string> = { /* тот же что в actions.ts */ };
+const RUSSIAN_TO_ENGLISH: Record<string, string> = { /* тот же что в actions.ts */ };
+
+function parseCellMarkers(cell: string) {
+  let text = cell.trim();
+  let bg: string | undefined;
+  let textColor: string | undefined;
+
+  const matches = [...text.matchAll(/\((bg-|фон-)?([a-zа-яё#0-9-]+)\)/gi)];
+
+  for (const m of matches) {
+    const prefix = m[1] || "";
+    let token = m[2].toLowerCase().replace(/ё/g, "е");
+    const key = RUSSIAN_TO_ENGLISH[token] || token;
+
+    if (prefix === "bg-" || prefix === "фон-") {
+      bg = COLOR_MAP[key] || (key.startsWith("#") ? key : undefined);
+    } else {
+      textColor = COLOR_MAP[key] || (key.startsWith("#") ? key : undefined);
+    }
+  }
+
+  text = text.replace(/\((bg-|фон-)?[a-zа-яё#0-9-]+\)\s*/gi, "").trim();
+  return { text, bg, textColor };
+}
+
+export default function MarkdownDocEditor() {
   const { user } = useAppContext();
-  const [markdown, setMarkdown] = useState("");
-  const [title, setTitle] = useState("Daily_Report");
-  const [isSending, setIsSending] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const chatId = user?.id?.toString();
 
-  // Persistence Engine: Загрузка черновика
-  useEffect(() => {
-    const saved = localStorage.getItem("cv_md_draft");
-    if (saved) setMarkdown(saved);
-    else setMarkdown("# Новый отчет\n\n| Задача | Статус |\n|:---|:---|\n| (bg-green) Фича | **Готово** |");
-    setMounted(true);
-  }, []);
+  const [markdown, setMarkdown] = useState(`# Пример отчёта
+
+**Жирный** и *курсив*.
+
+## Таблица с цветами
+
+| Задача                    | Статус                     | Приоритет                     |
+|---------------------------|----------------------------|-------------------------------|
+| (bg-зелёный) Дизайн       | Готово                     | (amber) Высокий               |
+| Код                       | (bg-оранжевый) В процессе  | Средний                       |
+| (красный) Тестирование    | Запланировано              | (rose) Критично               |
+| Деплой                    | (bg-изумрудный) Готово     | (sky) Норма                   |`);
+
+  const [title, setTitle] = useState("Мой_отчёт_Февраль");
+  const [isSending, setIsSending] = useState(false);
 
   // Автосохранение
   useEffect(() => {
-    if (markdown) localStorage.setItem("cv_md_draft", markdown);
+    const saved = localStorage.getItem("md-doc-draft");
+    if (saved) setMarkdown(saved);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("md-doc-draft", markdown);
   }, [markdown]);
 
   const handleSend = async () => {
-    if (!user?.id) return toast.error("Войдите в систему");
+    if (!chatId) return toast.error("Откройте в Telegram");
     setIsSending(true);
-    const res = await generateMarkdownDocxAndSend(markdown, user.id.toString(), title);
+    const res = await generateMarkdownDocxAndSend(markdown, chatId, title);
     setIsSending(false);
-    if (res.success) toast.success("Документ в твоем Telegram!");
-    else toast.error(res.error);
+    res.success ? toast.success(res.message) : toast.error(res.error);
   };
 
-  const insertTool = (type: string) => {
-    const tools: Record<string, string> = {
-      bold: "**Текст**",
-      table: "\n| Заголовок | Статус |\n|:---|:---|\n| (bg-blue) Текст | OK |\n",
-      color: "(bg-blue) (white) "
-    };
-    setMarkdown(prev => prev + tools[type]);
+  const copyMarkdown = () => {
+    navigator.clipboard.writeText(markdown);
+    toast.success("Markdown скопирован!");
   };
 
-  if (!mounted) return null;
+  const insertDemo = () => {
+    const demo = `\n\n## Новая таблица\n\n| Задача | Статус | Приоритет |\n|--------|--------|-----------|\n| (bg-красный) Критично | В работе | (фиолетовый) Важно |`;
+    setMarkdown(markdown + demo);
+    toast.info("Демо-таблица добавлена");
+  };
 
   return (
-    <div className="min-h-screen bg-[#050505] pt-20 pb-10 px-4 md:px-8 font-sans">
-      <div className="max-w-7xl mx-auto space-y-6">
-        
-        {/* Advanced Toolbar Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-zinc-900/80 border border-white/10 p-4 rounded-3xl backdrop-blur-2xl sticky top-24 z-40 shadow-[0_0_50px_-12px_rgba(59,130,246,0.3)]">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-600 rounded-2xl shadow-[0_0_20px_rgba(37,99,235,0.5)]">
-              <Sparkles className="text-white w-5 h-5 animate-pulse" />
-            </div>
+    <div className="min-h-screen bg-[#0a0a0a] pt-16 pb-24 font-sans">
+      <div className="max-w-6xl mx-auto px-4">
+        {/* Премиум хедер без overflow */}
+        <div className="sticky top-4 z-50 bg-zinc-950/90 border border-zinc-800 backdrop-blur-xl rounded-3xl px-6 py-4 mb-8 shadow-2xl flex flex-col sm:flex-row gap-4 items-center">
+          <div className="flex items-center gap-4 flex-1">
+            <div className="w-11 h-11 bg-gradient-to-br from-orange-500 to-purple-600 rounded-2xl flex items-center justify-center text-2xl">📝</div>
             <div>
-              <h1 className="font-orbitron text-xl font-black text-white leading-none">CV PRO EDITOR</h1>
-              <p className="text-[10px] text-blue-400 font-bold tracking-tighter uppercase mt-1">Smarter. Faster. Cyber.</p>
+              <div className="font-orbitron text-3xl tracking-widest text-white">MD → DOCX</div>
+              <div className="text-xs text-emerald-400">CyberVibe Studio • Edition для друга</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 bg-black/40 p-1.5 rounded-2xl border border-white/5">
-            <Button size="sm" variant="ghost" onClick={() => insertTool('bold')} className="hover:bg-white/10 text-zinc-400 hover:text-white"><Bold size={16}/></Button>
-            <Button size="sm" variant="ghost" onClick={() => insertTool('table')} className="hover:bg-white/10 text-zinc-400 hover:text-white"><TableIcon size={16}/></Button>
-            <Button size="sm" variant="ghost" onClick={() => insertTool('color')} className="hover:bg-white/10 text-zinc-400 hover:text-white"><FileJson size={16}/></Button>
-          </div>
-
-          <div className="flex gap-2">
-             <input 
-              value={title} 
-              onChange={e => setTitle(e.target.value)}
-              className="bg-zinc-800/50 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none w-40 hidden sm:block"
-            />
+          <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-center">
+            <Button onClick={copyMarkdown} variant="outline" className="border-zinc-700 hover:bg-zinc-900 rounded-2xl">
+              <Copy className="w-4 h-4 mr-2" /> Копировать
+            </Button>
+            <Button onClick={insertDemo} variant="outline" className="border-zinc-700 hover:bg-zinc-900 rounded-2xl">
+              <PlusCircle className="w-4 h-4 mr-2" /> Демо
+            </Button>
             <Button 
               onClick={handleSend} 
-              disabled={isSending}
-              className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-900/40 px-6"
+              disabled={isSending || !chatId}
+              className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white rounded-2xl px-8"
             >
-              {isSending ? <Loader2 className="animate-spin" /> : <Send size={18} className="mr-2"/>}
-              SEND TO TG
+              {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 mr-2" />}
+              Отправить в Telegram
             </Button>
           </div>
         </div>
 
-        {/* Workspace: Side-by-Side */}
-        <div className="grid lg:grid-cols-2 gap-8 h-[75vh]">
-          {/* Editor Pane */}
-          <div className="flex flex-col gap-3 group">
-            <div className="flex items-center justify-between px-4">
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest group-hover:text-blue-400 transition-colors">Input Stream</span>
-              <span className="text-[10px] text-zinc-700 font-mono">UTF-8 / MD_GFM</span>
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Редактор */}
+          <Card className="border-zinc-800 bg-zinc-950/80 backdrop-blur-xl overflow-hidden">
+            <div className="p-4 border-b border-zinc-800 flex items-center gap-3 bg-black/60">
+              <div className="text-emerald-400">✍️</div>
+              <input
+                type="text"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                className="flex-1 bg-transparent text-white font-medium focus:outline-none"
+                placeholder="Имя файла"
+              />
             </div>
-            <textarea
+            <Textarea
               value={markdown}
               onChange={e => setMarkdown(e.target.value)}
-              className="flex-1 bg-zinc-900/20 border border-white/5 rounded-[2.5rem] p-8 font-mono text-sm text-zinc-300 focus:outline-none focus:border-blue-500/50 transition-all resize-none shadow-inner custom-scrollbar"
-              placeholder="System awaiting data..."
+              className="h-[520px] resize-y min-h-[400px] textarea-cyber border-0 font-mono text-sm p-6 bg-transparent"
             />
-          </div>
+          </Card>
 
-          {/* Preview Pane */}
-          <div className="flex flex-col gap-3 group">
-            <div className="flex items-center justify-between px-4">
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest group-hover:text-emerald-400 transition-colors">Visual Output</span>
-              <div className="flex items-center gap-2">
-                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                 <span className="text-[10px] text-zinc-700 font-mono">LIVE_SYNC</span>
-              </div>
+          {/* Превью */}
+          <Card className="border-zinc-800 bg-zinc-950/80 backdrop-blur-xl overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-zinc-800 flex items-center gap-3 bg-black/60">
+              <Eye className="w-5 h-5 text-cyan-400" />
+              <div className="font-medium text-white">LIVE PREVIEW</div>
             </div>
-            <Card className="flex-1 bg-[#080808] border border-white/5 rounded-[2.5rem] p-8 overflow-auto prose prose-invert prose-sm max-w-none custom-scrollbar">
-              <ReactMarkdown 
+            <div className="flex-1 overflow-auto p-8 prose prose-invert max-w-none custom-scrollbar">
+              <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
                   td: ({ children }) => {
-                    const text = String(children);
-                    // Простой парсинг цветов для превью
-                    const bg = text.match(/\(bg-([a-zа-я]+)\)/i)?.[1];
-                    const fg = text.match(/\(([a-zа-я]+)\)/i)?.[1];
-                    const cleanText = text.replace(/\(.*?\)/g, "").trim();
-                    
-                    const bgClass = bg ? `bg-${bg}-500/20 text-${bg}-400` : "";
-                    
+                    let cellText = "";
+                    if (typeof children === "string") cellText = children;
+                    else if (Array.isArray(children)) cellText = children.map(c => typeof c === "string" ? c : "").join("");
+
+                    const { text, bg, textColor } = parseCellMarkers(cellText);
+
                     return (
-                      <td className={cn("border border-white/10 p-4 transition-all", bgClass)} style={{ color: fg }}>
-                        {cleanText}
+                      <td 
+                        className="border border-zinc-700 p-4 font-medium"
+                        style={{ backgroundColor: bg, color: textColor }}
+                      >
+                        {text || " "}
                       </td>
                     );
-                  }
+                  },
                 }}
               >
-                {markdown}
+                {markdown || "*Начни писать — всё сразу видно справа*"}
               </ReactMarkdown>
-            </Card>
-          </div>
+            </div>
+          </Card>
         </div>
 
-        {/* Legend / Status Bar */}
-        <div className="flex flex-wrap gap-4 justify-center py-6 opacity-50 hover:opacity-100 transition-opacity">
-           {['red', 'green', 'blue', 'yellow', 'purple'].map(c => (
-             <div key={c} className="flex items-center gap-2 px-3 py-1 bg-zinc-900 border border-white/5 rounded-full text-[10px] text-zinc-400 font-mono">
-               <div className={`w-2 h-2 rounded-full bg-${c}-500`} />
-               (bg-{c}) / ({c})
-             </div>
-           ))}
+        {/* Changelog + Призыв */}
+        <div className="mt-16 p-8 bg-zinc-900/70 border border-zinc-800 rounded-3xl text-sm">
+          <div className="text-cyan-400 font-orbitron text-xl mb-6">📜 История прокачки (мы вместе это делали)</div>
+          <div className="space-y-4 text-zinc-400">
+            <div>• v1 — Первый редактор + DOCX</div>
+            <div>• v2 — Переход на удобные префиксы</div>
+            <div>• v3 — Полная поддержка русских цветов</div>
+            <div className="text-emerald-400 font-medium">• v4 — Широкие колонки, автосохранение, идеальный мобильный UI</div>
+          </div>
+
+          <div className="mt-10 text-center">
+            <a 
+              href="https://chatgpt.com/codex" 
+              target="_blank"
+              className="text-white hover:text-cyan-400 transition-colors text-lg"
+            >
+              Хочешь новую фишку? Открой Codex и напиши мне запрос — я сделаю за минуту 🔥
+            </a>
+            <div className="text-xs text-zinc-500 mt-2">Так ты становишься настоящим тиммейтом CyberVibe</div>
+          </div>
         </div>
       </div>
     </div>
