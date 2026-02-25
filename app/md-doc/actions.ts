@@ -7,7 +7,7 @@ import { parseCellMarkers } from "@/lib/parseCellMarkers";
 
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, TableLayoutType, BorderStyle, ShadingType } = docx;
 
-// Надёжная ширина A4 (9638 DXA — стандартная рабочая область)
+// Стандартная ширина области печати A4 в DXA (20.32 см без полей)
 const FULL_TABLE_WIDTH = 9638;
 
 async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
@@ -31,13 +31,27 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
       let colCount = 0;
       let isHeaderRow = true;
 
-      // Считаем количество колонок
+      // Считаем максимальное количество колонок
+      let checkI = i;
+      while (checkI < lines.length && lines[checkI].trim().startsWith("|")) {
+        const rowLine = lines[checkI].trim();
+        if (!rowLine.includes("---")) {
+          const rawCells = rowLine.split("|").slice(1, -1);
+          colCount = Math.max(colCount, rawCells.length);
+        }
+        checkI++;
+      }
+
+      if (colCount === 0) { i++; continue; }
+
+      // Жёсткая ширина одной ячейки в DXA
+      const cellWidth = Math.floor(FULL_TABLE_WIDTH / colCount);
+
       while (i < lines.length && lines[i].trim().startsWith("|")) {
         const rowLine = lines[i].trim();
         if (rowLine.includes("---")) { i++; continue; }
 
         const rawCells = rowLine.split("|").slice(1, -1);
-        colCount = Math.max(colCount, rawCells.length);
 
         const rowCells = rawCells.map(raw => {
           const { text, bg, textColor } = parseCellMarkers(raw.trim());
@@ -51,13 +65,19 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
               })] 
             })],
             shading: bg ? { fill: bg, type: ShadingType.CLEAR } : undefined,
-            width: { size: Math.floor(FULL_TABLE_WIDTH / colCount), type: WidthType.DXA },
+            width: { size: cellWidth, type: WidthType.DXA },
             margins: { top: 160, bottom: 160, left: 180, right: 180 },
             borders: { top: { style: BorderStyle.SINGLE, size: 12 }, bottom: { style: BorderStyle.SINGLE, size: 12 }, left: { style: BorderStyle.SINGLE, size: 12 }, right: { style: BorderStyle.SINGLE, size: 12 } },
           });
         });
 
-        while (rowCells.length < colCount) rowCells.push(new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: " " })] })] }));
+        while (rowCells.length < colCount) {
+          rowCells.push(new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: " " })] })],
+            width: { size: cellWidth, type: WidthType.DXA },
+          }));
+        }
+
         tableRows.push(new TableRow({ children: rowCells }));
         isHeaderRow = false;
         i++;
