@@ -5,9 +5,13 @@ import { logger } from "@/lib/logger";
 import * as docx from "docx";
 import { parseCellMarkers } from "@/lib/parseCellMarkers";
 
-const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, TableLayoutType, BorderStyle, ShadingType } = docx;
+const { 
+  Document, Packer, Paragraph, TextRun, HeadingLevel, 
+  Table, TableRow, TableCell, WidthType, TableLayoutType, 
+  BorderStyle, ShadingType, AlignmentType 
+} = docx;
 
-// Стандартная ширина области печати A4 в DXA (20.32 см без полей)
+// Стандартная ширина области печати A4 в DXA (без полей)
 const FULL_TABLE_WIDTH = 9638;
 
 async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
@@ -19,85 +23,92 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
     const line = lines[i].trim();
     if (!line) { i++; continue; }
 
-    if (line.startsWith("# ")) {
-      children.push(new Paragraph({ text: line.slice(2), heading: HeadingLevel.HEADING_1 }));
-    } else if (line.startsWith("## ")) {
-      children.push(new Paragraph({ text: line.slice(3), heading: HeadingLevel.HEADING_2 }));
-    } else if (line.startsWith("### ")) {
-      children.push(new Paragraph({ text: line.slice(4), heading: HeadingLevel.HEADING_3 }));
+    if (line.startsWith("#")) {
+      const level = (line.match(/^#+/)?.[0].length || 1) as 1 | 2;
+      children.push(new Paragraph({ 
+        text: line.replace(/^#+\s*/, ""), 
+        heading: level === 1 ? HeadingLevel.HEADING_1 : HeadingLevel.HEADING_2,
+        spacing: { before: 240, after: 120 }
+      }));
     } 
     else if (line.startsWith("|")) {
       const tableRows: TableRow[] = [];
       let colCount = 0;
-      let isHeaderRow = true;
 
-      // Считаем максимальное количество колонок
+      // 1. Предварительный расчёт количества колонок
       let checkI = i;
       while (checkI < lines.length && lines[checkI].trim().startsWith("|")) {
-        const rowLine = lines[checkI].trim();
-        if (!rowLine.includes("---")) {
-          const rawCells = rowLine.split("|").slice(1, -1);
-          colCount = Math.max(colCount, rawCells.length);
+        if (!lines[checkI].includes("---")) {
+          const cells = lines[checkI].split("|").filter(Boolean);
+          if (cells.length > colCount) colCount = cells.length;
         }
         checkI++;
       }
 
       if (colCount === 0) { i++; continue; }
 
-      // Жёсткая ширина одной ячейки в DXA
+      // Жёсткая ширина ячейки в DXA
       const cellWidth = Math.floor(FULL_TABLE_WIDTH / colCount);
+      let isHeader = true;
 
       while (i < lines.length && lines[i].trim().startsWith("|")) {
-        const rowLine = lines[i].trim();
-        if (rowLine.includes("---")) { i++; continue; }
-
-        const rawCells = rowLine.split("|").slice(1, -1);
-
-        const rowCells = rawCells.map(raw => {
-          const { text, bg, textColor } = parseCellMarkers(raw.trim());
-
-          return new TableCell({
-            children: [new Paragraph({ 
-              children: [new TextRun({ 
-                text: text || " ", 
-                color: textColor?.replace("#", ""), 
-                bold: isHeaderRow 
-              })] 
-            })],
-            shading: bg ? { fill: bg, type: ShadingType.CLEAR } : undefined,
-            width: { size: cellWidth, type: WidthType.DXA },
-            margins: { top: 160, bottom: 160, left: 180, right: 180 },
-            borders: { top: { style: BorderStyle.SINGLE, size: 12 }, bottom: { style: BorderStyle.SINGLE, size: 12 }, left: { style: BorderStyle.SINGLE, size: 12 }, right: { style: BorderStyle.SINGLE, size: 12 } },
-          });
-        });
-
-        while (rowCells.length < colCount) {
-          rowCells.push(new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: " " })] })],
-            width: { size: cellWidth, type: WidthType.DXA },
-          }));
-        }
-
-        tableRows.push(new TableRow({ children: rowCells }));
-        isHeaderRow = false;
+        if (lines[i].includes("---")) { i++; continue; }
+        const rawCells = lines[i].split("|").slice(1, -1);
+        
+        tableRows.push(new TableRow({
+          children: rawCells.map(raw => {
+            const { text, bg, textColor } = parseCellMarkers(raw);
+            return new TableCell({
+              children: [new Paragraph({ 
+                children: [new TextRun({ 
+                  text: text || " ", 
+                  color: textColor?.replace("#", ""), 
+                  bold: isHeader 
+                })],
+                alignment: AlignmentType.LEFT
+              })],
+              shading: bg ? { fill: bg.replace("#", ""), type: ShadingType.CLEAR } : undefined,
+              width: { size: cellWidth, type: WidthType.DXA },
+              margins: { top: 100, bottom: 100, left: 100, right: 100 },
+              borders: { 
+                top: { style: BorderStyle.SINGLE, size: 4, color: "444444" },
+                bottom: { style: BorderStyle.SINGLE, size: 4, color: "444444" },
+                left: { style: BorderStyle.SINGLE, size: 4, color: "444444" },
+                right: { style: BorderStyle.SINGLE, size: 4, color: "444444" }
+              }
+            });
+          })
+        }));
+        isHeader = false;
         i++;
       }
 
-      children.push(new Table({
+      children.push(new Table({ 
         rows: tableRows,
         width: { size: FULL_TABLE_WIDTH, type: WidthType.DXA },
-        layout: TableLayoutType.FIXED,
-        borders: { top: { style: BorderStyle.SINGLE }, bottom: { style: BorderStyle.SINGLE }, left: { style: BorderStyle.SINGLE }, right: { style: BorderStyle.SINGLE }, insideH: { style: BorderStyle.SINGLE }, insideV: { style: BorderStyle.SINGLE } },
+        layout: TableLayoutType.FIXED
       }));
       continue;
     } 
     else {
-      children.push(new Paragraph({ children: [new TextRun(line)] }));
+      children.push(new Paragraph({ 
+        children: [new TextRun(line)], 
+        spacing: { after: 100 } 
+      }));
     }
     i++;
   }
 
-  const doc = new Document({ sections: [{ properties: {}, children }] });
+  const doc = new Document({ 
+    sections: [{ 
+      properties: {
+        page: {
+          margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } // 2.54 см поля
+        }
+      },
+      children 
+    }] 
+  });
   return Packer.toBuffer(doc);
 }
 
@@ -125,7 +136,7 @@ export async function generateMarkdownDocxAndSend(
       chatId,
       blob,
       fileName,
-      `📄 ${fileName}\nГотово из Markdown-редактора CyberVibe v8.0`
+      `📄 ${fileName}\nГотово из Markdown-редактора CyberVibe v8.1`
     );
 
     return result.success 
