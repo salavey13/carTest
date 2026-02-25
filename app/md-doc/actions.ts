@@ -7,6 +7,9 @@ import { parseCellMarkers } from "@/lib/parseCellMarkers";
 
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, TableLayoutType, BorderStyle, ShadingType } = docx;
 
+// Надёжная ширина таблицы A4 (9638 DXA — стандартная рабочая область)
+const FULL_TABLE_WIDTH = 9638;
+
 async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
   const children: any[] = [];
   const lines = markdown.split("\n");
@@ -28,6 +31,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
       let colCount = 0;
       let isHeaderRow = true;
 
+      // Считаем количество колонок
       while (i < lines.length && lines[i].trim().startsWith("|")) {
         const rowLine = lines[i].trim();
         if (rowLine.includes("---")) { i++; continue; }
@@ -47,7 +51,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
               })] 
             })],
             shading: bg ? { fill: bg, type: ShadingType.CLEAR } : undefined,
-            width: { size: Math.floor(10000 / colCount), type: WidthType.DXA }, // надёжная ширина
+            width: { size: Math.floor(FULL_TABLE_WIDTH / colCount), type: WidthType.DXA },
             margins: { top: 160, bottom: 160, left: 180, right: 180 },
             borders: { top: { style: BorderStyle.SINGLE, size: 12 }, bottom: { style: BorderStyle.SINGLE, size: 12 }, left: { style: BorderStyle.SINGLE, size: 12 }, right: { style: BorderStyle.SINGLE, size: 12 } },
           });
@@ -61,7 +65,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
 
       children.push(new Table({
         rows: tableRows,
-        width: { size: 10000, type: WidthType.DXA }, // полная ширина страницы
+        width: { size: FULL_TABLE_WIDTH, type: WidthType.DXA },
         layout: TableLayoutType.FIXED,
         borders: { top: { style: BorderStyle.SINGLE }, bottom: { style: BorderStyle.SINGLE }, left: { style: BorderStyle.SINGLE }, right: { style: BorderStyle.SINGLE }, insideH: { style: BorderStyle.SINGLE }, insideV: { style: BorderStyle.SINGLE } },
       }));
