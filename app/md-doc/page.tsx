@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Send, Eye, Copy, PlusCircle, UserCheck } from "lucide-react";
+import { Loader2, Send, Eye, Copy, PlusCircle, UserCheck, Printer } from "lucide-react";
 
 export default function MarkdownDocEditor() {
   const { user } = useAppContext();
@@ -33,6 +33,7 @@ export default function MarkdownDocEditor() {
   const [title, setTitle] = useState("Мой_отчёт_Февраль");
   const [isSendingSelf, setIsSendingSelf] = useState(false);
   const [isSendingManager, setIsSendingManager] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   // Автосохранение
   useEffect(() => {
@@ -67,7 +68,36 @@ export default function MarkdownDocEditor() {
     toast.info("Демо-таблица добавлена");
   };
 
-  // Рекурсивная функция для извлечения чистого текста из React-нод
+  const printDocument = () => {
+    setIsPrinting(true);
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>${title}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 40px; }
+              table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+              th, td { border: 1px solid #ccc; padding: 12px; text-align: left; }
+              th { background: #f0f0f0; }
+            </style>
+          </head>
+          <body>
+            ${markdown.replace(/\n/g, "<br>")}
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      setTimeout(() => printWindow.close(), 1000);
+    }
+    setIsPrinting(false);
+    toast.success("Открыто окно печати — выбери WiFi-принтер!");
+  };
+
+  // Рекурсивная функция для извлечения чистого текста
   const extractText = (node: any): string => {
     if (!node) return "";
     if (typeof node === "string") return node;
@@ -95,6 +125,9 @@ export default function MarkdownDocEditor() {
             </Button>
             <Button onClick={insertDemo} variant="outline" className="border-zinc-700 hover:bg-zinc-900 rounded-2xl">
               <PlusCircle className="w-4 h-4 mr-2" /> Демо
+            </Button>
+            <Button onClick={printDocument} disabled={isPrinting} variant="outline" className="border-zinc-700 hover:bg-zinc-900 rounded-2xl">
+              {isPrinting ? <Loader2 className="animate-spin" /> : <Printer className="w-4 h-4 mr-2" />} Напечатать
             </Button>
           </div>
         </div>
@@ -136,10 +169,7 @@ export default function MarkdownDocEditor() {
                     return (
                       <td 
                         className="border border-zinc-700 p-4 font-medium"
-                        style={{ 
-                          backgroundColor: bg ? `${bg}33` : undefined, 
-                          color: textColor || (bg ? "#ffffff" : undefined) 
-                        }}
+                        style={{ backgroundColor: bg, color: textColor || (bg ? "#ffffff" : undefined) }}
                       >
                         {children}
                       </td>
@@ -152,10 +182,7 @@ export default function MarkdownDocEditor() {
                     return (
                       <th 
                         className="border border-zinc-700 p-4 font-bold"
-                        style={{ 
-                          backgroundColor: bg ? `${bg}33` : undefined, 
-                          color: textColor || (bg ? "#ffffff" : undefined) 
-                        }}
+                        style={{ backgroundColor: bg, color: textColor || (bg ? "#ffffff" : undefined) }}
                       >
                         {children}
                       </th>
@@ -195,7 +222,7 @@ export default function MarkdownDocEditor() {
             <div>• v1 — Первый редактор + DOCX</div>
             <div>• v2 — Удобные префиксы</div>
             <div>• v3 — Русские цвета</div>
-            <div className="text-emerald-400">• v8.2 — Префиксы удалены в превью, цвет на жирном тексте, широкие колонки в DOCX</div>
+            <div className="text-emerald-400">• v8.2 — Полностью на русском, текст на цветном фоне, широкие колонки в DOCX</div>
           </div>
 
           <div className="mt-10 text-center">
