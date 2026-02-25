@@ -11,7 +11,6 @@ const {
   BorderStyle, ShadingType, AlignmentType 
 } = docx;
 
-// Стандартная ширина области печати A4 в DXA (без полей)
 const FULL_TABLE_WIDTH = 9638;
 
 async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
@@ -35,7 +34,6 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
       const tableRows: TableRow[] = [];
       let colCount = 0;
 
-      // Считаем количество колонок
       let checkI = i;
       while (checkI < lines.length && lines[checkI].trim().startsWith("|")) {
         if (!lines[checkI].includes("---")) {
