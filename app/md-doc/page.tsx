@@ -59,16 +59,18 @@ export default function MarkdownDocEditor() {
   };
 
   const insertDemo = () => {
-    const demo = `\n\n## Новая таблица\n\n| Задача | Статус | Приоритет |\n|--------|--------|-----------|\n| (bg-красный) Критично | В работе | (фиолетовый) Важно |`;
+    const demo = `\n\n## Новая таблица\n\n| Задача | Статус | Приоритет |
+|--------|--------|-----------|
+| (bg-красный) Критично | В работе | (фиолетовый) Важно |`;
     setMarkdown(markdown + demo);
     toast.info("Демо-таблица добавлена");
   };
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pt-16 pb-24 font-sans">
-      <div className="max-w-6xl mx-auto px-4">
+      <div className="max-w-7xl mx-auto px-4 xl:px-0">
         {/* Премиум хедер */}
-        <div className="sticky top-4 z-50 bg-zinc-950/95 border border-zinc-800 backdrop-blur-2xl rounded-3xl px-6 py-5 mb-8 shadow-2xl flex flex-col sm:flex-row items-center gap-4">
+        <div className="sticky top-4 z-50 bg-zinc-950/95 border border-zinc-800 backdrop-blur-2xl rounded-3xl px-6 py-5 mb-8 shadow-2xl flex flex-col xl:flex-row items-center gap-4">
           <div className="flex items-center gap-4 flex-1">
             <div className="w-12 h-12 bg-gradient-to-br from-orange-500 via-purple-600 to-cyan-500 rounded-2xl flex items-center justify-center text-3xl shadow-xl">📝</div>
             <div>
@@ -77,7 +79,7 @@ export default function MarkdownDocEditor() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-center">
+          <div className="flex flex-wrap gap-3 w-full xl:w-auto justify-center">
             <Button onClick={copyMarkdown} variant="outline" className="border-zinc-700 hover:bg-zinc-900 rounded-2xl">
               <Copy className="w-4 h-4 mr-2" /> Копировать
             </Button>
@@ -87,7 +89,7 @@ export default function MarkdownDocEditor() {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className="grid xl:grid-cols-2 gap-8">
           {/* Редактор */}
           <Card className="border-zinc-800 bg-zinc-950/80 backdrop-blur-xl overflow-hidden">
             <div className="p-4 border-b border-zinc-800 flex items-center gap-3 bg-black/60">
@@ -103,7 +105,7 @@ export default function MarkdownDocEditor() {
             <Textarea
               value={markdown}
               onChange={e => setMarkdown(e.target.value)}
-              className="h-[520px] resize-y min-h-[400px] textarea-cyber border-0 font-mono text-sm p-6 bg-transparent"
+              className="h-[calc(100vh-300px)] resize-y min-h-[500px] textarea-cyber border-0 font-mono text-sm p-6 bg-transparent"
             />
           </Card>
 
@@ -139,11 +141,11 @@ export default function MarkdownDocEditor() {
         </div>
 
         {/* Кнопки отправки */}
-        <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+        <div className="mt-10 flex flex-col xl:flex-row gap-4 justify-center">
           <Button 
             onClick={() => sendTo(chatId!, false)}
             disabled={isSendingSelf || !chatId}
-            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white rounded-3xl py-7 px-12 text-lg flex-1 sm:flex-none flex items-center justify-center gap-3 shadow-xl"
+            className="bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white rounded-3xl py-7 px-12 text-lg flex-1 xl:flex-none flex items-center justify-center gap-3 shadow-xl"
           >
             {isSendingSelf ? <Loader2 className="animate-spin" /> : <Send />} Отправить себе
           </Button>
@@ -151,7 +153,7 @@ export default function MarkdownDocEditor() {
           <Button 
             onClick={() => sendTo(MANAGER_CHAT_ID, true)}
             disabled={isSendingManager}
-            className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-3xl py-7 px-12 text-lg flex-1 sm:flex-none flex items-center justify-center gap-3 shadow-xl"
+            className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-3xl py-7 px-12 text-lg flex-1 xl:flex-none flex items-center justify-center gap-3 shadow-xl"
           >
             {isSendingManager ? <Loader2 className="animate-spin" /> : <UserCheck />} Отправить менеджеру
           </Button>
@@ -164,7 +166,7 @@ export default function MarkdownDocEditor() {
             <div>• v1 — Первый редактор + DOCX</div>
             <div>• v2 — Удобные префиксы</div>
             <div>• v3 — Русские цвета</div>
-            <div className="text-emerald-400">• v5.1 — Идеальный превью + менеджер + SOTA UI</div>
+            <div className="text-emerald-400">• v5.1 — Идеальный превью + менеджер + SOTA UI для PC/large</div>
           </div>
 
           <div className="mt-10 text-center">
