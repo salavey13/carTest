@@ -133,6 +133,19 @@ export default function MarkdownDocEditor() {
                       </td>
                     );
                   },
+                  th: ({ children }) => {
+                    let cellText = typeof children === "string" ? children : Array.isArray(children) ? children.map(c => typeof c === "string" ? c : "").join("") : "";
+                    const { text, bg, textColor } = parseCellMarkers(cellText);
+
+                    return (
+                      <th 
+                        className="border border-zinc-700 p-4 font-bold"
+                        style={{ backgroundColor: bg, color: textColor }}
+                      >
+                        {text || <span>&nbsp;</span>}
+                      </th>
+                    );
+                  },
                 }}
               >
                 {markdown || "*Начни писать — цвета сразу видно*"}
@@ -167,7 +180,7 @@ export default function MarkdownDocEditor() {
             <div>• v1 — Первый редактор + DOCX</div>
             <div>• v2 — Удобные префиксы</div>
             <div>• v3 — Русские цвета</div>
-            <div className="text-emerald-400">• v6.9 — Пустые ячейки, широкие колонки + полный фикс</div>
+            <div className="text-emerald-400">• v6.9 — Заголовки жирные + цветные, пустые ячейки, PC-полировка</div>
           </div>
 
           <div className="mt-10 text-center">
