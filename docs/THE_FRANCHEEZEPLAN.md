@@ -1500,10 +1500,10 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T49 — Software-engineering hardening sweep (security/SPA/state/CSS/cart-write load)
 - status: `in_progress`
-- updated_at: `2026-02-23T16:20:00Z`
+- updated_at: `2026-02-25T20:35:31Z`
 - owner: `codex`
-- notes: Continued hardening pass with anti-workaround fixes plus style-system discipline: Telegram auth DB sync now server-action-only, service-role hardcoded fallback removed, SPA routing restored in franchize header/profile/menu, cart writes moved to checkpoint/page-exit queue with retry-on-failed-save, and franchize pill controls switched to CSS variable driven Tailwind utilities instead of direct inline color properties.
-- next_step: Finish remaining T49 substeps — broader franchize style-system variable migration and AppContext decomposition/realtime strategy audit, then run full regression smoke.
+- notes: Continued hardening pass with anti-workaround fixes plus style-system discipline: Telegram auth DB sync now server-action-only, service-role hardcoded fallback removed, SPA routing restored in franchize header/profile/menu, cart writes moved to checkpoint/page-exit queue with retry-on-failed-save, franchize pill controls switched to CSS-variable-driven Tailwind utilities, and create-form AI JSON local apply now reports precise parse/object-shape errors instead of generic failure.
+- next_step: Finish remaining T49 substeps — broader franchize style-system variable migration, AppContext decomposition/realtime strategy audit, and theme-flash hardening; then run full regression smoke.
 - risks: Cart persistence is now safer for DB load but depends on explicit checkpoints (`/cart`, `/order/*`, pagehide); must verify no data loss in abrupt mobile-session kills.
 - dependencies: T48
 - deliverables:
@@ -1571,6 +1571,12 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary is in /docs/AGENT_DIARY.MD - MOVE EVERYTHING BELOW THERE PLEASE:
+
+
+### 2026-02-25 — T49 AI-JSON resilience increment (create-form local apply)
+- Hardened `/franchize/create` local `Advanced JSON` apply flow with explicit empty-input guard and top-level/object-shape validation (`root object` + `franchize object` expectations).
+- Upgraded parse failure feedback from generic error to precise parser details (`JSON.parse` message), keeping the page stable and operator-recoverable on malformed payloads.
+- Kept task status as `in_progress`: security/SPA/cart/style foundations are in place, but broader context/theme-flash architecture scope remains open.
 
 ### 2026-02-23 — T49 continuation (style-token discipline + cart save resilience)
 - Refined franchize pill styling to use CSS-variable-powered Tailwind utilities (`bg-[var(--...)]`, `text-[var(--...)]`) for category/quick-filter controls, reducing inline color dominance while preserving dynamic crew theming.
