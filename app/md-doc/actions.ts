@@ -28,18 +28,16 @@ const RUSSIAN_TO_ENGLISH: Record<string, string> = {
   "бирюзовый": "teal", "бирюз": "teal",
 };
 
-function parseCellMarkers(raw: string) {
+export function parseCellMarkers(raw: string) {
   let text = raw.trim();
   let bg: string | undefined;
   let textColor: string | undefined;
 
-  // Ловим: (bg-красный), (фон-красный), (красный), (red), (bg-red)
   const matches = [...text.matchAll(/\((bg-|фон-)?([a-zа-яё#0-9-]+)\)/gi)];
 
   for (const m of matches) {
     const prefix = m[1] || "";
     let token = m[2].toLowerCase().replace(/ё/g, "е");
-
     const key = RUSSIAN_TO_ENGLISH[token] || token;
 
     if (prefix === "bg-" || prefix === "фон-") {
@@ -84,18 +82,11 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
           const { text, bg, textColor } = parseCellMarkers(raw.trim());
 
           return new TableCell({
-            children: [new Paragraph({
-              children: [new TextRun({ text, color: textColor?.replace("#", "") })],
-            })],
+            children: [new Paragraph({ children: [new TextRun({ text, color: textColor?.replace("#", "") })] })],
             shading: bg ? { fill: bg, type: ShadingType.CLEAR } : undefined,
-            width: { size: 4500, type: WidthType.DXA }, // нормальная широкая колонка
-            margins: { top: 100, bottom: 100, left: 120, right: 120 },
-            borders: {
-              top: { style: BorderStyle.SINGLE, size: 10 },
-              bottom: { style: BorderStyle.SINGLE, size: 10 },
-              left: { style: BorderStyle.SINGLE, size: 10 },
-              right: { style: BorderStyle.SINGLE, size: 10 },
-            },
+            width: { size: 4800, type: WidthType.DXA },
+            margins: { top: 120, bottom: 120, left: 140, right: 140 },
+            borders: { top: { style: BorderStyle.SINGLE, size: 12 }, bottom: { style: BorderStyle.SINGLE, size: 12 }, left: { style: BorderStyle.SINGLE, size: 12 }, right: { style: BorderStyle.SINGLE, size: 12 } },
           });
         });
 
@@ -108,7 +99,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
         rows: tableRows,
         width: { size: 100, type: WidthType.PERCENTAGE },
         layout: TableLayoutType.FIXED,
-        columnWidths: Array(colCount).fill(4500),
+        columnWidths: Array(colCount).fill(4800),
         borders: { top: { style: BorderStyle.SINGLE }, bottom: { style: BorderStyle.SINGLE }, left: { style: BorderStyle.SINGLE }, right: { style: BorderStyle.SINGLE }, insideH: { style: BorderStyle.SINGLE }, insideV: { style: BorderStyle.SINGLE } },
       }));
       continue;
@@ -147,11 +138,11 @@ export async function generateMarkdownDocxAndSend(
       chatId,
       blob,
       fileName,
-      `📄 ${fileName}\nГотово из Markdown-редактора CyberVibe v4.0`
+      `📄 ${fileName}\nГотово из Markdown-редактора CyberVibe v4.1`
     );
 
     return result.success 
-      ? { success: true, message: `✅ ${fileName} отправлен в Telegram!` }
+      ? { success: true, message: `✅ ${fileName} отправлен!` }
       : { success: false, error: result.error || "Ошибка отправки" };
   } catch (e: any) {
     logger.error("[md-doc] DOCX error:", e);
