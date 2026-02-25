@@ -68,7 +68,7 @@ export default function MarkdownDocEditor() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pt-16 pb-24 font-sans">
-      <div className="max-w-7xl mx-auto px-4 xl:px-0">
+      <div className="max-w-7xl mx-auto px-4">
         {/* Премиум хедер */}
         <div className="sticky top-4 z-50 bg-zinc-950/95 border border-zinc-800 backdrop-blur-2xl rounded-3xl px-6 py-5 mb-8 shadow-2xl flex flex-col xl:flex-row items-center gap-4">
           <div className="flex items-center gap-4 flex-1">
