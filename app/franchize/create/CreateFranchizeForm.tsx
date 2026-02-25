@@ -249,9 +249,25 @@ export default function CreateFranchizeForm() {
   };
 
   const applyAdvancedJsonLocally = () => {
+    const rawJson = form.advancedJson?.trim();
+    if (!rawJson) {
+      setMessage("Поле Advanced JSON пустое. Вставьте JSON и повторите.");
+      return;
+    }
+
     try {
-      const parsed = JSON.parse(form.advancedJson || "{}");
+      const parsed = JSON.parse(rawJson) as unknown;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        setMessage("Advanced JSON должен быть JSON-объектом верхнего уровня.");
+        return;
+      }
+
       const source = parsed.franchize ?? parsed;
+      if (!source || typeof source !== "object" || Array.isArray(source)) {
+        setMessage("Ключ franchize должен содержать JSON-объект.");
+        return;
+      }
+
       setForm((prev) => ({
         ...prev,
         brandName: readPath(source, ["branding", "name"], prev.brandName),
@@ -288,8 +304,9 @@ export default function CreateFranchizeForm() {
           .join("\n") || prev.socialLinksText,
       }));
       setMessage("JSON применён локально для предпросмотра. Если всё ок — нажимайте сохранить.");
-    } catch {
-      setMessage("Не удалось применить JSON: проверьте формат.");
+    } catch (error) {
+      const details = error instanceof Error ? error.message : "Неизвестная ошибка парсинга";
+      setMessage(`Не удалось применить JSON: ${details}`);
     }
   };
 
