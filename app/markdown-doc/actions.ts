@@ -7,6 +7,9 @@ import { parseCellMarkers } from "@/lib/parseCellMarkers";
 
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, TableLayoutType, BorderStyle, ShadingType } = docx;
 
+// МАГИЧЕСКАЯ КОНСТАНТА: Ширина листа A4 в единицах DXA (за вычетом стандартных полей)
+const FULL_TABLE_WIDTH_DXA = 9638;
+
 async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
   const children: any[] = [];
   const lines = markdown.split("\n");
@@ -27,9 +30,8 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
     else if (line.startsWith("|")) {
       const tableRows: TableRow[] = [];
       let colCount = 0;
-      let isHeaderRow = true;
 
-      // Сначала узнаем макс. количество колонок в таблице
+      // 1. Сначала определяем максимальное количество колонок во всей таблице
       let checkI = i;
       while (checkI < lines.length && lines[checkI].trim().startsWith("|")) {
         if (!lines[checkI].includes("---")) {
@@ -38,6 +40,11 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
         }
         checkI++;
       }
+
+      // 2. Рассчитываем фиксированную ширину одной колонки в DXA
+      const columnWidthDxa = Math.floor(FULL_TABLE_WIDTH_DXA / colCount);
+
+      let isHeaderRow = true;
 
       while (i < lines.length && lines[i].trim().startsWith("|")) {
         const rowLine = lines[i].trim();
@@ -50,15 +57,15 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
           return new TableCell({
             children: [new Paragraph({ 
               children: [new TextRun({ 
-                text: text || " ", 
+                text: text || " ", // Фикс пустых строк
                 color: textColor?.replace("#", ""),
-                bold: isHeaderRow // Шапка всегда жирная
+                bold: isHeaderRow 
               })] 
             })],
             shading: bg ? { fill: bg.replace("#", ""), type: ShadingType.CLEAR } : undefined,
-            // ФИКС: Ширина в процентах, чтобы таблица была на весь лист
-            width: { size: 100 / colCount, type: WidthType.PERCENTAGE },
-            margins: { top: 120, bottom: 120, left: 120, right: 120 },
+            // МАГИЯ ТУТ: Указываем ширину в DXA для каждой ячейки
+            width: { size: columnWidthDxa, type: WidthType.DXA },
+            margins: { top: 140, bottom: 140, left: 140, right: 140 },
             borders: { 
               top: { style: BorderStyle.SINGLE, size: 4, color: "E2E8F0" }, 
               bottom: { style: BorderStyle.SINGLE, size: 4, color: "E2E8F0" }, 
@@ -68,16 +75,24 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
           });
         });
 
-        while (rowCells.length < colCount) rowCells.push(new TableCell({ children: [] }));
+        // Дозаполняем ячейки, если строка короче заголовка
+        while (rowCells.length < colCount) {
+          rowCells.push(new TableCell({ 
+            children: [], 
+            width: { size: columnWidthDxa, type: WidthType.DXA } 
+          }));
+        }
+        
         tableRows.push(new TableRow({ children: rowCells }));
-        isHeaderRow = false; // Последующие строки обычные
+        isHeaderRow = false;
         i++;
       }
 
+      // 3. Создаем таблицу с фиксированной раскладкой
       children.push(new Table({
         rows: tableRows,
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        layout: TableLayoutType.FIXED,
+        width: { size: FULL_TABLE_WIDTH_DXA, type: WidthType.DXA },
+        layout: TableLayoutType.FIXED, // ОБЯЗАТЕЛЬНО для соблюдения ширины колонок
       }));
       continue;
     } 
@@ -97,7 +112,7 @@ export async function sendMarkdownDoc(markdown: string, chatId: string, fileName
     const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
     const name = `${fileName.replace(/\s+/g, "_")}.docx`;
 
-    return await sendTelegramDocument(chatId, blob, name, `📄 *CyberVibe Studio v8.0*\nДокумент готов: \`${name}\``);
+    return await sendTelegramDocument(chatId, blob, name, `📄 *CyberVibe Studio v8.1*\nШирина таблиц: *DXA MAGIC*`);
   } catch (e: any) {
     logger.error("DOCX_GEN_ERROR", e);
     return { success: false, error: e.message };
