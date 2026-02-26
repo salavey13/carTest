@@ -1533,7 +1533,11 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - First paint does not flash incorrect light theme before dark theme sync for known dark-pref users.
   - AI JSON tooling reports precise validation errors without crashing franchize create flow.
 
-### Task T49 see in special ./T49-security_sweep.md
+### Task T49 VERY IMPORTSNT:
+see in special /docs/T49-security_sweep.md
+update status accordingly: /docs/THE_FRANCHEEZEPLAN_STATUS.MD
+
+
 ## 6) Task template for future extension
 
 When adding a new task, copy this block:
@@ -1570,7 +1574,33 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 
 ---
 
-## 7) Progress changelog / diary is in /docs/AGENT_DIARY.MD - MOVE EVERYTHING BELOW THERE PLEASE:
+## 7) Progress changelog / diary is in /docs/AGENT_DIARY.MD 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`/docs/AGENT_DIARY.MD` - MOVE EVERYTHING BELOW THERE PLEASE:
 
 
 ### 2026-02-25 — T49 AI-JSON resilience increment (create-form local apply)
