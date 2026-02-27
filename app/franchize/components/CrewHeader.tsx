@@ -159,7 +159,13 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
       <div className="pointer-events-none absolute inset-0 -z-10 backdrop-blur-xl" style={{ backgroundColor: `${crew.theme.palette.bgCard}E8` }} />
       <div className="pointer-events-none absolute inset-x-0 -top-[24px] h-[24px] backdrop-blur-xl" style={{ backgroundColor: `${crew.theme.palette.bgCard}EB` }} />
 
-      <div className="mx-auto w-full max-w-4xl">
+      <div
+        className="mx-auto w-full max-w-4xl overflow-hidden"
+        style={{
+          maxHeight: isCompact ? 0 : 112,
+          transition: "max-height 0.32s ease",
+        }}
+      >
         <div
           style={{
             display: "grid",

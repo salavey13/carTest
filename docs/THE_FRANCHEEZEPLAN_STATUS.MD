@@ -265,3 +265,9 @@ import { createClient } from "@supabase/supabase-js";
 - Focus-ring behavior remains via `focusRingOutlineStyle(...)`; no checkout logic changes.
 - Lint/build/screenshot checks passed on `vip-bike` order route.
 - Next planned task: start `T49.5` (AppContext decomposition + realtime strategy audit).
+
+## UPDATE 2026-02-28 (T49 review hotfix: crash + compact-gap)
+- Fixed **P1 regression** from review: `hooks/supabase.ts` no longer imports `@/lib/supabase-server`, so client modules that consume `@/hooks/supabase` no longer execute server-only `window` guard at bundle load.
+- Fixed **P2 regression** from review: `CrewHeader` compact state now collapses row layout height via `max-height` + `overflow-hidden` wrapper, removing blank sticky gap while preserving transform/opacity animation.
+- Revalidated with targeted lint + full build and captured updated visual smoke screenshot on `/franchize/vip-bike` after compact scroll.
+- Next beat: merge this regression hotfix, then open T49.5 context decomposition track.

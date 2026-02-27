@@ -3,15 +3,7 @@ import { generateJwtToken } from "@/lib/auth";
 import type { WebAppUser } from "@/types/telegram";
 import { logger } from "@/lib/logger"; 
 import type { Database } from "@/types/database.types.ts"; 
-import {
-  supabaseAdmin,
-  isSupabaseAdminAvailable,
-  getSupabaseAdminError,
-  withSupabaseAdmin,
-  getServiceRoleKey,
-} from "@/lib/supabase-server";
 
-export { supabaseAdmin, isSupabaseAdminAvailable, getSupabaseAdminError, withSupabaseAdmin };
 
 type DbUser = Database["public"]["Tables"]["users"]["Row"];
 type DbCar = Database["public"]["Tables"]["cars"]["Row"];
@@ -41,6 +33,64 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabaseAnon: SupabaseClient<Database> = createClient<Database>(supabaseUrl, supabaseAnonKey);
+
+
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+let adminClientInitError: string | null = null;
+
+export const supabaseAdmin: SupabaseClient<Database> = (() => {
+  if (!serviceRoleKey) {
+    const warning = "SUPABASE_SERVICE_ROLE_KEY is missing. Admin operations will fail.";
+    adminClientInitError = warning;
+    logger.warn(warning);
+
+    return new Proxy({} as SupabaseClient<Database>, {
+      get() {
+        throw new Error(
+          "supabaseAdmin is unavailable: SUPABASE_SERVICE_ROLE_KEY is missing. " +
+            "Use server-only actions/handlers for privileged operations.",
+        );
+      },
+    });
+  }
+
+  return createClient<Database>(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+})();
+
+export function isSupabaseAdminAvailable(): boolean {
+  return !!serviceRoleKey;
+}
+
+export function getSupabaseAdminError(): string | null {
+  return adminClientInitError;
+}
+
+export function getServiceRoleKey(): string | null {
+  return serviceRoleKey ?? null;
+}
+
+export async function withSupabaseAdmin<T>(
+  operation: (client: SupabaseClient<Database>) => Promise<T>,
+): Promise<{ success: boolean; data?: T; error?: string }> {
+  if (!isSupabaseAdminAvailable()) {
+    return { success: false, error: getSupabaseAdminError() ?? "Admin client unavailable." };
+  }
+
+  try {
+    const result = await operation(supabaseAdmin);
+    return { success: true, data: result };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    logger.error("Supabase admin operation failed:", error);
+    return { success: false, error: message };
+  }
+}
 
 export const createAuthenticatedClient = async (userId: string): Promise<SupabaseClient<Database> | null> => {
     if (!userId) {

@@ -1500,10 +1500,10 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T49 — Software-engineering hardening sweep (security/SPA/state/CSS/cart-write load)
 - status: `in_progress`
-- updated_at: `2026-02-27T23:45:00Z`
+- updated_at: `2026-02-28T00:55:00Z`
 - owner: `codex`
-- notes: Final T49.4 polish pass on order surface: converted remaining class-compatible inline var styles (`border/color/background` on promo, milestone, copilot, CTA controls) into Tailwind var utilities and trimmed style-object noise while preserving focus-ring behavior.
-- next_step: Start T49.5 AppContext decomposition + realtime strategy audit (T49.4 polish track considered complete enough for merge).
+- notes: Addressed post-review regressions: restored true compact-height collapse in `CrewHeader` (no blank sticky gap) and decoupled `hooks/supabase.ts` from `lib/supabase-server` to prevent client bundle crash paths while keeping server-only admin module for dedicated server actions.
+- next_step: Finalize T49 merge for regression fixes, then start T49.5 AppContext decomposition + realtime strategy audit.
 - risks: Cart durability and theme first-paint behavior still require regression checks on Telegram-like mobile sessions.
 - dependencies: T48
 - deliverables:
