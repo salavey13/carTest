@@ -26,7 +26,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const railRef = useRef<HTMLDivElement | null>(null);
 
-  // ... (useMemo and useEffects unchanged for brevity) ...
+  // ... (useMemo and useEffects unchanged) ...
   const defaultGroupLinks = useMemo(
     () => Array.from(new Set([...crew.catalog.showcaseGroups.map((group) => group.label), ...crew.catalog.categories, ...groupLinks].filter(Boolean))),
     [crew.catalog.categories, crew.catalog.showcaseGroups, groupLinks],
@@ -48,6 +48,8 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+  
+  // ... (Other useEffects unchanged for brevity) ...
 
   useEffect(() => {
     if (pathname !== mainCatalogPath) {
@@ -187,13 +189,16 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
             aria-label="Open menu"
             onClick={() => setMenuOpen(true)}
             className="inline-flex h-11 w-11 items-center justify-center rounded-xl transition"
-            style={{ backgroundColor: `${crew.theme.palette.bgBase}CC`, color: crew.theme.palette.textPrimary }}
+            style={{ backgroundColor: `${crew.theme.palette.bgBase}CC`, color: crew.theme.palette.textPrimary, pointerEvents: "auto" }}
           >
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* FIX: Logo is now a Link to mainCatalogPath */}
-          <Link href={mainCatalogPath} className="relative z-10 mx-auto flex flex-col items-center text-center cursor-pointer hover:opacity-90 transition-opacity">
+          {/* FIX: Added pointer-events-auto because parent has pointer-events: none when compact */}
+          <Link 
+            href={mainCatalogPath} 
+            className="relative z-10 mx-auto flex flex-col items-center text-center cursor-pointer hover:opacity-90 transition-opacity pointer-events-auto"
+          >
             <div className="relative h-16 w-16 overflow-hidden rounded-full border shadow-lg" style={{ borderColor: crew.theme.palette.accentMain, backgroundColor: crew.theme.palette.bgBase }}>
               {crew.header.logoUrl ? (
                 <Image src={crew.header.logoUrl} alt={`${crew.header.brandName} logo`} fill sizes="64px" className="object-cover" unoptimized />
