@@ -39,57 +39,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const telegramHookData = useTelegram();
   const { user, dbUser: initialDbUser, isLoading: isTelegramLoading, isAuthenticating: isTelegramAuthenticating, error: telegramError, ...restTelegramData } = telegramHookData;
 
-  // STICKY STATE: Initialize with initialDbUser, but never let it go back to null automatically
   const [dbUser, setDbUserInternal] = useState<Database["public"]["Tables"]["users"]["Row"] | null>(initialDbUser);
   const [startParamPayload, setStartParamPayload] = useState<string | null>(null);
   const [userCrewInfo, setUserCrewInfo] = useState<UserCrewInfo | null>(null);
   const [activeLobby, setActiveLobby] = useState<ActiveLobbyInfo | null>(null);
 
-  // We use a ref to track if we ever had a user, to prevent overwriting with null during loading/transitions
   const hasUserRef = useRef(!!initialDbUser);
 
-  // STABILIZED EFFECT:
-  // If we receive a valid user, update state and mark as found.
-  // If we receive null, ONLY update state if we haven't found a user yet (true logout requires manual handling).
+  // FIX: Stabilized User State
+  // If initialDbUser is present, update.
+  // If initialDbUser is missing, ONLY clear state if we never had a user.
+  // This prevents "logging out" during brief loading states when navigating.
   useEffect(() => {
     if (initialDbUser) {
       setDbUserInternal(initialDbUser);
       hasUserRef.current = true;
     } else if (!hasUserRef.current) {
-      // Only set to null if we never had a user (initial load state)
+      // Only set to null if we truly have no session history
       setDbUserInternal(null);
     }
-    // Note: If initialDbUser becomes null (e.g. during hook re-init), we explicitly ignore it 
-    // to keep the "stale" but valid user data visible during transitions.
   }, [initialDbUser]);
 
   const appToast = useAppToast();
 
   const refreshDbUser = useCallback(async () => {
-    // Use either the hook user or the sticky dbUser ID
+    // FIX: Use sticky user ID if telegram user is temporarily missing
     const userId = user?.id || dbUser?.user_id;
+    
     if (userId) {
       debugLogger.info(`[AppContext refreshDbUser] Refreshing dbUser for user ID: ${userId}`);
       try {
         const freshDbUser = await refreshDbUserAction(String(userId));
         if (freshDbUser) {
-            setDbUserInternal(freshDbUser);
-            hasUserRef.current = true;
-            debugLogger.info(`[AppContext refreshDbUser] dbUser refreshed successfully.`);
+           setDbUserInternal(freshDbUser);
+           hasUserRef.current = true;
+           debugLogger.info(`[AppContext refreshDbUser] dbUser refreshed successfully.`);
         }
       } catch (err) {
         debugLogger.error(`[AppContext refreshDbUser] Failed to refresh:`, err);
       }
     } else {
-      debugLogger.warn("[AppContext refreshDbUser] Cannot refresh, user ID is not available.");
+      debugLogger.warn("[AppContext refreshDbUser] Cannot refresh, user.id is not available.");
     }
   }, [user?.id, dbUser?.user_id]);
 
   useEffect(() => {
     const fetchCrewInfo = async () => {
+      // FIX: Rely on sticky dbUser to prevent clearing crew info unnecessarily
       if (!dbUser?.user_id) {
-        // Only clear crew info if we are genuinely logged out (dbUser is null)
-        // Since dbUser is sticky, this won't flash during nav
         if (!hasUserRef.current) setUserCrewInfo(null);
         return;
       }
@@ -109,7 +106,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       checkActiveGame();
-      // Polling is currently disabled to save resources as requested
+      // Pinging disabled as requested
       // const interval = setInterval(checkActiveGame, 60000); 
       // return () => clearInterval(interval);
   }, [dbUser?.user_id]);
@@ -128,8 +125,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return {
       ...restTelegramData,
       user,
-      dbUser, // Returns the sticky internal state
-      isLoading: isTelegramLoading, // Pass through loading state, but dbUser remains available
+      dbUser, // Returns stabilized user
+      isLoading: isTelegramLoading, 
       isAuthenticating: isTelegramAuthenticating,
       error: telegramError,
       startParamPayload,
@@ -140,18 +137,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [restTelegramData, user, dbUser, isTelegramLoading, isTelegramAuthenticating, telegramError, startParamPayload, refreshDbUser, clearStartParam, userCrewInfo, activeLobby]);
 
-  // Toast Logic (Simplified to reduce noise)
+  // Toast Logic
   useEffect(() => {
     let loadingTimer: NodeJS.Timeout | null = null;
     const LOADING_TOAST_DELAY = 500;
     const isClient = typeof document !== 'undefined';
     
-    // Only show loading toast if we don't have a user yet
+    // Only show loading if we don't have a sticky user
     const shouldShowLoading = (isTelegramLoading || isTelegramAuthenticating) && !dbUser;
 
     if (shouldShowLoading) {
-       appToast.dismiss("auth-success-toast"); 
-       appToast.dismiss("auth-error-toast");
+       appToast.dismiss("auth-success-toast"); appToast.dismiss("auth-error-toast");
        loadingTimer = setTimeout(() => {
           if (shouldShowLoading && (!isClient || document.visibilityState === 'visible')) {
              appToast.loading("Авторизация...", { id: "auth-loading-toast", duration: 15000 });
@@ -162,7 +158,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         appToast.dismiss("auth-loading-toast");
 
         if (telegramHookData.isAuthenticated && !telegramError && !dbUser) {
-             // Only show success if we just got the user
+             // Success toast logic can go here
         } else if (telegramError) {
              if (!isClient || document.visibilityState === 'visible') {
                  appToast.error(`Ошибка: ${telegramError.message}`, { id: "auth-error-toast", duration: 5000 });
@@ -191,16 +187,9 @@ export const useAppContext = (): AppContextData => {
      } as unknown as AppContextData;
   }
 
-  // Admin fallback logic
+  // Admin fallback
   if (context.isLoading === false && typeof context.isAdmin !== 'function') {
-    const fallbackIsAdmin = () => { 
-        if (context.dbUser) { 
-            const statusIsAdmin = context.dbUser.status === 'admin'; 
-            const roleIsAdmin = context.dbUser.role === 'vprAdmin' || context.dbUser.role === 'admin'; 
-            return statusIsAdmin || roleIsAdmin; 
-        } 
-        return false; 
-    };
+    const fallbackIsAdmin = () => { if (context.dbUser) { const statusIsAdmin = context.dbUser.status === 'admin'; const roleIsAdmin = context.dbUser.role === 'vprAdmin' || context.dbUser.role === 'admin'; return statusIsAdmin || roleIsAdmin; } return false; };
     return { ...context, isAdmin: fallbackIsAdmin } as AppContextData;
   }
 
