@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link"; // Added Link
+import Link from "next/link";
 import { Menu } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -26,8 +26,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const railRef = useRef<HTMLDivElement | null>(null);
 
-  // ... (existing useMemo and useEffects remain unchanged) ...
-
+  // ... (useMemo and useEffects unchanged for brevity) ...
   const defaultGroupLinks = useMemo(
     () => Array.from(new Set([...crew.catalog.showcaseGroups.map((group) => group.label), ...crew.catalog.categories, ...groupLinks].filter(Boolean))),
     [crew.catalog.categories, crew.catalog.showcaseGroups, groupLinks],
@@ -193,8 +192,8 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* WRAPPED LOGO IN LINK */}
-          <Link href={mainCatalogPath} className="relative z-10 mx-auto flex flex-col items-center text-center cursor-pointer hover:opacity-95 transition-opacity">
+          {/* FIX: Logo is now a Link to mainCatalogPath */}
+          <Link href={mainCatalogPath} className="relative z-10 mx-auto flex flex-col items-center text-center cursor-pointer hover:opacity-90 transition-opacity">
             <div className="relative h-16 w-16 overflow-hidden rounded-full border shadow-lg" style={{ borderColor: crew.theme.palette.accentMain, backgroundColor: crew.theme.palette.bgBase }}>
               {crew.header.logoUrl ? (
                 <Image src={crew.header.logoUrl} alt={`${crew.header.brandName} logo`} fill sizes="64px" className="object-cover" unoptimized />
