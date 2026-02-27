@@ -3,8 +3,15 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Loader2, Send, UserCheck, Sparkles, Eye, Edit3, FileText, ListChecks } from "lucide-react";
-import { loadFrancheezeStatusMarkdown, sendMarkdownDoc } from "./actions";
+import { Loader2, Send, UserCheck, Sparkles, Eye, Edit3, FileText, ListChecks, Bike, Database, Save } from "lucide-react";
+import {
+  getRentalDocDemoVariables,
+  loadFrancheezeStatusMarkdown,
+  loadRentalDealTemplateMarkdown,
+  saveRentalDocGenerationDemo,
+  sendMarkdownDoc,
+  type MarkdownTemplateVariables,
+} from "./actions";
 import { parseCellMarkers } from "@/lib/parseCellMarkers";
 import { useAppContext } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
@@ -12,21 +19,15 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const MANAGER_ID = "6216799537";
-const LOCAL_STORAGE_KEY = "markdown_doc_studio_v9";
+const LOCAL_STORAGE_KEY = "markdown_doc_studio_v10";
 
 const DEMO_MARKDOWN = `# Отчёт по задаче
 
-> **Важно:** таблицы в DOCX экспортируются с адекватной шириной колонок и корректно читаются в разных viewer.
-
-## Сводка
-
 | (bg-emerald) **Блок** | **Статус** | **Комментарий** |
 |:--|:--:|--:|
-| (фиолет) *Авторизация* | ✅ Готово | Поддержка Telegram WebApp |
+| *Авторизация* | ✅ Готово | Поддержка Telegram WebApp |
 | **Markdown DOC** | ⚙️ В работе | Исправлены жирный/**курсив** и ширина таблиц |
-| (bg-cyan) Интеграции | 🚀 Запущено | Экспорт в Telegram |
-
-Обычный текст, **жирный текст**, *курсив*, а также ***жирный курсив*** корректно экспортируются в DOCX.`;
+| Интеграции | 🚀 Запущено | Экспорт в Telegram |`;
 
 function extractText(node: ReactNode): string {
   if (!node) return "";
@@ -59,11 +60,22 @@ function renderCell(children: ReactNode, isHeader = false) {
   );
 }
 
+function applyVariables(template: string, variables: MarkdownTemplateVariables) {
+  return template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_full, key: string) => {
+    const value = variables[key];
+    return value === undefined || value === null ? "" : String(value);
+  });
+}
+
 export default function MarkdownDocPage() {
   const { user } = useAppContext();
   const [markdown, setMarkdown] = useState("");
+  const [templateMarkdown, setTemplateMarkdown] = useState("");
+  const [templateName, setTemplateName] = useState("manual_markdown");
+  const [variablesJson, setVariablesJson] = useState("{}");
   const [activeTab, setActiveTab] = useState<"edit" | "view">("edit");
   const [loading, setLoading] = useState<string | null>(null);
+  const [demoContext, setDemoContext] = useState<{ userId: string; ownerId: string; vehicleId: string } | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -94,21 +106,93 @@ export default function MarkdownDocPage() {
     const result = await sendMarkdownDoc(markdown, id);
     setLoading(null);
 
-    if (result.success) {
-      toast.success(`DOCX отправлен: ${label}`);
-    } else {
-      toast.error(result.error || "Ошибка отправки DOCX");
-    }
+    if (result.success) toast.success(`DOCX отправлен: ${label}`);
+    else toast.error(result.error || "Ошибка отправки DOCX");
   };
 
   const loadStatusDemo = async () => {
     try {
       setLoading("STATUS");
       const content = await loadFrancheezeStatusMarkdown();
+      setTemplateName("francheeze_status");
+      setTemplateMarkdown(content);
       setMarkdown(content);
       toast.success("Загружен docs/THE_FRANCHEEZEPLAN_STATUS.MD");
     } catch (error: any) {
       toast.error(error?.message || "Не удалось загрузить статус-файл");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const loadRentalTemplate = async () => {
+    try {
+      setLoading("RENT_TEMPLATE");
+      const content = await loadRentalDealTemplateMarkdown();
+      setTemplateName("rental_deal_template_demo");
+      setTemplateMarkdown(content);
+      setMarkdown(content);
+      toast.success("Загружен шаблон docs/RENTAL_DEAL_TEMPLATE_DEMO.md");
+    } catch (error: any) {
+      toast.error(error?.message || "Не удалось загрузить шаблон аренды");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const loadDbDemoVariables = async () => {
+    try {
+      setLoading("DB_VARS");
+      const demo = await getRentalDocDemoVariables();
+      setDemoContext({ userId: demo.userId, ownerId: demo.ownerId, vehicleId: demo.vehicleId });
+      setTemplateName(demo.templateName);
+      setVariablesJson(JSON.stringify(demo.variables, null, 2));
+      toast.success("Подтянут demo-набор переменных из users.metadata + cars.specs");
+    } catch (error: any) {
+      toast.error(error?.message || "Не удалось загрузить demo-переменные");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const applyTemplateToEditor = () => {
+    const source = templateMarkdown || markdown;
+    try {
+      const variables = JSON.parse(variablesJson) as MarkdownTemplateVariables;
+      const output = applyVariables(source, variables);
+      setMarkdown(output);
+      toast.success("Шаблон применён к markdown");
+    } catch {
+      toast.error("Проверь JSON переменных");
+    }
+  };
+
+  const saveGenerationToRentals = async () => {
+    if (!demoContext) {
+      toast.error("Сначала нажми DB VARS, чтобы выбрать user/car для demo-записи");
+      return;
+    }
+
+    try {
+      const variables = JSON.parse(variablesJson) as MarkdownTemplateVariables;
+      setLoading("SAVE_RENTAL");
+      const result = await saveRentalDocGenerationDemo({
+        templateName,
+        variables,
+        renderedMarkdown: markdown,
+        userId: demoContext.userId,
+        ownerId: demoContext.ownerId,
+        vehicleId: demoContext.vehicleId,
+      });
+
+      if (!result.success) {
+        toast.error(result.error || "Ошибка сохранения в rentals");
+        return;
+      }
+
+      toast.success("Demo-рентал с template+variables сохранён в public.rentals.metadata");
+    } catch {
+      toast.error("Проверь JSON переменных перед сохранением");
     } finally {
       setLoading(null);
     }
@@ -125,43 +209,40 @@ export default function MarkdownDocPage() {
               </div>
               <div>
                 <h1 className="font-orbitron text-lg font-black text-white md:text-xl">Markdown DOC Studio</h1>
-                <p className="text-[11px] text-zinc-400 md:text-xs">robust tables + correct DOCX emphasis</p>
+                <p className="text-[11px] text-zinc-400 md:text-xs">paper rental docs → template + variables + regenerate on demand</p>
               </div>
             </div>
 
             <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:items-center">
-              <Button
-                size="sm"
-                onClick={() => setMarkdown(DEMO_MARKDOWN)}
-                className="h-10 rounded-xl border border-white/20 bg-transparent px-2 text-white hover:bg-white/10 sm:px-4"
-              >
+              <Button size="sm" onClick={() => setMarkdown(DEMO_MARKDOWN)} className="h-10 rounded-xl border border-white/20 bg-transparent px-2 text-white hover:bg-white/10 sm:px-4">
                 <FileText className="h-4 w-4" />
-                <span className="hidden sm:inline">ДЕМО</span>
+                <span className="hidden sm:inline">DEMO</span>
               </Button>
-              <Button
-                size="sm"
-                onClick={loadStatusDemo}
-                disabled={!!loading}
-                className="h-10 rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-2 text-cyan-100 hover:bg-cyan-500/20 sm:px-4"
-              >
+              <Button size="sm" onClick={loadStatusDemo} disabled={!!loading} className="h-10 rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-2 text-cyan-100 hover:bg-cyan-500/20 sm:px-4">
                 {loading === "STATUS" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListChecks className="h-4 w-4" />}
                 <span className="hidden sm:inline">STATUS</span>
               </Button>
-              <Button
-                size="sm"
-                onClick={() => onSend(user?.id?.toString() || "", "СЕБЕ")}
-                disabled={!!loading}
-                className="h-10 rounded-xl bg-white px-2 text-black sm:px-4"
-              >
+              <Button size="sm" onClick={loadRentalTemplate} disabled={!!loading} className="h-10 rounded-xl border border-amber-400/40 bg-amber-500/10 px-2 text-amber-100 hover:bg-amber-500/20 sm:px-4">
+                {loading === "RENT_TEMPLATE" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bike className="h-4 w-4" />}
+                <span className="hidden sm:inline">RENT TEMPLATE</span>
+              </Button>
+              <Button size="sm" onClick={loadDbDemoVariables} disabled={!!loading} className="h-10 rounded-xl border border-violet-400/40 bg-violet-500/10 px-2 text-violet-100 hover:bg-violet-500/20 sm:px-4">
+                {loading === "DB_VARS" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
+                <span className="hidden sm:inline">DB VARS</span>
+              </Button>
+              <Button size="sm" onClick={applyTemplateToEditor} className="h-10 rounded-xl border border-white/20 bg-transparent px-2 text-white hover:bg-white/10 sm:px-4">
+                <Edit3 className="h-4 w-4" />
+                <span className="hidden sm:inline">APPLY</span>
+              </Button>
+              <Button size="sm" onClick={saveGenerationToRentals} disabled={!!loading} className="h-10 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-2 text-emerald-100 hover:bg-emerald-500/20 sm:px-4">
+                {loading === "SAVE_RENTAL" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                <span className="hidden sm:inline">SAVE RENTAL</span>
+              </Button>
+              <Button size="sm" onClick={() => onSend(user?.id?.toString() || "", "СЕБЕ")} disabled={!!loading} className="h-10 rounded-xl bg-white px-2 text-black sm:px-4">
                 {loading === "СЕБЕ" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 <span className="hidden sm:inline">СЕБЕ</span>
               </Button>
-              <Button
-                size="sm"
-                onClick={() => onSend(MANAGER_ID, "МЕНЕДЖЕРУ")}
-                disabled={!!loading}
-                className="h-10 rounded-xl bg-blue-600 px-2 text-white sm:px-4"
-              >
+              <Button size="sm" onClick={() => onSend(MANAGER_ID, "МЕНЕДЖЕРУ")} disabled={!!loading} className="h-10 rounded-xl bg-blue-600 px-2 text-white sm:px-4">
                 {loading === "МЕНЕДЖЕРУ" ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
                 <span className="hidden sm:inline">МЕНЕДЖЕРУ</span>
               </Button>
@@ -169,13 +250,23 @@ export default function MarkdownDocPage() {
           </div>
 
           <div className="mt-3 hidden flex-wrap gap-2 text-xs text-zinc-400 md:flex">
+            <span className="rounded-full border border-white/15 px-3 py-1">Template: {templateName}</span>
             <span className="rounded-full border border-white/15 px-3 py-1">Строк: {docStats.lines}</span>
             <span className="rounded-full border border-white/15 px-3 py-1">Табличных строк: {docStats.tableRows}</span>
-            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-emerald-300">adaptive table preview</span>
           </div>
         </header>
 
-        <section className="grid h-[66vh] gap-4 md:h-[64vh] md:gap-6 md:grid-cols-2">
+        <section className="grid gap-4 md:gap-6 lg:grid-cols-[0.34fr_0.33fr_0.33fr]">
+          <article className="rounded-[1.75rem] border border-white/10 bg-zinc-950/70 md:rounded-[2.25rem]">
+            <div className="border-b border-white/10 px-4 py-3 text-xs font-semibold text-zinc-400">Template variables (JSON)</div>
+            <textarea
+              value={variablesJson}
+              onChange={(event) => setVariablesJson(event.target.value)}
+              className="custom-scrollbar h-[32vh] w-full resize-none bg-transparent p-4 font-mono text-xs text-zinc-200 outline-none md:h-[56vh]"
+              placeholder='{"renter_full_name":"..."}'
+            />
+          </article>
+
           <article
             className={cn(
               "flex flex-col overflow-hidden rounded-[1.75rem] border border-white/10 bg-zinc-950/70 md:rounded-[2.25rem]",
@@ -185,8 +276,8 @@ export default function MarkdownDocPage() {
             <div className="border-b border-white/10 px-4 py-3 text-xs font-semibold text-zinc-400">Markdown editor</div>
             <textarea
               value={markdown}
-              onChange={(e) => setMarkdown(e.target.value)}
-              className="custom-scrollbar h-full flex-1 resize-none bg-transparent p-4 font-mono text-sm text-zinc-200 outline-none md:p-6"
+              onChange={(event) => setMarkdown(event.target.value)}
+              className="custom-scrollbar h-[44vh] flex-1 resize-none bg-transparent p-4 font-mono text-sm text-zinc-200 outline-none md:h-[56vh]"
               placeholder="Вставьте markdown..."
             />
           </article>
@@ -198,7 +289,7 @@ export default function MarkdownDocPage() {
             )}
           >
             <div className="border-b border-white/10 px-4 py-3 text-xs font-semibold text-zinc-400">Live preview</div>
-            <div className="markdown-doc-preview custom-scrollbar flex-1 overflow-auto p-4 md:p-6">
+            <div className="markdown-doc-preview custom-scrollbar h-[44vh] overflow-auto p-4 md:h-[56vh]">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
@@ -218,23 +309,11 @@ export default function MarkdownDocPage() {
         </section>
 
         <div className="fixed bottom-4 left-4 right-4 z-50 flex rounded-2xl border border-white/10 bg-zinc-900/95 p-1 shadow-2xl md:hidden">
-          <button
-            onClick={() => setActiveTab("edit")}
-            className={cn(
-              "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold",
-              activeTab === "edit" ? "bg-white/10 text-white" : "text-zinc-500",
-            )}
-          >
+          <button onClick={() => setActiveTab("edit")} className={cn("flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold", activeTab === "edit" ? "bg-white/10 text-white" : "text-zinc-500")}>
             <Edit3 size={14} />
             <span className="max-[380px]:hidden">ТЕКСТ</span>
           </button>
-          <button
-            onClick={() => setActiveTab("view")}
-            className={cn(
-              "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold",
-              activeTab === "view" ? "bg-white/10 text-white" : "text-zinc-500",
-            )}
-          >
+          <button onClick={() => setActiveTab("view")} className={cn("flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold", activeTab === "view" ? "bg-white/10 text-white" : "text-zinc-500")}>
             <Eye size={14} />
             <span className="max-[380px]:hidden">ОБЗОР</span>
           </button>
@@ -246,7 +325,6 @@ export default function MarkdownDocPage() {
           color: #e4e4e7;
           line-height: 1.6;
         }
-
         .markdown-table-wrap {
           width: 100%;
           overflow-x: auto;
@@ -255,7 +333,6 @@ export default function MarkdownDocPage() {
           border-radius: 0.75rem;
           background: rgba(24, 24, 27, 0.4);
         }
-
         .markdown-doc-preview table {
           width: 100%;
           min-width: 520px;
@@ -263,7 +340,6 @@ export default function MarkdownDocPage() {
           table-layout: auto;
           margin: 0;
         }
-
         .markdown-doc-preview th,
         .markdown-doc-preview td,
         .markdown-doc-preview .markdown-cell {
@@ -274,20 +350,9 @@ export default function MarkdownDocPage() {
           overflow-wrap: break-word;
           white-space: normal;
         }
-
         .markdown-doc-preview th {
           background: rgba(255, 255, 255, 0.06);
           font-weight: 700;
-        }
-
-        .markdown-doc-preview em {
-          font-style: italic;
-          color: #c4b5fd;
-        }
-
-        .markdown-doc-preview strong {
-          font-weight: 700;
-          color: #fff;
         }
       `}</style>
     </div>
