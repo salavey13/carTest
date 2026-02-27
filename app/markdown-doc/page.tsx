@@ -1,17 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Loader2, Send, UserCheck, Sparkles, Eye, Edit3, FileText } from "lucide-react";
 import { sendMarkdownDoc } from "./actions";
-import { parseCellMarkers } from "@/lib/parseCellMarkers";
 import { useAppContext } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Loader2, Send, Eye, Edit3, UserCheck, Sparkles, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MANAGER_ID = "6216799537";
+const LOCAL_STORAGE_KEY = "markdown_doc_studio_v9";
+
+const DEMO_MARKDOWN = `# Отчёт по задаче
+
+> **Важно:** таблицы в DOCX экспортируются с фиксированной шириной колонок для стабильного отображения.
+
+## Сводка
+
+| **Блок** | **Статус** | **Комментарий** |
+|:--|:--:|--:|
+| *Авторизация* | ✅ Готово | Поддержка Telegram WebApp |
+| **Markdown DOC** | ⚙️ В работе | Исправлены жирный/**курсив** и ширина таблиц |
+| Интеграции | 🚀 Запущено | Экспорт в Telegram |
+
+Обычный текст, **жирный текст**, *курсив*, а также ***жирный курсив*** корректно экспортируются в DOCX.`;
 
 export default function MarkdownDocPage() {
   const { user } = useAppContext();
@@ -20,91 +34,183 @@ export default function MarkdownDocPage() {
   const [loading, setLoading] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("cv_v8_fixed");
-    setMarkdown(saved || "# Отчёт\n\n| (bg-зелёный) **Участник** | **Действие** |\n|:---|:---|\n| Алиса | (синий) Запрос |");
+    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+    setMarkdown(saved || DEMO_MARKDOWN);
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("cv_v8_fixed", markdown);
+    if (!markdown) return;
+    localStorage.setItem(LOCAL_STORAGE_KEY, markdown);
   }, [markdown]);
 
-  // РЕКУРСИВНАЯ ФУНКЦИЯ ДЛЯ ИЗВЛЕЧЕНИЯ ТЕКСТА
-  const extractText = (node: any): string => {
-    if (!node) return "";
-    if (typeof node === "string") return node;
-    if (Array.isArray(node)) return node.map(extractText).join("");
-    if (node.props?.children) return extractText(node.props.children);
-    return "";
-  };
+  const docStats = useMemo(() => {
+    const lines = markdown.split(/\r?\n/).filter((line) => line.trim().length > 0).length;
+    const tableRows = markdown
+      .split(/\r?\n/)
+      .filter((line) => line.trim().startsWith("|") && !line.includes("---")).length;
+
+    return { lines, tableRows };
+  }, [markdown]);
 
   const onSend = async (id: string, label: string) => {
+    if (!id) {
+      toast.error("Не удалось определить получателя");
+      return;
+    }
+
     setLoading(label);
-    const res = await sendMarkdownDoc(markdown, id);
+    const result = await sendMarkdownDoc(markdown, id);
     setLoading(null);
-    if (res.success) toast.success(`Отправлено: ${label}`);
-  };
 
-  const renderCell = (children: any, isHeader = false) => {
-    const rawText = extractText(children); // БОЛЬШЕ НИКАКИХ [object Object]
-    const { text, bg, textColor } = parseCellMarkers(rawText);
-    const Tag = isHeader ? "th" : "td";
-
-    return (
-      <Tag 
-        className={cn("border border-zinc-800 p-4 transition-all text-sm", isHeader && "bg-zinc-900/50 font-bold")}
-        style={{ backgroundColor: bg ? `${bg}33` : undefined, color: textColor || bg }}
-      >
-        {text || children}
-      </Tag>
-    );
+    if (result.success) {
+      toast.success(`DOCX отправлен: ${label}`);
+    } else {
+      toast.error(result.error || "Ошибка отправки DOCX");
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#050506] pt-28 pb-12 px-4">
-      <div className="max-w-6xl mx-auto space-y-6">
-        
-        {/* Хедер с хорошим падингом */}
-        <header className="bg-zinc-900/90 border border-white/10 p-6 rounded-[2.5rem] backdrop-blur-3xl flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl sticky top-20 z-50">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center">
-              <Sparkles className="text-white fill-white" />
+      <div className="mx-auto max-w-6xl space-y-6">
+        <header className="sticky top-20 z-50 rounded-[2.25rem] border border-white/10 bg-zinc-900/85 p-6 shadow-2xl backdrop-blur-3xl">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600">
+                <Sparkles className="text-white" />
+              </div>
+              <div>
+                <h1 className="font-orbitron text-xl font-black text-white">Markdown DOC Studio v9</h1>
+                <p className="text-xs text-zinc-400">Усиленный рендер таблиц + корректный DOCX для bold/italic</p>
+              </div>
             </div>
-            <h1 className="font-orbitron text-xl font-black text-white">MD STUDIO 8.2</h1>
+
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => setMarkdown(DEMO_MARKDOWN)}
+                className="rounded-xl border border-white/20 bg-transparent px-5 text-white hover:bg-white/10"
+              >
+                <FileText className="mr-2 h-4 w-4" /> ДЕМО
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => onSend(user?.id?.toString() || "", "СЕБЕ")}
+                disabled={!!loading}
+                className="rounded-xl bg-white px-5 text-black"
+              >
+                {loading === "СЕБЕ" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                СЕБЕ
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => onSend(MANAGER_ID, "МЕНЕДЖЕРУ")}
+                disabled={!!loading}
+                className="rounded-xl bg-blue-600 px-5 text-white"
+              >
+                {loading === "МЕНЕДЖЕРУ" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserCheck className="mr-2 h-4 w-4" />}
+                МЕНЕДЖЕРУ
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-wrap justify-center gap-2">
-            <Button size="sm" onClick={() => onSend(user?.id?.toString() || "", "СЕБЕ")} disabled={!!loading} className="bg-white text-black rounded-xl px-6">
-              {loading === "СЕБЕ" ? <Loader2 className="animate-spin" /> : <Send size={14} className="mr-2"/>} СЕБЕ
-            </Button>
-            <Button size="sm" onClick={() => onSend(MANAGER_ID, "МЕНЕДЖЕРУ")} disabled={!!loading} className="bg-blue-600 text-white rounded-xl px-6">
-              <UserCheck size={14} className="mr-2"/> МЕНЕДЖЕРУ
-            </Button>
+
+          <div className="mt-4 flex flex-wrap gap-2 text-xs text-zinc-400">
+            <span className="rounded-full border border-white/15 px-3 py-1">Строк: {docStats.lines}</span>
+            <span className="rounded-full border border-white/15 px-3 py-1">Табличных строк: {docStats.tableRows}</span>
+            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-emerald-300">DOCX layout: fixed table width</span>
           </div>
         </header>
 
-        {/* Воркспейс */}
-        <div className="grid md:grid-cols-2 gap-6 h-[60vh] md:h-[65vh]">
-          <div className={cn("flex flex-col bg-zinc-950/50 border border-white/5 rounded-[2.5rem] overflow-hidden", activeTab === "view" && "hidden md:flex")}>
-            <textarea value={markdown} onChange={e => setMarkdown(e.target.value)} className="flex-1 p-8 bg-transparent text-zinc-300 font-mono text-sm focus:outline-none resize-none custom-scrollbar" />
-          </div>
+        <section className="grid h-[64vh] gap-6 md:grid-cols-2">
+          <article
+            className={cn(
+              "flex flex-col overflow-hidden rounded-[2.25rem] border border-white/10 bg-zinc-950/70",
+              activeTab === "view" && "hidden md:flex",
+            )}
+          >
+            <div className="border-b border-white/10 px-5 py-3 text-xs font-semibold text-zinc-400">Markdown editor</div>
+            <textarea
+              value={markdown}
+              onChange={(e) => setMarkdown(e.target.value)}
+              className="custom-scrollbar h-full flex-1 resize-none bg-transparent p-6 font-mono text-sm text-zinc-200 outline-none"
+              placeholder="Вставьте markdown..."
+            />
+          </article>
 
-          <div className={cn("flex flex-col bg-zinc-950/20 border border-white/5 rounded-[2.5rem] overflow-hidden backdrop-blur-sm", activeTab === "edit" && "hidden md:flex")}>
-            <div className="flex-1 p-8 overflow-auto prose prose-invert prose-sm max-w-none custom-scrollbar">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-                  td: ({ children }) => renderCell(children, false),
-                  th: ({ children }) => renderCell(children, true)
-                }}>
-                {markdown}
-              </ReactMarkdown>
+          <article
+            className={cn(
+              "flex flex-col overflow-hidden rounded-[2.25rem] border border-white/10 bg-zinc-950/40 backdrop-blur-sm",
+              activeTab === "edit" && "hidden md:flex",
+            )}
+          >
+            <div className="border-b border-white/10 px-5 py-3 text-xs font-semibold text-zinc-400">Live preview</div>
+            <div className="markdown-doc-preview custom-scrollbar flex-1 overflow-auto p-6">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
             </div>
-          </div>
-        </div>
+          </article>
+        </section>
 
-        {/* Мобильные табы */}
-        <div className="md:hidden fixed bottom-6 left-4 right-4 bg-zinc-900 border border-white/10 rounded-2xl p-1 z-50 flex shadow-2xl">
-          <button onClick={() => setActiveTab("edit")} className={cn("flex-1 py-4 rounded-xl text-xs font-bold", activeTab === "edit" ? "bg-white/10 text-white" : "text-zinc-500")}>ТЕКСТ</button>
-          <button onClick={() => setActiveTab("view")} className={cn("flex-1 py-4 rounded-xl text-xs font-bold", activeTab === "view" ? "bg-white/10 text-white" : "text-zinc-500")}>ОБЗОР</button>
+        <div className="fixed bottom-6 left-4 right-4 z-50 flex rounded-2xl border border-white/10 bg-zinc-900 p-1 shadow-2xl md:hidden">
+          <button
+            onClick={() => setActiveTab("edit")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-xs font-bold",
+              activeTab === "edit" ? "bg-white/10 text-white" : "text-zinc-500",
+            )}
+          >
+            <Edit3 size={14} /> ТЕКСТ
+          </button>
+          <button
+            onClick={() => setActiveTab("view")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-xs font-bold",
+              activeTab === "view" ? "bg-white/10 text-white" : "text-zinc-500",
+            )}
+          >
+            <Eye size={14} /> ОБЗОР
+          </button>
         </div>
       </div>
+
+      <style jsx global>{`
+        .markdown-doc-preview {
+          color: #e4e4e7;
+          line-height: 1.6;
+        }
+
+        .markdown-doc-preview table {
+          width: 100%;
+          border-collapse: collapse;
+          table-layout: fixed;
+          display: table;
+          border: 1px solid rgba(255, 255, 255, 0.16);
+          margin: 1rem 0;
+          background: rgba(24, 24, 27, 0.4);
+        }
+
+        .markdown-doc-preview th,
+        .markdown-doc-preview td {
+          border: 1px solid rgba(255, 255, 255, 0.16);
+          padding: 0.65rem;
+          vertical-align: top;
+          word-break: break-word;
+          overflow-wrap: anywhere;
+        }
+
+        .markdown-doc-preview th {
+          background: rgba(255, 255, 255, 0.06);
+          font-weight: 700;
+        }
+
+        .markdown-doc-preview em {
+          font-style: italic;
+          color: #c4b5fd;
+        }
+
+        .markdown-doc-preview strong {
+          font-weight: 700;
+          color: #fff;
+        }
+      `}</style>
     </div>
   );
 }
