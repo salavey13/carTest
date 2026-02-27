@@ -1,7 +1,7 @@
 # T49 — Software-engineering hardening sweep (security/SPA/state/CSS/cart-write load)
 
 **Status:** `in_progress`  
-**Updated_at:** `2026-02-27T23:45:00Z`  
+**Updated_at:** `2026-02-28T00:55:00Z`  
 **Owner:** `codex`  
 **Dependencies:** `T48`  
 **Parent Plan:** [THE_FRANCHEEZEPLAN.md](./THE_FRANCHEEZEPLAN.md)
@@ -28,6 +28,9 @@ Finish architecture-grade hardening after visual parity work. Keep the full engi
 - Extended `OrderPageClient` token migration: delivery/payment/promo/extras/copilot border+muted accents now reuse `--order-*` vars instead of repeated direct palette color wiring.
 - Completed `OrderPageClient` token pass #3: milestone badge on-color/background fallback, step status colors, and progress track/gradient endpoint now also consume `--order-*` vars.
 - Final polish pass: replaced remaining class-compatible inline var styles in `OrderPageClient` with Tailwind var utilities (`border-[var(--...)]`, `bg-[var(--...)]`, `text-[var(--...)]`) to reduce style-object churn before T49.5 handoff.
+
+- Follow-up review hotfix: restored actual compact-header layout collapse via `max-height + overflow-hidden` wrapper so the top row no longer leaves blank vertical gap in compact mode.
+- Follow-up review hotfix: removed `@/lib/supabase-server` import from shared `hooks/supabase.ts` to stop client runtime crashes from server-only guard while preserving server-only module usage in dedicated server action boundaries.
 
 ## Subtask queue (dependency-ordered)
 

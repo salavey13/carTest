@@ -658,3 +658,9 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - Root cause: prior passes focused on semantic var adoption first; utility-class conversion was left as final cleanup.
 - Fix/workaround: switched these nodes to Tailwind var utility classes and kept `focusRingOutlineStyle` only where outline tokens are still dynamic.
 - Verification command: `npm run lint -- --file app/franchize/components/OrderPageClient.tsx && npm run build`.
+
+### 2026-02-28 — T49 review regressions hotfix (P1 crash + P2 compact gap)
+- Symptom: client pages importing `@/hooks/supabase` crashed in browser because hook file imported server-only `@/lib/supabase-server` (top-level `window` guard throw), and compact `CrewHeader` left invisible blank layout gap on scroll.
+- Root cause: server-only boundary was wired into a shared hook consumed by client bundles; header animation pass removed previous height-clamp behavior and only animated opacity/transform.
+- Fix/workaround: decoupled `hooks/supabase.ts` from `lib/supabase-server` (local admin helper wiring restored for shared compatibility) and added `max-height + overflow-hidden` compact wrapper in `CrewHeader` so top row truly collapses.
+- Verification command: `npm run lint -- --file hooks/supabase.ts --file app/franchize/components/CrewHeader.tsx && npm run build`.
