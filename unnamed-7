@@ -1,0 +1,7 @@
+POST /api/streams                - создать / обновить стрим
+GET  /api/streams/:id            - данные стрима
+POST /api/streams/:id/start      - получила инструкцию начать (создаёт ключ, подключает SFU)
+POST /api/streams/:id/donate     - создать donation (backend: create PaymentIntent, webhook confirmation)
+POST /api/payments/webhook       - Stripe webhook (payment_intent.succeeded)
+WS   /ws/streams/:id             - websocket/socket для донатов/событий
+POST /api/ads/campaigns          - создать рекламную кампанию
