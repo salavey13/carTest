@@ -182,3 +182,10 @@ import { createClient } from "@supabase/supabase-js";
 - [ ] **UX:** Dark mode users never see a white flash on load.
 
 Как только T49 станет зеленым — мы официально готовы к релизу. **Не сдавайтесь, мы уже здесь!**
+---
+
+## UPDATE 2026-02-27 (T49 planning sync)
+- T49 replanned into explicit dependency chain in `docs/T49-security_sweep.md` and mirrored in `docs/THE_FRANCHEEZEPLAN.md`.
+- `T49.0` completed first: historical diary bulk extracted from THE plan and archived in `docs/AGENT_DIARY.md`.
+- Next active substep: `T49.1` (security boundary verification), then continue strictly in order through SPA/state/style/theme hardening.
+- Follow-up correction: restored technical-depth T49 subtask details (file anchors + verification commands) and replaced placeholder prefix with exact required phrase `continue as FRANCHEEZEPLAN_EXECUTIONER`.
