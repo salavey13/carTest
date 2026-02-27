@@ -93,6 +93,7 @@ export function useFranchizeCart(slug: string) {
   const queuedCartRef = useRef<FranchizeCartState | null>(null);
   const pendingPersistRef = useRef(false);
   const lastPersistedSnapshotRef = useRef<string>("{}");
+  const wasInFranchizeScopeRef = useRef(false);
 
   const serializeCart = useCallback((state: FranchizeCartState) => JSON.stringify(state), []);
 
@@ -194,6 +195,17 @@ export function useFranchizeCart(slug: string) {
     flushPersistNow();
   }, [flushPersistNow, pathname, slug]);
 
+
+  useEffect(() => {
+    const inFranchizeScope = pathname.startsWith(`/franchize/${slug}`);
+
+    if (wasInFranchizeScopeRef.current && !inFranchizeScope) {
+      flushPersistNow();
+    }
+
+    wasInFranchizeScopeRef.current = inFranchizeScope;
+  }, [flushPersistNow, pathname, slug]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -210,11 +222,13 @@ export function useFranchizeCart(slug: string) {
     window.addEventListener("beforeunload", flushOnPageExit);
     window.addEventListener("pagehide", flushOnPageExit);
     document.addEventListener("visibilitychange", onVisibilityChange);
+    document.addEventListener("freeze", flushOnPageExit as EventListener);
 
     return () => {
       window.removeEventListener("beforeunload", flushOnPageExit);
       window.removeEventListener("pagehide", flushOnPageExit);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      document.removeEventListener("freeze", flushOnPageExit as EventListener);
     };
   }, [flushPersistNow]);
 
