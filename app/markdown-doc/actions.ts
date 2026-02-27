@@ -1,12 +1,13 @@
 "use server";
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { sendTelegramDocument } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
 import * as docx from "docx";
 import { parseCellMarkers } from "@/lib/parseCellMarkers";
+
+// Base URL for your raw GitHub files
+const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/salavey13/carTest/main/docs";
 
 const {
   Document,
@@ -227,23 +228,44 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
   return Packer.toBuffer(doc);
 }
 
+
+
+
+/**
+ * Loads the Francheeze status from the remote GitHub repository
+ */
 export async function loadFrancheezeStatusMarkdown() {
   try {
-    const absolutePath = path.join(process.cwd(), "docs", "THE_FRANCHEEZEPLAN_STATUS.MD");
-    return await fs.readFile(absolutePath, "utf8");
+    const url = `${GITHUB_RAW_BASE}/THE_FRANCHEEZEPLAN_STATUS.MD`;
+    const response = await fetch(url, { cache: 'no-store' });
+    
+    if (!response.ok) {
+      throw new Error(`GitHub returned ${response.status}: ${response.statusText}`);
+    }
+    
+    return await response.text();
   } catch (error) {
-    logger.error("[markdown-doc] unable to load THE_FRANCHEEZEPLAN_STATUS.MD", error);
-    throw new Error("Не удалось загрузить docs/THE_FRANCHEEZEPLAN_STATUS.MD");
+    logger.error("[markdown-doc] remote load failed: THE_FRANCHEEZEPLAN_STATUS.MD", error);
+    throw new Error("Не удалось загрузить статус-файл из удаленного репозитория");
   }
 }
 
+/**
+ * Loads the Rental Deal template from the remote GitHub repository
+ */
 export async function loadRentalDealTemplateMarkdown() {
   try {
-    const absolutePath = path.join(process.cwd(), "docs", "RENTAL_DEAL_TEMPLATE_DEMO.md");
-    return await fs.readFile(absolutePath, "utf8");
+    const url = `${GITHUB_RAW_BASE}/RENTAL_DEAL_TEMPLATE_DEMO.md`;
+    const response = await fetch(url, { cache: 'no-store' });
+    
+    if (!response.ok) {
+      throw new Error(`GitHub returned ${response.status}: ${response.statusText}`);
+    }
+    
+    return await response.text();
   } catch (error) {
-    logger.error("[markdown-doc] unable to load RENTAL_DEAL_TEMPLATE_DEMO.md", error);
-    throw new Error("Не удалось загрузить docs/RENTAL_DEAL_TEMPLATE_DEMO.md");
+    logger.error("[markdown-doc] remote load failed: RENTAL_DEAL_TEMPLATE_DEMO.md", error);
+    throw new Error("Не удалось загрузить шаблон аренды из удаленного репозитория");
   }
 }
 
