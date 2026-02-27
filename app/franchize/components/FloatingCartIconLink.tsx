@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowUp, ShoppingCart } from "lucide-react";
 
 interface FloatingCartIconLinkProps {
@@ -14,28 +14,41 @@ interface FloatingCartIconLinkProps {
 }
 
 export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor, textColor, borderColor, backgroundColor }: FloatingCartIconLinkProps) {
+  const router = useRouter();
   const isCartEmpty = itemCount === 0;
+
+  const handleNav = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(href);
+  };
 
   return (
     <div
-      className="fixed bottom-6 right-4 z-30 flex items-center gap-3"
+      className="fixed bottom-6 right-4 z-[60] flex items-center gap-3"
       style={{
         ["--floating-cart-accent" as string]: accentColor,
         ["--floating-cart-border" as string]: borderColor,
         ["--floating-cart-text" as string]: textColor,
         ["--floating-cart-bg" as string]: backgroundColor,
+        pointerEvents: "auto", // Ensure clicks are caught
+        isolation: "isolate",
       }}
     >
       <button
         type="button"
         aria-label="Scroll to top"
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--floating-cart-bg)] text-[var(--floating-cart-text)] shadow-lg"
+        className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--floating-cart-bg)] text-[var(--floating-cart-text)] shadow-lg transition active:scale-95"
       >
         <ArrowUp className="h-5 w-5" />
       </button>
 
-      <Link href={href} className="relative inline-flex items-center justify-center gap-2 rounded-full bg-[var(--floating-cart-accent)] px-5 py-3 text-black shadow-xl transition-transform active:scale-95">
+      <button 
+        type="button"
+        onClick={handleNav}
+        className="relative inline-flex items-center justify-center gap-2 rounded-full bg-[var(--floating-cart-accent)] px-5 py-3 text-black shadow-xl transition-transform active:scale-95 cursor-pointer"
+      >
         <ShoppingCart className="h-5 w-5" />
         <span className="text-sm font-bold">{isCartEmpty ? "0 ₽" : `${totalPrice.toLocaleString("ru-RU")} ₽`}</span>
         <span
@@ -43,7 +56,7 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
         >
           {itemCount}
         </span>
-      </Link>
+      </button>
     </div>
   );
 }

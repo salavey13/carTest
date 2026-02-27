@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation"; // Added useRouter
+import { useRouter } from "next/navigation";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface } from "../lib/theme";
@@ -15,7 +15,7 @@ interface CartPageClientProps {
 export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const { cartLines, changeLineQty, removeLine, subtotal, itemCount } = useFranchizeCartLines(slug, items);
   const surface = crewPaletteForSurface(crew.theme);
-  const router = useRouter(); // Init router
+  const router = useRouter();
 
   return (
     <section
@@ -97,7 +97,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
             <p className="text-2xl font-semibold text-[var(--cart-accent)]">
               {subtotal.toLocaleString("ru-RU")} ₽
             </p>
-            {/* FIX: Use button with router.push instead of Link */}
+            {/* FIX: Use button with router.push */}
             <button
               type="button"
               onClick={() => router.push(`/franchize/${slug}/order/demo-order`)}

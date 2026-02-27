@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useRouter } from "next/navigation"; // Changed from Link to useRouter
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FranchizeCrewVM } from "../actions";
@@ -23,10 +23,10 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
     setMounted(true);
   }, []);
 
-  // FIX: Explicit navigation handler
   const handleNavigation = (href: string) => {
+    // Fire navigation immediately
     router.push(href);
-    // Small timeout to visually register the click before closing, but nav starts immediately
+    // Close menu slightly after to allow visual feedback
     setTimeout(() => {
       onOpenChange(false);
     }, 50);
