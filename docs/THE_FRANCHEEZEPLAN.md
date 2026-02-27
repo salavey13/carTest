@@ -1500,10 +1500,10 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T49 — Software-engineering hardening sweep (security/SPA/state/CSS/cart-write load)
 - status: `in_progress`
-- updated_at: `2026-02-27T12:20:00Z`
+- updated_at: `2026-02-27T23:45:00Z`
 - owner: `codex`
-- notes: Refined T49 subtask wording with the exact executor phrase prefix (`continue as FRANCHEEZEPLAN_EXECUTIONER`) and restored technical-depth details in the special T49 doc (anchors + verification commands).
-- next_step: Execute T49.1 security-boundary verification using the restored technical checklist/commands, then continue sequentially through T49.2–T49.6.
+- notes: Final T49.4 polish pass on order surface: converted remaining class-compatible inline var styles (`border/color/background` on promo, milestone, copilot, CTA controls) into Tailwind var utilities and trimmed style-object noise while preserving focus-ring behavior.
+- next_step: Start T49.5 AppContext decomposition + realtime strategy audit (T49.4 polish track considered complete enough for merge).
 - risks: Cart durability and theme first-paint behavior still require regression checks on Telegram-like mobile sessions.
 - dependencies: T48
 - deliverables:

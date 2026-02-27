@@ -149,17 +149,31 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
 
   return (
     <header
-      className="sticky top-0 z-40 border-b px-4 pb-2 pt-[max(env(safe-area-inset-top),0.2rem)] backdrop-blur-xl"
+      className="relative sticky top-0 z-40 border-b px-4 pb-2 pt-[max(env(safe-area-inset-top),0.2rem)]"
       style={{
         borderColor: crew.theme.palette.borderSoft,
         backgroundColor: `${crew.theme.palette.bgCard}E8`,
         color: crew.theme.palette.textPrimary,
       }}
     >
+      <div className="pointer-events-none absolute inset-0 -z-10 backdrop-blur-xl" style={{ backgroundColor: `${crew.theme.palette.bgCard}E8` }} />
       <div className="pointer-events-none absolute inset-x-0 -top-[24px] h-[24px] backdrop-blur-xl" style={{ backgroundColor: `${crew.theme.palette.bgCard}EB` }} />
 
       <div className="mx-auto w-full max-w-4xl">
-        <div className={`grid grid-cols-[44px_1fr_auto] items-center gap-3 overflow-hidden transition-all duration-300 ${isCompact ? "max-h-0 opacity-0 pb-0" : "max-h-32 opacity-100 pb-2"}`}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "44px 1fr auto",
+            alignItems: "center",
+            gap: "0.75rem",
+            opacity: isCompact ? 0 : 1,
+            paddingBottom: isCompact ? 0 : "0.5rem",
+            transform: isCompact ? "scaleY(0.85) translateY(-8px)" : "scaleY(1) translateY(0)",
+            transformOrigin: "top center",
+            transition: "transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, padding 0.3s ease",
+            pointerEvents: isCompact ? "none" : "auto",
+          }}
+        >
           <button
             type="button"
             aria-label="Open menu"
