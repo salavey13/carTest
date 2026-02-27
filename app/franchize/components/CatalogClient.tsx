@@ -244,9 +244,21 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
 
   return (
     <>
-      <section className="mx-auto w-full max-w-4xl px-4 pb-6 pt-8" id="catalog-sections">
+      <section
+        className="mx-auto w-full max-w-4xl px-4 pb-6 pt-8"
+        id="catalog-sections"
+        style={{
+          ["--catalog-accent" as string]: crew.theme.palette.accentMain,
+          ["--catalog-border" as string]: crew.theme.palette.borderSoft,
+          ["--catalog-text" as string]: crew.theme.palette.textPrimary,
+          ["--catalog-muted" as string]: crew.theme.palette.textSecondary,
+          ["--catalog-card-bg" as string]: crew.theme.palette.bgCard,
+          ["--catalog-accent-contrast" as string]: "#16130A",
+          ["--catalog-accent-muted-contrast" as string]: "#2A1A0D",
+        }}
+      >
         {!crew.isFound && (
-          <p className="mb-4 rounded-xl border px-3 py-2 text-sm" style={{ borderColor: crew.theme.palette.accentMain, color: crew.theme.palette.accentMain }}>
+          <p className="mb-4 rounded-xl border border-[var(--catalog-accent)] px-3 py-2 text-sm text-[var(--catalog-accent)]">
             Crew slug was not found. Rendering safe fallback shell.
           </p>
         )}
@@ -324,16 +336,16 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                   target={isExternal ? "_blank" : undefined}
                   rel={isExternal ? "noreferrer noopener" : undefined}
                 >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "#16130A" }}>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--catalog-accent-contrast)]">
                     {module.badge}
                   </p>
-                  <p className="mt-1 text-sm font-semibold leading-5" style={{ color: "#16130A" }}>
+                  <p className="mt-1 text-sm font-semibold leading-5 text-[var(--catalog-accent-contrast)]">
                     {module.title}
                   </p>
                   {module.subtitle ? (
-                    <p className="mt-1 text-xs" style={{ color: "#2A1A0D" }}>{module.subtitle}</p>
+                    <p className="mt-1 text-xs text-[var(--catalog-accent-muted-contrast)]">{module.subtitle}</p>
                   ) : null}
-                  <p className="mt-2 text-xs font-semibold" style={{ color: "#16130A" }}>
+                  <p className="mt-2 text-xs font-semibold text-[var(--catalog-accent-contrast)]">
                     {module.ctaLabel} →
                   </p>
                 </Link>
@@ -388,13 +400,10 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
             {itemsByCategory.map((group) => (
               <section key={group.category} id={toCategoryId(group.category)} data-category={group.category} data-count={group.items.length}>
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <h2 className="text-2xl font-bold uppercase leading-tight tracking-tight" style={{ color: crew.theme.palette.textPrimary }}>
+                  <h2 className="text-2xl font-bold uppercase leading-tight tracking-tight text-[var(--catalog-text)]">
                     {group.category}
                   </h2>
-                  <span
-                    className="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-medium"
-                    style={{ color: crew.theme.palette.textSecondary, backgroundColor: crew.theme.palette.bgCard }}
-                  >
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--catalog-card-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--catalog-muted)]">
                     {group.items.length} шт.
                   </span>
                 </div>
@@ -423,21 +432,18 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                         </div>
                         <div className="p-3">
                           {item.category.toLowerCase().includes("bobber") && (
-                            <span
-                              className="mb-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
-                              style={{ backgroundColor: `${crew.theme.palette.accentMain}dd`, color: "#16130A" }}
-                            >
+                            <span className="mb-2 inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
                               Хит 🔥
                             </span>
                           )}
                           <h3 className="mt-1 text-sm font-semibold leading-5">{item.title}</h3>
                           <p className="text-xs" style={surface.mutedText}>{item.description || item.subtitle}</p>
-                          <p className="mt-2 text-base font-bold" style={{ color: crew.theme.palette.accentMain }}>
+                          <p className="mt-2 text-base font-bold text-[var(--catalog-accent)]">
                             {item.pricePerDay.toLocaleString("ru-RU")} ₽
-                            <span className="ml-1 text-xs font-normal" style={{ color: crew.theme.palette.textSecondary }}>/ day</span>
+                            <span className="ml-1 text-xs font-normal text-[var(--catalog-muted)]">/ day</span>
                           </p>
                           <div className="mt-2 flex gap-2">
-                            <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-xs font-bold transition-transform active:scale-95" style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}>
+                            <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95">
                               {item.pricePerDay >= 6000 ? (
                                 <>
                                   <ShoppingCart className="h-4 w-4" />

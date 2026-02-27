@@ -189,3 +189,85 @@ import { createClient } from "@supabase/supabase-js";
 - `T49.0` completed first: historical diary bulk extracted from THE plan and archived in `docs/AGENT_DIARY.md`.
 - Next active substep: `T49.1` (security boundary verification), then continue strictly in order through SPA/state/style/theme hardening.
 - Follow-up correction: restored technical-depth T49 subtask details (file anchors + verification commands) and replaced placeholder prefix with exact required phrase `continue as FRANCHEEZEPLAN_EXECUTIONER`.
+
+## UPDATE 2026-02-27 (T49 reapply pack)
+- Reapplied tested T49 hardening snippets into main repo: smooth `CrewHeader` transform collapse, server-only Supabase admin module, and dropdown click-layer reliability fixes.
+- Security boundary now has explicit `lib/supabase-server.ts` (`server-only`) and `hooks/supabase.ts` consumes re-exported admin helpers instead of in-file service-role wiring.
+- Next sequential beat remains T49.2–T49.6 (SPA oath recovery audit, cart checkpoint persistence smoke, style-system breadth migration, context split strategy, theme-flash/AI-JSON resilience).
+
+## UPDATE 2026-02-27 (T49.2 SPA deep-link follow-up)
+- Extended SPA oath fix into `FranchizeRentalLifecycleActions`: same-origin `deepLink` now uses `router.push(...)`, while external Telegram links still use browser navigation.
+- This removes accidental hard reload for internal links without breaking Telegram handoff flows.
+- Next beat: complete remaining franchize-shell SPA audit and continue into T49.3 cart checkpoint persistence verification.
+
+## UPDATE 2026-02-27 (T49.2 deep-link safety guard)
+- Added safety gate for franchize lifecycle deep-links: only `http/https/tg` protocols are allowed.
+- Malformed or unsafe deep-links now show explicit toast error, preventing accidental unsafe navigation paths.
+- SPA behavior for same-origin links remains preserved via `router.push(...)`.
+
+## UPDATE 2026-02-27 (T49.2 cart page SPA links)
+- Converted `/franchize/[slug]/cart` internal links (`back to catalog`, `checkout CTA`) from `<a href>` to Next.js `Link`.
+- This removes residual hard-reload behavior on cart surface and aligns navigation with SPA oath contract.
+- Next beat: final T49.2 grep/smoke and transition to T49.3 cart checkpoint persistence validation.
+
+## UPDATE 2026-02-27 (T49.3 leave-scope cart flush)
+- Added a new persistence checkpoint in `useFranchizeCart`: when route leaves `/franchize/{slug}*`, pending cart state is flushed immediately.
+- This complements existing `/cart` + `/order/*` checkpoints and pagehide/visibility flushes.
+- Goal: reduce lost cart metadata risk during SPA route exits on mobile sessions.
+
+## UPDATE 2026-02-27 (T49.3 freeze lifecycle flush)
+- Cart persistence now flushes on `document` `freeze` event in addition to `pagehide`/`visibilitychange`.
+- This targets mobile Telegram/WebView suspend scenarios where unload semantics are unreliable.
+- Next beat: verify route-exit + background/foreground resume durability, then advance to T49.4 style-system pass.
+
+## UPDATE 2026-02-27 (T49.4 lifecycle style-token hotspot)
+- Refactored `FranchizeRentalLifecycleActions` to use CSS-variable Tailwind color utilities instead of repeated per-button inline colors.
+- Added explicit hover/focus-visible states tied to palette vars to keep keyboard/touch interaction visibility stable.
+- Next beat: continue same cleanup pattern across remaining franchize hotspots and run interaction-state smoke.
+
+## UPDATE 2026-02-27 (T49.4 cart style-token hotspot)
+- Refactored `CartPageClient` accent/border/focus styles to use CSS-variable Tailwind utilities.
+- Reduced inline color usage on cart CTA/price/qty controls while preserving crew-theme flexibility.
+- Next beat: interaction-state smoke on cart + lifecycle + header controls before continuing T49.4 sweep.
+
+## UPDATE 2026-02-27 (T49.4 catalog + item modal token sweep)
+- Continued style-system migration by moving catalog/item-modal accent and muted color hotspots to scoped CSS variables consumed via Tailwind var utilities.
+- `CatalogClient` now exposes `--catalog-*` vars for fallback notice, promo tile text, section headers/count pills, and product price/CTA badges.
+- `ItemModal` now exposes `--item-*` vars and uses them across option chips, focus outlines, spec labels, and modal action buttons to reduce inline color/focus wiring.
+- Next beat: run broader interaction-state smoke and finish remaining T49.4 hotspots before opening T49.5 context decomposition/realtime audit.
+
+## UPDATE 2026-02-27 (T49.4 shell token sweep: footer + floating cart + header menu)
+- Migrated `CrewFooter` colors/borders to scoped CSS variables (`--footer-*`) and Tailwind var classes to reduce inline color styling.
+- Migrated `FloatingCartIconLink` button/pill/badge styles to scoped CSS variables (`--floating-cart-*`) with var utilities.
+- Migrated `HeaderMenu` modal surface/link active states to scoped CSS variables (`--header-menu-*`) and utility classes for border/text theming consistency.
+- Next beat: final T49.4 interaction-state regression sweep, then move to T49.5 AppContext decomposition audit.
+
+## UPDATE 2026-02-27 (T49.4 order surface: SPA anchor cleanup + token vars)
+- Converted residual `OrderPageClient` catalog return anchor to Next.js `Link` (same-origin SPA transition preserved).
+- Added scoped `--order-*` CSS vars and migrated key accent/border usage (path chip, step circles, copilot accent labels, total/CTA).
+- Captured `vip-bike` order-route screenshot smoke and re-verified lint/build after change.
+- Next beat: run final cross-surface T49.4 interaction-state regression, then open T49.5 context decomposition audit.
+
+## UPDATE 2026-02-27 (T49.4 order token pass #2)
+- Reduced additional inline palette usage in `OrderPageClient` by moving delivery/payment toggles and copilot/promo/extras borders to `--order-*` var references.
+- Preserved checkout behavior while tightening style-system consistency on order page interaction states.
+- Re-ran lint/build and captured updated order-route screenshot smoke on `vip-bike`.
+- Next beat: finalize T49.4 regression evidence and move into T49.5 context decomposition audit.
+
+## UPDATE 2026-02-27 (T49.4 order token pass #3)
+- Migrated milestone panel color states in `OrderPageClient` to `--order-*` vars (badge on-color/bg fallback, step color states, progress track/gradient endpoint).
+- Kept checkout runtime behavior unchanged; this pass targets style-system consistency and interaction-state clarity only.
+- Revalidated lint/build and captured updated screenshot on `/franchize/vip-bike/order/demo-order`.
+- Next beat: run final multi-surface T49.4 regression checklist and move to T49.5 if green.
+
+## UPDATE 2026-02-27 (T49.4 final polish before T49.5)
+- `OrderPageClient` received one last cleanup pass: class-compatible inline var styles were moved to Tailwind var utility classes for promo/milestone/copilot/CTA controls.
+- Focus-ring behavior remains via `focusRingOutlineStyle(...)`; no checkout logic changes.
+- Lint/build/screenshot checks passed on `vip-bike` order route.
+- Next planned task: start `T49.5` (AppContext decomposition + realtime strategy audit).
+
+## UPDATE 2026-02-28 (T49 review hotfix: crash + compact-gap)
+- Fixed **P1 regression** from review: `hooks/supabase.ts` no longer imports `@/lib/supabase-server`, so client modules that consume `@/hooks/supabase` no longer execute server-only `window` guard at bundle load.
+- Fixed **P2 regression** from review: `CrewHeader` compact state now collapses row layout height via `max-height` + `overflow-hidden` wrapper, removing blank sticky gap while preserving transform/opacity animation.
+- Revalidated with targeted lint + full build and captured updated visual smoke screenshot on `/franchize/vip-bike` after compact scroll.
+- Next beat: merge this regression hotfix, then open T49.5 context decomposition track.

@@ -574,3 +574,93 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - Added RU-first telemetry naming (`энергия/фокус/уверенность`) and warm-up progression guidance so first-time teammates see realistic "grow while iterating" stats.
 - Added explicit noob tip: PR preview URL appears right after PR creation and remains stable across subsequent commits to the same PR branch.
 - Reaffirmed educational heartbeat targeting defaults (`ADMIN_CHAT_ID` + mock user fallback) for executor-mode progress nudges.
+
+### 2026-02-27 — T49 reapply pack (server-only boundary + header/dropdown reliability)
+- Reapplied proven T49 snippets into this branch: `CrewHeader` now collapses with transform-based animation (`scaleY/translateY`) to avoid max-height jitter and hidden-hitbox issues.
+- Introduced `lib/supabase-server.ts` with `import "server-only"` and proxy-based error messaging; moved admin helpers in `hooks/supabase.ts` to this server module so service-role access stays on server boundaries.
+- Hardened profile dropdown taps in sticky header context by adding isolation wrapper on the trigger side and explicit pointer-events/z-index classes in shared dropdown primitives.
+- Verification commands: `npm run lint -- --file app/franchize/components/CrewHeader.tsx --file app/franchize/components/FranchizeProfileButton.tsx --file components/ui/dropdown-menu.tsx --file hooks/supabase.ts --file lib/supabase-server.ts` and `npm run build`.
+
+### 2026-02-27 — T49.2 SPA deep-link guard + telegram heartbeat
+- Symptom: rental lifecycle actions always used `window.location.assign(result.deepLink)` which could force full reload for same-origin links.
+- Root cause: deep-link handler treated all links as external handoff.
+- Fix/workaround: added `navigateToDeepLink()` in `FranchizeRentalLifecycleActions` to detect same-origin URLs and use `router.push`, while keeping hard navigation for true external Telegram links.
+- Verification command: `npm run lint -- --file app/franchize/components/FranchizeRentalLifecycleActions.tsx && node scripts/codex-notify.mjs telegram --text "..."`.
+
+### 2026-02-27 — T49.2 deep-link safety hardening
+- Symptom: fallback branch still attempted blind hard navigation on malformed deep-link strings.
+- Root cause: `navigateToDeepLink` catch branch used `window.location.assign(deepLink)` even when URL parse failed.
+- Fix/workaround: restricted protocols to `http/https/tg` and replaced malformed/unsafe fallback with explicit toast error.
+- Verification command: `npm run lint -- --file app/franchize/components/FranchizeRentalLifecycleActions.tsx && npm run build`.
+
+### 2026-02-27 — T49.2 SPA oath cleanup on cart surface
+- Symptom: franchize cart page still used internal `<a href>` links for same-origin paths, causing hard reload transitions.
+- Root cause: residual static anchors remained in `CartPageClient` after earlier navigation hardening passes.
+- Fix/workaround: replaced those anchors with Next.js `Link` (`/franchize/{slug}` and `/franchize/{slug}/order/demo-order`).
+- Verification command: `npm run lint -- --file app/franchize/components/CartPageClient.tsx && npm run build`.
+
+### 2026-02-27 — T49.3 cart checkpoint: leave-franchize-scope flush
+- Symptom: pending cart snapshot could remain unsaved when user left franchize routes via SPA without hitting `/cart` or `/order/*` first.
+- Root cause: flush checkpoints were limited to checkout paths + page lifecycle events; pure in-app route switch could delay persistence.
+- Fix/workaround: added route-scope watcher in `useFranchizeCart` to flush once when leaving `/franchize/{slug}*` scope.
+- Verification command: `npm run lint -- --file app/franchize/hooks/useFranchizeCart.ts && npm run build`.
+
+### 2026-02-27 — T49.3 mobile lifecycle add-on (`freeze` flush)
+- Symptom: in some mobile WebView/background transitions, `beforeunload` is skipped and persistence timing can lag.
+- Root cause: cart flush relied on unload/pagehide/visibility events only.
+- Fix/workaround: added `document` `freeze` event listener in `useFranchizeCart` and flush on freeze.
+- Verification command: `npm run lint -- --file app/franchize/hooks/useFranchizeCart.ts && npm run build`.
+
+### 2026-02-27 — T49.4 style-token hotspot cleanup (lifecycle actions)
+- Symptom: `FranchizeRentalLifecycleActions` still relied on dense inline color styles, weakening consistent hover/focus semantics.
+- Root cause: dynamic palette values were applied directly per element rather than through shared CSS-variable utility classes.
+- Fix/workaround: moved palette to component-level CSS variables and switched buttons/text/borders to Tailwind var-based utilities with explicit focus-visible outlines.
+- Verification command: `npm run lint -- --file app/franchize/components/FranchizeRentalLifecycleActions.tsx && npm run build`.
+
+### 2026-02-27 — T49.4 style-token hotspot cleanup (cart page)
+- Symptom: `CartPageClient` still mixed crew palette via multiple inline color/focus style blocks.
+- Root cause: dynamic theme was wired per control rather than through shared component-level CSS vars.
+- Fix/workaround: introduced `--cart-accent`/`--cart-border` vars at section level and switched CTA/price/qty/focus visuals to Tailwind var utilities.
+- Verification command: `npm run lint -- --file app/franchize/components/CartPageClient.tsx && npm run build`.
+
+### 2026-02-27 — T49.4 style-token hotspot cleanup (catalog + item modal)
+- Symptom: `CatalogClient` and `ItemModal` still had multiple inline color/focus style blocks, especially around promo cards, badges, option chips, and CTA text.
+- Root cause: palette values were applied ad-hoc at element level instead of being scoped into reusable CSS variables.
+- Fix/workaround: added component-scoped `--catalog-*` and `--item-*` vars and migrated affected controls to Tailwind var-based classes (`bg-[var(...)]`, `text-[var(...)]`, `focus-visible:outline-[var(...)]`).
+- Verification command: `npm run lint -- --file app/franchize/modals/Item.tsx --file app/franchize/components/CatalogClient.tsx && npm run build`.
+
+### 2026-02-27 — T49.4 style-token hotspot cleanup (footer + floating cart + header menu)
+- Symptom: shell-level components still relied on repeated inline colors (`CrewFooter`, `FloatingCartIconLink`, `HeaderMenu`).
+- Root cause: these surfaces were left behind while earlier T49.4 passes focused on catalog/cart/lifecycle/modals.
+- Fix/workaround: introduced component-scoped CSS vars (`--footer-*`, `--floating-cart-*`, `--header-menu-*`) and switched border/background/text classes to Tailwind var utilities.
+- Verification command: `npm run lint -- --file app/franchize/components/CrewFooter.tsx --file app/franchize/components/FloatingCartIconLink.tsx --file app/franchize/modals/HeaderMenu.tsx && npm run build`.
+
+### 2026-02-27 — T49.4 order surface pass (SPA anchor + token vars)
+- Symptom: `OrderPageClient` still contained a residual internal `<a href>` and repeated accent/border inline color wiring.
+- Root cause: previous T49.4 passes prioritized catalog/cart/shell components, leaving order page partially migrated.
+- Fix/workaround: migrated catalog return link to Next.js `Link` and introduced scoped `--order-*` vars for key accent/border states in order summary/callouts/CTA.
+- Verification command: `npm run lint -- --file app/franchize/components/OrderPageClient.tsx && npm run build`.
+
+### 2026-02-27 — T49.4 order surface pass #2 (additional border/accent var migration)
+- Symptom: after first order-page migration, several controls still used direct `crew.theme.palette.*` border/accent references.
+- Root cause: migration was incremental; delivery/payment/promo/extras/copilot states were left as follow-up hotspots.
+- Fix/workaround: switched those states to `--order-*` var references while keeping `focusRingOutlineStyle` behavior and checkout logic unchanged.
+- Verification command: `npm run lint -- --file app/franchize/components/OrderPageClient.tsx && npm run build`.
+
+### 2026-02-27 — T49.4 order surface pass #3 (milestone/status color vars)
+- Symptom: milestone progress block still carried direct palette references for badge on-color, status text, and gradient track endpoint.
+- Root cause: earlier passes prioritized form controls; milestone visualization block remained partially unmigrated.
+- Fix/workaround: moved milestone-related color states to `--order-*` vars while preserving existing completion logic and readability.
+- Verification command: `npm run lint -- --file app/franchize/components/OrderPageClient.tsx && npm run build`.
+
+### 2026-02-27 — T49.4 final polish (inline-var class migration)
+- Symptom: several `OrderPageClient` nodes still used style objects for class-compatible var values (`borderColor`, `backgroundColor`, `color`).
+- Root cause: prior passes focused on semantic var adoption first; utility-class conversion was left as final cleanup.
+- Fix/workaround: switched these nodes to Tailwind var utility classes and kept `focusRingOutlineStyle` only where outline tokens are still dynamic.
+- Verification command: `npm run lint -- --file app/franchize/components/OrderPageClient.tsx && npm run build`.
+
+### 2026-02-28 — T49 review regressions hotfix (P1 crash + P2 compact gap)
+- Symptom: client pages importing `@/hooks/supabase` crashed in browser because hook file imported server-only `@/lib/supabase-server` (top-level `window` guard throw), and compact `CrewHeader` left invisible blank layout gap on scroll.
+- Root cause: server-only boundary was wired into a shared hook consumed by client bundles; header animation pass removed previous height-clamp behavior and only animated opacity/transform.
+- Fix/workaround: decoupled `hooks/supabase.ts` from `lib/supabase-server` (local admin helper wiring restored for shared compatibility) and added `max-height + overflow-hidden` compact wrapper in `CrewHeader` so top row truly collapses.
+- Verification command: `npm run lint -- --file hooks/supabase.ts --file app/franchize/components/CrewHeader.tsx && npm run build`.

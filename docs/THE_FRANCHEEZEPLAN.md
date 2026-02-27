@@ -1500,10 +1500,10 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T49 — Software-engineering hardening sweep (security/SPA/state/CSS/cart-write load)
 - status: `in_progress`
-- updated_at: `2026-02-27T12:20:00Z`
+- updated_at: `2026-02-28T00:55:00Z`
 - owner: `codex`
-- notes: Refined T49 subtask wording with the exact executor phrase prefix (`continue as FRANCHEEZEPLAN_EXECUTIONER`) and restored technical-depth details in the special T49 doc (anchors + verification commands).
-- next_step: Execute T49.1 security-boundary verification using the restored technical checklist/commands, then continue sequentially through T49.2–T49.6.
+- notes: Addressed post-review regressions: restored true compact-height collapse in `CrewHeader` (no blank sticky gap) and decoupled `hooks/supabase.ts` from `lib/supabase-server` to prevent client bundle crash paths while keeping server-only admin module for dedicated server actions.
+- next_step: Finalize T49 merge for regression fixes, then start T49.5 AppContext decomposition + realtime strategy audit.
 - risks: Cart durability and theme first-paint behavior still require regression checks on Telegram-like mobile sessions.
 - dependencies: T48
 - deliverables:

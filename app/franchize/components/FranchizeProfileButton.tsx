@@ -38,13 +38,14 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
   const userIsAdmin = typeof isAdmin === "function" ? isAdmin() : false;
 
   return (
-    <DropdownMenu>
+    <div style={{ isolation: "isolate", pointerEvents: "auto" }}>
+      <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
           aria-label="Профиль и навигация"
           className="inline-flex h-11 items-center gap-2 rounded-xl px-2 transition"
-          style={{ backgroundColor: bgColor, color: textColor }}
+          style={{ backgroundColor: bgColor, color: textColor, pointerEvents: "auto" }}
         >
           <span className="relative block h-8 w-8 overflow-hidden rounded-full border" style={{ borderColor }}>
             {avatarUrl ? (
@@ -117,6 +118,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
           </>
         )}
       </DropdownMenuContent>
-    </DropdownMenu>
+      </DropdownMenu>
+    </div>
   );
 }

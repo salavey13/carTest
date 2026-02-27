@@ -1,7 +1,7 @@
 # T49 — Software-engineering hardening sweep (security/SPA/state/CSS/cart-write load)
 
 **Status:** `in_progress`  
-**Updated_at:** `2026-02-27T12:20:00Z`  
+**Updated_at:** `2026-02-28T00:55:00Z`  
 **Owner:** `codex`  
 **Dependencies:** `T48`  
 **Parent Plan:** [THE_FRANCHEEZEPLAN.md](./THE_FRANCHEEZEPLAN.md)
@@ -10,6 +10,27 @@
 
 ## Objective
 Finish architecture-grade hardening after visual parity work. Keep the full engineering depth explicit (security boundaries, SPA tap reliability root-cause fixes, write-queue guarantees, style-token migration, context decomposition, theme bootstrap, AI JSON safety).
+
+## Latest execution update (2026-02-27)
+- Reapplied smooth `CrewHeader` compact transition via transform-based animation (`scaleY + translateY`) and compact-state `pointerEvents` guard.
+- Added dedicated server-only admin module `lib/supabase-server.ts` with `server-only` boundary and moved privileged exports out of `hooks/supabase.ts`.
+- Updated dropdown interaction layering (`FranchizeProfileButton` isolation + dropdown pointer-events/z-index tweaks) to stabilize tap behavior in sticky-header contexts.
+- Continued SPA oath hardening in rental lifecycle controls: same-origin deep links now route through Next.js `router.push`, external Telegram links keep browser navigation.
+- Added defensive deep-link gate in lifecycle actions to reject unsafe/malformed URLs with explicit toast feedback instead of blind hard navigation fallback.
+- Replaced franchize cart internal `<a href>` navigation with Next.js `Link` components to keep same-origin transitions SPA-safe.
+- Added leave-franchize-scope flush checkpoint in `useFranchizeCart` so pending cart state is persisted when user navigates away from `/franchize/{slug}*` within SPA.
+- Added `freeze` lifecycle flush hook to cover mobile WebView/background tab suspension where `beforeunload` may not fire reliably.
+- Migrated lifecycle action panel colors to CSS variables + Tailwind utilities (reduced inline color dominance, preserved hover/focus visibility).
+- Migrated cart page accent/border controls to CSS-variable Tailwind utilities and aligned focus-visible outline styles to var-driven classes.
+- Extended T49.4 style-token migration into `CatalogClient` + `ItemModal`: added scoped CSS vars (`--catalog-*`, `--item-*`) and replaced multiple inline accent/muted text/focus color blocks with Tailwind var utilities for chips, promo cards, price/CTA labels, and modal controls.
+- Extended T49.4 style-token migration into shell surfaces (`CrewFooter`, `FloatingCartIconLink`, `HeaderMenu`): moved footer/menu/floating-cart accent-border-text styling to scoped CSS vars and Tailwind var classes while keeping navigation behavior unchanged.
+- Continued T49.4 on `OrderPageClient`: removed residual internal `<a href>` fallback (migrated to `Link`) and introduced scoped `--order-*` vars for key accent/border typography and CTA states to reduce inline style hotspots without changing checkout flow.
+- Extended `OrderPageClient` token migration: delivery/payment/promo/extras/copilot border+muted accents now reuse `--order-*` vars instead of repeated direct palette color wiring.
+- Completed `OrderPageClient` token pass #3: milestone badge on-color/background fallback, step status colors, and progress track/gradient endpoint now also consume `--order-*` vars.
+- Final polish pass: replaced remaining class-compatible inline var styles in `OrderPageClient` with Tailwind var utilities (`border-[var(--...)]`, `bg-[var(--...)]`, `text-[var(--...)]`) to reduce style-object churn before T49.5 handoff.
+
+- Follow-up review hotfix: restored actual compact-header layout collapse via `max-height + overflow-hidden` wrapper so the top row no longer leaves blank vertical gap in compact mode.
+- Follow-up review hotfix: removed `@/lib/supabase-server` import from shared `hooks/supabase.ts` to stop client runtime crashes from server-only guard while preserving server-only module usage in dedicated server action boundaries.
 
 ## Subtask queue (dependency-ordered)
 
