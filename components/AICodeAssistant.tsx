@@ -5,7 +5,6 @@ import React, { useMemo, useState, useEffect, useImperativeHandle, forwardRef, M
 import {
     useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest, ImageReplaceTask, FileNode, RepoXmlPageContextType, PendingFlowDetails
 } from "@/contexts/RepoXmlPageContext";
-import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
 // Hooks & Components
 import { useAppToast } from '@/hooks/useAppToast';
@@ -200,9 +199,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             }
             try {
                 logger.debug(`[Effect Custom Links] Attempting to fetch user metadata for userId: ${userId}`);
-                const { data: userData, error: fetchError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", userId).single();
-                if (fetchError) { logger.error("[Effect Custom Links] Error fetching user metadata:", fetchError); toastError(`Ошибка загрузки ваших ссылок: ${fetchError.message}`); setCustomLinks([]); return; }
-                if (userData?.metadata?.customLinks && Array.isArray(userData.metadata.customLinks)) { setCustomLinks(userData.metadata.customLinks); logger.debug(`[Effect Custom Links] Loaded ${userData.metadata.customLinks.length} custom links for user ${userId}.`); }
+                if (dbUser?.metadata?.customLinks && Array.isArray(dbUser.metadata.customLinks)) { setCustomLinks(dbUser.metadata.customLinks); logger.debug(`[Effect Custom Links] Loaded ${dbUser.metadata.customLinks.length} custom links for user ${userId}.`); }
                 else { setCustomLinks([]); logger.debug(`[Effect Custom Links] No custom links found or invalid format for user ${userId}.`); }
             } catch (e: any) { logger.error("[Effect Custom Links] Exception during fetch:", e); toastError(`Критическая ошибка при загрузке ссылок: ${e.message ?? 'Неизвестно'}`); setCustomLinks([]); }
         };
