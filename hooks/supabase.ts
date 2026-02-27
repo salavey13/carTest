@@ -3,6 +3,15 @@ import { generateJwtToken } from "@/lib/auth";
 import type { WebAppUser } from "@/types/telegram";
 import { logger } from "@/lib/logger"; 
 import type { Database } from "@/types/database.types.ts"; 
+import {
+  supabaseAdmin,
+  isSupabaseAdminAvailable,
+  getSupabaseAdminError,
+  withSupabaseAdmin,
+  getServiceRoleKey,
+} from "@/lib/supabase-server";
+
+export { supabaseAdmin, isSupabaseAdminAvailable, getSupabaseAdminError, withSupabaseAdmin };
 
 type DbUser = Database["public"]["Tables"]["users"]["Row"];
 type DbCar = Database["public"]["Tables"]["cars"]["Row"];
@@ -26,26 +35,12 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://inmctohsodg
 const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzMzk1ODUsImV4cCI6MjA1MzkxNTU4NX0.AdNu5CBn6pp-P5M2lZ6LjpcqTXrhOdTOYMCiQrM_Ud4";
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
     logger.error("Supabase URL or Anon Key is missing from environment variables.");
 }
-if (!serviceRoleKey) {
-    logger.warn("SUPABASE_SERVICE_ROLE_KEY is missing. Admin operations might fail.");
-}
 
 export const supabaseAnon: SupabaseClient<Database> = createClient<Database>(supabaseUrl, supabaseAnonKey);
-
-export const supabaseAdmin: SupabaseClient<Database> = serviceRoleKey
-    ? createClient<Database>(supabaseUrl, serviceRoleKey, {
-        auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-        }
-    })
-    : (()=>{ logger.error("Admin client creation failed due to missing service role key."); return null as any; })(); 
 
 export const createAuthenticatedClient = async (userId: string): Promise<SupabaseClient<Database> | null> => {
     if (!userId) {
@@ -230,6 +225,7 @@ export async function generateCarEmbedding(
     };
   }
 ): Promise<{ success: boolean; message: string; carId?: string; error?: string }> {
+    const serviceRoleKey = getServiceRoleKey();
     if (!serviceRoleKey || !supabaseUrl) {
         return { success: false, message: "Service role key or Supabase URL missing.", error:"Configuration error." };
     }
