@@ -24,6 +24,9 @@ const {
 } = docx;
 
 const TABLE_BORDER_COLOR = "D1D5DB";
+const PAGE_WIDTH_DXA = 11906;
+const PAGE_MARGIN_DXA = 1440;
+const CONTENT_WIDTH_DXA = PAGE_WIDTH_DXA - PAGE_MARGIN_DXA * 2;
 
 type InlineStyle = {
   bold?: boolean;
@@ -154,8 +157,11 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
         continue;
       }
 
-      const basePercent = Math.floor(100 / colCount);
-      const percentRemainder = 100 - basePercent * colCount;
+      const baseCellWidth = Math.floor(CONTENT_WIDTH_DXA / colCount);
+      const widthRemainder = CONTENT_WIDTH_DXA - baseCellWidth * colCount;
+      const columnWidths = Array.from({ length: colCount }, (_, index) =>
+        baseCellWidth + (index < widthRemainder ? 1 : 0),
+      );
 
       markdownRows.forEach((rawRow, rowIndex) => {
         const normalizedRow = [...rawRow];
@@ -169,7 +175,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
             children: normalizedRow.map((rawCell, cellIndex) => {
               const { text, bg, textColor } = parseCellMarkers(rawCell);
               const cleanText = text || " ";
-              const width = basePercent + (cellIndex < percentRemainder ? 1 : 0);
+              const width = columnWidths[cellIndex];
 
               return new TableCell({
                 children: [
@@ -186,7 +192,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
                   }),
                 ],
                 shading: bg ? { fill: bg.replace("#", ""), type: ShadingType.CLEAR } : undefined,
-                width: { size: width, type: WidthType.PERCENTAGE },
+                width: { size: width, type: WidthType.DXA },
                 margins: { top: 120, bottom: 120, left: 120, right: 120 },
                 borders: {
                   top: { style: BorderStyle.SINGLE, size: 2, color: TABLE_BORDER_COLOR },
@@ -203,8 +209,9 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
       children.push(
         new Table({
           rows: tableRows,
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          layout: TableLayoutType.AUTOFIT,
+          width: { size: CONTENT_WIDTH_DXA, type: WidthType.DXA },
+          columnWidths,
+          layout: TableLayoutType.FIXED,
         }),
       );
 
@@ -222,7 +229,7 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
       {
         properties: {
           page: {
-            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+            margin: { top: PAGE_MARGIN_DXA, right: PAGE_MARGIN_DXA, bottom: PAGE_MARGIN_DXA, left: PAGE_MARGIN_DXA },
           },
         },
         children,
