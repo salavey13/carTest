@@ -26,6 +26,8 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const railRef = useRef<HTMLDivElement | null>(null);
 
+  // ... (existing useMemo and useEffects remain unchanged) ...
+
   const defaultGroupLinks = useMemo(
     () => Array.from(new Set([...crew.catalog.showcaseGroups.map((group) => group.label), ...crew.catalog.categories, ...groupLinks].filter(Boolean))),
     [crew.catalog.categories, crew.catalog.showcaseGroups, groupLinks],
