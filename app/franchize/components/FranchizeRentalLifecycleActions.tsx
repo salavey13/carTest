@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import {
@@ -34,6 +35,7 @@ export function FranchizeRentalLifecycleActions({
   palette,
 }: FranchizeRentalLifecycleActionsProps) {
   const { dbUser } = useAppContext();
+  const router = useRouter();
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -55,17 +57,48 @@ export function FranchizeRentalLifecycleActions({
     });
   };
 
+  const navigateToDeepLink = (deepLink: string) => {
+    try {
+      const resolvedUrl = new URL(deepLink, window.location.origin);
+      const isSameOrigin = resolvedUrl.origin === window.location.origin;
+      const isSafeProtocol = ["http:", "https:", "tg:"].includes(resolvedUrl.protocol);
+
+      if (!isSafeProtocol) {
+        toast.error("Небезопасная ссылка для перехода.");
+        return;
+      }
+
+      if (isSameOrigin) {
+        router.push(`${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`);
+        return;
+      }
+
+      window.location.assign(resolvedUrl.toString());
+    } catch (_error) {
+      toast.error("Некорректная ссылка для перехода.");
+    }
+  };
+
   const canConfirmPickup = role === "owner" && ["pending_confirmation", "confirmed"].includes(status);
   const canConfirmReturn = role === "owner" && status === "active";
   const canUploadStartPhoto = role === "renter" && ["pending_confirmation", "confirmed"].includes(status);
   const canUploadEndPhoto = role === "renter" && status === "active";
 
   return (
-    <div className="mt-4 rounded-2xl border p-3" style={{ borderColor: palette.borderSoft, backgroundColor: `${palette.bgCard}CC` }}>
-      <p className="text-xs uppercase tracking-[0.16em]" style={{ color: palette.textSecondary }}>
-        Lifecycle controls
-      </p>
-      <p className="mt-1 text-xs" style={{ color: palette.textSecondary }}>
+    <div
+      className="mt-4 rounded-2xl border bg-[var(--lifecycle-bg)] p-3"
+      style={{
+        ["--lifecycle-bg" as string]: `${palette.bgCard}CC`,
+        ["--lifecycle-border" as string]: palette.borderSoft,
+        ["--lifecycle-muted" as string]: palette.textSecondary,
+        ["--lifecycle-text" as string]: palette.textPrimary,
+        ["--lifecycle-accent" as string]: palette.accentMain,
+        ["--lifecycle-accent-hover" as string]: palette.accentMainHover,
+        borderColor: "var(--lifecycle-border)",
+      }}
+    >
+      <p className="text-xs uppercase tracking-[0.16em] text-[var(--lifecycle-muted)]">Lifecycle controls</p>
+      <p className="mt-1 text-xs text-[var(--lifecycle-muted)]">
         Роль: {role === "owner" ? "владелец" : role === "renter" ? "арендатор" : "наблюдатель"} · payment: {paymentStatus}
       </p>
 
@@ -88,8 +121,7 @@ export function FranchizeRentalLifecycleActions({
                 toast.success("Получение подтверждено. Обновите карточку для актуального статуса.");
               })
             }
-            className="rounded-xl px-3 py-2 text-sm font-semibold"
-            style={{ backgroundColor: palette.accentMain, color: "#16130A" }}
+            className="rounded-xl bg-[var(--lifecycle-accent)] px-3 py-2 text-sm font-semibold text-[#16130A] transition-colors hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lifecycle-accent)]"
           >
             {pendingAction === "pickup" ? "Подтверждаем..." : "Подтвердить выдачу"}
           </button>
@@ -113,8 +145,7 @@ export function FranchizeRentalLifecycleActions({
                 toast.success("Возврат подтвержден. Обновите карточку для актуального статуса.");
               })
             }
-            className="rounded-xl px-3 py-2 text-sm font-semibold"
-            style={{ backgroundColor: palette.accentMainHover, color: "#16130A" }}
+            className="rounded-xl bg-[var(--lifecycle-accent-hover)] px-3 py-2 text-sm font-semibold text-[#16130A] transition-colors hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lifecycle-accent)]"
           >
             {pendingAction === "return" ? "Подтверждаем..." : "Подтвердить возврат"}
           </button>
@@ -135,11 +166,10 @@ export function FranchizeRentalLifecycleActions({
                   toast.error(result.error || "Не удалось открыть сценарий фото ДО.");
                   return;
                 }
-                window.location.assign(result.deepLink);
+                navigateToDeepLink(result.deepLink);
               })
             }
-            className="rounded-xl border px-3 py-2 text-sm"
-            style={{ borderColor: palette.borderSoft, color: palette.textPrimary }}
+            className="rounded-xl border border-[var(--lifecycle-border)] px-3 py-2 text-sm text-[var(--lifecycle-text)] transition-colors hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lifecycle-accent)]"
           >
             {pendingAction === "photo-start" ? "Открываем..." : "Фото ДО в Telegram"}
           </button>
@@ -160,18 +190,17 @@ export function FranchizeRentalLifecycleActions({
                   toast.error(result.error || "Не удалось открыть сценарий фото ПОСЛЕ.");
                   return;
                 }
-                window.location.assign(result.deepLink);
+                navigateToDeepLink(result.deepLink);
               })
             }
-            className="rounded-xl border px-3 py-2 text-sm"
-            style={{ borderColor: palette.borderSoft, color: palette.textPrimary }}
+            className="rounded-xl border border-[var(--lifecycle-border)] px-3 py-2 text-sm text-[var(--lifecycle-text)] transition-colors hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lifecycle-accent)]"
           >
             {pendingAction === "photo-end" ? "Открываем..." : "Фото ПОСЛЕ в Telegram"}
           </button>
         )}
       </div>
 
-      {role === "guest" && <p className="mt-3 text-xs" style={{ color: palette.textSecondary }}>Действия доступны владельцу или арендатору этой сделки.</p>}
+      {role === "guest" && <p className="mt-3 text-xs text-[var(--lifecycle-muted)]">Действия доступны владельцу или арендатору этой сделки.</p>}
     </div>
   );
 }
