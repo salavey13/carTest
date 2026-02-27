@@ -46,8 +46,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const hasUserRef = useRef(!!initialDbUser);
   
-  // FIX: Ref to track if we've already synced the start param from Telegram this session.
-  // This prevents the param from resurfacing after being cleared.
+  // CRITICAL FIX: Lock to prevent infinite reading of the static start_param from TG
   const startParamSyncedRef = useRef(false);
 
   useEffect(() => {
@@ -105,16 +104,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setStartParamPayload(null);
   }, []);
 
-  // FIX: Only sync start_param if we haven't done so yet.
-  // Telegram's initDataUnsafe.start_param persists forever, so we must ignore it after the first read/clear.
+  // CRITICAL FIX: Only read start_param ONCE. 
+  // Telegram's initDataUnsafe object is static and retains the param, causing infinite re-sets if we don't gate it.
   useEffect(() => {
     if (startParamSyncedRef.current) return;
 
     if (telegramHookData.tg && telegramHookData.tg.initDataUnsafe?.start_param) {
       const rawStartParam = telegramHookData.tg.initDataUnsafe.start_param;
-      debugLogger.info(`[AppContext] Received start_param (raw): ${rawStartParam}. Syncing once.`);
-      setStartParamPayload(rawStartParam);
-      startParamSyncedRef.current = true;
+      if (rawStartParam) {
+        debugLogger.info(`[AppContext] Received start_param (raw): ${rawStartParam}. Syncing once.`);
+        setStartParamPayload(rawStartParam);
+        startParamSyncedRef.current = true;
+      }
     }
   }, [telegramHookData.tg]);
 
@@ -154,7 +155,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         appToast.dismiss("auth-loading-toast");
 
         if (telegramHookData.isAuthenticated && !telegramError && !dbUser) {
-             // Success
+             // Success logic
         } else if (telegramError) {
              if (!isClient || document.visibilityState === 'visible') {
                  appToast.error(`Ошибка: ${telegramError.message}`, { id: "auth-error-toast", duration: 5000 });

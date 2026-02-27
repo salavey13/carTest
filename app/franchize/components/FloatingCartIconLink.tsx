@@ -17,6 +17,7 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
   const router = useRouter();
   const isCartEmpty = itemCount === 0;
 
+  // Use explicit navigation handler to bypass any Link/Anchor weirdness
   const handleNav = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -31,7 +32,7 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
         ["--floating-cart-border" as string]: borderColor,
         ["--floating-cart-text" as string]: textColor,
         ["--floating-cart-bg" as string]: backgroundColor,
-        pointerEvents: "auto", // Ensure clicks are caught
+        pointerEvents: "auto", // FORCE clickable
         isolation: "isolate",
       }}
     >
@@ -39,12 +40,12 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
         type="button"
         aria-label="Scroll to top"
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--floating-cart-bg)] text-[var(--floating-cart-text)] shadow-lg transition active:scale-95"
+        className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--floating-cart-bg)] text-[var(--floating-cart-text)] shadow-lg transition active:scale-95 cursor-pointer"
       >
         <ArrowUp className="h-5 w-5" />
       </button>
 
-      <button 
+      <button
         type="button"
         onClick={handleNav}
         className="relative inline-flex items-center justify-center gap-2 rounded-full bg-[var(--floating-cart-accent)] px-5 py-3 text-black shadow-xl transition-transform active:scale-95 cursor-pointer"

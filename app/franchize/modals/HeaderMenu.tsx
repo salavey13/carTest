@@ -24,12 +24,12 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
   }, []);
 
   const handleNavigation = (href: string) => {
-    // Fire navigation immediately
+    // 1. Navigate immediately
     router.push(href);
-    // Close menu slightly after to allow visual feedback
+    // 2. Close the menu after a tiny tick to allow visual feedback and ensure router caught the event
     setTimeout(() => {
       onOpenChange(false);
-    }, 50);
+    }, 100);
   };
 
   if (!open || !mounted) {

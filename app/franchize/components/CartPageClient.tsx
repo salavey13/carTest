@@ -97,11 +97,10 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
             <p className="text-2xl font-semibold text-[var(--cart-accent)]">
               {subtotal.toLocaleString("ru-RU")} ₽
             </p>
-            {/* FIX: Use button with router.push */}
             <button
               type="button"
               onClick={() => router.push(`/franchize/${slug}/order/demo-order`)}
-              className="mt-4 inline-flex w-full justify-center rounded-xl bg-[var(--cart-accent)] px-4 py-3 text-sm font-semibold text-[#16130A] transition hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cart-accent)]"
+              className="mt-4 inline-flex w-full justify-center rounded-xl bg-[var(--cart-accent)] px-4 py-3 text-sm font-semibold text-[#16130A] transition hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cart-accent)] cursor-pointer"
             >
               Перейти к оформлению
             </button>
