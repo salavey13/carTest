@@ -1,5 +1,7 @@
 "use server";
 
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { sendTelegramDocument } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import * as docx from "docx";
@@ -21,7 +23,6 @@ const {
   TableLayoutType,
 } = docx;
 
-const MAX_WIDTH_DXA = 9638;
 const TABLE_BORDER_COLOR = "D1D5DB";
 
 type InlineStyle = {
@@ -67,10 +68,7 @@ function splitTableRow(line: string): string[] {
 }
 
 function isMarkdownDividerRow(cells: string[]) {
-  return (
-    cells.length > 0 &&
-    cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()))
-  );
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
 }
 
 function parseInlineRuns(text: string, style: InlineStyle = {}): InlineSegment[] {
@@ -122,13 +120,16 @@ function createParagraph(text: string, options?: { heading?: (typeof HeadingLeve
 }
 
 async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
-  const children: any[] = [];
+  const children: docx.FileChild[] = [];
   const lines = markdown.split(/\r?\n/);
   let i = 0;
 
   while (i < lines.length) {
     const line = lines[i].trim();
-    if (!line) { i++; continue; }
+    if (!line) {
+      i++;
+      continue;
+    }
 
     if (line.startsWith("#")) {
       const level = line.match(/^#+/)?.[0].length || 1;
@@ -153,8 +154,8 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
         continue;
       }
 
-      const baseCellWidth = Math.floor(MAX_WIDTH_DXA / colCount);
-      const widthRemainder = MAX_WIDTH_DXA - baseCellWidth * colCount;
+      const basePercent = Math.floor(100 / colCount);
+      const percentRemainder = 100 - basePercent * colCount;
 
       markdownRows.forEach((rawRow, rowIndex) => {
         const normalizedRow = [...rawRow];
@@ -168,14 +169,13 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
             children: normalizedRow.map((rawCell, cellIndex) => {
               const { text, bg, textColor } = parseCellMarkers(rawCell);
               const cleanText = text || " ";
+              const width = basePercent + (cellIndex < percentRemainder ? 1 : 0);
 
               return new TableCell({
                 children: [
                   new Paragraph({
                     alignment: AlignmentType.LEFT,
-                    children: parseInlineRuns(cleanText, {
-                      bold: isHeaderRow,
-                    }).map((segment) =>
+                    children: parseInlineRuns(cleanText, { bold: isHeaderRow }).map((segment) =>
                       textColor
                         ? new TextRun({
                             ...segment,
@@ -185,13 +185,8 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
                     ),
                   }),
                 ],
-                shading: bg
-                  ? { fill: bg.replace("#", ""), type: ShadingType.CLEAR }
-                  : undefined,
-                width: {
-                  size: baseCellWidth + (cellIndex < widthRemainder ? 1 : 0),
-                  type: WidthType.DXA,
-                },
+                shading: bg ? { fill: bg.replace("#", ""), type: ShadingType.CLEAR } : undefined,
+                width: { size: width, type: WidthType.PERCENTAGE },
                 margins: { top: 120, bottom: 120, left: 120, right: 120 },
                 borders: {
                   top: { style: BorderStyle.SINGLE, size: 2, color: TABLE_BORDER_COLOR },
@@ -208,10 +203,11 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
       children.push(
         new Table({
           rows: tableRows,
-          width: { size: MAX_WIDTH_DXA, type: WidthType.DXA },
-          layout: TableLayoutType.FIXED,
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          layout: TableLayoutType.AUTOFIT,
         }),
       );
+
       i = checkI;
       continue;
     } else {
@@ -237,10 +233,20 @@ async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
   return Packer.toBuffer(doc);
 }
 
+export async function loadFrancheezeStatusMarkdown() {
+  try {
+    const absolutePath = path.join(process.cwd(), "docs", "THE_FRANCHEEZEPLAN_STATUS.MD");
+    return await fs.readFile(absolutePath, "utf8");
+  } catch (error) {
+    logger.error("[markdown-doc] unable to load THE_FRANCHEEZEPLAN_STATUS.MD", error);
+    throw new Error("Не удалось загрузить docs/THE_FRANCHEEZEPLAN_STATUS.MD");
+  }
+}
+
 export async function sendMarkdownDoc(markdown: string, chatId: string) {
   try {
     const bytes = await generateDocxBytes(markdown);
-    return await sendTelegramDocument(chatId, new Blob([bytes]), "Report.docx", "🚀 CyberVibe v8.2");
+    return await sendTelegramDocument(chatId, new Blob([bytes]), "Report.docx", "🚀 CyberVibe v8.3");
   } catch (e: any) {
     logger.error("[markdown-doc] failed to generate DOCX", e);
     return { success: false, error: e.message };
