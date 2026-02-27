@@ -18,7 +18,6 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
   const [mounted, setMounted] = useState(false);
   const surface = crewPaletteForSurface(crew.theme);
 
-
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -61,7 +60,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
                 key={`${link.href}-${link.label}`}
                 href={link.href}
                 onClick={() => onOpenChange(false)}
-                className={`block rounded-xl border px-4 py-3 text-sm transition ${
+                className={`block rounded-xl border px-4 py-3 text-sm transition cursor-pointer ${
                   isActive
                     ? "border-[var(--header-menu-accent)] text-[var(--header-menu-accent)]"
                     : "border-[var(--header-menu-border)] text-[var(--header-menu-text)]"

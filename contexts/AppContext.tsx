@@ -50,8 +50,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isAuthenticating = isTelegramAuthenticating;
   const error = telegramError;
 
+  // STABILIZED: Only update dbUserInternal if initialDbUser is valid.
+  // This prevents losing the user session during SPA transitions where hooks might momentarily return null.
   useEffect(() => {
-    setDbUserInternal(initialDbUser);
+    if (initialDbUser) {
+      setDbUserInternal(initialDbUser);
+    }
   }, [initialDbUser]);
 
   const appToast = useAppToast();
@@ -81,7 +85,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetchCrewInfo();
   }, [dbUser]);
 
-  // Poll for Active Game (Optimized)
+  // Poll for Active Game (Optimized/Defused)
   useEffect(() => {
       if (!dbUser?.user_id) return;
 
@@ -93,11 +97,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       checkActiveGame();
       
-      // RELAXED TIMER: 60 seconds.
-      // Real-time updates within the lobby page handle the fast-paced stuff.
-      // This is just to update the Global Header if they navigate away.
-      const interval = setInterval(checkActiveGame, 60000); 
-      return () => clearInterval(interval);
+      // DEFUSED: Connection pinging turned off for now to reduce overhead.
+      // const interval = setInterval(checkActiveGame, 60000); 
+      // return () => clearInterval(interval);
   }, [dbUser?.user_id]);
 
   const clearStartParam = useCallback(() => {
@@ -122,7 +124,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return {
       ...restTelegramData,
       user,
-      dbUser,
+      dbUser, // Returns the stabilized internal state
       isLoading,
       isAuthenticating,
       error,
@@ -166,7 +168,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (telegramHookData.isAuthenticated && !error) {
             appToast.dismiss("auth-error-toast");
              if (!isClient || document.visibilityState === 'visible') {
-                 appToast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2500 });
+                // Reduced noise for authenticated users
+                // appToast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2500 });
              }
         } else if (error) {
             appToast.dismiss("auth-success-toast");

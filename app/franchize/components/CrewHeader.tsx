@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link"; // Added Link
 import { Menu } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -190,7 +191,8 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="relative z-10 mx-auto flex flex-col items-center text-center">
+          {/* WRAPPED LOGO IN LINK */}
+          <Link href={mainCatalogPath} className="relative z-10 mx-auto flex flex-col items-center text-center cursor-pointer hover:opacity-95 transition-opacity">
             <div className="relative h-16 w-16 overflow-hidden rounded-full border shadow-lg" style={{ borderColor: crew.theme.palette.accentMain, backgroundColor: crew.theme.palette.bgBase }}>
               {crew.header.logoUrl ? (
                 <Image src={crew.header.logoUrl} alt={`${crew.header.brandName} logo`} fill sizes="64px" className="object-cover" unoptimized />
@@ -200,7 +202,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
                 </div>
               )}
             </div>
-          </div>
+          </Link>
 
           <FranchizeProfileButton
             bgColor={`${crew.theme.palette.bgBase}CC`}
