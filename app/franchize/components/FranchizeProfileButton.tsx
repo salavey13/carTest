@@ -1,9 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link"; // Added Link
+import Link from "next/link";
 import { ChevronDown, Palette, Settings, Shield, User } from "lucide-react";
-// Removed useRouter as we now use Link
 import { useAppContext } from "@/contexts/AppContext";
 import {
   DropdownMenu,
@@ -31,7 +30,6 @@ function getInitials(name: string): string {
 }
 
 export function FranchizeProfileButton({ bgColor, textColor, borderColor }: FranchizeProfileButtonProps) {
-  // Removed router
   const { dbUser, user, userCrewInfo, isAdmin } = useAppContext();
   const effectiveUser = dbUser || user;
   const displayName = effectiveUser?.username || effectiveUser?.full_name || effectiveUser?.first_name || "Operator";
@@ -45,7 +43,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
           <button
             type="button"
             aria-label="Профиль и навигация"
-            className="inline-flex h-11 items-center gap-2 rounded-xl px-2 transition"
+            className="inline-flex h-11 items-center gap-2 rounded-xl px-2 transition hover:opacity-80"
             style={{ backgroundColor: bgColor, color: textColor, pointerEvents: "auto" }}
           >
             <span className="relative block h-8 w-8 overflow-hidden rounded-full border" style={{ borderColor }}>
@@ -64,32 +62,35 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
         <DropdownMenuContent align="end" className="w-56" sideOffset={8}>
           <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          
-          {/* Use asChild with Link for proper SPA navigation without blocking events */}
-          <DropdownMenuItem asChild>
-            <Link href="/profile" className="cursor-pointer w-full">
+
+          {/* 
+            FIX: Nested Link inside DropdownMenuItem without 'asChild'.
+            Added 'p-0' to Item and padding to Link to ensure the click target is the Link itself.
+          */}
+          <DropdownMenuItem className="p-0 focus:bg-transparent">
+            <Link href="/profile" className="flex w-full cursor-pointer items-center px-2 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-sm outline-none">
               <User className="mr-2 h-4 w-4" />
               <span>Профиль</span>
             </Link>
           </DropdownMenuItem>
-          
-          <DropdownMenuItem asChild>
-            <Link href="/settings" className="cursor-pointer w-full">
+
+          <DropdownMenuItem className="p-0 focus:bg-transparent">
+            <Link href="/settings" className="flex w-full cursor-pointer items-center px-2 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-sm outline-none">
               <Settings className="mr-2 h-4 w-4" />
               <span>Настройки</span>
             </Link>
           </DropdownMenuItem>
 
-          <DropdownMenuItem asChild>
-            <Link href="/franchize/create" className="cursor-pointer w-full">
+          <DropdownMenuItem className="p-0 focus:bg-transparent">
+            <Link href="/franchize/create" className="flex w-full cursor-pointer items-center px-2 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-sm outline-none">
               <Palette className="mr-2 h-4 w-4" />
               <span>Branding (экипаж)</span>
             </Link>
           </DropdownMenuItem>
 
           {userCrewInfo?.slug && (
-            <DropdownMenuItem asChild>
-              <Link href={`/crews/${userCrewInfo.slug}`} className="cursor-pointer w-full">
+            <DropdownMenuItem className="p-0 focus:bg-transparent">
+              <Link href={`/crews/${userCrewInfo.slug}`} className="flex w-full cursor-pointer items-center px-2 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-sm outline-none">
                 <Palette className="mr-2 h-4 w-4" />
                 <span>Мой экипаж</span>
               </Link>
@@ -99,8 +100,8 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
           {userIsAdmin && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/admin" className="cursor-pointer w-full">
+              <DropdownMenuItem className="p-0 focus:bg-transparent">
+                <Link href="/admin" className="flex w-full cursor-pointer items-center px-2 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-sm outline-none">
                   <Shield className="mr-2 h-4 w-4" />
                   <span>Admin</span>
                 </Link>

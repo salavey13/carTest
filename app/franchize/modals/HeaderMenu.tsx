@@ -22,6 +22,13 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
     setMounted(true);
   }, []);
 
+  const handleLinkClick = () => {
+    // FIX: Delay closing slightly to allow navigation event to propagate
+    setTimeout(() => {
+      onOpenChange(false);
+    }, 150);
+  };
+
   if (!open || !mounted) {
     return null;
   }
@@ -59,7 +66,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
               <Link
                 key={`${link.href}-${link.label}`}
                 href={link.href}
-                onClick={() => onOpenChange(false)}
+                onClick={handleLinkClick}
                 className={`block rounded-xl border px-4 py-3 text-sm transition cursor-pointer ${
                   isActive
                     ? "border-[var(--header-menu-accent)] text-[var(--header-menu-accent)]"
