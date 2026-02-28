@@ -1,7 +1,7 @@
 "use server";
 
-import { createInvoice } from "@/hooks/supabase";
-import { supabaseAdmin } from "@/lib/supabase-server";
+
+import { createInvoice, supabaseAdmin } from "@/lib/supabase-server";
 import { sendTelegramInvoice } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
