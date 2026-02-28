@@ -35,7 +35,6 @@ interface AppContextData extends ReturnType<typeof useTelegram> {
 const AppContext = createContext<Partial<AppContextData>>({});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const processedStartParam = useRef(false);
   const telegramHookData = useTelegram();
   const { user, dbUser: initialDbUser, isLoading: isTelegramLoading, isAuthenticating: isTelegramAuthenticating, error: telegramError, ...restTelegramData } = telegramHookData;
 
