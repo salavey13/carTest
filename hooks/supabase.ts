@@ -2,8 +2,9 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { generateJwtToken } from "@/lib/auth";
 import type { WebAppUser } from "@/types/telegram";
 import { logger } from "@/lib/logger"; 
-import type { Database } from "@/types/database.types.ts"; 
+import type { Database } from "@/types/database.types"; 
 
+// --- Type Definitions ---
 type DbUser = Database["public"]["Tables"]["users"]["Row"];
 type DbCar = Database["public"]["Tables"]["cars"]["Row"];
 type DbInvoice = Database["public"]["Tables"]["invoices"]["Row"];
@@ -12,6 +13,7 @@ type DbArticle = Database["public"]["Tables"]["articles"]["Row"];
 type DbArticleSection = Database["public"]["Tables"]["article_sections"]["Row"];
 type DbUserResult = Database["public"]["Tables"]["user_results"]["Row"];
 
+// --- Configuration ---
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://inmctohsodgdohamhzag.supabase.co";
 const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
@@ -21,55 +23,60 @@ if (!supabaseUrl || !supabaseAnonKey) {
     logger.error("Supabase URL or Anon Key is missing from environment variables.");
 }
 
+// --- Public Client (Safe for Client Side) ---
 export const supabaseAnon: SupabaseClient<Database> = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
-// MEAT MEDAL FIX: Lazy initialization for supabaseAdmin
-// We use a singleton pattern but delay creation until first access.
-// This prevents the "Poisoned Client" issue where client-side imports (where Key is undefined)
-// cause the module to export a broken Proxy that persists into Server Actions.
-let _adminClientInstance: SupabaseClient<Database> | null = null;
+// --- Admin Client (The Meat Medal Fix) ---
+// We use a Lazy Proxy. This ensures that:
+// 1. Importing this file on the Client DOES NOT crash the build.
+// 2. Accessing 'supabaseAdmin' on the Client throws a clear FATAL error.
+// 3. Accessing 'supabaseAdmin' on the Server (Actions) initializes a fresh client with the Service Key.
+
+let _lazyServerClient: SupabaseClient<Database> | null = null;
 
 export const supabaseAdmin = new Proxy({} as SupabaseClient<Database>, {
     get: (_target, prop) => {
-        // 1. If we already have a working client, use it.
-        if (_adminClientInstance) {
-            return (_adminClientInstance as any)[prop];
+        // 1. STRICT Client-Side Guard
+        if (typeof window !== "undefined") {
+             throw new Error(
+                "❌ FATAL: Attempted to access 'supabaseAdmin' on the Client.\n" +
+                "This variable is Server-Only. Use 'supabaseAnon' or move logic to a Server Action."
+             );
         }
 
-        // 2. Try to initialize.
-        const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        
-        if (key) {
-            _adminClientInstance = createClient<Database>(supabaseUrl, key, {
+        // 2. Server-Side Lazy Initialization (Singleton per Request/Container)
+        if (!_lazyServerClient) {
+            const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+            
+            if (!key) {
+                // If we are on the server but the key is missing, we must fail loudly.
+                throw new Error(
+                    "❌ FATAL: 'supabaseAdmin' accessed on Server, but SUPABASE_SERVICE_ROLE_KEY is missing from env."
+                );
+            }
+
+            _lazyServerClient = createClient<Database>(supabaseUrl, key, {
                 auth: {
                     persistSession: false,
                     autoRefreshToken: false,
                     detectSessionInUrl: false,
                 },
             });
-            return (_adminClientInstance as any)[prop];
         }
 
-        // 3. If no key (Client Environment), throw strict error on usage.
-        // This ensures client code crashes loudly instead of failing silently if it tries to use Admin.
-        if (prop === "from" || prop === "rpc" || prop === "storage") {
-             return () => {
-                throw new Error(
-                    "FATAL: Attempted to use supabaseAdmin on the client or without SUPABASE_SERVICE_ROLE_KEY.\n" +
-                    "This code path is Server-Only."
-                );
-             };
-        }
-        
-        return undefined;
+        // 3. Forward the property access to the real client
+        return (_lazyServerClient as any)[prop];
     }
 });
 
+// --- Helpers ---
+
 export function isSupabaseAdminAvailable(): boolean {
-  return !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return typeof window === "undefined" && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 }
 
 export function getServiceRoleKey(): string | null {
+  if (typeof window !== "undefined") return null;
   return process.env.SUPABASE_SERVICE_ROLE_KEY ?? null;
 }
 
@@ -77,7 +84,7 @@ export async function withSupabaseAdmin<T>(
   operation: (client: SupabaseClient<Database>) => Promise<T>,
 ): Promise<{ success: boolean; data?: T; error?: string }> {
   if (!isSupabaseAdminAvailable()) {
-    return { success: false, error: "Admin client unavailable (Missing Key)." };
+    return { success: false, error: "Admin client unavailable (Client context or missing key)." };
   }
 
   try {
@@ -121,9 +128,9 @@ export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
         return null;
     }
     
-    // Explicit check before usage to avoid the Proxy throw if possible
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) { 
-        logger.error("[SupabaseHook] fetchUserData: Admin Key missing (Are you on client?).");
+    // Guard against Client-Side usage
+    if (typeof window !== "undefined") {
+        logger.error("fetchUserData called on CLIENT. This function uses supabaseAdmin and must be Server-Only.");
         return null;
     }
 
@@ -151,8 +158,9 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
         logger.error("[SupabaseHook] createOrUpdateUser called with empty userId");
         return null;
     }
-     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-         logger.error("[SupabaseHook] createOrUpdateUser: Admin Key missing.");
+     // Guard against Client-Side usage
+     if (typeof window !== "undefined") {
+         logger.error("[SupabaseHook] createOrUpdateUser called on CLIENT. Aborting.");
          return null;
      }
 
@@ -212,8 +220,9 @@ export async function updateUserMetadata(
     return { success: false, error: "User ID is required." };
   }
   
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return { success: false, error: "Database admin client is not available." };
+  // Guard against Client-Side usage
+  if (typeof window !== "undefined") {
+      return { success: false, error: "Cannot update user metadata from client side directly. Use a Server Action." };
   }
 
   try {
@@ -225,7 +234,6 @@ export async function updateUserMetadata(
       .single();
 
     if (error) {
-      logger.error(`[SupabaseHook] Error updating metadata for ${userId}:`, error);
       if (error.code === 'PGRST116') return { success: false, error: `User ${userId} not found.` };
       throw error; 
     }
@@ -272,7 +280,7 @@ export async function generateCarEmbedding(
     if (!serviceRoleKey || !supabaseUrl) {
         return { success: false, message: "Service role key or Supabase URL missing.", error:"Configuration error." };
     }
-    // Safe to use supabaseAdmin now
+    // Safe to use supabaseAdmin here as we checked keys above
     let endpoint: string;
     let requestBody: any = {};
     const headers = {
@@ -415,6 +423,7 @@ export const searchCars = async (embedding: number[], limit: number = 5): Promis
     if (!embedding || embedding.length !== VECTOR_DIMENSIONS) {
         return { success: false, error: `Invalid embedding provided (length ${embedding?.length}, expected ${VECTOR_DIMENSIONS})` };
     }
+    // Search is public, use Anon
     if (!supabaseAnon) {
         return { success: false, error: "Anon client is not available for search." };
     }
@@ -447,6 +456,7 @@ export const searchCars = async (embedding: number[], limit: number = 5): Promis
 
 export const getSimilarCars = async (carId: string, matchCount: number = 3): Promise<{ success: boolean; data?: DbCar[]; error?: string }> => { 
      if (!carId) return { success: false, error: "Car ID is required." };
+     // Similar cars is public, use Anon
      if (!supabaseAnon) return { success: false, error: "Anon client not available."};
      try {
         const { data, error } = await supabaseAnon.rpc("similar_cars", {
@@ -501,7 +511,7 @@ export const fetchArticleSections = async (articleId: string): Promise<{ success
   }
 };
 
-export const saveTestProgress = async (userId: string, progress: any): Promise<{ success: boolean; error?: string }> => {
+export const saveTestProgress = async (userId: string, progress: any): Promise<{ success: boolean; error?: string }> {
     const client = await createAuthenticatedClient(userId);
     if (!client) return { success: false, error: "Failed to create authenticated client." };
 
@@ -550,7 +560,8 @@ export const updateUserSubscription = async (
   subscriptionId: string | null 
 ): Promise<{ success: boolean; data?: DbUser; error?: string }> => {
     if (!userId) return { success: false, error: "User ID is required." };
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { success: false, error: "Admin client not available." };
+    // Guard against Client
+    if (typeof window !== "undefined") return { success: false, error: "Cannot use Admin client on client-side." };
 
     logger.info(`Attempting to update subscription-related info for user ${userId}. New subscription_id: ${subscriptionId}`);
     try {
@@ -589,7 +600,8 @@ export const createInvoice = async (
     subscriptionId?: number, 
     metadata: Record<string, any> = {}
 ): Promise<{ success: boolean; data?: DbInvoice; error?: string }> => {
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { success: false, error: "Admin client not available."};
+    // Guard against Client
+    if (typeof window !== "undefined") return { success: false, error: "Cannot use Admin client on client-side." };
     if (!id || !userId || amount == null || !type) return { success: false, error: "Missing required parameters for invoice creation." };
 
     try {
@@ -645,7 +657,8 @@ export const updateInvoiceStatus = async (
     invoiceId: string,
     status: DbInvoice['status'] 
 ): Promise<{ success: boolean; data?: DbInvoice; error?: string }> => {
-     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { success: false, error: "Admin client not available."};
+     // Guard against Client
+     if (typeof window !== "undefined") return { success: false, error: "Cannot use Admin client on client-side." };
      if (!invoiceId || !status) return { success: false, error: "Invoice ID and status are required." };
 
      try {
@@ -671,7 +684,8 @@ export const updateInvoiceStatus = async (
 };
 
 export const getInvoiceById = async (invoiceId: string): Promise<{ success: boolean; data?: DbInvoice; error?: string }> => {
-     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { success: false, error: "Admin client not available."};
+     // Guard against Client
+     if (typeof window !== "undefined") return { success: false, error: "Cannot use Admin client on client-side." };
      if (!invoiceId) return { success: false, error: "Invoice ID is required." };
 
       try {
@@ -697,7 +711,8 @@ export const getInvoiceById = async (invoiceId: string): Promise<{ success: bool
 };
 
 export const getUserInvoices = async (userId: string): Promise<{ success: boolean; data?: DbInvoice[]; error?: string }> => {
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { success: false, error: "Admin client not available." };
+    // Guard against Client
+    if (typeof window !== "undefined") return { success: false, error: "Cannot use Admin client on client-side." };
     const client = supabaseAdmin;
 
     if (!userId) return { success: false, error: "User ID is required." };
@@ -732,7 +747,8 @@ export const createRental = async (
     endDate: string,   
     totalCost: number
 ): Promise<{ success: boolean; data?: DbRental; error?: string }> => {
-     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { success: false, error: "Admin client not available."};
+     // Guard against Client
+     if (typeof window !== "undefined") return { success: false, error: "Cannot use Admin client on client-side." };
      if (!userId || !carId || !startDate || !endDate || totalCost == null || totalCost < 0) {
          return { success: false, error: "Missing or invalid parameters for rental creation." };
      }
@@ -774,7 +790,8 @@ export const createRental = async (
 };
 
 export const getUserRentals = async (userId: string): Promise<{ success: boolean; data?: RentalWithCarDetails[]; error?: string }> => {
-     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { success: false, error: "Admin client not available." };
+     // Guard against Client
+     if (typeof window !== "undefined") return { success: false, error: "Cannot use Admin client on client-side." };
      const client = supabaseAdmin;
 
      if (!userId) return { success: false, error: "User ID is required." };
@@ -811,7 +828,8 @@ export const updateRentalPaymentStatus = async (
     rentalId: number, 
     paymentStatus: DbRental['payment_status'] 
 ): Promise<{ success: boolean; data?: DbRental; error?: string }> => {
-     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { success: false, error: "Admin client not available."};
+     // Guard against Client
+     if (typeof window !== "undefined") return { success: false, error: "Cannot use Admin client on client-side." };
      if (rentalId === undefined || rentalId === null || !paymentStatus) {
         return { success: false, error: "Rental ID and payment status are required." };
      }
@@ -839,7 +857,8 @@ export const updateRentalPaymentStatus = async (
 };
 
 export const uploadImage = async (bucketName: string, file: File, fileName?: string): Promise<{ success: boolean; publicUrl?: string; error?: string }> => {
-     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { success: false, error: "Admin client not available."};
+     // Guard against Client
+     if (typeof window !== "undefined") return { success: false, error: "Cannot use Admin client on client-side." };
      if (!bucketName || !file) return { success: false, error: "Bucket name and file are required." };
 
     try {
@@ -966,7 +985,8 @@ export const getUserSubscription = async (
   userId: string
 ): Promise<{ success: boolean; data?: string | null; error?: string }> => { 
     if (!userId) return { success: false, error: "User ID is required." };
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { success: false, error: "Admin client not available." };
+    // Guard against Client
+    if (typeof window !== "undefined") return { success: false, error: "Cannot use Admin client on client-side." };
 
     try {
         const { data: userData, error: userError } = await supabaseAdmin

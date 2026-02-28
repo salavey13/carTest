@@ -1,49 +1,16 @@
 "use server";
 
-import { createClient } from "@supabase/supabase-js";
+import { fetchUserData, supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
 import type { UserCrewInfo, ActiveLobbyInfo } from "./AppContext";
 
-// --- ISOLATED ADMIN CLIENT GENERATOR ---
-// We do NOT import supabaseAdmin from hooks/supabase to avoid
-// any "client-side module initialization" poisoning.
-// We create a fresh instance guaranteed to have the server env vars.
-function getSafeServerAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) {
-    throw new Error("Missing Supabase URL or Service Role Key in Server Action context.");
-  }
-
-  return createClient<Database>(url, key, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
-}
-
 export async function fetchDbUserAction(userId: string): Promise<Database["public"]["Tables"]["users"]["Row"] | null> {
   if (!userId) return null;
-  
   try {
-    const admin = getSafeServerAdmin();
-    const { data, error } = await admin
-      .from("users")
-      .select("*, metadata") // Explicitly select metadata to be sure
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (error) {
-      logger.error(`[fetchDbUserAction] Supabase error for ${userId}:`, error);
-      return null;
-    }
-    return data;
+    return await fetchUserData(userId);
   } catch (error) {
-    logger.error(`[fetchDbUserAction] Unexpected failure for user ${userId}:`, error);
+    logger.error(`[fetchDbUserAction] Failed for user ${userId}:`, error);
     return null;
   }
 }
@@ -58,8 +25,7 @@ export async function upsertTelegramUserAction(payload: {
   if (!payload.userId) return null;
 
   try {
-    const admin = getSafeServerAdmin();
-    const { data, error } = await admin
+    const { data, error } = await supabaseAdmin
       .from("users")
       .upsert(
         {
@@ -77,7 +43,10 @@ export async function upsertTelegramUserAction(payload: {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
+
     return data;
   } catch (error) {
     logger.error(`[upsertTelegramUserAction] Failed for user ${payload.userId}:`, error);
@@ -86,7 +55,6 @@ export async function upsertTelegramUserAction(payload: {
 }
 
 export async function refreshDbUserAction(userId: string): Promise<Database["public"]["Tables"]["users"]["Row"] | null> {
-  // Alias to fetchDbUserAction for clarity
   return await fetchDbUserAction(userId);
 }
 
@@ -94,10 +62,7 @@ export async function fetchUserCrewInfoAction(userId: string): Promise<UserCrewI
   if (!userId) return null;
 
   try {
-    const admin = getSafeServerAdmin();
-    
-    // Check ownership
-    const { data: ownedCrew } = await admin
+    const { data: ownedCrew } = await supabaseAdmin
       .from('crews')
       .select('id, slug, name, logo_url')
       .eq('owner_id', userId)
@@ -107,8 +72,7 @@ export async function fetchUserCrewInfoAction(userId: string): Promise<UserCrewI
       return { ...ownedCrew, is_owner: true };
     }
 
-    // Check membership
-    const { data: memberData } = await admin
+    const { data: memberData } = await supabaseAdmin
       .from('crew_members')
       .select('crews(id, slug, name, logo_url)')
       .eq('user_id', userId)
@@ -116,16 +80,10 @@ export async function fetchUserCrewInfoAction(userId: string): Promise<UserCrewI
       .maybeSingle();
       
     if (memberData && memberData.crews) {
-      // Supabase types sometimes return array or object depending on query, handle safely
+      // Handle array vs object return type from join
       const crewData = Array.isArray(memberData.crews) ? memberData.crews[0] : memberData.crews;
       if (crewData) {
-          return { 
-              id: crewData.id, 
-              slug: crewData.slug || '', // Ensure string
-              name: crewData.name, 
-              logo_url: crewData.logo_url || '', 
-              is_owner: false 
-          };
+          return { ...crewData, is_owner: false };
       }
     }
 
@@ -140,8 +98,7 @@ export async function fetchActiveGameAction(userId: string): Promise<ActiveLobby
   if (!userId) return null;
 
   try {
-    const admin = getSafeServerAdmin();
-    const { data, error } = await admin
+    const { data, error } = await supabaseAdmin
         .from('lobby_members')
         .select('lobby_id, lobbies!inner(id, name, start_at, status, metadata)')
         .eq('user_id', userId)
@@ -152,7 +109,6 @@ export async function fetchActiveGameAction(userId: string): Promise<ActiveLobby
 
     if (data && data.lobbies) {
         const lobby = Array.isArray(data.lobbies) ? data.lobbies[0] : data.lobbies;
-        // Safe access to metadata properties
         const meta = typeof lobby.metadata === 'object' && lobby.metadata ? lobby.metadata as any : {};
         const actualStart = meta.actual_start_at || lobby.start_at; 
         
@@ -171,7 +127,7 @@ export async function fetchActiveGameAction(userId: string): Promise<ActiveLobby
   }
 }
 
-// --- THE FIX FOR CART SAVING ---
+// --- LOGIC FIX HERE: Manually merge metadata before update ---
 export async function saveUserFranchizeCartAction(
   userId: string,
   slug: string,
@@ -182,50 +138,47 @@ export async function saveUserFranchizeCartAction(
   }
 
   try {
-    const admin = getSafeServerAdmin();
-    
-    // 1. Fetch current metadata explicitly
-    const { data: user, error: fetchError } = await admin
+    // 1. Fetch current metadata manually
+    const { data: user, error: fetchError } = await supabaseAdmin
         .from("users")
         .select("metadata")
         .eq("user_id", userId)
         .single();
 
     if (fetchError || !user) {
-      logger.error(`[saveUserFranchizeCartAction] Could not fetch user ${userId} to update cart.`, fetchError);
-      return { ok: false, error: "User not found or database error" };
+      logger.error(`[saveUserFranchizeCartAction] Could not fetch user ${userId}.`, fetchError);
+      return { ok: false, error: "User not found" };
     }
 
-    // 2. Safe Deep Merge
     const currentMeta = (user.metadata as Record<string, any>) || {};
     const currentSettings = (currentMeta.settings as Record<string, any>) || {};
     const currentCarts = (currentSettings.franchizeCart as Record<string, any>) || {};
 
+    // 2. Perform Deep Merge in JS
     const nextMetadata = {
       ...currentMeta,
       settings: {
         ...currentSettings,
         franchizeCart: {
           ...currentCarts,
-          [slug]: cartState,
+          [slug]: cartState, // Update only this slug's cart
         },
       },
     };
 
-    // 3. Perform Update
-    const { error: updateError, count } = await admin
+    // 3. Write back the full metadata object
+    const { error: updateError, count } = await supabaseAdmin
       .from("users")
       .update({ metadata: nextMetadata, updated_at: new Date().toISOString() })
       .eq("user_id", userId)
-      .select('user_id', { count: 'exact' }); // Select ID to verify row was touched
+      .select('user_id', { count: 'exact' });
 
     if (updateError) {
       throw updateError;
     }
     
-    // Paranoid check: did we actually update a row?
     if (count === 0) {
-        logger.warn(`[saveUserFranchizeCartAction] Update returned 0 rows for user ${userId}. User might have been deleted.`);
+        logger.warn(`[saveUserFranchizeCartAction] Update touched 0 rows for ${userId}. User might be deleted.`);
         return { ok: false, error: "User not found during update" };
     }
 
