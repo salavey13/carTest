@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { debugLogger } from "@/lib/debugLogger"; 
 import { logger as globalLogger } from "@/lib/logger"; 
-import { fetchDbUserAction, upsertTelegramUserAction } from "@/contexts/actions";
+import { createOrUpdateUser as dbCreateOrUpdateUser, fetchUserData as dbFetchUserData } from "@/hooks/supabase";
 import type { TelegramWebApp, WebAppUser, WebAppInitData } from "@/types/telegram";
 import type { Database } from "@/types/database.types";
 
