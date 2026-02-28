@@ -511,7 +511,7 @@ export const fetchArticleSections = async (articleId: string): Promise<{ success
   }
 };
 
-export const saveTestProgress = async (userId: string, progress: any): Promise<{ success: boolean; error?: string }> {
+export const saveTestProgress = async (userId: string, progress: any): Promise<{ success: boolean; error?: string }> => {
     const client = await createAuthenticatedClient(userId);
     if (!client) return { success: false, error: "Failed to create authenticated client." };
 
