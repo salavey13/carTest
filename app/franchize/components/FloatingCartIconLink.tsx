@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowUp, ShoppingCart } from "lucide-react";
 
 interface FloatingCartIconLinkProps {
@@ -14,11 +14,17 @@ interface FloatingCartIconLinkProps {
 }
 
 export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor, textColor, borderColor, backgroundColor }: FloatingCartIconLinkProps) {
+  const router = useRouter();
   const isCartEmpty = itemCount === 0;
+
+  const handleNav = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(href);
+  };
 
   return (
     <div
-      // FIX: Changed bottom-6 to bottom-24
       className="fixed bottom-24 right-4 z-[60] flex items-center gap-3"
       style={{
         ["--floating-cart-accent" as string]: accentColor,
@@ -38,8 +44,9 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
         <ArrowUp className="h-5 w-5" />
       </button>
 
-      <Link 
-        href={href}
+      <button
+        type="button"
+        onClick={handleNav}
         className="relative inline-flex items-center justify-center gap-2 rounded-full bg-[var(--floating-cart-accent)] px-5 py-3 text-black shadow-xl transition-transform active:scale-95 cursor-pointer"
       >
         <ShoppingCart className="h-5 w-5" />
@@ -49,7 +56,7 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
         >
           {itemCount}
         </span>
-      </Link>
+      </button>
     </div>
   );
 }

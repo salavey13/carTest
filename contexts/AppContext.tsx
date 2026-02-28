@@ -4,7 +4,6 @@ import type React from "react";
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
 import { debugLogger } from "@/lib/debugLogger";
-import { logger as globalLogger } from "@/lib/logger";
 import { useAppToast } from "@/hooks/useAppToast";
 import type { Database } from "@/types/database.types";
 import { refreshDbUserAction, fetchUserCrewInfoAction, fetchActiveGameAction } from "./actions";
@@ -45,9 +44,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeLobby, setActiveLobby] = useState<ActiveLobbyInfo | null>(null);
 
   const hasUserRef = useRef(!!initialDbUser);
-  
-  // CRITICAL FIX: Lock to prevent infinite reading of the static start_param from TG
-  // This prevents the "navigation cancelled" bug where state updates during nav kill the route change.
   const processedStartParam = useRef(false);
 
   useEffect(() => {
@@ -64,16 +60,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshDbUser = useCallback(async () => {
     const userId = user?.id || dbUser?.user_id;
     if (userId) {
-      debugLogger.info(`[AppContext refreshDbUser] Refreshing dbUser for user ID: ${userId}`);
       try {
         const freshDbUser = await refreshDbUserAction(String(userId));
         if (freshDbUser) {
            setDbUserInternal(freshDbUser);
            hasUserRef.current = true;
-           debugLogger.info(`[AppContext refreshDbUser] dbUser refreshed successfully.`);
         }
       } catch (err) {
-        debugLogger.error(`[AppContext refreshDbUser] Failed to refresh:`, err);
+        debugLogger.error(`[AppContext] Refresh failed:`, err);
       }
     }
   }, [user?.id, dbUser?.user_id]);
@@ -87,7 +81,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const crewInfo = await fetchUserCrewInfoAction(dbUser.user_id);
       setUserCrewInfo(crewInfo);
     };
-
     fetchCrewInfo();
   }, [dbUser]);
 
@@ -101,24 +94,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [dbUser?.user_id]);
 
   const clearStartParam = useCallback(() => {
-    debugLogger.info("[AppContext] Clearing startParamPayload.");
     setStartParamPayload(null);
   }, []);
 
-  // Sync Start Param ONE TIME ONLY. 
-  // Telegram's initDataUnsafe object is static and retains the param forever.
   useEffect(() => {
     if (processedStartParam.current) return;
 
-    if (telegramHookData.tg && telegramHookData.tg.initDataUnsafe?.start_param) {
-      const rawStartParam = telegramHookData.tg.initDataUnsafe.start_param;
-      if (rawStartParam) {
-        debugLogger.info(`[AppContext] Received start_param (raw): ${rawStartParam}. Syncing once.`);
-        setStartParamPayload(rawStartParam);
+    // Check directly to avoid dependency churn
+    const rawParam = telegramHookData.startParam || telegramHookData.initDataUnsafe?.start_param;
+    
+    if (rawParam) {
+      debugLogger.info(`[AppContext] Syncing Start Param: ${rawParam}`);
+      setStartParamPayload(rawParam);
+      processedStartParam.current = true;
+    } else if (telegramHookData.tg) {
+        // If TG is fully loaded but has no param, stop checking
         processedStartParam.current = true;
-      }
     }
-  }, [telegramHookData.tg]);
+  }, [telegramHookData.startParam, telegramHookData.initDataUnsafe, telegramHookData.tg]);
 
   const contextValue = useMemo(() => {
     return {
@@ -136,35 +129,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [restTelegramData, user, dbUser, isTelegramLoading, isTelegramAuthenticating, telegramError, startParamPayload, refreshDbUser, clearStartParam, userCrewInfo, activeLobby]);
 
-  // Toast Logic
   useEffect(() => {
     let loadingTimer: NodeJS.Timeout | null = null;
-    const LOADING_TOAST_DELAY = 500;
-    const isClient = typeof document !== 'undefined';
-    
     const shouldShowLoading = (isTelegramLoading || isTelegramAuthenticating) && !dbUser;
 
     if (shouldShowLoading) {
        appToast.dismiss("auth-success-toast"); appToast.dismiss("auth-error-toast");
        loadingTimer = setTimeout(() => {
-          if (shouldShowLoading && (!isClient || document.visibilityState === 'visible')) {
+          if ((isTelegramLoading || isAuthenticating) && !dbUser) {
              appToast.loading("Авторизация...", { id: "auth-loading-toast", duration: 15000 });
           }
-       }, LOADING_TOAST_DELAY);
+       }, 500);
     } else {
         if (loadingTimer) clearTimeout(loadingTimer);
         appToast.dismiss("auth-loading-toast");
-
-        if (telegramHookData.isAuthenticated && !telegramError && !dbUser) {
-             // Success logic
-        } else if (telegramError) {
-             if (!isClient || document.visibilityState === 'visible') {
-                 appToast.error(`Ошибка: ${telegramError.message}`, { id: "auth-error-toast", duration: 5000 });
-            }
+        if (telegramError) {
+             appToast.error(`Ошибка: ${telegramError.message}`, { id: "auth-error-toast", duration: 5000 });
         }
     }
     return () => { if (loadingTimer) clearTimeout(loadingTimer); };
-  }, [isTelegramLoading, isTelegramAuthenticating, telegramError, telegramHookData.isAuthenticated, dbUser, appToast]);
+  }, [isTelegramLoading, isTelegramAuthenticating, telegramError, dbUser, appToast, isAuthenticating]);
 
   return <AppContext.Provider value={contextValue as AppContextData}>{children}</AppContext.Provider>;
 };
