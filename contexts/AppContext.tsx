@@ -35,6 +35,7 @@ interface AppContextData extends ReturnType<typeof useTelegram> {
 const AppContext = createContext<Partial<AppContextData>>({});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const processedStartParam = useRef(false);
   const telegramHookData = useTelegram();
   const { user, dbUser: initialDbUser, isLoading: isTelegramLoading, isAuthenticating: isTelegramAuthenticating, error: telegramError, ...restTelegramData } = telegramHookData;
 
@@ -98,18 +99,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   useEffect(() => {
-    if (processedStartParam.current) return;
-
-    const rawParam = telegramHookData.startParam || telegramHookData.initDataUnsafe?.start_param;
-    
-    if (rawParam) {
-      debugLogger.info(`[AppContext] Syncing Start Param: ${rawParam}`);
-      setStartParamPayload(rawParam);
+    if (telegramHookData.tg && telegramHookData.tg.initDataUnsafe?.start_param) {
+      if (processedStartParam.current) return; // ← GUARD
       processedStartParam.current = true;
-    } else if (telegramHookData.tg) {
-        processedStartParam.current = true;
+      
+      const rawStartParam = telegramHookData.tg.initDataUnsafe.start_param;
+      debugLogger.info(`[AppContext] Received start_param: ${rawStartParam}`);
+      setStartParamPayload(rawStartParam);
+    } else {
+      if (startParamPayload !== null) {
+        setStartParamPayload(null);
+        processedStartParam.current = false; // ← RESET
+      }
     }
-  }, [telegramHookData.startParam, telegramHookData.initDataUnsafe, telegramHookData.tg]);
+  }, [telegramHookData.tg, telegramHookData.tg?.initDataUnsafe?.start_param, startParamPayload]);
 
   const contextValue = useMemo(() => {
     return {
