@@ -15,7 +15,7 @@ import {
   fetchUserCyberFitnessProfile,
   CyberFitnessProfile,
   DailyActivityRecord, 
-} from "@/hooks/cyberFitnessSupabase";
+} from "@/lib/cyberFitnessSupabase-server";
 import { format, subDays, parseISO, isValid } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Sparkles, ExternalLink, GitBranch, Orbit } from "lucide-react";
