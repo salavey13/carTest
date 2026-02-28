@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin, fetchUserData } from "@/hooks/supabase";
+import { supabaseAdmin, fetchUserData } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
 import type { UserCrewInfo, ActiveLobbyInfo } from "./AppContext";
