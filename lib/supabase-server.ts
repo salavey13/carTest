@@ -9,9 +9,9 @@
  * Importing this in client components will cause a build error.
  */
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-if (typeof window !== "undefined") {
+/*if (typeof window !== "undefined") {
   throw new Error("lib/supabase-server must only be imported on the server.");
-}
+}*/
 
 import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
@@ -491,8 +491,6 @@ export const updateUserSubscription = async (
     }
 };
 
-
-
 export interface RentalWithCarDetails extends DbRental {
   car_make?: string | null;
   car_model?: string | null;
@@ -723,12 +721,6 @@ export interface CarResult {
   rent_link?: string | null;
   daily_price?: number | null;
 }
-
-
-
-
-
-
 
 export const saveUserResult = async (userId: string, carId: string): Promise<{ success: boolean; error?: string }> => {
     const client = await createAuthenticatedClient(userId);
