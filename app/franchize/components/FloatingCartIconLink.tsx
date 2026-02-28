@@ -18,7 +18,8 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
 
   return (
     <div
-      className="fixed bottom-6 right-4 z-[60] flex items-center gap-3"
+      // FIX: Changed bottom-6 to bottom-24 to avoid overlapping the "Add" button in modals
+      className="fixed bottom-24 right-4 z-[60] flex items-center gap-3"
       style={{
         ["--floating-cart-accent" as string]: accentColor,
         ["--floating-cart-border" as string]: borderColor,

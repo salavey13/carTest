@@ -22,8 +22,8 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
     setMounted(true);
   }, []);
 
+  // FIX: Restore delayed close logic to allow navigation to start
   const handleLinkClick = () => {
-    // FIX: Allow the navigation event to propagate before unmounting the portal
     setTimeout(() => {
       onOpenChange(false);
     }, 150);
