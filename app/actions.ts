@@ -1,7 +1,7 @@
 "use server"; 
 
 import {
-  fetchUserDataAction as dbFetchUserData, 
+  fetchUserData as dbFetchUserData, 
   updateUserMetadata as dbUpdateUserMetadata,
   uploadImage,
   supabaseAdmin,
