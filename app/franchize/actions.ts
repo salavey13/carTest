@@ -1,6 +1,7 @@
 "use server";
 
-import { createInvoice, supabaseAdmin } from "@/hooks/supabase";
+import { createInvoice } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendTelegramInvoice } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
@@ -46,7 +47,6 @@ function resolvePaletteByMode(franchize: UnknownRecord): FranchizeTheme["palette
     borderSoft: readPath(source, ["borderSoft"], defaultTheme.palette.borderSoft),
   };
 }
-
 
 export interface FranchizeTheme {
   mode: string;
@@ -326,7 +326,6 @@ const withSlug = (href: string, slug: string) => {
       return href;
   }
 };
-
 
 function parseSocialLinks(lines: string): Array<{ label: string; href: string }> {
   return lines
@@ -640,7 +639,6 @@ function trimCampaignTitle(title: string, fallback: string): string {
   return normalized.length > 72 ? `${normalized.slice(0, 69)}...` : normalized;
 }
 
-
 function parsePromoBanners(lines: string, slug: string): Array<{ id: string; title: string; subtitle: string; code: string; href: string; imageUrl: string; activeFrom: string; activeTo: string; priority: number; ctaLabel: string }> {
   return lines
     .split("\n")
@@ -705,7 +703,6 @@ function normalizeCatalogOrder(categories: string[]): string[] {
   const wbItems = unique.filter((category) => category.toLowerCase().includes("wbitem"));
   return [...regular, ...wbItems];
 }
-
 
 async function resolveFranchizeEditorAccess(actorUserId: string | undefined, crew: { id: string; owner_id?: string | null }): Promise<boolean> {
   if (!actorUserId) {

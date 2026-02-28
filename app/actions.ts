@@ -2,11 +2,11 @@
 
 import {
   generateCarEmbedding, 
-  supabaseAdmin, 
   fetchUserData as dbFetchUserData, 
   updateUserMetadata as dbUpdateUserMetadata,
   uploadImage, 
 } from "@/hooks/supabase"; 
+import { supabaseAdmin } from "@/lib/supabase-server";
 import axios from "axios";
 import { verifyJwtToken, generateJwtToken } from "@/lib/auth"; 
 import { logger } from "@/lib/logger"; 
