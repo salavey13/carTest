@@ -73,8 +73,6 @@ export function getServiceRoleKey(): string | null {
   return process.env.SUPABASE_SERVICE_ROLE_KEY ?? null;
 }
 
-// ... Rest of the file remains exactly as is, but now 'supabaseAdmin' usage inside them is safe ...
-
 export async function withSupabaseAdmin<T>(
   operation: (client: SupabaseClient<Database>) => Promise<T>,
 ): Promise<{ success: boolean; data?: T; error?: string }> {
@@ -241,11 +239,6 @@ export async function updateUserMetadata(
     return { success: false, error: catchError instanceof Error ? catchError.message : "Failed to update user metadata." };
   }
 }
-
-// ... (Rest of the file follows exactly, but uses the fixed supabaseAdmin)
-// For brevity, I'm not repeating the remaining 500 lines as they don't change logic, 
-// just inherit the fixed supabaseAdmin constant. 
-// Assume all other exports (generateCarEmbedding, searchCars, etc.) are present below.
 
 const VECTOR_DIMENSIONS = 384; 
 
