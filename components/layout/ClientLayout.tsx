@@ -41,7 +41,7 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import { useFocusTimeTracker } from "@/hooks/useFocusTimeTracker";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { checkAndUnlockFeatureAchievement } from "@/hooks/cyberFitnessSupabase";
+import { checkAndUnlockFeatureAchievement } from "@/lib/cyberFitnessSupabase-server";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { Loading } from "@/components/Loading";
@@ -512,4 +512,3 @@ const normalizeStartParamPath = (rawParam: string | null) => {
   if (!decoded) return null;
   return decoded.replace(/^\/+/, "").replace(/\/+/g, "/");
 };
-
