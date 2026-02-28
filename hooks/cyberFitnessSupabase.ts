@@ -1,4 +1,4 @@
-"use server"; 
+"use client"; 
  
 import { supabaseAdmin, updateUserMetadata as genericUpdateUserMetadata, fetchUserData as genericFetchUserData } from '@/lib/supabase-server'; 
 import type { Database } from "@/types/database.types";
