@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowUp, ShoppingCart } from "lucide-react";
 
 interface FloatingCartIconLinkProps {
@@ -14,15 +14,7 @@ interface FloatingCartIconLinkProps {
 }
 
 export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor, textColor, borderColor, backgroundColor }: FloatingCartIconLinkProps) {
-  const router = useRouter();
   const isCartEmpty = itemCount === 0;
-
-  // Use explicit navigation handler to bypass any Link/Anchor weirdness
-  const handleNav = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    router.push(href);
-  };
 
   return (
     <div
@@ -32,7 +24,7 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
         ["--floating-cart-border" as string]: borderColor,
         ["--floating-cart-text" as string]: textColor,
         ["--floating-cart-bg" as string]: backgroundColor,
-        pointerEvents: "auto", // FORCE clickable
+        pointerEvents: "auto",
         isolation: "isolate",
       }}
     >
@@ -45,9 +37,8 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
         <ArrowUp className="h-5 w-5" />
       </button>
 
-      <button
-        type="button"
-        onClick={handleNav}
+      <Link 
+        href={href}
         className="relative inline-flex items-center justify-center gap-2 rounded-full bg-[var(--floating-cart-accent)] px-5 py-3 text-black shadow-xl transition-transform active:scale-95 cursor-pointer"
       >
         <ShoppingCart className="h-5 w-5" />
@@ -57,7 +48,7 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
         >
           {itemCount}
         </span>
-      </button>
+      </Link>
     </div>
   );
 }

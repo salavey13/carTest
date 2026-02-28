@@ -36,15 +36,17 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = typeof isAdmin === "function" ? isAdmin() : false;
 
+  // FIX: Removed 'pointerEvents: auto' from the wrapper. 
+  // It allows the parent 'CrewHeader' to correctly disable interactions when compacted.
   return (
-    <div style={{ isolation: "isolate", pointerEvents: "auto" }}>
+    <div style={{ isolation: "isolate" }}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
             aria-label="Профиль и навигация"
             className="inline-flex h-11 items-center gap-2 rounded-xl px-2 transition hover:opacity-80"
-            style={{ backgroundColor: bgColor, color: textColor, pointerEvents: "auto" }}
+            style={{ backgroundColor: bgColor, color: textColor }}
           >
             <span className="relative block h-8 w-8 overflow-hidden rounded-full border" style={{ borderColor }}>
               {avatarUrl ? (
@@ -63,7 +65,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
           <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          {/* FIX: Use asChild so the Link IS the menu item. This ensures click handling works natively. */}
+          {/* FIX: Use asChild to make the Link the functional menu item. */}
           <DropdownMenuItem asChild>
             <Link href="/profile" className="flex w-full cursor-pointer items-center px-2 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-sm outline-none">
               <User className="mr-2 h-4 w-4" />

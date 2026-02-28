@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FranchizeCrewVM } from "../actions";
@@ -16,20 +16,17 @@ interface HeaderMenuProps {
 
 export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuProps) {
   const [mounted, setMounted] = useState(false);
-  const router = useRouter();
   const surface = crewPaletteForSurface(crew.theme);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const handleNavigation = (href: string) => {
-    // 1. Navigate immediately
-    router.push(href);
-    // 2. Close the menu after a tiny tick to allow visual feedback and ensure router caught the event
+  const handleLinkClick = () => {
+    // FIX: Allow the navigation event to propagate before unmounting the portal
     setTimeout(() => {
       onOpenChange(false);
-    }, 100);
+    }, 150);
   };
 
   if (!open || !mounted) {
@@ -66,18 +63,18 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
           {crew.header.menuLinks.map((link) => {
             const isActive = activePath === link.href;
             return (
-              <button
+              <Link
                 key={`${link.href}-${link.label}`}
-                type="button"
-                onClick={() => handleNavigation(link.href)}
-                className={`w-full text-left block rounded-xl border px-4 py-3 text-sm transition cursor-pointer ${
+                href={link.href}
+                onClick={handleLinkClick}
+                className={`block rounded-xl border px-4 py-3 text-sm transition cursor-pointer ${
                   isActive
                     ? "border-[var(--header-menu-accent)] text-[var(--header-menu-accent)]"
                     : "border-[var(--header-menu-border)] text-[var(--header-menu-text)]"
                 }`}
               >
                 {link.label}
-              </button>
+              </Link>
             );
           })}
         </div>
