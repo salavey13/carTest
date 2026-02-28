@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { ChevronDown, Palette, Settings, Shield, User } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   DropdownMenu,
@@ -30,13 +30,17 @@ function getInitials(name: string): string {
 }
 
 export function FranchizeProfileButton({ bgColor, textColor, borderColor }: FranchizeProfileButtonProps) {
+  const router = useRouter();
   const { dbUser, user, userCrewInfo, isAdmin } = useAppContext();
   const effectiveUser = dbUser || user;
   const displayName = effectiveUser?.username || effectiveUser?.full_name || effectiveUser?.first_name || "Operator";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = typeof isAdmin === "function" ? isAdmin() : false;
 
-  // FIX: Removed 'pointerEvents: auto' to fix overlay click blocking
+  const handleNav = (path: string) => {
+    router.push(path);
+  };
+
   return (
     <div style={{ isolation: "isolate" }}>
       <DropdownMenu>
@@ -45,7 +49,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
             type="button"
             aria-label="Профиль и навигация"
             className="inline-flex h-11 items-center gap-2 rounded-xl px-2 transition hover:opacity-80"
-            style={{ backgroundColor: bgColor, color: textColor, pointerEvents: "auto" }}
+            style={{ backgroundColor: bgColor, color: textColor }}
           >
             <span className="relative block h-8 w-8 overflow-hidden rounded-full border" style={{ borderColor }}>
               {avatarUrl ? (
@@ -64,45 +68,34 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
           <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          {/* FIX: Use asChild + Link pattern */}
-          <DropdownMenuItem asChild>
-            <Link href="/profile" className="flex w-full cursor-pointer items-center px-2 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-sm outline-none">
-              <User className="mr-2 h-4 w-4" />
-              <span>Профиль</span>
-            </Link>
+          <DropdownMenuItem onClick={() => handleNav("/profile")} className="cursor-pointer">
+            <User className="mr-2 h-4 w-4" />
+            <span>Профиль</span>
           </DropdownMenuItem>
 
-          <DropdownMenuItem asChild>
-            <Link href="/settings" className="flex w-full cursor-pointer items-center px-2 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-sm outline-none">
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Настройки</span>
-            </Link>
+          <DropdownMenuItem onClick={() => handleNav("/settings")} className="cursor-pointer">
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Настройки</span>
           </DropdownMenuItem>
 
-          <DropdownMenuItem asChild>
-            <Link href="/franchize/create" className="flex w-full cursor-pointer items-center px-2 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-sm outline-none">
-              <Palette className="mr-2 h-4 w-4" />
-              <span>Branding (экипаж)</span>
-            </Link>
+          <DropdownMenuItem onClick={() => handleNav("/franchize/create")} className="cursor-pointer">
+            <Palette className="mr-2 h-4 w-4" />
+            <span>Branding (экипаж)</span>
           </DropdownMenuItem>
 
           {userCrewInfo?.slug && (
-            <DropdownMenuItem asChild>
-              <Link href={`/crews/${userCrewInfo.slug}`} className="flex w-full cursor-pointer items-center px-2 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-sm outline-none">
-                <Palette className="mr-2 h-4 w-4" />
-                <span>Мой экипаж</span>
-              </Link>
+            <DropdownMenuItem onClick={() => handleNav(`/crews/${userCrewInfo.slug}`)} className="cursor-pointer">
+              <Palette className="mr-2 h-4 w-4" />
+              <span>Мой экипаж</span>
             </DropdownMenuItem>
           )}
 
           {userIsAdmin && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/admin" className="flex w-full cursor-pointer items-center px-2 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-sm outline-none">
-                  <Shield className="mr-2 h-4 w-4" />
-                  <span>Admin</span>
-                </Link>
+              <DropdownMenuItem onClick={() => handleNav("/admin")} className="cursor-pointer">
+                <Shield className="mr-2 h-4 w-4" />
+                <span>Admin</span>
               </DropdownMenuItem>
             </>
           )}
