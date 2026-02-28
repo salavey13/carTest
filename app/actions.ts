@@ -4,9 +4,9 @@ import {
   generateCarEmbedding, 
   fetchUserData as dbFetchUserData, 
   updateUserMetadata as dbUpdateUserMetadata,
-  uploadImage, 
+  uploadImage,
+  supabaseAdmin,
 } from "@/hooks/supabase"; 
-import { supabaseAdmin } from "@/lib/supabase-server";
 import axios from "axios";
 import { verifyJwtToken, generateJwtToken } from "@/lib/auth"; 
 import { logger } from "@/lib/logger"; 
