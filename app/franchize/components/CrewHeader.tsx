@@ -181,7 +181,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
             transform: isCompact ? "scaleY(0.85) translateY(-8px)" : "scaleY(1) translateY(0)",
             transformOrigin: "top center",
             transition: "transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, padding 0.3s ease",
-            pointerEvents: isCompact ? "none" : "auto",
+            pointerEvents: "auto",
           }}
         >
           <button
