@@ -22,7 +22,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
     setMounted(true);
   }, []);
 
-  // FIX: Restore delayed close logic to allow navigation to start
+  // FIX: Delayed close handler
   const handleLinkClick = () => {
     setTimeout(() => {
       onOpenChange(false);
@@ -66,7 +66,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
               <Link
                 key={`${link.href}-${link.label}`}
                 href={link.href}
-                onClick={handleLinkClick}
+                onClick={handleLinkClick} // FIX: Used the handler here
                 className={`block rounded-xl border px-4 py-3 text-sm transition cursor-pointer ${
                   isActive
                     ? "border-[var(--header-menu-accent)] text-[var(--header-menu-accent)]"
