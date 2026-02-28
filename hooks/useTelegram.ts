@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { debugLogger } from "@/lib/debugLogger"; 
 import { logger as globalLogger } from "@/lib/logger"; 
-import { createOrUpdateUser as upsertTelegramUserAction, fetchUserData as fetchDbUserAction } from "@/contexts/actions";
+/*import { createOrUpdateUser as upsertTelegramUserAction, fetchUserData as fetchDbUserAction } from "@/contexts/actions";*/
+import { 
+  fetchDbUserAction,           // Server Action
+  upsertTelegramUserAction     // Server Action
+} from "@/contexts/actions";
+
 import type { TelegramWebApp, WebAppUser, WebAppInitData } from "@/types/telegram";
 import type { Database } from "@/types/database.types";
 
