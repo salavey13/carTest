@@ -1,6 +1,6 @@
 "use client"; 
  
-import { supabaseAdmin, updateUserMetadata as genericUpdateUserMetadata, fetchUserData as genericFetchUserData } from '@/lib/supabase-server'; 
+//import { updateUserMetadata as genericUpdateUserMetadata, fetchUserData as genericFetchUserData } from '@/lib/supabase-server'; 
 import type { Database } from "@/types/database.types";
 import { logger } from "@/lib/logger";
 import { format } from 'date-fns';
