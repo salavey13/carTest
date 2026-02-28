@@ -12,10 +12,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import Image from "next/image";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import {
-  fetchUserCyberFitnessProfile,
+  fetchUserCyberFitnessProfile, 
+} from "@/lib/cyberFitnessSupabase-server";
+import {
   CyberFitnessProfile,
   DailyActivityRecord, 
-} from "@/lib/cyberFitnessSupabase-server";
+} from "@/hooks/cyberFitnessSupabase";
 import { format, subDays, parseISO, isValid } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Sparkles, ExternalLink, GitBranch, Orbit } from "lucide-react";
