@@ -9,9 +9,9 @@
  * Importing this in client components will cause a build error.
  */
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-/*if (typeof window !== "undefined") {
+if (typeof window !== "undefined") {
   throw new Error("lib/supabase-server must only be imported on the server.");
-}*/
+}
 
 import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
@@ -110,12 +110,12 @@ export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
         logger.warn("fetchUserData called with empty userId");
         return null;
     }
-    
+    /*
     // Guard against Client-Side usage
     if (typeof window !== "undefined") {
         logger.error("fetchUserData called on CLIENT. This function uses supabaseAdmin and must be Server-Only.");
         return null;
-    }
+    }*/
 
     try {
         const { data, error } = await supabaseAdmin
@@ -141,11 +141,12 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
         logger.error("[SupabaseHook] createOrUpdateUser called with empty userId");
         return null;
     }
+/*
      // Guard against Client-Side usage
      if (typeof window !== "undefined") {
          logger.error("[SupabaseHook] createOrUpdateUser called on CLIENT. Aborting.");
          return null;
-     }
+     }*/
 
     logger.info("[SupabaseHook] Attempting to create or update user:", { userId, username: userInfo.username });
 
@@ -202,12 +203,12 @@ export async function updateUserMetadata(
   if (!userId) {
     return { success: false, error: "User ID is required." };
   }
-  
+  /*
   // Guard against Client-Side usage
   if (typeof window !== "undefined") {
       return { success: false, error: "Cannot update user metadata from client side directly. Use a Server Action." };
   }
-
+*/
   try {
     const { data, error } = await supabaseAdmin
       .from("users") 
