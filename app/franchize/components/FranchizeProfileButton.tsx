@@ -36,7 +36,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = typeof isAdmin === "function" ? isAdmin() : false;
 
-  // FIX: Removed 'pointerEvents: auto' to prevent ghost clicks when header is compact
+  // FIX: Removed 'pointerEvents: auto' to fix overlay click blocking
   return (
     <div style={{ isolation: "isolate" }}>
       <DropdownMenu>
@@ -64,7 +64,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
           <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          {/* FIX: Using asChild with Link for proper semantic navigation */}
+          {/* FIX: Use asChild + Link pattern */}
           <DropdownMenuItem asChild>
             <Link href="/profile" className="flex w-full cursor-pointer items-center px-2 py-1.5 hover:bg-accent hover:text-accent-foreground rounded-sm outline-none">
               <User className="mr-2 h-4 w-4" />

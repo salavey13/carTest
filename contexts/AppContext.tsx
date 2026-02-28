@@ -46,8 +46,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const hasUserRef = useRef(!!initialDbUser);
   
-  // CRITICAL FIX: Track if we have EVER synced the start param this session.
-  // Telegram's initDataUnsafe is static. If we don't ignore it after first read, we loop forever.
+  // CRITICAL FIX: Lock to prevent infinite reading of the static start_param from TG
+  // This prevents the "navigation cancelled" bug where state updates during nav kill the route change.
   const processedStartParam = useRef(false);
 
   useEffect(() => {
@@ -105,7 +105,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setStartParamPayload(null);
   }, []);
 
-  // Sync Start Param ONE TIME ONLY
+  // Sync Start Param ONE TIME ONLY. 
+  // Telegram's initDataUnsafe object is static and retains the param forever.
   useEffect(() => {
     if (processedStartParam.current) return;
 
@@ -135,7 +136,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [restTelegramData, user, dbUser, isTelegramLoading, isTelegramAuthenticating, telegramError, startParamPayload, refreshDbUser, clearStartParam, userCrewInfo, activeLobby]);
 
-  // Simplified Toast Logic
+  // Toast Logic
   useEffect(() => {
     let loadingTimer: NodeJS.Timeout | null = null;
     const LOADING_TOAST_DELAY = 500;
@@ -155,7 +156,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         appToast.dismiss("auth-loading-toast");
 
         if (telegramHookData.isAuthenticated && !telegramError && !dbUser) {
-             // Success
+             // Success logic
         } else if (telegramError) {
              if (!isClient || document.visibilityState === 'visible') {
                  appToast.error(`Ошибка: ${telegramError.message}`, { id: "auth-error-toast", duration: 5000 });
