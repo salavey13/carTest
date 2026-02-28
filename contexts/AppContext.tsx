@@ -100,7 +100,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (processedStartParam.current) return;
 
-    // Check directly to avoid dependency churn
     const rawParam = telegramHookData.startParam || telegramHookData.initDataUnsafe?.start_param;
     
     if (rawParam) {
@@ -108,7 +107,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setStartParamPayload(rawParam);
       processedStartParam.current = true;
     } else if (telegramHookData.tg) {
-        // If TG is fully loaded but has no param, stop checking
         processedStartParam.current = true;
     }
   }, [telegramHookData.startParam, telegramHookData.initDataUnsafe, telegramHookData.tg]);
@@ -129,6 +127,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [restTelegramData, user, dbUser, isTelegramLoading, isTelegramAuthenticating, telegramError, startParamPayload, refreshDbUser, clearStartParam, userCrewInfo, activeLobby]);
 
+  // FIX: Replaced `isAuthenticating` (undefined) with `isTelegramAuthenticating`
   useEffect(() => {
     let loadingTimer: NodeJS.Timeout | null = null;
     const shouldShowLoading = (isTelegramLoading || isTelegramAuthenticating) && !dbUser;
@@ -136,7 +135,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (shouldShowLoading) {
        appToast.dismiss("auth-success-toast"); appToast.dismiss("auth-error-toast");
        loadingTimer = setTimeout(() => {
-          if ((isTelegramLoading || isAuthenticating) && !dbUser) {
+          // Check variable name here as well
+          if ((isTelegramLoading || isTelegramAuthenticating) && !dbUser) {
              appToast.loading("Авторизация...", { id: "auth-loading-toast", duration: 15000 });
           }
        }, 500);
@@ -148,7 +148,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
     }
     return () => { if (loadingTimer) clearTimeout(loadingTimer); };
-  }, [isTelegramLoading, isTelegramAuthenticating, telegramError, dbUser, appToast, isAuthenticating]);
+  }, [isTelegramLoading, isTelegramAuthenticating, telegramError, dbUser, appToast]);
 
   return <AppContext.Provider value={contextValue as AppContextData}>{children}</AppContext.Provider>;
 };
