@@ -17,6 +17,7 @@ import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://inmctohsodgdohamhzag.supabase.co";
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export function validateServiceRoleKey(): { valid: boolean; error?: string } {
@@ -104,6 +105,12 @@ export async function withSupabaseAdmin<T>(
     return { success: false, error: message };
   }
 }
+
+
+// Public anon client (safe to export from server too – key is public)
+export const supabaseAnon = createClient<Database>(supabaseUrl, anonKey);
+
+
 
 export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
     if (!userId) {
