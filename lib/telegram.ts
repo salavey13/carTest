@@ -116,10 +116,3 @@ export async function upsertTelegramUser(user: WebAppUser) {
     throw error; // Re-throw to be caught by Server Action
   }
 }
-
-export function getTelegramUser(): WebAppUser | null {
-  if (typeof window === "undefined") return null
-  const telegram = (window as any).Telegram?.WebApp
-  if (!telegram?.initDataUnsafe?.user) return null
-  return telegram.initDataUnsafe.user
-}
