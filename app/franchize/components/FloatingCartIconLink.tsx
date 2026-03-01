@@ -37,7 +37,6 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
         <ArrowUp className="h-5 w-5" />
       </button>
 
-      {/* FLOATING CART — PURE <Link> SPA */}
       <Link
         href={href}
         className="relative inline-flex items-center justify-center gap-2 rounded-full bg-[var(--floating-cart-accent)] px-5 py-3 text-black shadow-xl transition-transform active:scale-95 cursor-pointer no-underline"
