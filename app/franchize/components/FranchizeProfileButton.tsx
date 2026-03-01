@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { ChevronDown, Palette, Settings, Shield, User } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   DropdownMenu,
@@ -30,16 +30,11 @@ function getInitials(name: string): string {
 }
 
 export function FranchizeProfileButton({ bgColor, textColor, borderColor }: FranchizeProfileButtonProps) {
-  const router = useRouter();
   const { dbUser, user, userCrewInfo, isAdmin } = useAppContext();
   const effectiveUser = dbUser || user;
   const displayName = effectiveUser?.username || effectiveUser?.full_name || effectiveUser?.first_name || "Operator";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = typeof isAdmin === "function" ? isAdmin() : false;
-
-  const handleNav = (path: string) => {
-    router.push(path); // ← pure SPA navigation (same as working “назад” link)
-  };
 
   return (
     <div style={{ isolation: "isolate" }}>
@@ -68,34 +63,44 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
           <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem onClick={() => handleNav("/profile")} className="cursor-pointer">
-            <User className="mr-2 h-4 w-4" />
-            <span>Профиль</span>
+          <DropdownMenuItem asChild className="cursor-pointer">
+            <Link href="/profile">
+              <User className="mr-2 h-4 w-4" />
+              <span>Профиль</span>
+            </Link>
           </DropdownMenuItem>
 
-          <DropdownMenuItem onClick={() => handleNav("/settings")} className="cursor-pointer">
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Настройки</span>
+          <DropdownMenuItem asChild className="cursor-pointer">
+            <Link href="/settings">
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Настройки</span>
+            </Link>
           </DropdownMenuItem>
 
-          <DropdownMenuItem onClick={() => handleNav("/franchize/create")} className="cursor-pointer">
-            <Palette className="mr-2 h-4 w-4" />
-            <span>Branding (экипаж)</span>
+          <DropdownMenuItem asChild className="cursor-pointer">
+            <Link href="/franchize/create">
+              <Palette className="mr-2 h-4 w-4" />
+              <span>Branding (экипаж)</span>
+            </Link>
           </DropdownMenuItem>
 
           {userCrewInfo?.slug && (
-            <DropdownMenuItem onClick={() => handleNav(`/crews/${userCrewInfo.slug}`)} className="cursor-pointer">
-              <Palette className="mr-2 h-4 w-4" />
-              <span>Мой экипаж</span>
+            <DropdownMenuItem asChild className="cursor-pointer">
+              <Link href={`/crews/${userCrewInfo.slug}`}>
+                <Palette className="mr-2 h-4 w-4" />
+                <span>Мой экипаж</span>
+              </Link>
             </DropdownMenuItem>
           )}
 
           {userIsAdmin && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleNav("/admin")} className="cursor-pointer">
-                <Shield className="mr-2 h-4 w-4" />
-                <span>Admin</span>
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link href="/admin">
+                  <Shield className="mr-2 h-4 w-4" />
+                  <span>Admin</span>
+                </Link>
               </DropdownMenuItem>
             </>
           )}
