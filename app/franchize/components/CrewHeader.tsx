@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import type { FranchizeCrewVM } from "../actions";
 import { HeaderMenu } from "../modals/HeaderMenu";
 import { FranchizeProfileButton } from "./FranchizeProfileButton";
@@ -22,7 +22,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   const [catalogLinks, setCatalogLinks] = useState<string[]>([]);
   const [isCompact, setIsCompact] = useState(false);
   const pathname = usePathname();
-  const router = useRouter();
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const railRef = useRef<HTMLDivElement | null>(null);
 
@@ -32,9 +31,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   );
 
   const visibleRailLinks = useMemo(() => {
-    if (pathname === mainCatalogPath && catalogLinks.length > 0) {
-      return catalogLinks;
-    }
+    if (pathname === mainCatalogPath && catalogLinks.length > 0) return catalogLinks;
     return defaultGroupLinks;
   }, [catalogLinks, defaultGroupLinks, mainCatalogPath, pathname]);
 
@@ -53,9 +50,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
 
     const hydrateSections = () => {
       const sections = Array.from(document.querySelectorAll<HTMLElement>("section[data-category]"));
-      const labels = sections
-        .map((section) => section.getAttribute("data-category")?.trim() ?? "")
-        .filter(Boolean);
+      const labels = sections.map((section) => section.getAttribute("data-category")?.trim() ?? "").filter(Boolean);
       setCatalogLinks(Array.from(new Set(labels)));
       return sections;
     };
@@ -93,13 +88,10 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
 
   useEffect(() => {
     if (pathname !== mainCatalogPath || typeof window === "undefined") return;
-
     const hash = window.location.hash?.replace("#", "");
     if (!hash) return;
-
     const section = document.getElementById(hash);
     if (!section) return;
-
     const yOffset = 136;
     const y = section.getBoundingClientRect().top + window.scrollY - yOffset;
     window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
@@ -107,27 +99,9 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
 
   useEffect(() => {
     if (!activeCategory || !railRef.current) return;
-
-    const activePill = railRef.current.querySelector<HTMLButtonElement>(`button[data-category-pill="${CSS.escape(activeCategory)}"]`);
+    const activePill = railRef.current.querySelector<HTMLButtonElement>(`a[data-category-pill="${CSS.escape(activeCategory)}"]`);
     activePill?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   }, [activeCategory]);
-
-  const scrollToCategory = (categoryLabel: string) => {
-    const targetId = toCategoryId(categoryLabel);
-
-    if (pathname !== mainCatalogPath) {
-      router.push(`${mainCatalogPath}#${targetId}`);
-      return;
-    }
-
-    const section = document.getElementById(targetId);
-    if (!section) return;
-
-    const yOffset = 136;
-    const y = section.getBoundingClientRect().top + window.scrollY - yOffset;
-    window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
-    setActiveCategory(categoryLabel);
-  };
 
   return (
     <header
@@ -168,7 +142,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* HEADER LOGO — PURE SPA LINK (fixed) */}
+          {/* HEADER LOGO — PURE <Link> SPA */}
           <Link
             href={mainCatalogPath}
             className="relative z-10 mx-auto flex flex-col items-center text-center cursor-pointer hover:opacity-90 transition-opacity pointer-events-auto"
@@ -208,33 +182,34 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
         </div>
       </div>
 
-      {visibleRailLinks.length > 0 ? (
+      {visibleRailLinks.length > 0 && (
         <div className="-mx-4 mt-1 border-t px-4 pt-2" style={{ borderColor: crew.theme.palette.borderSoft }}>
           <div
             ref={railRef}
             className="mx-auto flex w-full max-w-4xl gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
           >
             {visibleRailLinks.map((linkLabel) => {
+              const targetId = toCategoryId(linkLabel);
+              const href = pathname === mainCatalogPath ? `#${targetId}` : `${mainCatalogPath}#${targetId}`;
               const isActive = activeCategory === linkLabel;
               return (
-                <button
+                <Link
                   key={linkLabel}
-                  type="button"
+                  href={href}
                   data-category-pill={linkLabel}
-                  onClick={() => scrollToCategory(linkLabel)}
-                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-4 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] transition-colors"
+                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-4 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] transition-colors pointer-events-auto"
                   style={{
                     ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
                     ["--pill-text" as string]: isActive ? "#000000" : crew.theme.palette.textPrimary,
                   }}
                 >
                   {linkLabel}
-                </button>
+                </Link>
               );
             })}
           </div>
         </div>
-      ) : null}
+      )}
 
       <HeaderMenu crew={crew} activePath={activePath} open={menuOpen} onOpenChange={setMenuOpen} />
     </header>
