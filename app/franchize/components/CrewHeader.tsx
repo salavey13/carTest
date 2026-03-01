@@ -86,26 +86,9 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
     };
   }, [mainCatalogPath, pathname]);
 
-  useEffect(() => {
-    if (pathname !== mainCatalogPath || typeof window === "undefined") return;
-    const hash = window.location.hash?.replace("#", "");
-    if (!hash) return;
-    const section = document.getElementById(hash);
-    if (!section) return;
-    const yOffset = 136;
-    const y = section.getBoundingClientRect().top + window.scrollY - yOffset;
-    window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
-  }, [mainCatalogPath, pathname]);
-
-  useEffect(() => {
-    if (!activeCategory || !railRef.current) return;
-    const activePill = railRef.current.querySelector<HTMLButtonElement>(`a[data-category-pill="${CSS.escape(activeCategory)}"]`);
-    activePill?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-  }, [activeCategory]);
-
   return (
     <header
-      className="sticky top-0 z-50 border-b px-4 pb-2 pt-[max(env(safe-area-inset-top),0.2rem)]"
+      className="sticky top-0 z-50 border-b px-4 pb-2 pt-[max(env(safe-area-inset-top),0.2rem)] backdrop-blur-2xl"
       style={{
         borderColor: crew.theme.palette.borderSoft,
         backgroundColor: `${crew.theme.palette.bgCard}F0`,
@@ -142,7 +125,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* HEADER LOGO — PURE <Link> SPA */}
+          {/* HEADER LOGO — PURE SPA LINK */}
           <Link
             href={mainCatalogPath}
             className="relative z-10 mx-auto flex flex-col items-center text-center cursor-pointer hover:opacity-90 transition-opacity pointer-events-auto"

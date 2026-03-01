@@ -63,30 +63,30 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
           <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem asChild className="cursor-pointer">
-            <Link href="/profile">
+          <DropdownMenuItem asChild>
+            <Link href="/profile" className="cursor-pointer flex items-center gap-2 w-full">
               <User className="mr-2 h-4 w-4" />
               <span>Профиль</span>
             </Link>
           </DropdownMenuItem>
 
-          <DropdownMenuItem asChild className="cursor-pointer">
-            <Link href="/settings">
+          <DropdownMenuItem asChild>
+            <Link href="/settings" className="cursor-pointer flex items-center gap-2 w-full">
               <Settings className="mr-2 h-4 w-4" />
               <span>Настройки</span>
             </Link>
           </DropdownMenuItem>
 
-          <DropdownMenuItem asChild className="cursor-pointer">
-            <Link href="/franchize/create">
+          <DropdownMenuItem asChild>
+            <Link href="/franchize/create" className="cursor-pointer flex items-center gap-2 w-full">
               <Palette className="mr-2 h-4 w-4" />
               <span>Branding (экипаж)</span>
             </Link>
           </DropdownMenuItem>
 
           {userCrewInfo?.slug && (
-            <DropdownMenuItem asChild className="cursor-pointer">
-              <Link href={`/crews/${userCrewInfo.slug}`}>
+            <DropdownMenuItem asChild>
+              <Link href={`/crews/${userCrewInfo.slug}`} className="cursor-pointer flex items-center gap-2 w-full">
                 <Palette className="mr-2 h-4 w-4" />
                 <span>Мой экипаж</span>
               </Link>
@@ -96,8 +96,8 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
           {userIsAdmin && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild className="cursor-pointer">
-                <Link href="/admin">
+              <DropdownMenuItem asChild>
+                <Link href="/admin" className="cursor-pointer flex items-center gap-2 w-full">
                   <Shield className="mr-2 h-4 w-4" />
                   <span>Admin</span>
                 </Link>
