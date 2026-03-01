@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { ChevronRight, MapPin, Phone, Send } from "lucide-react";
-import { useAppContext } from "@/contexts/AppContext"; // ← NEW
 import type { FranchizeCrewVM } from "../actions";
 import { isExternalHref } from "../lib/navigation";
 
@@ -11,7 +10,6 @@ interface CrewFooterProps {
 }
 
 export function CrewFooter({ crew }: CrewFooterProps) {
-  const { openLink } = useAppContext(); // ← SAFE TELEGRAM NAVIGATION
   const bg = crew.theme.palette.accentMain;
   const text = crew.footer.textColor || "#16130A";
   const border = "#b78609";
@@ -21,10 +19,6 @@ export function CrewFooter({ crew }: CrewFooterProps) {
     : crew.contacts.telegram
       ? [{ label: crew.contacts.telegram, href: `https://t.me/${crew.contacts.telegram.replace("@", "")}` }]
       : [{ label: "Telegram", href: "https://t.me/oneBikePlsBot" }];
-
-  const handleInternalLink = (href: string) => {
-    openLink(href); // ← THIS IS THE FIX
-  };
 
   return (
     <footer
@@ -65,14 +59,10 @@ export function CrewFooter({ crew }: CrewFooterProps) {
                       <span>{link.label}</span>
                     </a>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleInternalLink(link.href)}
-                      className="flex w-full items-center gap-2 py-3 text-left hover:opacity-90 transition"
-                    >
+                    <Link href={link.href} className="flex items-center gap-2 py-3 hover:opacity-90 transition">
                       <ChevronRight className="h-4 w-4" />
                       <span>{link.label}</span>
-                    </button>
+                    </Link>
                   )}
                 </li>
               );

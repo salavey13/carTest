@@ -38,7 +38,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
   const userIsAdmin = typeof isAdmin === "function" ? isAdmin() : false;
 
   const handleNav = (path: string) => {
-    router.push(path);
+    router.push(path); // ← pure SPA navigation (same as working “назад” link)
   };
 
   return (
