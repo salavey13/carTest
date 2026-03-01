@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { ChevronRight, MapPin, Phone, Send } from "lucide-react";
+import { useAppContext } from "@/contexts/AppContext"; // ← NEW
 import type { FranchizeCrewVM } from "../actions";
 import { isExternalHref } from "../lib/navigation";
 
@@ -8,14 +11,20 @@ interface CrewFooterProps {
 }
 
 export function CrewFooter({ crew }: CrewFooterProps) {
+  const { openLink } = useAppContext(); // ← SAFE TELEGRAM NAVIGATION
   const bg = crew.theme.palette.accentMain;
   const text = crew.footer.textColor || "#16130A";
   const border = "#b78609";
+
   const socialLinks = crew.footer.socialLinks.length > 0
     ? crew.footer.socialLinks
     : crew.contacts.telegram
       ? [{ label: crew.contacts.telegram, href: `https://t.me/${crew.contacts.telegram.replace("@", "")}` }]
       : [{ label: "Telegram", href: "https://t.me/oneBikePlsBot" }];
+
+  const handleInternalLink = (href: string) => {
+    openLink(href); // ← THIS IS THE FIX
+  };
 
   return (
     <footer
@@ -46,21 +55,28 @@ export function CrewFooter({ crew }: CrewFooterProps) {
         <section>
           <h3 className="text-3xl font-semibold leading-none text-[var(--footer-text)]">Меню</h3>
           <ul className="mt-5 space-y-1 text-base">
-            {crew.header.menuLinks.map((link) => (
-              <li key={`${link.href}-${link.label}`} className="border-b border-[var(--footer-border)]">
-                {isExternalHref(link.href) ? (
-                  <a href={link.href} className="flex items-center gap-2 py-3" target="_blank" rel="noreferrer">
-                    <ChevronRight className="h-4 w-4" />
-                    <span>{link.label}</span>
-                  </a>
-                ) : (
-                  <Link href={link.href} className="flex items-center gap-2 py-3">
-                    <ChevronRight className="h-4 w-4" />
-                    <span>{link.label}</span>
-                  </Link>
-                )}
-              </li>
-            ))}
+            {crew.header.menuLinks.map((link) => {
+              const isExternal = isExternalHref(link.href);
+              return (
+                <li key={`${link.href}-${link.label}`} className="border-b border-[var(--footer-border)]">
+                  {isExternal ? (
+                    <a href={link.href} className="flex items-center gap-2 py-3" target="_blank" rel="noreferrer">
+                      <ChevronRight className="h-4 w-4" />
+                      <span>{link.label}</span>
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleInternalLink(link.href)}
+                      className="flex w-full items-center gap-2 py-3 text-left hover:opacity-90 transition"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                      <span>{link.label}</span>
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
 
