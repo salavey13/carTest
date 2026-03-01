@@ -39,10 +39,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   }, [catalogLinks, defaultGroupLinks, mainCatalogPath, pathname]);
 
   useEffect(() => {
-    const onScroll = () => {
-      setIsCompact(window.scrollY > 36);
-    };
-
+    const onScroll = () => setIsCompact(window.scrollY > 36);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -137,12 +134,10 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
       className="sticky top-0 z-50 border-b px-4 pb-2 pt-[max(env(safe-area-inset-top),0.2rem)] backdrop-blur-2xl"
       style={{
         borderColor: crew.theme.palette.borderSoft,
-        backgroundColor: `${crew.theme.palette.bgCard}F0`, // ← direct blur + opacity, no absolute layers
+        backgroundColor: `${crew.theme.palette.bgCard}F0`,
         color: crew.theme.palette.textPrimary,
       }}
     >
-      {/* NO MORE pointer-events-none absolute backdrop divs — this was the killer */}
-
       <div className="mx-auto w-full max-w-4xl overflow-hidden">
         <div
           style={{
@@ -173,6 +168,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
             <Menu className="h-5 w-5" />
           </button>
 
+          {/* HEADER LOGO — PURE SPA LINK (fixed) */}
           <Link
             href={mainCatalogPath}
             className="relative z-10 mx-auto flex flex-col items-center text-center cursor-pointer hover:opacity-90 transition-opacity pointer-events-auto"

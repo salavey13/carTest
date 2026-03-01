@@ -1,9 +1,9 @@
 "use client";
 
 import { X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useAppContext } from "@/contexts/AppContext"; // ← NEW
 import type { FranchizeCrewVM } from "../actions";
 import { crewPaletteForSurface } from "../lib/theme";
 
@@ -16,19 +16,15 @@ interface HeaderMenuProps {
 
 export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuProps) {
   const [mounted, setMounted] = useState(false);
-  const { openLink } = useAppContext(); // ← SAFE NAV
   const surface = crewPaletteForSurface(crew.theme);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const handleNavigation = (href: string) => {
-    openLink(href);           // ← THIS IS THE FIX
-    onOpenChange(false);
-  };
-
-  if (!open || !mounted) return null;
+  if (!open || !mounted) {
+    return null;
+  }
 
   return createPortal(
     <div className="fixed inset-0 z-[70] flex items-start justify-center bg-black/75 p-4" onClick={() => onOpenChange(false)}>
@@ -60,10 +56,10 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
           {crew.header.menuLinks.map((link) => {
             const isActive = activePath === link.href;
             return (
-              <button
+              <Link
                 key={`${link.href}-${link.label}`}
-                type="button"
-                onClick={() => handleNavigation(link.href)}
+                href={link.href}
+                onClick={() => onOpenChange(false)}
                 className={`w-full text-left block rounded-xl border px-4 py-3 text-sm transition cursor-pointer ${
                   isActive
                     ? "border-[var(--header-menu-accent)] text-[var(--header-menu-accent)]"
@@ -71,7 +67,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
                 }`}
               >
                 {link.label}
-              </button>
+              </Link>
             );
           })}
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { ArrowUp, ShoppingCart } from "lucide-react";
-import { useAppContext } from "@/contexts/AppContext"; // ← NEW
 
 interface FloatingCartIconLinkProps {
   href: string;
@@ -14,11 +14,13 @@ interface FloatingCartIconLinkProps {
 }
 
 export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor, textColor, borderColor, backgroundColor }: FloatingCartIconLinkProps) {
-  const { openLink } = useAppContext(); // ← SAFE NAV
+  const router = useRouter();
   const isCartEmpty = itemCount === 0;
 
-  const handleNav = () => {
-    openLink(href); // ← THIS IS THE FIX
+  const handleNav = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(href); // ← pure SPA navigation
   };
 
   return (
@@ -49,9 +51,7 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
       >
         <ShoppingCart className="h-5 w-5" />
         <span className="text-sm font-bold">{isCartEmpty ? "0 ₽" : `${totalPrice.toLocaleString("ru-RU")} ₽`}</span>
-        <span
-          className="absolute -right-1.5 -top-1.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-[var(--floating-cart-border)] bg-white px-1.5 text-xs font-bold text-[#16130A] shadow-md"
-        >
+        <span className="absolute -right-1.5 -top-1.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-[var(--floating-cart-border)] bg-white px-1.5 text-xs font-bold text-[#16130A] shadow-md">
           {itemCount}
         </span>
       </button>
