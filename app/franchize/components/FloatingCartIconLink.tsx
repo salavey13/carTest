@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { ArrowUp, ShoppingCart } from "lucide-react";
+import { useAppContext } from "@/contexts/AppContext"; // ← NEW
 
 interface FloatingCartIconLinkProps {
   href: string;
@@ -14,13 +14,11 @@ interface FloatingCartIconLinkProps {
 }
 
 export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor, textColor, borderColor, backgroundColor }: FloatingCartIconLinkProps) {
-  const router = useRouter();
+  const { openLink } = useAppContext(); // ← SAFE NAV
   const isCartEmpty = itemCount === 0;
 
-  const handleNav = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    router.push(href);
+  const handleNav = () => {
+    openLink(href); // ← THIS IS THE FIX
   };
 
   return (
