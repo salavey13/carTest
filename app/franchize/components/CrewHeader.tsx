@@ -105,7 +105,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
 
   return (
     <header
-      className="sticky top-0 z-50 border-b px-4 pb-2 pt-[max(env(safe-area-inset-top),0.2rem)] backdrop-blur-2xl"
+      className="sticky top-0 z-50 border-b px-4 pb-2 pt-[max(env(safe-area-inset-top),0.2rem)]"
       style={{
         borderColor: crew.theme.palette.borderSoft,
         backgroundColor: `${crew.theme.palette.bgCard}F0`,
