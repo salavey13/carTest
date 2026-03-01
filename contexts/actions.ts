@@ -1,6 +1,7 @@
 "use server";
 
-import { supabaseAdmin, fetchUserData } from "@/lib/supabase-server";
+import { supabaseAdmin, fetchUserData } from "@/lib/supabase-server"; // SAFE IMPORT
+import { upsertTelegramUser } from "@/lib/telegram"; // NEW SAFE IMPORT
 import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
 import type { UserCrewInfo, ActiveLobbyInfo } from "./AppContext";
@@ -8,6 +9,7 @@ import type { UserCrewInfo, ActiveLobbyInfo } from "./AppContext";
 export async function fetchDbUserAction(userId: string): Promise<Database["public"]["Tables"]["users"]["Row"] | null> {
   if (!userId) return null;
   try {
+    // This calls fetchUserData from lib/supabase-server which uses the safe admin client
     return await fetchUserData(userId);
   } catch (error) {
     logger.error(`[fetchDbUserAction] Failed for user ${userId}:`, error);
@@ -25,28 +27,18 @@ export async function upsertTelegramUserAction(payload: {
   if (!payload.userId) return null;
 
   try {
-    const { data, error } = await supabaseAdmin
-      .from("users")
-      .upsert(
-        {
-          user_id: payload.userId,
-          username: payload.username || null,
-          full_name: payload.fullName || null,
-          avatar_url: payload.avatarUrl || null,
-          language_code: payload.languageCode || null,
-          updated_at: new Date().toISOString(),
-          role: "user",
-          status: "active",
-        },
-        { onConflict: "user_id" },
-      )
-      .select()
-      .single();
+    // Reconstruct the WebAppUser object structure required by the lib function
+    const webAppUserLike = {
+        id: parseInt(payload.userId),
+        username: payload.username || undefined,
+        first_name: payload.fullName || "", // Approximation since we merged names
+        last_name: "",
+        photo_url: payload.avatarUrl || undefined,
+        language_code: payload.languageCode || undefined
+    };
 
-    if (error) {
-      throw error;
-    }
-
+    // Use the logic in lib/telegram.ts which uses the safe supabaseAdmin
+    const data = await upsertTelegramUser(webAppUserLike);
     return data;
   } catch (error) {
     logger.error(`[upsertTelegramUserAction] Failed for user ${payload.userId}:`, error);
@@ -57,6 +49,9 @@ export async function upsertTelegramUserAction(payload: {
 export async function refreshDbUserAction(userId: string): Promise<Database["public"]["Tables"]["users"]["Row"] | null> {
   return await fetchDbUserAction(userId);
 }
+
+// ... (fetchUserCrewInfoAction and fetchActiveGameAction remain the same, 
+// they use supabaseAdmin imported from @/lib/supabase-server at the top, which is correct) ...
 
 export async function fetchUserCrewInfoAction(userId: string): Promise<UserCrewInfo | null> {
   if (!userId) return null;
@@ -80,13 +75,11 @@ export async function fetchUserCrewInfoAction(userId: string): Promise<UserCrewI
       .maybeSingle();
       
     if (memberData && memberData.crews) {
-      // Handle array vs object return type from join
       const crewData = Array.isArray(memberData.crews) ? memberData.crews[0] : memberData.crews;
       if (crewData) {
           return { ...crewData, is_owner: false };
       }
     }
-
     return null;
   } catch (error) {
     logger.error(`[fetchUserCrewInfoAction] Failed for user ${userId}:`, error);
@@ -96,7 +89,6 @@ export async function fetchUserCrewInfoAction(userId: string): Promise<UserCrewI
 
 export async function fetchActiveGameAction(userId: string): Promise<ActiveLobbyInfo | null> {
   if (!userId) return null;
-
   try {
     const { data, error } = await supabaseAdmin
         .from('lobby_members')
@@ -120,14 +112,12 @@ export async function fetchActiveGameAction(userId: string): Promise<ActiveLobby
             status: lobby.status
         };
     }
-    
     return null;
   } catch (error) {
     return null;
   }
 }
 
-// --- LOGIC FIX HERE: Manually merge metadata before update ---
 export async function saveUserFranchizeCartAction(
   userId: string,
   slug: string,
@@ -166,21 +156,15 @@ export async function saveUserFranchizeCartAction(
       },
     };
 
-    // 3. Write back the full metadata object
+    // 3. Write back
     const { error: updateError, count } = await supabaseAdmin
       .from("users")
       .update({ metadata: nextMetadata, updated_at: new Date().toISOString() })
       .eq("user_id", userId)
       .select('user_id', { count: 'exact' });
 
-    if (updateError) {
-      throw updateError;
-    }
-    
-    if (count === 0) {
-        logger.warn(`[saveUserFranchizeCartAction] Update touched 0 rows for ${userId}. User might be deleted.`);
-        return { ok: false, error: "User not found during update" };
-    }
+    if (updateError) throw updateError;
+    if (count === 0) return { ok: false, error: "User not found during update" };
 
     return { ok: true };
   } catch (error) {
