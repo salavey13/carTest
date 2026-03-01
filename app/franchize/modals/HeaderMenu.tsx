@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FranchizeCrewVM } from "../actions";
@@ -16,21 +16,11 @@ interface HeaderMenuProps {
 
 export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuProps) {
   const [mounted, setMounted] = useState(false);
-  const router = useRouter();
   const surface = crewPaletteForSurface(crew.theme);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  const handleNavigation = (href: string) => {
-    // 1. Initiate navigation
-    router.push(href);
-    // 2. Delay closing to ensure navigation event isn't cancelled by unmount
-    setTimeout(() => {
-      onOpenChange(false);
-    }, 150);
-  };
 
   if (!open || !mounted) {
     return null;
@@ -66,10 +56,10 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
           {crew.header.menuLinks.map((link) => {
             const isActive = activePath === link.href;
             return (
-              <button
+              <Link
                 key={`${link.href}-${link.label}`}
-                type="button"
-                onClick={() => handleNavigation(link.href)}
+                href={link.href}
+                onClick={() => onOpenChange(false)}
                 className={`w-full text-left block rounded-xl border px-4 py-3 text-sm transition cursor-pointer ${
                   isActive
                     ? "border-[var(--header-menu-accent)] text-[var(--header-menu-accent)]"
@@ -77,7 +67,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
                 }`}
               >
                 {link.label}
-              </button>
+              </Link>
             );
           })}
         </div>
