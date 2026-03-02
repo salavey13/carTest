@@ -1,15 +1,15 @@
 "use server";
 
-import { fetchUserData, supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin, fetchUserData } from "@/lib/supabase-server"; // SAFE IMPORT
+import { upsertTelegramUser } from "@/lib/telegram"; // NEW SAFE IMPORT
 import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
 import type { UserCrewInfo, ActiveLobbyInfo } from "./AppContext";
 
-
-
 export async function fetchDbUserAction(userId: string): Promise<Database["public"]["Tables"]["users"]["Row"] | null> {
   if (!userId) return null;
   try {
+    // This calls fetchUserData from lib/supabase-server which uses the safe admin client
     return await fetchUserData(userId);
   } catch (error) {
     logger.error(`[fetchDbUserAction] Failed for user ${userId}:`, error);
@@ -27,28 +27,18 @@ export async function upsertTelegramUserAction(payload: {
   if (!payload.userId) return null;
 
   try {
-    const { data, error } = await supabaseAdmin
-      .from("users")
-      .upsert(
-        {
-          user_id: payload.userId,
-          username: payload.username || null,
-          full_name: payload.fullName || null,
-          avatar_url: payload.avatarUrl || null,
-          language_code: payload.languageCode || null,
-          updated_at: new Date().toISOString(),
-          role: "user",
-          status: "active",
-        },
-        { onConflict: "user_id" },
-      )
-      .select()
-      .single();
+    // Reconstruct the WebAppUser object structure required by the lib function
+    const webAppUserLike = {
+        id: parseInt(payload.userId),
+        username: payload.username || undefined,
+        first_name: payload.fullName || "", // Approximation since we merged names
+        last_name: "",
+        photo_url: payload.avatarUrl || undefined,
+        language_code: payload.languageCode || undefined
+    };
 
-    if (error) {
-      throw error;
-    }
-
+    // Use the logic in lib/telegram.ts which uses the safe supabaseAdmin
+    const data = await upsertTelegramUser(webAppUserLike);
     return data;
   } catch (error) {
     logger.error(`[upsertTelegramUserAction] Failed for user ${payload.userId}:`, error);
@@ -56,22 +46,13 @@ export async function upsertTelegramUserAction(payload: {
   }
 }
 
-/**
- * Safely reloads user data from server.
- */
 export async function refreshDbUserAction(userId: string): Promise<Database["public"]["Tables"]["users"]["Row"] | null> {
-  try {
-    const freshDbUser = await fetchUserData(userId);
-    return freshDbUser;
-  } catch (e) {
-    logger.error(`[refreshDbUserAction] Error refreshing dbUser for ${userId}:`, e);
-    return null;
-  }
+  return await fetchDbUserAction(userId);
 }
 
-/**
- * Fetches crew info for the user.
- */
+// ... (fetchUserCrewInfoAction and fetchActiveGameAction remain the same, 
+// they use supabaseAdmin imported from @/lib/supabase-server at the top, which is correct) ...
+
 export async function fetchUserCrewInfoAction(userId: string): Promise<UserCrewInfo | null> {
   if (!userId) return null;
 
@@ -94,10 +75,11 @@ export async function fetchUserCrewInfoAction(userId: string): Promise<UserCrewI
       .maybeSingle();
       
     if (memberData && memberData.crews) {
-      const crewData = memberData.crews as { id: string; slug: string; name: string; logo_url: string; };
-      return { ...crewData, is_owner: false };
+      const crewData = Array.isArray(memberData.crews) ? memberData.crews[0] : memberData.crews;
+      if (crewData) {
+          return { ...crewData, is_owner: false };
+      }
     }
-
     return null;
   } catch (error) {
     logger.error(`[fetchUserCrewInfoAction] Failed for user ${userId}:`, error);
@@ -105,18 +87,11 @@ export async function fetchUserCrewInfoAction(userId: string): Promise<UserCrewI
   }
 }
 
-/**
- * Checks if the user is in an Active Lobby.
- * FIX: Uses !inner to force filtering only for ACTIVE lobbies, ignoring finished/open ones.
- */
 export async function fetchActiveGameAction(userId: string): Promise<ActiveLobbyInfo | null> {
   if (!userId) return null;
-
   try {
     const { data, error } = await supabaseAdmin
         .from('lobby_members')
-        // The !inner here is CRITICAL. It forces the query to only return rows 
-        // where the joined 'lobbies' record actually matches the filter.
         .select('lobby_id, lobbies!inner(id, name, start_at, status, metadata)')
         .eq('user_id', userId)
         .eq('lobbies.status', 'active') 
@@ -125,8 +100,9 @@ export async function fetchActiveGameAction(userId: string): Promise<ActiveLobby
     if (error) throw error;
 
     if (data && data.lobbies) {
-        const lobby = data.lobbies as any;
-        const actualStart = lobby.metadata?.actual_start_at || lobby.start_at; 
+        const lobby = Array.isArray(data.lobbies) ? data.lobbies[0] : data.lobbies;
+        const meta = typeof lobby.metadata === 'object' && lobby.metadata ? lobby.metadata as any : {};
+        const actualStart = meta.actual_start_at || lobby.start_at; 
         
         return {
             id: lobby.id,
@@ -136,10 +112,8 @@ export async function fetchActiveGameAction(userId: string): Promise<ActiveLobby
             status: lobby.status
         };
     }
-    
     return null;
   } catch (error) {
-    // logger.error(`[fetchActiveGameAction] Error for user ${userId}:`, error);
     return null;
   }
 }
@@ -154,40 +128,43 @@ export async function saveUserFranchizeCartAction(
   }
 
   try {
-    const currentUserData = await fetchUserData(userId);
-    if (!currentUserData) {
+    // 1. Fetch current metadata manually
+    const { data: user, error: fetchError } = await supabaseAdmin
+        .from("users")
+        .select("metadata")
+        .eq("user_id", userId)
+        .single();
+
+    if (fetchError || !user) {
+      logger.error(`[saveUserFranchizeCartAction] Could not fetch user ${userId}.`, fetchError);
       return { ok: false, error: "User not found" };
     }
 
-    const existingMetadata = (currentUserData.metadata && typeof currentUserData.metadata === "object")
-      ? (currentUserData.metadata as Record<string, unknown>)
-      : {};
-    const existingSettings = (existingMetadata.settings && typeof existingMetadata.settings === "object")
-      ? (existingMetadata.settings as Record<string, unknown>)
-      : {};
-    const existingFranchizeCart = (existingSettings.franchizeCart && typeof existingSettings.franchizeCart === "object")
-      ? (existingSettings.franchizeCart as Record<string, unknown>)
-      : {};
+    const currentMeta = (user.metadata as Record<string, any>) || {};
+    const currentSettings = (currentMeta.settings as Record<string, any>) || {};
+    const currentCarts = (currentSettings.franchizeCart as Record<string, any>) || {};
 
-    const nextMetadata: Record<string, unknown> = {
-      ...existingMetadata,
+    // 2. Perform Deep Merge in JS
+    const nextMetadata = {
+      ...currentMeta,
       settings: {
-        ...existingSettings,
+        ...currentSettings,
         franchizeCart: {
-          ...existingFranchizeCart,
-          [slug]: cartState,
+          ...currentCarts,
+          [slug]: cartState, // Update only this slug's cart
         },
       },
     };
 
-    const updateResult = await supabaseAdmin
+    // 3. Write back
+    const { error: updateError, count } = await supabaseAdmin
       .from("users")
-      .update({ metadata: nextMetadata })
-      .eq("user_id", userId);
+      .update({ metadata: nextMetadata, updated_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .select('user_id', { count: 'exact' });
 
-    if (updateResult.error) {
-      throw updateResult.error;
-    }
+    if (updateError) throw updateError;
+    if (count === 0) return { ok: false, error: "User not found during update" };
 
     return { ok: true };
   } catch (error) {

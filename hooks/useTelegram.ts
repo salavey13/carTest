@@ -3,9 +3,30 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { debugLogger } from "@/lib/debugLogger"; 
 import { logger as globalLogger } from "@/lib/logger"; 
-import { fetchDbUserAction, upsertTelegramUserAction } from "@/contexts/actions";
+/*import { createOrUpdateUser as upsertTelegramUserAction, fetchUserData as fetchDbUserAction } from "@/contexts/actions";*/
+import { 
+  fetchDbUserAction,           // Server Action
+  upsertTelegramUserAction     // Server Action
+} from "@/contexts/actions";
+
 import type { TelegramWebApp, WebAppUser, WebAppInitData } from "@/types/telegram";
 import type { Database } from "@/types/database.types";
+
+const DEFAULT_THEME_PARAMS = {
+  bg_color: '#000000',
+  text_color: '#ffffff',
+  hint_color: '#888888',
+  link_color: '#007aff',
+  button_color: '#007aff',
+  button_text_color: '#ffffff',
+  secondary_bg_color: '#1c1c1d',
+  header_bg_color: '#000000',
+  accent_text_color: '#007aff',
+  section_bg_color: '#1c1c1d',
+  section_header_text_color: '#8e8e93',
+  subtitle_text_color: '#8e8e93',
+  destructive_text_color: '#ff3b30'
+};
 
 type DatabaseUser = Database["public"]["Tables"]["users"]["Row"] | null;
 interface AuthResult {
@@ -399,7 +420,7 @@ export function useTelegram() {
         setHeaderColor: (color: string) => safeWebAppCall('setHeaderColor', color),
         setBackgroundColor: (color: string) => safeWebAppCall('setBackgroundColor', color),
         platform: tgWebApp?.platform ?? 'unknown',
-        themeParams: tgWebApp?.themeParams ?? { bg_color: '#000000', text_color: '#ffffff', hint_color: '#888888', link_color: '#007aff', button_color: '#007aff', button_text_color: '#ffffff', secondary_bg_color: '#1c1c1d', header_bg_color: '#000000', accent_text_color: '#007aff', section_bg_color: '#1c1c1d', section_header_text_color: '#8e8e93', subtitle_text_color: '#8e8e93', destructive_text_color: '#ff3b30' },
+        themeParams: tgWebApp?.themeParams ?? DEFAULT_THEME_PARAMS,
         initData: tgWebApp?.initData, 
         initDataUnsafe: tgWebApp?.initDataUnsafe,
         colorScheme: tgWebApp?.colorScheme ?? 'dark',

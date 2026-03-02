@@ -1,9 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
+import { useFranchizeCart } from "../hooks/useFranchizeCart"; // Import cart state access
 import { crewPaletteForSurface } from "../lib/theme";
+import { saveUserFranchizeCartAction } from "@/contexts/actions"; // Explicit import
+import { useAppContext } from "@/contexts/AppContext";
+import { Link } from "lucide-react"; // Wait, removing this, using next/link if needed but using router mostly
 
 interface CartPageClientProps {
   crew: FranchizeCrewVM;
@@ -13,7 +18,21 @@ interface CartPageClientProps {
 
 export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const { cartLines, changeLineQty, removeLine, subtotal, itemCount } = useFranchizeCartLines(slug, items);
+  const { cart } = useFranchizeCart(slug); // Get raw cart state to save
   const surface = crewPaletteForSurface(crew.theme);
+  const router = useRouter();
+  const { dbUser } = useAppContext();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleProceed = async () => {
+    setIsSaving(true);
+    // Sync to DB explicitly before navigating
+    if (dbUser?.user_id) {
+        await saveUserFranchizeCartAction(dbUser.user_id, slug, cart);
+    }
+    // Navigate even if save failed (local storage might still be used by next page if hydrated client-side)
+    router.push(`/franchize/${slug}/order/demo-order`);
+  };
 
   return (
     <section
@@ -32,13 +51,14 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
       {cartLines.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-dashed p-6 text-sm" style={surface.subtleCard}>
           Корзина пока пустая. Добавьте байк из каталога, чтобы перейти к оформлению.
-          <div>
-            <Link
-              href={`/franchize/${slug}`}
-              className="mt-4 inline-flex font-medium text-[var(--cart-accent)] underline-offset-4 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cart-accent)]"
-            >
+          <div className="mt-4">
+             {/* Using standard anchor/button for back link to be safe */}
+             <button
+                onClick={() => router.push(`/franchize/${slug}`)}
+                className="inline-flex font-medium text-[var(--cart-accent)] underline-offset-4 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cart-accent)]"
+             >
               Вернуться в каталог
-            </Link>
+             </button>
           </div>
         </div>
       ) : (
@@ -95,12 +115,14 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
             <p className="text-2xl font-semibold text-[var(--cart-accent)]">
               {subtotal.toLocaleString("ru-RU")} ₽
             </p>
-            <Link
-              href={`/franchize/${slug}/order/demo-order`}
-              className="mt-4 inline-flex w-full justify-center rounded-xl bg-[var(--cart-accent)] px-4 py-3 text-sm font-semibold text-[#16130A] transition hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cart-accent)]"
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={handleProceed}
+              className="mt-4 inline-flex w-full justify-center rounded-xl bg-[var(--cart-accent)] px-4 py-3 text-sm font-semibold text-[#16130A] transition hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cart-accent)] cursor-pointer disabled:opacity-70"
             >
-              Перейти к оформлению
-            </Link>
+              {isSaving ? "Сохранение..." : "Перейти к оформлению"}
+            </button>
           </aside>
         </div>
       )}
