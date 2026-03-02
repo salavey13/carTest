@@ -11,7 +11,6 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as Rech
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Image from "next/image";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
-"use client";
 
 import { fetchUserCyberFitnessProfile } from "@/lib/cyberFitnessServer";
 import type { CyberFitnessProfile } from "@/types/cyberFitness";
