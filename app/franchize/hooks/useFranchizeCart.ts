@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-// Note: We deliberately do NOT import the save action here anymore. 
-// Saving happens only on specific user interactions (Checkout).
 
 export type FranchizeCartOptions = {
   package: string;
@@ -78,24 +76,25 @@ export function useFranchizeCart(slug: string) {
     const rawLocal = window.localStorage.getItem(storageKey);
     let initialState: FranchizeCartState = {};
 
-    // Priority 1: Local Storage
     if (rawLocal) {
       try {
         initialState = sanitizeCartState(JSON.parse(rawLocal));
       } catch {
         initialState = {};
       }
-    } 
-    // Priority 2: DB Metadata (Read-only restore)
-    else if (dbUser?.metadata) {
+    } else if (dbUser?.metadata) {
+      // Fallback to DB metadata if local is empty (Read-Only)
       const meta = dbUser.metadata as Record<string, any>;
       const settings = meta.settings as Record<string, any> | undefined;
       const remoteCart = settings?.franchizeCart?.[slug];
       
       if (remoteCart) {
         initialState = sanitizeCartState(remoteCart);
-        // Sync retrieved DB state to local storage immediately so it sticks
-        window.localStorage.setItem(storageKey, JSON.stringify(initialState));
+        // Sync retrieved DB state to local storage immediately
+        const serialized = JSON.stringify(initialState);
+        if (window.localStorage.getItem(storageKey) !== serialized) {
+            window.localStorage.setItem(storageKey, serialized);
+        }
       }
     }
 
@@ -103,39 +102,50 @@ export function useFranchizeCart(slug: string) {
     setIsHydrated(true);
   }, [slug, storageKey, dbUser?.metadata]); 
 
-  // 2. Persistence Logic (Local Only - No Server Actions Here)
+  // 2. Persistence Logic (Loop Safe)
   useEffect(() => {
     if (!isHydrated || typeof window === "undefined") return;
     
-    // Synchronous local save - zero network latency
-    window.localStorage.setItem(storageKey, JSON.stringify(cart));
-    window.dispatchEvent(new CustomEvent(CART_SYNC_EVENT, { detail: { storageKey } }));
+    const newState = JSON.stringify(cart);
+    const currentState = window.localStorage.getItem(storageKey);
+
+    // CRITICAL FIX: Only write/dispatch if value actually changed.
+    // This stops the infinite Ping-Pong loop between tabs/components.
+    if (currentState !== newState) {
+        window.localStorage.setItem(storageKey, newState);
+        window.dispatchEvent(new CustomEvent(CART_SYNC_EVENT, { detail: { storageKey } }));
+    }
   }, [cart, storageKey, isHydrated]);
 
-  // 3. Tab Sync
+  // 3. Sync Listener
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== storageKey) return;
-      hydrate();
-    };
+    const handleSync = (e: Event | StorageEvent) => {
+        const detail = (e as CustomEvent).detail;
+        
+        // Filter out irrelevant events
+        if (e.type === CART_SYNC_EVENT && detail?.storageKey !== storageKey) return;
+        if (e.type === 'storage' && (e as StorageEvent).key !== storageKey) return;
 
-    const onCartSync = (event: Event) => {
-      const detail = (event as CustomEvent).detail;
-      if (detail?.storageKey === storageKey) hydrate();
-    };
-
-    const hydrate = () => {
         const raw = window.localStorage.getItem(storageKey);
-        if (raw) setCart(sanitizeCartState(JSON.parse(raw)));
+        if (!raw) return;
+
+        const newState = sanitizeCartState(JSON.parse(raw));
+        
+        // Loop Breaker: Don't trigger re-render if state is semantically identical
+        setCart(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(newState)) return prev;
+            return newState;
+        });
     };
 
-    window.addEventListener("storage", onStorage);
-    window.addEventListener(CART_SYNC_EVENT, onCartSync as EventListener);
+    window.addEventListener("storage", handleSync);
+    window.addEventListener(CART_SYNC_EVENT, handleSync);
+    
     return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener(CART_SYNC_EVENT, onCartSync as EventListener);
+      window.removeEventListener("storage", handleSync);
+      window.removeEventListener(CART_SYNC_EVENT, handleSync);
     };
   }, [storageKey]);
 
