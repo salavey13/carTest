@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { ChevronRight, MapPin, Phone, Send } from "lucide-react";
 import type { FranchizeCrewVM } from "../actions";
@@ -11,6 +13,7 @@ export function CrewFooter({ crew }: CrewFooterProps) {
   const bg = crew.theme.palette.accentMain;
   const text = crew.footer.textColor || "#16130A";
   const border = "#b78609";
+
   const socialLinks = crew.footer.socialLinks.length > 0
     ? crew.footer.socialLinks
     : crew.contacts.telegram
@@ -46,21 +49,24 @@ export function CrewFooter({ crew }: CrewFooterProps) {
         <section>
           <h3 className="text-3xl font-semibold leading-none text-[var(--footer-text)]">Меню</h3>
           <ul className="mt-5 space-y-1 text-base">
-            {crew.header.menuLinks.map((link) => (
-              <li key={`${link.href}-${link.label}`} className="border-b border-[var(--footer-border)]">
-                {isExternalHref(link.href) ? (
-                  <a href={link.href} className="flex items-center gap-2 py-3" target="_blank" rel="noreferrer">
-                    <ChevronRight className="h-4 w-4" />
-                    <span>{link.label}</span>
-                  </a>
-                ) : (
-                  <Link href={link.href} className="flex items-center gap-2 py-3">
-                    <ChevronRight className="h-4 w-4" />
-                    <span>{link.label}</span>
-                  </Link>
-                )}
-              </li>
-            ))}
+            {crew.header.menuLinks.map((link) => {
+              const isExternal = isExternalHref(link.href);
+              return (
+                <li key={`${link.href}-${link.label}`} className="border-b border-[var(--footer-border)]">
+                  {isExternal ? (
+                    <a href={link.href} className="flex items-center gap-2 py-3" target="_blank" rel="noreferrer">
+                      <ChevronRight className="h-4 w-4" />
+                      <span>{link.label}</span>
+                    </a>
+                  ) : (
+                    <Link href={link.href} className="flex items-center gap-2 py-3 hover:opacity-90 transition">
+                      <ChevronRight className="h-4 w-4" />
+                      <span>{link.label}</span>
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
 

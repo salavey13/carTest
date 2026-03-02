@@ -18,14 +18,11 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
   const [mounted, setMounted] = useState(false);
   const surface = crewPaletteForSurface(crew.theme);
 
-
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!open || !mounted) {
-    return null;
-  }
+  if (!open || !mounted) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[70] flex items-start justify-center bg-black/75 p-4" onClick={() => onOpenChange(false)}>
@@ -37,7 +34,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
           ["--header-menu-text" as string]: crew.theme.palette.textPrimary,
           ["--header-menu-accent" as string]: crew.theme.palette.accentMain,
         }}
-        onClick={(event) => event.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm font-semibold uppercase tracking-[0.16em]">Menu</p>
@@ -61,7 +58,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
                 key={`${link.href}-${link.label}`}
                 href={link.href}
                 onClick={() => onOpenChange(false)}
-                className={`block rounded-xl border px-4 py-3 text-sm transition ${
+                className={`w-full text-left block rounded-xl border px-4 py-3 text-sm transition cursor-pointer ${
                   isActive
                     ? "border-[var(--header-menu-accent)] text-[var(--header-menu-accent)]"
                     : "border-[var(--header-menu-border)] text-[var(--header-menu-text)]"

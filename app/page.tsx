@@ -12,7 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import Image from "next/image";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import {
-  fetchUserCyberFitnessProfile,
+  fetchUserCyberFitnessProfile, 
+} from "@/lib/cyberFitnessSupabase-server";
+import {
   CyberFitnessProfile,
   DailyActivityRecord, 
 } from "@/hooks/cyberFitnessSupabase";

@@ -1,6 +1,6 @@
-// /lib/telegram.ts
 import { logger } from "@/lib/logger"
 import type { WebAppUser } from "@/types/telegram"
+import { supabaseAdmin } from "@/lib/supabase-server" // Safe Server Import
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL
@@ -9,9 +9,7 @@ if (!TELEGRAM_BOT_TOKEN) {
   logger.warn("Missing TELEGRAM_BOT_TOKEN. Telegram features may not work.")
 }
 
-if (!APP_URL) {
-  logger.warn("Missing APP_URL. Webhook features may not work.")
-}
+// ... (Existing exports like setTelegramWebhook, validateTelegramWebAppData, sendTelegramMessage remain unchanged) ...
 
 export async function setTelegramWebhook() {
   if (!TELEGRAM_BOT_TOKEN || !APP_URL) {
@@ -43,19 +41,15 @@ export async function validateTelegramWebAppData(initData: string): Promise<bool
     const hash = data.get("hash")
     if (!hash) return false
 
-    // Remove hash from data before checking
     data.delete("hash")
 
-    // Sort parameters alphabetically
     const dataToCheck = Array.from(data.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, value]) => `${key}=${value}`)
       .join("\n")
 
-    // Create HMAC-SHA256 hash
     const crypto = require("crypto")
     const secretKey = crypto.createHash("sha256").update(TELEGRAM_BOT_TOKEN!).digest()
-
     const generatedHash = crypto.createHmac("sha256", secretKey).update(dataToCheck).digest("hex")
 
     return generatedHash === hash
@@ -89,12 +83,36 @@ export async function sendTelegramMessage(chatId: string, text: string) {
   return response.json()
 }
 
-export function getTelegramUser(): WebAppUser | null {
-  if (typeof window === "undefined") return null
+// --- NEW: Server-Side Upsert Logic ---
+export async function upsertTelegramUser(user: WebAppUser) {
+  if (!user.id) throw new Error("User ID is missing");
+  
+  const userIdStr = user.id.toString();
+  
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("users")
+      .upsert(
+        {
+          user_id: userIdStr,
+          username: user.username || null,
+          full_name: `${user.first_name || ""} ${user.last_name || ""}`.trim() || null,
+          avatar_url: user.photo_url || null,
+          language_code: user.language_code || null,
+          updated_at: new Date().toISOString(),
+          // Default fields for new users
+          role: "user",
+          status: "active",
+        },
+        { onConflict: "user_id" }
+      )
+      .select()
+      .single();
 
-  const telegram = (window as any).Telegram?.WebApp
-  if (!telegram?.initDataUnsafe?.user) return null
-
-  return telegram.initDataUnsafe.user
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    logger.error(`[lib/telegram] Failed to upsert user ${userIdStr}:`, error);
+    throw error; // Re-throw to be caught by Server Action
+  }
 }
-
