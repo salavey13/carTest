@@ -16,24 +16,17 @@ import {
 } from '@/types/cyberFitness';
 import { getCyberFitnessProfile, getDefaultCyberFitnessProfile } from './cyberFitnessShared';
 
+// Import the actual database function from supabase-server
+import { fetchUserData, updateUserMetadata, supabaseAdmin } from '@/lib/supabase-server';
+import type { Database } from '@/types/database.types';
+
+type DbUser = Database["public"]["Tables"]["users"]["Row"];
+
 // Simple console logger for server-side
 const logger = {
   info: (...args: any[]) => console.log('[CyberFitness]', ...args),
   warn: (...args: any[]) => console.warn('[CyberFitness]', ...args),
   error: (...args: any[]) => console.error('[CyberFitness]', ...args),
-};
-
-// Type for database user (adjust based on your actual DB types)
-type DbUser = {
-  user_id: string;
-  metadata?: Record<string, any> | null;
-};
-
-// Mock/placeholder for supabaseAdmin - replace with your actual implementation
-// This would typically import from your supabase-server.ts file
-const getSupabaseAdmin = () => {
-  // Return your supabase admin client here
-  throw new Error("Supabase admin client not configured - implement in your project");
 };
 
 /**
@@ -55,10 +48,8 @@ export const fetchUserCyberFitnessProfile = async (
   }
 
   try {
-    // Replace this with your actual database fetch
-    // const userData = await fetchUserData(userId);
-    // For now, return default profile
-    const userData: DbUser | null = null;
+    // ACTUAL database fetch using the imported function
+    const userData = await fetchUserData(userId);
 
     if (!userData) {
       logger.warn(`[FetchProfile] User ${userId} not found. Returning default profile.`);
@@ -100,16 +91,67 @@ export const updateUserCyberFitnessProfile = async (
   }
 
   try {
-    // Replace with your actual implementation
     // 1. Fetch current user data
-    // 2. Get existing profile via getCyberFitnessProfile()
-    // 3. Merge updates
-    // 4. Calculate level changes, achievements, etc.
-    // 5. Save to database
+    const userData = await fetchUserData(userId);
+    if (!userData) {
+      return { success: false, error: `User ${userId} not found.` };
+    }
 
-    // Placeholder implementation
-    logger.info(`[UpdateProfile] Profile update for ${userId} would be processed here.`);
-    return { success: true, newAchievements: [] };
+    // 2. Get existing profile
+    const existingProfile = getCyberFitnessProfile(userId, userData.metadata);
+
+    // 3. Merge updates (deep merge for nested objects)
+    const updatedProfile: CyberFitnessProfile = {
+      ...existingProfile,
+      ...updates,
+      featuresUsed: {
+        ...existingProfile.featuresUsed,
+        ...(updates.featuresUsed || {}),
+      },
+      dailyActivityLog: updates.dailyActivityLog || existingProfile.dailyActivityLog,
+      achievements: updates.achievements || existingProfile.achievements,
+      activeQuests: updates.activeQuests || existingProfile.activeQuests,
+      completedQuests: updates.completedQuests || existingProfile.completedQuests,
+      unlockedPerks: updates.unlockedPerks || existingProfile.unlockedPerks,
+    };
+
+    // Handle kiloVibes as delta (additive)
+    if (typeof updates.kiloVibes === 'number') {
+      updatedProfile.kiloVibes = existingProfile.kiloVibes + updates.kiloVibes;
+    }
+
+    // 4. Calculate level changes
+    const previousLevel = existingProfile.level;
+    let newLevel = previousLevel;
+    
+    for (let i = LEVEL_THRESHOLDS_KV.length - 1; i >= 0; i--) {
+      if (updatedProfile.kiloVibes >= LEVEL_THRESHOLDS_KV[i]) {
+        newLevel = i;
+        break;
+      }
+    }
+    updatedProfile.level = newLevel;
+    
+    if (newLevel > previousLevel) {
+      updatedProfile.cognitiveOSVersion = COGNITIVE_OS_VERSIONS[newLevel] || `v${newLevel}.0`;
+    }
+
+    // 5. Save to database via metadata
+    const currentMetadata = (userData.metadata as Record<string, any>) || {};
+    const newMetadata = {
+      ...currentMetadata,
+      [CYBERFIT_METADATA_KEY]: updatedProfile,
+    };
+
+    const result = await updateUserMetadata(userId, newMetadata);
+
+    if (!result.success) {
+      logger.error(`[UpdateProfile] Failed to update metadata for ${userId}: ${result.error}`);
+      return { success: false, error: result.error || "Failed to update profile." };
+    }
+
+    logger.info(`[UpdateProfile] Profile updated for ${userId}. Level: ${updatedProfile.level}, KV: ${updatedProfile.kiloVibes}`);
+    return { success: true, data: result.data, newAchievements: [] };
 
   } catch (e: any) {
     logger.error(`[UpdateProfile] Exception for ${userId}:`, e);
@@ -133,27 +175,44 @@ export const logCyberFitnessAction = async (
 
   // Calculate KiloVibes delta based on action type
   let kiloVibesDelta = 0;
+  const updates: Partial<CyberFitnessProfile> = {};
 
   if (actionType === 'filesExtracted' && typeof countOrDetails === 'number') {
     kiloVibesDelta = countOrDetails * 0.1;
+    updates.totalFilesExtracted = countOrDetails;
   } else if (actionType === 'tokensProcessed' && typeof countOrDetails === 'number') {
     kiloVibesDelta = countOrDetails * 0.001;
+    updates.totalTokensProcessed = countOrDetails;
   } else if (actionType === 'kworkRequestSent' && typeof countOrDetails === 'number') {
     kiloVibesDelta = countOrDetails * 5;
+    updates.totalKworkRequestsSent = countOrDetails;
   } else if (actionType === 'prCreated' && typeof countOrDetails === 'number') {
     kiloVibesDelta = countOrDetails * 50;
+    updates.totalPrsCreated = countOrDetails;
   } else if (actionType === 'branchUpdated' && typeof countOrDetails === 'number') {
     kiloVibesDelta = countOrDetails * 20;
+    updates.totalBranchesUpdated = countOrDetails;
   } else if (actionType === 'featureUsed' && typeof countOrDetails === 'object' && 'featureName' in countOrDetails) {
     kiloVibesDelta = 5;
+    updates.featuresUsed = {
+      [countOrDetails.featureName]: countOrDetails.featureValue ?? true,
+    };
   } else if (actionType === 'focusTimeAdded' && typeof countOrDetails === 'object' && 'minutes' in countOrDetails) {
     kiloVibesDelta = countOrDetails.minutes * 0.5;
+    updates.focusTimeHours = countOrDetails.minutes / 60;
   }
+
+  updates.kiloVibes = kiloVibesDelta;
+  updates.lastActivityTimestamp = new Date().toISOString();
 
   logger.info(`[LogAction] Action '${actionType}' for ${userId}. KV Delta: ${kiloVibesDelta}`);
 
-  // Replace with actual implementation
-  return { success: true };
+  const result = await updateUserCyberFitnessProfile(userId, updates);
+  return { 
+    success: result.success, 
+    error: result.error,
+    newAchievements: result.newAchievements 
+  };
 };
 
 /**
@@ -190,10 +249,27 @@ export async function spendKiloVibes(
     return { success: false, error: "Invalid user ID or amount." };
   }
 
-  // Replace with actual database transaction
-  // This would use a database function to atomically deduct KV
+  const profileResult = await fetchUserCyberFitnessProfile(userId);
+  if (!profileResult.success || !profileResult.data) {
+    return { success: false, error: "Failed to fetch profile." };
+  }
 
-  return { success: true, newBalance: 0 };
+  const currentKV = profileResult.data.kiloVibes;
+  if (currentKV < amount) {
+    return { success: false, error: "Insufficient KiloVibes balance." };
+  }
+
+  // Deduct KV (negative delta)
+  const result = await updateUserCyberFitnessProfile(userId, { 
+    kiloVibes: -amount 
+  });
+
+  if (!result.success) {
+    return { success: false, error: result.error || "Failed to deduct KiloVibes." };
+  }
+
+  const newBalance = currentKV - amount;
+  return { success: true, newBalance };
 }
 
 /**
@@ -226,7 +302,7 @@ export const markTutorialAsCompleted = async (
 
   const updateResult = await updateUserCyberFitnessProfile(userId, {
     kiloVibes: actualKiloVibesAward,
-    completedQuests: [tutorialQuestId],
+    completedQuests: [...currentProfile.completedQuests, tutorialQuestId],
   });
 
   if (!updateResult.success) {
