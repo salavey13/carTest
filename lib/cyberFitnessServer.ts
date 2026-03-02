@@ -255,3 +255,26 @@ export const setCognitiveOSVersion = async (
   const result = await updateUserCyberFitnessProfile(userId, { cognitiveOSVersion: version });
   return { success: result.success, error: result.error };
 };
+
+/**
+ * Checks and unlocks a feature-based achievement
+ * Server action - can be called from client components
+ */
+export const checkAndUnlockFeatureAchievement = async (
+  userId: string,
+  featureName: string,
+  featureValue: string | number | boolean = true
+): Promise<{ success: boolean; newAchievements?: Achievement[]; error?: string }> => {
+  if (!userId || !featureName) {
+    logger.warn("[CheckFeatureAchievement] User ID and feature name required.");
+    return { success: false, error: "User ID and feature name required." };
+  }
+
+  const details: { featureName: string; featureValue?: string | number | boolean } = {
+    featureName: String(featureName),
+    featureValue: featureValue
+  };
+
+  const result = await logCyberFitnessAction(userId, 'featureUsed', details);
+  return result;
+};
