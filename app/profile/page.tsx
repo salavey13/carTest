@@ -11,14 +11,13 @@ import { FaSpinner, FaLock } from "react-icons/fa6";
 import { useState, useEffect, useCallback } from "react"; 
 import Modal from "@/components/ui/Modal"; 
 import { toast } from "sonner";
-import {
+import type { CyberFitnessProfile, Achievement } from "@/types/cyberFitness";
+import { ALL_ACHIEVEMENTS } from "@/types/cyberFitness";
+import { getAchievementDetails } from "@/lib/cyberFitnessShared";
+import { 
   fetchUserCyberFitnessProfile,
-  CyberFitnessProfile,
-  getAchievementDetails,
-  Achievement,
-  ALL_ACHIEVEMENTS, 
-  checkAndUnlockFeatureAchievement, 
-} from "@/hooks/cyberFitnessSupabase";
+  checkAndUnlockFeatureAchievement 
+} from "@/lib/cyberFitnessServer";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts';
 import VibeContentRenderer from "@/components/VibeContentRenderer";
