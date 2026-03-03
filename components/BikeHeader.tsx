@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
-import UserInfo from "@/components/user-info";
+import { UserInfo } from "@/components/user-info";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
