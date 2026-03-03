@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { LayoutGrid, X, Search, Globe, Rocket, ShieldCheck } from "lucide-react";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import UserInfo from "@/components/user-info";
+import { UserInfo } from "@/components/user-info";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
@@ -11,12 +11,14 @@ import { cn } from "@/lib/utils";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { ThemeToggleButton } from "@/components/ThemeToggleButton";
-import {
+/*import {
     QUEST_ORDER,
     fetchUserCyberFitnessProfile,
     isQuestUnlocked as checkQuestUnlockedFromHook,
     CyberFitnessProfile
-} from '@/hooks/cyberFitnessSupabase';
+} from '@/hooks/cyberFitnessSupabase';*/
+import { fetchUserCyberFitnessProfile, isQuestUnlocked as checkQuestUnlockedFromHook } from "@/lib/cyberFitnessServer";
+import type { CyberFitnessProfile, QUEST_ORDER } from "@/types/cyberFitness";
 
 // --- Types ---
 type ColorKey = 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red' | 'orange' | 'gray';

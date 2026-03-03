@@ -10,7 +10,8 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import { Button } from "@/components/ui/button"; 
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 
-export default function UserInfo() {
+// Исправление 1: Делаем именованный экспорт (убрано default)
+export function UserInfo() {
   const { dbUser, user, isInTelegramContext, isLoading, error } = useAppContext();
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
@@ -64,9 +65,11 @@ export default function UserInfo() {
     );
   }
 
-  const displayName = effectiveUser.username || effectiveUser.full_name || effectiveUser.first_name || "Агент";
+  // Исправление 3: Безопасное чтение свойств через приведение типов (Any)
+  const eUserAny = effectiveUser as any;
+  const displayName = eUserAny.username || eUserAny.full_name || eUserAny.first_name || "Агент";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
-  const isMock = 'is_bot' in effectiveUser ? effectiveUser.is_bot : (effectiveUser.id === 413553377 && process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true');
+  const isMock = 'is_bot' in effectiveUser ? effectiveUser.is_bot : (eUserAny.id === 413553377 && process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true');
 
   return (
     <Link href="/profile" passHref legacyBehavior>
@@ -77,17 +80,17 @@ export default function UserInfo() {
         transition={{ duration: 0.5 }}
         aria-label={`Профиль пользователя ${displayName}`}
       >
-        <div
-          className="relative w-9 h-9 sm:w-10 sm:h-10"
-        >
+        <div className="relative w-9 h-9 sm:w-10 sm:h-10">
           {avatarUrl ? (
             <div className="relative w-full h-full rounded-full overflow-hidden border-2 border-brand-pink/80 shadow-[0_0_12px_rgba(var(--brand-pink-rgb),0.6)] group-hover:scale-105 group-hover:shadow-[0_0_18px_rgba(var(--brand-pink-rgb),0.7)] transition-all duration-300">
+              {/* Исправление 2: Добавлен unoptimized */}
               <Image
                 src={avatarUrl}
                 alt={`Аватар ${displayName}`}
                 fill
                 style={{objectFit:"cover"}} 
                 className="rounded-full" 
+                unoptimized
               />
             </div>
           ) : (
@@ -96,7 +99,6 @@ export default function UserInfo() {
             </div>
           )}
           {isInTelegramContext && (
-             // --- УЛУЧШЕННАЯ ИКОНКА ---
             <VibeContentRenderer content="::FaTelegram::" className="absolute -bottom-1 -right-1 h-5 w-5 text-[#2AABEE] bg-white rounded-full p-0.5 border border-dark-bg shadow-lg" />
           )}
           {isMock && (
@@ -116,7 +118,7 @@ export default function UserInfo() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
               >
-                {char}
+                {char as React.ReactNode}
               </motion.span>
             ))
           ) : (
@@ -126,7 +128,7 @@ export default function UserInfo() {
       </motion.a>
     </Link>
   );
-};
+}
 
 function getInitials(name: string): string {
   if (!name || typeof name !== 'string') return "?";
