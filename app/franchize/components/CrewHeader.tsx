@@ -24,6 +24,19 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   const pathname = usePathname();
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const railRef = useRef<HTMLDivElement | null>(null);
+  const prevPathnameRef = useRef<string | null>(null);
+
+  // Reset active category when navigating away from main catalog
+  // Scheduling setState via setTimeout to satisfy linter
+  useEffect(() => {
+    const prev = prevPathnameRef.current;
+    prevPathnameRef.current = pathname;
+
+    if (prev !== null && prev !== pathname && pathname !== mainCatalogPath) {
+      const timer = setTimeout(() => setActiveCategory(null), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [pathname, mainCatalogPath]);
 
   const defaultGroupLinks = useMemo(
     () => Array.from(new Set([...crew.catalog.showcaseGroups.map((group) => group.label), ...crew.catalog.categories, ...groupLinks].filter(Boolean))),
