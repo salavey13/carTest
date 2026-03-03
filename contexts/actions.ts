@@ -1,7 +1,7 @@
 "use server";
 
-import { supabaseAdmin, fetchUserData } from "@/lib/supabase-server"; // SAFE IMPORT
-import { upsertTelegramUser } from "@/lib/telegram"; // NEW SAFE IMPORT
+// ИЗМЕНЕНИЕ: импортируем безопасный createOrUpdateUser вместо upsertTelegramUser
+import { supabaseAdmin, fetchUserData, createOrUpdateUser } from "@/lib/supabase-server"; 
 import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
 import type { UserCrewInfo, ActiveLobbyInfo } from "./AppContext";
@@ -9,7 +9,6 @@ import type { UserCrewInfo, ActiveLobbyInfo } from "./AppContext";
 export async function fetchDbUserAction(userId: string): Promise<Database["public"]["Tables"]["users"]["Row"] | null> {
   if (!userId) return null;
   try {
-    // This calls fetchUserData from lib/supabase-server which uses the safe admin client
     return await fetchUserData(userId);
   } catch (error) {
     logger.error(`[fetchDbUserAction] Failed for user ${userId}:`, error);
@@ -27,18 +26,18 @@ export async function upsertTelegramUserAction(payload: {
   if (!payload.userId) return null;
 
   try {
-    // Reconstruct the WebAppUser object structure required by the lib function
-    const webAppUserLike = {
-        id: parseInt(payload.userId),
+    // ИЗМЕНЕНИЕ: Формируем объект для функции createOrUpdateUser. 
+    // Заметьте, role и status здесь нет, поэтому функция в lib/supabase-server.ts 
+    // их проигнорирует и не перезапишет у существующих юзеров.
+    const userInfo = {
         username: payload.username || undefined,
-        first_name: payload.fullName || "", // Approximation since we merged names
-        last_name: "",
+        first_name: payload.fullName || undefined,
+        last_name: "", // Игнорируется, так как мы уже склеили полное имя
         photo_url: payload.avatarUrl || undefined,
         language_code: payload.languageCode || undefined
     };
 
-    // Use the logic in lib/telegram.ts which uses the safe supabaseAdmin
-    const data = await upsertTelegramUser(webAppUserLike);
+    const data = await createOrUpdateUser(payload.userId, userInfo);
     return data;
   } catch (error) {
     logger.error(`[upsertTelegramUserAction] Failed for user ${payload.userId}:`, error);
@@ -49,9 +48,6 @@ export async function upsertTelegramUserAction(payload: {
 export async function refreshDbUserAction(userId: string): Promise<Database["public"]["Tables"]["users"]["Row"] | null> {
   return await fetchDbUserAction(userId);
 }
-
-// ... (fetchUserCrewInfoAction and fetchActiveGameAction remain the same, 
-// they use supabaseAdmin imported from @/lib/supabase-server at the top, which is correct) ...
 
 export async function fetchUserCrewInfoAction(userId: string): Promise<UserCrewInfo | null> {
   if (!userId) return null;
@@ -128,7 +124,6 @@ export async function saveUserFranchizeCartAction(
   }
 
   try {
-    // 1. Fetch current metadata manually
     const { data: user, error: fetchError } = await supabaseAdmin
         .from("users")
         .select("metadata")
@@ -144,19 +139,17 @@ export async function saveUserFranchizeCartAction(
     const currentSettings = (currentMeta.settings as Record<string, any>) || {};
     const currentCarts = (currentSettings.franchizeCart as Record<string, any>) || {};
 
-    // 2. Perform Deep Merge in JS
     const nextMetadata = {
       ...currentMeta,
       settings: {
         ...currentSettings,
         franchizeCart: {
           ...currentCarts,
-          [slug]: cartState, // Update only this slug's cart
+          [slug]: cartState,
         },
       },
     };
 
-    // 3. Write back
     const { error: updateError, count } = await supabaseAdmin
       .from("users")
       .update({ metadata: nextMetadata, updated_at: new Date().toISOString() })
