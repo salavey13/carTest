@@ -20,7 +20,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [catalogLinks, setCatalogLinks] = useState<string[]>([]);
-  const [isCompact, setIsCompact] = useState(false);
+  const[isCompact, setIsCompact] = useState(false);
   const pathname = usePathname();
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const railRef = useRef<HTMLDivElement | null>(null);
@@ -33,14 +33,31 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   const visibleRailLinks = useMemo(() => {
     if (pathname === mainCatalogPath && catalogLinks.length > 0) return catalogLinks;
     return defaultGroupLinks;
-  }, [catalogLinks, defaultGroupLinks, mainCatalogPath, pathname]);
+  },[catalogLinks, defaultGroupLinks, mainCatalogPath, pathname]);
 
+  // --- FIXED: Hysteresis Scroll Listener ---
   useEffect(() => {
-    const onScroll = () => setIsCompact(window.scrollY > 36);
+    const onScroll = () => {
+      setIsCompact((prev) => {
+        const scrollY = window.scrollY;
+        // If the header is full-size, wait until we scroll well PAST the threshold (60px) to collapse it
+        if (!prev && scrollY > 60) {
+          return true;
+        }
+        // If the header is collapsed, wait until we scroll well ABOVE the threshold (20px) to expand it
+        if (prev && scrollY < 20) {
+          return false;
+        }
+        // If we are in the "dead zone" between 20 and 60, change nothing. (Breaks the loop!)
+        return prev;
+      });
+    };
+    
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  },[]);
+  // -----------------------------------------
 
   useEffect(() => {
     if (pathname !== mainCatalogPath) {
@@ -66,7 +83,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
         const category = mostVisible?.target.getAttribute("data-category");
         if (category) setActiveCategory(category);
       },
-      { rootMargin: "-95px 0px -55% 0px", threshold: [0.2, 0.4, 0.65, 0.9] },
+      { rootMargin: "-95px 0px -55% 0px", threshold:[0.2, 0.4, 0.65, 0.9] },
     );
 
     sections.forEach((section) => observer.observe(section));
@@ -84,7 +101,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
       observer.disconnect();
       mutationObserver.disconnect();
     };
-  }, [mainCatalogPath, pathname]);
+  },[mainCatalogPath, pathname]);
 
   return (
     <header
@@ -182,8 +199,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
                   data-category-pill={linkLabel}
                   className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-4 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] transition-colors pointer-events-auto"
                   style={{
-                    ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
-                    ["--pill-text" as string]: isActive ? "#000000" : crew.theme.palette.textPrimary,
+                    ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,["--pill-text" as string]: isActive ? "#000000" : crew.theme.palette.textPrimary,
                   }}
                 >
                   {linkLabel}
