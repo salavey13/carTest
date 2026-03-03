@@ -1,3 +1,4 @@
+// /app/franchize/components/CrewHeader.tsx
 "use client";
 
 import Image from "next/image";
@@ -20,7 +21,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [catalogLinks, setCatalogLinks] = useState<string[]>([]);
-  const[isCompact, setIsCompact] = useState(false);
+  const [isCompact, setIsCompact] = useState(false);
   const pathname = usePathname();
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const railRef = useRef<HTMLDivElement | null>(null);
@@ -46,7 +47,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   const visibleRailLinks = useMemo(() => {
     if (pathname === mainCatalogPath && catalogLinks.length > 0) return catalogLinks;
     return defaultGroupLinks;
-  },[catalogLinks, defaultGroupLinks, mainCatalogPath, pathname]);
+  }, [catalogLinks, defaultGroupLinks, mainCatalogPath, pathname]);
 
   // --- FIXED: Hysteresis Scroll Listener ---
   useEffect(() => {
@@ -69,7 +70,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  },[]);
+  }, []);
   // -----------------------------------------
 
   useEffect(() => {
@@ -96,7 +97,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
         const category = mostVisible?.target.getAttribute("data-category");
         if (category) setActiveCategory(category);
       },
-      { rootMargin: "-95px 0px -55% 0px", threshold:[0.2, 0.4, 0.65, 0.9] },
+      { rootMargin: "-95px 0px -55% 0px", threshold: [0.2, 0.4, 0.65, 0.9] },
     );
 
     sections.forEach((section) => observer.observe(section));
@@ -114,7 +115,28 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
       observer.disconnect();
       mutationObserver.disconnect();
     };
-  },[mainCatalogPath, pathname]);
+  }, [mainCatalogPath, pathname]);
+
+  // --- NEW: Плавный скролл активного бейджа (pill) в центр экрана ---
+  useEffect(() => {
+    if (activeCategory && railRef.current) {
+      // Экранируем кавычки на случай нестандартных названий категорий
+      const safeCategory = activeCategory.replace(/"/g, '\\"');
+      const activeEl = railRef.current.querySelector(`[data-category-pill="${safeCategory}"]`) as HTMLElement;
+      
+      if (activeEl) {
+        const container = railRef.current;
+        // Вычисляем нужный сдвиг (позиция элемента относительно контейнера - половина контейнера + половина элемента)
+        const scrollLeft = activeEl.offsetLeft - container.clientWidth / 2 + activeEl.clientWidth / 2;
+        
+        container.scrollTo({
+          left: scrollLeft,
+          behavior: "smooth",
+        });
+      }
+    }
+  }, [activeCategory]);
+  // ------------------------------------------------------------------
 
   return (
     <header
@@ -197,9 +219,10 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
 
       {visibleRailLinks.length > 0 && (
         <div className="-mx-4 mt-1 border-t px-4 pt-2" style={{ borderColor: crew.theme.palette.borderSoft }}>
+          {/* Добавлен класс 'relative' для корректного расчета offsetLeft дочерних элементов */}
           <div
             ref={railRef}
-            className="mx-auto flex w-full max-w-4xl gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+            className="relative mx-auto flex w-full max-w-4xl gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
           >
             {visibleRailLinks.map((linkLabel) => {
               const targetId = toCategoryId(linkLabel);
@@ -212,7 +235,8 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
                   data-category-pill={linkLabel}
                   className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-4 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] transition-colors pointer-events-auto"
                   style={{
-                    ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,["--pill-text" as string]: isActive ? "#000000" : crew.theme.palette.textPrimary,
+                    ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
+                    ["--pill-text" as string]: isActive ? "#000000" : crew.theme.palette.textPrimary,
                   }}
                 >
                   {linkLabel}
