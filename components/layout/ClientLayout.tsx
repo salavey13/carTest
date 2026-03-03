@@ -413,7 +413,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/admin",
     "/paddock",
     "/rentals",
-    "/vipbikerental",
+    //"/vipbikerental",
     "/strikeball", 
   ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
@@ -431,6 +431,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname === "/wblanding/referral" ||
         pathname === "/csv-compare" ||
         pathname === "/streamer" ||
+        pathname === "/vipbikerental" ||
         pathname === "/blogger" ||
         pathname?.startsWith("/optimapipe") ||
         pathname?.startsWith("/rules") ||
