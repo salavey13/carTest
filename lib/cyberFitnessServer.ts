@@ -215,6 +215,17 @@ export const logCyberFitnessAction = async (
   };
 };
 
+
+export const isQuestUnlocked = (questId: string, completedQuests: string[] | undefined, questOrder: string[]): boolean => {
+  if (!questId || !questOrder || !Array.isArray(questOrder)) return false;
+  if (!completedQuests) completedQuests = [];
+  const questIndex = questOrder.indexOf(questId);
+  if (questIndex === -1) return false;
+  if (questIndex === 0) return true;
+  const previousQuestId = questOrder[questIndex - 1];
+  return completedQuests.includes(previousQuestId);
+};
+
 /**
  * Gets the user's current CyberFitness level
  * Server action - can be called from client components
