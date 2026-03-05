@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { analyzeMessage } from "@/app/actions";
 import { useAppContext } from "@/contexts/AppContext";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -33,7 +33,7 @@ export default function BullshitDetector() {
   useEffect(() => {
     const checkSubscription = async () => {
       if (user) {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAnon
           .from("users")
           .select("status")
           .eq("user_id", user.id.toString())

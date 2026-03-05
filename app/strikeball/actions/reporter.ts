@@ -1,12 +1,12 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 
 export async function generateBattleReport(lobbyId: string) {
   // 1. Fetch Lobby & Logs
-  const { data: lobby } = await supabaseAdmin.from("lobbies").select("*").eq("id", lobbyId).single();
-  const { data: members } = await supabaseAdmin.from("lobby_members").select("*, user:users(username)").eq("lobby_id", lobbyId);
-  const { data: checkpoints } = await supabaseAdmin.from("lobby_checkpoints").select("*").eq("lobby_id", lobbyId);
+  const { data: lobby } = await supabaseAnon.from("lobbies").select("*").eq("id", lobbyId).single();
+  const { data: members } = await supabaseAnon.from("lobby_members").select("*, user:users(username)").eq("lobby_id", lobbyId);
+  const { data: checkpoints } = await supabaseAnon.from("lobby_checkpoints").select("*").eq("lobby_id", lobbyId);
   
   // In a real scenario, we'd query an 'events' table for a timeline. 
   // For now, we reconstruct the story from current state.

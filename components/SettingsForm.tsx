@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { notifyAdmin } from "@/app/actions";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -18,7 +18,7 @@ export default function SettingsForm() {
   useEffect(() => {
     if (!dbUser || !isAdmin()) return;
     const fetchRates = async () => {
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await supabaseAnon
         .from("consumption_rates")
         .select("id, amount, chemicals(name), service_types(name), car_sizes(name)");
       if (error) {
@@ -37,7 +37,7 @@ export default function SettingsForm() {
     setLoading(true);
     try {
       for (const [id, amount] of Object.entries(formData)) {
-        const { error } = await supabaseAdmin
+        const { error } = await supabaseAnon
           .from("consumption_rates")
           .update({ amount: Number(amount) })
           .eq("id", id);

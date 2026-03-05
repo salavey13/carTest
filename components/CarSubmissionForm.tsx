@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
-import { supabaseAdmin, uploadImage } from "@/hooks/supabase";
+import { supabaseAnon, uploadImage } from "@/hooks/supabase";
 import type { Database } from "@/types/database.types";
 
 type VehicleData = Partial<Database["public"]["Tables"]["cars"]["Row"]>;
@@ -286,14 +286,14 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       };
 
       if (isEdit && vehicleToEdit?.id) {
-        const { error } = await supabaseAdmin.from("cars").update(payload).eq("id", vehicleToEdit.id);
+        const { error } = await supabaseAnon.from("cars").update(payload).eq("id", vehicleToEdit.id);
         if (error) throw error;
         toast.success("Успешно обновлено");
         onSuccess?.(payload);
       } else {
         // generate id if not provided
         const id = `${(payload.make || "item").toString().toLowerCase().replace(/\s+/g, "-")}-${(payload.model || "x").toString().toLowerCase().replace(/\s+/g, "-")}-${uuidv4().slice(0, 8)}`;
-        const { error } = await supabaseAdmin.from("cars").insert([{ id, ...payload }]);
+        const { error } = await supabaseAnon.from("cars").insert([{ id, ...payload }]);
         if (error) throw error;
         toast.success("Успешно добавлено в public.cars");
         onSuccess?.({ id, ...payload });

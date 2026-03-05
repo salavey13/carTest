@@ -1,8 +1,16 @@
 // /types/telegram.d.ts
 export interface TelegramWebApp {
   ready: () => void
+  expand?: () => void
   disableVerticalSwipes: () => void
+  setHeaderColor?: (color: string) => void
+  setBackgroundColor?: (color: string) => void
+  platform?: string
+  themeParams?: Record<string, string>
+  colorScheme?: 'light' | 'dark'
+  initData?: string
   initDataUnsafe: {
+    start_param?: string
     user?: WebAppUser
   }
   openLink: (url: string) => void;
@@ -29,4 +37,3 @@ declare global {
     }
   }
 }
-

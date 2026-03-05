@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { supabaseAdmin } from '@/hooks/supabase';
+import { supabaseAnon } from '@/hooks/supabase';
 import axios from 'axios';
 
 export const dynamic = 'force-dynamic'; // FIXED: Prevent static generation/execution during build
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ success: true, count: 0, message: 'No data fetched (possibly geo-blocked).' });
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAnon
       .from('market_data')
       .insert(allMarketData);
     

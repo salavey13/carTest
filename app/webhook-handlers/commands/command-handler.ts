@@ -11,7 +11,7 @@ import { profileCommand } from "./profile";
 import { helpCommand } from "./help";
 import { rageSettingsCommand } from "./rageSettings";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { simCommand } from "./sim";
 import { simGoCommand } from "./sim_go";
 import { seedMarketCommand } from "./seed_market";
@@ -135,7 +135,7 @@ export async function handleCommand(update: any) {
                 await handleCtxSelection(chatId, userId, text); return;
             }
 
-            const { data: activeSurvey } = await supabaseAdmin.from("user_survey_state").select('user_id').eq('user_id', String(userId)).maybeSingle();
+            const { data: activeSurvey } = await supabaseAnon.from("user_survey_state").select('user_id').eq('user_id', String(userId)).maybeSingle();
             if (activeSurvey && update.message?.from) {
                 await startCommand(chatId, userId, update.message.from, text);
             } else {
@@ -150,7 +150,7 @@ export async function handleCommand(update: any) {
 
 async function handleApprove(id: string, chatId: number, userId: string, type: string = 'rule') {
   // Простая проверка на admin (расширить по appContext)
-  const { data: isAdmin } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
+  const { data: isAdmin } = await supabaseAnon.from('users').select('role').eq('user_id', userId).single();
   if (isAdmin?.role !== 'admin') {
     await sendComplexMessage(chatId, 'Access denied.', []);
     return;
@@ -163,7 +163,7 @@ async function handleApprove(id: string, chatId: number, userId: string, type: s
   });
 
   if (response.ok) {
-    const { data: rental } = await supabaseAdmin.from('rentals').select('*').eq('rental_id', id).single();
+    const { data: rental } = await supabaseAnon.from('rentals').select('*').eq('rental_id', id).single();
     const summaryMd = escapeTelegramMarkdown(`Booking approved! \n**Type:** ${rental.metadata.session_type || type} \n**Time:** ${rental.requested_start_date} - ${rental.requested_end_date}`);
     await sendComplexMessage(rental.user_id, summaryMd, [], { imageQuery: `${type}-confirmed`, parseMode: 'MarkdownV2' });
     if (rental.metadata.rigger_id) await sendComplexMessage(rental.metadata.rigger_id, summaryMd, [], { parseMode: 'MarkdownV2' });
@@ -175,7 +175,7 @@ async function handleApprove(id: string, chatId: number, userId: string, type: s
 
 async function handleDecline(id: string, chatId: number, userId: string, type: string = 'rule') {
   // Admin check аналогично
-  const { data: isAdmin } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
+  const { data: isAdmin } = await supabaseAnon.from('users').select('role').eq('user_id', userId).single();
   if (isAdmin?.role !== 'admin') {
     await sendComplexMessage(chatId, 'Access denied.', []);
     return;
@@ -188,7 +188,7 @@ async function handleDecline(id: string, chatId: number, userId: string, type: s
   });
 
   if (response.ok) {
-    const { data: rental } = await supabaseAdmin.from('rentals').select('*').eq('rental_id', id).single();
+    const { data: rental } = await supabaseAnon.from('rentals').select('*').eq('rental_id', id).single();
     const summaryMd = escapeTelegramMarkdown(`Booking declined. \n**Type:** ${rental.metadata.session_type || type} \nRefund initiated.`);
     await sendComplexMessage(rental.user_id, summaryMd, [], { parseMode: 'MarkdownV2' });
     if (rental.metadata.rigger_id) await sendComplexMessage(rental.metadata.rigger_id, summaryMd, [], { parseMode: 'MarkdownV2' });
@@ -200,13 +200,13 @@ async function handleDecline(id: string, chatId: number, userId: string, type: s
 
 async function handleAccept(id: string, chatId: number, userId: string) {
   // Rigger check: убедиться, что userId == rigger_id
-  const { data: rental } = await supabaseAdmin.from('rentals').select('metadata->>rigger_id').eq('rental_id', id).single();
+  const { data: rental } = await supabaseAnon.from('rentals').select('metadata->>rigger_id').eq('rental_id', id).single();
   if (rental.metadata.rigger_id !== userId) {
     await sendComplexMessage(chatId, 'Access denied.', []);
     return;
   }
 
-  const { error } = await supabaseAdmin.from('rentals').update({
+  const { error } = await supabaseAnon.from('rentals').update({
     metadata: { ...rental.metadata, rigger_confirmed: true }
   }).eq('rental_id', id);
 
@@ -222,13 +222,13 @@ async function handleAccept(id: string, chatId: number, userId: string) {
 
 async function handleRiggerDecline(id: string, chatId: number, userId: string) {
   // Аналогично accept, но decline: notify admin to reassign
-  const { data: rental } = await supabaseAdmin.from('rentals').select('metadata->>rigger_id').eq('rental_id', id).single();
+  const { data: rental } = await supabaseAnon.from('rentals').select('metadata->>rigger_id').eq('rental_id', id).single();
   if (rental.metadata.rigger_id !== userId) {
     await sendComplexMessage(chatId, 'Access denied.', []);
     return;
   }
 
-  const { error } = await supabaseAdmin.from('rentals').update({
+  const { error } = await supabaseAnon.from('rentals').update({
     status: 'pending_reassign', // Или cancelled, по логике
     metadata: { ...rental.metadata, rigger_confirmed: false }
   }).eq('rental_id', id);

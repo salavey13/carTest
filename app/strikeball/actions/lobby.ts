@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin, fetchUserData } from "@/hooks/supabase";
+import { supabaseAnon, fetchUserData } from "@/hooks/supabase";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
 import { v4 as uuidv4 } from "uuid";
@@ -9,11 +9,11 @@ const BOT_USERNAME = "oneSitePlsBot";
 
 /**
  * Fetches the most recent geo-pings for all active members in a lobby.
- * Privileged access via supabaseAdmin.
+ * Privileged access via supabaseAnon.
  */
 export async function getLobbyGeoData(lobbyId: string) {
     try {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAnon
             .from('lobby_geo_pings')
             .select('user_id, lat, lng, timestamp')
             .eq('lobby_id', lobbyId)
@@ -39,7 +39,7 @@ export async function getLobbyGeoData(lobbyId: string) {
 export async function fetchLobbyData(lobbyId: string) {
   try {
     // 1. Fetch Lobby
-    const { data: lobby, error: lobbyError } = await supabaseAdmin
+    const { data: lobby, error: lobbyError } = await supabaseAnon
       .from("lobbies")
       .select(`*, host_crew:crews(id, name, logo_url)`)
       .eq("id", lobbyId)
@@ -48,7 +48,7 @@ export async function fetchLobbyData(lobbyId: string) {
     if (lobbyError || !lobby) return { success: false, error: "Lobby not found" };
 
     // 2. Fetch Members
-    const { data: members, error: membersError } = await supabaseAdmin
+    const { data: members, error: membersError } = await supabaseAnon
       .from("lobby_members")
       .select("*")
       .eq("lobby_id", lobbyId);
@@ -63,14 +63,14 @@ export async function fetchLobbyData(lobbyId: string) {
 
     if (userIds.length > 0) {
       // Users
-      const { data: users } = await supabaseAdmin
+      const { data: users } = await supabaseAnon
         .from("users")
         .select("user_id, username, full_name, avatar_url")
         .in("user_id", userIds);
       users?.forEach((u) => { userMap[u.user_id] = u; });
 
       // Gear (Active/Paid items only)
-      const { data: purchases } = await supabaseAdmin
+      const { data: purchases } = await supabaseAnon
         .from("user_purchases")
         .select("user_id, metadata")
         .in("user_id", userIds)
@@ -119,7 +119,7 @@ export async function createStrikeballLobby(
     const qrHash = uuidv4(); 
     
     // 1. Create Lobby record
-    const { data: lobby, error: lobbyError } = await supabaseAdmin
+    const { data: lobby, error: lobbyError } = await supabaseAnon
       .from("lobbies")
       .insert({
         name,
@@ -149,7 +149,7 @@ export async function createStrikeballLobby(
     }
 
     // 2. Auto-join owner as Blue Team Leader
-    const { error: memberError } = await supabaseAdmin.from("lobby_members").insert({
+    const { error: memberError } = await supabaseAnon.from("lobby_members").insert({
       lobby_id: lobby.id,
       user_id: userId,
       role: 'owner', 
@@ -187,12 +187,12 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
 
   try {
     // 0. CHECK OWNERSHIP FIRST
-    const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id, name").eq("id", lobbyId).single();
+    const { data: lobby } = await supabaseAnon.from("lobbies").select("owner_id, name").eq("id", lobbyId).single();
     const isOwner = lobby?.owner_id === userId;
     const role = isOwner ? 'owner' : 'member';
 
     // 1. Check existing member
-    const { data: existing } = await supabaseAdmin
+    const { data: existing } = await supabaseAnon
       .from("lobby_members")
       .select("id, team, role")
       .eq("lobby_id", lobbyId)
@@ -202,7 +202,7 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
     if (existing) {
         // Update team AND ensure role is correct (restore owner rank if lost)
         if (existing.team !== team || existing.role !== role) {
-            await supabaseAdmin
+            await supabaseAnon
                 .from("lobby_members")
                 .update({ team, role, status: 'ready' }) 
                 .eq("id", existing.id);
@@ -212,7 +212,7 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
     }
 
     // 2. Insert new member
-    await supabaseAdmin.from("lobby_members").insert({
+    await supabaseAnon.from("lobby_members").insert({
       lobby_id: lobbyId,
       user_id: userId,
       role: role, // Use calculated role
@@ -240,7 +240,7 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
 export async function getOpenLobbies() {
   try {
     // Fetch lobbies AND their host crew details
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAnon
       .from("lobbies")
       .select(`
         *,
@@ -259,14 +259,14 @@ export async function getOpenLobbies() {
 
 export async function getUserActiveLobbies(userId: string) {
     if (!userId) return { success: false, data: [] };
-    const { data } = await supabaseAdmin.from("lobby_members").select("lobby_id").eq("user_id", userId);
+    const { data } = await supabaseAnon.from("lobby_members").select("lobby_id").eq("user_id", userId);
     return { success: true, data: data?.map(d => d.lobby_id) || [] };
 }
 
 export async function addNoobBot(lobbyId: string, team: string) {
   try {
     const botId = uuidv4(); 
-    const { error } = await supabaseAdmin.from("lobby_members").insert({
+    const { error } = await supabaseAnon.from("lobby_members").insert({
       lobby_id: lobbyId,
       user_id: botId,
       is_bot: true,
@@ -283,7 +283,7 @@ export async function addNoobBot(lobbyId: string, team: string) {
 
 export async function removeMember(memberId: string) {
   try {
-    const { error } = await supabaseAdmin.from("lobby_members").delete().eq("id", memberId);
+    const { error } = await supabaseAnon.from("lobby_members").delete().eq("id", memberId);
     if (error) throw error;
     return { success: true };
   } catch (e: any) {
@@ -294,7 +294,7 @@ export async function removeMember(memberId: string) {
 export async function togglePlayerStatus(memberId: string, currentStatus: string) {
     try {
         const newStatus = currentStatus === 'alive' ? 'dead' : 'alive';
-        await supabaseAdmin.from("lobby_members").update({ status: newStatus }).eq("id", memberId);
+        await supabaseAnon.from("lobby_members").update({ status: newStatus }).eq("id", memberId);
         return { success: true, newStatus };
     } catch (e) {
         return { success: false, error: "Ошибка статуса" };
@@ -306,7 +306,7 @@ export async function togglePlayerStatus(memberId: string, currentStatus: string
  */
 export async function proposeLobbyDate(lobbyId: string, userId: string, newDate: string) {
     try {
-        const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id, metadata").eq("id", lobbyId).single();
+        const { data: lobby } = await supabaseAnon.from("lobbies").select("owner_id, metadata").eq("id", lobbyId).single();
         if (lobby?.owner_id !== userId) throw new Error("Только владелец может менять дату");
 
         const newMeta = { 
@@ -316,8 +316,8 @@ export async function proposeLobbyDate(lobbyId: string, userId: string, newDate:
         };
 
         // Сбрасываем голоса при смене даты
-        await supabaseAdmin.from("lobby_members").update({ metadata: { vote: null } }).eq("lobby_id", lobbyId);
-        await supabaseAdmin.from("lobbies").update({ start_at: newDate, metadata: newMeta }).eq("id", lobbyId);
+        await supabaseAnon.from("lobby_members").update({ metadata: { vote: null } }).eq("lobby_id", lobbyId);
+        await supabaseAnon.from("lobbies").update({ start_at: newDate, metadata: newMeta }).eq("id", lobbyId);
 
         return { success: true };
     } catch (e: any) { return { success: false, error: e.message }; }
@@ -328,11 +328,11 @@ export async function proposeLobbyDate(lobbyId: string, userId: string, newDate:
  */
 export async function voteForLobbyDate(lobbyId: string, userId: string, vote: 'ok' | 'not_ok') {
     try {
-        const { data: member } = await supabaseAdmin.from("lobby_members").select("id, metadata").eq("lobby_id", lobbyId).eq("user_id", userId).single();
+        const { data: member } = await supabaseAnon.from("lobby_members").select("id, metadata").eq("lobby_id", lobbyId).eq("user_id", userId).single();
         if (!member) throw new Error("Вы не участник операции");
 
         const newMeta = { ...(member.metadata as object), vote };
-        await supabaseAdmin.from("lobby_members").update({ metadata: newMeta }).eq("id", member.id);
+        await supabaseAnon.from("lobby_members").update({ metadata: newMeta }).eq("id", member.id);
 
         return { success: true };
     } catch (e: any) { return { success: false, error: e.message }; }
@@ -343,9 +343,9 @@ export async function voteForLobbyDate(lobbyId: string, userId: string, vote: 'o
  */
 export async function setLobbyApprovalStatus(lobbyId: string, status: 'approved_unpaid' | 'approved_paid') {
     try {
-        const { data: lobby } = await supabaseAdmin.from("lobbies").select("metadata").eq("id", lobbyId).single();
+        const { data: lobby } = await supabaseAnon.from("lobbies").select("metadata").eq("id", lobbyId).single();
         const newMeta = { ...lobby.metadata, approval_status: status };
-        await supabaseAdmin.from("lobbies").update({ metadata: newMeta }).eq("id", lobbyId);
+        await supabaseAnon.from("lobbies").update({ metadata: newMeta }).eq("id", lobbyId);
         return { success: true };
     } catch (e: any) { return { success: false, error: e.message }; }
 }
@@ -371,7 +371,7 @@ export async function editLobby(
 
   try {
     // 0. ПРОВЕРКА ПРАВ (Проверка Владельца)
-    const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id").eq("id", lobbyId).single();
+    const { data: lobby } = await supabaseAnon.from("lobbies").select("owner_id").eq("id", lobbyId).single();
     if (!lobby) throw new Error("Lobby not found");
     if (lobby.owner_id !== userId) throw new Error("ACCESS DENIED");
 
@@ -386,7 +386,7 @@ export async function editLobby(
     
     // Специальная обработка для metadata, чтобы не перезаписать всё целиком, а смержить или обновить по ключу
     if (payload.metadata) {
-        const { data: currentLobby } = await supabaseAdmin.from("lobbies").select("metadata").eq("id", lobbyId).single();
+        const { data: currentLobby } = await supabaseAnon.from("lobbies").select("metadata").eq("id", lobbyId).single();
         const existingMeta = currentLobby?.metadata || {};
         
         // Ensure we don't lose 'bots_enabled' if it wasn't in the payload
@@ -398,7 +398,7 @@ export async function editLobby(
     }
 
     // 2. ЗАПИСЬ В БАЗУ
-    const { error } = await supabaseAdmin
+    const { error } = await supabaseAnon
       .from("lobbies")
       .update(updateData)
       .eq("id", lobbyId);

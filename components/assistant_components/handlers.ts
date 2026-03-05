@@ -27,7 +27,7 @@ import {
     getOpenPullRequests 
 } from '@/app/actions_github/actions'; 
 import { sendTelegramDocument, notifyAdmin } from '@/app/actions';
-import { supabaseAdmin } from '@/hooks/supabase'; 
+import { getUserMetadataAction, mergeUserMetadataAction } from "@/app/repo-xml/actions_user_metadata";
 import { selectFunctionDefinition, extractFunctionName } from '@/lib/codeUtils';
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { 
@@ -382,15 +382,15 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         setIsProcessingPR(true); const toastId = toast.loading(`Сохранение ${filesToSave.length} файлов...`);
         try {
             const filesData = filesToSave.map(f => ({ p: f.path, c: f.content, e: f.extension || '?' }));
-            const { data: existingData, error: fetchError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", dbUser.user_id).single();
-            if (fetchError && fetchError.code !== 'PGRST116') throw fetchError; 
-            const existingGeneratedFiles = existingData?.metadata?.generated_files || [];
+            const metadataResult = await getUserMetadataAction(dbUser.user_id);
+            if (!metadataResult.success) throw new Error(metadataResult.error || "Failed to load existing metadata");
+            const existingGeneratedFiles = (metadataResult.metadata as any)?.generated_files || [];
             const newPathsSet = new Set(filesData.map(f => f.p));
             const filteredExisting = existingGeneratedFiles.filter((f: any) => f?.path && !newPathsSet.has(f.path));
             const newFilesFormatted = filesData.map(f => ({ path: f.p, code: f.c, extension: f.e }));
             const mergedFiles = [ ...filteredExisting, ...newFilesFormatted ];
-            const { error: upsertError } = await supabaseAdmin.from("users").upsert({ user_id: dbUser.user_id, metadata: { ...(existingData?.metadata || {}), generated_files: mergedFiles } }, { onConflict: 'user_id' });
-            if (upsertError) throw upsertError;
+            const saveResult = await mergeUserMetadataAction(dbUser.user_id, { generated_files: mergedFiles });
+            if (!saveResult.success) throw new Error(saveResult.error || "Failed to save generated files");
             toast.success(`${filesToSave.length} файлов сохранено/обновлено в вашем профиле.`, { id: toastId });
         } catch (err: any) { logger.error("[Handler SaveFiles] Save error:", err); toast.error(`Ошибка сохранения файлов: ${err?.message ?? 'Неизвестная ошибка'}`, { id: toastId }); }
         finally { setIsProcessingPR(false); }
@@ -447,11 +447,8 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         setCustomLinks(updatedLinks); 
         const toastId = toast.loading("Сохранение ссылки...");
         try {
-            const { data: existingData, error: fetchError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", dbUser.user_id).single();
-            if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
-            const currentMetadata = existingData?.metadata || {};
-            const { error: upsertError } = await supabaseAdmin.from("users").upsert({ user_id: dbUser.user_id, metadata: { ...currentMetadata, customLinks: updatedLinks } }, { onConflict: 'user_id' });
-            if (upsertError) throw upsertError;
+            const saveResult = await mergeUserMetadataAction(dbUser.user_id, { customLinks: updatedLinks });
+            if (!saveResult.success) throw new Error(saveResult.error || "Failed to save custom links");
             toast.success(`Ссылка "${name}" добавлена.`, { id: toastId });
         } catch (e: any) { logger.error("[Handler AddCustomLink] Save error:", e); toast.error(`Ошибка сохранения ссылки: ${e?.message ?? 'Неизвестная ошибка'}`, { id: toastId }); setCustomLinks(customLinks); }
      }, [customLinks, dbUser?.user_id, imageReplaceTask, iconReplaceTask, setCustomLinks]); 

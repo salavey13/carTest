@@ -1,7 +1,7 @@
 "use server";
 
 import { qrMerchantHandler } from "@/app/webhook-handlers/qr-merchant"; // Import logic directly
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 
 export async function simulateGearPurchase(userId: string, itemId: string) {
     try {

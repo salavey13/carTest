@@ -1,7 +1,7 @@
 import { logger } from "@/lib/logger";
 import { getArbitrageScannerSettings } from "@/app/elon/arbitrage_scanner_actions";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { Database } from "@/lib/database.types";
 
 type MarketDataInsert = Database['public']['Tables']['market_data']['Insert'];
@@ -28,7 +28,7 @@ export async function seedMarketCommand(chatId: number, userId: string) {
 
     // Удаляем старые данные по всем отслеживаемым парам, чтобы начать с чистого листа
     const symbolsToDelete = trackedPairs.filter(p => p.includes('/USDT'));
-    await supabaseAdmin.from('market_data').delete().in('symbol', symbolsToDelete);
+    await supabaseAnon.from('market_data').delete().in('symbol', symbolsToDelete);
     logger.info(`[SeedMarket] Cleared old data for symbols: ${symbolsToDelete.join(', ')}`);
 
 
@@ -70,7 +70,7 @@ export async function seedMarketCommand(chatId: number, userId: string) {
       throw new Error("Нет пар или бирж в настройках для генерации данных.");
     }
 
-    const { error } = await supabaseAdmin.from('market_data').insert(seedPoints);
+    const { error } = await supabaseAnon.from('market_data').insert(seedPoints);
     if (error) {
       throw new Error(`Ошибка Supabase при записи: ${error.message}`);
     }

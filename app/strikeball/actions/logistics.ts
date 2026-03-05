@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -12,7 +12,7 @@ export async function updateTransportStatus(
   payload: { role: string; seats?: number; car_name?: string }
 ) {
   try {
-    const { data: member } = await supabaseAdmin.from("lobby_members").select("metadata").eq("id", memberId).single();
+    const { data: member } = await supabaseAnon.from("lobby_members").select("metadata").eq("id", memberId).single();
     const currentMeta = (member?.metadata as Record<string, any>) || {};
     
     // If becoming a driver, clear passenger data
@@ -39,7 +39,7 @@ export async function updateTransportStatus(
 
     const newMeta = { ...currentMeta, transport: transportData };
 
-    const { error } = await supabaseAdmin.from("lobby_members").update({ metadata: newMeta }).eq("id", memberId);
+    const { error } = await supabaseAnon.from("lobby_members").update({ metadata: newMeta }).eq("id", memberId);
     if (error) throw error;
     
     revalidatePath('/strikeball/lobbies');
@@ -52,7 +52,7 @@ export async function updateTransportStatus(
  */
 export async function joinCar(passengerId: string, driverId: string) {
     try {
-        const { data: member } = await supabaseAdmin.from("lobby_members").select("metadata").eq("id", passengerId).single();
+        const { data: member } = await supabaseAnon.from("lobby_members").select("metadata").eq("id", passengerId).single();
         const currentMeta = (member?.metadata as Record<string, any>) || {};
         
         const newMeta = {
@@ -63,7 +63,7 @@ export async function joinCar(passengerId: string, driverId: string) {
             }
         };
 
-        const { error } = await supabaseAdmin.from("lobby_members").update({ metadata: newMeta }).eq("id", passengerId);
+        const { error } = await supabaseAnon.from("lobby_members").update({ metadata: newMeta }).eq("id", passengerId);
         if (error) throw error;
         return { success: true };
     } catch (e: any) { return { success: false, error: e.message }; }
@@ -74,7 +74,7 @@ export async function signSafetyBriefing(
   operatorData: { fio: string, phone: string, school?: string }
 ) {
   try {
-    const { data: member } = await supabaseAdmin.from("lobby_members").select("metadata").eq("id", memberId).single();
+    const { data: member } = await supabaseAnon.from("lobby_members").select("metadata").eq("id", memberId).single();
     const currentMeta = (member?.metadata as Record<string, any>) || {};
     
     // Инжектим данные оператора в метаданные для PDF-генератора
@@ -85,7 +85,7 @@ export async function signSafetyBriefing(
         operator_data: operatorData 
     };
 
-    const { error } = await supabaseAdmin.from("lobby_members").update({ metadata: newMeta }).eq("id", memberId);
+    const { error } = await supabaseAnon.from("lobby_members").update({ metadata: newMeta }).eq("id", memberId);
     if (error) throw error;
     
     revalidatePath('/strikeball/lobbies');

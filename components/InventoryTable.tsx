@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { translations } from "@/components/translations_inventory";
@@ -19,7 +19,7 @@ export default function InventoryTable() {
   useEffect(() => {
     if (!dbUser || !isAdmin()) return;
     const fetchInventory = async () => {
-      const { data, error } = await supabaseAdmin.from("chemicals").select("*");
+      const { data, error } = await supabaseAnon.from("chemicals").select("*");
       if (error) {
         toast.error(`Error fetching inventory: ${error.message}`);
       } else {

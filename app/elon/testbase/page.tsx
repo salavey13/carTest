@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { supabaseAdmin } from '@/hooks/supabase';
+import { supabaseAnon } from '@/hooks/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,7 @@ const ArbitrageTerminalPage = () => {
   const fetchOpportunities = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await supabaseAnon
         .from('arbitrage_opportunities')
         .select('*')
         .order('potential_profit_pct_a_to_b', { ascending: false }) // Show most profitable first

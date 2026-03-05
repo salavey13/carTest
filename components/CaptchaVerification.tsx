@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { Loader2, Trophy, RefreshCw } from "lucide-react";
 import { notifyCaptchaSuccess, notifySuccessfulUsers, generateCaptcha, verifyCaptcha } from "@/app/actions";
@@ -39,7 +39,7 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
   useEffect(() => {
     const fetchSettingsAndCaptcha = async () => {
       try {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAnon
           .from("settings")
           .select("string_length, character_set, case_sensitive, noise_level, font_size, background_color, text_color, distortion")
           .eq("id", 1)
@@ -90,7 +90,7 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
     if (isAdmin()) {
       const fetchSuccessfulUsers = async () => {
         try {
-          const { data, error } = await supabaseAdmin
+          const { data, error } = await supabaseAnon
             .from("users")
             .select("*")
             .filter("metadata->captchaSuccess", "eq", true);
@@ -116,7 +116,7 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
       if (isValid) {
         const currentMetadata = dbUser.metadata || {};
         const updatedMetadata = { ...currentMetadata, captchaSuccess: true };
-        const { error } = await supabaseAdmin
+        const { error } = await supabaseAnon
           .from("users")
           .update({ metadata: updatedMetadata })
           .eq("user_id", dbUser.user_id);
@@ -160,7 +160,7 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
   const handleSaveSettings = async () => {
     if (!editingSettings) return;
     try {
-      await supabaseAdmin.from("settings").update(editingSettings).eq("id", 1);
+      await supabaseAnon.from("settings").update(editingSettings).eq("id", 1);
       setSettings(editingSettings);
       const { image, hash } = await generateCaptcha(editingSettings);
       setCaptchaImage(image);

@@ -2,7 +2,7 @@ import { WebhookHandler } from "./types";
 import { sendTelegramMessage, notifyAdmin } from "../actions"; 
 import { debugLogger } from "@/lib/debugLogger";
 import { logger } from "@/lib/logger"; // This logger is for server-side/build logs
-import { supabaseAdmin } from '@/hooks/supabase'; 
+import { supabaseAnon } from '@/hooks/supabase'; 
 import type { Database } from "@/types/database.types"; 
 
 type User = Database["public"]["Tables"]["users"]["Row"];
@@ -43,7 +43,7 @@ export const disableDummyModeHandler: WebhookHandler = {
     logger.info(`[DisableDummyModeHandler] Processing disable dummy mode for target user: ${targetUserId} (requested by ${requesterUserId})`);
 
     try {
-      const { data: targetUserData, error: fetchError } = await supabaseAdmin
+      const { data: targetUserData, error: fetchError } = await supabaseAnon
         .from('users')
         .select('metadata, username, full_name') 
         .eq('user_id', targetUserId)
@@ -77,7 +77,7 @@ export const disableDummyModeHandler: WebhookHandler = {
         disabled_at: new Date().toISOString(), 
       };
 
-      const { error: updateError } = await supabaseAdmin
+      const { error: updateError } = await supabaseAnon
         .from("users")
         .update({ metadata: updatedMetadata })
         .eq("user_id", targetUserId);

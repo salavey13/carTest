@@ -2,7 +2,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { supabaseAdmin, createAuthenticatedClient } from "@/hooks/supabase";
+import { supabaseAnon, createAuthenticatedClient } from "@/hooks/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
@@ -113,26 +113,26 @@ function BotBustersDailyStatsSection({ language }) {
     async function fetchStatsAndBots() {
       try {
         const today = new Date().toISOString().split("T")[0];
-        const { data: blocks, error: blocksError } = await supabaseAdmin
+        const { data: blocks, error: blocksError } = await supabaseAnon
           .from("actions")
           .select("id", { count: "exact" })
           .eq("action_type", "block")
           .gte("created_at", today);
         if (blocksError) throw blocksError;
 
-        const { data: reports, error: reportsError } = await supabaseAdmin
+        const { data: reports, error: reportsError } = await supabaseAnon
           .from("actions")
           .select("id", { count: "exact" })
           .eq("action_type", "report")
           .gte("created_at", today);
         if (reportsError) throw reportsError;
 
-        const { count: totalBotsCount, error: totalError } = await supabaseAdmin
+        const { count: totalBotsCount, error: totalError } = await supabaseAnon
           .from("bots")
           .select("id", { count: "exact" });
         if (totalError) throw totalError;
 
-        const { count: confirmedBotsCount, error: confirmedError } = await supabaseAdmin
+        const { count: confirmedBotsCount, error: confirmedError } = await supabaseAnon
           .from("bots")
           .select("id", { count: "exact" })
           .eq("confirmed", true);
@@ -142,7 +142,7 @@ function BotBustersDailyStatsSection({ language }) {
         let offset = 0;
         const limit = 1000;
         while (true) {
-          const { data, error } = await supabaseAdmin
+          const { data, error } = await supabaseAnon
             .from("bots")
             .select("user_name")
             .order("last_updated", { ascending: false })
