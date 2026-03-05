@@ -7,6 +7,11 @@ import {
   fetchDbUserAction,
   upsertTelegramUserAction
 } from "@/contexts/actions";
+import {
+  attachVisibilityExpandRecovery,
+  safeExpand,
+  safeReady,
+} from "@/lib/telegramViewport";
 
 import type { TelegramWebApp, WebAppUser, WebAppInitData } from "@/types/telegram";
 import type { Database } from "@/types/database.types";
@@ -204,6 +209,7 @@ export function useTelegram() {
 
   useEffect(() => {
     let isMounted = true;
+    let detachVisibilityRecovery: (() => void) | undefined;
     globalLogger.info("[HOOK_TELEGRAM EFFECT_MAIN_INIT] START. isMounted:", isMounted);
     
     setIsLoading(true);
@@ -250,11 +256,16 @@ export function useTelegram() {
           }
           
           if (isMounted) {
-            telegram.ready(); 
+            safeReady(telegram);
             globalLogger.log("[HOOK_TELEGRAM initialize] STEP 3.3: Called telegram.ready()");
             if (inTgContextReal && telegram.expand) {
-                telegram.expand();
+              const expanded = await safeExpand(telegram, { attempts: 3, delayMs: 120 });
+              if (expanded) {
                 globalLogger.info("[HOOK_TELEGRAM initialize] STEP 3.3.1: Called telegram.expand() to maximize Web App.");
+              } else {
+                globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 3.3.1_WARN: expand() did not confirm success after retries.");
+              }
+              detachVisibilityRecovery = attachVisibilityExpandRecovery(telegram, { attempts: 2, delayMs: 150 });
             }
           }
 
@@ -266,9 +277,9 @@ export function useTelegram() {
                   globalLogger.info(`[HOOK_TELEGRAM initialize] STEP 4A.1: REAL Telegram auth validated successfully via API. Auth Candidate User ID: ${authCandidate.id}`);
               } else {
                   globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 4A.2: REAL Telegram initData validation FAILED via API or returned no user. Error will be set.");
-                   if (isMounted && !error) { 
+                   if (isMounted) { 
                      const validationError = new Error("Telegram data validation failed via API. User data might be compromised or API issue.");
-                     setError(validationError);
+                     setError((prev) => prev ?? validationError);
                    }
               }
           } else if (telegram.initDataUnsafe?.user?.id && process.env.NODE_ENV === 'development') {
@@ -299,12 +310,12 @@ export function useTelegram() {
               setTgUser(authData.tgUserToSet);
               setDbUser(authData.dbUserToSet); 
               setIsAuthenticated(authData.isAuthenticatedToSet);
-              if(authData.isAuthenticatedToSet && error) setError(null); 
+              if (authData.isAuthenticatedToSet) setError(null); 
             }
           } catch (authProcessError: any) { 
             globalLogger.error(`[HOOK_TELEGRAM initialize] STEP 7.3 (ERROR): Error DURING handleAuthentication:`, authProcessError.message);
             if (isMounted) {
-              if(!error) setError(authProcessError); 
+              setError((prev) => prev ?? authProcessError); 
               setTgUser(authCandidate); 
               setDbUser(null);          
               setIsAuthenticated(false); 
@@ -313,10 +324,8 @@ export function useTelegram() {
         } else { 
            globalLogger.warn(`[HOOK_TELEGRAM initialize] STEP 7 (NO_CANDIDATE): No authCandidate available.`);
            if (isMounted) {
-             if (!error) { 
-               const noAuthCandidateError = new Error("No user data available for authentication.");
-               setError(noAuthCandidateError);
-             }
+             const noAuthCandidateError = new Error("No user data available for authentication.");
+             setError((prev) => prev ?? noAuthCandidateError);
             setTgUser(null);
             setDbUser(null);
             setIsAuthenticated(false);
@@ -324,8 +333,8 @@ export function useTelegram() {
         }
       } catch (outerError: any) { 
         globalLogger.error("[HOOK_TELEGRAM initialize] STEP ERROR (OUTER_CATCH): CRITICAL OUTER ERROR:", outerError.message);
-        if (isMounted && !error) { 
-          setError(outerError);
+        if (isMounted) { 
+          setError((prev) => prev ?? outerError);
         }
       } finally { 
         if (isMounted) {
@@ -339,6 +348,7 @@ export function useTelegram() {
     return () => {
       globalLogger.info("[HOOK_TELEGRAM EFFECT_MAIN_INIT_CLEANUP] Cleanup. Setting isMounted=false.");
       isMounted = false;
+      detachVisibilityRecovery?.();
     };
   }, [handleAuthentication]); 
 

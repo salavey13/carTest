@@ -1,5 +1,5 @@
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import Papa from "papaparse";
 
@@ -18,12 +18,12 @@ export async function wbCommand(chatId: number, userId: string) {
     // 1. Identify Crew Membership & Ownership
     // We check both memberships AND ownerships to be safe
     const [memberRes, ownerRes] = await Promise.all([
-      supabaseAdmin
+      supabaseAnon
         .from('crew_members')
         .select('crew_id, role, crews(id, name, slug, owner_id)')
         .eq('user_id', userId)
         .eq('membership_status', 'active'),
-      supabaseAdmin
+      supabaseAnon
         .from('crews')
         .select('id, name, slug, owner_id')
         .eq('owner_id', userId)
@@ -83,7 +83,7 @@ export async function wbCommand(chatId: number, userId: string) {
     await sendComplexMessage(chatId, `📡 *Uplink Established: ${targetCrew.name}* \n_Gathering intelligence..._`, [], { parseMode: 'Markdown' });
 
     // Fetch Items for this Crew
-    const { data: items, error: itemsError } = await supabaseAdmin
+    const { data: items, error: itemsError } = await supabaseAnon
       .from('cars') // Assuming 'cars' table is used for items based on context
       .select('*')
       .eq('crew_id', targetCrew.id)

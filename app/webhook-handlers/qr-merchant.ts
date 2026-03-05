@@ -1,6 +1,6 @@
 import { WebhookHandler } from "./types";
 import { sendComplexMessage } from "./actions/sendComplexMessage";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 
 export const qrMerchantHandler: WebhookHandler = {
   canHandle: (invoice) => {

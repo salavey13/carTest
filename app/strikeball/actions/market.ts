@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin, fetchUserData } from "@/hooks/supabase";
+import { supabaseAnon, fetchUserData } from "@/hooks/supabase";
 import { sendTelegramInvoice } from "@/app/actions"; 
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
@@ -9,7 +9,7 @@ const LISTING_FEE = 50; // 50 XTR to list an item
 
 export async function getGearList() {
     // 1. Fetch all items (No Join)
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAnon
       .from("cars")
       .select("*")
       .in("type", ["gear", "weapon", "consumable", "loot"]) 
@@ -32,7 +32,7 @@ export async function getGearList() {
     // 3. Fetch Usernames manually
     let userMap: Record<string, string> = {};
     if (ownerIds.length > 0) {
-        const { data: users, error: userError } = await supabaseAdmin
+        const { data: users, error: userError } = await supabaseAnon
             .from("users")
             .select("user_id, username")
             .in("user_id", ownerIds);
@@ -60,7 +60,7 @@ export async function getGearList() {
 
 export async function rentGear(userId: string, gearId: string) {
   try {
-    const { data: item } = await supabaseAdmin.from("cars").select("*").eq("id", gearId).single();
+    const { data: item } = await supabaseAnon.from("cars").select("*").eq("id", gearId).single();
     if (!item) throw new Error("Снаряжение не найдено.");
 
     const invoicePayload = `gear_rent_${gearId}_${Date.now()}`;
@@ -108,7 +108,7 @@ export async function payListingFee(userId: string, itemDetails: any) {
         );
         
         if (result.success) {
-             await supabaseAdmin.from("invoices").update({ metadata }).eq("id", payload);
+             await supabaseAnon.from("invoices").update({ metadata }).eq("id", payload);
         }
 
         if (!result.success) throw new Error(result.error);
@@ -122,11 +122,11 @@ export async function payListingFee(userId: string, itemDetails: any) {
 export async function contactSeller(buyerId: string, itemId: string) {
     try {
         // Fetch item first
-        const { data: item } = await supabaseAdmin.from("cars").select("*").eq("id", itemId).single();
+        const { data: item } = await supabaseAnon.from("cars").select("*").eq("id", itemId).single();
         if (!item || !item.owner_id) throw new Error("Продавец не найден");
 
         // Fetch Buyer Name
-        const { data: buyer } = await supabaseAdmin.from("users").select("username").eq("user_id", buyerId).single();
+        const { data: buyer } = await supabaseAnon.from("users").select("username").eq("user_id", buyerId).single();
         const buyerName = buyer?.username ? `@${buyer.username}` : "Покупатель";
 
         // Notify Seller
@@ -145,7 +145,7 @@ export async function contactSeller(buyerId: string, itemId: string) {
 export async function getUserPurchases(userId: string) {
     if (!userId) return { success: false, data: [] };
     try {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAnon
             .from("user_purchases")
             .select("*")
             .eq("user_id", userId)

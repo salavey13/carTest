@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { sendTelegramInvoice, notifyAdmin } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
@@ -24,7 +24,7 @@ export default function OrderSnatcherSection() {
   useEffect(() => {
     const checkAccess = async () => {
       if (!user?.id) return;
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await supabaseAnon
         .from("users")
         .select("metadata")
         .eq("user_id", user.id.toString())

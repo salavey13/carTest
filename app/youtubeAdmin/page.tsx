@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { CharacterForm } from "@/components/CharacterForm";
 import { motion } from "framer-motion";
@@ -28,7 +28,7 @@ export default function YoutubeAdminPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const { data, error } = await supabaseAdmin.from("characters").select("*");
+        const { data, error } = await supabaseAnon.from("characters").select("*");
         if (error) throw error;
         setCharacters(data || []);
 
@@ -71,7 +71,7 @@ export default function YoutubeAdminPage() {
       if (result.success) {
         toast.success("Video uploaded successfully!");
         // Save video metadata to database
-        await supabaseAdmin.from("videos").insert([{
+        await supabaseAnon.from("videos").insert([{
           title,
           description,
           tags: tags.split(",").map(tag => tag.trim()),
@@ -97,7 +97,7 @@ export default function YoutubeAdminPage() {
 
   const handleDeleteCharacter = async (id: number) => {
     try {
-      const { error } = await supabaseAdmin.from("characters").delete().eq("id", id);
+      const { error } = await supabaseAnon.from("characters").delete().eq("id", id);
       if (error) throw error;
       setCharacters(characters.filter((char) => char.id !== id));
       toast.success("Character deleted successfully!");

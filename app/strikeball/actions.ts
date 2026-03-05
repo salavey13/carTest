@@ -1,6 +1,7 @@
 "use server";
 
-import { supabaseAdmin, fetchUserData } from "@/hooks/supabase";
+import { fetchUserData } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { sendTelegramInvoice } from "@/app/actions"; 
 import { logger } from "@/lib/logger";

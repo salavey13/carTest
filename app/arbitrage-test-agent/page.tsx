@@ -4,7 +4,7 @@ import React, { useState, useCallback, Suspense, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import { supabaseAdmin } from '@/hooks/supabase';
+import { supabaseAnon } from '@/hooks/supabase';
 import { triggerMarketDataFetch, triggerCentralAnalyzer, runFullSimulation } from './actions';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -109,7 +109,7 @@ const ArbitrageTestAgentPage = () => {
     const orderByColumn = tableName === 'arbitrage_opportunities' ? 'timestamp_a' : 'timestamp';
 
     try {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAnon
             .from(tableName)
             .select('*')
             .limit(50)

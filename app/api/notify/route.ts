@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { escapeMarkdown } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
         
         const { rental_id, event_type, created_by, payload } = eventData;
         
-        const { data: rentalContext, error } = await supabaseAdmin
+        const { data: rentalContext, error } = await supabaseAnon
             .from('rentals')
             .select(`
                 user_id,
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
                 recipient_ids.add(owner_id);
 
                 if (vehicle?.crew_id) {
-                    const { data: members, error: memberError } = await supabaseAdmin
+                    const { data: members, error: memberError } = await supabaseAnon
                         .from('crew_members')
                         .select('user_id')
                         .eq('crew_id', vehicle.crew_id);

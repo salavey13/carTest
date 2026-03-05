@@ -1,7 +1,7 @@
 // /app/wb/[slug]/actions_csv.ts
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import Papa from "papaparse";
 import { v4 as uuidv4 } from "uuid";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";

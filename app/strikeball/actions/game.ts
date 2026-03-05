@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { revalidatePath } from "next/cache";
 import { logger } from "@/lib/logger";
 
@@ -12,14 +12,14 @@ export async function startGame(lobbyId: string, userId: string) {
         return { success: false, error: "INVALID_LOBBY_ID_FORMAT" };
     }
     try {
-    const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id, metadata").eq("id", lobbyId).single();
+    const { data: lobby } = await supabaseAnon.from("lobbies").select("owner_id, metadata").eq("id", lobbyId).single();
     if (!lobby || lobby.owner_id !== userId) throw new Error("ACCESS DENIED");
 
     const newMeta = { ...lobby.metadata, actual_start_at: new Date().toISOString(), score: { red: 0, blue: 0 } };
-    const { error: lobbyError } = await supabaseAdmin.from("lobbies").update({ status: 'active', metadata: newMeta }).eq("id", lobbyId);
+    const { error: lobbyError } = await supabaseAnon.from("lobbies").update({ status: 'active', metadata: newMeta }).eq("id", lobbyId);
     if (lobbyError) throw lobbyError;
 
-    const { error: membersError } = await supabaseAdmin.from("lobby_members").update({ status: 'alive' }).eq("lobby_id", lobbyId);
+    const { error: membersError } = await supabaseAnon.from("lobby_members").update({ status: 'alive' }).eq("lobby_id", lobbyId);
     if (membersError) logger.warn("Failed to set members to alive", membersError);
     
     return { success: true };
@@ -34,18 +34,18 @@ export async function endGame(lobbyId: string, userId: string, winner: 'red' | '
     try {
     // We allow system (userId='system') to end game too
     if (userId !== 'system') {
-        const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id").eq("id", lobbyId).single();
+        const { data: lobby } = await supabaseAnon.from("lobbies").select("owner_id").eq("id", lobbyId).single();
         if (!lobby || lobby.owner_id !== userId) throw new Error("ACCESS DENIED");
     }
 
-    const { data: lobbyMeta } = await supabaseAdmin.from("lobbies").select("metadata").eq("id", lobbyId).single();
+    const { data: lobbyMeta } = await supabaseAnon.from("lobbies").select("metadata").eq("id", lobbyId).single();
     const newMeta = {
       ...lobbyMeta?.metadata,
       actual_end_at: new Date().toISOString(),
       winner: winner
     };
 
-    const { error } = await supabaseAdmin.from("lobbies").update({ status: 'finished', metadata: newMeta }).eq("id", lobbyId);
+    const { error } = await supabaseAnon.from("lobbies").update({ status: 'finished', metadata: newMeta }).eq("id", lobbyId);
     if (error) throw error;
     return { success: true };
   } catch (e: any) { return { success: false, error: e.message }; }
@@ -57,14 +57,14 @@ export async function updateScore(lobbyId: string, userId: string, team: 'red' |
         return { success: false, error: "INVALID_LOBBY_ID_FORMAT" };
     }
     try {
-    const { data: lobby } = await supabaseAdmin.from("lobbies").select("owner_id, metadata").eq("id", lobbyId).single();
+    const { data: lobby } = await supabaseAnon.from("lobbies").select("owner_id, metadata").eq("id", lobbyId).single();
     if (!lobby || lobby.owner_id !== userId) throw new Error("ACCESS DENIED");
 
     const currentScore = lobby.metadata?.score || { red: 0, blue: 0 };
     const newScoreVal = Math.max(0, (currentScore[team] || 0) + delta);
     const newMeta = { ...lobby.metadata, score: { ...currentScore, [team]: newScoreVal } };
 
-    const { error } = await supabaseAdmin.from("lobbies").update({ metadata: newMeta }).eq("id", lobbyId);
+    const { error } = await supabaseAnon.from("lobbies").update({ metadata: newMeta }).eq("id", lobbyId);
     if (error) throw error;
     return { success: true };
   } catch (e: any) { return { success: false, error: e.message }; }
@@ -76,17 +76,17 @@ export async function playerHit(lobbyId: string, memberId: string) {
         return { success: false, error: "INVALID_LOBBY_ID_FORMAT" };
     }
     try {
-        const { data: member } = await supabaseAdmin.from("lobby_members").select("team, status").eq("id", memberId).single();
+        const { data: member } = await supabaseAnon.from("lobby_members").select("team, status").eq("id", memberId).single();
         if (!member || member.status === 'dead') return { success: false, error: "Invalid state" };
 
-        await supabaseAdmin.from("lobby_members").update({ status: 'dead', joined_at: new Date().toISOString() }).eq("id", memberId);
+        await supabaseAnon.from("lobby_members").update({ status: 'dead', joined_at: new Date().toISOString() }).eq("id", memberId);
 
-        const { data: lobby } = await supabaseAdmin.from("lobbies").select("metadata").eq("id", lobbyId).single();
+        const { data: lobby } = await supabaseAnon.from("lobbies").select("metadata").eq("id", lobbyId).single();
         const currentScore = lobby?.metadata?.score || { red: 0, blue: 0 };
         const enemyTeam = member.team === 'blue' ? 'red' : 'blue';
         const newScore = { ...currentScore, [enemyTeam]: (currentScore[enemyTeam] || 0) + 1 };
 
-        await supabaseAdmin.from("lobbies").update({ metadata: { ...lobby.metadata, score: newScore } }).eq("id", lobbyId);
+        await supabaseAnon.from("lobbies").update({ metadata: { ...lobby.metadata, score: newScore } }).eq("id", lobbyId);
         return { success: true };
     } catch (e: any) { return { success: false, error: e.message }; }
 }
@@ -104,7 +104,7 @@ export async function handleBaseInteraction(lobbyId: string, userId: string, tar
         return { success: false, error: "INVALID_LOBBY_ID_FORMAT" };
     }
     try {
-        const { data: member } = await supabaseAdmin
+        const { data: member } = await supabaseAnon
             .from("lobby_members")
             .select("id, team, status")
             .eq("lobby_id", lobbyId)
@@ -119,7 +119,7 @@ export async function handleBaseInteraction(lobbyId: string, userId: string, tar
                 return { success: true, message: "База подтверждена. Боезапас пополнен." };
             }
             // Respawn
-            await supabaseAdmin.from("lobby_members").update({ status: 'alive' }).eq("id", member.id);
+            await supabaseAnon.from("lobby_members").update({ status: 'alive' }).eq("id", member.id);
             return { success: true, message: "ВЫ ВОЗРОЖДЕНЫ! В БОЙ!" };
         }
 
@@ -127,7 +127,7 @@ export async function handleBaseInteraction(lobbyId: string, userId: string, tar
         if (member.status === 'dead') return { success: false, error: "Мертвые не штурмуют базу!" };
 
         // Check Domination Conditions
-        const { data: checkpoints } = await supabaseAdmin
+        const { data: checkpoints } = await supabaseAnon
             .from("lobby_checkpoints")
             .select("owner_team")
             .eq("lobby_id", lobbyId);
@@ -162,8 +162,8 @@ export async function playerRespawnAtCheckpoint(lobbyId: string, userId: string,
         return { success: false, error: "INVALID_LOBBY_ID_FORMAT" };
     }
     try {
-         const { data: member } = await supabaseAdmin.from("lobby_members").select("id, team").eq("lobby_id", lobbyId).eq("user_id", userId).single();
-         const { data: cp } = await supabaseAdmin.from("lobby_checkpoints").select("owner_team").eq("id", checkpointId).single();
+         const { data: member } = await supabaseAnon.from("lobby_members").select("id, team").eq("lobby_id", lobbyId).eq("user_id", userId).single();
+         const { data: cp } = await supabaseAnon.from("lobby_checkpoints").select("owner_team").eq("id", checkpointId).single();
          
          if (!member || !cp) throw new Error("Invalid target");
          
@@ -171,7 +171,7 @@ export async function playerRespawnAtCheckpoint(lobbyId: string, userId: string,
              return { success: false, error: "Точка не под вашим контролем!" };
          }
 
-         await supabaseAdmin.from("lobby_members").update({ status: 'alive' }).eq("id", member.id);
+         await supabaseAnon.from("lobby_members").update({ status: 'alive' }).eq("id", member.id);
          return { success: true, message: "Высадка на точке завершена." };
     } catch (e: any) {
         return { success: false, error: e.message };
@@ -185,7 +185,7 @@ export async function playerRespawn(lobbyId: string, userId: string, checkpointI
         return { success: false, error: "INVALID_PARAMETERS" };
     }
     try {
-        const { data: member } = await supabaseAdmin.from("lobby_members").select("id, team, status").eq("id", userId).eq("lobby_id", lobbyId).single();
+        const { data: member } = await supabaseAnon.from("lobby_members").select("id, team, status").eq("id", userId).eq("lobby_id", lobbyId).single();
         if (!member) throw new Error("Member not found");
 
         // If specific checkpoint provided, delegate to specialist
@@ -194,7 +194,7 @@ export async function playerRespawn(lobbyId: string, userId: string, checkpointI
         }
 
         // Otherwise generic respawn (assume at base or just revive)
-        await supabaseAdmin.from("lobby_members").update({ status: 'alive' }).eq("id", member.id);
+        await supabaseAnon.from("lobby_members").update({ status: 'alive' }).eq("id", member.id);
         revalidatePath(`/strikeball/lobbies/${lobbyId}`);
 
         return { success: true, message: "ВЫ ВОЗРОЖДЕНЫ!" };
@@ -205,7 +205,7 @@ export async function playerRespawn(lobbyId: string, userId: string, checkpointI
 }
 
 export async function updatePlayerLocation(lobbyId: string, userId: string, lat: number, lng: number) {
-    const { error } = await supabaseAdmin
+    const { error } = await supabaseAnon
         .from('lobby_geo_pings')
         .insert({ lobby_id: lobbyId, user_id: userId, lat, lng });
 

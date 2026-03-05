@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import path from 'path'; 
 import fs from 'fs';   
@@ -18,9 +18,9 @@ const { PDFDocument, rgb } = pdfLibModule;
 export async function generateAndSendLobbyPdf(userId: string, lobbyId: string) {
   try {
     // 1. Сбор разведданных
-    const { data: lobby } = await supabaseAdmin.from("lobbies").select("*").eq("id", lobbyId).single();
-    const { data: members } = await supabaseAdmin.from("lobby_members").select("*").eq("lobby_id", lobbyId);
-    const { data: checkpoints } = await supabaseAdmin.from("lobby_checkpoints").select("*").eq("lobby_id", lobbyId);
+    const { data: lobby } = await supabaseAnon.from("lobbies").select("*").eq("id", lobbyId).single();
+    const { data: members } = await supabaseAnon.from("lobby_members").select("*").eq("lobby_id", lobbyId);
+    const { data: checkpoints } = await supabaseAnon.from("lobby_checkpoints").select("*").eq("lobby_id", lobbyId);
     
     if (!lobby) throw new Error("Operation not found");
 
@@ -199,17 +199,17 @@ export async function generateAndSendLobbyPdf(userId: string, lobbyId: string) {
 export async function generateAndSendLobbyPdfDefault(userId: string, lobbyId: string) {
   try {
     // 1. Fetch Data
-    const { data: lobby } = await supabaseAdmin.from("lobbies").select("*").eq("id", lobbyId).single();
-    const { data: rawMembers } = await supabaseAdmin.from("lobby_members").select("*").eq("lobby_id", lobbyId);
+    const { data: lobby } = await supabaseAnon.from("lobbies").select("*").eq("id", lobbyId).single();
+    const { data: rawMembers } = await supabaseAnon.from("lobby_members").select("*").eq("lobby_id", lobbyId);
     
     // NEW: Fetch Checkpoints
-    const { data: checkpoints } = await supabaseAdmin.from("lobby_checkpoints").select("*").eq("lobby_id", lobbyId);
+    const { data: checkpoints } = await supabaseAnon.from("lobby_checkpoints").select("*").eq("lobby_id", lobbyId);
     
     if (!lobby) throw new Error("Lobby not found");
 
     // We need members linked to users to get names
     const userIds = rawMembers?.map((m: any) => m.user_id).filter((id: string) => id && id.length > 10) || [];
-    const { data: users } = await supabaseAdmin.from("users").select("user_id, username, full_name").in("user_id", userIds);
+    const { data: users } = await supabaseAnon.from("users").select("user_id, username, full_name").in("user_id", userIds);
     
     const userMap = new Map();
     users?.forEach((u: any) => userMap.set(u.user_id, u));
@@ -451,7 +451,7 @@ export async function generateAndSendLobbyPdfDefault(userId: string, lobbyId: st
 // ... [generateGearCatalogPdf remains same] ...
 export async function generateGearCatalogPdf(userId: string) {
   try {
-    const { data: gear } = await supabaseAdmin.from("cars").select("*").in("type", ["gear", "weapon", "consumable"]);
+    const { data: gear } = await supabaseAnon.from("cars").select("*").in("type", ["gear", "weapon", "consumable"]);
     if (!gear || gear.length === 0) throw new Error("No gear found in armory.");
 
     const pdfDoc = await PDFDocument.create();
@@ -520,8 +520,8 @@ export async function generateGearCatalogPdf(userId: string) {
 export async function generateLobbyShareLink(lobbyId: string, formattedTime?: string) {
   try {
     // 1. Получаем данные лобби и участников
-    const { data: lobby } = await supabaseAdmin.from("lobbies").select("*").eq("id", lobbyId).single();
-    const { data: members } = await supabaseAdmin.from("lobby_members").select("*").eq("lobby_id", lobbyId);
+    const { data: lobby } = await supabaseAnon.from("lobbies").select("*").eq("id", lobbyId).single();
+    const { data: members } = await supabaseAnon.from("lobby_members").select("*").eq("lobby_id", lobbyId);
 
     if (!lobby) throw new Error("Operation not found");
 

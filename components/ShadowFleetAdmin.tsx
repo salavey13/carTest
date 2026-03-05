@@ -2,7 +2,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import type React from "react"
-import { supabaseAdmin } from "@/hooks/supabase"
+import { supabaseAnon } from "@/hooks/supabase"
 import { useAppContext } from "@/contexts/AppContext"
 import Link from "next/link"
 import Image from "next/image"
@@ -43,7 +43,7 @@ export function ShadowFleetAdmin() {
 
     const fetchPremiumCars = async () => {
       try {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAnon
           .from("cars")
           .select(`
             id,

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMessage';
 import { notifyAdmin } from '@/app/actions';
-import { supabaseAdmin } from '@/hooks/supabase';
+import { supabaseAnon } from '@/hooks/supabase';
 
 export async function POST(req: NextRequest) {
   try {
-    if (!supabaseAdmin) {
+    if (!supabaseAnon) {
       return NextResponse.json({ error: 'Supabase admin client is not available' }, { status: 500 });
     }
 
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Authenticate and check if sender is admin
-    const { data: senderData, error: senderError } = await supabaseAdmin
+    const { data: senderData, error: senderError } = await supabaseAnon
       .from('users')
       .select('role')
       .eq('user_id', senderId)
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch all user_ids (exclude admins or bots if needed)
-    const { data: users, error: usersError } = await supabaseAdmin
+    const { data: users, error: usersError } = await supabaseAnon
       .from('users')
       .select('user_id')
       .eq('role', 'admin'); // Optional: Only admins receiving the broadcast
