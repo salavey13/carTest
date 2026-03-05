@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { createStrikeballLobby } from "./lobby";
 import { logger } from "@/lib/logger";
 
@@ -22,7 +22,7 @@ async function createMatchNode(
         max_players: 10
     }) as any;
 
-    const { data, error } = await supabaseAdmin.from("tournament_matches").insert({
+    const { data, error } = await supabaseAnon.from("tournament_matches").insert({
         tournament_id: tourneyId,
         round: round,
         match_order: order,
@@ -43,7 +43,7 @@ export async function createTournament(userId: string, name: string, crewIds: st
         if (crewIds.length !== 4) throw new Error("MVP supports exactly 4 crews for now.");
         
         // 1. Create Tournament
-        const { data: tourney, error: tErr } = await supabaseAdmin
+        const { data: tourney, error: tErr } = await supabaseAnon
             .from("tournaments")
             .insert({ name, created_by: userId, status: 'active' })
             .select()
@@ -68,8 +68,8 @@ export async function createTournament(userId: string, name: string, crewIds: st
 }
 
 export async function fetchTournament(id: string) {
-    const { data: tourney } = await supabaseAdmin.from("tournaments").select("*").eq("id", id).single();
-    const { data: matches } = await supabaseAdmin
+    const { data: tourney } = await supabaseAnon.from("tournaments").select("*").eq("id", id).single();
+    const { data: matches } = await supabaseAnon
         .from("tournament_matches")
         .select(`
             *,
@@ -91,11 +91,11 @@ export async function fetchTournament(id: string) {
 export async function advanceMatch(matchId: string, winnerCrewId: string) {
     try {
         // 1. Get current match details
-        const { data: match } = await supabaseAdmin.from("tournament_matches").select("*").eq("id", matchId).single();
+        const { data: match } = await supabaseAnon.from("tournament_matches").select("*").eq("id", matchId).single();
         if (!match) throw new Error("Match not found");
 
         // 2. Update current match
-        await supabaseAdmin.from("tournament_matches").update({
+        await supabaseAnon.from("tournament_matches").update({
             winner_crew_id: winnerCrewId,
             status: 'completed'
         }).eq("id", matchId);
@@ -104,7 +104,7 @@ export async function advanceMatch(matchId: string, winnerCrewId: string) {
         if (match.next_match_id && match.next_match_slot) {
             const updateField = match.next_match_slot === 1 ? 'crew1_id' : 'crew2_id';
             
-            await supabaseAdmin.from("tournament_matches")
+            await supabaseAnon.from("tournament_matches")
                 .update({ [updateField]: winnerCrewId })
                 .eq("id", match.next_match_id);
         }

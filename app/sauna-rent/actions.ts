@@ -1,7 +1,7 @@
 "use server";
 
 import { createBooking } from "@/app/rentals/actions"; // existing server action in your repo
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 
 type SaunaPayload = {

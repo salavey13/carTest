@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -20,7 +20,7 @@ import { VibeContentRenderer } from "@/components/VibeContentRenderer"; // Added
 
 const notifyYtTeam = async (message: string) => {
   try {
-    const { data: ytTeamMembers, error } = await supabaseAdmin
+    const { data: ytTeamMembers, error } = await supabaseAnon
       .from("users")
       .select("user_id")
       .eq("role", "ytTeam");
@@ -50,7 +50,7 @@ export default function TasksPage() {
     const fetchTasks = async () => {
       setLoading(true);
       try {
-          const { data, error } = await supabaseAdmin
+          const { data, error } = await supabaseAnon
             .from("tasks")
             .select("*")
             .order("created_at", { ascending: false });
@@ -86,7 +86,7 @@ export default function TasksPage() {
         assigned_to: user?.id.toString(), 
         created_at: new Date().toISOString(),
       };
-      const { data: task, error } = await supabaseAdmin
+      const { data: task, error } = await supabaseAnon
         .from("tasks")
         .insert(taskData)
         .select()
@@ -110,7 +110,7 @@ export default function TasksPage() {
       return;
     }
     try {
-      const { data: task, error } = await supabaseAdmin
+      const { data: task, error } = await supabaseAnon
         .from("tasks")
         .update({
           title: editingTask.title,
@@ -141,7 +141,7 @@ export default function TasksPage() {
       return;
     }
     try {
-      const { error } = await supabaseAdmin
+      const { error } = await supabaseAnon
         .from("tasks")
         .delete()
         .eq("id", id);

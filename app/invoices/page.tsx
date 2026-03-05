@@ -7,7 +7,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { getUserInvoices, getUserRentals } from "@/hooks/supabase";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { Trophy, Car, CreditCard, Crown } from "lucide-react";
 
 interface Invoice { id: string; type: string; status: string; amount: number; metadata: { car_make?: string; car_model?: string; days?: number; subscription_id?: string }; }
@@ -67,7 +67,7 @@ export default function GloryHall() {
     const fetchTopFleets = async () => {
       toast.info("Чекаю топ-флоты для админа...");
       try {
-        const { data, error } = await supabaseAdmin.rpc("get_top_fleets");
+        const { data, error } = await supabaseAnon.rpc("get_top_fleets");
         if (error) {
           toast.error(`Ошибка топ-флотов: ${error.message || "Топ-флоты сломались!"}`);
         } else {

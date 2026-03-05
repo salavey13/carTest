@@ -1,7 +1,7 @@
 "use server";
 
 import { notifyAdmin, updateUserSettings } from "@/app/actions";
-import { supabaseAdmin, createOrUpdateUser } from "@/hooks/supabase";
+import { supabaseAnon, createOrUpdateUser } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 // CHANGED IMPORT: Now using warehouse questions
@@ -17,9 +17,9 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, userna
   const { answers, user_id } = state;
 
   // Save to survey-specific table
-  await supabaseAdmin.from("user_surveys").insert({ user_id, username: username || "unknown", survey_data: answers });
+  await supabaseAnon.from("user_surveys").insert({ user_id, username: username || "unknown", survey_data: answers });
   // Delete the temporary state
-  await supabaseAdmin.from("user_survey_state").delete().eq('user_id', user_id);
+  await supabaseAnon.from("user_survey_state").delete().eq('user_id', user_id);
   // Save results to user's metadata
   await updateUserSettings(user_id, { survey_results: answers });
 
@@ -68,10 +68,10 @@ export async function startCommand(chatId: number, userId: number, from_user: an
 
   if (text === '/start') {
     // Reset previous state
-    await supabaseAdmin.from("user_survey_state").delete().eq('user_id', userIdStr);
-    await supabaseAdmin.from("user_surveys").delete().eq('user_id', userIdStr);
+    await supabaseAnon.from("user_survey_state").delete().eq('user_id', userIdStr);
+    await supabaseAnon.from("user_surveys").delete().eq('user_id', userIdStr);
 
-    const { data: newState, error } = await supabaseAdmin
+    const { data: newState, error } = await supabaseAnon
       .from("user_survey_state")
       .insert({ user_id: userIdStr, current_step: 1, answers: {} })
       .select().single();
@@ -88,7 +88,7 @@ export async function startCommand(chatId: number, userId: number, from_user: an
 
   } else {
     // Handle Answer
-    const { data: currentState } = await supabaseAdmin.from("user_survey_state").select('*').eq('user_id', userIdStr).maybeSingle();
+    const { data: currentState } = await supabaseAnon.from("user_survey_state").select('*').eq('user_id', userIdStr).maybeSingle();
 
     if (!currentState) {
       // User sent text without an active survey -> redirect to app or restart
@@ -116,7 +116,7 @@ export async function startCommand(chatId: number, userId: number, from_user: an
     if (nextStep > surveyQuestions.length) {
       await handleSurveyCompletion(chatId, { ...currentState, answers: newAnswers }, username);
     } else {
-      await supabaseAdmin.from("user_survey_state").update({ current_step: nextStep, answers: newAnswers }).eq('user_id', userIdStr);
+      await supabaseAnon.from("user_survey_state").update({ current_step: nextStep, answers: newAnswers }).eq('user_id', userIdStr);
       const nextQuestion = surveyQuestions.find(q => q.step === nextStep)!;
       const buttons = nextQuestion.answers ? nextQuestion.answers.map(a => ([{ text: a.text }])) : [];
       await sendComplexMessage(chatId, nextQuestion.question, buttons, { keyboardType: nextQuestion.answers ? 'reply' : 'remove' });

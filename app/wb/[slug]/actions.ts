@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { unstable_noStore as noStore } from "next/cache";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import Papa from "papaparse";

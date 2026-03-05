@@ -1,11 +1,11 @@
-import { supabaseAdmin } from '@/hooks/supabase'; // Admin for write
+import { supabaseAnon } from '@/hooks/supabase'; // Admin for write
 import { NextResponse } from 'next/server';
 import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMessage';
 import { escapeTelegramMarkdown } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 
 export async function POST(request: Request) {
-  if (!supabaseAdmin) {
+  if (!supabaseAnon) {
     logger.error('[POST /api/rules/book] Supabase admin client unavailable.');
     return NextResponse.json({ error: 'Database unavailable' }, { status: 500 });
   }
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
   try {
     // Check overlap для rig и rigger (если есть)
-    let overlapQuery = supabaseAdmin.from('rentals').select('*').eq('vehicle_id', 'rule-cube-basic');
+    let overlapQuery = supabaseAnon.from('rentals').select('*').eq('vehicle_id', 'rule-cube-basic');
     if (riggerId) overlapQuery = overlapQuery.eq('metadata->>rigger_id', riggerId);
     overlapQuery = overlapQuery.lt('requested_start_date', endIso).gt('requested_end_date', startIso);
 
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     if (overlaps?.length) throw new Error('Overlap detected');
 
     // Create booking
-    const { data: rental } = await supabaseAdmin.rpc('createBooking', {
+    const { data: rental } = await supabaseAnon.rpc('createBooking', {
       p_user_id: userId,
       p_vehicle_id: 'rule-cube-basic',
       p_start_date: startIso,
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const rentalId = rental.rental_id;
 
     // Update metadata
-    await supabaseAdmin.from('rentals').update({
+    await supabaseAnon.from('rentals').update({
       metadata: {
         type: 'rule',
         rule_id: 'rule-cube-basic',
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
     // 1% XTR invoice
     const amount = Math.round(price * 0.01 * 100);
-    const { data: invoice } = await supabaseAdmin.rpc('create_invoice', {
+    const { data: invoice } = await supabaseAnon.rpc('create_invoice', {
       p_type: 'rule_booking',
       p_id: `rule_${rentalId}`,
       p_user_id: userId,
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
     // Rigger notif if set
     if (riggerId) {
-      const { data: rigger } = await supabaseAdmin.from('users').select('user_id').eq('metadata->>rigger_id', riggerId).single();
+      const { data: rigger } = await supabaseAnon.from('users').select('user_id').eq('metadata->>rigger_id', riggerId).single();
       if (rigger) await sendComplexMessage(rigger.user_id, `${summaryMd}\nAccept?`, [[{ text: '/accept_' + rentalId }, { text: '/decline_' + rentalId }]], { keyboardType: 'reply' });
     }
 

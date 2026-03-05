@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/hooks/supabase';
+import { supabaseAnon } from '@/hooks/supabase';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Save partial audit progress
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseAnon
       .from('audit_progress')
       .upsert({
         user_id: userId,

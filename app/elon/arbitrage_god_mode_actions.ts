@@ -1,7 +1,7 @@
 "use server";
 
 import { logger } from "@/lib/logger";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import type { ArbitrageSettings, GodModeOpportunity, GodModeSimulationResult } from "./arbitrage_scanner_types";
 import { v4 as uuidv4 } from 'uuid';
 

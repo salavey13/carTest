@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import { Brain } from "lucide-react";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
 import { Graph } from "@/components/Graph";
 import { ProgressIndicator } from "@/components/ProgressIndicator";
@@ -57,7 +57,7 @@ export default function SupercarTest() {
   // Fetch questions on mount
   useEffect(() => {
     const fetchQuestions = async () => {
-      const { data, error } = await supabaseAdmin.from("questions").select("*").order("position", { ascending: true });
+      const { data, error } = await supabaseAnon.from("questions").select("*").order("position", { ascending: true });
       if (error) {
         console.error("Ошибка загрузки вопросов:", error);
       } else if (data) {
@@ -70,7 +70,7 @@ export default function SupercarTest() {
   // Fetch all answers on mount
   useEffect(() => {
     const fetchAnswers = async () => {
-      const { data, error } = await supabaseAdmin.from("answers").select("*");
+      const { data, error } = await supabaseAnon.from("answers").select("*");
       if (error) {
         console.error("Ошибка загрузки ответов:", error);
       } else if (data) {
@@ -84,7 +84,7 @@ export default function SupercarTest() {
   useEffect(() => {
     const loadProgress = async () => {
       if (user?.id) {
-        const { data } = await supabaseAdmin.from("users").select("test_progress").eq("user_id", user.id).single();
+        const { data } = await supabaseAnon.from("users").select("test_progress").eq("user_id", user.id).single();
         if (data?.test_progress) {
           setCurrentQuestionIndex(data.test_progress.currentQuestionIndex);
           setSelectedAnswers(data.test_progress.selectedAnswers);
@@ -99,7 +99,7 @@ export default function SupercarTest() {
   useEffect(() => {
     const checkAdmin = async () => {
       if (user?.id) {
-        const { data } = await supabaseAdmin.from("users").select("role").eq("user_id", user.id).single();
+        const { data } = await supabaseAnon.from("users").select("role").eq("user_id", user.id).single();
         setIsAdmin(data?.role === "admin");
       }
     };
@@ -160,7 +160,7 @@ export default function SupercarTest() {
           const topResult = data[0];
           setResult(topResult);
 
-          const { data: similar, error: similarError } = await supabaseAdmin.rpc("similar_cars", {
+          const { data: similar, error: similarError } = await supabaseAnon.rpc("similar_cars", {
             car_id: topResult.id,
             match_count: 3,
           });
@@ -179,14 +179,14 @@ export default function SupercarTest() {
         setSearchError("Не удалось найти подходящую машину. Попробуйте снова.");
       } finally {
         setIsSearching(false);
-        await supabaseAdmin.from("users").update({ test_progress: null }).eq("user_id", user?.id);
+        await supabaseAnon.from("users").update({ test_progress: null }).eq("user_id", user?.id);
       }
     } else {
       const progress = {
         currentQuestionIndex: nextIndex,
         selectedAnswers: updatedAnswers,
       };
-      await supabaseAdmin.from("users").update({ test_progress: progress }).eq("user_id", user?.id);
+      await supabaseAnon.from("users").update({ test_progress: progress }).eq("user_id", user?.id);
       setSelectedAnswers(updatedAnswers);
       setCurrentQuestionIndex(nextIndex);
     }
@@ -202,7 +202,7 @@ export default function SupercarTest() {
     setMode("question");
     modeProgress.set(0);
     setSearchError(null);
-    await supabaseAdmin.from("users").update({ test_progress: null }).eq("user_id", user?.id);
+    await supabaseAnon.from("users").update({ test_progress: null }).eq("user_id", user?.id);
   };
 
   if (questions.length === 0) {

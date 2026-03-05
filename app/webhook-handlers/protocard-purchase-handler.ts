@@ -1,5 +1,5 @@
 import type { WebhookHandler } from "./types";
-import { supabaseAdmin, updateUserMetadata } from '@/hooks/supabase';
+import { supabaseAnon, updateUserMetadata } from '@/hooks/supabase';
 import { sendTelegramMessage } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
@@ -48,7 +48,7 @@ export const protocardPurchaseHandler: WebhookHandler = {
 
     try {
       // Step 1: Grant Access. This function encapsulates updating the user metadata.
-      const grantResult = await supabaseAdmin.rpc('grant_protocard_access', {
+      const grantResult = await supabaseAnon.rpc('grant_protocard_access', {
           p_user_id: userId,
           p_card_id: cardId,
           p_card_details: { // Constructing the card details based on invoice
@@ -77,7 +77,7 @@ export const protocardPurchaseHandler: WebhookHandler = {
       logger.info(`[ProtoCardHandler] User ${userId} metadata updated successfully via RPC with ProtoCard ${cardId}.`);
 
       // Step 2: Mark invoice as paid
-      const { error: updateInvoiceError } = await supabaseAdmin
+      const { error: updateInvoiceError } = await supabaseAnon
         .from("invoices")
         .update({ status: "paid", updated_at: new Date().toISOString() })
         .eq("id", invoice.id)

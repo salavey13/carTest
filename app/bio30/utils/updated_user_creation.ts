@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import type { WebAppUser } from "@/types/telegram";
 import { setReferrer } from "../ref_actions";
@@ -34,7 +34,7 @@ export async function createOrUpdateUserWithReferral({
     const bio30Params = parseBio30StartApp(startParam);
     
     // Create or update user
-    const userResult = await supabaseAdmin
+    const userResult = await supabaseAnon
       .from("users")
       .upsert({ 
         user_id: userId, 

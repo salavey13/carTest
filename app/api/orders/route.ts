@@ -1,6 +1,6 @@
 // /app/api/orders/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { notifyAdmin } from "@/app/actions";
 import { processOrders } from "@/lib/inventory";
 
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if order already exists
-    const { data: existingOrder, error: checkError } = await supabaseAdmin
+    const { data: existingOrder, error: checkError } = await supabaseAnon
       .from("orders")
       .select("id")
       .eq("crm_name", crm_name)
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert new order and get its ID
-    const { data: newOrder, error: insertError } = await supabaseAdmin
+    const { data: newOrder, error: insertError } = await supabaseAnon
       .from("orders")
       .insert({
         crm_name,

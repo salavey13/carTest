@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from '@/hooks/supabase'; 
+import { supabaseAdmin } from '@/lib/supabase-server'; 
 import { sendTelegramMessage, sendTelegramInvoice as tgSendInvoice } from '@/app/actions'; 
 import { spendKiloVibes, addKiloVibes } from '@/app/cyberfitness/actions'; // This import now works
 import { logger } from "@/lib/logger"; 

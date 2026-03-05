@@ -3,7 +3,7 @@
 
 import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
-import { supabaseAdmin } from '@/hooks/supabase'; 
+import { supabaseAdmin } from '@/lib/supabase-server'; 
 import { sendTelegramMessage as commonSendTelegramMessage } from '@/app/actions'; 
 import { generatePdfBytes } from './pdfGenerator'; 
 

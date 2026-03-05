@@ -1,7 +1,7 @@
 "use server";
 
 import { logger } from "@/lib/logger";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
 import { sendTelegramInvoice } from "@/app/actions";
 import { sosCommand } from "./sos";

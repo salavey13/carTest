@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import path from 'path'; 
 import fs from 'fs';   
@@ -19,7 +19,7 @@ export async function generateCrewShiftPdf(userId: string, shiftId: string) {
   logger.info(`[AAR_GEN] Начало генерации PDF для смены: ${shiftId}`);
 
   try {
-    const { data: shift, error: shiftError } = await supabaseAdmin
+    const { data: shift, error: shiftError } = await supabaseAnon
       .from("crew_member_shifts")
       .select("*, crews(name, slug), users(username, full_name)")
       .eq("id", shiftId)
@@ -115,11 +115,11 @@ export async function generateCrewShiftPdf(userId: string, shiftId: string) {
  */
 export async function generateRaidSummaryPdf(userId: string, slug: string) {
   try {
-    const { data: crew } = await supabaseAdmin.from("crews").select("id, name").eq("slug", slug).single();
+    const { data: crew } = await supabaseAnon.from("crews").select("id, name").eq("slug", slug).single();
     if (!crew) throw new Error("Экипаж не найден.");
 
     const today = new Date().toISOString().split('T')[0];
-    const { data: shifts, error } = await supabaseAdmin
+    const { data: shifts, error } = await supabaseAnon
       .from("crew_member_shifts")
       .select("*, users(username, full_name)")
       .eq("crew_id", crew.id)

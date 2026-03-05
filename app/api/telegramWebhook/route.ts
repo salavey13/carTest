@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { sendComplexMessage, KeyboardButton } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { handleWebhookProxy } from "@/app/webhook-handlers/proxy";
 import { handleCommand } from "@/app/webhook-handlers/commands/command-handler";
@@ -25,7 +25,7 @@ async function handlePhotoMessage(message: any) {
     const userId = message.from.id.toString();
     const chatId = message.chat.id;
 
-    const { data: userState, error: stateError } = await supabaseAdmin
+    const { data: userState, error: stateError } = await supabaseAnon
         .from('user_states')
         .select('*')
         .eq('user_id', userId)
@@ -46,7 +46,7 @@ async function handlePhotoMessage(message: any) {
     }
 
     if (!rentalIdFromState || !photoTypeFromState) {
-        const { data: rentals, error: rentalsError } = await supabaseAdmin
+        const { data: rentals, error: rentalsError } = await supabaseAnon
             .from('rentals')
             .select('rental_id, status, created_at')
             .eq('user_id', userId)
@@ -62,7 +62,7 @@ async function handlePhotoMessage(message: any) {
 
         let resolved: { rental_id: string; photo_type: 'start' | 'end' } | null = null;
         for (const rental of rentals ?? []) {
-            const { data: events } = await supabaseAdmin
+            const { data: events } = await supabaseAnon
                 .from('events')
                 .select('type, status')
                 .eq('rental_id', rental.rental_id);
@@ -90,7 +90,7 @@ async function handlePhotoMessage(message: any) {
         rentalIdFromState = resolved.rental_id;
         photoTypeFromState = resolved.photo_type;
 
-        await supabaseAdmin.from('user_states').upsert({
+        await supabaseAnon.from('user_states').upsert({
             user_id: userId,
             state: 'awaiting_rental_photo',
             context: resolved,
@@ -99,7 +99,7 @@ async function handlePhotoMessage(message: any) {
     }
 
     if (userState.expires_at && new Date(userState.expires_at).getTime() < Date.now()) {
-        await supabaseAdmin.from('user_states').delete().eq('user_id', userId);
+        await supabaseAnon.from('user_states').delete().eq('user_id', userId);
         await sendComplexMessage(chatId, '⌛️ Режим загрузки фото истек. Нажмите /actions и запустите шаг снова.', [], undefined);
         return;
     }
@@ -134,7 +134,7 @@ async function handlePhotoMessage(message: any) {
             throw new Error(uploadResult.error || "Failed to upload image to storage.");
         }
 
-        const { error: eventError } = await supabaseAdmin.from('events').insert({
+        const { error: eventError } = await supabaseAnon.from('events').insert({
           rental_id: rental_id,
           type: `photo_${photo_type}`,
           status: 'completed',
@@ -146,7 +146,7 @@ async function handlePhotoMessage(message: any) {
           throw new Error(`Failed to create photo event: ${eventError.message}`);
         }
 
-        await supabaseAdmin.from('user_states').delete().eq('user_id', userId);
+        await supabaseAnon.from('user_states').delete().eq('user_id', userId);
         
         await sendComplexMessage(chatId, `📸 Фото "${photo_type === 'start' ? 'ДО' : 'ПОСЛЕ'}" успешно загружено для аренды ${rental_id.slice(0, 8)}. Владелец уведомлен.`, [], undefined);
 
@@ -164,7 +164,7 @@ async function handleLocationMessage(message: any) {
 
     // --- ДОБАВЛЕНО: Сценарий 1 - Обновление геолокации члена экипажа на смене ---
     try {
-        const { data: member, error: memberError } = await supabaseAdmin
+        const { data: member, error: memberError } = await supabaseAnon
             .from('crew_members')
             .select('live_status')
             .eq('user_id', userId)
@@ -175,7 +175,7 @@ async function handleLocationMessage(message: any) {
 
         // Если участник в статусе 'riding', обновляем его геолокацию и прекращаем дальнейшую обработку.
         if (member && member.live_status === 'riding') {
-            const { error: updateError } = await supabaseAdmin
+            const { error: updateError } = await supabaseAnon
                 .from('crew_members')
                 .update({ last_location: `POINT(${longitude} ${latitude})` })
                 .eq('user_id', userId);
@@ -191,7 +191,7 @@ async function handleLocationMessage(message: any) {
     }
 
     // --- Сценарий 2 и 3: Обработка на основе состояния пользователя (user_states) ---
-    const { data: userState, error: stateError } = await supabaseAdmin
+    const { data: userState, error: stateError } = await supabaseAnon
         .from('user_states').select('*').eq('user_id', userId).single();
 
     // Если состояния нет (и это не райдер на смене), то игнорируем.
@@ -205,7 +205,7 @@ async function handleLocationMessage(message: any) {
         const { rental_id, crew_id } = userState.context as { rental_id: string, crew_id: string };
         
         try {
-            const { data: crewData, error: crewError } = await supabaseAdmin
+            const { data: crewData, error: crewError } = await supabaseAnon
                 .from('crews').select('hq_location').eq('id', crew_id).single();
             if (crewError || !crewData?.hq_location) throw new Error("Could not retrieve crew location.");
 
@@ -222,7 +222,7 @@ async function handleLocationMessage(message: any) {
             }
             buttons.push([{ text: "🙏 Помогите, денег нет!"}]);
 
-            await supabaseAdmin.from('user_states').update({
+            await supabaseAnon.from('user_states').update({
                 state: 'awaiting_sos_payment_choice',
                 context: { rental_id, geotag: { latitude, longitude } }
             }).eq('user_id', userId);
@@ -239,12 +239,12 @@ async function handleLocationMessage(message: any) {
     } else if (userState.state === 'awaiting_geotag') { 
         const { rental_id, event_id } = userState.context as { rental_id: string, event_id: string };
         try {
-            const { error: eventUpdateError } = await supabaseAdmin
+            const { error: eventUpdateError } = await supabaseAnon
                 .from('events')
                 .update({ payload: { geotag: { latitude, longitude } }, status: 'pending_acceptance' })
                 .eq('id', event_id);
             if (eventUpdateError) throw eventUpdateError;
-            await supabaseAdmin.from('user_states').delete().eq('user_id', userId);
+            await supabaseAnon.from('user_states').delete().eq('user_id', userId);
             await sendComplexMessage(chatId, `📍 Геотег получен! Оповещаем экипаж о месте перехвата. Вы можете оставить транспорт.`, [], undefined);
         } catch (error) {
             logger.error(`[Webhook Location Handler] Error processing location for user ${userId}:`, error);

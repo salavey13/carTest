@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from '@/hooks/supabase';
+import { supabaseAdmin } from '@/lib/supabase-server';
 // Import types directly if not re-exported from hooks/supabase
 import type { Database } from "@/types/database.types";
 import { logger } from '@/lib/logger';
