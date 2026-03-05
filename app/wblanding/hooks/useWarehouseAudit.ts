@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMessage';
-import { supabaseAdmin } from '@/hooks/supabase';
+import { clearWarehouseAuditProgress, getWarehouseAuditState, saveWarehouseAuditProgress } from '@/app/wblanding/actions_audit';
 import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 
 // ============= Enhanced Interfaces =============
@@ -102,47 +102,28 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     const loadProgress = async () => {
       try {
         // Check for incomplete audit
-        const { data: progress, error: progressError } = await supabaseAdmin
-          .from('audit_progress')
-          .select('*')
-          .eq('user_id', userId)
-          .single();
-        
-        if (progressError && progressError.code !== 'PGRST116') {
-          console.error('Progress load error:', progressError);
+        const result = await getWarehouseAuditState(userId);
+
+        if (!result.success) {
+          console.error('Failed to load warehouse audit state:', result.error);
+          return;
         }
-        
+
+        const progress = result.progress as any;
         if (progress) {
           const timeDiff = Date.now() - new Date(progress.updated_at).getTime();
           const hoursDiff = timeDiff / (1000 * 60 * 60);
-          
-          // Offer to resume if incomplete audit is less than 24 hours old
+
           if (hoursDiff < 24 && progress.current_step < 8) {
             setStep(progress.current_step);
-            // Map DB column answers_snapshot to state answers
             setAnswers(progress.answers_snapshot || {});
             setEstimatedTime(`Продолжить с шага ${progress.current_step}`);
             console.log('✅ Progress loaded:', progress);
             return;
-          } else if (hoursDiff >= 24) {
-            // Delete expired progress
-            await supabaseAdmin.from('audit_progress').delete().eq('user_id', userId);
           }
         }
-        
-        // Check for last completed audit
-        const { data: lastAudit, error: auditError } = await supabaseAdmin
-          .from('audit_reports')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-        
-        if (auditError && auditError.code !== 'PGRST116') {
-          console.error('Last audit load error:', auditError);
-        }
-        
+
+        const lastAudit = result.lastAudit as any;
         if (lastAudit) {
           setHasCompletedAudit(true);
           setLastCompletedAudit(lastAudit);
@@ -154,7 +135,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     };
     
     loadProgress();
-  }, [userId]); // Remove supabaseAdmin from deps to prevent infinite loops
+  }, [userId]);
 
   // ============= Analytics =============
   const trackAuditEvent = useCallback((eventName: string, properties: Record<string, any>) => {
@@ -293,21 +274,21 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     if (!userId) return;
     
     try {
-      await supabaseAdmin.from('audit_progress').upsert({
-        user_id: userId,
-        current_step: step,
-        answers_snapshot: answers, // FIX: Use correct column name
-        updated_at: new Date().toISOString(),
-      }, { 
-        onConflict: 'user_id',
-        ignoreDuplicates: false 
+      const result = await saveWarehouseAuditProgress({
+        userId,
+        currentStep: step,
+        answersSnapshot: answers as Record<string, unknown>,
       });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save progress');
+      }
       
       console.log('💾 Progress saved:', { step, answers });
     } catch (error) {
       console.error('Failed to save progress:', error);
     }
-  }, [userId, step, answers, supabaseAdmin]);
+  }, [userId, step, answers]);
 
   // ============= Roadmap Generation =============
   const generateRoadmap = useCallback((calc: CalculationBreakdown, ans: EnhancedAuditAnswers): RoadmapItem[] => {
@@ -375,12 +356,13 @@ export const useWarehouseAudit = (userId: string | undefined) => {
   const clearProgress = useCallback(async () => {
     if (!userId) return;
     try {
-      await supabaseAdmin.from('audit_progress').delete().eq('user_id', userId);
+      const result = await clearWarehouseAuditProgress(userId);
+      if (!result.success) throw new Error(result.error || 'Failed to clear progress');
       console.log('🗑️ Progress cleared');
     } catch (error) {
       console.error('Failed to clear progress:', error);
     }
-  }, [userId, supabaseAdmin]);
+  }, [userId]);
 
   // ============= Navigation =============
   const handleNext = useCallback(() => {
