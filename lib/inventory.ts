@@ -1,5 +1,5 @@
 // /lib/inventory.ts
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { notifyAdmin } from "@/app/actions";
 
 const LOW_STOCK_THRESHOLD = 1000; // Threshold in ml

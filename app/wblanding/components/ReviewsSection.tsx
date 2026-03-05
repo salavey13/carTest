@@ -7,8 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { useAppContext } from '@/contexts/AppContext';
-import { getApprovedTestimonials } from '../actions_view';
-import { supabaseAdmin } from '@/hooks/supabase'; // Можно вынести в action_create_review, но для краткости тут
+import { createTestimonial, getApprovedTestimonials } from '../actions_view';
 
 interface Testimonial {
   id: string;
@@ -36,16 +35,14 @@ export const ReviewsSection = () => {
     
     setIsSubmitting(true);
     try {
-      // Лучше вынести в Server Action, но для примера:
-      const { error } = await supabaseAdmin.from('testimonials').insert({
-        user_id: dbUser.user_id,
+      const result = await createTestimonial({
+        userId: dbUser.user_id,
         username: dbUser.username || 'Anon',
         content: newReview,
-        rating: rating,
-        is_approved: false // Премодерация
+        rating,
       });
       
-      if (error) throw error;
+      if (!result.success) throw new Error(result.error || 'Ошибка отправки');
       
       toast.success("Отзыв отправлен на модерацию!");
       setNewReview("");
