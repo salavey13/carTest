@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { supabaseAdmin, createInvoice } from "@/hooks/supabase";
+import { supabaseAnon, createInvoice } from "@/hooks/supabase";
 import { sendTelegramInvoice, notifyAdmin } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
@@ -33,7 +33,7 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
   useEffect(() => {
     const checkAccess = async () => {
       if (!user?.id) return;
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await supabaseAnon
         .from("users")
         .select("has_script_access")
         .eq("user_id", user.id.toString())

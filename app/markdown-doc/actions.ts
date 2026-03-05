@@ -2,7 +2,7 @@
 
 import { sendTelegramDocument } from "@/app/actions";
 import { logger } from "@/lib/logger";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import * as docx from "docx";
 import { parseCellMarkers } from "@/lib/parseCellMarkers";
 

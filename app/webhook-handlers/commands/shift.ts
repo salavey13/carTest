@@ -1,7 +1,7 @@
 "use server";
 
 import { logger } from "@/lib/logger";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 
 function escapeTelegramMarkdown(text: string): string {
@@ -14,7 +14,7 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
     logger.info(`[Shift Command EXEC] User ${userId}, Action: ${action || 'request_keyboard'}`);
     
     try {
-        const { data: crewMember, error: crewError } = await supabaseAdmin
+        const { data: crewMember, error: crewError } = await supabaseAnon
             .from("crew_members")
             .select("crew_id, live_status, crews(owner_id, name)")
             .eq("user_id", userId)
@@ -59,7 +59,7 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                     userMessage = "✅ *Смена начата\\.* Время пошло\\.";
                     ownerMessage = `🟢 @${safeUsername} начал смену в экипаже *'${safeCrewName}'*\\.`;
                     // FIX: Changed start_time to clock_in_time to match schema
-                    shiftLogAction = () => supabaseAdmin.from('crew_member_shifts').insert({
+                    shiftLogAction = () => supabaseAnon.from('crew_member_shifts').insert({
                         member_id: userId,
                         crew_id: crew_id,
                         clock_in_time: new Date().toISOString()
@@ -73,7 +73,7 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                     ownerMessage = `🔴 @${safeUsername} завершил смену в экипаже *'${safeCrewName}'*\\.`;
                     // FIX: Changed end_time and start_time to clock_out_time and clock_in_time
                     shiftLogAction = async () => {
-                        const { data: latestShift } = await supabaseAdmin.from('crew_member_shifts')
+                        const { data: latestShift } = await supabaseAnon.from('crew_member_shifts')
                             .select('id')
                             .eq('member_id', userId)
                             .is('clock_out_time', null)
@@ -81,7 +81,7 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                             .limit(1)
                             .single();
                         if (latestShift) {
-                            return supabaseAdmin.from('crew_member_shifts').update({ clock_out_time: new Date().toISOString() }).eq('id', latestShift.id);
+                            return supabaseAnon.from('crew_member_shifts').update({ clock_out_time: new Date().toISOString() }).eq('id', latestShift.id);
                         }
                     };
                 }
@@ -102,7 +102,7 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
         }
         
         if (Object.keys(updateData).length > 0) {
-            await supabaseAdmin.from("crew_members").update(updateData).eq("user_id", userId).eq("membership_status", "active");
+            await supabaseAnon.from("crew_members").update(updateData).eq("user_id", userId).eq("membership_status", "active");
             if (shiftLogAction) await shiftLogAction();
             
             await sendComplexMessage(chatId, userMessage, [], { removeKeyboard: true, parseMode: 'MarkdownV2' });

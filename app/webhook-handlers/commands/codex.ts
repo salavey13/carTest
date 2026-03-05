@@ -1,7 +1,7 @@
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
 import { postCodexCommandToSlack } from "@/lib/slack";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 
 type TelegramPhotoMeta = {
   file_id: string;
@@ -55,7 +55,7 @@ function parseDateFromPrompt(prompt: string): ParsedDate | null {
 }
 
 async function findReadySolutionByDate(isoDate: string) {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabaseAnon
     .from("homework_daily_solutions")
     .select("solution_key, topic, updated_at")
     .eq("homework_date", isoDate)

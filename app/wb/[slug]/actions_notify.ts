@@ -1,7 +1,7 @@
 // /app/wb/[slug]/actions_notify.ts
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendComplexMessage, KeyboardButton } from "@/app/webhook-handlers/actions/sendComplexMessage";
 
 /**

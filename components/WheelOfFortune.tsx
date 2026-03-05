@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { useAppContext } from "@/contexts/AppContext"
-import { supabaseAdmin } from "@/hooks/supabase"
+import { supabaseAnon } from "@/hooks/supabase"
 import { notifyWinners } from "@/app/actions"
 import { toast } from "sonner"
 import { Loader2, Trophy, RotateCw } from "lucide-react"
@@ -76,7 +76,7 @@ export default function WheelOfFortune() {
           wheelNumber: selectedSegment.value,
         }
 
-        const { error } = await supabaseAdmin
+        const { error } = await supabaseAnon
           .from("users")
           .update({ metadata: updatedMetadata })
           .eq("user_id", dbUser.user_id)
@@ -106,7 +106,7 @@ export default function WheelOfFortune() {
         return
       }
 
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await supabaseAnon
         .from("users")
         .select("*")
         .filter("metadata->wheelNumber", "eq", winningNumber)

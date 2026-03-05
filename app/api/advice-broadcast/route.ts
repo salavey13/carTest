@@ -1,7 +1,7 @@
 // Директива "use server" здесь не нужна, т.к. это Route Handler
 
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/hooks/supabase';
+import { supabaseAnon } from '@/hooks/supabase';
 import { sendTelegramMessage } from '@/app/actions'; 
 import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
@@ -53,7 +53,7 @@ async function handleAdviceBroadcastProcessing(request: Request) {
 
     try {
         debugLogger.log('Fetching users with active broadcasts...');
-        const { data: users, error: fetchError } = await supabaseAdmin
+        const { data: users, error: fetchError } = await supabaseAnon
             .from('users')
             .select('user_id, metadata') 
             .filter('metadata->advice_broadcast->>enabled', 'eq', 'true') 
@@ -86,7 +86,7 @@ async function handleAdviceBroadcastProcessing(request: Request) {
                     remaining_section_ids: [] 
                 };
 
-                const { error: disableError } = await supabaseAdmin
+                const { error: disableError } = await supabaseAnon
                     .from('users')
                     .update({
                         metadata: {
@@ -111,7 +111,7 @@ async function handleAdviceBroadcastProcessing(request: Request) {
 
             try {
                 debugLogger.log(`Fetching content for section ${nextSectionId}...`);
-                const { data: section, error: sectionError } = await supabaseAdmin
+                const { data: section, error: sectionError } = await supabaseAnon
                     .from('article_sections')
                     .select('id, title, content')
                     .eq('id', nextSectionId)
@@ -161,7 +161,7 @@ async function handleAdviceBroadcastProcessing(request: Request) {
                 };
 
                 debugLogger.log(`Updating metadata for user ${userId}. Finished: ${isFinished}`);
-                const { error: updateError } = await supabaseAdmin
+                const { error: updateError } = await supabaseAnon
                     .from('users')
                     .update({ metadata: { ...metadata, advice_broadcast: newBroadcastState } }) 
                     .eq('user_id', userId);

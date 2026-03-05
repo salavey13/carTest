@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from 'next/cache';
 import { handleWebhookUpdate } from '@/app/actions'; // Import the master handler

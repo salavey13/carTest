@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from '@/hooks/supabase'; 
+import { supabaseAdmin } from '@/lib/supabase-server'; 
 import type { Database } from "@/types/database.types";
 import Papa from 'papaparse';
 import * as cheerio from 'cheerio';

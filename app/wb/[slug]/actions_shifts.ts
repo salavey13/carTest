@@ -1,7 +1,7 @@
 // /app/wb/[slug]/actions_shifts.ts
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { notifyCrewOwner } from "@/app/wb/[slug]/actions_notify";
 import Papa from "papaparse";

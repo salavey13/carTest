@@ -1,6 +1,6 @@
 // /app/api/search/route.ts
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 
 // Simplified embedding generator
 function generateSimplifiedEmbedding(text: string): number[] {
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     console.log("Эмбеддинг сгенерирован, первые 5 значений:", queryEmbedding.slice(0, 5));
 
     console.log("Вызов RPC Supabase с эмбеддингом");
-    const { data, error } = await supabaseAdmin.rpc("search_cars", {
+    const { data, error } = await supabaseAnon.rpc("search_cars", {
       query_embedding: queryEmbedding,
       match_count: 5,
     });

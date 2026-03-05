@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { updateUserSettings, sendTelegramInvoice } from "@/app/actions";
 import { processReferralCommissions } from "./ref_actions";

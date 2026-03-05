@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 
 export async function getUserCombatStats(userId: string) {
@@ -8,7 +8,7 @@ export async function getUserCombatStats(userId: string) {
 
     try {
         // 1. Get all lobbies the user has joined
-        const { data: memberships, error: memberError } = await supabaseAdmin
+        const { data: memberships, error: memberError } = await supabaseAnon
             .from("lobby_members")
             .select("lobby_id, team")
             .eq("user_id", userId);
@@ -21,7 +21,7 @@ export async function getUserCombatStats(userId: string) {
         const lobbyIds = memberships.map(m => m.lobby_id);
 
         // 2. Fetch details for these lobbies (only finished ones)
-        const { data: lobbies, error: lobbyError } = await supabaseAdmin
+        const { data: lobbies, error: lobbyError } = await supabaseAnon
             .from("lobbies")
             .select("id, status, metadata")
             .in("id", lobbyIds)

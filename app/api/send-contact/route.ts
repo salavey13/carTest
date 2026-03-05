@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 
 function escapeHtml(input: string | undefined | null) {
   if (!input) return "";
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
     // Prepare insert payload
     let leadId: string | null = null;
     let leadSaved = false;
-    if (supabaseAdmin) {
+    if (supabaseAnon) {
       try {
         // generate id properly
         const id = (typeof crypto !== "undefined" && typeof (crypto as any).randomUUID === "function")
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
           updated_at: new Date().toISOString(),
         };
 
-        const { data: leadData, error: leadError } = await supabaseAdmin
+        const { data: leadData, error: leadError } = await supabaseAnon
           .from("leads_optima")
           .insert(insertPayload)
           .select("*")
@@ -108,7 +108,7 @@ export async function POST(req: Request) {
         logger.error("/api/send-contact: Supabase insert failed", err);
       }
     } else {
-      logger.warn("/api/send-contact: supabaseAdmin not available — skipping DB save");
+      logger.warn("/api/send-contact: supabaseAnon not available — skipping DB save");
     }
 
     const html = buildHtmlMessage({ ...body, phone: phoneDigits ? `+${phoneDigits}` : phoneRaw, ts: body.ts || new Date().toISOString() });
@@ -130,7 +130,7 @@ export async function POST(req: Request) {
       logger.error("/api/send-contact: Telegram send failed", sendResult.error);
       if (leadSaved) {
         try {
-          await supabaseAdmin?.from("leads_optima").update({ notified: false, updated_at: new Date().toISOString() }).eq("id", leadId);
+          await supabaseAnon?.from("leads_optima").update({ notified: false, updated_at: new Date().toISOString() }).eq("id", leadId);
         } catch (e) {
           logger.error("/api/send-contact: failed updating lead notified flag", e);
         }
@@ -141,7 +141,7 @@ export async function POST(req: Request) {
 
     if (leadSaved) {
       try {
-        await supabaseAdmin?.from("leads_optima").update({ notified: true, updated_at: new Date().toISOString() }).eq("id", leadId);
+        await supabaseAnon?.from("leads_optima").update({ notified: true, updated_at: new Date().toISOString() }).eq("id", leadId);
       } catch (e) {
         logger.error("/api/send-contact: failed updating lead notified=true", e);
       }

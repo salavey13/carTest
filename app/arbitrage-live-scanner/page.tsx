@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { useAppContext } from '@/contexts/AppContext';
-import { supabaseAdmin } from '@/hooks/supabase';
+import { supabaseAnon } from '@/hooks/supabase';
 import { toast } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -64,7 +64,7 @@ const ArbitrageLiveScannerPage = () => {
     setResults([]);
     addLog("Initiating client-side fetch sequence...");
     
-    if (!supabaseAdmin) {
+    if (!supabaseAnon) {
         toast.error("Supabase client not available.");
         addLog("ERROR: Supabase client not available.");
         setIsLoading(false);
@@ -73,7 +73,7 @@ const ArbitrageLiveScannerPage = () => {
 
     try {
       addLog("Calling 'get-api-keys' function...");
-      const { data: keyData, error: keyError } = await supabaseAdmin.functions.invoke('get-api-keys');
+      const { data: keyData, error: keyError } = await supabaseAnon.functions.invoke('get-api-keys');
       
       if (keyError || !keyData.success) {
         throw new Error(keyError?.message || keyData.error || "Failed to fetch API keys.");

@@ -2,7 +2,7 @@
 "use server";
 
 import { v4 as uuidv4 } from 'uuid';
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendTelegramInvoice, notifyAdmin } from "@/app/actions"; // Import from main actions
 import { logger } from "@/lib/logger";
 import { debugLogger } from "@/lib/debugLogger";

@@ -1,5 +1,5 @@
 import { logger } from "@/lib/logger";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 import type { GodModeDeck } from "@/app/elon/arbitrage_scanner_types";
 
@@ -17,7 +17,7 @@ export async function leaderboardCommand(chatId: number, userId: string) {
 
   try {
     // --- ИСПРАВЛЕНИЕ: Запрашиваем данные из кастомной таблицы 'users' ---
-    const { data: users, error } = await supabaseAdmin
+    const { data: users, error } = await supabaseAnon
       .from('users')
       .select('user_id, username, metadata')
       .neq('metadata', null); // Отсеиваем профили без метаданных

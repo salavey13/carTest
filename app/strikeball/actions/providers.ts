@@ -1,13 +1,13 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { revalidatePath } from "next/cache";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 
 const BOT_APP_URL = "https://t.me/oneSitePlsBot/app";
 
 export async function getProviderOffers(playerCount: number, activityId?: string) {
-    const { data: providers, error } = await supabaseAdmin
+    const { data: providers, error } = await supabaseAnon
         .from('crews')
         .select('*')
         .eq('metadata->>is_provider', 'true');
@@ -60,7 +60,7 @@ export async function getProviderOffers(playerCount: number, activityId?: string
 export async function selectProviderForLobby(lobbyId: string, providerId: string, offer: any) {
     try {
         // 1. Get current lobby details (Name + Metadata)
-        const { data: lobby } = await supabaseAdmin.from('lobbies').select('name, metadata, owner_id').eq('id', lobbyId).single();
+        const { data: lobby } = await supabaseAnon.from('lobbies').select('name, metadata, owner_id').eq('id', lobbyId).single();
         
         if (!lobby) throw new Error("Lobby not found");
         
@@ -70,7 +70,7 @@ export async function selectProviderForLobby(lobbyId: string, providerId: string
             approval_status: 'proposed' // Moves lobby to "Pending Provider Approval"
         };
 
-        const { error: updateError } = await supabaseAdmin
+        const { error: updateError } = await supabaseAnon
             .from('lobbies')
             .update({ 
                 provider_id: providerId,
@@ -81,7 +81,7 @@ export async function selectProviderForLobby(lobbyId: string, providerId: string
         if (updateError) throw updateError;
         
         // 2. Fetch Provider Info for Notifications
-        const { data: provider } = await supabaseAdmin
+        const { data: provider } = await supabaseAnon
             .from('crews')
             .select('owner_id, name, logo_url, metadata')
             .eq('id', providerId)
@@ -131,7 +131,7 @@ export async function selectProviderForLobby(lobbyId: string, providerId: string
 export async function approveProviderForLobby(lobbyId: string, providerId: string, userId: string) {
     try {
         // 1. Verify Identity: Ensure requester is OWNER of the PROVIDER Crew
-        const { data: providerCrew, error: crewError } = await supabaseAdmin
+        const { data: providerCrew, error: crewError } = await supabaseAnon
             .from('crews')
             .select('id, owner_id, name')
             .eq('id', providerId)
@@ -141,7 +141,7 @@ export async function approveProviderForLobby(lobbyId: string, providerId: strin
         if (providerCrew.owner_id !== userId) throw new Error("ACCESS DENIED: You are not the provider owner.");
 
         // 2. Get Lobby Data for Notifications
-        const { data: lobby, error: lobbyError } = await supabaseAdmin
+        const { data: lobby, error: lobbyError } = await supabaseAnon
             .from('lobbies')
             .select('name, owner_id, metadata, status')
             .eq('id', lobbyId)
@@ -157,7 +157,7 @@ export async function approveProviderForLobby(lobbyId: string, providerId: strin
             approved_at: new Date().toISOString()
         };
 
-        const { error: updateError } = await supabaseAdmin
+        const { error: updateError } = await supabaseAnon
             .from('lobbies')
             .update({ metadata: newMetadata })
             .eq('id', lobbyId);
@@ -189,7 +189,7 @@ export async function approveProviderForLobby(lobbyId: string, providerId: strin
 export async function rejectProviderForLobby(lobbyId: string, providerId: string, userId: string) {
     try {
         // Similar validation logic
-        const { data: providerCrew, error: crewError } = await supabaseAdmin
+        const { data: providerCrew, error: crewError } = await supabaseAnon
             .from('crews')
             .select('id, owner_id, name')
             .eq('id', providerId)
@@ -198,7 +198,7 @@ export async function rejectProviderForLobby(lobbyId: string, providerId: string
         if (crewError || !providerCrew) throw new Error("Provider crew not found");
         if (providerCrew.owner_id !== userId) throw new Error("ACCESS DENIED");
 
-        const { data: lobby, error: lobbyError } = await supabaseAdmin
+        const { data: lobby, error: lobbyError } = await supabaseAnon
             .from('lobbies')
             .select('name, owner_id')
             .eq('id', lobbyId)
@@ -207,7 +207,7 @@ export async function rejectProviderForLobby(lobbyId: string, providerId: string
         if (lobbyError || !lobby) throw new Error("Lobby not found");
 
         // Reset provider proposal
-        const { error: updateError } = await supabaseAdmin
+        const { error: updateError } = await supabaseAnon
             .from('lobbies')
             .update({ 
                 provider_id: null,
@@ -240,7 +240,7 @@ export async function rejectProviderForLobby(lobbyId: string, providerId: string
 export async function addSnowboardServiceToCrew(crewId: string) {
     try {
         // Get current crew metadata
-        const { data: crew } = await supabaseAdmin
+        const { data: crew } = await supabaseAnon
             .from('crews')
             .select('metadata')
             .eq('id', crewId)
@@ -335,7 +335,7 @@ export async function addSnowboardServiceToCrew(crewId: string) {
                 : crew.metadata.provider_type
         };
         
-        const { error } = await supabaseAdmin
+        const { error } = await supabaseAnon
             .from('crews')
             .update({ metadata: updatedMetadata })
             .eq('id', crewId);
