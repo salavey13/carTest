@@ -49,3 +49,33 @@ To prevent scope creep, the following are explicitly out-of-scope for this cycle
 - New Telegram framework adoption (`telegraf`, `grammY`, etc.); this cycle only tracks current HTTP-based integration path.
 - Database schema/policy rewrites not required by package upgrade compatibility.
 - Performance optimization passes not caused by upgraded package regressions.
+
+---
+
+## Execution log (this run)
+
+### Stage A — core (`next` + `react` + `react-dom`)
+
+- **Dependency action:** `npm install next@14.2.35 react@18.3.1 react-dom@18.3.1`
+- **Result:** ✅ success (`next` moved to `^14.2.35`; `react`/`react-dom` remained on `18.3.1` latest in React 18 line).
+
+Checks:
+- ✅ `npm run lint` (completed with pre-existing warnings only; no new dependency-caused lint errors)
+- ✅ `timeout 300 npm run build` (build completed on Next `14.2.35`)
+
+### Stage B — alignment (`eslint-config-next`, `@types/react`, `@types/react-dom`, TS if needed)
+
+- **Dependency action attempted:** `npm install -D eslint-config-next@14.2.35 @types/react@18.3.28 @types/react-dom@18.3.7`
+- **Result:** ❌ blocked by registry outage in this environment.
+
+Failure evidence:
+- `npm error code E503`
+- `npm error 503 Service Unavailable - GET https://registry.npmjs.org/@types%2freact`
+- `npm error 503 Service Unavailable - GET https://registry.npmjs.org/eslint-config-next`
+
+Additional check:
+- `curl -I https://registry.npmjs.org/eslint-config-next` returned upstream `503 Service Unavailable` in current runner path.
+
+Status after this run:
+- Stage A: **done**
+- Stage B: **blocked (external npm registry 503)**
