@@ -30,7 +30,7 @@ import StrikeballBottomNav from "@/app/strikeball/components/StrikeballBottomNav
 import { StrikeballBackground } from "@/app/strikeball/components/StrikeballBackground";
 
 import StickyChatButton from "@/components/StickyChatButton";
-import { AppProvider, useAppContext } from "@/contexts/AppContext";
+import { AppProvider, useAppContext, useStrikeballLobbyContext } from "@/contexts/AppContext";
 import { ThemeProvider } from "@/components/theme-provider"; 
 import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -253,8 +253,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     isLoading: isAppLoading,
     isAuthenticating,
     clearStartParam,
-    activeLobby // GHOST-VIS: Global Active Combat State
   } = useAppContext();
+  const { activeLobby } = useStrikeballLobbyContext(); // GHOST-VIS: Global Active Combat State
   
   const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
   const startParamHandledRef = useRef(false);

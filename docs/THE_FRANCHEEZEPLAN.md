@@ -1500,12 +1500,28 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T49 — Software-engineering hardening sweep (security/SPA/state/CSS/cart-write load)
 - status: `in_progress`
-- updated_at: `2026-02-28T00:55:00Z`
+- updated_at: `2026-03-06T00:40:00Z`
 - owner: `codex`
-- notes: Addressed post-review regressions: restored true compact-height collapse in `CrewHeader` (no blank sticky gap) and decoupled `hooks/supabase.ts` from `lib/supabase-server` to prevent client bundle crash paths while keeping server-only admin module for dedicated server actions.
-- next_step: Finalize T49 merge for regression fixes, then start T49.5 AppContext decomposition + realtime strategy audit.
-- risks: Cart durability and theme first-paint behavior still require regression checks on Telegram-like mobile sessions.
+- notes: T49 remains active parent. Completed T49.5 split in `contexts/AppContext.tsx` (auth/runtime/cart/strikeball boundaries + strikeball-specific hook extraction) and switched active-lobby refresh to realtime event subscriptions instead of timer-only pseudo-realtime. Completed T49.6 by adding first-paint theme bootstrap script in `app/layout.tsx` and precise recoverable Advanced JSON validation in `/app/franchize/create/*`.
+- next_step: Start **T50 — T49 closure regression pack** (Telegram WebApp smoke on theme first paint + franchize create validation UX + strikeball lobby subscription stability).
+- risks: Realtime lobby subscription currently listens on full `lobbies` table change feed; verify acceptable event volume for high-match concurrency and tighten filters if needed.
 - dependencies: T48
+
+- subtask tracking:
+  - **T49.5 — App context decomposition and realtime strategy audit**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-06T00:32:00Z`
+    - notes: Responsibility map finalized and split into isolated providers (auth/runtime/cart/strikeball). `useStrikeballLobbyContext` extracted for strikeball-only consumers, reducing unrelated rerender pressure from lobby state. Active lobby updates now refresh via Supabase realtime events instead of timer-only polling.
+    - risks: Current realtime listener for `lobbies` is broad (`event:*`); may need tighter filter if noisy in production.
+    - next_step: Run focused strikeball smoke checks on join/leave/active-state transitions under mobile latency.
+  - **T49.6 — Theme flash prevention + AI JSON robustness**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-06T00:38:00Z`
+    - notes: Added `beforeInteractive` theme bootstrap script to align html class before hydration and avoid first-paint mismatch. Hardened `/app/franchize/create/CreateFranchizeForm.tsx` Advanced JSON parsing with explicit validation states (empty payload, parse error details, root object shape, franchize object shape) while preserving recoverable UI feedback.
+    - risks: LocalStorage theme value can be stale vs DB preference; DB sync still reconciles post-auth.
+    - next_step: Start **T50 — T49 closure regression pack** and capture final smoke evidence.
 - deliverables:
   - `docs/T49-security_sweep.md`
   - `docs/THE_FRANCHEEZEPLAN.md`

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAppContext } from "@/contexts/AppContext";
+import { useAppContext, useStrikeballLobbyContext } from "@/contexts/AppContext";
 import { CreateLobbyForm } from "./components/CreateLobbyForm";
 import { useTacticalOutbox } from "./hooks/useTacticalOutbox";
 import { captureCheckpoint } from "./actions/domination";
@@ -89,7 +89,8 @@ const Q3MenuItem = ({ label, subLabel, href, onClick, icon: Icon, className }: a
 };
 
 export default function StrikeballDashboard() {
-  const { tg, dbUser, activeLobby, isAdmin } = useAppContext(); 
+  const { tg, dbUser, isAdmin } = useAppContext();
+  const { activeLobby } = useStrikeballLobbyContext(); 
   const { addToOutbox, flushQueue, queue } = useTacticalOutbox(); 
   const router = useRouter();
   const [menuStep, setMenuStep] = useState<'main' | 'create'>('main');
