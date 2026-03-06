@@ -35,7 +35,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
   const displayName = effectiveUser?.username || effectiveUser?.full_name || effectiveUser?.first_name || "Operator";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = typeof isAdmin === "function" ? isAdmin() : false;
-  const franchizeAdminHref = `/franchize/admin${userCrewInfo?.slug ? `?slug=${encodeURIComponent(userCrewInfo.slug)}` : ""}`;
+  const franchizeAdminHref = `/franchize/${userCrewInfo?.slug || "vip-bike"}/admin`;
 
   return (
     <div style={{ isolation: "isolate" }}>

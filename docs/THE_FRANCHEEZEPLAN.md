@@ -1503,11 +1503,18 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - updated_at: `2026-03-06T00:40:00Z`
 - owner: `codex`
 - notes: T49 remains active parent. Completed T49.5 split in `contexts/AppContext.tsx` (auth/runtime/cart/strikeball boundaries + strikeball-specific hook extraction) and switched active-lobby refresh to realtime event subscriptions instead of timer-only pseudo-realtime. Completed T49.6 by adding first-paint theme bootstrap script in `app/layout.tsx` and precise recoverable Advanced JSON validation in `/app/franchize/create/*`. Follow-up T49.8 fixed franchize admin route normalization (`/franchize/admin`) and adaptive crew-themed styling/linking regressions from review.
-- next_step: Start **T50 — checkout/admin resilience pass** (local template fallback, order retry snapshot, and server-side crew ACL scope for franchize admin).
+- next_step: Start **T50 — checkout/admin resilience pass** (local template fallback, order retry snapshot, server-side crew ACL scope, and franchize-form tokenization for light-theme parity).
 - risks: Realtime lobby subscription currently listens on full `lobbies` table change feed; verify acceptable event volume for high-match concurrency and tighten filters if needed.
 - dependencies: T48
 
 - subtask tracking:
+  - **T49.9 — Crew-scoped admin route migration to `/franchize/[slug]/admin` + light-theme contrast polish**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-06T03:10:00Z`
+    - notes: Migrated franchize admin routing from flat `/franchize/admin` to crew-scoped `/franchize/[slug]/admin` with legacy redirects preserving `slug/edit` query forwarding. Updated profile/admin links to slug route and polished page contrast by forcing crew metadata theme tokens for headers/filters/info blocks instead of project-default button/text colors.
+    - risks: `CarSubmissionForm` still contains global style classes and can look partially off-theme on light crews; dedicated form-level tokenization should be planned.
+    - next_step: Add themed wrapper/token map for `CarSubmissionForm` (or franchize-only variant) to fully eliminate default project palette bleed in light mode.
   - **T49.8 — Franchize admin route normalization + adaptive themed polish**
     - status: `done`
     - owner: `codex`

@@ -151,7 +151,7 @@ function AdminPageContent() {
             </Link>
 
             <Link
-              href={`/franchize/admin${userCrewInfo?.slug ? `?slug=${encodeURIComponent(userCrewInfo.slug)}` : ""}`}
+              href={`/franchize/${userCrewInfo?.slug || "vip-bike"}/admin`}
               className="group inline-flex items-center justify-center w-full md:w-auto px-6 py-3 border-2 border-yellow-400 bg-yellow-400/10 text-yellow-300 rounded-lg font-orbitron text-lg tracking-wider transition-all duration-300 hover:bg-yellow-400 hover:text-black"
             >
               <VibeContentRenderer content="::FaFileContract::" className="mr-3" />
