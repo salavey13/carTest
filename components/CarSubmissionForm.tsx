@@ -44,6 +44,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
   const [rentLink, setRentLink] = useState(vehicleToEdit?.rent_link ?? "");
   const [isTest, setIsTest] = useState<boolean>(!!vehicleToEdit?.is_test_result);
   const [ownerIdState, setOwnerIdState] = useState<string | null>(ownerId ?? (vehicleToEdit?.owner_id ?? null));
+  const [vinValue, setVinValue] = useState<string>(String((vehicleToEdit?.specs as any)?.vin ?? ""));
 
   // gallery and specs (for bikes etc.)
   const [specs, setSpecs] = useState<SpecItem[]>([]);
@@ -94,6 +95,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       setSpecs(entries.map(([key, value]) => ({ id: uuidv4(), key, value: String(value) })));
       const g = Array.isArray(s.gallery) ? s.gallery.map((url: string) => ({ id: uuidv4(), url })) : [];
       setGallery(g);
+      setVinValue(String(s.vin ?? ""));
 
       // blog/stream fields
       if (vehicleToEdit.type === "blog") {
@@ -145,6 +147,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
   // sample stream JSON
   function insertSampleStream() {
     setStreamSpecsRaw(defaultStreamTemplate);
+    setVinValue("");
     const sample = JSON.parse(defaultStreamTemplate);
     setStreamTitle(sample.title);
     setStreamSlug(streamSlug || `stream-${Date.now()}`);
@@ -202,6 +205,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
     setStreamTitle("");
     setStreamSlug("");
     setStreamSpecsRaw(defaultStreamTemplate);
+    setVinValue("");
     toast.info("Форма очищена");
   }
 
@@ -211,6 +215,9 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
     specs.forEach((s) => {
       if (s.key) obj[s.key] = s.value;
     });
+    if ((type === "bike" || type === "car") && vinValue.trim()) {
+      obj.vin = vinValue.trim();
+    }
     const galleryUrls = gallery.map((g) => g.url).filter(Boolean);
     if (galleryUrls.length) obj.gallery = galleryUrls;
 
@@ -362,6 +369,12 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
               </div>
             </div>
             <p className="text-xs text-foreground mb-2">Добавь пар ключ-значение. Галерея тоже поддерживается.</p> {/* Fixed */}
+            {(type === "bike" || type === "car") && (
+              <div className="mb-3 grid gap-2 sm:grid-cols-[160px,1fr]">
+                <Label className="text-xs text-foreground">VIN (быстрое поле)</Label>
+                <Input value={vinValue} onChange={(e) => setVinValue(e.target.value)} placeholder="например JH2PC37A16M301309" className="input-cyber" />
+              </div>
+            )}
             <div className="space-y-2">
               {specs.map((s) => (
                 <div key={s.id} className="flex gap-2">

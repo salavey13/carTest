@@ -297,10 +297,12 @@ export async function sendTelegramMessage(
   }
 }
 
-export async function sendTelegramDocument(chatId: string, fileContent: string, fileName: string): Promise<{ success: boolean; data?: any; error?: string }> {
+export async function sendTelegramDocument(chatId: string, fileContent: string | Blob | Uint8Array, fileName: string): Promise<{ success: boolean; data?: any; error?: string }> {
    if (!TELEGRAM_BOT_TOKEN) return { success: false, error: "Telegram bot token not configured" };
   try {
-    const blob = new Blob([fileContent], { type: "text/plain;charset=utf-8" });
+    const blob = fileContent instanceof Blob
+      ? fileContent
+      : new Blob([fileContent], { type: fileName.toLowerCase().endsWith(".docx") ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "text/plain;charset=utf-8" });
     const formData = new FormData();
     formData.append("chat_id", chatId);
     formData.append("document", blob, fileName);
