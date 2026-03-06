@@ -35,6 +35,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
   const displayName = effectiveUser?.username || effectiveUser?.full_name || effectiveUser?.first_name || "Operator";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = typeof isAdmin === "function" ? isAdmin() : false;
+  const franchizeAdminHref = `/franchize/admin${userCrewInfo?.slug ? `?slug=${encodeURIComponent(userCrewInfo.slug)}` : ""}`;
 
   return (
     <div style={{ isolation: "isolate" }}>
@@ -59,36 +60,43 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
           </button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="end" className="w-56" sideOffset={8}>
+        <DropdownMenuContent align="end" className="w-64 max-w-[calc(100vw-1.5rem)]" sideOffset={8}>
           <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
           <DropdownMenuItem asChild>
-            <Link href="/profile" className="cursor-pointer flex items-center gap-2 w-full">
+            <Link href="/profile" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
               <User className="mr-2 h-4 w-4" />
-              <span>Профиль</span>
+              <span className="truncate">Профиль</span>
             </Link>
           </DropdownMenuItem>
 
           <DropdownMenuItem asChild>
-            <Link href="/settings" className="cursor-pointer flex items-center gap-2 w-full">
+            <Link href="/settings" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
               <Settings className="mr-2 h-4 w-4" />
-              <span>Настройки</span>
+              <span className="truncate">Настройки</span>
             </Link>
           </DropdownMenuItem>
 
           <DropdownMenuItem asChild>
-            <Link href="/franchize/create" className="cursor-pointer flex items-center gap-2 w-full">
-              <Palette className="mr-2 h-4 w-4" />
-              <span>Branding (экипаж)</span>
+            <Link href="/franchize/create" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+              <Palette className="mr-2 h-4 w-4 shrink-0" />
+              <span className="truncate">Branding (экипаж)</span>
+            </Link>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem asChild>
+            <Link href={franchizeAdminHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+              <Shield className="mr-2 h-4 w-4 shrink-0" />
+              <span className="truncate">Franchize admin</span>
             </Link>
           </DropdownMenuItem>
 
           {userCrewInfo?.slug && (
             <DropdownMenuItem asChild>
-              <Link href={`/crews/${userCrewInfo.slug}`} className="cursor-pointer flex items-center gap-2 w-full">
+              <Link href={`/crews/${userCrewInfo.slug}`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
                 <Palette className="mr-2 h-4 w-4" />
-                <span>Мой экипаж</span>
+                <span className="truncate">Мой экипаж</span>
               </Link>
             </DropdownMenuItem>
           )}
@@ -97,9 +105,9 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/admin" className="cursor-pointer flex items-center gap-2 w-full">
+                <Link href="/admin" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
                   <Shield className="mr-2 h-4 w-4" />
-                  <span>Admin</span>
+                  <span className="truncate">Admin</span>
                 </Link>
               </DropdownMenuItem>
             </>

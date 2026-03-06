@@ -2,7 +2,9 @@
 
 
 import { createInvoice, supabaseAdmin } from "@/lib/supabase-server";
-import { sendTelegramInvoice } from "@/app/actions";
+import { notifyAdmin, sendTelegramDocument, sendTelegramInvoice } from "@/app/actions";
+import { generateDocxBytes } from "@/app/markdown-doc/actions";
+import { applyTemplateVariables } from "@/lib/markdownTemplate";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
 import { randomUUID } from "crypto";
@@ -1007,6 +1009,86 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput, actorUser
   };
 }
 
+
+
+function formatMoney(value: number): string {
+  return Number(value || 0).toLocaleString("ru-RU");
+}
+
+async function buildFranchizeOrderDocAndNotify(payload: z.infer<typeof franchizeOrderInvoiceSchema> & { totalAmount: number; subtotal: number; extrasTotal: number }) {
+  const { data: cars, error: carsError } = await supabaseAdmin
+    .from("cars")
+    .select("id, make, model, specs")
+    .in("id", payload.cartLines.map((line) => line.itemId));
+
+  if (carsError) {
+    logger.error("[franchize] failed to load cars for order doc", carsError);
+  }
+
+  const byId = new Map((cars || []).map((car) => [car.id, car]));
+  const extrasRows = payload.extras.length
+    ? payload.extras
+        .map((extra) => `| ${extra.label} | 1 | ${formatMoney(extra.amount)} ₽ | ${formatMoney(extra.amount)} ₽ |`)
+        .join("\n")
+    : "| Без доп. опций | 0 | 0 ₽ | 0 ₽ |";
+
+  const firstLine = payload.cartLines[0];
+  const firstCar = firstLine ? byId.get(firstLine.itemId) : null;
+  const firstSpecs = (firstCar?.specs as Record<string, unknown> | null) || {};
+
+  const template = await fetch("https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE_DEMO.md", { cache: "no-store" }).then((r) => r.text());
+
+  const rendered = applyTemplateVariables(template, {
+    contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}`,
+    contract_date: new Date().toLocaleDateString("ru-RU"),
+    renter_full_name: payload.recipient,
+    renter_document_id: "заполняется при выдаче",
+    renter_phone: payload.phone,
+    issuer_name: `Franchize ${payload.slug}`,
+    issuer_signatory: "Администратор экипажа",
+    bike_make_model: firstCar ? `${firstCar.make || "Bike"} ${firstCar.model || "Model"}` : payload.cartLines.map((line) => line.itemId).join(", "),
+    bike_vin: String(firstSpecs.vin || firstSpecs.frame || firstSpecs.vin_number || "уточняется"),
+    bike_plate: String(firstSpecs.plate || firstSpecs.state_number || "уточняется"),
+    rent_start_date: payload.time,
+    rent_end_date: payload.time,
+    rent_days: 1,
+    daily_price_rub: formatMoney(payload.subtotal),
+    subtotal_rub: formatMoney(payload.subtotal),
+    extras_rows: extrasRows,
+    extras_total_rub: formatMoney(payload.extrasTotal),
+    total_price_rub: formatMoney(payload.totalAmount),
+    deposit_rub: "20 000",
+  });
+
+  const bytes = await generateDocxBytes(rendered);
+  const docFileName = `franchize-order-${payload.slug}-${payload.orderId}.docx`;
+
+  const adminChatId = process.env.ADMIN_CHAT_ID;
+  if (!adminChatId) {
+    throw new Error("ADMIN_CHAT_ID not configured");
+  }
+
+  await notifyAdmin(
+    [
+      `🧾 Новый franchize-заказ #${payload.orderId}`,
+      `Crew: ${payload.slug}`,
+      `Получатель: ${payload.recipient}`,
+      `Телефон: ${payload.phone}`,
+      `Время: ${payload.time}`,
+      `Оплата: ${payload.payment}`,
+      `Доставка: ${payload.delivery}`,
+      `Итого: ${formatMoney(payload.totalAmount)} ₽`,
+    ].join("\n"),
+  );
+
+  const sendDocResult = await sendTelegramDocument(adminChatId, new Blob([bytes]), docFileName);
+  if (!sendDocResult.success) {
+    throw new Error(sendDocResult.error || "Failed to send DOCX to admin");
+  }
+
+  return { renderedMarkdown: rendered, docFileName };
+}
+
 const franchizeOrderInvoiceSchema = z.object({
   slug: z.string().trim().min(1),
   orderId: z.string().trim().min(1),
@@ -1045,6 +1127,25 @@ const franchizeOrderInvoiceSchema = z.object({
       .default({ package: "Base", duration: "1 day", perk: "Стандарт", auction: "Без аукциона" }),
   })).min(1),
 });
+
+export async function submitFranchizeOrderNotification(input: unknown): Promise<{ success: boolean; error?: string }> {
+  const parsed = franchizeOrderInvoiceSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Некорректный payload заказа." };
+  }
+
+  const payload = parsed.data;
+  const effectiveTotal = payload.totalAmount > 0 ? payload.totalAmount : payload.subtotal + payload.extrasTotal;
+
+  try {
+    await buildFranchizeOrderDocAndNotify({ ...payload, totalAmount: effectiveTotal, subtotal: payload.subtotal, extrasTotal: payload.extrasTotal });
+    return { success: true };
+  } catch (error) {
+    logger.error("[franchize] submitFranchizeOrderNotification failed", error);
+    return { success: false, error: error instanceof Error ? error.message : "Failed to submit order notification" };
+  }
+}
 
 export async function createFranchizeOrderInvoice(input: unknown): Promise<{ success: boolean; invoiceId?: string; amountXtr?: number; error?: string }> {
   const parsed = franchizeOrderInvoiceSchema.safeParse(input);
@@ -1120,6 +1221,8 @@ export async function createFranchizeOrderInvoice(input: unknown): Promise<{ suc
   };
 
   try {
+    await buildFranchizeOrderDocAndNotify({ ...payload, totalAmount: effectiveTotal, subtotal: payload.subtotal, extrasTotal: payload.extrasTotal });
+
     const invoiceRecord = await createInvoice("franchize_order", invoiceId, payload.telegramUserId, amountXtr, 0, metadata);
     if (!invoiceRecord.success) {
       return { success: false, error: invoiceRecord.error ?? "Не удалось создать запись счёта." };

@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import * as docx from "docx";
 import { parseCellMarkers } from "@/lib/parseCellMarkers";
+import { applyTemplateVariables } from "@/lib/markdownTemplate";
 
 // Base URL for your raw GitHub files
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/salavey13/carTest/main/docs";
@@ -122,7 +123,7 @@ function createParagraph(text: string, options?: { heading?: (typeof HeadingLeve
   });
 }
 
-async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
+export async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
   const children: docx.FileChild[] = [];
   const lines = markdown.split(/\r?\n/);
   let i = 0;
@@ -374,7 +375,7 @@ export async function saveRentalDocGenerationDemo(input: {
 export async function sendMarkdownDoc(markdown: string, chatId: string) {
   try {
     const bytes = await generateDocxBytes(markdown);
-    return await sendTelegramDocument(chatId, new Blob([bytes]), "Report.docx", "🚀 CyberVibe v8.4");
+    return await sendTelegramDocument(chatId, new Blob([bytes]), "Report.docx");
   } catch (e: any) {
     logger.error("[markdown-doc] failed to generate DOCX", e);
     return { success: false, error: e.message };
