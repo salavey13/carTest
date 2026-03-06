@@ -105,7 +105,7 @@ function AdminPageContent() {
           className="max-w-4xl mx-auto p-4 sm:p-6 md:p-8 bg-dark-card/80 backdrop-blur-xl rounded-2xl shadow-2xl shadow-brand-purple/20 border border-brand-purple/50"
         >
           <h2
-            className="text-2xl sm:text-3xl md:text-4xl font-semibold text-brand-purple mb-4 cyber-text glitch flex items-center justify-center gap-3"
+            className="mb-4 flex items-center justify-center gap-3 text-2xl font-semibold text-white sm:text-3xl md:text-4xl"
             data-text="VIBE CONTROL CENTER"
           >
             <VibeContentRenderer content="::FaSatelliteDish::" className="h-8 w-8 animate-pulse text-shadow-cyber" /> VIBE CONTROL CENTER

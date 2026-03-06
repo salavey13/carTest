@@ -1508,6 +1508,13 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - dependencies: T48
 
 - subtask tracking:
+  - **T49.10 — Remove mistaken flat admin redirects + mobile overflow polish**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-06T04:05:00Z`
+    - notes: Removed mistakenly created flat admin redirect pages (`/franchize/admin`, `/admin/franchize`) and kept only canonical slug route `/franchize/[slug]/admin` plus legacy `/admin`. Polished mobile overflow issues in admin UX by making top controls/buttons/select blocks wrap and stack safely in `CarSubmissionForm`; fixed dark-on-dark legacy `/admin` title contrast.
+    - risks: `CarSubmissionForm` remains shared across multiple domains; further franchize-only theme tokenization could still improve light-theme parity.
+    - next_step: Add optional `appearance` mode to `CarSubmissionForm` so franchize admin can fully consume crew palette tokens without affecting other product surfaces.
   - **T49.9 — Crew-scoped admin route migration to `/franchize/[slug]/admin` + light-theme contrast polish**
     - status: `done`
     - owner: `codex`

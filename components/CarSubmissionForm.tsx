@@ -321,10 +321,10 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4 bg-card/95 p-4 md:p-6 rounded-xl border border-border shadow-sm"
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-lg font-orbitron text-foreground">Добавить / Редактировать запись</h3>
-        <div className="flex items-center gap-2">
-          <select value={type} onChange={(e) => setType(e.target.value as CarType)} className="input-cyber text-sm">
+        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:items-center sm:justify-end">
+          <select value={type} onChange={(e) => setType(e.target.value as CarType)} className="input-cyber w-full text-sm sm:min-w-[140px]">
             <option value="car">Car</option>
             <option value="bike">Bike</option>
             <option value="cross">Cross</option>
@@ -362,7 +362,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       {(type === "bike" || type === "cross" || type === "car" || type === "sauna" || type === "massage" || type === "massage_master") && (
         <>
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h4 className="text-sm font-semibold text-foreground">Характеристики (Specs)</h4>
               <div className="flex gap-2">
                 <Button type="button" onClick={() => { setSpecs([]); toast.success("Specs очищены"); }} variant="ghost" size="sm">Очистить</Button>
@@ -377,10 +377,10 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
             )}
             <div className="space-y-2">
               {specs.map((s) => (
-                <div key={s.id} className="flex gap-2">
+                <div key={s.id} className="flex flex-col gap-2 sm:flex-row">
                   <Input value={s.key} onChange={(e) => updateSpec(s.id, "key", e.target.value)} placeholder="ключ (например engine_cc)" className="input-cyber" />
                   <Input value={s.value} onChange={(e) => updateSpec(s.id, "value", e.target.value)} placeholder="значение" className="input-cyber" />
-                  <Button type="button" variant="destructive" onClick={() => removeSpec(s.id)}>Удалить</Button>
+                  <Button type="button" variant="destructive" className="sm:w-auto" onClick={() => removeSpec(s.id)}>Удалить</Button>
                 </div>
               ))}
               <Button type="button" onClick={addSpec} variant="outline">Добавить характеристику</Button>
@@ -391,7 +391,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
 
       {/* Gallery with previews */}
       <div>
-        <div className="flex items-center justify-between mb-2">
+        <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h4 className="text-sm font-semibold text-foreground">Gallery (optional)</h4>
           <div className="flex gap-2">
             <Button type="button" onClick={addGallery} variant="outline" size="sm">Добавить случайное</Button>
@@ -444,9 +444,9 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       {/* stream editor */}
       {type === "stream" && (
         <div>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h4 className="text-sm font-semibold text-foreground">Stream overlay — config</h4>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button type="button" variant="ghost" onClick={insertSampleStream}>Insert sample</Button>
               <Button type="button" variant="ghost" onClick={copyStreamJson}>Copy JSON</Button>
               <Button type="button" variant="ghost" onClick={copyBotPrompt}>Copy bot prompt</Button>
@@ -478,15 +478,17 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
         </div>
         <div>
           <Label className="text-xs text-foreground">Image URL or upload</Label> {/* Fixed */}
-          <div className="flex gap-2">
-            <Input value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value); }} className="input-cyber" placeholder="https://..." />
-            <Button type="button" variant="ghost" onClick={() => { const newUrl = RANDOM_UNSPLASH("hero"); setImageUrl(newUrl); setImagePreview(newUrl); toast.info("Случайная обложка обновлена"); }}>
-              Random
-            </Button>
-            <label htmlFor={`file-${formId}`} className="btn input-cyber cursor-pointer p-2 border border-border rounded-md flex items-center">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value); }} className="input-cyber flex-1" placeholder="https://..." />
+            <div className="flex gap-2">
+              <Button type="button" variant="ghost" className="sm:w-auto" onClick={() => { const newUrl = RANDOM_UNSPLASH("hero"); setImageUrl(newUrl); setImagePreview(newUrl); toast.info("Случайная обложка обновлена"); }}>
+                Random
+              </Button>
+              <label htmlFor={`file-${formId}`} className="btn input-cyber cursor-pointer p-2 border border-border rounded-md flex items-center">
               <VibeContentRenderer content="::FaUpload::" />&nbsp;Upload
             </label>
             <input id={`file-${formId}`} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+            </div>
           </div>
         </div>
       </div>
@@ -497,17 +499,17 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
         </div>
       )}
 
-      <div className="flex gap-2 items-center">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <Button type="submit" disabled={saving} className="w-full">
           {saving ? <><VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> Сохраняю...</> :
             isEdit ? "Обновить запись" : "Поддержать в public.cars"}
         </Button>
 
-        <Button type="button" variant="secondary" onClick={() => { setIsTest((s) => !s); }} >
+        <Button type="button" variant="secondary" className="sm:w-auto" onClick={() => { setIsTest((s) => !s); }} >
           {isTest ? "Marked Test" : "Mark test"}
         </Button>
 
-        <div className="ml-auto text-xs text-foreground">
+        <div className="text-xs text-foreground sm:ml-auto">
           {isEdit ? "Редактирование" : "Новая запись"} • type: <span className="font-mono ml-1">{type}</span>
         </div>
       </div>
