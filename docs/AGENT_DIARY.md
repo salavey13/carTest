@@ -689,3 +689,9 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** first implementation shipped as a standalone admin subtree with hardcoded palette and only partial navigation updates.
 - **Fix/workaround:** moved canonical page to `/franchize/admin`, added compatibility redirect from `/admin/franchize`, switched page surfaces to crew theme from `getFranchizeBySlug(slug)` and tightened mobile text wrapping/truncation in profile dropdown to avoid offscreen labels.
 - **Verification command:** `npm run lint` + Playwright screenshots for `/franchize/admin?slug=vip-bike` and franchize header/profile dropdown checks.
+
+## 2026-03-06 — Crew-scoped franchize admin route + contrast regression pass
+- **Symptom:** operator expected per-crew admin path (`/franchize/[slug]/admin`), while flat route caused weaker context scoping; light-theme readability still leaked project default colors in headers/filters.
+- **Root cause:** first migration stopped at `/franchize/admin` and reused some default button styles not bound to crew theme vars.
+- **Fix/workaround:** moved canonical route to `/franchize/[slug]/admin`, kept both `/franchize/admin` and `/admin/franchize` as forwarding redirects with `slug/edit` preservation, and switched admin shell typography/filter controls to crew palette variables to avoid default contrast mismatch.
+- **Verification command:** `npm run lint` and Playwright screenshots on `/franchize/vip-bike/admin` (mobile) + redirect smoke from `/franchize/admin?slug=vip-bike`.
