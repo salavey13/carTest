@@ -664,3 +664,10 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - Root cause: server-only boundary was wired into a shared hook consumed by client bundles; header animation pass removed previous height-clamp behavior and only animated opacity/transform.
 - Fix/workaround: decoupled `hooks/supabase.ts` from `lib/supabase-server` (local admin helper wiring restored for shared compatibility) and added `max-height + overflow-hidden` compact wrapper in `CrewHeader` so top row truly collapses.
 - Verification command: `npm run lint -- --file hooks/supabase.ts --file app/franchize/components/CrewHeader.tsx && npm run build`.
+
+### 2026-03-06 — T49.5/T49.6 lesson: split global context first, then harden first-paint + parse boundaries
+- **Symptom:** `AppContext` mixed auth/runtime/lobby concerns, so strikeball lobby updates forced broader consumers to re-evaluate; Advanced JSON parser in franchize create only had catch-all feedback; first paint could momentarily mismatch user theme before sync.
+- **Root cause:** single-provider responsibility sprawl and late-only theme decision path; JSON validation relied directly on generic `JSON.parse` flow without explicit structural checks.
+- **Fix/workaround:** introduced concern-focused providers (`AppAuthContext`, `AppRuntimeContext`, `AppCartContext`, `StrikeballLobbyContext`) + `useStrikeballLobbyContext`; replaced timer-only lobby refresh pattern with Supabase realtime triggers; injected `beforeInteractive` theme bootstrap script in `app/layout.tsx`; added deterministic `validateAdvancedJson` guard with precise recoverable messages.
+- **Verification command:** `npm run lint` and `npm run build`.
+- **Next task:** **T50 — T49 closure regression pack** (Telegram first-paint smoke + strikeball realtime noise audit + franchize create JSON UX checks).

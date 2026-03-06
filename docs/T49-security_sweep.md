@@ -1,7 +1,7 @@
 # T49 — Software-engineering hardening sweep (security/SPA/state/CSS/cart-write load)
 
 **Status:** `in_progress`  
-**Updated_at:** `2026-02-28T00:55:00Z`  
+**Updated_at:** `2026-03-06T00:40:00Z`  
 **Owner:** `codex`  
 **Dependencies:** `T48`  
 **Parent Plan:** [THE_FRANCHEEZEPLAN.md](./THE_FRANCHEEZEPLAN.md)
@@ -12,6 +12,11 @@
 Finish architecture-grade hardening after visual parity work. Keep the full engineering depth explicit (security boundaries, SPA tap reliability root-cause fixes, write-queue guarantees, style-token migration, context decomposition, theme bootstrap, AI JSON safety).
 
 ## Latest execution update (2026-02-27)
+- T49.5 completed: mapped `AppContext` responsibilities and split low-risk boundaries into `AppAuthContext`, `AppRuntimeContext`, `AppCartContext`, and strikeball-specific `StrikeballLobbyContext`; extracted `useStrikeballLobbyContext` and migrated strikeball consumers.
+- T49.5 realtime hardening: active-lobby refresh now reacts to Supabase realtime events (`lobby_members`, `lobbies`) instead of timer-only pseudo-realtime polling.
+- T49.6 completed: added early `beforeInteractive` theme bootstrap in `app/layout.tsx` to align first paint class before hydration and reduce palette flash mismatch.
+- T49.6 input robustness: `/app/franchize/create/CreateFranchizeForm.tsx` now validates Advanced JSON with recoverable, precise errors (empty payload, JSON parse details, root-object shape, `franchize` object shape).
+- Next task aligned across docs: **T50 — T49 closure regression pack** (Telegram first-paint smoke + strikeball realtime noise check + franchize create JSON error UX run).
 - Reapplied smooth `CrewHeader` compact transition via transform-based animation (`scaleY + translateY`) and compact-state `pointerEvents` guard.
 - Added dedicated server-only admin module `lib/supabase-server.ts` with `server-only` boundary and moved privileged exports out of `hooks/supabase.ts`.
 - Updated dropdown interaction layering (`FranchizeProfileButton` isolation + dropdown pointer-events/z-index tweaks) to stabilize tap behavior in sticky-header contexts.
@@ -116,6 +121,6 @@ Finish architecture-grade hardening after visual parity work. Keep the full engi
 ---
 
 ## Exit criteria for T49 completion
-- All T49.0–T49.6 subtasks are marked done in the main plan.
+- T49.5 and T49.6 are done and logged with owner/updated_at/risks/next_step under T49 parent in the main plan.
 - Regression smoke confirms SPA navigation, cart checkpoint persistence, interaction-state visibility, and no theme flash on dark-default paths.
 - T49 status sync is reflected in `docs/THE_FRANCHEEZEPLAN_STATUS.MD` with next-step pointer.

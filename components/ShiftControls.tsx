@@ -6,13 +6,14 @@ import { toast } from "sonner";
 import { 
   Play, LogOut, Activity, FileText, Timer, Package, Coins, Share2, Loader2, FileBarChart 
 } from "lucide-react";
-import { useAppContext } from "@/contexts/AppContext";
+import { useAppContext, useStrikeballLobbyContext } from "@/contexts/AppContext";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { generateCrewShiftPdf, generateRaidSummaryPdf } from "@/app/wb/actions/service";
 
 export default function ShiftControls({ slug }: { slug: string }) {
-  const { dbUser, activeLobby, userCrewInfo, tg } = useAppContext();
+  const { dbUser, userCrewInfo, tg } = useAppContext();
+  const { activeLobby } = useStrikeballLobbyContext();
   const userId = dbUser?.user_id;
   const isOwner = userCrewInfo?.is_owner && userCrewInfo?.slug === slug;
 
