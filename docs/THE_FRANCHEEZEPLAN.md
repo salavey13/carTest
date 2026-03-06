@@ -1825,3 +1825,24 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Replaced temporary `/franchize/[slug]/rentals` redirect with real franchize page that keeps CrewHeader/CrewFooter and renders rentals control center inside franchize shell.
 - Restored social link parser behavior (no aggressive auto-normalization), while internal footer menu links now use client-side `Link` for reliable navigation.
 - Next beat: add “smart auction apply” assistant that preselects best tick by item category, active campaign priority, and delivery mode.
+
+### T47 — Greenbox/Tesseract collaborative gamelab planning bootstrap (keyword-trigger ad-hoc)
+- status: `done`
+- updated_at: `2026-03-06T00:00:00Z`
+- owner: `codex`
+- notes: Operator request mentioned franchize-style structure for greenhouse management; created dedicated cross-team plan doc with scenario-gamedev workflow, tenant page IA, and newbie academy scope.
+- next_step: Start G1 from `docs/GREENBOX_TESSERACT_GAMELAB_PLAN.md` (academy MVP).
+- risks: Scope is broad; requires disciplined sequential execution and simulator-first boundaries.
+- dependencies: T46
+- deliverables:
+  - `docs/GREENBOX_TESSERACT_GAMELAB_PLAN.md`
+
+### 2026-03-06 — T47 completion (Greenbox/Tesseract plan bootstrap)
+- Captured collaborative execution model for Alice + Codex with one shared MD status board.
+- Defined page structure for multi-tenant greenbox management, simulator gameplay, alerts, academy, and replay flows.
+- Locked simulator-first roadmap and deferred real hardware switching behind a future adapter contract.
+
+### 2026-03-06 — T47 refinement pass (RU-first Greenbox collaboration + Alice pitch)
+- Added mandatory RU-first language guidance directly into `docs/GREENBOX_TESSERACT_GAMELAB_PLAN.md` for all Greenbox/Tesseract-triggered tasks.
+- Added dedicated operator-ready Russian pitch file `docs/GREENBOX_ALICE_PITCH_RU.md` with clear onboarding CTA for Alice (`get me up to speed on greenbox plan`).
+- Preserved simulator-first execution contract and kept implementation sequencing unchanged (next step remains G1 academy MVP).
