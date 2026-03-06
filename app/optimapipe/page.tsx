@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { toast } from "sonner";
-import { getTelegramUser } from "@/lib/telegram";
 import { ChevronDown, Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
@@ -31,6 +30,12 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
  */
 
 type ContactForm = { name: string; phone: string; email: string; message: string };
+
+function getTelegramUser() {
+  if (typeof window === "undefined") return null;
+  const appUser = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user;
+  return appUser ?? null;
+}
 
 const navLinks = [
   { href: "#services", label: "Услуги" },
