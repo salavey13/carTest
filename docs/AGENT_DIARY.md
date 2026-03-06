@@ -695,3 +695,9 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Root cause:** first migration stopped at `/franchize/admin` and reused some default button styles not bound to crew theme vars.
 - **Fix/workaround:** moved canonical route to `/franchize/[slug]/admin`, kept both `/franchize/admin` and `/admin/franchize` as forwarding redirects with `slug/edit` preservation, and switched admin shell typography/filter controls to crew palette variables to avoid default contrast mismatch.
 - **Verification command:** `npm run lint` and Playwright screenshots on `/franchize/vip-bike/admin` (mobile) + redirect smoke from `/franchize/admin?slug=vip-bike`.
+
+## 2026-03-06 — Removed mistaken flat admin routes; fixed mobile control overflow
+- **Symptom:** operator reported that mobile admin controls (type select/actions/footer buttons) overflowed horizontally and that temporary flat admin redirects were undesirable.
+- **Root cause:** control groups in `CarSubmissionForm` were rigid row-based flex layouts; route cleanup stage still kept transitional redirect pages.
+- **Fix/workaround:** deleted mistaken pages (`/franchize/admin`, `/admin/franchize`) and kept only `/franchize/[slug]/admin` + `/admin`; refactored `CarSubmissionForm` action rows and field controls to stack/wrap on small widths; adjusted legacy `/admin` title to high-contrast text.
+- **Verification command:** `npm run lint` + Playwright screenshot on `/franchize/vip-bike/admin` and `/admin` mobile viewport.
