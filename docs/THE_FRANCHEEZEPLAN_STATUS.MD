@@ -272,3 +272,10 @@ import { createClient } from "@supabase/supabase-js";
 - Fixed **P2 regression** from review: `CrewHeader` compact state now collapses row layout height via `max-height` + `overflow-hidden` wrapper, removing blank sticky gap while preserving transform/opacity animation.
 - Revalidated with targeted lint + full build and captured updated visual smoke screenshot on `/franchize/vip-bike` after compact scroll.
 - Next beat: merge this regression hotfix, then open T49.5 context decomposition track.
+
+## UPDATE 2026-03-06 (T49.5 + T49.6 complete, parent T49 stays active)
+- T49 remains the active parent track; completed T49.5 with low-risk context split in `contexts/AppContext.tsx` (auth/runtime/cart/strikeball) and extracted strikeball-only lobby state into `useStrikeballLobbyContext`.
+- Replaced timer-only pseudo-realtime for active lobby with event-driven Supabase realtime subscriptions (`lobby_members` + `lobbies`) and kept fallback refresh action.
+- Completed T49.6 with early theme bootstrap script in `app/layout.tsx` (`beforeInteractive`) to reduce first-paint theme mismatch.
+- Hardened `/app/franchize/create` Advanced JSON flow with precise recoverable validation messages (empty payload, parse detail, root/franchize shape errors).
+- Next task: **T50 — T49 closure regression pack** (Telegram first-paint smoke, strikeball realtime noise validation, franchize create JSON validation UX verification).

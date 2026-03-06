@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useAppContext } from "@/contexts/AppContext";
+import { useAppContext, useStrikeballLobbyContext } from "@/contexts/AppContext";
 import { motion } from "framer-motion";
 import { FaUserAstronaut, FaStopwatch, FaCrosshairs } from "react-icons/fa6";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export default function StrikeballHeader() {
-  const { user, activeLobby } = useAppContext(); 
+  const { user } = useAppContext();
+  const { activeLobby } = useStrikeballLobbyContext(); 
   const [elapsed, setElapsed] = useState("00:00");
 
   useEffect(() => {

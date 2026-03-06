@@ -90,6 +90,37 @@ function readPath<T>(obj: unknown, path: string[], fallback: T): T {
   return (current as T) ?? fallback;
 }
 
+
+type JsonValidationResult =
+  | { ok: true; source: Record<string, unknown> }
+  | { ok: false; message: string };
+
+function validateAdvancedJson(rawJson: string): JsonValidationResult {
+  if (!rawJson.trim()) {
+    return { ok: false, message: "Поле Advanced JSON пустое. Вставьте JSON и повторите." };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawJson);
+  } catch (error) {
+    const details = error instanceof Error ? error.message : "Неизвестная ошибка парсинга";
+    return { ok: false, message: `JSON parse error: ${details}` };
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { ok: false, message: "Advanced JSON должен быть JSON-объектом верхнего уровня." };
+  }
+
+  const root = parsed as Record<string, unknown>;
+  const source = (root.franchize ?? root) as unknown;
+  if (!source || typeof source !== "object" || Array.isArray(source)) {
+    return { ok: false, message: "Ключ franchize должен содержать JSON-объект." };
+  }
+
+  return { ok: true, source: source as Record<string, unknown> };
+}
+
 export default function CreateFranchizeForm() {
   const [form, setForm] = useState<FranchizeConfigInput>({
     slug: "",
@@ -249,66 +280,51 @@ export default function CreateFranchizeForm() {
   };
 
   const applyAdvancedJsonLocally = () => {
-    const rawJson = form.advancedJson?.trim();
-    if (!rawJson) {
-      setMessage("Поле Advanced JSON пустое. Вставьте JSON и повторите.");
+    const validation = validateAdvancedJson(form.advancedJson ?? "");
+    if (!validation.ok) {
+      setMessage(validation.message);
       return;
     }
 
-    try {
-      const parsed = JSON.parse(rawJson) as unknown;
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        setMessage("Advanced JSON должен быть JSON-объектом верхнего уровня.");
-        return;
-      }
-
-      const source = parsed.franchize ?? parsed;
-      if (!source || typeof source !== "object" || Array.isArray(source)) {
-        setMessage("Ключ franchize должен содержать JSON-объект.");
-        return;
-      }
-
-      setForm((prev) => ({
-        ...prev,
-        brandName: readPath(source, ["branding", "name"], prev.brandName),
-        tagline: readPath(source, ["branding", "tagline"], prev.tagline),
-        logoUrl: readPath(source, ["branding", "logoUrl"], prev.logoUrl),
-        themeMode: readPath(source, ["theme", "mode"], prev.themeMode),
-        bgBase: readPath(source, ["theme", "palette", "bgBase"], prev.bgBase),
-        bgCard: readPath(source, ["theme", "palette", "bgCard"], prev.bgCard),
-        borderSoft: readPath(source, ["theme", "palette", "borderSoft"], prev.borderSoft),
-        accentMain: readPath(source, ["theme", "palette", "accentMain"], prev.accentMain),
-        accentMainHover: readPath(source, ["theme", "palette", "accentMainHover"], prev.accentMainHover),
-        textPrimary: readPath(source, ["theme", "palette", "textPrimary"], prev.textPrimary),
-        textSecondary: readPath(source, ["theme", "palette", "textSecondary"], prev.textSecondary),
-        lightBgBase: readPath(source, ["theme", "palettes", "light", "bgBase"], prev.lightBgBase),
-        lightBgCard: readPath(source, ["theme", "palettes", "light", "bgCard"], prev.lightBgCard),
-        lightBorderSoft: readPath(source, ["theme", "palettes", "light", "borderSoft"], prev.lightBorderSoft),
-        lightAccentMain: readPath(source, ["theme", "palettes", "light", "accentMain"], prev.lightAccentMain),
-        lightAccentMainHover: readPath(source, ["theme", "palettes", "light", "accentMainHover"], prev.lightAccentMainHover),
-        lightTextPrimary: readPath(source, ["theme", "palettes", "light", "textPrimary"], prev.lightTextPrimary),
-        lightTextSecondary: readPath(source, ["theme", "palettes", "light", "textSecondary"], prev.lightTextSecondary),
-        phone: readPath(source, ["contacts", "phone"], prev.phone),
-        email: readPath(source, ["contacts", "email"], prev.email),
-        address: readPath(source, ["contacts", "address"], prev.address),
-        telegram: readPath(source, ["contacts", "telegram"], prev.telegram),
-        mapGps: readPath(source, ["contacts", "map", "gps"], prev.mapGps),
-        mapImageUrl: readPath(source, ["contacts", "map", "imageUrl"], prev.mapImageUrl),
-        mapBoundsTop: String(readPath(source, ["contacts", "map", "bounds", "top"], prev.mapBoundsTop)),
-        mapBoundsBottom: String(readPath(source, ["contacts", "map", "bounds", "bottom"], prev.mapBoundsBottom)),
-        mapBoundsLeft: String(readPath(source, ["contacts", "map", "bounds", "left"], prev.mapBoundsLeft)),
-        mapBoundsRight: String(readPath(source, ["contacts", "map", "bounds", "right"], prev.mapBoundsRight)),
-        socialLinksText: readPath(source, ["footer", "socialLinks"], [])
-          .map((entry: { label?: string; href?: string }) => `${entry.label ?? ""}|${entry.href ?? ""}`)
-          .filter(Boolean)
-          .join("\n") || prev.socialLinksText,
-      }));
-      setMessage("JSON применён локально для предпросмотра. Если всё ок — нажимайте сохранить.");
-    } catch (error) {
-      const details = error instanceof Error ? error.message : "Неизвестная ошибка парсинга";
-      setMessage(`Не удалось применить JSON: ${details}`);
-    }
+    const source = validation.source;
+    setForm((prev) => ({
+      ...prev,
+      brandName: readPath(source, ["branding", "name"], prev.brandName),
+      tagline: readPath(source, ["branding", "tagline"], prev.tagline),
+      logoUrl: readPath(source, ["branding", "logoUrl"], prev.logoUrl),
+      themeMode: readPath(source, ["theme", "mode"], prev.themeMode),
+      bgBase: readPath(source, ["theme", "palette", "bgBase"], prev.bgBase),
+      bgCard: readPath(source, ["theme", "palette", "bgCard"], prev.bgCard),
+      borderSoft: readPath(source, ["theme", "palette", "borderSoft"], prev.borderSoft),
+      accentMain: readPath(source, ["theme", "palette", "accentMain"], prev.accentMain),
+      accentMainHover: readPath(source, ["theme", "palette", "accentMainHover"], prev.accentMainHover),
+      textPrimary: readPath(source, ["theme", "palette", "textPrimary"], prev.textPrimary),
+      textSecondary: readPath(source, ["theme", "palette", "textSecondary"], prev.textSecondary),
+      lightBgBase: readPath(source, ["theme", "palettes", "light", "bgBase"], prev.lightBgBase),
+      lightBgCard: readPath(source, ["theme", "palettes", "light", "bgCard"], prev.lightBgCard),
+      lightBorderSoft: readPath(source, ["theme", "palettes", "light", "borderSoft"], prev.lightBorderSoft),
+      lightAccentMain: readPath(source, ["theme", "palettes", "light", "accentMain"], prev.lightAccentMain),
+      lightAccentMainHover: readPath(source, ["theme", "palettes", "light", "accentMainHover"], prev.lightAccentMainHover),
+      lightTextPrimary: readPath(source, ["theme", "palettes", "light", "textPrimary"], prev.lightTextPrimary),
+      lightTextSecondary: readPath(source, ["theme", "palettes", "light", "textSecondary"], prev.lightTextSecondary),
+      phone: readPath(source, ["contacts", "phone"], prev.phone),
+      email: readPath(source, ["contacts", "email"], prev.email),
+      address: readPath(source, ["contacts", "address"], prev.address),
+      telegram: readPath(source, ["contacts", "telegram"], prev.telegram),
+      mapGps: readPath(source, ["contacts", "map", "gps"], prev.mapGps),
+      mapImageUrl: readPath(source, ["contacts", "map", "imageUrl"], prev.mapImageUrl),
+      mapBoundsTop: String(readPath(source, ["contacts", "map", "bounds", "top"], prev.mapBoundsTop)),
+      mapBoundsBottom: String(readPath(source, ["contacts", "map", "bounds", "bottom"], prev.mapBoundsBottom)),
+      mapBoundsLeft: String(readPath(source, ["contacts", "map", "bounds", "left"], prev.mapBoundsLeft)),
+      mapBoundsRight: String(readPath(source, ["contacts", "map", "bounds", "right"], prev.mapBoundsRight)),
+      socialLinksText: readPath(source, ["footer", "socialLinks"], [])
+        .map((entry: { label?: string; href?: string }) => `${entry.label ?? ""}|${entry.href ?? ""}`)
+        .filter(Boolean)
+        .join("\n") || prev.socialLinksText,
+    }));
+    setMessage("JSON применён локально для предпросмотра. Если всё ок — нажимайте сохранить.");
   };
+
 
   const onLoad = () => {
     startTransition(async () => {
