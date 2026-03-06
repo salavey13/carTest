@@ -1502,12 +1502,40 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - status: `in_progress`
 - updated_at: `2026-03-06T00:40:00Z`
 - owner: `codex`
-- notes: T49 remains active parent. Completed T49.5 split in `contexts/AppContext.tsx` (auth/runtime/cart/strikeball boundaries + strikeball-specific hook extraction) and switched active-lobby refresh to realtime event subscriptions instead of timer-only pseudo-realtime. Completed T49.6 by adding first-paint theme bootstrap script in `app/layout.tsx` and precise recoverable Advanced JSON validation in `/app/franchize/create/*`.
-- next_step: Start **T50 — T49 closure regression pack** (Telegram WebApp smoke on theme first paint + franchize create validation UX + strikeball lobby subscription stability).
+- notes: T49 remains active parent. Completed T49.5 split in `contexts/AppContext.tsx` (auth/runtime/cart/strikeball boundaries + strikeball-specific hook extraction) and switched active-lobby refresh to realtime event subscriptions instead of timer-only pseudo-realtime. Completed T49.6 by adding first-paint theme bootstrap script in `app/layout.tsx` and precise recoverable Advanced JSON validation in `/app/franchize/create/*`. Follow-up T49.8 fixed franchize admin route normalization (`/franchize/admin`) and adaptive crew-themed styling/linking regressions from review.
+- next_step: Start **T50 — checkout/admin resilience pass** (local template fallback, order retry snapshot, server-side crew ACL scope, and franchize-form tokenization for light-theme parity).
 - risks: Realtime lobby subscription currently listens on full `lobbies` table change feed; verify acceptable event volume for high-match concurrency and tighten filters if needed.
 - dependencies: T48
 
 - subtask tracking:
+  - **T49.10 — Remove mistaken flat admin redirects + mobile overflow polish**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-06T04:05:00Z`
+    - notes: Removed mistakenly created flat admin redirect pages (`/franchize/admin`, `/admin/franchize`) and kept only canonical slug route `/franchize/[slug]/admin` plus legacy `/admin`. Polished mobile overflow issues in admin UX by making top controls/buttons/select blocks wrap and stack safely in `CarSubmissionForm`; fixed dark-on-dark legacy `/admin` title contrast.
+    - risks: `CarSubmissionForm` remains shared across multiple domains; further franchize-only theme tokenization could still improve light-theme parity.
+    - next_step: Add optional `appearance` mode to `CarSubmissionForm` so franchize admin can fully consume crew palette tokens without affecting other product surfaces.
+  - **T49.9 — Crew-scoped admin route migration to `/franchize/[slug]/admin` + light-theme contrast polish**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-06T03:10:00Z`
+    - notes: Migrated franchize admin routing from flat `/franchize/admin` to crew-scoped `/franchize/[slug]/admin` with legacy redirects preserving `slug/edit` query forwarding. Updated profile/admin links to slug route and polished page contrast by forcing crew metadata theme tokens for headers/filters/info blocks instead of project-default button/text colors.
+    - risks: `CarSubmissionForm` still contains global style classes and can look partially off-theme on light crews; dedicated form-level tokenization should be planned.
+    - next_step: Add themed wrapper/token map for `CarSubmissionForm` (or franchize-only variant) to fully eliminate default project palette bleed in light mode.
+  - **T49.8 — Franchize admin route normalization + adaptive themed polish**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-06T02:25:00Z`
+    - notes: Moved crew admin surface from `/admin/franchize` to canonical `/franchize/admin` with compatibility redirect, updated franchize profile dropdown + admin links, and rebuilt page styling to hydrate from crew branding/theme palette (slug-aware) with mobile-safe text wrapping.
+    - risks: Fleet scope currently still uses editable vehicles action and filters client-side by crew; strict server-side ACL hardening remains in T50.
+    - next_step: In T50 add server-side scoped query endpoint for crew-owner subsets and remove client-side filtering fallback.
+  - **T49.7 — Franchize checkout doc-notification + crew-admin VIN UX pass**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-06T01:35:00Z`
+    - notes: Wired checkout notification action to generate DOCX from RENTAL_DEAL template with live order/cart/specs (including VIN) and send it as Telegram document to admin on order submit (manual + XTR flows). Added mobile-first `/admin` improvements (bike/car filters + VIN guidance) plus dedicated `/admin/franchize` crew-owner console for VIN-centric editing.
+    - risks: Current DOC render pulls template from GitHub raw URL; if network is unavailable, notification send fails.
+    - next_step: Add local template fallback and optional persisted `orders` table snapshot for audit/retry in next iteration.
   - **T49.5 — App context decomposition and realtime strategy audit**
     - status: `done`
     - owner: `codex`
@@ -1540,10 +1568,34 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   6. **T49.5 — continue as FRANCHEEZEPLAN_EXECUTIONER: App context decomposition and realtime strategy audit**: split oversized app context by concern and reduce timer-only pseudo-realtime behavior.
   7. **T49.6 — continue as FRANCHEEZEPLAN_EXECUTIONER: Theme flash prevention + AI JSON robustness**: ensure first paint uses early theme signal and malformed JSON remains recoverable with precise inline errors.
   8. **Sync point:** reflect subtask outcomes in `docs/THE_FRANCHEEZEPLAN_STATUS.MD` after each completed substep.
+  9. **T49.7 — Franchize checkout doc-notification + crew-admin VIN UX pass**: reuse markdown-doc template generation during order submit, send DOC to admin with order details, and improve `/admin` + dedicated `/admin/franchize` mobile-first editor with bike/car VIN focus.
 - acceptance criteria:
   - T49 subtasks are explicit, dependency-ordered, and actionable without additional interpretation.
   - Section 7 of THE plan remains slim, with historical narrative archived in `docs/AGENT_DIARY.md`.
   - Security/SPA/cart/style/context/theme/AI-json checks are represented as concrete subtask goals in both T49 docs.
+
+
+### T50 — Checkout contract payload resilience + franchize crew ACL expansion
+- status: `todo`
+- updated_at: `-`
+- owner: `unassigned`
+- notes: Stabilize order-doc generation with local template fallback, persist order snapshot for retries/audit, and enforce crew-owner visibility ACL for admin/franchize vehicle editing.
+- next_step: Start with local template fallback in server action and write retry-safe order log row before Telegram sends.
+- risks: Requires migration decision for long-lived order snapshot storage schema.
+- dependencies: T49
+- deliverables:
+  - `app/franchize/actions.ts`
+  - `app/admin/franchize/page.tsx`
+  - `supabase/migrations/*` (if snapshot table is added)
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Add local fallback for doc template read (`docs/RENTAL_DEAL_TEMPLATE_DEMO.md`) when GitHub raw is unavailable.
+  2. Store normalized order snapshot in DB before send attempts and mark send status (`pending/sent/failed`).
+  3. Add retry endpoint/action for failed admin-doc sends.
+  4. Expand crew-owner ACL in admin/franchize UI (filter by crew owner id when metadata role is limited admin).
+- acceptance criteria:
+  - Admin receives DOC for successful submits and failed sends are retryable without data loss.
+  - Crew-owner editor cannot edit out-of-scope crew inventory rows.
 
 ## 6) Task template for future extension
 

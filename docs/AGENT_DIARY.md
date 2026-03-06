@@ -671,3 +671,33 @@ Purpose: keep compact, reusable operational memory for bridge/homework tasks so 
 - **Fix/workaround:** introduced concern-focused providers (`AppAuthContext`, `AppRuntimeContext`, `AppCartContext`, `StrikeballLobbyContext`) + `useStrikeballLobbyContext`; replaced timer-only lobby refresh pattern with Supabase realtime triggers; injected `beforeInteractive` theme bootstrap script in `app/layout.tsx`; added deterministic `validateAdvancedJson` guard with precise recoverable messages.
 - **Verification command:** `npm run lint` and `npm run build`.
 - **Next task:** **T50 — T49 closure regression pack** (Telegram first-paint smoke + strikeball realtime noise audit + franchize create JSON UX checks).
+
+## 2026-03-06 — Franchize checkout now sends DOC contract draft to admin
+- **Symptom:** checkout for non-XTR flow only showed client toast and admin did not receive structured contract artifact.
+- **Root cause:** order submit path had no server-side notification action; markdown-doc generator was isolated in playground page.
+- **Fix/workaround:** extracted reusable markdown variable renderer + DOCX generator from `app/markdown-doc/actions.ts`, wired new franchize server actions to render contract template with checkout + car specs (VIN/plate/frame), then send DOC via Telegram `sendDocument` to admin in both manual and XTR order submit paths.
+- **Verification:** run lint, create checkout payload through `/franchize/[slug]/order/[id]`, confirm admin receives text notification + `.docx` attachment.
+
+## 2026-03-06 — Crew admin VIN UX shortcut for bike/car cards
+- **Symptom:** operators had to manually add `specs.vin` via key-value editor, causing missed VIN fields and weak contract output quality.
+- **Root cause:** admin UI had generic specs input only and `/admin` filtered out car items.
+- **Fix/workaround:** added explicit VIN quick input for `bike`/`car` in `CarSubmissionForm`, broadened `/admin` list to bike+car with mobile filters, and created dedicated `/admin/franchize` crew-themed VIN-focused console.
+- **Verification:** open `/admin` and `/admin/franchize`, edit bike/car, set VIN, save, and confirm VIN appears in `cars.specs.vin`.
+
+## 2026-03-06 — Franchize admin route normalized to `/franchize/admin` with theme hydration
+- **Symptom:** reviewer feedback flagged wrong route placement (`/admin/franchize`), weak brand-theme adoption, and dropdown/admin link mismatch.
+- **Root cause:** first implementation shipped as a standalone admin subtree with hardcoded palette and only partial navigation updates.
+- **Fix/workaround:** moved canonical page to `/franchize/admin`, added compatibility redirect from `/admin/franchize`, switched page surfaces to crew theme from `getFranchizeBySlug(slug)` and tightened mobile text wrapping/truncation in profile dropdown to avoid offscreen labels.
+- **Verification command:** `npm run lint` + Playwright screenshots for `/franchize/admin?slug=vip-bike` and franchize header/profile dropdown checks.
+
+## 2026-03-06 — Crew-scoped franchize admin route + contrast regression pass
+- **Symptom:** operator expected per-crew admin path (`/franchize/[slug]/admin`), while flat route caused weaker context scoping; light-theme readability still leaked project default colors in headers/filters.
+- **Root cause:** first migration stopped at `/franchize/admin` and reused some default button styles not bound to crew theme vars.
+- **Fix/workaround:** moved canonical route to `/franchize/[slug]/admin`, kept both `/franchize/admin` and `/admin/franchize` as forwarding redirects with `slug/edit` preservation, and switched admin shell typography/filter controls to crew palette variables to avoid default contrast mismatch.
+- **Verification command:** `npm run lint` and Playwright screenshots on `/franchize/vip-bike/admin` (mobile) + redirect smoke from `/franchize/admin?slug=vip-bike`.
+
+## 2026-03-06 — Removed mistaken flat admin routes; fixed mobile control overflow
+- **Symptom:** operator reported that mobile admin controls (type select/actions/footer buttons) overflowed horizontally and that temporary flat admin redirects were undesirable.
+- **Root cause:** control groups in `CarSubmissionForm` were rigid row-based flex layouts; route cleanup stage still kept transitional redirect pages.
+- **Fix/workaround:** deleted mistaken pages (`/franchize/admin`, `/admin/franchize`) and kept only `/franchize/[slug]/admin` + `/admin`; refactored `CarSubmissionForm` action rows and field controls to stack/wrap on small widths; adjusted legacy `/admin` title to high-contrast text.
+- **Verification command:** `npm run lint` + Playwright screenshot on `/franchize/vip-bike/admin` and `/admin` mobile viewport.

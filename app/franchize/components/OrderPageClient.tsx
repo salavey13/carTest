@@ -5,7 +5,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
-import { createFranchizeOrderInvoice } from "../actions";
+import { createFranchizeOrderInvoice, submitFranchizeOrderNotification } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
 
@@ -167,6 +167,28 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     }
 
     startSubmitTransition(async () => {
+      const notifyResult = await submitFranchizeOrderNotification({
+        slug,
+        orderId,
+        telegramUserId: String(user?.id ?? "manual-order"),
+        recipient: submitPayload.recipient,
+        phone: submitPayload.phone,
+        time: submitPayload.time,
+        comment: submitPayload.comment,
+        payment: submitPayload.payment,
+        delivery: submitPayload.delivery,
+        subtotal,
+        extrasTotal: submitPayload.extrasTotal,
+        totalAmount: submitPayload.totalAmount,
+        extras: submitPayload.extras,
+        cartLines: submitPayload.cartLines,
+      });
+
+      if (!notifyResult.success) {
+        toast.error(notifyResult.error ?? "Не удалось отправить уведомление админу.");
+        return;
+      }
+
       if (payment === "telegram_xtr") {
         if (!user?.id) {
           toast.error("Для XTR-счёта откройте страницу из Telegram WebApp.");
@@ -199,9 +221,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         return;
       }
 
-      // backend submit will be connected in a separate step
-      console.info("checkout payload draft", submitPayload);
-      toast.info("Черновой payload собран. Бэкенд submit подключим следующим шагом.");
+      toast.success("Заказ отправлен администратору вместе с DOC-файлом. Скоро с вами свяжутся.");
     });
   };
 
