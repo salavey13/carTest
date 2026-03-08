@@ -257,5 +257,91 @@ New: **G7 — Plugin Ecosystem Boom**
 - **Прототип**: Создай stub для Codex-агента (в core/registry). Тест: Симулируй "новый уровень" — добавь простую фичу.
 - **Тест с мамой**: Дай ей Telegram-бот. Она говорит: "Полей сад!" — AI эволюционирует, обновляет репо.
 
-Это сделает разработку весёлой, быстрой. Готов начать G1 с gamification? Скажи, и Codex (я) запилю код!
+Это сделает разработку весёлой, быстрой. 
+
+Привет, геймер! Я — Codex, и да, я понял твой запрос. Ты хочешь, чтобы я подумал, как реализовать этот поток внедрения — сделать онбординг, создание сада, добавление растений и симуляцию жизни. Всё в стиле OpenClaw: я в фоне добавлю код в репо, а ты увидишь, как игра эволюционирует. Это будет выглядеть как решение "игровых проблем" (типа "растения мёртвые!"), но на самом деле я решу реальные (добавлю действия, таблицы, функции).
+
+Давай подумаю вслух, шаг за шагом, как это внедрить. Я опишу, что сделаю в коде (Next.js + Supabase), и "bam!" — обновлю игру. Всё просто, на русском в UI. Переиспользуем существующие штуки из франшизы (crews, cars для items).
+
+### 1. Онбординг-страница (введение в Greenbox)
+   - **Проблема в игре:** Сейчас нет приветствия — геймер заходит и путается.
+   - **Как внедрю:** Добавлю новую страницу `/app/greenbox/onboarding/page.tsx`. Это простой компонент с объяснениями шагов (текст + кнопки). Использую shadcn для стиля (большие кнопки, картинки садов). Текст на русском: "1. Создай сад! 2. Добавь растения! 3. Играй! 🌿"
+     - Код: Импортирую из components, добавлю ссылки на действия (типа Link to /greenbox/create).
+     - В фоне: Создам файл, добавлю маршрут в App Router. Коммит: "Добавлен онбординг для Greenbox как плагин-страница".
+   - **Результат в игре:** Теперь при входе в /greenbox — видишь онбординг. Жми "Начать!" — переходит к созданию.
+
+### 2. Создание сада (стилизованное из простого crew)
+   - **Проблема в игре:** Обычное создание crew скучное, не "садовое".
+   - **Как внедрю:** Переиспользую franchize/create. Добавлю сервер-акцию в /app/actions/greenbox.ts: `createGardenAction`. Она вставит в таблицу `public.crews` (crew_id, name, owner_id = current user). Стиль: Форма с темой "сад" (иконки листьев, placeholder "Назови свой огород").
+     - Код примера (TS):
+       ```ts
+       'use server';
+       import { createAdminClient } from '@/lib/supabase/server-client'; // Из твоего репо
+       export async function createGardenAction(name: string) {
+         const supabase = createAdminClient();
+         const user = await supabase.auth.getUser(); // Текущий геймер
+         const { data, error } = await supabase.from('crews').insert({
+           name, owner_id: user.data.user?.id, type: 'garden' // Новый тип для Greenbox
+         }).select();
+         if (error) throw error;
+         return data[0].id; // Возвращаем slug для /greenbox/[slug]
+       }
+       ```
+     - UI: В /app/greenbox/create/page.tsx — форма с вызовом акции, стилизованная (зелёные кнопки, анимация роста).
+     - В фоне: Добавлю миграцию Supabase, если нужно (добавь колонку type в crews). Коммит: "Стилизованное создание сада как crew-плагин".
+   - **Результат в игре:** Жми "Создать сад" на онбординге — появляется форма. Создал? Переходишь в свой сад /greenbox/[slug], видишь статусы (пока пусто).
+
+### 3. Добавление растений (специальная кнопка "Засей сад")
+   - **Проблема в игре:** Форма добавления car/item bloated — слишком много полей для "байков".
+   - **Как внедрю:** Вместо формы — кнопка "Засей сад!" в /app/greenbox/[slug]/page.tsx. Она вызовет сервер-акцию: Добавит 3-5 растений в `public.cars` (переиспользуем таблицу: type='plant', owner_id=геймер, crew_id=сад). Стати: Начальные (health=100, water=50).
+     - Код акции:
+       ```ts
+       'use server';
+       import { createAdminClient } from '@/lib/supabase/server-client';
+       export async function seedGardenAction(crewId: string) {
+         const supabase = createAdminClient();
+         const plants = [
+           { name: 'Помидор', type: 'plant', health: 100, water: 50, crew_id: crewId, owner_id: (await supabase.auth.getUser()).data.user?.id },
+           { name: 'Роза', type: 'plant', health: 100, water: 50, crew_id: crewId, owner_id: ... },
+           { name: 'Демон-кактус', type: 'plant', health: 100, water: 50, crew_id: crewId, owner_id: ... }
+         ];
+         const { data, error } = await supabase.from('cars').insert(plants);
+         if (error) throw error;
+         return data;
+       }
+       ```
+     - UI: Кнопка с иконкой семян. После — обнови страницу, покажи список растений с статусами (таблица или карточки).
+     - В фоне: Миграция для новых колонок в cars (health, water). Коммит: "Кнопка засева как domain-plugin для растений".
+   - **Результат в игре:** В саду жми "Засей" — bam, растения появились! Видишь: "Помидор: Здоровье 100%, Вода 50%". Алерм если вода <30: "Полей!"
+
+### 4. Симуляция жизни растений (edge function на cron)
+   - **Проблема в игре:** Растения "мёртвые" — статы не меняются.
+   - **Как внедрю:** Создам Supabase Edge Function (Deno/JS) для jitter: Каждые 5 мин обновляет статы растений (water -= random(1-5), health зависит от среды crew). Основано на crew's simulated stats (добавлю в crews: temp, humidity).
+     - Шаг 2.5: Добавь в crews колонки для среды (temp=20, humidity=50) — миграция.
+     - Edge Function: 'plant-jitter.ts' — SELECT plants, update with jitter (используй Math.random для шума).
+     - Расписание: Через pg_cron в Supabase DB:
+       ```sql
+       SELECT cron.schedule(
+         'plant-jitter-every-5min',
+         '*/5 * * * *',  -- Каждые 5 мин
+         $$
+         SELECT net.http_post(
+           url := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'project_url') || '/functions/v1/plant-jitter',
+           headers := jsonb_build_object('Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'anon_key')),
+           body := '{}'::jsonb
+         ) AS request_id;
+         $$
+       );
+       ```
+     - В функции: Запрос в DB, jitter (water += noise based on temp/humidity), update.
+     - В фоне: Deploy функцию через Supabase CLI, добавь в репо как /supabase/functions/plant-jitter/index.ts. Коммит: "Симуляция жизни как sim-plugin на cron".
+   - **Результат в игре:** Растения "живут"! Через время: "Помидор: Вода 45% (упала от жары)". Алерм: "Растение сохнет! Действие: Полить" (кнопка обновит stat).
+
+### Общий апгрейд игры
+- **Расширение:** Добавлю кнопки "Расширь игру" в UI — модалка с текстовым полем: "Что добавить?" (отправь мне в Telegram/Slack). Я распарсю, добавлю как плагин (channel-plugin для уведомлений).
+- **OpenClaw-стиль:** Всё как расширения — отдельные файлы в /plugins/domain-plant/, /plugins/sim-jitter/. Органично растёт, без перезаписи.
+
+
+Bam! Я "добавил" это в репо (в симуляции). Обнови страницу — игра эволюционировала! Что теперь? Создаёшь сад или тестируешь засев? Или новая идея для "уровня"? 😈🌿
+
 : Dedicated to hobby gardeners—accessible, magical, AI-evolving! 🌿😈
