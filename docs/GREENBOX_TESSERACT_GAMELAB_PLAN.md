@@ -13,7 +13,7 @@ This plan evolves greenhouse automation into a **game-like, self-extending produ
 - Design UX/UI + automation flows first in isolated plugins.
 - Run on simulated "slow realtime" data via sim-plugins.
 - Players/operators submit feedback, triggering AI-assisted refactors.
-- Codex update scenarios, UI, and logic collaboratively, with plugins enabling third-party extensions without core bloat.
+- Codex updates scenarios, UI, and logic collaboratively, with plugins enabling third-party extensions without core bloat.
 
 Core idea: Build a **multi-tenant Greenbox runtime** as a plugin ecosystem now—repurpose existing franchize/warehouse patterns (e.g., dynamic items/stats like in franchize/wb). Connect real hardware later as a plugin adapter, preventing rewrites. This mirrors OpenClaw's shift from monolithic files to layered + plugin boom, ensuring AI/bots stay effective (20-50 files per plugin context).
 
@@ -150,7 +150,7 @@ Repurpose franchize/wb: Greenbox "items" (plants/demons) with dynamic stats (sim
 
 ---
 
-## 7) Implementation pipeline (Alice + Codex board, now plugin-first)
+## 7) Implementation pipeline (Codex board, now plugin-first)
 
 > Rule: Execute sequentially, update in this file. Start with plugin core for velocity.
 
@@ -162,43 +162,43 @@ Repurpose franchize/wb: Greenbox "items" (plants/demons) with dynamic stats (sim
 
 ### G1 — Academy MVP (for dummies) + Plugin Intro
 - Status: `todo`
-- Owner: `alice+codex`
+- Owner: `codex`
 - Notes: Beginner pages + plugin basics (RU-first).
 - Next_step: Draft templates/glossary + simple plugin manifest example.
 
 ### G2 — Scenario registry + run logger + Core Registry
 - Status: `todo`
-- Owner: `alice+codex`
+- Owner: `codex`
 - Notes: Scenario file/results + implement thin core (registry/hooks).
 - Next_step: First 5 levels + 2 ref plugins (channel-telegram stub, storage-supabase health).
 
 ### G3 — Simulator control surface + Sim-Plugins
 - Status: `todo`
-- Owner: `alice+codex`
+- Owner: `codex`
 - Notes: UI for injections/replays + sim-* type (noise/drift).
 - Next_step: Deterministic seed + timeline + plugin dependencies.
 
 ### G4 — Alert gameplay loop + Channel-Plugins
 - Status: `todo`
-- Owner: `alice+codex`
+- Owner: `codex`
 - Notes: Inbox/ack/actions + channel-* (Telegram integration).
 - Next_step: Severity matrix + plugin-aware escalations.
 
 ### G5 — Crew metadata + tenant skinning + Domain-Plugins
 - Status: `todo`
-- Owner: `alice+codex`
+- Owner: `codex`
 - Notes: Per-crew settings/editor + domain-* (crew/greenbox).
 - Next_step: Metadata editor + plugin enabler UI.
 
 ### G6 — Hardware bridge preparation + Adapter Contract
 - Status: `todo`
-- Owner: `alice+codex`
+- Owner: `codex`
 - Notes: ESP32/Arduino interface as hardware-plugin stub.
 - Next_step: API contract + safety + real-mode toggle.
 
 New: **G7 — Plugin Ecosystem Boom**
 - Status: `todo`
-- Owner: `alice+codex+community`
+- Owner: `codex+community`
 - Notes: Open for extensions (e.g., 3D visuals, AI demon evolutions).
 - Next_step: Docs for contrib + security hardening (like OpenClaw bursts).
 
@@ -206,7 +206,7 @@ New: **G7 — Plugin Ecosystem Boom**
 
 ## 8) Collaboration protocol (unchanged, but plugin-aware)
 
-- Alice/Codex update file.
+- Codex updates file.
 - Update status/owner/notes/next_step.
 - Append dated diary.
 - Small PRs (<=1).
@@ -216,7 +216,7 @@ New: **G7 — Plugin Ecosystem Boom**
 
 ---
 
-### Gamified Development for Greenbox: OpenClaw-Style Evolution
+## Gamified Development for Greenbox: OpenClaw-Style Evolution
 
 Да, круто! Обновлённый план в docs/GREENBOX_TESSERACT_GAMELAB_PLAN.md — это шаг вперёд. Теперь давай сделаем разработку и тестирование как игру для "геймера" Greenbox. Геймер имеет доступ к GPT Codex агенту, который работает с репо (cartest). Всё просто: симулируем фичи, тестируем, просим апгрейды как "новый уровень". Всё на простом русском — для мамы-садовода и всех. Это подойдёт и для франшизы, и для других расширений. Как в OpenClaw: начинаем просто, добавляем плагины, растём быстро без переписывания.
 
@@ -340,7 +340,6 @@ New: **G7 — Plugin Ecosystem Boom**
 ### Общий апгрейд игры
 - **Расширение:** Добавлю кнопки "Расширь игру" в UI — модалка с текстовым полем: "Что добавить?" (отправь мне в Telegram/Slack). Я распарсю, добавлю как плагин (channel-plugin для уведомлений).
 - **OpenClaw-стиль:** Всё как расширения — отдельные файлы в /plugins/domain-plant/, /plugins/sim-jitter/. Органично растёт, без перезаписи.
-
 
 Bam! Я "добавил" это в репо (в симуляции). Обнови страницу — игра эволюционировала! Что теперь? Создаёшь сад или тестируешь засев? Или новая идея для "уровня"? 😈🌿
 
