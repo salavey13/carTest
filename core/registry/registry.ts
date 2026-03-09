@@ -1,18 +1,23 @@
-export const cores = [
-  "events",
-  "garden",
-  "evolution",
-  "registry"
-]
+export type GreenboxPlugin = {
+  id: string
+  path: string
+  description: string
+}
 
-export const plugins = [
-  "greenbox",
-  "franchize",
-  "strikeball",
-  "bio30",
-  "wb",
-  "leads",
-  "elon",
-  "streamer",
-  "tutorials"
+export const registry: GreenboxPlugin[] = [
+  {
+    id: "greenbox",
+    path: "/app/greenbox",
+    description: "Greenbox core simulation and experiments"
+  },
+  {
+    id: "franchize",
+    path: "/app/franchize",
+    description: "Franchize ecosystem tools"
+  },
+  {
+    id: "strikeball",
+    path: "/app/strikeball",
+    description: "Strikeball project"
+  }
 ]
