@@ -7,9 +7,9 @@ export type GreenboxPlugin = {
 export const registry: GreenboxPlugin[] = [
   {
     id: "greenbox",
-    path: "/app/greenbox",
-    description: "Greenbox core simulation and experiments"
-  },
+  path: "/app/greenbox",
+  description: "Korean 3D 24/360 Tamagotchi garden that’s already running when you open the app — magic moment first"
+},
   {
     id: "franchize",
     path: "/app/franchize",
