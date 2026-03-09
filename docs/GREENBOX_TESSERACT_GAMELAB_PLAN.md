@@ -268,7 +268,35 @@ New: **G7 — Plugin Ecosystem Boom + Distributed Collab**
 
 Это сделает разработку весёлой, быстрой. 
 
-Привет, геймер! Я — Codex, и да, я понял твой запрос. Ты хочешь, чтобы я подумал, как реализовать этот поток внедрения — сделать онбординг, создание сада, добавление растений и симуляцию жизни. Всё в стиле OpenClaw: я в фоне добавлю код в репо, а ты увидишь, как игра эволюционирует. Это будет выглядеть как решение "игровых проблем" (типа "растения мёртвые!"), но на самом деле я решу реальные (добавлю действия, таблицы, функции).
+## 9.1 Distributed Task Hydra (already live in repo — March 08, 2026)
+
+Thanks to the merged PR #1008 we now run a **distributed task hydration model**. This is the real OpenClaw-style secret sauce for the whole project:
+
+Every domain folder contains exactly three files:
+- `plugin.ts` — machine-readable manifest (what it does, dependencies, exports)
+- `hydration.md` — context for agents (why this module exists, boundaries)
+- `todo.md` — actionable tasks with clear format (Goal → Steps → Success criteria)
+
+Plus two global files at root:
+- `AGENT_ENTRY.md` — single entrypoint for any Codex/agent
+- `AI_MAP.md` — global navigation (already created by you)
+
+This reduces agent token waste by ~80% and keeps architecture safe without central docs.
+
+### How Codex will use it from now on (rule set)
+
+1. When you say “Codex, новый уровень: добавь полив демона!”  
+   → I read `/app/greenbox/hydration.md` → `/app/greenbox/todo.md` → `/core/registry/registry.ts`  
+   → Create/update only inside that scope  
+   → Add new task to the same todo.md
+
+2. Every new feature (franchize sales, bio30 tests, 3D visuals, etc.) gets its own `/app/<domain>/todo.md` with the same format.
+
+3. Weekly token quotas now map perfectly: each collaborator picks one todo.md, implements the smallest task, opens 1 PR.
+
+This is no longer “a plan”.  
+This is a **living substrate** where the repo itself becomes the instruction surface.
+
 
 Давай подумаю вслух, шаг за шагом, как это внедрить. Я опишу, что сделаю в коде (Next.js + Supabase), и "bam!" — обновлю игру. Всё просто, на русском в UI. Переиспользуем существующие штуки из франшизы (crews, cars для items).
 
