@@ -530,3 +530,508 @@ AI writes the majority of the code.
 ```
 
 Design the system so the AI **never gets lost**.
+
+
+# MEANWHILE FOR USER EXPERIENCE
+
+This "TRADE LIKE AN INSIDER" transcript is actually **shockingly relevant to what we’re building**, even though on the surface it's about a trading app. The deeper layer is **product cognition engineering** — which fits **Greenbox + AI-native architecture** extremely well.
+
+I'll break the insights and **directly graft them onto our AGENTS + Greenbox architecture plan**.
+
+---
+
+# 1. The most important concept: **Magic Moment Engineering**
+
+The founder says:
+
+> the goal is to force the user into the magic moment within 2 minutes 
+
+And even more extreme:
+
+> if onboarding can't be completed while going to the bathroom it's too long 
+
+That is **a brutal product constraint**.
+
+Now apply it to **Greenbox**.
+
+Greenbox cannot start like this:
+
+```
+create simulation
+configure parameters
+select modules
+deploy engine
+run test
+```
+
+That's **developer UX**.
+
+Instead we must design:
+
+```
+🌱 Create Garden
+↓
+🔥 System under stress
+↓
+🤖 AI proposes fix
+↓
+✨ Simulation evolves
+```
+
+Meaning:
+
+**Greenbox magic moment**
+
+```
+USER
+clicks one thing
+
+AI
+changes system behavior live
+```
+
+The **wow moment** must be:
+
+```
+"I changed the system with one action"
+```
+
+Not:
+
+```
+"I configured a simulator"
+```
+
+---
+
+# 2. Mental Calories — this is huge for us
+
+He says:
+
+> If the screen is more than 100 mental calories it's too much 
+
+This is extremely relevant to our architecture.
+
+Because developer tools usually look like:
+
+```
+config panel
+50 toggles
+10 dropdowns
+```
+
+Which is **mental calorie explosion**.
+
+Greenbox should follow:
+
+### rule
+
+```
+every interaction = binary decision
+```
+
+Example:
+
+Bad:
+
+```
+set drift threshold
+set jitter
+set noise
+set retry
+set backoff
+```
+
+Good:
+
+```
+🔥 Chaos Mode
+ON / OFF
+```
+
+Under the hood:
+
+```
+sim-drift
+sim-jitter
+sim-failure
+sim-latency
+```
+
+But the UI is **1 switch**.
+
+---
+
+# 3. The insane insight: **show value before payment**
+
+In the video they literally **execute trades before charging**:
+
+> we showed the magic moment before the payment and conversions improved 70% 
+
+This is genius psychology.
+
+Now apply this to **Greenbox**.
+
+Instead of:
+
+```
+create plugin
+configure simulator
+run simulation
+```
+
+We do:
+
+```
+open Greenbox
+↓
+system already evolving
+↓
+AI already experimenting
+↓
+user interferes
+```
+
+Meaning:
+
+Greenbox must **start alive**.
+
+Like:
+
+```
+🌿 plants already growing
+🔥 some dying
+💧 irrigation broken
+🤖 AI fixing it
+```
+
+User enters **mid-simulation**.
+
+This is exactly the same trick.
+
+---
+
+# 4. Focus on ONE thing (not ten)
+
+He says:
+
+> if you try to catch two rabbits you catch none 
+
+This applies brutally to our project.
+
+Right now we have many possibilities:
+
+```
+plugin platform
+AI dev tool
+simulation engine
+automation system
+app ecosystem
+```
+
+But **Greenbox onboarding must only communicate one thing**.
+
+Best candidate:
+
+```
+Grow software like plants.
+```
+
+Everything else is hidden.
+
+---
+
+# 5. The portfolio trick → plugin discovery
+
+He explains they **only show 4 portfolios**, even though they have hundreds:
+
+> showing all options reduced conversions by 70% 
+
+This maps perfectly to our **plugin ecosystem**.
+
+Bad UI:
+
+```
+200 plugins
+choose one
+```
+
+Good UI:
+
+```
+4 experiments
+```
+
+Example:
+
+```
+🌱 Growth Garden
+🔥 Chaos Garden
+🧠 AI Garden
+📡 Integration Garden
+```
+
+Each is actually:
+
+```
+bundle of plugins
+```
+
+---
+
+# 6. Binary decisions
+
+They try to make every question:
+
+```
+YES / NO
+```
+
+Apply this to **Greenbox control panel**.
+
+Bad:
+
+```
+choose retry policy
+choose simulation mode
+choose drift curve
+```
+
+Good:
+
+```
+🧪 Test system?
+YES / NO
+```
+
+---
+
+# 7. Superuser economics
+
+He explains something important:
+
+> revenue retention improved when superusers could spend up to 6x the base price 
+
+Translate this to our system.
+
+Greenbox should have **layers of power**.
+
+Example:
+
+Level 1
+
+```
+simple garden
+```
+
+Level 2
+
+```
+custom simulations
+```
+
+Level 3
+
+```
+AI plugin creation
+```
+
+Level 4
+
+```
+full system mutation
+```
+
+Superusers = **builders**.
+
+---
+
+# 8. The deeper insight: **curiosity culture**
+
+The hiring philosophy:
+
+> they look for obsession and curiosity rather than resume 
+
+For us this translates into something interesting:
+
+Greenbox should reward **curiosity loops**.
+
+Example:
+
+User presses:
+
+```
+🔥 stress system
+```
+
+AI replies:
+
+```
+Latency increased
+Would you like to:
+• add queue
+• scale workers
+• ignore
+```
+
+User explores.
+
+This becomes **learning through play**.
+
+---
+
+# 9. This aligns perfectly with our architecture
+
+Our architecture already creates **cognitive islands**:
+
+```
+plugins
+cores
+gateways
+```
+
+Greenbox becomes the **interactive map** of those islands.
+
+Instead of reading architecture docs, users **play the system**.
+
+---
+
+# 10. The crazy meta insight
+
+Their product works because it gives **instant power**.
+
+The user feels like:
+
+```
+I'm insider trading
+```
+
+Even though technically they're just copying public filings.
+
+Greenbox must produce the same feeling:
+
+```
+I'm evolving software ecosystems
+```
+
+Even if under the hood it's just:
+
+```
+plugin toggles
+AI refactors
+simulations
+```
+
+Perception matters.
+
+---
+
+# 11. What this changes in AGENTS architecture
+
+Agents should optimize for:
+
+```
+MAGIC MOMENT CREATION
+```
+
+not just
+
+```
+feature implementation
+```
+
+Agents should ask:
+
+```
+Does this create a wow moment?
+```
+
+If not:
+
+```
+simplify
+```
+
+---
+
+# 12. The biggest opportunity
+
+Combine:
+
+```
+Greenbox
++
+AI coding agents
++
+plugin architecture
+```
+
+You get something extremely rare:
+
+```
+SELF-EVOLVING SOFTWARE LAB
+```
+
+User plays.
+
+AI modifies code.
+
+System evolves.
+
+---
+
+# 13. The final insight
+
+Their onboarding principle:
+
+> maximize the emotional response 
+
+Greenbox should trigger:
+
+```
+😳
+🤯
+"Wait… it just changed the system"
+```
+
+Not:
+
+```
+"Okay I configured something"
+```
+
+---
+
+# 14. The scary realization
+
+If we implement this correctly:
+
+Greenbox won't feel like:
+
+```
+developer tool
+```
+
+It will feel like:
+
+```
+Factorio
++
+SimCity
++
+AI coding
+```
+
+That is **extremely addictive**.
+
+---
+
+# If you want, I can also show something extremely interesting:
+
+How the **Autopilot onboarding trick maps directly to an AI development workflow**.
+
+And it leads to a **radical idea**:
+
+Greenbox could let users **accidentally ship real features** while playing.
+
+Which is honestly **insane product design**.
