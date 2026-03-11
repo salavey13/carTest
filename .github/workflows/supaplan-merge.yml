@@ -1,0 +1,31 @@
+name: SupaPlan Merge Sync
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+
+  update-task:
+
+    if: github.event.pull_request.merged == true
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Extract SupaPlan task id
+        id: extract
+        run: |
+          TASK_ID=$(echo "${{ github.event.pull_request.body }}" | grep -oE 'supaplan_task:[a-zA-Z0-9-]+' | cut -d':' -f2)
+          echo "task=$TASK_ID" >> $GITHUB_OUTPUT
+
+      - name: Update Supabase
+        if: steps.extract.outputs.task != ''
+        run: |
+          curl -X PATCH \
+          "$SUPABASE_URL/rest/v1/supaplan_tasks?id=eq.${{ steps.extract.outputs.task }}" \
+          -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+          -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+          -H "Content-Type: application/json" \
+          -d '{"status":"done"}'
