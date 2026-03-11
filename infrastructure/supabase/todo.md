@@ -1,13 +1,14 @@
+# /infrastructure/supabase
+
 Purpose
-Centralize database access.
+Central supabase client factory & migration helpers for server-only usage.
 
 Tasks
-- Implement Supabase client factory.
-- Provide helper functions:
-  - `insertPlant`
-  - `updatePlantStats`
-  - `getCrewPlants`
-- Ensure server-only usage for privileged operations.
+- [ ] Implement `supabaseAdmin` factory (server-only, service role key) at /lib/supabaseAdmin.ts
+- [ ] Add helper wrappers: insertRow, upsertRow, rpcCall (typed)
+- [ ] Provide migrations folder structure and doc how to run (supabase cli)
+- [ ] Add hydration.md explaining secrets/role usage and safety rules
 
 Constraints
-- Do not import plugins here.
+- Never expose service role key to client.
+- Agents must call through server actions that use supabaseAdmin.
