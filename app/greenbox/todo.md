@@ -8,7 +8,7 @@ Goal: Keep pushing the Magic Moment closer to 0 seconds.
 - Read this todo + autoresearch.md (if exists).
 - Hypothesize extensions.
 - Implement in one go.
-- Measure: “User now feels X while still on the shitter.”
+- Measure: “User now feels X while still taking a shit.”
 - Repeat on any “новый уровень” or genie-lamp trigger.
 
 Phase 1 tasks (magic-moment-first)

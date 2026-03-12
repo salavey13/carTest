@@ -1,7 +1,10 @@
 If you are an AI agent:
 
 1. read /system/mindmap.ts
-2. navigate to any plugin folder (/app/<domain> like greenbox, franchize, strikeball, wb…)
-3. read hydration.md
-4. execute tasks from todo.md
-5. If “новый уровень” or fake door is mentioned → activate Artificial General Iterator (/autoresearch.md)
+2. call supaplan.pick_task(your_capability)
+3. navigate to the returned todo_path
+4. read hydration.md + todo.md
+5. execute
+6. update_status → ready_for_pr
+
+SupaPlan is the new coordination brain.
