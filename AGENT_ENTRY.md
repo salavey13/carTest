@@ -1,19 +1,22 @@
-# Agent Entry — SupaPlan + Artificial General Iterator
+---
+name: agent-entry
+description: Single entrypoint for all AI contributors.
+---
 
-Welcome, AI contributor.
+# Agent Entry
 
-This repository now uses **SupaPlan** as the single source of truth for tasks.
+Welcome.
 
-Do NOT read the entire repository.
+This repository uses **SupaPlan + Artificial General Iterator**.
+
+**Do NOT** read the entire repo.
 
 Instead:
-
-1. Start with AI_MAP.md
-2. Call supaplan.pick_task(your_capability) — it returns the next task + todo_path
-3. Read the linked todo.md for context
+1. Call `supaplan.pick_task(your_capability)`
+2. Go to the returned `todo_path`
+3. Read hydration.md + todo.md
 4. Execute
 5. Update status → ready_for_pr
-6. Open small PR (include “supaplan_task:<id>” in description)
 
 Rules:
 • Respect folder boundaries
@@ -21,4 +24,4 @@ Rules:
 • Human merge is the only way a task becomes done
 • Prefer small PRs
 
-The repo now grows itself through SupaPlan.
+The repo now grows itself.

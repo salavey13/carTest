@@ -1,3 +1,10 @@
+---
+name: ai-map
+description: Minimal navigation for agents.
+---
+
+# AI Map
+
 If you are an AI agent:
 
 1. read /system/mindmap.ts
