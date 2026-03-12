@@ -7,8 +7,10 @@ Core magic moment (first principles from Autopilot + Karpathy autoresearch):
 - BEFORE any account creation, payment, or heavy decision.
 - Fake doors = genie lamps: click “pH for dummies?” or mention any plugin name → Codex spends its own token budget → todo.md updates → link appears while you’re still taking a shit.
 
-Bathroom test rule (global iterator standard):
-If you can’t grow a new limb of the app in the time it takes to take a shit, it’s too slow.
+Bathroom test rule (for user-facing UX only):
+If the user cannot feel the magic moment / complete the UX flow in the time it takes to take a shit, that UX task fails the test.
+
+Agent tasks in SupaPlan are separate — they are the technical steps that make the UX magic happen.
 
 Boundaries:
 - Only touch files inside /app/greenbox/
