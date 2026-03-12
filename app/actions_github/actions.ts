@@ -143,7 +143,7 @@ export async function fetchRepoContents_pro(repoUrl: string, customToken?: strin
 
     // Фильтры из оригинала
     const allowedRootFiles = new Set(['package.json','tailwind.config.ts','tsconfig.json','next.config.js','next.config.mjs','vite.config.ts','vite.config.js','README.md','AGENTS.md','AGENT_ENTRY.md','AI_MAP.md','seed.sql','autoresearch.md']);
-    const allowedPrefixes = ['app/','components/','contexts/','hooks/','lib/','types/','utils/','core/','skills/','infrastructure/','system/’];
+    const allowedPrefixes = ['app/','components/','contexts/','hooks/','lib/','types/','utils/','core/','skills/','infrastructure/','system/'];
     const excludedExactPaths = new Set([]);
     const excludedPrefixes = ['.git/','node_modules/','.next/','dist/','build/','out/','public/','supabase/','Configame/','components/ui/','.vscode/','.idea/','coverage/','storybook-static/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/'];
     const excludedExtensions = ['.pl','.json','.png','.jpg','.jpeg','.gif','.svg','.ico','.webp','.avif','.mp4','.webm','.mov','.mp3','.wav','.ogg','.pdf','.woff','.woff2','.ttf','.otf','.eot','.zip','.gz','.tar','.rar','.env','.lock','.log','.DS_Store','.csv','.xlsx','.xls','.yaml','.yml','.bak','.tmp','.swp','.map','.dll','.exe','.so','.dylib'];
