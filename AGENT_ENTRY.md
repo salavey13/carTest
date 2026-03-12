@@ -1,23 +1,24 @@
-# Greenbox Agent Entry (now with Artificial General Iterator)
+# Agent Entry — SupaPlan + Artificial General Iterator
 
 Welcome, AI contributor.
 
-This repository uses a **distributed task hydration model + Artificial General Iterator**.
+This repository now uses **SupaPlan** as the single source of truth for tasks.
 
 Do NOT read the entire repository.
 
 Instead:
 
 1. Start with AI_MAP.md
-2. Navigate to the relevant folder (/app/<domain>)
-3. Read hydration.md for context
-4. Read todo.md for tasks
-5. If user says “новый уровень” or clicks a fake door → run the iterator (see /autoresearch.md)
+2. Call supaplan.pick_task(your_capability) — it returns the next task + todo_path
+3. Read the linked todo.md for context
+4. Execute
+5. Update status → ready_for_pr
+6. Open small PR (include “supaplan_task:<id>” in description)
 
 Rules:
 • Respect folder boundaries
-• Do not create new top-level architecture without updating /core/registry
+• Only SupaPlan can claim tasks (mutex + heartbeat)
+• Human merge is the only way a task becomes done
 • Prefer small PRs
-• Iterator can spend its own token budget to grow any limb instantly
 
-The repository now grows itself.
+The repo now grows itself through SupaPlan.

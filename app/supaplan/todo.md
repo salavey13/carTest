@@ -1,133 +1,33 @@
-# SupaPlan Extension
+# SupaPlan Extension — coordination brain for the entire repo
 
-SupaPlan is a minimal orchestration system for coordinating AI agents working on a repository.
+Purpose
+Turn GitHub + Supabase into a distributed execution system for AI agents (autoresearch style, zero GPU).
 
-It converts GitHub + Supabase into a distributed execution system.
+## Iterator Instructions (now active)
+Goal: Keep the whole repo self-iterating.
+- On any “новый уровень” or genie-lamp trigger → pick_task from SupaPlan.
+- Execute → ready_for_pr.
+- GitHub Action on merge → done.
 
-Supabase = coordination brain  
-GitHub = execution substrate
+Phase 1 — Core extension (already seeded)
+- [x] Database schema (supaplan_tasks, claims, events)
+- [x] Atomic claim RPC
+- [x] Server actions (claimTask, heartbeat, updateTaskStatus, logEvent)
+- [x] UI: /app/supaplan/page.tsx + StatusClient.tsx (realtime)
+- [x] Seed tasks from all local todo.md files
 
----
+Phase 2 — Agent integration (iterator live)
+- [ ] Codex SKILL.md + full skill contract (pick_task, update_status, log_event)
+- [ ] Heartbeat + auto-release on expiry
+- [ ] Task progress events + Telegram notifications
+- [ ] ready_for_pr state + merge workflow
 
-# Task lifecycle
+Phase 3 — Observability & scaling
+- [ ] Markdown export / snapshot
+- [ ] Advanced dashboards (agents, throughput, claims)
+- [ ] Agent leasing (multiple agents in parallel on different capabilities)
 
-open → claimed → running → ready_for_pr → done
-
-Agents may only move tasks forward.
-
-Human merge is the only way a task becomes **done**.
-
----
-
-# Phase 1 — Core extension
-
-## TASK: SupaPlan migration
-
-Create database schema for:
-
-supaplan_tasks  
-supaplan_claims  
-supaplan_events
-
-Implement atomic claim RPC.
-
----
-
-## TASK: SupaPlan status page
-
-Create:
-
-/app/supaplan/page.tsx  
-/app/supaplan/StatusClient.tsx
-
-Page must show realtime task list.
-
----
-
-## TASK: SupaPlan server actions
-
-Create server actions:
-
-claimTask  
-updateTaskStatus  
-logEvent
-
-Use supabaseAdmin.
-
----
-
-# Phase 2 — Agent integration
-
-## TASK: Codex skill contract
-
-Define minimal agent API:
-
-supaplan.pick_task(capability)  
-supaplan.update_status(task_id,status)  
-supaplan.log_event(type,payload)
-
-Document in SKILL.md.
-
----
-
-## TASK: Agent heartbeat
-
-Add heartbeat mechanism.
-
-If claim heartbeat expires → release task.
-
----
-
-## TASK: Task progress events
-
-Allow agents to log progress events to supaplan_events.
-
----
-
-# Phase 3 — GitHub integration
-
-## TASK: Merge workflow
-
-Create:
-
-.github/workflows/supaplan-merge.yml
-
-Workflow should:
-
-1 detect merged PR  
-2 read task id from PR description  
-3 update supaplan_tasks.status → done
-
----
-
-## TASK: ready_for_pr state
-
-Agents must move tasks to:
-
-ready_for_pr
-
-before human opens PR.
-
----
-
-# Phase 4 — Observability
-
-## TASK: Telegram notifications
-
-Send task status changes to Telegram.
-
----
-
-## TASK: Markdown export
-
-Allow exporting tasks into markdown.
-
----
-
-## TASK: Advanced dashboards
-
-Show:
-
-agents  
-active claims  
-task throughput
+Notes
+- Agents may only set status up to ready_for_pr.
+- Human merge is the only way a task becomes done.
+- Every other todo.md (greenbox, franchize, core, etc.) is now a mirror — SupaPlan is the single source of truth.

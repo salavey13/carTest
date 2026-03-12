@@ -1,21 +1,21 @@
-# Artificial General Iterator (project-wide)
+# Artificial General Iterator (project-wide, SupaPlan-backed)
 
 Goal
-Let any extension self-iterate exactly like Karpathy’s autoresearch, but zero GPU.
+Run Karpathy-style autoresearch across the entire repo using SupaPlan as coordination layer.
 
 How it works
-1. User says “новый уровень: …” or clicks any fake door / genie lamp.
-2. Codex reads the relevant todo.md + this file.
-3. Forms hypothesis → implements changes in one go.
-4. Updates the todo.md with new tasks or completed checkboxes.
-5. Magic link appears in <2 minutes while user is still on the shitter.
+1. User says “Codex, новый уровень: …” or clicks any genie-lamp fake door.
+2. Iterator calls supaplan.pick_task(capability) → claims task atomically.
+3. Executes the task (creates/updates files, runs code, opens PR).
+4. Updates status → ready_for_pr.
+5. GitHub Action on merge sets status → done and releases claim.
 
-Bathroom test (global rule)
-If the extension cannot grow while you take a shit, it fails the test.
+Bathroom test (for user-facing UX only):
+If the user cannot feel the magic moment or complete the UX flow in the time it takes to take a shit, that UX task fails the test.
+
+Agent tasks in SupaPlan are the technical implementation steps — they are separate and never subject to the bathroom test.
 
 Works for any domain
-- Mention “franchize” → iterator updates /app/franchize/todo.md
-- Mention “strikeball” → iterator updates that todo
-- Mention “pH for dummies” inside Greenbox → creates academy page instantly
+Mention any plugin name or fake door → iterator automatically picks the matching task from SupaPlan.
 
 This is the final boss for our distributed task hydra.
