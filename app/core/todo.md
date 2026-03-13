@@ -9,9 +9,9 @@ Goals
 
 Tasks (priority order)
 - [ ] Extract /app/actions.ts -> /app/core/supabase_actions.ts (DB helpers, migrations)
-- [ ] Extract telegram-specific logic -> /app/core/telegram_actions.ts (sendMessage wrapper)
+- [x] Extract telegram-specific logic -> /app/core/telegram_actions.ts (sendMessage wrapper)
 - [ ] Create /app/core/garden_actions.ts (createGarden, seedGarden, plant updates)
-- [ ] Add /app/core/index.ts to re-export all core actions as named exports
+- [x] Add /app/core/index.ts to re-export all core actions as named exports
 - [ ] Move shared utilities -> /infrastructure/utils (date/uuid/logging)
 - [ ] Add hydration.md and CONTRACT.md for core (describe public stable API)
 - [ ] Add tests / simple smoke actions (server-side tests)
