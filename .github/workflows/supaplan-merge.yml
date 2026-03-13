@@ -29,13 +29,23 @@ jobs:
             BODY=$(printf '%s' "${{ github.event.pull_request.body }}")
           fi
 
-          IDS=$(printf '%s\n' "$BODY" \
-            | sed -nE '/supaplan_task[[:space:]]*:/I s/.*supaplan_task[[:space:]]*:[[:space:]]*//Ip' \
-            | tr ',' '\n' \
-            | sed -E 's/[[:space:]]+//g' \
-            | grep -oiE '^[0-9a-f-]{36}$' \
-            | sort -u \
-            | paste -sd, -)
+          IDS=$(BODY="$BODY" python3 - <<'PY'
+import os
+import re
+
+body = os.environ.get('BODY', '')
+marker_re = re.compile(r'supaplan_task\s*:\s*([^\n\r]+)', re.IGNORECASE)
+uuid_re = re.compile(r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b')
+
+ids = set()
+for match in marker_re.finditer(body):
+    tail = match.group(1)
+    for task_id in uuid_re.findall(tail):
+        ids.add(task_id.lower())
+
+print(','.join(sorted(ids)))
+PY
+          )
           echo "tasks=$IDS" >> "$GITHUB_OUTPUT"
 
           if [ -z "$IDS" ]; then
