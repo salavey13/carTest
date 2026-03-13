@@ -46,3 +46,12 @@ status updates
 Humans
 
 PR merge
+
+---
+
+## Operator assets
+
+- Runtime API contract: `app/supaplan/SKILL.md`
+- State audit + fake doors: `app/supaplan/STATE.md`
+- Codex local skill runbook: `skills/supaplan-supabase-operator/SKILL.md`
+- CLI helper: `scripts/supaplan-skill.mjs`
