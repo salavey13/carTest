@@ -653,7 +653,7 @@ export default function CyberVibePage() {
       <div id={heroTriggerId} style={{ height: '150vh' }} aria-hidden="true" />
 
       <div className="relative z-10 container mx-auto px-4 pt-10 pb-10">
-        <Card className="max-w-4xl mx-auto bg-black/85 backdrop-blur-xl text-white rounded-2xl border-2 border-brand-yellow/50 shadow-[0_0_35px_theme(colors.brand-yellow/0.5)]">
+        <Card className="max-w-4xl mx-auto bg-black/85 backdrop-blur-xl text-white rounded-2xl border-2 border-brand-yellow/50 shadow-[0_0_35px_rgba(250,204,21,0.5)]">
           <CardContent className="space-y-12 p-4 md:p-8 pt-8">
 
             {t.sections.map((section, index) => {

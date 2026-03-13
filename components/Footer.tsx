@@ -65,7 +65,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/repo-xml"
-                  className={`${importantLinkClass} border-brand-purple/50 hover:border-brand-purple [--tw-shadow-color:theme(colors.brand-purple/60%)] bg-purple-950/40 hover:bg-purple-900/50`}
+                  className={`${importantLinkClass} border-brand-purple/50 hover:border-brand-purple [--tw-shadow-color:rgba(124,92,255,0.6)] bg-purple-950/40 hover:bg-purple-900/50`}
                 >
                   <Sparkles className="w-4 h-4 text-brand-yellow animate-[pulse_1.8s_infinite]" /> SUPERVIBE Studio
                 </Link>
@@ -73,7 +73,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/nexus"
-                  className={`${importantLinkClass} border-brand-green/50 hover:border-brand-green [--tw-shadow-color:theme(colors.brand-green/60%)] bg-green-950/40 hover:bg-green-900/50`}
+                  className={`${importantLinkClass} border-brand-green/50 hover:border-brand-green [--tw-shadow-color:rgba(0,255,157,0.6)] bg-green-950/40 hover:bg-green-900/50`}
                 >
                   <Network className="w-4 h-4 text-neon-lime animate-[pulse_2s_infinite_0.2s]" /> NEXUS Hub
                 </Link>
