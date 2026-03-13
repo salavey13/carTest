@@ -17,10 +17,10 @@ Phase 1 — Core extension (already seeded)
 - [x] Seed tasks from all local todo.md files
 
 Phase 2 — Agent integration (iterator live)
-- [ ] Codex SKILL.md + full skill contract (pick_task, update_status, log_event)
+- [x] Codex SKILL.md + full skill contract (pick_task, update_status, log_event)
 - [ ] Heartbeat + auto-release on expiry
 - [ ] Task progress events + Telegram notifications
-- [ ] ready_for_pr state + merge workflow
+- [x] ready_for_pr state + merge workflow
 
 Phase 3 — Observability & scaling
 - [ ] Markdown export / snapshot

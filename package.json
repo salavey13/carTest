@@ -10,7 +10,8 @@
     "notify:callback": "node scripts/codex-notify.mjs callback",
     "notify:telegram": "node scripts/codex-notify.mjs telegram",
     "lint:target": "eslint --max-warnings=0 app/franchize scripts/codex-notify.mjs",
-    "qa:franchize": "node scripts/franchize-qa-check.mjs"
+    "qa:franchize": "node scripts/franchize-qa-check.mjs",
+    "supaplan:skill": "node scripts/supaplan-skill.mjs"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "1.3.1",
