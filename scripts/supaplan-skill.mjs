@@ -13,6 +13,10 @@ function getArg(name, fallback = undefined) {
   return args[idx + 1];
 }
 
+function hasFlag(name) {
+  return args.includes(`--${name}`);
+}
+
 function required(value, message) {
   if (!value) throw new Error(message);
   return value;
@@ -39,14 +43,82 @@ function normalizeError(error) {
   }
 }
 
+function isTransientNetworkError(error) {
+  const text = normalizeError(error).toLowerCase();
+  return (
+    text.includes('fetch failed') ||
+    text.includes('econnrefused') ||
+    text.includes('enotfound') ||
+    text.includes('etimedout') ||
+    text.includes('network')
+  );
+}
 
+function restRpc(rpcName, body = {}) {
+  return restRequest('POST', `rpc/${rpcName}`, body);
+}
+
+async function fallbackClaimViaRest(capability, agentId) {
+  const candidates = restRequest(
+    'GET',
+    `supaplan_tasks?select=*&status=eq.open&capability=eq.${encodeURIComponent(capability)}&order=created_at.asc&limit=1`,
+  );
+  const task = Array.isArray(candidates) ? candidates[0] : null;
+
+  if (!task) {
+    return { mode: 'fallback-rest', result: { task: null } };
+  }
+
+  const now = new Date().toISOString();
+  const claimedRows = restRequest(
+    'PATCH',
+    `supaplan_tasks?id=eq.${task.id}&status=eq.open`,
+    { status: 'claimed', updated_at: now },
+    'return=representation',
+  );
+  const claimedTask = Array.isArray(claimedRows) ? claimedRows[0] : null;
+
+  if (!claimedTask) {
+    return { mode: 'fallback-rest', result: { task: null, reason: 'race_condition' } };
+  }
+
+  const claimRows = restRequest(
+    'POST',
+    'supaplan_claims',
+    {
+      task_id: claimedTask.id,
+      agent_id: agentId,
+      claim_token: randomUUID(),
+      status: 'claimed',
+      claimed_at: now,
+      last_heartbeat: now,
+    },
+    'return=representation',
+  );
+
+  return {
+    mode: 'fallback-rest',
+    result: {
+      task: claimedTask,
+      claim: Array.isArray(claimRows) ? claimRows[0] : claimRows,
+    },
+  };
+}
 
 function restRequest(method, path, body = null, prefer = null) {
   const url = required(process.env.NEXT_PUBLIC_SUPABASE_URL, 'Missing NEXT_PUBLIC_SUPABASE_URL');
   const key = required(process.env.SUPABASE_SERVICE_ROLE_KEY, 'Missing SUPABASE_SERVICE_ROLE_KEY');
   const fullUrl = `${url}/rest/v1/${path}`;
 
-  const args = ['-sS', '-X', method, fullUrl, '-H', `apikey: ${key}`, '-H', `Authorization: Bearer ${key}`, '-H', 'Content-Type: application/json'];
+  const args = [
+    '-sS',
+    '-X', method,
+    fullUrl,
+    '-H', `apikey: ${key}`,
+    '-H', `Authorization: Bearer ${key}`,
+    '-H', 'Content-Type: application/json',
+    '-w', '\n%{http_code}',
+  ];
   if (prefer) args.push('-H', `Prefer: ${prefer}`);
   if (body !== null) args.push('-d', JSON.stringify(body));
 
@@ -55,13 +127,27 @@ function restRequest(method, path, body = null, prefer = null) {
     throw new Error(result.stderr || result.stdout || 'curl request failed');
   }
 
-  const text = (result.stdout || '').trim();
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
+  const output = result.stdout || '';
+  const splitIdx = output.lastIndexOf('\n');
+  const responseText = splitIdx === -1 ? output.trim() : output.slice(0, splitIdx).trim();
+  const httpCodeRaw = splitIdx === -1 ? '000' : output.slice(splitIdx + 1).trim();
+  const httpCode = Number.parseInt(httpCodeRaw, 10);
+
+  let parsed = null;
+  if (responseText) {
+    try {
+      parsed = JSON.parse(responseText);
+    } catch {
+      parsed = responseText;
+    }
   }
+
+  if (!Number.isFinite(httpCode) || httpCode < 200 || httpCode >= 300) {
+    const details = typeof parsed === 'string' ? parsed : JSON.stringify(parsed ?? {});
+    throw new Error(`REST ${method} ${path} failed with HTTP ${httpCodeRaw}: ${details}`);
+  }
+
+  return parsed;
 }
 
 function extractTaskIdFromText(text) {
@@ -70,71 +156,151 @@ function extractTaskIdFromText(text) {
   return match?.[1] ?? null;
 }
 
+
+function resolveCapabilityForPick(requestedCapability) {
+  if (requestedCapability && requestedCapability !== 'auto') {
+    return { capability: requestedCapability, source: 'arg' };
+  }
+
+  const candidates = restRequest(
+    'GET',
+    'supaplan_tasks?select=capability,updated_at&status=eq.open&order=updated_at.asc&limit=1',
+  );
+  const first = Array.isArray(candidates) ? candidates[0] : null;
+  if (!first?.capability) {
+    return { capability: null, source: 'auto-empty' };
+  }
+
+  return { capability: first.capability, source: 'auto-oldest-open' };
+}
+
 async function pickTask() {
-  const capability = required(getArg('capability'), 'Missing --capability');
+  const requestedCapability = getArg('capability', 'auto');
   const agentId = getArg('agentId', process.env.SUPAPLAN_AGENT_ID || 'codex-local-agent');
-  const supabase = getAdminClient();
+  const dryRun = hasFlag('dry-run');
+  const resolved = resolveCapabilityForPick(requestedCapability);
 
-  const { data, error } = await supabase.rpc('supaplan_claim_task', {
-    p_capability: capability,
-    p_agent: agentId,
-  });
-
-  if (!error) {
-    console.log(JSON.stringify({ mode: 'rpc', result: data ?? { task: null } }, null, 2));
+  if (!resolved.capability) {
+    console.log(JSON.stringify({ mode: 'none', result: { task: null }, capabilitySource: resolved.source }, null, 2));
     return;
   }
 
-  if (!CLAIM_RPC_FALLBACK_CODES.has(error.code ?? '')) {
-    throw error;
-  }
+  const capability = resolved.capability;
 
-  const { data: task, error: selectError } = await supabase
-    .from('supaplan_tasks')
-    .select('*')
-    .eq('status', 'open')
-    .eq('capability', capability)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (selectError) throw selectError;
-  if (!task) {
-    console.log(JSON.stringify({ mode: 'fallback', result: { task: null } }, null, 2));
+  if (dryRun) {
+    const candidateRows = restRequest(
+      'GET',
+      `supaplan_tasks?select=*&status=eq.open&capability=eq.${encodeURIComponent(capability)}&order=created_at.asc&limit=1`,
+    );
+    const candidate = Array.isArray(candidateRows) ? candidateRows[0] : null;
+    console.log(JSON.stringify({
+      mode: 'dry-run',
+      capability,
+      capabilitySource: resolved.source,
+      result: { task: candidate ?? null },
+    }, null, 2));
     return;
   }
 
-  const now = new Date().toISOString();
-  const { data: claimedTask, error: updateError } = await supabase
-    .from('supaplan_tasks')
-    .update({ status: 'claimed', updated_at: now })
-    .eq('id', task.id)
-    .eq('status', 'open')
-    .select('*')
-    .maybeSingle();
-
-  if (updateError) throw updateError;
-  if (!claimedTask) {
-    console.log(JSON.stringify({ mode: 'fallback', result: { task: null } }, null, 2));
-    return;
+  let supabase = null;
+  try {
+    supabase = getAdminClient();
+  } catch (error) {
+    if (!isTransientNetworkError(error)) {
+      throw error;
+    }
   }
 
-  const { data: claim, error: claimError } = await supabase
-    .from('supaplan_claims')
-    .insert({
-      task_id: claimedTask.id,
-      agent_id: agentId,
-      claim_token: randomUUID(),
-      status: 'claimed',
-      claimed_at: now,
-      last_heartbeat: now,
-    })
-    .select('*')
-    .maybeSingle();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.rpc('supaplan_claim_task', {
+        p_capability: capability,
+        p_agent: agentId,
+      });
 
-  if (claimError) throw claimError;
+      if (!error) {
+        console.log(JSON.stringify({ mode: 'rpc-js', capability, capabilitySource: resolved.source, result: data ?? { task: null } }, null, 2));
+        return;
+      }
 
-  console.log(JSON.stringify({ mode: 'fallback', result: { task: claimedTask, claim } }, null, 2));
+      if (!CLAIM_RPC_FALLBACK_CODES.has(error.code ?? '')) {
+        throw error;
+      }
+
+      const { data: task, error: selectError } = await supabase
+        .from('supaplan_tasks')
+        .select('*')
+        .eq('status', 'open')
+        .eq('capability', capability)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (selectError) throw selectError;
+      if (!task) {
+        console.log(JSON.stringify({ mode: 'fallback-js', capability, capabilitySource: resolved.source, result: { task: null } }, null, 2));
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const { data: claimedTask, error: updateError } = await supabase
+        .from('supaplan_tasks')
+        .update({ status: 'claimed', updated_at: now })
+        .eq('id', task.id)
+        .eq('status', 'open')
+        .select('*')
+        .maybeSingle();
+
+      if (updateError) throw updateError;
+      if (!claimedTask) {
+        console.log(JSON.stringify({ mode: 'fallback-js', capability, capabilitySource: resolved.source, result: { task: null } }, null, 2));
+        return;
+      }
+
+      const { data: claim, error: claimError } = await supabase
+        .from('supaplan_claims')
+        .insert({
+          task_id: claimedTask.id,
+          agent_id: agentId,
+          claim_token: randomUUID(),
+          status: 'claimed',
+          claimed_at: now,
+          last_heartbeat: now,
+        })
+        .select('*')
+        .maybeSingle();
+
+      if (claimError) throw claimError;
+
+      console.log(JSON.stringify({ mode: 'fallback-js', capability, capabilitySource: resolved.source, result: { task: claimedTask, claim } }, null, 2));
+      return;
+    } catch (error) {
+      if (!isTransientNetworkError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  try {
+    const rpcResult = restRpc('supaplan_claim_task', {
+      p_capability: capability,
+      p_agent: agentId,
+    });
+    console.log(JSON.stringify({ mode: 'rpc-rest', capability, capabilitySource: resolved.source, result: rpcResult ?? { task: null } }, null, 2));
+    return;
+  } catch (error) {
+    if (!isTransientNetworkError(error)) {
+      throw error;
+    }
+  }
+
+  try {
+    const fallback = await fallbackClaimViaRest(capability, agentId);
+    console.log(JSON.stringify({ ...fallback, capability, capabilitySource: resolved.source }, null, 2));
+    return;
+  } catch (error) {
+    throw new Error(`pick-task failed in all modes (rpc-js -> rpc-rest -> fallback-rest): ${normalizeError(error)}`);
+  }
 }
 
 async function updateStatus() {
@@ -225,8 +391,32 @@ function reviewMergeWorkflow() {
 
 
 async function smokeFlow() {
-  const capability = required(getArg('capability'), 'Missing --capability');
+  const requestedCapability = getArg('capability', 'auto');
   const agentId = getArg('agentId', process.env.SUPAPLAN_AGENT_ID || 'codex-local-agent');
+  const dryRun = hasFlag('dry-run');
+  const resolved = resolveCapabilityForPick(requestedCapability);
+
+  if (!resolved.capability) {
+    console.log(JSON.stringify({ mode: 'none', result: { task: null }, capabilitySource: resolved.source }, null, 2));
+    return;
+  }
+
+  const capability = resolved.capability;
+
+  if (dryRun) {
+    const candidateRows = restRequest(
+      'GET',
+      `supaplan_tasks?select=*&status=eq.open&capability=eq.${encodeURIComponent(capability)}&order=created_at.asc&limit=1`,
+    );
+    const candidate = Array.isArray(candidateRows) ? candidateRows[0] : null;
+    console.log(JSON.stringify({
+      mode: 'dry-run',
+      capability,
+      capabilitySource: resolved.source,
+      result: { task: candidate ?? null },
+    }, null, 2));
+    return;
+  }
 
   const candidates = restRequest('GET', `supaplan_tasks?select=*&status=eq.open&capability=eq.${encodeURIComponent(capability)}&order=created_at.asc&limit=1`);
   const task = Array.isArray(candidates) ? candidates[0] : null;
@@ -290,6 +480,46 @@ async function smokeFlow() {
   }, null, 2));
 }
 
+
+async function status() {
+  const tasks = restRequest('GET', 'supaplan_tasks?select=id,capability,status,updated_at,title,todo_path&order=updated_at.desc&limit=200');
+  const rows = Array.isArray(tasks) ? tasks : [];
+
+  const counts = rows.reduce((acc, row) => {
+    const key = row.status || 'unknown';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const byCapability = rows.reduce((acc, row) => {
+    const cap = row.capability || 'unknown';
+    acc[cap] = acc[cap] || { open: 0, running: 0, ready_for_pr: 0 };
+    if (row.status === 'open') acc[cap].open += 1;
+    if (row.status === 'running') acc[cap].running += 1;
+    if (row.status === 'ready_for_pr') acc[cap].ready_for_pr += 1;
+    return acc;
+  }, {});
+
+  const oldestOpen = rows
+    .filter((row) => row.status === 'open')
+    .sort((a, b) => String(a.updated_at || '').localeCompare(String(b.updated_at || '')))
+    .slice(0, 5)
+    .map((row) => ({
+      id: row.id,
+      title: row.title,
+      capability: row.capability,
+      todo_path: row.todo_path,
+      updated_at: row.updated_at,
+    }));
+
+  console.log(JSON.stringify({
+    ok: true,
+    total: rows.length,
+    counts,
+    byCapability,
+    oldestOpen,
+  }, null, 2));
+}
 async function inspectMigrations() {
   const lifecycle = ['open', 'claimed', 'running', 'ready_for_pr', 'done'];
   const hasMergeWorkflow = existsSync('.github/workflows/supaplan-merge.yml');
@@ -322,10 +552,11 @@ const runners = {
   'inspect-migrations': inspectMigrations,
   'review-merge-workflow': reviewMergeWorkflow,
   'smoke-flow': smokeFlow,
+  'status': status,
 };
 
 if (!command || !runners[command]) {
-  console.error('Usage: node scripts/supaplan-skill.mjs <pick-task|update-status|task-status|log-event|inspect-migrations|review-merge-workflow|smoke-flow> [--key value]');
+  console.error('Usage: node scripts/supaplan-skill.mjs <pick-task|update-status|task-status|log-event|inspect-migrations|review-merge-workflow|smoke-flow|status> [--key value] (pick-task supports --capability <name|auto> --agentId <id> --dry-run)');
   process.exit(1);
 }
 
