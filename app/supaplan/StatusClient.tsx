@@ -250,6 +250,13 @@ export default function StatusClient() {
     });
   }, [eventSourceFilter, eventTypeFilter, events]);
 
+  const suggestedTasks = useMemo(() => {
+    return tasks
+      .filter((task) => task.status === "open")
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .slice(0, 3);
+  }, [tasks]);
+
   const handleNotify = useCallback((task: SupaPlanTask) => {
     setNotifState(null);
 
@@ -344,6 +351,46 @@ export default function StatusClient() {
           Filter: <span className="font-medium text-slate-900 dark:text-slate-100">{activeFilter === "all" ? "All" : STATUS_META[activeFilter].label}</span>
         </p>
       </div>
+
+      <section className="rounded-xl border border-indigo-200/70 bg-indigo-50/60 p-4 dark:border-indigo-500/30 dark:bg-indigo-950/20">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-200">
+              Mission board: pick your next interesting task
+            </h2>
+            <p className="mt-1 text-sm text-indigo-900/90 dark:text-indigo-100/90">
+              Want to run a manual Codex sprint? Grab one task below and paste the quick ref directly into chat.
+            </p>
+          </div>
+          <code className="rounded-md bg-indigo-900/90 px-2 py-1 text-xs text-indigo-100">
+            node scripts/supaplan-skill.mjs pick-task --capability &lt;capability&gt; --agentId &lt;id&gt;
+          </code>
+        </div>
+
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          {suggestedTasks.map((task) => (
+            <article
+              key={task.id}
+              className="rounded-lg border border-indigo-200 bg-white/95 p-3 text-sm dark:border-indigo-500/40 dark:bg-slate-900/70"
+            >
+              <p className="font-semibold text-slate-900 dark:text-slate-100">{task.title}</p>
+              <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                capability: <span className="font-mono">{task.capability ?? "n/a"}</span>
+              </p>
+              <p className="mt-1 break-all text-[11px] text-slate-500 dark:text-slate-400">task_id: {task.id}</p>
+              <p className="mt-2 rounded bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                Codex, take task {task.id} ({task.title})
+              </p>
+            </article>
+          ))}
+
+          {suggestedTasks.length === 0 && (
+            <p className="rounded-lg border border-dashed border-indigo-300 p-3 text-xs text-indigo-900 dark:border-indigo-500/40 dark:text-indigo-200">
+              No open tasks right now. That means the queue is clean and ready for new ideas.
+            </p>
+          )}
+        </div>
+      </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.45fr_1fr]">
         <div className="space-y-3">

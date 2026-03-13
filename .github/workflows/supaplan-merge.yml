@@ -36,7 +36,6 @@ jobs:
             | grep -oiE '^[0-9a-f-]{36}$' \
             | sort -u \
             | paste -sd, -)
-' | grep -oiE '^[0-9a-f-]{36}$' | sort -u | paste -sd, -)
           echo "tasks=$IDS" >> "$GITHUB_OUTPUT"
 
           if [ -z "$IDS" ]; then
