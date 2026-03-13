@@ -476,7 +476,7 @@ export default function GamifiedSelfDevPage() {
       <div id={heroTriggerId} style={{ height: '150vh' }} aria-hidden="true" />
 
       <div className="relative z-10 container mx-auto px-4 pt-10 pb-10">
-        <Card className="max-w-4xl mx-auto bg-black/85 backdrop-blur-xl text-white rounded-2xl border-2 border-brand-cyan/50 shadow-[0_0_35px_theme(colors.brand-cyan/0.5)]">
+        <Card className="max-w-4xl mx-auto bg-black/85 backdrop-blur-xl text-white rounded-2xl border-2 border-brand-cyan/50 shadow-[0_0_35px_rgba(6,182,212,0.5)]">
           <CardContent className="space-y-12 p-4 md:p-8 pt-8">
 
             {sections.map((section, index) => {
