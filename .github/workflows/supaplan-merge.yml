@@ -3,49 +3,60 @@ name: SupaPlan Merge Sync
 on:
   pull_request:
     types: [closed]
+  workflow_dispatch:
+    inputs:
+      pr_body:
+        description: "Optional test PR body override for dry-run checks"
+        required: false
+        type: string
 
 jobs:
   update-task:
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     env:
       SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
     steps:
-      - name: Extract SupaPlan task id from PR body
+      - name: Extract SupaPlan task ids from PR body
         id: extract
         shell: bash
         run: |
-          BODY=$(cat <<'PR_BODY'
-${{ github.event.pull_request.body }}
-PR_BODY
-)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BODY="${{ inputs.pr_body }}"
+          else
+            BODY=$(printf '%s' "${{ github.event.pull_request.body }}")
+          fi
 
-          TASK_ID=$(echo "$BODY" | grep -oiE 'supaplan_task\s*:\s*[0-9a-f-]{36}' | head -n1 | grep -oiE '[0-9a-f-]{36}' || true)
-          echo "task=$TASK_ID" >> "$GITHUB_OUTPUT"
+          IDS=$(printf '%s\n' "$BODY" | grep -oiE 'supaplan_task\s*:\s*([0-9a-f-]{36}([[:space:]]*,[[:space:]]*[0-9a-f-]{36})*)' | sed -E 's/.*:[[:space:]]*//' | tr ',' '\n' | tr -d ' 	' | grep -oiE '^[0-9a-f-]{36}$' | sort -u | paste -sd, -)
+          echo "tasks=$IDS" >> "$GITHUB_OUTPUT"
 
-          if [ -z "$TASK_ID" ]; then
+          if [ -z "$IDS" ]; then
             echo "No supaplan_task:<uuid> found in PR body; skipping."
           else
-            echo "Extracted SupaPlan task id: $TASK_ID"
+            echo "Extracted SupaPlan task ids: $IDS"
           fi
 
       - name: Validate workflow env
-        if: steps.extract.outputs.task != ''
+        if: steps.extract.outputs.tasks != ''
         shell: bash
         run: |
           test -n "$SUPABASE_URL" || (echo 'Missing secret NEXT_PUBLIC_SUPABASE_URL' && exit 1)
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo 'Missing secret SUPABASE_SERVICE_ROLE_KEY' && exit 1)
 
-      - name: Mark SupaPlan task done
-        if: steps.extract.outputs.task != ''
+      - name: Mark SupaPlan task(s) done
+        if: steps.extract.outputs.tasks != ''
         shell: bash
         run: |
-          curl -sS -X PATCH \
-            "$SUPABASE_URL/rest/v1/supaplan_tasks?id=eq.${{ steps.extract.outputs.task }}" \
-            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: return=representation" \
-            -d "{\"status\":\"done\",\"updated_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
+          IFS=',' read -r -a TASKS <<< "${{ steps.extract.outputs.tasks }}"
+          for TASK_ID in "${TASKS[@]}"; do
+            echo "Updating task $TASK_ID -> done"
+            curl -sS -X PATCH \
+              "$SUPABASE_URL/rest/v1/supaplan_tasks?id=eq.$TASK_ID" \
+              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Content-Type: application/json" \
+              -H "Prefer: return=representation" \
+              -d "{\"status\":\"done\",\"updated_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
+          done
