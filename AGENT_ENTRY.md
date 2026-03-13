@@ -21,6 +21,10 @@ Instead:
    - `node scripts/supaplan-skill.mjs task-status --taskId <task_id>`
    - claim row exists in `supaplan_claims` for `<task_id>`
 
+7. Before creating PR, include task token in both places for merge automation:
+   - PR title contains `supaplan_task:<task_id>`
+   - PR description contains `supaplan_task: <task_id>` on its own line
+
 If JS client fetch fails in this environment, use the same script commands (they now auto-fallback to REST).
 
 Rules:
