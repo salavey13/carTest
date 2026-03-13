@@ -5,27 +5,47 @@ on:
     types: [closed]
 
 jobs:
-
   update-task:
-
     if: github.event.pull_request.merged == true
-
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
     steps:
-
-      - name: Extract SupaPlan task id
+      - name: Extract SupaPlan task id from PR body
         id: extract
+        shell: bash
         run: |
-          TASK_ID=$(echo "${{ github.event.pull_request.body }}" | grep -oE 'supaplan_task:[a-zA-Z0-9-]+' | cut -d':' -f2)
-          echo "task=$TASK_ID" >> $GITHUB_OUTPUT
+          BODY=$(cat <<'PR_BODY'
+${{ github.event.pull_request.body }}
+PR_BODY
+)
 
-      - name: Update Supabase
+          TASK_ID=$(echo "$BODY" | grep -oiE 'supaplan_task\s*:\s*[0-9a-f-]{36}' | head -n1 | grep -oiE '[0-9a-f-]{36}' || true)
+          echo "task=$TASK_ID" >> "$GITHUB_OUTPUT"
+
+          if [ -z "$TASK_ID" ]; then
+            echo "No supaplan_task:<uuid> found in PR body; skipping."
+          else
+            echo "Extracted SupaPlan task id: $TASK_ID"
+          fi
+
+      - name: Validate workflow env
         if: steps.extract.outputs.task != ''
+        shell: bash
         run: |
-          curl -X PATCH \
-          "$SUPABASE_URL/rest/v1/supaplan_tasks?id=eq.${{ steps.extract.outputs.task }}" \
-          -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-          -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-          -H "Content-Type: application/json" \
-          -d '{"status":"done"}'
+          test -n "$SUPABASE_URL" || (echo 'Missing secret NEXT_PUBLIC_SUPABASE_URL' && exit 1)
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo 'Missing secret SUPABASE_SERVICE_ROLE_KEY' && exit 1)
+
+      - name: Mark SupaPlan task done
+        if: steps.extract.outputs.task != ''
+        shell: bash
+        run: |
+          curl -sS -X PATCH \
+            "$SUPABASE_URL/rest/v1/supaplan_tasks?id=eq.${{ steps.extract.outputs.task }}" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=representation" \
+            -d "{\"status\":\"done\",\"updated_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"

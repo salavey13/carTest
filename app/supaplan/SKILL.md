@@ -1,49 +1,37 @@
-# SupaPlan Agent Skill
+# SupaPlan Agent Skill (runtime)
 
-Agents must interact with SupaPlan through a minimal API.
+Runtime server module: `app/supaplan/skill.ts`.
 
----
+For operator-facing CLI/runbook usage, use local skill:
+- `skills/supaplan-supabase-operator/SKILL.md`
 
-## pick_task
+## Runtime API
 
-Select next available task.
+### `supaplan.pick_task(capability, agentId)`
 
-Input
+- Uses `supaplan_claim_task` RPC for atomic claim.
+- If RPC is unavailable, uses fallback claim sequence:
+  1. select first `open` task by capability,
+  2. update task to `claimed` guarded by `status = open`,
+  3. insert claim into `supaplan_claims`.
 
-capability
+### `supaplan.update_status(taskId, status)`
 
-Output
+Allowed status writes for agents only:
+- `claimed`
+- `running`
+- `ready_for_pr`
 
-task object
+### `supaplan.log_event(type, payload)`
 
----
+- Inserts into `supaplan_events` with `source: "codex"`.
 
-## update_status
+## Agent loop
 
-Update task status.
+1. `pick_task`
+2. `update_status(..., "running")`
+3. execute task work
+4. `log_event("task_progress", ...)`
+5. `update_status(..., "ready_for_pr")`
 
-Valid states
-
-claimed  
-running  
-ready_for_pr
-
-Agents cannot mark tasks as done.
-
----
-
-## log_event
-
-Record progress events.
-
-Used for debugging and monitoring.
-
----
-
-# Agent flow
-
-1 pick_task  
-2 claim task  
-3 update_status running  
-4 execute work  
-5 update_status ready_for_pr
+`done` is merge-owned and must not be set by agents.
