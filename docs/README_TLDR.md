@@ -73,18 +73,24 @@ git push origin main
 - Suffix format: prefer `-team.vercel.app` (dot-prefixed `.team.vercel.app` is also supported).
 
 
-## 8) Automation expansion roadmap
+## 8) SupaPlan-first для агентов
+- По умолчанию сначала брать preplanned задачу через SupaPlan (`AGENT_ENTRY.md`).
+- Быстрый claim: `node scripts/supaplan-skill.mjs pick-task --capability <capability> --agentId <agent_id>`.
+- Если задача получена: вести статусы (`running` -> `ready_for_pr`) и логировать прогресс (`log-event`).
+- Импровизация/adhoc — только если нет claimable open задачи или SupaPlan временно недоступен.
+
+## 9) Automation expansion roadmap
 - See `docs/AUTOMATION_EXPANSION_PLAN.md` for the full phased plan: auto callback execution, lifecycle statuses, preview health checks, and schema-level operator intelligence.
 
 
-## 9) Notification helper script
+## 10) Notification helper script
 - `node scripts/codex-notify.mjs callback ...` to send callback quickly.
 - `node scripts/codex-notify.mjs telegram ...` to ping a user/chat directly via bot token.
 - heartbeat fan-out mode: telegram notify resolves recipients from env/flags and always mirrors to `417553377`; use `--dryRun true` to inspect target list.
 - For `/codex` originator notification, send both `telegramChatId` and `telegramUserId`.
 
 
-## 10) CyberTutor homework-photo (strict)
+## 11) CyberTutor homework-photo (strict)
 - No plan-only responses: solve numbered tasks from photo/PDF where possible.
 - In `Что дано`, include extracted statements from textbooks, not only task numbers.
 - Save to Supabase + verify (`save` then `exists/select`) before callback says "saved".
@@ -96,7 +102,7 @@ git push origin main
 - If Slack photo upload has `missing_scope`, send public photo links fallback.
 
 
-## 11) Agent memory
+## 12) Agent memory
 - Read/update `docs/AGENT_DIARY.md` for practical runtime lessons (bridge errors, screenshot fallbacks, callback edge-cases).
 
 - Canonical CyberTutor contract: `docs/CYBERTUTOR_RUNTIME_CONTRACT_V1.md`.
