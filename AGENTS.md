@@ -175,6 +175,21 @@ Operator intent mapping:
 - If request is broad/ambiguous (e.g. “continue”, “ебаш”, “do next”), default to SupaPlan claim flow first.
 - If request is explicit and conflicts with queued SupaPlan tasks, do requested scope but still report SupaPlan pending context.
 
+### 6.2) SupaPlan context map (mandatory reading order before implementation)
+
+To avoid missing system-level context, always read these files in this order when working SupaPlan-related tasks:
+
+1. `AGENT_ENTRY.md` — single-entry workflow contract.
+2. `AI_MAP.md` — high-level system map + where autonomous planners/queues live.
+3. `system/mindmap/todo.md` — operator mindmap and active execution vectors.
+4. `app/supaplan/README.md` — feature-level overview for SupaPlan app surfaces.
+5. `app/supaplan/ARCHITECTURE.md` + `app/supaplan/STATE.md` + `app/supaplan/CODEX_USAGE.md` — implementation/runtime contracts.
+6. `docs/SUPAPLAN_FOR_DUMMIES.md` — fast onboarding explainer for new operators.
+
+Hard reminder (learned from regressions): do **not** assume one SupaPlan source is complete.
+Cross-check at least map + mindmap + app docs before changing claim/state/merge automation.
+If any referenced file is missing or moved, explicitly log that mismatch in your final report and PR body.
+
 ---
 
 ## 7) Documentation contract

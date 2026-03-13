@@ -1576,12 +1576,12 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 
 ### T50 — Checkout contract payload resilience + franchize crew ACL expansion
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Stabilize order-doc generation with local template fallback, persist order snapshot for retries/audit, and enforce crew-owner visibility ACL for admin/franchize vehicle editing.
-- next_step: Start with local template fallback in server action and write retry-safe order log row before Telegram sends.
-- risks: Requires migration decision for long-lived order snapshot storage schema.
+- status: `in_progress`
+- updated_at: `2026-03-13T09:00:00Z`
+- owner: `codex`
+- notes: Implemented server-side template fallback chain (GitHub raw -> local docs file), added durable `franchize_order_notifications` snapshot log with send-status transitions (`pending/sent/failed`), and exposed retry action restoring payload from latest snapshot.
+- next_step: Finish crew-owner ACL expansion in franchize admin/editor scope and wire operator retry trigger in admin UI.
+- risks: Retry action currently re-inserts snapshot on each attempt (expected audit trail growth); ACL scope depends on shared admin page shape.
 - dependencies: T49
 - deliverables:
   - `app/franchize/actions.ts`
@@ -1637,6 +1637,8 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 
 Historical diary entries were moved to `docs/AGENT_DIARY.md` to keep this execution ledger readable.
 Append only compact session deltas here as pointers when needed; full narrative belongs to the diary archive.
+
+- 2026-03-13: T50 started — added order-doc template local fallback + DB snapshot/retry pipeline (`franchize_order_notifications`) in server actions/migration; next focus is crew ACL + retry UI wire-up.
 
 ---
 
