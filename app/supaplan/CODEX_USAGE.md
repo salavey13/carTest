@@ -23,5 +23,6 @@ Verification checklist:
 - `supaplan_tasks.status` is `ready_for_pr`
 - at least one row exists in `supaplan_claims` for the task
 - PR title includes `supaplan_task:<task_id>`
+- PR description includes a standalone line: `supaplan_task: <task_id>`
 
 `supaplan-skill.mjs` has REST fallback for environments where JS fetch fails.
