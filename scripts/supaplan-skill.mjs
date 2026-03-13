@@ -306,32 +306,62 @@ async function pickTask() {
 async function updateStatus() {
   const taskId = required(getArg('taskId'), 'Missing --taskId');
   const status = required(getArg('status'), 'Missing --status');
-  const supabase = getAdminClient();
+  const now = new Date().toISOString();
 
   if (!ALLOWED_AGENT_STATUSES.has(status)) {
     throw new Error(`Invalid --status=${status}. Allowed: claimed|running|ready_for_pr`);
   }
 
-  const { error } = await supabase
-    .from('supaplan_tasks')
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq('id', taskId);
+  try {
+    const supabase = getAdminClient();
+    const { error } = await supabase
+      .from('supaplan_tasks')
+      .update({ status, updated_at: now })
+      .eq('id', taskId);
 
-  if (error) throw error;
+    if (error) throw error;
+  } catch (error) {
+    if (!isTransientNetworkError(error)) {
+      throw error;
+    }
+
+    restRequest(
+      'PATCH',
+      `supaplan_tasks?id=eq.${taskId}`,
+      { status, updated_at: now },
+      'return=minimal',
+    );
+  }
+
   console.log(JSON.stringify({ ok: true, taskId, status }, null, 2));
 }
 
 async function taskStatus() {
   const taskId = required(getArg('taskId'), 'Missing --taskId');
-  const supabase = getAdminClient();
+  let data = null;
 
-  const { data, error } = await supabase
-    .from('supaplan_tasks')
-    .select('id,title,capability,status,updated_at,todo_path')
-    .eq('id', taskId)
-    .maybeSingle();
+  try {
+    const supabase = getAdminClient();
+    const result = await supabase
+      .from('supaplan_tasks')
+      .select('id,title,capability,status,updated_at,todo_path')
+      .eq('id', taskId)
+      .maybeSingle();
 
-  if (error) throw error;
+    if (result.error) throw result.error;
+    data = result.data;
+  } catch (error) {
+    if (!isTransientNetworkError(error)) {
+      throw error;
+    }
+
+    const rows = restRequest(
+      'GET',
+      `supaplan_tasks?select=id,title,capability,status,updated_at,todo_path&id=eq.${taskId}&limit=1`,
+    );
+    data = Array.isArray(rows) ? (rows[0] ?? null) : rows;
+  }
+
   console.log(JSON.stringify({ ok: true, task: data }, null, 2));
 }
 
@@ -339,7 +369,6 @@ async function logEvent() {
   const type = required(getArg('type'), 'Missing --type');
   const payloadRaw = getArg('payload', '{}');
   const source = getArg('source', 'codex-skill');
-  const supabase = getAdminClient();
 
   let payload;
   try {
@@ -348,13 +377,32 @@ async function logEvent() {
     throw new Error('Invalid --payload JSON');
   }
 
-  const { data, error } = await supabase
-    .from('supaplan_events')
-    .insert({ source, type, payload })
-    .select('*')
-    .maybeSingle();
+  let data = null;
 
-  if (error) throw error;
+  try {
+    const supabase = getAdminClient();
+    const result = await supabase
+      .from('supaplan_events')
+      .insert({ source, type, payload })
+      .select('*')
+      .maybeSingle();
+
+    if (result.error) throw result.error;
+    data = result.data;
+  } catch (error) {
+    if (!isTransientNetworkError(error)) {
+      throw error;
+    }
+
+    const rows = restRequest(
+      'POST',
+      'supaplan_events',
+      { source, type, payload },
+      'return=representation',
+    );
+    data = Array.isArray(rows) ? (rows[0] ?? null) : rows;
+  }
+
   console.log(JSON.stringify({ ok: true, event: data }, null, 2));
 }
 
