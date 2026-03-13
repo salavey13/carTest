@@ -29,11 +29,12 @@ interface ImageReplaceToolProps {
     oldImageUrl: string;
     onReplaceConfirmed: (newImageUrl: string) => void;
     onCancel: () => void;
+    uploadBucketName?: string;
 }
 
 // --- Component ---
-export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl, onReplaceConfirmed, onCancel }) => {
-    logger.debug("[Flow 1 - Image Swap] ImageReplaceTool Render", { oldImageUrl }); // Log entry
+export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl, onReplaceConfirmed, onCancel, uploadBucketName = "about" }) => {
+    logger.debug("[Flow 1 - Image Swap] ImageReplaceTool Render", { oldImageUrl, uploadBucketName }); // Log entry
     const [newImageUrlInput, setNewImageUrlInput] = useState("");
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -59,9 +60,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
 
         // --- ИСПОЛЬЗУЕМ uploadBatchImages ---
         const formData = new FormData();
-        // !!! ВАЖНО: Убедись, что бакет 'about' существует и публичен, или используй другой бакет !!!
-        const bucketName = "about"; // TODO: Make this configurable or pass as prop?
-        formData.append("bucketName", bucketName);
+        formData.append("bucketName", uploadBucketName);
         formData.append("files", file); // Добавляем один файл
 
         try {
