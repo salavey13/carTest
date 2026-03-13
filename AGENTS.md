@@ -159,6 +159,22 @@ When implementing tasks:
 - if environment blocks checks, report exact failure reason
 - for visual UI changes, capture screenshots when runtime is available
 
+### 6.1) SupaPlan-first execution protocol (mandatory default)
+
+Before doing ad-hoc coding, agents must check SupaPlan backlog first and execute preplanned work when available.
+
+1. Start from `AGENT_ENTRY.md` and treat it as the single-entry workflow.
+2. Run SupaPlan skill/CLI claim flow first:
+   - `node scripts/supaplan-skill.mjs inspect-migrations`
+   - `node scripts/supaplan-skill.mjs pick-task --capability <your_capability> --agentId <agent_id>`
+3. If a task is returned, execute only that `todo_path` scope, keep status synced (`running` -> `ready_for_pr`), and log progress events.
+4. Branch/PR title must include `supaplan_task:<uuid>` when task-bound to preserve merge automation traceability.
+5. Only improvise outside SupaPlan when **no open SupaPlan task** can be claimed for current capability (or SupaPlan infra is unavailable). In that case, explicitly note fallback reason in the final report/PR body.
+
+Operator intent mapping:
+- If request is broad/ambiguous (e.g. “continue”, “ебаш”, “do next”), default to SupaPlan claim flow first.
+- If request is explicit and conflicts with queued SupaPlan tasks, do requested scope but still report SupaPlan pending context.
+
 ---
 
 ## 7) Documentation contract
