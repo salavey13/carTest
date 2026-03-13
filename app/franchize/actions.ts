@@ -8,6 +8,8 @@ import { applyTemplateVariables } from "@/lib/markdownTemplate";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import { readFile } from "fs/promises";
+import path from "path";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -1015,8 +1017,84 @@ function formatMoney(value: number): string {
   return Number(value || 0).toLocaleString("ru-RU");
 }
 
-async function buildFranchizeOrderDocAndNotify(payload: z.infer<typeof franchizeOrderInvoiceSchema> & { totalAmount: number; subtotal: number; extrasTotal: number }) {
-  const { data: cars, error: carsError } = await supabaseAdmin
+type FranchizeOrderNotifyPayload = z.infer<typeof franchizeOrderInvoiceSchema> & {
+  totalAmount: number;
+  subtotal: number;
+  extrasTotal: number;
+};
+
+async function loadFranchizeDealTemplate(): Promise<string> {
+  try {
+    const response = await fetch("https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE_DEMO.md", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`template fetch failed with ${response.status}`);
+    }
+
+    const remoteTemplate = await response.text();
+    if (remoteTemplate.trim().length > 0) {
+      return remoteTemplate;
+    }
+
+    throw new Error("template fetch returned empty content");
+  } catch (error) {
+    logger.warn("[franchize] fallback to local RENTAL_DEAL_TEMPLATE_DEMO.md", error);
+    const localTemplatePath = path.join(process.cwd(), "docs", "RENTAL_DEAL_TEMPLATE_DEMO.md");
+    return readFile(localTemplatePath, "utf8");
+  }
+}
+
+async function createFranchizeOrderNotificationLog(payload: FranchizeOrderNotifyPayload) {
+  const snapshot = {
+    ...payload,
+    persistedAt: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabaseAdmin
+    .from("franchize_order_notifications")
+    .insert({
+      slug: payload.slug,
+      order_id: payload.orderId,
+      payload: snapshot,
+      send_status: "pending",
+      attempts: 1,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to persist order snapshot: ${error.message}`);
+  }
+
+  return data.id as string;
+}
+
+async function updateFranchizeOrderNotificationLog(
+  logId: string,
+  patch: {
+    send_status: "sent" | "failed";
+    rendered_markdown?: string;
+    doc_file_name?: string;
+    last_error?: string;
+  },
+) {
+  const { error } = await supabaseAdmin
+    .from("franchize_order_notifications")
+    .update({
+      ...patch,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", logId);
+
+  if (error) {
+    logger.error("[franchize] failed to update franchize_order_notifications", { logId, error });
+  }
+}
+
+async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayload) {
+  const logId = await createFranchizeOrderNotificationLog(payload);
+
+  try {
+    const { data: cars, error: carsError } = await supabaseAdmin
     .from("cars")
     .select("id, make, model, specs")
     .in("id", payload.cartLines.map((line) => line.itemId));
@@ -1036,7 +1114,7 @@ async function buildFranchizeOrderDocAndNotify(payload: z.infer<typeof franchize
   const firstCar = firstLine ? byId.get(firstLine.itemId) : null;
   const firstSpecs = (firstCar?.specs as Record<string, unknown> | null) || {};
 
-  const template = await fetch("https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE_DEMO.md", { cache: "no-store" }).then((r) => r.text());
+  const template = await loadFranchizeDealTemplate();
 
   const rendered = applyTemplateVariables(template, {
     contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}`,
@@ -1086,7 +1164,23 @@ async function buildFranchizeOrderDocAndNotify(payload: z.infer<typeof franchize
     throw new Error(sendDocResult.error || "Failed to send DOCX to admin");
   }
 
+  await updateFranchizeOrderNotificationLog(logId, {
+    send_status: "sent",
+    rendered_markdown: rendered,
+    doc_file_name: docFileName,
+    last_error: "",
+  });
+
   return { renderedMarkdown: rendered, docFileName };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to submit order notification";
+    await updateFranchizeOrderNotificationLog(logId, {
+      send_status: "failed",
+      last_error: message,
+    });
+
+    throw error;
+  }
 }
 
 const franchizeOrderInvoiceSchema = z.object({
@@ -1145,6 +1239,38 @@ export async function submitFranchizeOrderNotification(input: unknown): Promise<
     logger.error("[franchize] submitFranchizeOrderNotification failed", error);
     return { success: false, error: error instanceof Error ? error.message : "Failed to submit order notification" };
   }
+}
+
+const retryFranchizeNotificationSchema = z.object({
+  slug: z.string().trim().min(1),
+  orderId: z.string().trim().min(1),
+});
+
+export async function retryFranchizeOrderNotification(input: unknown): Promise<{ success: boolean; error?: string }> {
+  const parsed = retryFranchizeNotificationSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Некорректный payload для retry." };
+  }
+
+  const { slug, orderId } = parsed.data;
+  const { data: logRow, error } = await supabaseAdmin
+    .from("franchize_order_notifications")
+    .select("payload")
+    .eq("slug", slug)
+    .eq("order_id", orderId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    return { success: false, error: `Не удалось загрузить snapshot для retry: ${error.message}` };
+  }
+
+  if (!logRow?.payload || typeof logRow.payload !== "object") {
+    return { success: false, error: "Snapshot заказа не найден для retry." };
+  }
+
+  return submitFranchizeOrderNotification(logRow.payload);
 }
 
 export async function createFranchizeOrderInvoice(input: unknown): Promise<{ success: boolean; invoiceId?: string; amountXtr?: number; error?: string }> {
