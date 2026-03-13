@@ -29,7 +29,14 @@ jobs:
             BODY=$(printf '%s' "${{ github.event.pull_request.body }}")
           fi
 
-          IDS=$(printf '%s\n' "$BODY" | grep -oiE 'supaplan_task\s*:\s*([0-9a-f-]{36}([[:space:]]*,[[:space:]]*[0-9a-f-]{36})*)' | sed -E 's/.*:[[:space:]]*//' | tr ',' '\n' | tr -d ' 	' | grep -oiE '^[0-9a-f-]{36}$' | sort -u | paste -sd, -)
+          IDS=$(printf '%s\n' "$BODY" \
+            | sed -nE '/supaplan_task[[:space:]]*:/I s/.*supaplan_task[[:space:]]*:[[:space:]]*//Ip' \
+            | tr ',' '\n' \
+            | sed -E 's/[[:space:]]+//g' \
+            | grep -oiE '^[0-9a-f-]{36}$' \
+            | sort -u \
+            | paste -sd, -)
+' | grep -oiE '^[0-9a-f-]{36}$' | sort -u | paste -sd, -)
           echo "tasks=$IDS" >> "$GITHUB_OUTPUT"
 
           if [ -z "$IDS" ]; then
