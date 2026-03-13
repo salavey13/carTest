@@ -3,18 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-type SupaPlanStatus = "open" | "claimed" | "running" | "ready_for_pr" | "done";
+type KnownSupaPlanStatus = "open" | "claimed" | "running" | "ready_for_pr" | "done";
 
 type SupaPlanTask = {
   id: string;
   title: string;
-  status: SupaPlanStatus;
+  status: string;
   todo_path: string | null;
   capability: string | null;
   created_at: string;
 };
 
-const STATUS_META: Record<SupaPlanStatus, { label: string; className: string }> = {
+const STATUS_META: Record<KnownSupaPlanStatus, { label: string; className: string }> = {
   open: {
     label: "Open",
     className: "bg-slate-100 text-slate-800",
@@ -37,9 +37,29 @@ const STATUS_META: Record<SupaPlanStatus, { label: string; className: string }> 
   },
 };
 
+const UNKNOWN_STATUS_META = {
+  label: "Unknown",
+  className: "bg-rose-100 text-rose-800",
+};
+
+function isKnownStatus(status: string): status is KnownSupaPlanStatus {
+  return Object.prototype.hasOwnProperty.call(STATUS_META, status);
+}
+
+function getStatusMeta(status: string) {
+  if (isKnownStatus(status)) {
+    return STATUS_META[status];
+  }
+
+  return {
+    label: `${UNKNOWN_STATUS_META.label}: ${status}`,
+    className: UNKNOWN_STATUS_META.className,
+  };
+}
+
 export default function StatusClient() {
   const [tasks, setTasks] = useState<SupaPlanTask[]>([]);
-  const [activeFilter, setActiveFilter] = useState<SupaPlanStatus | "all">("all");
+  const [activeFilter, setActiveFilter] = useState<KnownSupaPlanStatus | "all">("all");
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const hasSupabaseEnv = Boolean(
@@ -104,9 +124,11 @@ export default function StatusClient() {
   }, [load, supabase]);
 
   const statusCounts = useMemo(() => {
-    return tasks.reduce<Record<SupaPlanStatus, number>>(
+    return tasks.reduce<Record<KnownSupaPlanStatus, number>>(
       (acc, task) => {
-        acc[task.status] += 1;
+        if (isKnownStatus(task.status)) {
+          acc[task.status] += 1;
+        }
         return acc;
       },
       {
@@ -136,7 +158,7 @@ export default function StatusClient() {
       )}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {(Object.keys(STATUS_META) as SupaPlanStatus[]).map((status) => (
+        {(Object.keys(STATUS_META) as KnownSupaPlanStatus[]).map((status) => (
           <button
             key={status}
             type="button"
@@ -168,32 +190,39 @@ export default function StatusClient() {
           All tasks ({tasks.length})
         </button>
         <p className="text-sm text-slate-600">
-          Current filter: <span className="font-medium text-slate-900">{activeFilter === "all" ? "All" : STATUS_META[activeFilter].label}</span>
+          Current filter:{" "}
+          <span className="font-medium text-slate-900">
+            {activeFilter === "all" ? "All" : STATUS_META[activeFilter].label}
+          </span>
         </p>
       </div>
 
       <div className="space-y-3">
-        {filteredTasks.map((task) => (
-          <article
-            key={task.id}
-            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <h3 className="text-base font-semibold text-slate-900">{task.title}</h3>
-              <span
-                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_META[task.status].className}`}
-              >
-                {STATUS_META[task.status].label}
-              </span>
-            </div>
+        {filteredTasks.map((task) => {
+          const badge = getStatusMeta(task.status);
 
-            <div className="mt-3 space-y-1 text-sm text-slate-600">
-              {task.capability && <p>Capability: {task.capability}</p>}
-              {task.todo_path && <p>Scope: {task.todo_path}</p>}
-              <p>Created: {new Date(task.created_at).toLocaleString()}</p>
-            </div>
-          </article>
-        ))}
+          return (
+            <article
+              key={task.id}
+              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="text-base font-semibold text-slate-900">{task.title}</h3>
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${badge.className}`}
+                >
+                  {badge.label}
+                </span>
+              </div>
+
+              <div className="mt-3 space-y-1 text-sm text-slate-600">
+                {task.capability && <p>Capability: {task.capability}</p>}
+                {task.todo_path && <p>Scope: {task.todo_path}</p>}
+                <p>Created: {new Date(task.created_at).toLocaleString()}</p>
+              </div>
+            </article>
+          );
+        })}
 
         {filteredTasks.length === 0 && (
           <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">
