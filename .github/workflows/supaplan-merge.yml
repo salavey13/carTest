@@ -29,8 +29,6 @@ jobs:
             BODY=$(printf '%s' "${{ github.event.pull_request.body }}")
           fi
 
-          # Extract ONLY UUIDs that appear after "supaplan_task:" (case-insensitive)
-          # Same behaviour as your original Python: set + sorted + lowercase
           IDS=$(
             printf '%s' "$BODY" \
             | grep -oP '(?i)supaplan_task\s*:\s*\K[^\n\r]+' \
@@ -63,11 +61,13 @@ jobs:
           IFS=',' read -r -a TASKS <<< "${{ steps.extract.outputs.tasks }}"
           for TASK_ID in "${TASKS[@]}"; do
             echo "Updating task $TASK_ID -> done"
-            curl -sS -X PATCH \
+            curl -sS -f -X PATCH \
               "$SUPABASE_URL/rest/v1/supaplan_tasks?id=eq.$TASK_ID" \
               -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Content-Type: application/json" \
               -H "Prefer: return=representation" \
-              -d "{\"status\":\"done\",\"updated_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
+              -w "HTTP_STATUS=%{http_code}\n" \
+              -d '{"status":"done","updated_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}' \
+              || echo "CURL FAILED (see above)"
           done
