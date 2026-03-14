@@ -59,6 +59,8 @@ const UNKNOWN_STATUS_META = {
   cardClass: "border-rose-300/70 dark:border-rose-500/40",
 };
 
+const ACTIVE_STATUSES: KnownSupaPlanStatus[] = ["open", "claimed", "running", "ready_for_pr"];
+
 function isKnownStatus(status: string): status is KnownSupaPlanStatus {
   return Object.prototype.hasOwnProperty.call(STATUS_META, status);
 }
@@ -102,10 +104,10 @@ export default function StatusClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [eventSourceFilter, setEventSourceFilter] = useState<string>("all");
   const [eventTypeFilter, setEventTypeFilter] = useState<string>("all");
+  const [taskView, setTaskView] = useState<"pipeline" | "done">("pipeline");
+  const [mobileStatus, setMobileStatus] = useState<KnownSupaPlanStatus>("open");
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [notifState, setNotifState] = useState<{ taskId: string; message: string; kind: "ok" | "error" } | null>(
-    null
-  );
+  const [notifState, setNotifState] = useState<{ taskId: string; message: string; kind: "ok" | "error" } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const { dbUser, user } = useAppContext();
@@ -244,6 +246,23 @@ export default function StatusClient() {
     });
   }, [activeFilter, capabilityFilter, searchQuery, tasks]);
 
+  const activeTasks = useMemo(() => filteredTasks.filter((task) => task.status !== "done"), [filteredTasks]);
+
+  const doneTasks = useMemo(() => {
+    return filteredTasks.filter((task) => task.status === "done").sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }, [filteredTasks]);
+
+  const pipelineColumns = useMemo(() => {
+    return ACTIVE_STATUSES.map((status) => ({
+      status,
+      tasks: activeTasks.filter((task) => task.status === status),
+    }));
+  }, [activeTasks]);
+
+  const mobileTasks = useMemo(() => {
+    return activeTasks.filter((task) => task.status === mobileStatus);
+  }, [activeTasks, mobileStatus]);
+
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
       if (eventSourceFilter !== "all" && event.source !== eventSourceFilter) {
@@ -298,35 +317,95 @@ export default function StatusClient() {
     [recipientChatId]
   );
 
+  const renderTaskCard = useCallback(
+    (task: SupaPlanTask, compact = false) => {
+      const badge = getStatusMeta(task.status);
+      return (
+        <article
+          key={task.id}
+          className={`rounded-xl border bg-white/95 ${compact ? "p-2.5" : "p-3"} shadow-sm transition hover:shadow-md dark:bg-slate-900/60 ${badge.cardClass}`}
+        >
+          <h3 className={`${compact ? "text-xs" : "text-sm"} font-semibold leading-snug text-slate-900 dark:text-slate-100`}>{task.title}</h3>
+
+          <div className="mt-1.5 space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+            {task.capability && (
+              <p className="truncate" title={task.capability}>
+                <span className="text-slate-500 dark:text-slate-400">Способность:</span> {task.capability}
+              </p>
+            )}
+            {task.todo_path && (
+              <p className="break-all">
+                <span className="text-slate-500 dark:text-slate-400">Область:</span> {task.todo_path}
+              </p>
+            )}
+            <p className="break-all text-[10px] text-slate-500 dark:text-slate-400">#{task.id}</p>
+          </div>
+
+          {(task.status === "open" || task.status === "ready_for_pr") && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleNotify(task)}
+                disabled={isPending}
+                className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Отправить в Телеграм
+              </button>
+              {notifState?.taskId === task.id && (
+                <span className={`text-[11px] ${notifState.kind === "ok" ? "text-emerald-500" : "text-rose-500"}`}>{notifState.message}</span>
+              )}
+            </div>
+          )}
+        </article>
+      );
+    },
+    [handleNotify, isPending, notifState]
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {loadError && (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700/70 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 sm:p-4 sm:text-sm dark:border-amber-700/70 dark:bg-amber-950/40 dark:text-amber-200">
           СупаПлан пока не подключился: {loadError}
         </div>
       )}
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
         {(Object.keys(STATUS_META) as KnownSupaPlanStatus[]).map((status) => (
           <button
             key={status}
             type="button"
             onClick={() => setActiveFilter(status)}
-            className={`rounded-2xl border bg-white/95 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-900/50 ${STATUS_META[status].cardClass} ${
+            className={`rounded-xl border bg-white/95 p-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:rounded-2xl sm:p-4 dark:bg-slate-900/50 ${STATUS_META[status].cardClass} ${
               activeFilter === status ? "ring-2 ring-indigo-500 dark:ring-indigo-400" : ""
             }`}
           >
-            <div className="text-[11px] uppercase tracking-wide text-slate-600 dark:text-slate-300">{STATUS_META[status].label}</div>
-            <div className="mt-1 text-3xl font-semibold text-slate-900 dark:text-slate-50">{statusCounts[status]}</div>
+            <div className="text-[10px] uppercase tracking-wide text-slate-600 dark:text-slate-300 sm:text-[11px]">{STATUS_META[status].label}</div>
+            <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50 sm:text-3xl">{statusCounts[status]}</div>
           </button>
         ))}
       </section>
 
-      <div className="grid gap-3 rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/50 md:grid-cols-4">
+      <section className="grid gap-2 sm:grid-cols-3 sm:gap-3">
+        <article className="rounded-xl border border-slate-200/80 bg-white/95 p-3 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/50">
+          <p className="text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-300">Рабочий поток</p>
+          <p className="mt-1.5 text-2xl font-semibold text-slate-900 dark:text-slate-100">{statusCounts.open + statusCounts.claimed + statusCounts.running + statusCounts.ready_for_pr}</p>
+        </article>
+        <article className="rounded-xl border border-emerald-200/80 bg-emerald-50/80 p-3 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-950/20">
+          <p className="text-[10px] uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Сделано</p>
+          <p className="mt-1.5 text-2xl font-semibold text-emerald-900 dark:text-emerald-100">{statusCounts.done}</p>
+        </article>
+        <article className="rounded-xl border border-indigo-200/80 bg-indigo-50/70 p-3 shadow-sm dark:border-indigo-500/30 dark:bg-indigo-950/20">
+          <p className="text-[10px] uppercase tracking-wide text-indigo-700 dark:text-indigo-300">События</p>
+          <p className="mt-1.5 text-2xl font-semibold text-indigo-900 dark:text-indigo-100">{events.length}</p>
+        </article>
+      </section>
+
+      <div className="grid gap-2 rounded-2xl border border-slate-200/80 bg-white/95 p-2.5 shadow-sm sm:gap-3 sm:p-3 dark:border-slate-700/80 dark:bg-slate-900/50 md:grid-cols-4">
         <button
           type="button"
           onClick={() => setActiveFilter("all")}
-          className={`rounded-full px-3 py-1.5 text-sm transition ${
+          className={`rounded-full px-3 py-1.5 text-xs transition sm:text-sm ${
             activeFilter === "all"
               ? "bg-slate-900 text-white dark:bg-indigo-500"
               : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
@@ -339,13 +418,13 @@ export default function StatusClient() {
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
           placeholder="Поиск по названию, ID, способности"
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 sm:text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         />
 
         <select
           value={capabilityFilter}
           onChange={(event) => setCapabilityFilter(event.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 sm:text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         >
           <option value="all">Все способности</option>
           {capabilities.map((capability) => (
@@ -355,63 +434,121 @@ export default function StatusClient() {
           ))}
         </select>
 
-        <p className="self-center text-sm text-slate-600 dark:text-slate-300">
+        <p className="self-center text-xs text-slate-600 sm:text-sm dark:text-slate-300">
           Фильтр: <span className="font-medium text-slate-900 dark:text-slate-100">{activeFilter === "all" ? "все" : STATUS_META[activeFilter].label}</span>
         </p>
       </div>
 
-      <section className="grid gap-4 lg:grid-cols-[1.45fr_minmax(0,1fr)]">
-        <div className="min-w-0 space-y-3">
-          {filteredTasks.map((task) => {
-            const badge = getStatusMeta(task.status);
-
-            return (
-              <article
-                key={task.id}
-                className={`rounded-2xl border bg-white/95 p-4 shadow-sm transition hover:shadow-md dark:bg-slate-900/50 ${badge.cardClass}`}
+      <section className="grid gap-3 lg:grid-cols-[1.45fr_minmax(0,1fr)] sm:gap-4">
+        <div className="min-w-0 space-y-2.5 sm:space-y-3">
+          <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/50">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setTaskView("pipeline")}
+                className={`rounded-xl px-3 py-2 text-xs font-medium transition sm:text-sm ${
+                  taskView === "pipeline"
+                    ? "bg-slate-900 text-white dark:bg-indigo-500"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                }`}
               >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <h3 className="text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">{task.title}</h3>
-                  <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-medium ${badge.className}`}>{badge.label}</span>
-                </div>
+                Рабочий поток
+              </button>
+              <button
+                type="button"
+                onClick={() => setTaskView("done")}
+                className={`rounded-xl px-3 py-2 text-xs font-medium transition sm:text-sm ${
+                  taskView === "done"
+                    ? "bg-emerald-700 text-white dark:bg-emerald-600"
+                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
+                }`}
+              >
+                Архив сделанного ({doneTasks.length})
+              </button>
+            </div>
+          </div>
 
-                <div className="mt-2 grid gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-300 sm:grid-cols-2">
-                  {task.capability && (
-                    <p className="truncate" title={task.capability}>
-                      <span className="text-slate-500 dark:text-slate-400">Способность:</span> {task.capability}
-                    </p>
-                  )}
-                  <p className="break-all">
-                    <span className="text-slate-500 dark:text-slate-400">ID:</span> {task.id}
-                  </p>
-                  {task.todo_path && (
-                    <p className="break-all sm:col-span-2">
-                      <span className="text-slate-500 dark:text-slate-400">Область:</span> {task.todo_path}
-                    </p>
-                  )}
-                  <p>
-                    <span className="text-slate-500 dark:text-slate-400">Создана:</span> {new Date(task.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-
-                {(task.status === "open" || task.status === "ready_for_pr") && (
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
+          {taskView === "pipeline" && (
+            <>
+              <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-sm md:hidden dark:border-slate-700/80 dark:bg-slate-900/50">
+                <div className="flex gap-1.5 overflow-x-auto pb-1">
+                  {ACTIVE_STATUSES.map((status) => (
                     <button
+                      key={`mobile-${status}`}
                       type="button"
-                      onClick={() => handleNotify(task)}
-                      disabled={isPending}
-                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={() => setMobileStatus(status)}
+                      className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                        mobileStatus === status
+                          ? "bg-slate-900 text-white dark:bg-indigo-500"
+                          : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                      }`}
                     >
-                      Отправить в Телеграм
+                      {STATUS_META[status].label} ({pipelineColumns.find((column) => column.status === status)?.tasks.length ?? 0})
                     </button>
-                    {notifState?.taskId === task.id && (
-                      <span className={`text-xs ${notifState.kind === "ok" ? "text-emerald-500" : "text-rose-500"}`}>{notifState.message}</span>
-                    )}
-                  </div>
-                )}
-              </article>
-            );
-          })}
+                  ))}
+                </div>
+
+                <div className="mt-2 space-y-2">
+                  {mobileTasks.map((task) => renderTaskCard(task, true))}
+                  {mobileTasks.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
+                      В этом статусе пусто.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="hidden gap-3 md:grid xl:grid-cols-2">
+                {pipelineColumns.map(({ status, tasks: columnTasks }) => (
+                  <section key={status} className={`rounded-2xl border bg-slate-50/75 p-3 dark:bg-slate-900/30 ${STATUS_META[status].cardClass}`}>
+                    <header className="mb-3 flex items-center justify-between gap-2">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${STATUS_META[status].className}`}>{STATUS_META[status].label}</span>
+                      <span className="text-xs text-slate-600 dark:text-slate-300">{columnTasks.length}</span>
+                    </header>
+
+                    <div className="space-y-2">
+                      {columnTasks.map((task) => renderTaskCard(task))}
+
+                      {columnTasks.length === 0 && (
+                        <div className="rounded-xl border border-dashed border-slate-300 bg-white/70 p-4 text-center text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                          Пусто.
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </>
+          )}
+
+          {taskView === "done" && (
+            <div className="space-y-2.5 sm:space-y-3">
+              {doneTasks.map((task) => {
+                const badge = getStatusMeta(task.status);
+
+                return (
+                  <article key={task.id} className={`rounded-2xl border bg-white/95 p-3 shadow-sm sm:p-4 dark:bg-slate-900/50 ${badge.cardClass}`}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h3 className="text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">{task.title}</h3>
+                      <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-medium ${badge.className}`}>{badge.label}</span>
+                    </div>
+                    <div className="mt-2 grid gap-1 text-[11px] text-slate-600 sm:grid-cols-2 sm:text-xs dark:text-slate-300">
+                      {task.capability && <p>Способность: {task.capability}</p>}
+                      <p>Создана: {new Date(task.created_at).toLocaleDateString()}</p>
+                      {task.todo_path && <p className="break-all sm:col-span-2">Область: {task.todo_path}</p>}
+                      <p className="break-all sm:col-span-2">ID: {task.id}</p>
+                    </div>
+                  </article>
+                );
+              })}
+
+              {doneTasks.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
+                  В архиве пока нет задач.
+                </div>
+              )}
+            </div>
+          )}
 
           {filteredTasks.length === 0 && (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
@@ -420,7 +557,7 @@ export default function StatusClient() {
           )}
         </div>
 
-        <aside className="min-w-0 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/50">
+        <aside className="min-w-0 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm sm:p-4 dark:border-slate-700/80 dark:bg-slate-900/50">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">Лента событий</h3>
             <span className="text-xs text-slate-500 dark:text-slate-400">{filteredEvents.length} шт.</span>
@@ -453,7 +590,7 @@ export default function StatusClient() {
             </select>
           </div>
 
-          <div className="mt-4 max-h-[540px] space-y-2 overflow-x-hidden overflow-y-auto pr-1">
+          <div className="mt-3 max-h-[420px] space-y-2 overflow-x-hidden overflow-y-auto pr-1 sm:mt-4 sm:max-h-[540px]">
             {filteredEvents.map((event) => (
               <div key={event.id} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900">
                 <p className="font-medium text-slate-800 dark:text-slate-100">
@@ -478,20 +615,18 @@ export default function StatusClient() {
         </aside>
       </section>
 
-      <section className="rounded-2xl border border-indigo-200/70 bg-gradient-to-br from-indigo-50 via-violet-50 to-cyan-50 p-4 dark:border-indigo-500/30 dark:from-indigo-950/20 dark:via-slate-900 dark:to-cyan-950/20">
+      <section className="rounded-2xl border border-indigo-200/70 bg-gradient-to-br from-indigo-50 via-violet-50 to-cyan-50 p-3 sm:p-4 dark:border-indigo-500/30 dark:from-indigo-950/20 dark:via-slate-900 dark:to-cyan-950/20">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-200">Как запускать задачи без CLI-магии</h2>
-            <p className="mt-1 text-sm text-indigo-900/90 dark:text-indigo-100/90">
-              Пользователю нужен только пересланный сигнал в Codex и затем кнопка Create PR, когда агент закончит.
-            </p>
+            <p className="mt-1 text-sm text-indigo-900/90 dark:text-indigo-100/90">Пользователю нужен только пересланный сигнал в Codex и затем кнопка Create PR, когда агент закончит.</p>
           </div>
           <span className="rounded-full border border-indigo-300/70 bg-white/80 px-3 py-1 text-xs font-medium text-indigo-700 dark:border-indigo-400/40 dark:bg-slate-900/60 dark:text-indigo-200">
-            Ручной flow: Telegram → Codex → PR
+            Ручной поток: Телеграм → Codex → ПР
           </span>
         </div>
 
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <div className="mt-3 grid gap-2 sm:gap-3 md:grid-cols-3">
           {suggestedTasks.map((task) => (
             <article key={task.id} className="rounded-xl border border-indigo-200 bg-white/95 p-3 text-sm dark:border-indigo-500/40 dark:bg-slate-900/70">
               <p className="font-semibold text-slate-900 dark:text-slate-100">{task.title}</p>
@@ -510,8 +645,8 @@ export default function StatusClient() {
           )}
         </div>
 
-        <div className="mt-4 rounded-xl border border-indigo-200/70 bg-indigo-950 px-3 py-2 text-xs text-indigo-50 dark:border-indigo-400/30">
-          Пример сообщения для Codex (после того как переслал TG сигнал): «возьми задачу из пересланного уведомления и сделай PR».
+        <div className="mt-3 rounded-xl border border-indigo-200/70 bg-indigo-950 px-3 py-2 text-xs text-indigo-50 dark:border-indigo-400/30">
+          Пример сообщения для Codex (после пересылки сигнала): «возьми задачу из пересланного уведомления и сделай PR».
         </div>
       </section>
 

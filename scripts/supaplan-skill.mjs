@@ -568,6 +568,48 @@ async function status() {
     oldestOpen,
   }, null, 2));
 }
+
+async function addTask() {
+  const title = required(getArg('title'), 'Missing --title');
+  const capability = required(getArg('capability'), 'Missing --capability');
+  const todoPath = getArg('todoPath', null);
+  const status = getArg('status', 'open');
+
+  if (status !== 'open') {
+    throw new Error('Invalid --status. For planned tasks use status=open');
+  }
+
+  const payload = {
+    title,
+    capability,
+    status,
+    todo_path: todoPath,
+  };
+
+  let row = null;
+
+  try {
+    const supabase = getAdminClient();
+    const result = await supabase
+      .from('supaplan_tasks')
+      .insert(payload)
+      .select('id,title,capability,status,todo_path,created_at')
+      .maybeSingle();
+
+    if (result.error) throw result.error;
+    row = result.data;
+  } catch (error) {
+    if (!isTransientNetworkError(error)) {
+      throw error;
+    }
+
+    const rows = restRequest('POST', 'supaplan_tasks', payload, 'return=representation');
+    row = Array.isArray(rows) ? (rows[0] ?? null) : rows;
+  }
+
+  console.log(JSON.stringify({ ok: true, task: row }, null, 2));
+}
+
 async function inspectMigrations() {
   const lifecycle = ['open', 'claimed', 'running', 'ready_for_pr', 'done'];
   const hasMergeWorkflow = existsSync('.github/workflows/supaplan-merge.yml');
@@ -601,10 +643,11 @@ const runners = {
   'review-merge-workflow': reviewMergeWorkflow,
   'smoke-flow': smokeFlow,
   'status': status,
+  'add-task': addTask,
 };
 
 if (!command || !runners[command]) {
-  console.error('Usage: node scripts/supaplan-skill.mjs <pick-task|update-status|task-status|log-event|inspect-migrations|review-merge-workflow|smoke-flow|status> [--key value] (pick-task supports --capability <name|auto> --agentId <id> --dry-run)');
+  console.error('Usage: node scripts/supaplan-skill.mjs <pick-task|update-status|task-status|log-event|inspect-migrations|review-merge-workflow|smoke-flow|status|add-task> [--key value] (pick-task supports --capability <name|auto> --agentId <id> --dry-run; add-task supports --title --capability [--todoPath])');
   process.exit(1);
 }
 
