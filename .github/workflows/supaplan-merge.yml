@@ -23,16 +23,20 @@ jobs:
         id: extract
         shell: bash
         run: |
+          # Safe way to pass PR body (prevents shell injection / command-not-found spam)
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            BODY="${{ inputs.pr_body }}"
+            cat > /tmp/pr_body.txt << 'EOF'
+            ${{ inputs.pr_body }}
+            EOF
           else
-            BODY=$(printf '%s' "${{ github.event.pull_request.body }}")
+            cat > /tmp/pr_body.txt << 'EOF'
+            ${{ github.event.pull_request.body }}
+            EOF
           fi
 
-          # Extract ONLY UUIDs that appear after "supaplan_task:" (case-insensitive)
-          # Same behaviour as your original Python: set + sorted + lowercase
+          # Same regex logic as before (case-insensitive, UUID only after "supaplan_task:")
           IDS=$(
-            printf '%s' "$BODY" \
+            cat /tmp/pr_body.txt \
             | grep -oP '(?i)supaplan_task\s*:\s*\K[^\n\r]+' \
             | grep -oE '\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b' \
             | tr '[:upper:]' '[:lower:]' \
