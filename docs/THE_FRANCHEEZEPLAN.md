@@ -1848,3 +1848,22 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Added mandatory RU-first language guidance directly into `docs/GREENBOX_TESSERACT_GAMELAB_PLAN.md` for all Greenbox/Tesseract-triggered tasks.
 - Added dedicated operator-ready Russian pitch file `docs/GREENBOX_ALICE_PITCH_RU.md` with clear onboarding CTA for Alice (`get me up to speed on greenbox plan`).
 - Preserved simulator-first execution contract and kept implementation sequencing unchanged (next step remains G1 academy MVP).
+
+### T48 — Formalize franchize as plugin (meta.plugin)
+- status: `done`
+- updated_at: `2026-03-14T00:00:00Z`
+- owner: `codex`
+- notes: Added plugin manifest + hydration + contract files for `/app/franchize` and synced `app/franchize/todo.md` checklist for formalization scope.
+- next_step: Split follow-up into explicit tasks for metadata extraction into cores and leftover payments/items-sync features.
+- risks: Current plugin docs describe existing runtime; deeper extraction into shared cores still pending and should be done incrementally.
+- dependencies: T47
+- deliverables:
+  - `app/franchize/plugin.ts`
+  - `app/franchize/hydration.md`
+  - `app/franchize/CONTRACT.md`
+  - `app/franchize/todo.md`
+
+### 2026-03-14 — T48 completion (franchize plugin formalization + supaplan UX alignment support)
+- Formalized `/app/franchize` as extension-style plugin with explicit capabilities/exports/uses manifest.
+- Added hydration and contract docs so agents/operators can reason about public route surface and server/client boundaries.
+- Synced franchize todo checklist for formalization items and documented next split-ready follow-up work.
