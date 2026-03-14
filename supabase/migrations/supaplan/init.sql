@@ -11,7 +11,8 @@ create table supaplan_tasks (
   created_by text,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
-  metadata jsonb default '{}'::jsonb
+  metadata jsonb default '{}'::jsonb,
+  pr_url text null
 );
 
 create table supaplan_claims (
