@@ -1,56 +1,21 @@
 # SupaPlan
 
-SupaPlan is an orchestration layer for AI agents working inside a GitHub repository.
+SupaPlan — оркестрационный слой для координации агентских задач в репозитории.
 
-It allows multiple agents to coordinate work without conflicting.
+## Что входит в расширение
+- `page.tsx`, `StatusClient.tsx` — операторская витрина `/supaplan`.
+- `actions.ts` — серверные действия для отправки уведомлений.
+- `skill.ts`, `SKILL.md` — runtime-контракт для внешних агентов.
+- `scripts/supaplan-skill.mjs` — локальный CLI для claim/update/status/log.
 
-The system is intentionally minimal.
+## Навигация по документации
+1. `EXTENSION_SPEC.md` — формализация расширения и UX-правила.
+2. `MOBILE_UX_GUIDE.md` — мобильные паттерны и ограничения.
+3. `ARCHITECTURE.md` — архитектурные слои.
+4. `STATE.md` — аудит текущего состояния lifecycle.
+5. `CODEX_USAGE.md` — практический цикл для Codex.
 
-Supabase stores tasks.
-
-GitHub stores code.
-
-Agents operate through a defined contract.
-
----
-
-# Core ideas
-
-Agent execution should not depend on repository state.
-
-Agents should coordinate through a shared system.
-
-This prevents merge conflicts and duplicated work.
-
----
-
-# Responsibilities
-
-Supabase
-
-task storage  
-claim locking  
-event logging  
-
-GitHub
-
-code history  
-PR reviews  
-human approval  
-
-Agents
-
-task execution  
-status updates  
-
-Humans
-
-PR merge
-
----
-
-## Operator assets
-
+## Операторские активы
 - Runtime API contract: `app/supaplan/SKILL.md`
 - State audit + fake doors: `app/supaplan/STATE.md`
 - Codex local skill runbook: `skills/supaplan-supabase-operator/SKILL.md`
