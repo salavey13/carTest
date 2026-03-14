@@ -1,0 +1,5 @@
+title,capability,status,todo_path
+"СупаПлан: закреплённая мобильная кнопка «Отправить в Телеграм»","ui.dashboard",open,"/app/supaplan/todo.md#Phase-4"
+"СупаПлан: блок «Готово к ПР» с быстрыми ссылками на PR","ui.dashboard",open,"/app/supaplan/todo.md#Phase-4"
+"СупаПлан CLI: массовый импорт задач из CSV","workflow",open,"/scripts/supaplan-skill.mjs#add-task"
+"СупаПлан CLI: валидация capability перед созданием задачи","workflow",open,"/scripts/supaplan-skill.mjs#add-task"
