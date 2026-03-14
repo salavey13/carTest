@@ -407,8 +407,8 @@ export default function StatusClient() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1.45fr_1fr]">
-        <div className="space-y-3">
+      <section className="grid gap-4 lg:grid-cols-[1.5fr_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-3">
           {filteredTasks.map((task) => {
             const badge = getStatusMeta(task.status);
 
@@ -471,7 +471,7 @@ export default function StatusClient() {
           )}
         </div>
 
-        <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/50">
+        <aside className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/50">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">Свежие события</h3>
             <span className="text-xs text-slate-500 dark:text-slate-400">{filteredEvents.length} шт.</span>
@@ -504,19 +504,19 @@ export default function StatusClient() {
             </select>
           </div>
 
-          <div className="mt-4 max-h-[520px] space-y-2 overflow-auto pr-1">
+          <div className="mt-4 max-h-[520px] space-y-2 overflow-x-hidden overflow-y-auto pr-1">
             {filteredEvents.map((event) => (
               <div
                 key={event.id}
-                className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-900"
+                className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900"
               >
                 <p className="font-medium text-slate-800 dark:text-slate-100">
                   {event.type}
                   <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">#{event.id}</span>
                 </p>
-                <p className="mt-1 text-slate-600 dark:text-slate-300">{formatPayload(event.payload)}</p>
+                <p className="mt-1 text-slate-600 dark:text-slate-300"><span className="break-words">{formatPayload(event.payload)}</span></p>
                 <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                  {event.source ?? "неизвестно"} • {new Date(event.created_at).toLocaleString()}
+                  <span className="break-all">{event.source ?? "неизвестно"}</span> • {new Date(event.created_at).toLocaleString()}
                 </p>
               </div>
             ))}
@@ -528,6 +528,19 @@ export default function StatusClient() {
             )}
           </div>
         </aside>
+      </section>
+
+
+      <section className="rounded-xl border border-cyan-200/70 bg-gradient-to-br from-cyan-50 via-indigo-50 to-violet-50 p-4 text-sm dark:border-cyan-500/30 dark:from-cyan-950/20 dark:via-slate-900 dark:to-violet-950/20">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-cyan-900 dark:text-cyan-200">Зачем вообще СупаПлан</h3>
+        <p className="mt-1 text-slate-700 dark:text-slate-200">
+          Мы строим не просто доску задач, а пульт оркестра для роя ИИ-агентов: человек задаёт вектор,
+          система распределяет нагрузку, а код едет в ПР-ритме без хаоса и дубликатов.
+        </p>
+        <p className="mt-2 text-slate-700 dark:text-slate-300">
+          Идея простая: меньше ручной рутины, больше скорости мысли. Сегодня это удобная панель,
+          завтра — автономный производственный поток, где команда задаёт курс, а СупаПлан масштабирует исполнение.
+        </p>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
