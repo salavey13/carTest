@@ -8,6 +8,7 @@ type TaskNotifyInput = {
   taskTitle: string;
   capability?: string | null;
   todoPath?: string | null;
+  chatId?: string | null;
 };
 
 export async function claimTask(capability: string, agentId: string) {
@@ -52,32 +53,32 @@ export async function logTaskProgressEvent(taskId: string, summary: string) {
 }
 
 export async function notifyTaskPickInTelegram(input: TaskNotifyInput) {
-  const scopeLine = input.todoPath ? `\nScope: ${input.todoPath}` : "";
-  const capabilityLine = input.capability ? `\nCapability: ${input.capability}` : "";
+  const scopeLine = input.todoPath ? `\nОбласть: ${input.todoPath}` : "";
+  const capabilityLine = input.capability ? `\nСпособность: ${input.capability}` : "";
   const deepLink = `https://t.me/oneBikePlsBot/app?startapp=supaplan`;
   const appLink = `https://v0-car-test.vercel.app/supaplan`;
 
   const message = [
-    "📌 *SupaPlan task ping*",
-    `Task: ${input.taskTitle}`,
-    `Task ID: ${input.taskId}`,
+    "📌 *Сигнал из СупаПлана*",
+    `Задача: ${input.taskTitle}`,
+    `ID задачи: ${input.taskId}`,
     `${capabilityLine}${scopeLine}`,
     "",
-    "Open in WebApp and claim it fast.",
+    "Открой ВебАпп и быстро забери задачу.",
   ]
     .join("\n")
     .replace(/\n{3,}/g, "\n\n");
 
   const result = await sendTelegramMessageCore(message, [
-    { text: "Open SupaPlan", url: appLink },
-    { text: "Telegram WebApp", url: deepLink },
-  ]);
+    { text: "Открыть СупаПлан", url: appLink },
+    { text: "Телеграм ВебАпп", url: deepLink },
+  ], undefined, input.chatId ?? undefined);
 
   if (!result.success) {
     return { success: false, error: result.error };
   }
 
-  await logTaskProgressEvent(input.taskId, "Task shared via Telegram from dashboard");
+  await logTaskProgressEvent(input.taskId, "Задача отправлена в Телеграм из панели");
 
   return { success: true };
 }
