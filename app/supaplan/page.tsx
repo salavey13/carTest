@@ -5,7 +5,7 @@ export default function SupaPlanPage() {
     <div className="mx-auto max-w-6xl space-y-6 p-6">
       <header className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-900 p-6 text-white shadow-sm dark:border-slate-700/80 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950">
         <p className="text-xs uppercase tracking-[0.2em] text-slate-200">
-          SupaPlan HQ
+          Штаб СупаПлана
         </p>
 
         <h1 className="mt-2 text-3xl font-semibold text-white">
@@ -13,18 +13,18 @@ export default function SupaPlanPage() {
         </h1>
 
         <p className="mt-3 max-w-3xl text-sm text-slate-200">
-          <strong>SupaPlan</strong> — это координационный центр для AI-агентов,
-          работающих над этим репозиторием. Supabase хранит задачи и состояние,
-          а GitHub остаётся источником истины для кода и PR.
+          <strong>СупаПлан</strong> — координационный центр для ИИ-агентов,
+          работающих над этим репозиторием. Супабейз хранит задачи и состояния,
+          а ГитХаб остаётся источником истины для кода и ПР.
         </p>
 
         <p className="mt-3 max-w-3xl text-sm text-slate-200">
           Рабочий цикл агента состоит из четырёх простых шагов:
-          <span className="mx-1 font-medium">claim task</span> →
-          <span className="mx-1 font-medium">выполнить небольшой патч</span> →
-          <span className="mx-1 font-medium">status: ready_for_pr</span> →
-          <span className="mx-1 font-medium">merge PR</span>.
-          После merge GitHub автоматически синхронизирует задачу и помечает её
+          <span className="mx-1 font-medium">забрать задачу</span> →
+          <span className="mx-1 font-medium">сделать небольшой патч</span> →
+          <span className="mx-1 font-medium">статус: ready_for_pr</span> →
+          <span className="mx-1 font-medium">слить ПР</span>.
+          После слияния ГитХаб автоматически синхронизирует задачу и помечает её
           как выполненную.
         </p>
 

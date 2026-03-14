@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { createClient } from "@supabase/supabase-js";
 
 import { notifyTaskPickInTelegram } from "./actions";
+import { useAppContext } from "@/contexts/AppContext";
 
 type KnownSupaPlanStatus = "open" | "claimed" | "running" | "ready_for_pr" | "done";
 
@@ -24,32 +25,38 @@ type SupaPlanEvent = {
   payload: Record<string, unknown> | null;
 };
 
-const STATUS_META: Record<KnownSupaPlanStatus, { label: string; className: string }> = {
+const STATUS_META: Record<KnownSupaPlanStatus, { label: string; className: string; cardClass: string }> = {
   open: {
-    label: "Open",
-    className: "bg-slate-100 text-slate-800 dark:bg-slate-700/60 dark:text-slate-100",
+    label: "Открыта",
+    className: "bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-200",
+    cardClass: "border-sky-300/70 dark:border-sky-500/40",
   },
   claimed: {
-    label: "Claimed",
-    className: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200",
+    label: "Забрана",
+    className: "bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-200",
+    cardClass: "border-indigo-300/70 dark:border-indigo-500/40",
   },
   running: {
-    label: "Running",
+    label: "В работе",
     className: "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200",
+    cardClass: "border-amber-300/70 dark:border-amber-500/40",
   },
   ready_for_pr: {
-    label: "Ready for PR",
-    className: "bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-200",
+    label: "Готова к ПР",
+    className: "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-500/20 dark:text-fuchsia-200",
+    cardClass: "border-fuchsia-300/70 dark:border-fuchsia-500/40",
   },
   done: {
-    label: "Done",
+    label: "Сделана",
     className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200",
+    cardClass: "border-emerald-300/70 dark:border-emerald-500/40",
   },
 };
 
 const UNKNOWN_STATUS_META = {
-  label: "Unknown",
+  label: "Неизвестно",
   className: "bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-200",
+  cardClass: "border-rose-300/70 dark:border-rose-500/40",
 };
 
 function isKnownStatus(status: string): status is KnownSupaPlanStatus {
@@ -64,12 +71,13 @@ function getStatusMeta(status: string) {
   return {
     label: `${UNKNOWN_STATUS_META.label}: ${status}`,
     className: UNKNOWN_STATUS_META.className,
+    cardClass: UNKNOWN_STATUS_META.cardClass,
   };
 }
 
 function formatPayload(payload: Record<string, unknown> | null): string {
   if (!payload) {
-    return "No payload";
+    return "Без нагрузки";
   }
 
   const summary = payload.summary;
@@ -100,9 +108,21 @@ export default function StatusClient() {
   );
   const [isPending, startTransition] = useTransition();
 
+  const { dbUser, user } = useAppContext();
+
   const hasSupabaseEnv = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
+
+  const recipientChatId = useMemo(() => {
+    const fromDb = (dbUser as { chat_id?: string | number } | null)?.chat_id;
+    const fromTelegram = user?.id;
+    const candidate = fromDb ?? fromTelegram;
+    if (candidate === undefined || candidate === null) {
+      return undefined;
+    }
+    return String(candidate);
+  }, [dbUser, user?.id]);
 
   const supabase = useMemo(() => {
     if (!hasSupabaseEnv) {
@@ -117,7 +137,7 @@ export default function StatusClient() {
 
   const load = useCallback(async () => {
     if (!supabase) {
-      setLoadError("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
+      setLoadError("Отсутствуют NEXT_PUBLIC_SUPABASE_URL или NEXT_PUBLIC_SUPABASE_ANON_KEY");
       setTasks([]);
       setEvents([]);
       return;
@@ -136,7 +156,7 @@ export default function StatusClient() {
     ]);
 
     if (taskError || eventError) {
-      setLoadError(taskError?.message ?? eventError?.message ?? "Failed to load SupaPlan data");
+      setLoadError(taskError?.message ?? eventError?.message ?? "Не удалось загрузить данные СупаПлана");
       return;
     }
 
@@ -266,12 +286,13 @@ export default function StatusClient() {
         taskTitle: task.title,
         capability: task.capability,
         todoPath: task.todo_path,
+        chatId: recipientChatId,
       });
 
       if (!result.success) {
         setNotifState({
           taskId: task.id,
-          message: result.error ?? "Could not send Telegram notification",
+          message: result.error ?? "Не удалось отправить уведомление в Телеграм",
           kind: "error",
         });
 
@@ -280,36 +301,32 @@ export default function StatusClient() {
 
       setNotifState({
         taskId: task.id,
-        message: "Sent to Telegram",
+        message: recipientChatId ? "Отправлено в чат пользователя" : "Отправлено в админ-чат",
         kind: "ok",
       });
     });
-  }, []);
+  }, [recipientChatId]);
 
   return (
     <div className="space-y-6">
       {loadError && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700/70 dark:bg-amber-950/40 dark:text-amber-200">
-          SupaPlan cannot connect yet: {loadError}
+          СупаПлан пока не подключился: {loadError}
         </div>
       )}
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-3 grid-cols-2 xl:grid-cols-5">
         {(Object.keys(STATUS_META) as KnownSupaPlanStatus[]).map((status) => (
           <button
             key={status}
             type="button"
             onClick={() => setActiveFilter(status)}
-            className={`rounded-xl border p-4 text-left transition hover:shadow-sm dark:border-slate-700/80 dark:bg-slate-900/30 ${
-              activeFilter === status ? "border-black dark:border-indigo-400" : "border-slate-200"
+            className={`rounded-xl border p-3 text-left transition hover:shadow-sm dark:bg-slate-900/30 ${STATUS_META[status].cardClass} ${
+              activeFilter === status ? "ring-2 ring-offset-1 ring-indigo-500 dark:ring-indigo-400 dark:ring-offset-slate-950" : ""
             }`}
           >
-            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">
-              {STATUS_META[status].label}
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
-              {statusCounts[status]}
-            </div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-600 dark:text-slate-300">{STATUS_META[status].label}</div>
+            <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{statusCounts[status]}</div>
           </button>
         ))}
       </section>
@@ -324,13 +341,13 @@ export default function StatusClient() {
               : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
           }`}
         >
-          All tasks ({tasks.length})
+          Все задачи ({tasks.length})
         </button>
 
         <input
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Search by title, capability, id"
+          placeholder="Поиск по названию, ID, способности"
           className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         />
 
@@ -339,7 +356,7 @@ export default function StatusClient() {
           onChange={(event) => setCapabilityFilter(event.target.value)}
           className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         >
-          <option value="all">All capabilities</option>
+          <option value="all">Все способности</option>
           {capabilities.map((capability) => (
             <option key={capability} value={capability}>
               {capability}
@@ -348,22 +365,20 @@ export default function StatusClient() {
         </select>
 
         <p className="self-center text-sm text-slate-600 dark:text-slate-300">
-          Filter: <span className="font-medium text-slate-900 dark:text-slate-100">{activeFilter === "all" ? "All" : STATUS_META[activeFilter].label}</span>
+          Фильтр: <span className="font-medium text-slate-900 dark:text-slate-100">{activeFilter === "all" ? "все" : STATUS_META[activeFilter].label}</span>
         </p>
       </div>
 
       <section className="rounded-xl border border-indigo-200/70 bg-indigo-50/60 p-4 dark:border-indigo-500/30 dark:bg-indigo-950/20">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-200">
-              Mission board: pick your next interesting task
-            </h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-200">Стартовая доска: быстрый ручной запуск</h2>
             <p className="mt-1 text-sm text-indigo-900/90 dark:text-indigo-100/90">
-              Want to run a manual Codex sprint? Grab one task below and paste the quick ref directly into chat.
+              Выберите задачу ниже и вставьте готовую строку в чат, чтобы запустить Кодекс вручную.
             </p>
           </div>
-          <code className="rounded-md bg-indigo-900/90 px-2 py-1 text-xs text-indigo-100">
-            node scripts/supaplan-skill.mjs pick-task --capability &lt;capability&gt; --agentId &lt;id&gt;
+          <code className="max-w-full overflow-x-auto rounded-md bg-indigo-900/90 px-2 py-1 text-xs text-indigo-100">
+            node scripts/supaplan-skill.mjs pick-task --capability &lt;способность&gt; --agentId &lt;айди&gt;
           </code>
         </div>
 
@@ -375,58 +390,68 @@ export default function StatusClient() {
             >
               <p className="font-semibold text-slate-900 dark:text-slate-100">{task.title}</p>
               <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                capability: <span className="font-mono">{task.capability ?? "n/a"}</span>
+                способность: <span className="font-mono">{task.capability ?? "нет"}</span>
               </p>
-              <p className="mt-1 break-all text-[11px] text-slate-500 dark:text-slate-400">task_id: {task.id}</p>
+              <p className="mt-1 break-all text-[11px] text-slate-500 dark:text-slate-400">айди_задачи: {task.id}</p>
               <p className="mt-2 rounded bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                Codex, take task {task.id} ({task.title})
+                Кодекс, возьми задачу {task.id} ({task.title})
               </p>
             </article>
           ))}
 
           {suggestedTasks.length === 0 && (
             <p className="rounded-lg border border-dashed border-indigo-300 p-3 text-xs text-indigo-900 dark:border-indigo-500/40 dark:text-indigo-200">
-              No open tasks right now. That means the queue is clean and ready for new ideas.
+              Сейчас нет открытых задач. Очередь чистая и ждёт новые идеи.
             </p>
           )}
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1.45fr_1fr]">
-        <div className="space-y-3">
+      <section className="grid gap-4 lg:grid-cols-[1.5fr_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-3">
           {filteredTasks.map((task) => {
             const badge = getStatusMeta(task.status);
 
             return (
               <article
                 key={task.id}
-                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/50"
+                className={`rounded-xl border bg-white p-3 shadow-sm dark:bg-slate-900/50 ${badge.cardClass}`}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{task.title}</h3>
-                  <span
-                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${badge.className}`}
-                  >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <h3 className="text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">{task.title}</h3>
+                  <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-medium ${badge.className}`}>
                     {badge.label}
                   </span>
                 </div>
 
-                <div className="mt-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">
-                  {task.capability && <p>Capability: {task.capability}</p>}
-                  {task.todo_path && <p>Scope: {task.todo_path}</p>}
-                  <p>ID: {task.id}</p>
-                  <p>Created: {new Date(task.created_at).toLocaleString()}</p>
+                <div className="mt-2 grid gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-300 sm:grid-cols-2">
+                  {task.capability && (
+                    <p className="truncate" title={task.capability}>
+                      <span className="text-slate-500 dark:text-slate-400">Способность:</span> {task.capability}
+                    </p>
+                  )}
+                  <p className="break-all">
+                    <span className="text-slate-500 dark:text-slate-400">ID:</span> {task.id}
+                  </p>
+                  {task.todo_path && (
+                    <p className="sm:col-span-2 break-all">
+                      <span className="text-slate-500 dark:text-slate-400">Область:</span> {task.todo_path}
+                    </p>
+                  )}
+                  <p>
+                    <span className="text-slate-500 dark:text-slate-400">Создана:</span> {new Date(task.created_at).toLocaleDateString()}
+                  </p>
                 </div>
 
                 {(task.status === "open" || task.status === "ready_for_pr") && (
-                  <div className="mt-3 flex items-center gap-2">
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => handleNotify(task)}
                       disabled={isPending}
                       className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Notify in Telegram
+                      Отправить в Телеграм
                     </button>
                     {notifState?.taskId === task.id && (
                       <span className={`text-xs ${notifState.kind === "ok" ? "text-emerald-500" : "text-rose-500"}`}>
@@ -441,17 +466,15 @@ export default function StatusClient() {
 
           {filteredTasks.length === 0 && (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
-              No tasks in this filter yet. Pick another combination and keep shipping ✨
+              В этом фильтре задач пока нет.
             </div>
           )}
         </div>
 
-        <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/50">
+        <aside className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/50">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
-              Recent events
-            </h3>
-            <span className="text-xs text-slate-500 dark:text-slate-400">{filteredEvents.length} visible</span>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">Свежие события</h3>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{filteredEvents.length} шт.</span>
           </div>
 
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -460,7 +483,7 @@ export default function StatusClient() {
               onChange={(event) => setEventSourceFilter(event.target.value)}
               className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             >
-              <option value="all">All sources</option>
+              <option value="all">Все источники</option>
               {eventSources.map((source) => (
                 <option key={source} value={source}>
                   {source}
@@ -472,7 +495,7 @@ export default function StatusClient() {
               onChange={(event) => setEventTypeFilter(event.target.value)}
               className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             >
-              <option value="all">All types</option>
+              <option value="all">Все типы</option>
               {eventTypes.map((eventType) => (
                 <option key={eventType} value={eventType}>
                   {eventType}
@@ -481,30 +504,48 @@ export default function StatusClient() {
             </select>
           </div>
 
-          <div className="mt-4 max-h-[520px] space-y-2 overflow-auto pr-1">
+          <div className="mt-4 max-h-[520px] space-y-2 overflow-x-hidden overflow-y-auto pr-1">
             {filteredEvents.map((event) => (
               <div
                 key={event.id}
-                className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-900"
+                className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900"
               >
                 <p className="font-medium text-slate-800 dark:text-slate-100">
                   {event.type}
                   <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">#{event.id}</span>
                 </p>
-                <p className="mt-1 text-slate-600 dark:text-slate-300">{formatPayload(event.payload)}</p>
+                <p className="mt-1 text-slate-600 dark:text-slate-300"><span className="break-words">{formatPayload(event.payload)}</span></p>
                 <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                  {event.source ?? "unknown"} • {new Date(event.created_at).toLocaleString()}
+                  <span className="break-all">{event.source ?? "неизвестно"}</span> • {new Date(event.created_at).toLocaleString()}
                 </p>
               </div>
             ))}
 
             {filteredEvents.length === 0 && (
               <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                No events for this filter.
+                Нет событий для выбранного фильтра.
               </p>
             )}
           </div>
         </aside>
+      </section>
+
+
+      <section className="rounded-xl border border-cyan-200/70 bg-gradient-to-br from-cyan-50 via-indigo-50 to-violet-50 p-4 text-sm dark:border-cyan-500/30 dark:from-cyan-950/20 dark:via-slate-900 dark:to-violet-950/20">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-cyan-900 dark:text-cyan-200">Зачем вообще СупаПлан</h3>
+        <p className="mt-1 text-slate-700 dark:text-slate-200">
+          Мы строим не просто доску задач, а пульт оркестра для роя ИИ-агентов: человек задаёт вектор,
+          система распределяет нагрузку, а код едет в ПР-ритме без хаоса и дубликатов.
+        </p>
+        <p className="mt-2 text-slate-700 dark:text-slate-300">
+          Идея простая: меньше ручной рутины, больше скорости мысли. Сегодня это удобная панель,
+          завтра — автономный производственный поток, где команда задаёт курс, а СупаПлан масштабирует исполнение.
+        </p>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
+        <p className="font-semibold text-slate-700 dark:text-slate-200">Словарик русифицированных терминов:</p>
+        <p className="mt-1">клейм = claim, ПР = pull request, ВебАпп = web app, айди = id, нагрузка = payload.</p>
       </section>
     </div>
   );
