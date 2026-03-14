@@ -31,3 +31,9 @@ Notes
 - Agents may only set status up to ready_for_pr.
 - Human merge is the only way a task becomes done.
 - Every other todo.md (greenbox, franchize, core, etc.) is now a mirror — SupaPlan is the single source of truth.
+
+Phase 4 — Marketplace UX transition
+- [x] Reframe /supaplan hero and task board as operator marketplace surface
+- [x] Move manual command example below task list and replace with Telegram-forward flow guidance
+- [ ] Add “PR-ready spotlight” lane with one-click open PR links from task cards
+- [ ] Add dedicated mobile-first sticky CTA for Telegram-forward flow
