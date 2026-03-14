@@ -110,9 +110,7 @@ export default function StatusClient() {
 
   const { dbUser, user } = useAppContext();
 
-  const hasSupabaseEnv = Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  const hasSupabaseEnv = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
   const recipientChatId = useMemo(() => {
     const fromDb = (dbUser as { chat_id?: string | number } | null)?.chat_id;
@@ -129,10 +127,7 @@ export default function StatusClient() {
       return null;
     }
 
-    return createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
-    );
+    return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL as string, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string);
   }, [hasSupabaseEnv]);
 
   const load = useCallback(async () => {
@@ -144,15 +139,8 @@ export default function StatusClient() {
     }
 
     const [{ data: taskData, error: taskError }, { data: eventData, error: eventError }] = await Promise.all([
-      supabase
-        .from("supaplan_tasks")
-        .select("id,title,status,todo_path,capability,created_at")
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("supaplan_events")
-        .select("id,created_at,source,type,payload")
-        .order("created_at", { ascending: false })
-        .limit(25),
+      supabase.from("supaplan_tasks").select("id,title,status,todo_path,capability,created_at").order("created_at", { ascending: true }),
+      supabase.from("supaplan_events").select("id,created_at,source,type,payload").order("created_at", { ascending: false }).limit(25),
     ]);
 
     if (taskError || eventError) {
@@ -277,65 +265,68 @@ export default function StatusClient() {
       .slice(0, 3);
   }, [tasks]);
 
-  const handleNotify = useCallback((task: SupaPlanTask) => {
-    setNotifState(null);
+  const handleNotify = useCallback(
+    (task: SupaPlanTask) => {
+      setNotifState(null);
 
-    startTransition(async () => {
-      const result = await notifyTaskPickInTelegram({
-        taskId: task.id,
-        taskTitle: task.title,
-        capability: task.capability,
-        todoPath: task.todo_path,
-        chatId: recipientChatId,
-      });
-
-      if (!result.success) {
-        setNotifState({
+      startTransition(async () => {
+        const result = await notifyTaskPickInTelegram({
           taskId: task.id,
-          message: result.error ?? "Не удалось отправить уведомление в Телеграм",
-          kind: "error",
+          taskTitle: task.title,
+          capability: task.capability,
+          todoPath: task.todo_path,
+          chatId: recipientChatId,
         });
 
-        return;
-      }
+        if (!result.success) {
+          setNotifState({
+            taskId: task.id,
+            message: result.error ?? "Не удалось отправить уведомление в Телеграм",
+            kind: "error",
+          });
 
-      setNotifState({
-        taskId: task.id,
-        message: recipientChatId ? "Отправлено в чат пользователя" : "Отправлено в админ-чат",
-        kind: "ok",
+          return;
+        }
+
+        setNotifState({
+          taskId: task.id,
+          message: recipientChatId ? "Отправлено в чат пользователя" : "Отправлено в админ-чат",
+          kind: "ok",
+        });
       });
-    });
-  }, [recipientChatId]);
+    },
+    [recipientChatId]
+  );
 
   return (
     <div className="space-y-6">
       {loadError && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700/70 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700/70 dark:bg-amber-950/40 dark:text-amber-200">
           СупаПлан пока не подключился: {loadError}
         </div>
       )}
 
-      <section className="grid gap-3 grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {(Object.keys(STATUS_META) as KnownSupaPlanStatus[]).map((status) => (
           <button
             key={status}
             type="button"
             onClick={() => setActiveFilter(status)}
-            className={`rounded-xl border p-3 text-left transition hover:shadow-sm dark:bg-slate-900/30 ${STATUS_META[status].cardClass} ${
-              activeFilter === status ? "ring-2 ring-offset-1 ring-indigo-500 dark:ring-indigo-400 dark:ring-offset-slate-950" : ""
+            className={`rounded-2xl border bg-white/95 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-900/50 ${STATUS_META[status].cardClass} ${
+              activeFilter === status ? "ring-2 ring-indigo-500 dark:ring-indigo-400" : ""
             }`}
           >
             <div className="text-[11px] uppercase tracking-wide text-slate-600 dark:text-slate-300">{STATUS_META[status].label}</div>
-            <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{statusCounts[status]}</div>
+            <div className="mt-1 text-3xl font-semibold text-slate-900 dark:text-slate-50">{statusCounts[status]}</div>
           </button>
         ))}
       </section>
 
-      <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700/80 dark:bg-slate-900/50 md:grid-cols-4">
+      <div className="grid gap-3 rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/50 md:grid-cols-4">
         <button
           type="button"
           onClick={() => setActiveFilter("all")}
-          className={`rounded-full px-3 py-1 text-sm transition ${
+          className={`rounded-full px-3 py-1.5 text-sm transition ${
             activeFilter === "all"
               ? "bg-slate-900 text-white dark:bg-indigo-500"
               : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
@@ -369,45 +360,7 @@ export default function StatusClient() {
         </p>
       </div>
 
-      <section className="rounded-xl border border-indigo-200/70 bg-indigo-50/60 p-4 dark:border-indigo-500/30 dark:bg-indigo-950/20">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-200">Стартовая доска: быстрый ручной запуск</h2>
-            <p className="mt-1 text-sm text-indigo-900/90 dark:text-indigo-100/90">
-              Выберите задачу ниже и вставьте готовую строку в чат, чтобы запустить Кодекс вручную.
-            </p>
-          </div>
-          <code className="max-w-full overflow-x-auto rounded-md bg-indigo-900/90 px-2 py-1 text-xs text-indigo-100">
-            node scripts/supaplan-skill.mjs pick-task --capability &lt;способность&gt; --agentId &lt;айди&gt;
-          </code>
-        </div>
-
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
-          {suggestedTasks.map((task) => (
-            <article
-              key={task.id}
-              className="rounded-lg border border-indigo-200 bg-white/95 p-3 text-sm dark:border-indigo-500/40 dark:bg-slate-900/70"
-            >
-              <p className="font-semibold text-slate-900 dark:text-slate-100">{task.title}</p>
-              <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                способность: <span className="font-mono">{task.capability ?? "нет"}</span>
-              </p>
-              <p className="mt-1 break-all text-[11px] text-slate-500 dark:text-slate-400">айди_задачи: {task.id}</p>
-              <p className="mt-2 rounded bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                Кодекс, возьми задачу {task.id} ({task.title})
-              </p>
-            </article>
-          ))}
-
-          {suggestedTasks.length === 0 && (
-            <p className="rounded-lg border border-dashed border-indigo-300 p-3 text-xs text-indigo-900 dark:border-indigo-500/40 dark:text-indigo-200">
-              Сейчас нет открытых задач. Очередь чистая и ждёт новые идеи.
-            </p>
-          )}
-        </div>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-[1.5fr_minmax(0,1fr)]">
+      <section className="grid gap-4 lg:grid-cols-[1.45fr_minmax(0,1fr)]">
         <div className="min-w-0 space-y-3">
           {filteredTasks.map((task) => {
             const badge = getStatusMeta(task.status);
@@ -415,13 +368,11 @@ export default function StatusClient() {
             return (
               <article
                 key={task.id}
-                className={`rounded-xl border bg-white p-3 shadow-sm dark:bg-slate-900/50 ${badge.cardClass}`}
+                className={`rounded-2xl border bg-white/95 p-4 shadow-sm transition hover:shadow-md dark:bg-slate-900/50 ${badge.cardClass}`}
               >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <h3 className="text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">{task.title}</h3>
-                  <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-medium ${badge.className}`}>
-                    {badge.label}
-                  </span>
+                  <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-medium ${badge.className}`}>{badge.label}</span>
                 </div>
 
                 <div className="mt-2 grid gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-300 sm:grid-cols-2">
@@ -434,7 +385,7 @@ export default function StatusClient() {
                     <span className="text-slate-500 dark:text-slate-400">ID:</span> {task.id}
                   </p>
                   {task.todo_path && (
-                    <p className="sm:col-span-2 break-all">
+                    <p className="break-all sm:col-span-2">
                       <span className="text-slate-500 dark:text-slate-400">Область:</span> {task.todo_path}
                     </p>
                   )}
@@ -454,9 +405,7 @@ export default function StatusClient() {
                       Отправить в Телеграм
                     </button>
                     {notifState?.taskId === task.id && (
-                      <span className={`text-xs ${notifState.kind === "ok" ? "text-emerald-500" : "text-rose-500"}`}>
-                        {notifState.message}
-                      </span>
+                      <span className={`text-xs ${notifState.kind === "ok" ? "text-emerald-500" : "text-rose-500"}`}>{notifState.message}</span>
                     )}
                   </div>
                 )}
@@ -465,15 +414,15 @@ export default function StatusClient() {
           })}
 
           {filteredTasks.length === 0 && (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
               В этом фильтре задач пока нет.
             </div>
           )}
         </div>
 
-        <aside className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/50">
+        <aside className="min-w-0 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/50">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">Свежие события</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">Лента событий</h3>
             <span className="text-xs text-slate-500 dark:text-slate-400">{filteredEvents.length} шт.</span>
           </div>
 
@@ -504,17 +453,16 @@ export default function StatusClient() {
             </select>
           </div>
 
-          <div className="mt-4 max-h-[520px] space-y-2 overflow-x-hidden overflow-y-auto pr-1">
+          <div className="mt-4 max-h-[540px] space-y-2 overflow-x-hidden overflow-y-auto pr-1">
             {filteredEvents.map((event) => (
-              <div
-                key={event.id}
-                className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900"
-              >
+              <div key={event.id} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900">
                 <p className="font-medium text-slate-800 dark:text-slate-100">
                   {event.type}
                   <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">#{event.id}</span>
                 </p>
-                <p className="mt-1 text-slate-600 dark:text-slate-300"><span className="break-words">{formatPayload(event.payload)}</span></p>
+                <p className="mt-1 text-slate-600 dark:text-slate-300">
+                  <span className="break-words">{formatPayload(event.payload)}</span>
+                </p>
                 <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                   <span className="break-all">{event.source ?? "неизвестно"}</span> • {new Date(event.created_at).toLocaleString()}
                 </p>
@@ -530,17 +478,41 @@ export default function StatusClient() {
         </aside>
       </section>
 
+      <section className="rounded-2xl border border-indigo-200/70 bg-gradient-to-br from-indigo-50 via-violet-50 to-cyan-50 p-4 dark:border-indigo-500/30 dark:from-indigo-950/20 dark:via-slate-900 dark:to-cyan-950/20">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-200">Как запускать задачи без CLI-магии</h2>
+            <p className="mt-1 text-sm text-indigo-900/90 dark:text-indigo-100/90">
+              Пользователю нужен только пересланный сигнал в Codex и затем кнопка Create PR, когда агент закончит.
+            </p>
+          </div>
+          <span className="rounded-full border border-indigo-300/70 bg-white/80 px-3 py-1 text-xs font-medium text-indigo-700 dark:border-indigo-400/40 dark:bg-slate-900/60 dark:text-indigo-200">
+            Ручной flow: Telegram → Codex → PR
+          </span>
+        </div>
 
-      <section className="rounded-xl border border-cyan-200/70 bg-gradient-to-br from-cyan-50 via-indigo-50 to-violet-50 p-4 text-sm dark:border-cyan-500/30 dark:from-cyan-950/20 dark:via-slate-900 dark:to-violet-950/20">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-cyan-900 dark:text-cyan-200">Зачем вообще СупаПлан</h3>
-        <p className="mt-1 text-slate-700 dark:text-slate-200">
-          Мы строим не просто доску задач, а пульт оркестра для роя ИИ-агентов: человек задаёт вектор,
-          система распределяет нагрузку, а код едет в ПР-ритме без хаоса и дубликатов.
-        </p>
-        <p className="mt-2 text-slate-700 dark:text-slate-300">
-          Идея простая: меньше ручной рутины, больше скорости мысли. Сегодня это удобная панель,
-          завтра — автономный производственный поток, где команда задаёт курс, а СупаПлан масштабирует исполнение.
-        </p>
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          {suggestedTasks.map((task) => (
+            <article key={task.id} className="rounded-xl border border-indigo-200 bg-white/95 p-3 text-sm dark:border-indigo-500/40 dark:bg-slate-900/70">
+              <p className="font-semibold text-slate-900 dark:text-slate-100">{task.title}</p>
+              <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                способность: <span className="font-mono">{task.capability ?? "нет"}</span>
+              </p>
+              <p className="mt-1 break-all text-[11px] text-slate-500 dark:text-slate-400">айди_задачи: {task.id}</p>
+              <p className="mt-2 text-xs text-slate-700 dark:text-slate-200">Отправь уведомление из карточки задачи выше и перешли его в чат с Codex.</p>
+            </article>
+          ))}
+
+          {suggestedTasks.length === 0 && (
+            <p className="rounded-lg border border-dashed border-indigo-300 p-3 text-xs text-indigo-900 dark:border-indigo-500/40 dark:text-indigo-200">
+              Сейчас нет открытых задач. Очередь чистая и ждёт новые идеи.
+            </p>
+          )}
+        </div>
+
+        <div className="mt-4 rounded-xl border border-indigo-200/70 bg-indigo-950 px-3 py-2 text-xs text-indigo-50 dark:border-indigo-400/30">
+          Пример сообщения для Codex (после того как переслал TG сигнал): «возьми задачу из пересланного уведомления и сделай PR».
+        </div>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
