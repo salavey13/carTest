@@ -60,18 +60,26 @@ jobs:
           test -n "$SUPABASE_URL" || (echo 'Missing secret NEXT_PUBLIC_SUPABASE_URL' && exit 1)
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo 'Missing secret SUPABASE_SERVICE_ROLE_KEY' && exit 1)
 
-      - name: Mark SupaPlan task(s) done
+      - name: Mark SupaPlan task(s) done and save PR link
         if: steps.extract.outputs.tasks != ''
         shell: bash
+        env:
+          MERGED_PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           IFS=',' read -r -a TASKS <<< "${{ steps.extract.outputs.tasks }}"
           for TASK_ID in "${TASKS[@]}"; do
             echo "Updating task $TASK_ID -> done"
+            payload=$(jq -nc \
+              --arg status "done" \
+              --arg updated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              --arg pr_url "$MERGED_PR_URL" \
+              '{status:$status,updated_at:$updated_at,pr_url:($pr_url | select(length > 0))}')
+
             curl -sS -f -X PATCH \
               "$SUPABASE_URL/rest/v1/supaplan_tasks?id=eq.$TASK_ID" \
               -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Content-Type: application/json" \
               -H "Prefer: return=representation" \
-              -d '{"status":"done","updated_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}'
+              -d "$payload"
           done
