@@ -383,6 +383,16 @@ export async function postCodexCommandToSlack(params: {
     telegramUserId: params.telegramUserId,
   };
 
+  const isSupaPlanCodeword = /(^|\s)ебаш(!+)?($|\s)/iu.test(normalizedCommand);
+  const supaPlanInstruction = isSupaPlanCodeword
+    ? [
+        "",
+        "Режим кодового слова «ебаш» включён.",
+        "Обязательно запусти цикл СупаПлана: inspect-migrations -> pick-task (capability=auto или ru-friendly) -> update-status running.",
+        "Выбери задачу с русским названием, если доступно, и напиши в ответе, какая задача забрана.",
+      ].join("\n")
+    : null;
+
   const photos = params.telegramPhotos || [];
   const documents = params.telegramDocuments || [];
   const originLine = `TG origin: @${params.telegramUsername || "unknown"} (user ${params.telegramUserId})`;
@@ -394,6 +404,7 @@ export async function postCodexCommandToSlack(params: {
     photos.length > 0 ? `TG photo count: ${photos.length}` : null,
     documents.length > 0 ? `TG document count: ${documents.length}` : null,
     `Callback payload hint: ${JSON.stringify(callbackHint)}`,
+    supaPlanInstruction,
   ]
     .filter(Boolean)
     .join("\n")
