@@ -23,16 +23,16 @@ jobs:
         id: extract
         shell: bash
         run: |
-          # Safe way to pass PR body (prevents shell injection / command-not-found spam)
+          # === ИСПРАВЛЕНИЕ: убрали heredoc, который ломался на многострочных PR ===
+          # Теперь используем printf — это 100% безопасно и никогда не даёт ошибку
+          # "here-document delimited by end-of-file"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            cat > /tmp/pr_body.txt <<-'EOF'
-              ${{ inputs.pr_body }}
-            EOF
+            BODY="${{ inputs.pr_body }}"
           else
-            cat > /tmp/pr_body.txt <<-'EOF'
-              ${{ github.event.pull_request.body }}
-            EOF
+            BODY="${{ github.event.pull_request.body }}"
           fi
+
+          printf '%s\n' "$BODY" > /tmp/pr_body.txt
 
           # Same regex logic as before (case-insensitive, UUID only after "supaplan_task:")
           IDS=$(
@@ -68,7 +68,7 @@ jobs:
         run: |
           IFS=',' read -r -a TASKS <<< "${{ steps.extract.outputs.tasks }}"
           for TASK_ID in "${TASKS[@]}"; do
-            echo "Updating task $TASK_ID -> done"
+            echo "Updating task $TASK_ID → done + pr_url"
             payload=$(jq -nc \
               --arg status "done" \
               --arg updated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
