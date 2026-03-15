@@ -15,6 +15,7 @@ type SupaPlanTask = {
   todo_path: string | null;
   capability: string | null;
   created_at: string;
+  pr_url: string | null;
 };
 
 type SupaPlanEvent = {
@@ -141,7 +142,7 @@ export default function StatusClient() {
     }
 
     const [{ data: taskData, error: taskError }, { data: eventData, error: eventError }] = await Promise.all([
-      supabase.from("supaplan_tasks").select("id,title,status,todo_path,capability,created_at").order("created_at", { ascending: true }),
+      supabase.from("supaplan_tasks").select("id,title,status,todo_path,capability,created_at,pr_url").order("created_at", { ascending: true }),
       supabase.from("supaplan_events").select("id,created_at,source,type,payload").order("created_at", { ascending: false }).limit(25),
     ]);
 
@@ -536,6 +537,18 @@ export default function StatusClient() {
                       {task.capability && <p>Способность: {task.capability}</p>}
                       <p>Создана: {new Date(task.created_at).toLocaleDateString()}</p>
                       {task.todo_path && <p className="break-all sm:col-span-2">Область: {task.todo_path}</p>}
+                      {task.pr_url && (
+                        <p className="sm:col-span-2">
+                          <a
+                            href={task.pr_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-100 dark:hover:bg-emerald-500/30"
+                          >
+                            Открыть связанный ПР
+                          </a>
+                        </p>
+                      )}
                       <p className="break-all sm:col-span-2">ID: {task.id}</p>
                     </div>
                   </article>
