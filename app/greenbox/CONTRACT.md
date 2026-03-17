@@ -1,36 +1,20 @@
-Purpose
-Greenbox is the experimental simulation environment for hydroponic systems.
+# Greenbox Contract
 
-Public Interface
+## Назначение
+Greenbox — стартовый модуль для «магического момента» в экосистеме SupaPlan:
+пользователь сразу видит живой сад и только потом думает про регистрацию и настройки.
 
-The module exposes:
+## Публичные точки входа
+- `app/greenbox/page.tsx` — стартовая страница с демо и фейковыми дверями.
+- `app/greenbox/layout.tsx` — базовый контейнер темы Greenbox.
+- `app/greenbox/plugin.ts` — манифест расширения и список возможностей.
 
-- simulation state
-- plant model
-- sensor model
+## Минимальные требования к модулю
+1. Текст и кнопки — RU-first, крупные и понятные.
+2. Визуальная сцена должна создавать ощущение «сад уже живой» менее чем за 90 секунд.
+3. Фейковые двери обязаны существовать как UX-крючки для следующих задач SupaPlan.
 
-Other modules may depend on these exports.
-
-Stable APIs
-
-simulation.start()
-simulation.stop()
-simulation.getState()
-
-Constraints
-
-- Do not directly access database.
-- All persistence goes through /infrastructure/supabase.
-- External communication goes through /gateway modules.
-
-Allowed Changes
-
-Agents may:
-
-- add simulation features
-- extend sensor models
-- improve visualization
-
-Agents must NOT:
-
-- change API names without updating registry.
+## Ограничения
+- Изменения в рамках Greenbox держим внутри `app/greenbox/*`.
+- Секреты и привилегированные ключи не добавляем в клиентский код.
+- Внутреннюю навигацию оставляем SPA-совместимой (через `Link`/router).
