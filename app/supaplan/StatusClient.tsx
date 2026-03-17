@@ -285,6 +285,13 @@ export default function StatusClient() {
       .slice(0, 3);
   }, [tasks]);
 
+  const readyForPrSpotlight = useMemo(() => {
+    return tasks
+      .filter((task) => task.status === "ready_for_pr")
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .slice(0, 4);
+  }, [tasks]);
+
   const handleNotify = useCallback(
     (task: SupaPlanTask) => {
       setNotifState(null);
@@ -660,6 +667,66 @@ export default function StatusClient() {
 
         <div className="mt-3 rounded-xl border border-indigo-200/70 bg-indigo-950 px-3 py-2 text-xs text-indigo-50 dark:border-indigo-400/30">
           Пример сообщения для Codex (после пересылки сигнала): «возьми задачу из пересланного уведомления и сделай PR».
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-fuchsia-200/80 bg-white/95 p-3 shadow-sm sm:p-4 dark:border-fuchsia-500/30 dark:bg-slate-900/50">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-fuchsia-800 dark:text-fuchsia-200">Лента готовых к ПР</h2>
+            <p className="mt-1 text-xs text-slate-700 dark:text-slate-300">Здесь собраны задачи, которые можно сразу открыть и проверить перед слиянием.</p>
+          </div>
+          <span className="rounded-full border border-fuchsia-300/70 bg-fuchsia-50 px-3 py-1 text-xs font-medium text-fuchsia-700 dark:border-fuchsia-400/40 dark:bg-fuchsia-500/10 dark:text-fuchsia-200">
+            Готово: {readyForPrSpotlight.length}
+          </span>
+        </div>
+
+        <div className="mt-3 grid gap-2 sm:gap-3 md:grid-cols-2">
+          {readyForPrSpotlight.map((task) => (
+            <article key={`spotlight-${task.id}`} className="rounded-xl border border-fuchsia-200/80 bg-fuchsia-50/40 p-3 dark:border-fuchsia-500/30 dark:bg-fuchsia-950/10">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{task.title}</p>
+              <p className="mt-1 break-all text-[11px] text-slate-600 dark:text-slate-300">ID: {task.id}</p>
+              {task.todo_path && <p className="mt-1 break-all text-[11px] text-slate-600 dark:text-slate-300">Область: {task.todo_path}</p>}
+
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {task.pr_url ? (
+                  <a
+                    href={task.pr_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex rounded-lg border border-fuchsia-300 bg-fuchsia-100 px-2.5 py-1 text-[11px] font-medium text-fuchsia-800 transition hover:bg-fuchsia-200 dark:border-fuchsia-400/40 dark:bg-fuchsia-500/20 dark:text-fuchsia-100 dark:hover:bg-fuchsia-500/30"
+                  >
+                    Открыть ПР
+                  </a>
+                ) : (
+                  <span className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+                    Ссылка на ПР пока не записана
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => handleNotify(task)}
+                  disabled={isPending}
+                  className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Пнуть в Телеграм
+                </button>
+              </div>
+
+              {notifState?.taskId === task.id && (
+                <p className={`mt-1 text-[11px] ${notifState.kind === "ok" ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300"}`}>
+                  {notifState.message}
+                </p>
+              )}
+            </article>
+          ))}
+
+          {readyForPrSpotlight.length === 0 && (
+            <p className="rounded-xl border border-dashed border-fuchsia-300 p-4 text-xs text-fuchsia-900 dark:border-fuchsia-500/40 dark:text-fuchsia-200">
+              Пока нет задач в состоянии «Готова к ПР». Как только агент завершит работу, карточка появится здесь.
+            </p>
+          )}
         </div>
       </section>
 
