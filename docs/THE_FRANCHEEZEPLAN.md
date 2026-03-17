@@ -1500,74 +1500,110 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T49 — Software-engineering hardening sweep (security/SPA/state/CSS/cart-write load)
 - status: `in_progress`
+ 
 - updated_at: `2026-03-17T10:40:00Z`
 - owner: `codex`
 - notes: Continued hardening pass with two additional guardrails in franchize create: AI JSON local-apply now reports precise parse-position hints without generic crashes, and launch cockpit execution links switched from internal <a> to Next.js Link to preserve SPA navigation contract. Also hardened social links hydration against malformed JSON node shapes.
 - next_step: Continue remaining T49 substeps (theme flash + AppContext decomposition/realtime architecture audit) and run broader Telegram webview smoke around menu/footer overlays.
 - risks: Cart persistence is now safer for DB load but depends on explicit checkpoints (`/cart`, `/order/*`, pagehide); must verify no data loss in abrupt mobile-session kills.
+
+- updated_at: `2026-03-16T00:40:00Z`
+- owner: `codex`
+- notes: T49 remains active parent. Completed T49.5 split in `contexts/AppContext.tsx` (auth/runtime/cart/strikeball boundaries + strikeball-specific hook extraction) and switched active-lobby refresh to realtime event subscriptions instead of timer-only pseudo-realtime. Completed T49.6 by adding first-paint theme bootstrap script in `app/layout.tsx` and precise recoverable Advanced JSON validation in `/app/franchize/create/*`. Follow-up T49.8 fixed franchize admin route normalization (`/franchize/admin`) and adaptive crew-themed styling/linking regressions from review.
+- next_step: Start **T50 — checkout/admin resilience pass** (local template fallback, order retry snapshot, server-side crew ACL scope, and franchize-form tokenization for light-theme parity).
+- risks: Realtime lobby subscription currently listens on full `lobbies` table change feed; verify acceptable event volume for high-match concurrency and tighten filters if needed.
+ 
 - dependencies: T48
+
+- subtask tracking:
+  - **T49.10 — Remove mistaken flat admin redirects + mobile overflow polish**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-06T04:05:00Z`
+    - notes: Removed mistakenly created flat admin redirect pages (`/franchize/admin`, `/admin/franchize`) and kept only canonical slug route `/franchize/[slug]/admin` plus legacy `/admin`. Polished mobile overflow issues in admin UX by making top controls/buttons/select blocks wrap and stack safely in `CarSubmissionForm`; fixed dark-on-dark legacy `/admin` title contrast.
+    - risks: `CarSubmissionForm` remains shared across multiple domains; further franchize-only theme tokenization could still improve light-theme parity.
+    - next_step: Add optional `appearance` mode to `CarSubmissionForm` so franchize admin can fully consume crew palette tokens without affecting other product surfaces.
+  - **T49.9 — Crew-scoped admin route migration to `/franchize/[slug]/admin` + light-theme contrast polish**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-06T03:10:00Z`
+    - notes: Migrated franchize admin routing from flat `/franchize/admin` to crew-scoped `/franchize/[slug]/admin` with legacy redirects preserving `slug/edit` query forwarding. Updated profile/admin links to slug route and polished page contrast by forcing crew metadata theme tokens for headers/filters/info blocks instead of project-default button/text colors.
+    - risks: `CarSubmissionForm` still contains global style classes and can look partially off-theme on light crews; dedicated form-level tokenization should be planned.
+    - next_step: Add themed wrapper/token map for `CarSubmissionForm` (or franchize-only variant) to fully eliminate default project palette bleed in light mode.
+  - **T49.8 — Franchize admin route normalization + adaptive themed polish**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-06T02:25:00Z`
+    - notes: Moved crew admin surface from `/admin/franchize` to canonical `/franchize/admin` with compatibility redirect, updated franchize profile dropdown + admin links, and rebuilt page styling to hydrate from crew branding/theme palette (slug-aware) with mobile-safe text wrapping.
+    - risks: Fleet scope currently still uses editable vehicles action and filters client-side by crew; strict server-side ACL hardening remains in T50.
+    - next_step: In T50 add server-side scoped query endpoint for crew-owner subsets and remove client-side filtering fallback.
+  - **T49.7 — Franchize checkout doc-notification + crew-admin VIN UX pass**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-06T01:35:00Z`
+    - notes: Wired checkout notification action to generate DOCX from RENTAL_DEAL template with live order/cart/specs (including VIN) and send it as Telegram document to admin on order submit (manual + XTR flows). Added mobile-first `/admin` improvements (bike/car filters + VIN guidance) plus dedicated `/admin/franchize` crew-owner console for VIN-centric editing.
+    - risks: Current DOC render pulls template from GitHub raw URL; if network is unavailable, notification send fails.
+    - next_step: Add local template fallback and optional persisted `orders` table snapshot for audit/retry in next iteration.
+  - **T49.5 — App context decomposition and realtime strategy audit**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-06T00:32:00Z`
+    - notes: Responsibility map finalized and split into isolated providers (auth/runtime/cart/strikeball). `useStrikeballLobbyContext` extracted for strikeball-only consumers, reducing unrelated rerender pressure from lobby state. Active lobby updates now refresh via Supabase realtime events instead of timer-only polling.
+    - risks: Current realtime listener for `lobbies` is broad (`event:*`); may need tighter filter if noisy in production.
+    - next_step: Run focused strikeball smoke checks on join/leave/active-state transitions under mobile latency.
+  - **T49.6 — Theme flash prevention + AI JSON robustness**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-06T00:38:00Z`
+    - notes: Added `beforeInteractive` theme bootstrap script to align html class before hydration and avoid first-paint mismatch. Hardened `/app/franchize/create/CreateFranchizeForm.tsx` Advanced JSON parsing with explicit validation states (empty payload, parse error details, root object shape, franchize object shape) while preserving recoverable UI feedback.
+    - risks: LocalStorage theme value can be stale vs DB preference; DB sync still reconciles post-auth.
+    - next_step: Start **T50 — T49 closure regression pack** and capture final smoke evidence.
 - deliverables:
+  - `docs/T49-security_sweep.md`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+  - `docs/AGENT_DIARY.md`
   - `hooks/useTelegram.ts`
   - `hooks/supabase.ts`
   - `hooks/useFranchizeCart.ts`
-  - `app/franchize/components/*` (navigation touchpoints)
-  - `contexts/AppContext.tsx` (or split contexts)
-  - `docs/THE_FRANCHEEZEPLAN.md`
+  - `app/franchize/components/*` (navigation + themed controls)
+  - `contexts/AppContext.tsx` (or split providers)
 - implementation checklist:
-  1. **Security first:** eliminate any client import path that can bundle `SUPABASE_SERVICE_ROLE_KEY`; move privileged user-create/update logic to server actions/route handlers only.
-  2. **SPA recovery (critical):** remove full-reload navigation fallbacks (`window.location.assign`, hard `<a>` for internal routes) and restore deterministic Next.js `Link`/router transitions.
-  3. **Root-cause tap fix:** audit z-index/overlay/stopPropagation conflicts in franchize header/menu/footer/modal layers so taps work without sacrificing SPA behavior.
-  4. **Cart DB load guard:** stop high-frequency JSONB writes on every cart micro-change; keep cart local-first and persist on checkout/explicit sync points with bounded write cadence.
-  5. **Style-system cleanup:** reduce inline-style dominance in franchize surfaces by moving palette delivery to CSS variables usable via Tailwind utilities (`bg-[var(--...)]`, `text-[var(--...)]`) so focus/hover/active states remain reliable.
-  6. **Context split plan:** decompose oversized `AppContext` responsibilities into smaller logical providers (`Auth/Cart/Game`) and replace minute polling where possible with event/realtime-driven updates.
-  7. **Theme flash hardening:** bootstrap theme from early server-readable signal (cookie/session hint) to avoid white-flash first paint before async profile/theme sync completes.
-  8. **Micro-optimization rollback:** remove/avoid cargo-cult `React.memo` on trivial icon/text renderers unless profiling proves benefit.
-  9. **AI JSON resilience:** harden franchize AI-JSON parsing/validation so malformed payloads produce inline actionable errors instead of component-breaking crashes.
-  10. **Regression pack:** run focused smoke for Telegram-style navigation, modal/cart actions, and no-white-flash route transitions on `/franchize/vip-bike`.
+  1. **T49.0 — continue as FRANCHEEZEPLAN_EXECUTIONER: Unbloat planning ledger by moving legacy diary archive** (`done`): move oversized section-7 history into `docs/AGENT_DIARY.md`, keep only compact pointer section in THE plan.
+  2. **T49.1 — continue as FRANCHEEZEPLAN_EXECUTIONER: Security boundary hardening (server-only admin paths)**: verify privileged Supabase logic remains server-only and no client import chain can touch service-role key access.
+  3. **T49.2 — continue as FRANCHEEZEPLAN_EXECUTIONER: SPA navigation oath recovery in franchize shell**: keep internal links SPA-first and solve tap reliability through layering/event fixes (not hard reload fallbacks).
+  4. **T49.3 — continue as FRANCHEEZEPLAN_EXECUTIONER: Cart write-pressure control and checkpoint persistence**: preserve local-first UX and flush on explicit checkpoints/page lifecycle with retry-safe queue semantics.
+  5. **T49.4 — continue as FRANCHEEZEPLAN_EXECUTIONER: Style-system variable migration and interaction-state safety**: migrate remaining inline color hotspots toward CSS-variable Tailwind utilities and keep focus/hover/active visibility intact.
+  6. **T49.5 — continue as FRANCHEEZEPLAN_EXECUTIONER: App context decomposition and realtime strategy audit**: split oversized app context by concern and reduce timer-only pseudo-realtime behavior.
+  7. **T49.6 — continue as FRANCHEEZEPLAN_EXECUTIONER: Theme flash prevention + AI JSON robustness**: ensure first paint uses early theme signal and malformed JSON remains recoverable with precise inline errors.
+  8. **Sync point:** reflect subtask outcomes in `docs/THE_FRANCHEEZEPLAN_STATUS.MD` after each completed substep.
+  9. **T49.7 — Franchize checkout doc-notification + crew-admin VIN UX pass**: reuse markdown-doc template generation during order submit, send DOC to admin with order details, and improve `/admin` + dedicated `/admin/franchize` mobile-first editor with bike/car VIN focus.
 - acceptance criteria:
-  - No client-side bundle path can access admin/service-role Supabase credentials.
-  - Internal franchize navigation uses SPA transitions (no forced full reload workaround for same-origin routes).
-  - Cart persistence no longer performs frequent metadata writes per tiny quantity edit.
-  - Interaction-state styles (`hover/focus/active`) remain visible after theme application without inline override conflicts.
-  - Context updates avoid full-app rerenders for unrelated state and remove brittle timer-only dependency for realtime-like UX.
-  - First paint does not flash incorrect light theme before dark theme sync for known dark-pref users.
-  - AI JSON tooling reports precise validation errors without crashing franchize create flow.
+  - T49 subtasks are explicit, dependency-ordered, and actionable without additional interpretation.
+  - Section 7 of THE plan remains slim, with historical narrative archived in `docs/AGENT_DIARY.md`.
+  - Security/SPA/cart/style/context/theme/AI-json checks are represented as concrete subtask goals in both T49 docs.
 
-### T49.1 — Postpone fake embedding fallback redesign (explicitly deferred)
-- status: `todo`
-- updated_at: `-`
-- owner: `unassigned`
-- notes: Documented deferral: vector-embedding fallback redesign is intentionally excluded from current hardening wave per operator instruction ("don't bother about embeddings generation").
-- next_step: Revisit only when search relevance workstream is scheduled.
-- risks: Search quality may remain degraded in edge-failure mode until dedicated embeddings task is prioritized.
+
+### T50 — Checkout contract payload resilience + franchize crew ACL expansion
+- status: `in_progress`
+- updated_at: `2026-03-13T09:00:00Z`
+- owner: `codex`
+- notes: Implemented server-side template fallback chain (GitHub raw -> local docs file), added durable `franchize_order_notifications` snapshot log with send-status transitions (`pending/sent/failed`), and exposed retry action restoring payload from latest snapshot.
+- next_step: Finish crew-owner ACL expansion in franchize admin/editor scope and wire operator retry trigger in admin UI.
+- risks: Retry action currently re-inserts snapshot on each attempt (expected audit trail growth); ACL scope depends on shared admin page shape.
 - dependencies: T49
 - deliverables:
+  - `app/franchize/actions.ts`
+  - `app/admin/franchize/page.tsx`
+  - `supabase/migrations/*` (if snapshot table is added)
   - `docs/THE_FRANCHEEZEPLAN.md`
 - implementation checklist:
-  1. Keep current scope focused on security + SPA + state reliability.
-  2. Capture explicit defer note in diary to prevent accidental silent scope creep.
+  1. Add local fallback for doc template read (`docs/RENTAL_DEAL_TEMPLATE_DEMO.md`) when GitHub raw is unavailable.
+  2. Store normalized order snapshot in DB before send attempts and mark send status (`pending/sent/failed`).
+  3. Add retry endpoint/action for failed admin-doc sends.
+  4. Expand crew-owner ACL in admin/franchize UI (filter by crew owner id when metadata role is limited admin).
 - acceptance criteria:
-  - Plan clearly states embeddings fallback redesign is deferred by instruction.
-
-### T49.2 — AGENTS context diet + archive trigger policy
-- status: `done`
-- updated_at: `2026-02-23T12:20:00Z`
-- owner: `codex`
-- notes: Added explicit memory-system policy in AGENTS so long diary context is loaded on demand only (Telegram/Slack/screenshots/homework triggers), reducing routine prompt bloat while preserving incident memory quality.
-- next_step: Continue with T48 implementation as next product-facing execution task.
-- risks: If trigger list is ignored manually, agents may still over-read diary and lose focus on small UI tasks.
-- dependencies: T47
-- deliverables:
-  - `AGENTS.md`
-  - `docs/THE_FRANCHEEZEPLAN.md`
-- implementation checklist:
-  1. Keep AGENTS as constitutional rules and move historical depth to diary-on-demand behavior.
-  2. Define concrete trigger categories when diary must be read before coding.
-  3. Preserve existing diary contract (append lessons after meaningful incidents).
-- acceptance criteria:
-  - AGENTS contains explicit rule to skip full diary for routine edits.
-  - AGENTS contains explicit trigger list for mandatory diary reads.
-  - Plan diary records this context-diet update for traceability.
+  - Admin receives DOC for successful submits and failed sends are retryable without data loss.
+  - Crew-owner editor cannot edit out-of-scope crew inventory rows.
 
 ## 6) Task template for future extension
 
@@ -1605,6 +1641,7 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 
 ---
 
+<<<<<<< codex/request-clarification-on-task
 ## 7) Progress changelog / diary
 
 ### 2026-03-17 — T49 continuation (AI JSON resilience + SPA link contract in create cockpit)
@@ -1734,291 +1771,16 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 - Added optional `theme` prop to `FranchizeContactsMap` and wired it from contacts page so fallback/frame colors follow crew palette tokens.
 - Next beat: T23 should tackle remaining catalog tile utility background classes for complete storefront token isolation.
 
+=======
+## 7) Progress changelog / diary is in /docs/AGENT_DIARY.MD
+>>>>>>> main
 
-### 2026-02-22 — T21 completion (token hotspot cleanup)
-- Migrated cart page headline/empty state/cards/summary/muted copy to `crewPaletteForSurface` styles and explicit border tokens.
-- Migrated catalog search input + empty blocks + fallback description copy away from global muted utility token defaults.
-- Updated item modal option-chip section headers to use crew `textSecondary` token.
-- Next beat: T22 should finish `OrderPageClient` utility-token migration and run another vip-bike light-mode readability sweep.
+Historical diary entries were moved to `docs/AGENT_DIARY.md` to keep this execution ledger readable.
+Append only compact session deltas here as pointers when needed; full narrative belongs to the diary archive.
 
-
-### 2026-02-22 — T20 completion (floating cart palette-mode background)
-- Added `floatingCartOverlayBackground(theme)` helper in franchize theme lib so cart shell translucency is derived from crew palette + mode.
-- Threaded `theme` through floating cart wrappers and removed hardcoded dark RGBA from `FloatingCartIconLink`.
-- Restored direct usage of `textColor` prop for icon/label contrast instead of shadowing it as an unused argument.
-- Next beat: continue with T21 and migrate remaining `text-muted-foreground/bg-card` hotspots in catalog/cart/order components.
-
-
-### 2026-02-22 — T19 completion (surface token cleanup for overlays)
-- Updated `Item` modal surfaces/muted text/spec cards to use `crewPaletteForSurface` styles instead of global `bg-card/text-muted-foreground` classes.
-- Updated `HeaderMenu` tagline muted text to resolver-driven palette color to keep copy readable in custom crew themes.
-- Updated `FloatingCartIconLink` shell/empty state styling to remove reliance on global theme card/muted utility tokens.
-- Next beat: continue with T20 and migrate remaining catalog/cart/order utility-token hotspots.
-
-### 2026-02-21 — T18 completion (`/franchize/create` dual palette UX)
-- Added Light palette fieldset in create form (7 semantic tokens) with separate preview card and additional contrast diagnostics.
-- Extended `FranchizeConfigInput`/validation/defaults to carry both dark (existing) and light palette tokens.
-- Updated save pipeline to persist `theme.palettes.dark|light` and sync active `theme.palette` based on selected `theme.mode`.
-- Updated load/apply logic so editor hydrates light palette values from metadata and keeps legacy compatibility.
-
-### 2026-02-21 — T17 completion (palette resolver + dual-palette seed support)
-- Added `crewPaletteForSurface` helper and applied it to `/franchize/[slug]/about|cart|contacts|order/[id]` page shells to stop leaking global `bg-background/text-foreground` tokens into crew-themed surfaces.
-- Extended `getFranchizeBySlug` palette hydration to resolve by theme mode from either flat `theme.palette` or dual `theme.palettes.dark/light` metadata.
-- Updated demo SQL hydration seeds (`vip-bike`, `sly13`) with explicit dual palette sets; `sly13` now defaults to a light-mode variant while preserving dark palette fallback.
-- Next beat: T18 form UX should expose both palette sets in `/franchize/create` for no-code operators.
-
-### 2026-02-21 — T16 completion (rental lifecycle controls on franchize card)
-- Added role-aware control panel directly in `/franchize/[slug]/rental/[id]`: owner actions (confirm pickup/return) and renter actions (open Telegram photo flow for start/end).
-- Extended `getFranchizeRentalCard` payload with `ownerId`/`renterId` so UI can deterministically gate controls by participant role.
-- Kept Telegram-first flow by reusing existing rental server actions (`confirmVehiclePickup`, `confirmVehicleReturn`, `initiateTelegramRentalPhotoUpload`) instead of duplicating lifecycle logic.
-- Next beat: begin T17 palette resolver migration to prevent crew dark palette clashes with global light/dark tokens.
-
-
-### 2026-02-21 — T16C ad-hoc polish (category rail + unified nav helper)
-- Added shared franchize navigation helper (`app/franchize/lib/navigation.ts`) and reused it in header modal/profile actions + category id mapping.
-- Rebuilt header category rail to derive links from rendered catalog sections (`section[data-category]`), so order now mirrors catalog and empty showcase groups are auto-hidden.
-- Implemented smooth click-scroll to chosen group, active-pill auto-scroll-into-view, hidden scrollbar rail, and split sticky behavior (top header scrolls away, pills rail stays visible).
-- Updated AGENTS with two routing hints: RU task text defaults to FRANCHEEZEPLAN and generic `FRANCHEEZEPLAN` requests should execute the next ready planned task; also set default QA slug to `vip-bike`.
-
-
-### 2026-02-21 — T16B ad-hoc polish (subpage back-link reliability)
-- Fixed remaining flaky internal links on cart/order/rental subpages where `Вернуться в каталог` / `К каталогу` sometimes did not navigate in Telegram webview.
-- Switched those actions to direct anchor navigation and kept visual hierarchy unchanged.
-- Re-tested on mobile viewport: cart->catalog, order->catalog, rental->catalog all route correctly.
-
-
-### 2026-02-21 — T16A ad-hoc polish (tap/click reliability sweep)
-- Investigated shared root cause across franchize header/footer/profile/cart: internal client-link taps were unreliable in modal/dropdown/webview surfaces.
-- Hardened routing by using deterministic navigation paths (anchors or explicit `window.location.assign`) for footer menu links, profile dropdown items, and floating cart pill.
-- Re-validated interaction flow on mobile viewport: header menu link opens `/about`, footer `Контакты` opens `/contacts`, profile dropdown opens `/settings`, cart pill opens `/cart`.
-- Added AGENTS keyword-trigger note so Pepperolli/VIP-bike/franchize requests always spawn/update an ad-hoc FRANCHEEZEPLAN task for historical continuity.
-
-
-
-
-
-
-### 2026-02-21 — T16 polish (post-payment "You are in" notification)
-- Upgraded `franchize_order` success notification to rich celebratory payload with full order details (recipient/phone/delivery/slot/cart/extras/totals), deep links, and visual image query.
-- Kept primary continuation CTA first in notification keyboard and preserved Telegram deep-link as dedicated secondary action.
-- Added owner/admin message refinements with richer totals breakdown for faster operator verification.
-
-### 2026-02-21 — T16 polish (CTA hierarchy + fallback minimization)
-- Swapped action hierarchy so the primary button is now `Продолжить оформление` (main next step after invoice intent), while Telegram deep-link moved to subtle fallback row.
-- Removed `Legacy rentals` shortcut entirely to keep franchize-first flow deterministic.
-- Added celebratory deal-start badge and info-icon tooltip for fallback semantics to keep UX clear without noisy body copy.
-
-### 2026-02-21 — T16 polish (deep-link CTA clarity + checkout rename)
-- Clarified why Telegram button exists directly in rental card UX copy: fallback entrypoint for restoring `startapp=rental-...` context when opened outside mini-app session.
-- Renamed/visual-polished checkout action to `Перейти в оформление` with icon for clearer operator intent and stronger scanability.
-- Captured fresh screenshot and reran lint/build/franchize smoke checks.
-
-### 2026-02-21 — T16 progress (profile dropdown in franchize header)
-- Replaced franchize header avatar link with role-aware dropdown navigation: `Профиль`, `Настройки`, `Branding`, optional `Мой экипаж`, and `Admin` for admins only.
-- Kept dropdown shell palette-bound to crew metadata to avoid global theme contrast regressions.
-- Clarified next beat: role-bound rental action controls remain pending in T16 scope.
-
-### 2026-02-21 — T16 pre-hotfix (header palette source)
-- Resolved dark/light mesh issue from QA screenshot by switching `CrewHeader` surface colors (header bg, ticker rail, menu/profile shells, balloon text) to crew metadata palette tokens.
-- Added follow-up tasks: T17 for full palette/theming parity audit and T18 for `/franchize/create` dual-palette UX expansion.
-- Captured updated `/franchize/vip-bike/rental/demo-order` screenshot after header pre-hotfix and reran lint/build/smoke checks.
-
-### 2026-02-21 — T16 progress (franchize rental page styling + build unblock)
-- Fixed production build import path for franchize rental page (`../../../actions`), resolving missing-export errors during Next.js build.
-- Overhauled `/franchize/[slug]/rental/[id]` visuals to use crew metadata palette and shared franchize shell (`CrewHeader` + `CrewFooter`) for brand-consistent runtime UX.
-- Revalidated production build after refactor and captured fresh mobile screenshot artifact for `/franchize/vip-bike/rental/demo-order`.
-
-### 2026-02-21 — T15 execution complete (Telegram photo fallback + completed events)
-- Fixed Telegram rental photo ingestion when `user_states.awaiting_rental_photo` is missing by auto-detecting likely renter rental context and expected photo type from status/events.
-- Prevented stuck return/pickup confirmations by saving `photo_start`/`photo_end` events with `status=completed` in both webhook and `addRentalPhoto` paths.
-- Kept `/actions` compatibility while reducing fragile dependency on short-lived chat session state.
-
-
-### 2026-02-21 — T14 execution complete (cart-line persistence + franchize rental handoff)
-- Migrated franchize cart storage to structured cart lines with option hash (`itemId::package|duration|perk`) and backward-compatible hydration from legacy qty-only storage.
-- Unified cart/order/floating totals on line-level pricing so option selections persist and affect totals consistently.
-- Extended invoice metadata with generated `rental_id` + deep links and introduced `/franchize/[slug]/rental/[id]` runtime page as the new handoff surface.
-- Added `franchize_order` webhook handler to upsert `rentals` as confirmed hot leads after successful XTR payment and notify renter/owner/admin with franchize-first links.
-- Updated startapp routing in `ClientLayout` to resolve `rental-<uuid>` toward franchize rental pages before falling back to legacy routes.
-
-
-### 2026-02-21 — T13 execution complete (modal/specs + smooth rails + extras totals)
-- Updated item modal UX to open with 3-line description clamp and explicit `Показать ещё.../Скрыть` toggle for long texts.
-- Replaced static quick-spec copy with parsed `cars.specs` metadata cards (with fallback values) to match VIP motorbike rental context.
-- Stabilized header balloon rail active-state behavior with deterministic intersection scoring and visual selected state, while keeping scrollbar chrome hidden.
-- Hard-pinned `wbitem` subgroup ordering to render at the end of catalog grouping.
-- Added selectable checkout extras and included them in final total + XTR invoice 1% tip calculation/metadata.
-
-
-### 2026-02-21 — T12 execution complete (pepperolli card polish + top balloons refactor)
-- Moved section/group balloon rail ownership into `CrewHeader` so it now persists across all `/franchize/[slug]/*` pages and removed duplicate in-catalog sticky rail source.
-- Extended top header blur with a `-42px` safe-area cap and applied scrollbarless horizontal rails to avoid camera-cutout visual gap on phones.
-- Refined catalog cards with mixed visual variants, dynamic `Хит 🔥` badge logic for bobber-like entries, richer description rendering, and split CTA labels (`Добавить` vs `Выбрать`).
-- Expanded catalog query scope to include `bike`, `accessories`, `gear`, `wbitem` plus dynamic showcase groups (`23rd feb edition`, `Все по 6000`) for roster-style duplication.
-- Captured updated mobile screenshot artifact and sent execution closeout telemetry attempt via notify script (env-dependent).
-
-### 2026-02-20 — T11 execution complete (header overlap + borderless controls)
-- Updated franchize header action buttons to borderless styling for `Меню` and `Профиль` wrappers while preserving tap area and hover feedback.
-- Raised header menu overlay stacking order and added safe-area-aware modal sizing/scroll behavior to avoid visual overlap with sticky catalog/search layers.
-- Captured refreshed mobile screenshot evidence after menu-open state validation.
-- Sent Telegram heartbeat update for task closeout with next-beat note.
-
-### 2026-02-20 — T10 execution complete (post-QA smoke automation)
-- Added `scripts/franchize-qa-check.mjs` to validate canonical slug-scoped franchize pages (`catalog/about/contacts/cart/order`) against a configurable base URL.
-- Added `npm run qa:franchize` command so operators can run a single-step post-deploy smoke pass.
-- Re-ran targeted franchize lint gate (`npm run lint:target`) and smoke verification against production URL.
-- Sent Telegram heartbeat closeout via `scripts/codex-notify.mjs telegram` with super-admin mirror recipient included.
-
-### 2026-02-20 — T9 execution complete (QA matrix + rollout evidence)
-- Verified viewport coverage for `/franchize/vip-bike` catalog at 360x800, 390x844, 768x1024, and desktop; captured screenshot matrix artifacts.
-- Captured required franchize flow screenshots: catalog, header menu, item modal, cart, order, and contacts pages.
-- Ran `npm run lint` (pass with existing repo-wide warnings), `npm run build` (pass with non-blocking env warnings), and route smoke check via `curl` for core slug routes (`200` responses).
-- Sent executor heartbeat via `scripts/codex-notify.mjs telegram` with super-admin mirror behavior enabled by script defaults.
-
-### 2026-02-20 — T8.6 execution complete (copy + submit-state observability pass)
-- Normalized `/franchize/[slug]/about` fallback description to RU-first operator copy and removed leftover English scaffold tone.
-- Added deterministic submit-hint text on checkout sidebar to surface why CTA is blocked (empty cart, missing consent, Telegram WebApp requirement).
-- Kept checkout CTA language aligned with current payment branch (`XTR` vs regular confirm) while retaining no-crash behavior for non-Telegram sessions.
-- Marked T8.6 done and opened path for T9 QA matrix.
-
-### 2026-02-20 — T8.6 polish slice (checkout SoT + Telegram XTR payment)
-- Unified checkout/cart composition through shared cart-line derivation and removed checkout-only seeded assumptions.
-- Added empty-cart CTA/guard behavior and submit disable to prevent invalid order confirmation attempts.
-- Implemented Telegram Stars (XTR) as primary checkout payment option with server action that creates invoice metadata and sends Telegram invoice for 1% proof-of-interest tip.
-- Revalidated franchize-targeted lint and refreshed checkout screenshot evidence for the updated payment/summary UX.
-
-### 2026-02-20 — T8.5 execution complete (map tab + Telegram-first copy pass)
-- Added dedicated `Карта+соцсети` tab in franchize create form for no-code map calibration.
-- Wired map calibration fields and social links through config load/save action contract.
-- Updated footer to remove `Вход/Регистрация` block and show crew social links instead.
-- Removed email-first copy from franchize contact surface and kept Telegram-driven comms emphasis.
-
-### 2026-02-20 — T8.4 execution complete (VibeMap reinvestigation + contacts integration)
-- Reinvestigated reusable `components/VibeMap.tsx` from car-rent/game surfaces and fixed practical robustness issues.
-- Added fallback static map image and switched map image rendering to `object-contain` for safer calibrated overlays.
-- Added reset control to quickly restore pan/zoom state on mobile interaction drift.
-- Replaced contacts iframe approach with dedicated `FranchizeContactsMap` wrapper using VibeMap + metadata GPS marker.
-- Extended SQL hydration docs with map `imageUrl` and `bounds` metadata for VIP-BIKE and SLY13.
-
-### 2026-02-20 — T8.3 execution complete (follow-up parity sweep)
-- Removed header search icon entirely and switched right-side action to dedicated franchize profile component wrapper based on shared user widget.
-- Removed catalog clutter remnants (`Каталог (bike only)` and slug path label) so first fold starts with search.
-- Added map section to `/franchize/[slug]/contacts` using metadata coordinates (`contacts.map.gps`) and fallback state when coordinates are absent.
-- Reworked franchize footer into full-width yellow multi-section layout (contacts/menu/profile/social) with row separators + bottom strip.
-- Deleted obsolete unslugged franchize pages (`/franchize/about|contacts|cart|order/[id]`) as requested.
-
-
-### 2026-02-20 — T8.2 execution complete (Pepperolli parity polish slice)
-- Added top ticker strip in franchize header and wired content from `catalog.tickerItems` metadata.
-- Added omnipresent header quick-link balloons for catalog section recall from about/contacts surfaces.
-- Implemented full-width catalog search (input + button) with real filtering across title/subtitle/description/category.
-- Moved verbose tagline from header into `HeaderMenu` to reduce first-screen clutter and match reference rhythm.
-- Extended SQL seed docs (`vip-bike`, `sly13`) with demo ticker metadata and quick-link arrays.
-
-### 2026-02-18 — bootstrap
-- Added full franchise execution plan with sequential tasks and status fields.
-- Marked T1/T2 as completed for documentation bootstrap.
-- Established extension template for future tasks.
-
-### 2026-02-18 — refinement pass (deeper execution detail)
-- Expanded remaining tasks (T3-T9) with implementation checklists, risks, and acceptance criteria for separate-session execution.
-- Added second-pass visual extraction with more precise palette candidates from screenshots.
-- Added hydration-ready theme token contract to include colors/spacing/radius in crew metadata.
-- Added fallback/normalization rules and stronger progress protocol fields.
-
-### 2026-02-18 — FRANCHEEZEPLAN_EXECUTIONER bootstrap
-- Added local-skills discovery follow-up (notify + supabase-related repo skills and scripts).
-- Added quick-start executor runbook at `docs/FRANCHEEZEPLAN.md` for next-session continuation.
-- Added AGENTS protocol for `continue as FRANCHEEZEPLAN_EXECUTIONER` deterministic task pickup and state updates.
-
-### 2026-02-18 — T3 execution complete (route scaffold)
-- Marked T3 `in_progress` -> `done` following dependency order.
-- Implemented franchize runtime loader/action with fallback hydration for unknown slug and cars query safety.
-- Scaffolded pages: `/franchize/[slug]` plus legacy static placeholders (`/franchize/cart`, `/franchize/order/[id]`, `/franchize/about`, `/franchize/contacts`) before slug migration finalized.
-- Captured mobile screenshot for `/franchize/demo` to document current scaffold visual baseline.
-
-### 2026-02-18 — T3 refinement (VIP_BIKE hydration seed)
-- Replaced scaffold demo navigation target with `/franchize/vip-bike` for operator-facing testing.
-- Added detailed SQL hydration blueprint at `docs/sql/vip-bike-franchize-hydration.sql` to populate `crews.metadata.franchize` using VIP_BIKE data from existing pages/components.
-- Preserved legacy metadata compatibility by keeping top-level provider/contact keys in SQL merge section.
-
-### 2026-02-18 — T3a execution complete (slug-in-path stabilization)
-- Added slug-scoped routes for about/contacts/cart/order and moved page rendering there.
-- Added backward-compatible redirects from `/franchize/about|contacts|cart` (and `/franchize/order/[id]`) to `/franchize/vip-bike/*`.
-- Updated `getFranchizeBySlug` contacts fallback order: `metadata.franchize.contacts` -> `metadata.franchize.footer` -> crew fields.
-- Normalized fallback/header menu links to include slug in franchize scoped URLs.
-
-### 2026-02-18 — T3b execution complete (doc slug consistency pass)
-- Rechecked `docs/FRANCHEEZEPLAN.md` and `docs/THE_FRANCHEEZEPLAN.md` for non-slug franchize route references.
-- Normalized target IA + JSON template + future task deliverables to `/franchize/{slug}/...` or `/franchize/[slug]/...` patterns.
-- Kept static non-slug routes only when explicitly describing compatibility redirects/history.
-
-### 2026-02-18 — T4 execution complete (Pepperolli shell baseline)
-- Marked T4 `in_progress` -> `done` after implementing reusable shell components for franchize pages.
-- Added `CrewHeader`, `HeaderMenu`, `CrewFooter`, and `FloatingCartIconLink` with palette-driven styling from `crew.theme.palette`.
-- Integrated shell components on `/franchize/[slug]`, `/about`, `/contacts`, `/cart`, and `/order/[id]` so floating cart and menu scaffolding persist across core surfaces.
-
-### 2026-02-19 — T4 polish pass (logo + images + bike-only filter)
-- Applied follow-up polish from operator feedback: centered/enlarged crew logo in header for stronger brand lockup.
-- Restored visual completeness of catalog cards by rendering bike images (with explicit placeholder when `image_url` is absent).
-- Tightened data contract in loader to include only `type=bike` items for franchize catalog hydration.
-
-### 2026-02-19 — T4 polish pass 2 (layout chrome isolation + default footer upgrade)
-- Disabled global `ClientLayout` header/footer chrome on `/franchize*` paths so only franchize shell components render there.
-- Overhauled default `Footer` component structure for better scanability while preserving hardcoded product copy/links.
-- Replaced Jumpstart CTA slot with `NEXUS Hub` link to align platform narrative flow.
-
-### 2026-02-19 — T4 polish pass 3 (light-theme support + compact global footer on franchize)
-- Reworked franchize page surfaces to rely on semantic theme tokens (`bg-background`, `text-foreground`, `text-muted-foreground`) instead of hardcoded dark-only text/background pairing.
-- Restored global `Footer` visibility on `/franchize*`, but added an ultra-compact one-line variant specifically for franchize routes.
-- Added real header links for utility icons (`/repo-xml` and `/profile`) so right-side controls are actionable.
-
-### 2026-02-19 — T4 polish pass 4 (category anchors + nano-header split)
-- Changed global layout behavior for `/franchize*`: keep compact global footer but suppress only default global header (no duplicate top chrome).
-- Updated franchize header utility search icon behavior to act as in-page catalog filter jump (scroll to category section rail) instead of external route navigation.
-- Reworked catalog rendering into category-grouped sections with stable anchor ids so subtype pills scroll to their corresponding item sublists.
-
-### 2026-02-19 — T4 polish pass 5 (bike subtype grouping fix)
-- Fixed franchize catalog grouping bug where all cards collapsed into a single `bike` bucket after bike-only filtering.
-- Updated loader mapping to derive display category from bike subtype fields (`specs.subtype`/`bike_subtype`/`segment`/`specs.type`) and ignore plain `type=bike` as grouping key.
-- Preserved bike-only filtering while restoring effective category-anchor scrolling behavior for subtype pills.
-
-### 2026-02-19 — Executor protocol extension (interactive Tamagotchi transparency)
-- Updated `AGENTS.md` executor mode with explicit RU-summary + Tamagotchi telemetry output requirements for operator-facing completion messages.
-- Synced `docs/FRANCHEEZEPLAN.md` definition-of-done to include telemetry fields (`mood/energy/focus/confidence/comment`) alongside technical summary.
-- Kept telemetry policy additive-only so implementation evidence and command checks remain primary.
-
-### 2026-02-19 — Executor personality expansion (GPTgotchi/CyberDaemon)
-- Expanded `AGENTS.md` executor protocol from basic telemetry to expressive GPTgotchi mode: wake-state, playful roast/praise, iteration hints, and motivational micro-guidance.
-- Updated `docs/FRANCHEEZEPLAN.md` DoD telemetry schema to include `iteration_hint` and `roast_or_praise`.
-- Kept safety boundary explicit: expressive UX is additive and must not replace objective technical reporting.
-
-### 2026-02-19 — Executor coaching loop upgrade (progress_stage + next beat)
-- Extended executor telemetry schema with `progress_stage` and `next_beat` to support explicit iterative rhythm (`scan → patch → validate → ship`).
-- Added noob-friendly coaching flow in `AGENTS.md`: wake state, beat log, corner-case nudge, polish prompt, and final Create-PR reminder.
-- Synced `docs/FRANCHEEZEPLAN.md` DoD so operator-facing summaries consistently guide novices through next-step execution.
-
-### 2026-02-19 — Executor identity final touch (merge-day)
-- Added explicit operator-facing executor identity: **GPTgotchi CyberDaemon (GTC-Daemon)**.
-- Updated AGENTS + runbook so operator prompt "what is your name?" has deterministic answer.
-
-### 2026-02-19 — Merge-day persona final touch (name + beat loop)
-- Set explicit executor display name: **GPTgotchi CyberDaemon (GTC-Daemon)** for operator Q&A consistency.
-- Added merge-day interactive beat loop rule: wake state, stage log, next beat, polish prompt, and Create-PR reminder.
-- Reinforced onboarding intent: expressive coaching for newcomers without replacing technical evidence/checks.
-
-### 2026-02-19 — Educational heartbeat reporting enabled
-- Added executor rule to send compact Telegram heartbeat updates about iteration progress and novice hint adoption.
-- Bound report channel to `ADMIN_CHAT_ID` + mock-user operator id for educational observability.
-- Verified heartbeat delivery using `scripts/codex-notify.mjs telegram` (successful bot message send).
+- 2026-03-13: T50 started — added order-doc template local fallback + DB snapshot/retry pipeline (`franchize_order_notifications`) in server actions/migration; next focus is crew ACL + retry UI wire-up.
 
 ---
-
-### 2026-02-19 — Executor onboarding reinforcement + merged-PR context sync
-- Reviewed latest merged PRs from git history: `#949`, `#948`, `#947` (all executor/franchize continuity work) to keep coaching updates aligned with current rollout cadence.
-- Added RU-first telemetry naming (`энергия/фокус/уверенность`) and warm-up progression guidance so first-time teammates see realistic "grow while iterating" stats.
-- Added explicit noob tip: PR preview URL appears right after PR creation and remains stable across subsequent commits to the same PR branch.
-- Reaffirmed educational heartbeat targeting defaults (`ADMIN_CHAT_ID` + mock user fallback) for executor-mode progress nudges.
 
 ## 8) Skills and tooling note
 
@@ -2205,3 +1967,43 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Replaced temporary `/franchize/[slug]/rentals` redirect with real franchize page that keeps CrewHeader/CrewFooter and renders rentals control center inside franchize shell.
 - Restored social link parser behavior (no aggressive auto-normalization), while internal footer menu links now use client-side `Link` for reliable navigation.
 - Next beat: add “smart auction apply” assistant that preselects best tick by item category, active campaign priority, and delivery mode.
+
+### T47 — Greenbox/Tesseract collaborative gamelab planning bootstrap (keyword-trigger ad-hoc)
+- status: `done`
+- updated_at: `2026-03-06T00:00:00Z`
+- owner: `codex`
+- notes: Operator request mentioned franchize-style structure for greenhouse management; created dedicated cross-team plan doc with scenario-gamedev workflow, tenant page IA, and newbie academy scope.
+- next_step: Start G1 from `docs/GREENBOX_TESSERACT_GAMELAB_PLAN.md` (academy MVP).
+- risks: Scope is broad; requires disciplined sequential execution and simulator-first boundaries.
+- dependencies: T46
+- deliverables:
+  - `docs/GREENBOX_TESSERACT_GAMELAB_PLAN.md`
+
+### 2026-03-06 — T47 completion (Greenbox/Tesseract plan bootstrap)
+- Captured collaborative execution model for Alice + Codex with one shared MD status board.
+- Defined page structure for multi-tenant greenbox management, simulator gameplay, alerts, academy, and replay flows.
+- Locked simulator-first roadmap and deferred real hardware switching behind a future adapter contract.
+
+### 2026-03-06 — T47 refinement pass (RU-first Greenbox collaboration + Alice pitch)
+- Added mandatory RU-first language guidance directly into `docs/GREENBOX_TESSERACT_GAMELAB_PLAN.md` for all Greenbox/Tesseract-triggered tasks.
+- Added dedicated operator-ready Russian pitch file `docs/GREENBOX_ALICE_PITCH_RU.md` with clear onboarding CTA for Alice (`get me up to speed on greenbox plan`).
+- Preserved simulator-first execution contract and kept implementation sequencing unchanged (next step remains G1 academy MVP).
+
+### T48 — Formalize franchize as plugin (meta.plugin)
+- status: `done`
+- updated_at: `2026-03-14T00:00:00Z`
+- owner: `codex`
+- notes: Added plugin manifest + hydration + contract files for `/app/franchize` and synced `app/franchize/todo.md` checklist for formalization scope.
+- next_step: Split follow-up into explicit tasks for metadata extraction into cores and leftover payments/items-sync features.
+- risks: Current plugin docs describe existing runtime; deeper extraction into shared cores still pending and should be done incrementally.
+- dependencies: T47
+- deliverables:
+  - `app/franchize/plugin.ts`
+  - `app/franchize/hydration.md`
+  - `app/franchize/CONTRACT.md`
+  - `app/franchize/todo.md`
+
+### 2026-03-14 — T48 completion (franchize plugin formalization + supaplan UX alignment support)
+- Formalized `/app/franchize` as extension-style plugin with explicit capabilities/exports/uses manifest.
+- Added hydration and contract docs so agents/operators can reason about public route surface and server/client boundaries.
+- Synced franchize todo checklist for formalization items and documented next split-ready follow-up work.

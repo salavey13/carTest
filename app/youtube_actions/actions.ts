@@ -1,5 +1,6 @@
 "use server";
-import { supabaseAdmin, uploadImage } from "@/hooks/supabase";
+import { uploadImage } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { google } from "googleapis";
 import { Readable } from "stream";
 import { sendTelegramMessage } from "@/app/actions"; // Import for notifications

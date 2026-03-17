@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
-import { createFranchizeOrderInvoice } from "../actions";
+import { createFranchizeOrderInvoice, submitFranchizeOrderNotification } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
 
@@ -76,7 +77,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const consentRef = useRef<HTMLInputElement>(null);
   const surface = crewPaletteForSurface(crew.theme);
   const fieldStyle = {
-    borderColor: crew.theme.palette.borderSoft,
+    borderColor: "var(--order-border)",
     backgroundColor: `${crew.theme.palette.bgBase}a8`,
     color: crew.theme.palette.textPrimary,
   };
@@ -166,6 +167,28 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     }
 
     startSubmitTransition(async () => {
+      const notifyResult = await submitFranchizeOrderNotification({
+        slug,
+        orderId,
+        telegramUserId: String(user?.id ?? "manual-order"),
+        recipient: submitPayload.recipient,
+        phone: submitPayload.phone,
+        time: submitPayload.time,
+        comment: submitPayload.comment,
+        payment: submitPayload.payment,
+        delivery: submitPayload.delivery,
+        subtotal,
+        extrasTotal: submitPayload.extrasTotal,
+        totalAmount: submitPayload.totalAmount,
+        extras: submitPayload.extras,
+        cartLines: submitPayload.cartLines,
+      });
+
+      if (!notifyResult.success) {
+        toast.error(notifyResult.error ?? "Не удалось отправить уведомление админу.");
+        return;
+      }
+
       if (payment === "telegram_xtr") {
         if (!user?.id) {
           toast.error("Для XTR-счёта откройте страницу из Telegram WebApp.");
@@ -198,9 +221,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         return;
       }
 
-      // backend submit will be connected in a separate step
-      console.info("checkout payload draft", submitPayload);
-      toast.info("Черновой payload собран. Бэкенд submit подключим следующим шагом.");
+      toast.success("Заказ отправлен администратору вместе с DOC-файлом. Скоро с вами свяжутся.");
     });
   };
 
@@ -223,8 +244,22 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   };
 
   return (
-    <section className="mx-auto w-full max-w-4xl px-4 py-6">
-      <p className="text-xs uppercase tracking-[0.2em]" style={{ color: crew.theme.palette.accentMain }}>
+    <section
+      className="mx-auto w-full max-w-4xl px-4 py-6"
+      style={{
+        ["--order-accent" as string]: crew.theme.palette.accentMain,
+        ["--order-border" as string]: crew.theme.palette.borderSoft,
+        ["--order-muted" as string]: crew.theme.palette.textSecondary,
+        ["--order-accent-contrast" as string]: "#16130A",
+        ["--order-accent-on" as string]: crew.theme.palette.accentTextOn,
+        ["--order-text-primary" as string]: crew.theme.palette.textPrimary,
+        ["--order-text-muted" as string]: crew.theme.palette.textMuted,
+        ["--order-accent-soft" as string]: `${crew.theme.palette.accentMain}1f`,
+        ["--order-progress-track" as string]: `${crew.theme.palette.borderSoft}80`,
+        ["--order-progress-gradient-end" as string]: crew.theme.palette.accentMainHover,
+      }}
+    >
+      <p className="text-xs uppercase tracking-[0.2em] text-[var(--order-accent)]">
         /franchize/{slug}/order/{orderId}
       </p>
       <h1 className="mt-2 text-2xl font-semibold">Оформление заказа</h1>
@@ -236,7 +271,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           ["3", "Подтверждение"],
         ].map(([step, label], index) => (
           <div key={step} className="flex items-center gap-2">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border" style={{ borderColor: crew.theme.palette.borderSoft }}>{step}</span>
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[var(--order-border)]">{step}</span>
             <span>{label}</span>
             {index < 2 ? <span className="mx-1">→</span> : null}
           </div>
@@ -258,8 +293,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                   onClick={() => setDeliveryMode(value as "pickup" | "delivery")}
                   className="rounded-xl border px-3 py-2 text-sm transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
-                    borderColor: deliveryMode === value ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
-                    color: deliveryMode === value ? crew.theme.palette.accentMain : undefined,
+                    borderColor: deliveryMode === value ? "var(--order-accent)" : "var(--order-border)",
+                    color: deliveryMode === value ? "var(--order-accent)" : undefined,
                     ...focusRingOutlineStyle(crew.theme),
                   }}
                 >
@@ -289,8 +324,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                   onClick={() => setPayment(item.id)}
                   className="rounded-xl border px-3 py-2 text-left text-sm transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
-                    borderColor: payment === item.id ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
-                    color: payment === item.id ? crew.theme.palette.accentMain : undefined,
+                    borderColor: payment === item.id ? "var(--order-accent)" : "var(--order-border)",
+                    color: payment === item.id ? "var(--order-accent)" : undefined,
                     ...focusRingOutlineStyle(crew.theme),
                   }}
                 >
@@ -304,7 +339,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             ) : null}
             <div className="mt-3 flex gap-2">
               <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Промокод" value={promo} onChange={(e) => setPromo(e.target.value)} />
-              <button type="button" className="rounded-xl border px-3 text-sm transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ borderColor: crew.theme.palette.borderSoft, ...focusRingOutlineStyle(crew.theme) }}>
+              <button type="button" className="rounded-xl border border-[var(--order-border)] px-3 text-sm transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={focusRingOutlineStyle(crew.theme)}>
                 Применить
               </button>
             </div>
@@ -327,13 +362,13 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                     }
                     className="flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                     style={{
-                      borderColor: checked ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
-                      backgroundColor: checked ? `${crew.theme.palette.accentMain}1a` : undefined,
+                      borderColor: checked ? "var(--order-accent)" : "var(--order-border)",
+                      backgroundColor: checked ? "var(--order-accent-soft)" : undefined,
                       ...focusRingOutlineStyle(crew.theme),
                     }}
                   >
                     <span>{extra.label}</span>
-                    <span className="font-semibold" style={{ color: crew.theme.palette.accentMain }}>+{extra.amount.toLocaleString("ru-RU")} ₽</span>
+                    <span className="font-semibold text-[var(--order-accent)]">+{extra.amount.toLocaleString("ru-RU")} ₽</span>
                   </button>
                 );
               })}
@@ -348,13 +383,13 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
         <aside className="h-fit rounded-2xl border p-4" style={surface.card}>
           <p className="text-sm" style={surface.mutedText}>Заказ #{orderId}</p>
-          <div className="mt-3 rounded-xl border px-3 py-2" style={{ ...surface.subtleCard, borderColor: crew.theme.palette.borderSoft }}>
+          <div className="mt-3 rounded-xl border border-[var(--order-border)] px-3 py-2" style={surface.subtleCard}>
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs uppercase tracking-[0.18em]" style={surface.mutedText}>Checkout vibe</p>
               <span
                 className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
                 style={{
-                  color: completedMilestones === checkoutMilestones.length ? crew.theme.palette.accentTextOn : crew.theme.palette.accentMain,
+                  color: completedMilestones === checkoutMilestones.length ? "var(--order-accent-on)" : "var(--order-accent)",
                   backgroundColor:
                     completedMilestones === checkoutMilestones.length
                       ? crew.theme.palette.accentMain
@@ -366,12 +401,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             </div>
             <ul className="mt-2 space-y-1.5 text-xs">
               {checkoutMilestones.map((step) => (
-                <li key={step.id} className="flex items-center gap-2" style={{ color: step.done ? crew.theme.palette.textPrimary : crew.theme.palette.textSecondary }}>
+                <li key={step.id} className={`flex items-center gap-2 ${step.done ? "text-[var(--order-text-primary)]" : "text-[var(--order-muted)]"}`}>
                   <span
                     className="inline-flex h-4 w-4 items-center justify-center rounded-full border text-[10px]"
                     style={{
-                      borderColor: step.done ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
-                      color: step.done ? crew.theme.palette.accentMain : crew.theme.palette.textMuted,
+                      borderColor: step.done ? "var(--order-accent)" : "var(--order-border)",
+                      color: step.done ? "var(--order-accent)" : "var(--order-text-muted)",
                     }}
                   >
                     {step.done ? "✓" : "•"}
@@ -380,34 +415,34 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 </li>
               ))}
             </ul>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: `${crew.theme.palette.borderSoft}80` }}>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--order-progress-track)]">
               <div
                 className="h-full rounded-full transition-all duration-300"
                 style={{
                   width: `${readinessPercent}%`,
-                  background: `linear-gradient(90deg, ${crew.theme.palette.accentMain} 0%, ${crew.theme.palette.accentMainHover} 100%)`,
+                  background: "linear-gradient(90deg, var(--order-accent) 0%, var(--order-progress-gradient-end) 100%)",
                 }}
               />
             </div>
             <p className="mt-2 text-[11px]" style={surface.mutedText}>Готовность к подтверждению: {readinessPercent}%</p>
           </div>
 
-          <div className="mt-3 rounded-xl border p-3" style={{ ...surface.subtleCard, borderColor: crew.theme.palette.borderSoft }}>
+          <div className="mt-3 rounded-xl border border-[var(--order-border)] p-3" style={surface.subtleCard}>
             <div className="flex items-start justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: crew.theme.palette.accentMain }}>Checkout copilot</p>
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `${crew.theme.palette.accentMain}1f`, color: crew.theme.palette.accentMain }}>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--order-accent)]">Checkout copilot</p>
+              <span className="rounded-full bg-[var(--order-accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--order-accent)]">
                 {checkoutBlockers.length === 0 ? "ready" : `${checkoutBlockers.length} blockers`}
               </span>
             </div>
             {checkoutBlockers.length === 0 ? (
-              <p className="mt-2 text-xs" style={{ color: crew.theme.palette.textSecondary }}>
+              <p className="mt-2 text-xs text-[var(--order-muted)]">
                 Всё собрано. Проверьте способ оплаты и жмите подтверждение 🚀
               </p>
             ) : (
               <ul className="mt-2 space-y-1.5 text-xs">
                 {checkoutBlockers.map((blocker) => (
-                  <li key={blocker.id} className="flex items-center gap-2" style={{ color: crew.theme.palette.textSecondary }}>
-                    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px]" style={{ backgroundColor: `${crew.theme.palette.accentMain}1f`, color: crew.theme.palette.accentMain }}>
+                  <li key={blocker.id} className="flex items-center gap-2 text-[var(--order-muted)]">
+                    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[var(--order-accent-soft)] text-[10px] text-[var(--order-accent)]">
                       !
                     </span>
                     <span>{blocker.label}</span>
@@ -419,8 +454,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               <button
                 type="button"
                 onClick={() => focusBlockerControl(nextAction.id)}
-                className="mt-3 w-full rounded-lg border px-3 py-2 text-xs font-medium transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                style={{ borderColor: crew.theme.palette.accentMain, color: crew.theme.palette.accentMain, ...focusRingOutlineStyle(crew.theme) }}
+                className="mt-3 w-full rounded-lg border border-[var(--order-accent)] px-3 py-2 text-xs font-medium text-[var(--order-accent)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                style={focusRingOutlineStyle(crew.theme)}
               >
                 Исправить следующий шаг
               </button>
@@ -430,13 +465,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           {isCartEmpty ? (
             <div className="mt-3 rounded-xl border border-dashed p-3 text-sm" style={surface.subtleCard}>
               <p>Корзина пуста — добавьте байк из каталога перед оформлением.</p>
-              <a
+              <Link
                 href={`/franchize/${slug}`}
-                className="mt-3 inline-flex font-medium underline-offset-4 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                style={{ color: crew.theme.palette.accentMain, ...focusRingOutlineStyle(crew.theme) }}
+                className="mt-3 inline-flex font-medium text-[var(--order-accent)] underline-offset-4 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--order-accent)]"
               >
                 Вернуться в каталог
-              </a>
+              </Link>
             </div>
           ) : (
             <ul className="mt-2 space-y-2 text-sm">
@@ -452,12 +486,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             </ul>
           )}
 
-          <div className="mt-3 border-t pt-3 text-sm" style={{ borderColor: crew.theme.palette.borderSoft }}>
+          <div className="mt-3 border-t border-[var(--order-border)] pt-3 text-sm">
             <p className="flex justify-between"><span>Получение</span><span>{deliveryMode === "pickup" ? "Самовывоз" : "Доставка"}</span></p>
             <p className="mt-1 flex justify-between"><span>Оплата</span><span>{payments.find((item) => item.id === payment)?.label ?? payment}</span></p>
             <p className="mt-2 flex justify-between"><span>Подытог</span><span>{subtotal.toLocaleString("ru-RU")} ₽</span></p>
             <p className="mt-1 flex justify-between"><span>Доп. опции</span><span>{extrasTotal.toLocaleString("ru-RU")} ₽</span></p>
-            <p className="mt-2 flex justify-between text-base font-semibold" style={{ color: crew.theme.palette.accentMain }}>
+            <p className="mt-2 flex justify-between text-base font-semibold text-[var(--order-accent)]">
               <span>Итого</span>
               <span>{totalAmount.toLocaleString("ru-RU")} ₽</span>
             </p>
@@ -466,8 +500,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <button
             type="button"
             disabled={!canSubmit || isSubmitting}
-            className="mt-4 w-full rounded-xl px-4 py-3 text-sm font-semibold transition hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A", ...focusRingOutlineStyle(crew.theme) }}
+            className="mt-4 w-full rounded-xl bg-[var(--order-accent)] px-4 py-3 text-sm font-semibold text-[var(--order-accent-contrast)] transition hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            style={focusRingOutlineStyle(crew.theme)}
             onClick={handleSubmit}
           >
             {submitLabel}

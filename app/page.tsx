@@ -11,11 +11,10 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as Rech
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Image from "next/image";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
-import {
-  fetchUserCyberFitnessProfile,
-  CyberFitnessProfile,
-  DailyActivityRecord, 
-} from "@/hooks/cyberFitnessSupabase";
+
+import { fetchUserCyberFitnessProfile } from "@/lib/cyberFitnessServer";
+import type { CyberFitnessProfile } from "@/types/cyberFitness";
+
 import { format, subDays, parseISO, isValid } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Sparkles, ExternalLink, GitBranch, Orbit } from "lucide-react";

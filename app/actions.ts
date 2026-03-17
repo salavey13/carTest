@@ -1,12 +1,11 @@
 "use server"; 
 
 import {
-  generateCarEmbedding, 
-  supabaseAdmin, 
   fetchUserData as dbFetchUserData, 
   updateUserMetadata as dbUpdateUserMetadata,
-  uploadImage, 
-} from "@/hooks/supabase"; 
+  uploadImage,
+  supabaseAdmin,
+} from "@/lib/supabase-server"; 
 import axios from "axios";
 import { verifyJwtToken, generateJwtToken } from "@/lib/auth"; 
 import { logger } from "@/lib/logger"; 
@@ -18,6 +17,12 @@ import type { Database } from "@/types/database.types";
 import { Bucket } from '@supabase/storage-js'; 
 import { v4 as uuidv4 } from 'uuid'; 
 import { sendComplexMessage } from "./webhook-handlers/actions/sendComplexMessage";
+import {
+  sendTelegramDocumentCore,
+  sendTelegramMessageCore,
+  type InlineButton,
+  type TelegramApiResponse,
+} from "@/app/core/telegram_actions";
 
 type User = Database["public"]["Tables"]["users"]["Row"];
 type UserSettings = User['metadata']; 
@@ -45,26 +50,6 @@ function checkEnvVars() {
   }
 }
 checkEnvVars();
-
-interface InlineButton {
-  text: string;
-  url: string;
-}
-interface TelegramApiResponse {
-  ok: boolean;
-  result?: any;
-  description?: string;
-  error_code?: number;
-}
-interface SendPayloadBase {
-    chat_id: string;
-    reply_markup?: {
-        inline_keyboard: Array<Array<{ text: string; url: string }>>;
-    };
-}
-type SendTextPayload = SendPayloadBase & { text: string; parse_mode?: 'Markdown' | 'MarkdownV2' | 'HTML' };
-type SendPhotoPayload = SendPayloadBase & { photo: string; caption: string; parse_mode?: 'Markdown' | 'MarkdownV2' | 'HTML' };
-type SendPayload = SendTextPayload | SendPhotoPayload;
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -272,47 +257,13 @@ export async function sendTelegramMessage(
   buttons: InlineButton[] = [],
   imageUrl?: string,
   chatId?: string,
-  carId?: string 
+  carId?: string
 ): Promise<{ success: boolean; data?: any; error?: string }> {
-  if (!TELEGRAM_BOT_TOKEN) {
-    return { success: false, error: "Telegram bot token not configured" };
-  }
-  const finalChatId = chatId || ADMIN_CHAT_ID;
-  try {
-    let finalMessage = message;
-    if (carId) {
-      const { data: car, error } = await supabaseAdmin.from("cars").select("make, model, daily_price").eq("id", carId).single();
-      if (error) logger.error(`Failed to fetch car ${carId} for message: ${error.message}`);
-      else if (car) finalMessage += `\n\nCar: ${car.make} ${car.model}\nDaily Price: ${car.daily_price} ₽`;
-    }
-    const payload: SendPayload = imageUrl ? { chat_id: finalChatId, photo: imageUrl, caption: finalMessage, parse_mode: "Markdown" } : { chat_id: finalChatId, text: finalMessage, parse_mode: "Markdown" };
-    if (buttons.length > 0) payload.reply_markup = { inline_keyboard: [buttons.map((button) => ({ text: button.text, url: button.url }))] };
-    const endpoint = imageUrl ? "sendPhoto" : "sendMessage";
-    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${endpoint}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    const data: TelegramApiResponse = await response.json();
-    if (!data.ok) { logger.error(`Telegram API error (${endpoint}): ${data.description || "Unknown error"}`, { chatId: finalChatId, errorCode: data.error_code, payload }); throw new Error(data.description || `Failed to ${endpoint}`); }
-    return { success: true, data: data.result };
-  } catch (error) {
-    logger.error(`Error in sendTelegramMessage (${chatId || ADMIN_CHAT_ID}):`, error);
-    return { success: false, error: error instanceof Error ? error.message : "An unexpected error occurred while sending Telegram message" };
-  }
+  return sendTelegramMessageCore(message, buttons, imageUrl, chatId, carId);
 }
 
-export async function sendTelegramDocument(chatId: string, fileContent: string, fileName: string): Promise<{ success: boolean; data?: any; error?: string }> {
-   if (!TELEGRAM_BOT_TOKEN) return { success: false, error: "Telegram bot token not configured" };
-  try {
-    const blob = new Blob([fileContent], { type: "text/plain;charset=utf-8" });
-    const formData = new FormData();
-    formData.append("chat_id", chatId);
-    formData.append("document", blob, fileName);
-    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`, { method: "POST", body: formData });
-    const data: TelegramApiResponse = await response.json();
-    if (!data.ok) { logger.error(`Telegram API error (sendDocument): ${data.description || "Unknown error"}`, { chatId, errorCode: data.error_code }); throw new Error(data.description || "Failed to send document"); }
-    return { success: true, data: data.result };
-  } catch (error) {
-     logger.error(`Error in sendTelegramDocument (${chatId}):`, error);
-    return { success: false, error: error instanceof Error ? error.message : "An unexpected error occurred while sending document" };
-  }
+export async function sendTelegramDocument(chatId: string, fileContent: string | Blob | Uint8Array, fileName: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  return sendTelegramDocumentCore(chatId, fileContent, fileName);
 }
 
 export async function sendTelegramInvoice(chatId: string, title: string, description: string, payload: string, amount: number, subscription_id: number = 0, photo_url?: string): Promise<{ success: boolean; data?: any; error?: string }> {
@@ -550,34 +501,6 @@ export async function analyzeMessage(content: string): Promise<{ success: boolea
     } catch (error) {
         logger.error('Error analyzing message:', error);
         return { success: false, error: error instanceof Error ? error.message : 'Failed to analyze message' };
-    }
-}
-
-export async function generateEmbeddings(): Promise<{ success: boolean; message?: string; error?: string }> {
-  try {
-    const { count, error: fetchError } = await supabaseAdmin.from("cars").select("id", { count: 'exact', head: true }).is("embedding", null);
-    if (fetchError) { logger.error("Error fetching count of cars needing embeddings:", fetchError); throw fetchError; }
-    if (!count || count === 0) { logger.info("No cars found needing embedding generation."); return { success: true, message: "No cars needed embeddings." }; }
-    logger.info(`Found ${count} cars needing embeddings. Triggering batch generation...`);
-    const result = await generateCarEmbedding('batch'); 
-    logger.info(`Triggered embedding generation for ${count} cars. Result:`, result);
-    return { success: true, message: `Triggered embedding generation for ${count} cars. ${result.message}` };
-  } catch (error) {
-     logger.error("Error in generateEmbeddings action:", error);
-     return { success: false, error: error instanceof Error ? error.message : "Failed to trigger embedding generation" };
-  }
-}
-
-export async function findSimilarCars(embedding: number[], limit: number = 3): Promise<{ success: boolean; data?: any[]; error?: string }> {
-    if (!embedding || embedding.length === 0) { return { success: false, error: "Invalid embedding provided" }; }
-    try {
-        const { data, error } = await supabaseAdmin.rpc("search_cars", { query_embedding: embedding, match_count: limit });
-        if (error) { logger.error("Error searching for similar cars:", error); throw error; }
-        const formattedData = data?.map((car: any) => ({ ...car, similarity: car.similarity ? Math.round(car.similarity * 100) : 0 })) || [];
-        return { success: true, data: formattedData };
-    } catch (error) {
-        logger.error("Error in findSimilarCars action:", error);
-        return { success: false, error: error instanceof Error ? error.message : "Failed to find similar cars" };
     }
 }
 

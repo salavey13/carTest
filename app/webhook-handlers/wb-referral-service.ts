@@ -1,6 +1,6 @@
 import { WebhookHandler } from "./types";
 import { sendTelegramMessage } from "../actions";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { distributeSyndicateRewards } from "@/app/wblanding/actions_referral";
 import { logger } from "@/lib/logger";
 
@@ -15,7 +15,7 @@ export const wbReferralServiceHandler: WebhookHandler = {
     const serviceType = invoice.metadata?.service_type;
 
     // 1. Обновляем статус инвойса
-    await supabaseAdmin
+    await supabaseAnon
       .from("invoices")
       .update({ status: "paid", updated_at: new Date().toISOString() })
       .eq("id", invoice.id);
@@ -33,7 +33,7 @@ export const wbReferralServiceHandler: WebhookHandler = {
       status: 'paid_pending_setup'
     });
 
-    await supabaseAdmin
+    await supabaseAnon
       .from("users")
       .update({ 
         metadata: { ...currentMeta, purchased_services: purchasedServices } 

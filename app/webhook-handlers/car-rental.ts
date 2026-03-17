@@ -1,6 +1,6 @@
 import { WebhookHandler } from "./types";
 import { sendComplexMessage } from "./actions/sendComplexMessage";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 
 export const carRentalHandler: WebhookHandler = {
   canHandle: (invoice) => ["car_rental", "drop_anywhere", "sos_fuel", "sos_evac"].includes(invoice.type as string),
@@ -11,7 +11,7 @@ export const carRentalHandler: WebhookHandler = {
     // Логика для SOS и drop_anywhere остается без изменений...
     if (invoice.type === 'sos_fuel' || invoice.type === 'sos_evac') {
         const { rental_id, geotag } = metadata as { rental_id: string, geotag: any };
-        await supabaseAdmin.from('events').insert({
+        await supabaseAnon.from('events').insert({
             rental_id: rental_id, type: invoice.type, status: 'pending',
             payload: { xtr_amount: totalAmount, reason: "User paid for SOS", geotag }, created_by: userId
         });
@@ -22,14 +22,14 @@ export const carRentalHandler: WebhookHandler = {
 
     if (invoice.type === 'drop_anywhere') {
         const { rental_id } = metadata as { rental_id: string };
-        const { data: eventData, error: eventError } = await supabaseAdmin.from('events').insert({
+        const { data: eventData, error: eventError } = await supabaseAnon.from('events').insert({
             rental_id: rental_id, type: 'hustle_pickup', status: 'pending_geotag',
             payload: { xtr_amount: 100, reason: "User paid for drop anywhere" }, created_by: userId
         }).select('id').single();
         if (eventError || !eventData) {
             throw new Error(`Failed to create hustle event for rental ${rental_id}: ${eventError?.message}`);
         }
-        await supabaseAdmin.from('user_states').upsert({
+        await supabaseAnon.from('user_states').upsert({
             user_id: userId, state: 'awaiting_geotag', context: { rental_id: rental_id, event_id: eventData.id }
         });
         const renterMessage = `✅ Оплата принята! Теперь, пожалуйста, отправьте свою геолокацию через Telegram (Скрепка -> Геопозиция), чтобы экипаж знал, где забрать транспорт.`;

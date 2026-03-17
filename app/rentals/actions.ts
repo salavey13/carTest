@@ -1,7 +1,6 @@
-// /app/rentals/actions.ts
 "use server";
 
-import { supabaseAdmin, createInvoice } from "@/hooks/supabase";
+import { supabaseAdmin, createInvoice } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from 'next/cache';
 import { sendComplexMessage } from "../webhook-handlers/actions/sendComplexMessage";
@@ -257,7 +256,6 @@ export async function getUserRentals(userId: string): Promise<{ success: boolean
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
-
 
 export async function getFranchizeSlugForVehicle(vehicleId: string): Promise<{ success: boolean; slug?: string; error?: string }> {
     noStore();
@@ -570,7 +568,6 @@ export async function calculateDynamicPrice(vehicleId: string, startDateIso: str
     }
 }
 
-
 export async function initiateTelegramRentalPhotoUpload(
     rentalId: string,
     userId: string,
@@ -622,7 +619,6 @@ export async function initiateTelegramRentalPhotoUpload(
         return { success: false, error: e.message || 'Unknown error' };
     }
 }
-
 
 export async function archivePendingRental(
     rentalId: string,
@@ -810,10 +806,6 @@ export async function confirmVehicleReturn(rentalId: string, userId: string) {
     }
 }
 // ^^^ --- КОНЕЦ НОВОГО ДВИЖКА --- ^^^
-
-
-
-
 
 /**
  * Creates a sauna booking using the existing booking flow.

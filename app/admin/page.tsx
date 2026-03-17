@@ -18,7 +18,7 @@ import type { Database } from "@/types/database.types";
 type Vehicle = Database['public']['Tables']['cars']['Row'];
 
 function AdminPageContent() {
-  const { dbUser, isAdmin, isLoading: appContextLoading } = useAppContext();
+  const { dbUser, userCrewInfo, isAdmin, isLoading: appContextLoading } = useAppContext();
   const searchParams = useSearchParams();
   const router = useRouter();
   const editId = searchParams.get('edit');
@@ -27,6 +27,7 @@ function AdminPageContent() {
   const [userVehicles, setUserVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [isFetchingVehicles, setIsFetchingVehicles] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<"all" | "bike" | "car">("all");
 
   const fetchUserVehicles = useCallback(async (userId: string) => {
     setIsFetchingVehicles(true);
@@ -37,7 +38,7 @@ function AdminPageContent() {
         throw new Error(error || "Не удалось получить список техники.");
       }
       
-      setUserVehicles(data?.filter(v => v.type === 'bike') || []);
+      setUserVehicles((data || []).filter(v => v.type === 'bike' || v.type === 'car'));
       
       if(editId) {
         const vehicleToEdit = data?.find(v => v.id === editId);
@@ -64,6 +65,8 @@ function AdminPageContent() {
       fetchUserVehicles(dbUser.user_id);
     }
   }, [appContextLoading, dbUser, isAdmin, fetchUserVehicles]);
+
+  const visibleVehicles = userVehicles.filter((vehicle) => typeFilter === "all" ? true : vehicle.type === typeFilter);
 
   const handleVehicleSelect = (vehicleId: string) => {
     const vehicle = userVehicles.find(v => v.id === vehicleId);
@@ -95,39 +98,45 @@ function AdminPageContent() {
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent"></div>
         </div>
 
-      <main className="container mx-auto pt-10 px-4 relative z-10">
+      <main className="container mx-auto pt-6 px-3 sm:px-4 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-4xl mx-auto p-6 md:p-8 bg-dark-card/80 backdrop-blur-xl rounded-2xl shadow-2xl shadow-brand-purple/20 border border-brand-purple/50"
+          className="max-w-4xl mx-auto p-4 sm:p-6 md:p-8 bg-dark-card/80 backdrop-blur-xl rounded-2xl shadow-2xl shadow-brand-purple/20 border border-brand-purple/50"
         >
           <h2
-            className="text-3xl md:text-4xl font-semibold text-brand-purple mb-4 cyber-text glitch flex items-center justify-center gap-3"
+            className="mb-4 flex items-center justify-center gap-3 text-2xl font-semibold text-white sm:text-3xl md:text-4xl"
             data-text="VIBE CONTROL CENTER"
           >
             <VibeContentRenderer content="::FaSatelliteDish::" className="h-8 w-8 animate-pulse text-shadow-cyber" /> VIBE CONTROL CENTER
           </h2>
-          <p className="text-brand-orange mb-8 text-base font-mono text-center">
+          <p className="text-brand-orange mb-6 text-sm sm:text-base font-mono text-center">
             {selectedVehicle ? `Редактирование: ${selectedVehicle.make} ${selectedVehicle.model}` : 'Добавь свой байк в систему и стань частью флота.'}
           </p>
 
-          <div className="mb-6 space-y-2">
+          <div className="mb-6 space-y-3">
             <label className="text-sm font-mono text-foreground">УПРАВЛЕНИЕ ГАРАЖОМ</label> {/* Fixed contrast */}
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
                 <Select onValueChange={handleVehicleSelect} value={selectedVehicle?.id || ""} disabled={isFetchingVehicles || !!editId}>
                     <SelectTrigger className="input-cyber flex-1">
                         <SelectValue placeholder="Выберите байк для редактирования..." />
                     </SelectTrigger>
                     <SelectContent>
-                        {userVehicles.map(v => (
-                            <SelectItem key={v.id} value={v.id}>{v.make} {v.model}</SelectItem>
+                        {visibleVehicles.map(v => (
+                            <SelectItem key={v.id} value={v.id}>{v.type === "car" ? "🚗" : "🏍️"} {v.make} {v.model}</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
-                <Button variant="outline" onClick={() => { router.push('/admin'); setSelectedVehicle(null); }}>
+                <Button variant="outline" className="w-full sm:w-auto" onClick={() => { router.push('/admin'); setSelectedVehicle(null); }}>
                     <VibeContentRenderer content="::FaPlus:: Создать новый"/>
                 </Button>
             </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <Button type="button" variant={typeFilter === "all" ? "default" : "outline"} onClick={() => setTypeFilter("all")}>Все ({userVehicles.length})</Button>
+              <Button type="button" variant={typeFilter === "bike" ? "default" : "outline"} onClick={() => setTypeFilter("bike")}>Байки ({userVehicles.filter((v) => v.type === "bike").length})</Button>
+              <Button type="button" variant={typeFilter === "car" ? "default" : "outline"} onClick={() => setTypeFilter("car")}>Авто ({userVehicles.filter((v) => v.type === "car").length})</Button>
+            </div>
+            <p className="text-xs text-brand-orange/90">Для генерации договоров добавляй VIN в specs (ключ: <code>vin</code>) у bike/car карточек.</p>
           </div>
           
           <CarSubmissionForm ownerId={dbUser?.user_id} vehicleToEdit={selectedVehicle} onSuccess={handleFormSuccess} />
@@ -139,6 +148,14 @@ function AdminPageContent() {
             >
               <VibeContentRenderer content="::FaMotorcycle::" className="mr-3 transition-transform group-hover:rotate-[-5deg]" />
               В МОТО-ГАРАЖ
+            </Link>
+
+            <Link
+              href={`/franchize/${userCrewInfo?.slug || "vip-bike"}/admin`}
+              className="group inline-flex items-center justify-center w-full md:w-auto px-6 py-3 border-2 border-yellow-400 bg-yellow-400/10 text-yellow-300 rounded-lg font-orbitron text-lg tracking-wider transition-all duration-300 hover:bg-yellow-400 hover:text-black"
+            >
+              <VibeContentRenderer content="::FaFileContract::" className="mr-3" />
+              FRANCHIZE DOC HUB
             </Link>
 
             {isTrulyAdmin && (

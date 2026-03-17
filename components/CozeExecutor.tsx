@@ -8,7 +8,7 @@ import {
   closePullRequest,
 } from "@/app/actions_github/actions";
 import { executeCozeAgent, sendTelegramDocument, notifyAdmin } from "@/app/actions";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
 import { saveAs } from "file-saver";
 import { FaInfoCircle, FaTelegramPlane, FaTrash, FaExternalLinkAlt, FaRobot, FaImage, FaBook, FaPlus } from "react-icons/fa";
@@ -77,7 +77,7 @@ export default function CozeExecutor({
     const loadData = async () => {
       if (!user) return;
       try {
-        const { data: userData } = await supabaseAdmin
+        const { data: userData } = await supabaseAnon
           .from("users")
           .select("metadata")
           .eq("user_id", user.id)
@@ -94,7 +94,7 @@ export default function CozeExecutor({
         if (userData?.metadata?.customLink) {
           setCustomLink(userData.metadata.customLink);
         }
-        const { data: responses } = await supabaseAdmin
+        const { data: responses } = await supabaseAnon
           .from("coze_responses")
           .select("*")
           .eq("user_id", user.id)
@@ -246,7 +246,7 @@ const parseFilesFromText = (text: string): FileEntry[] => {
     setLoading(true);
     try {
       const fileData = files.map((file) => ({ path: file.path, code: file.content, extension: file.extension }));
-      const { data: existingData } = await supabaseAdmin
+      const { data: existingData } = await supabaseAnon
         .from("users")
         .select("metadata")
         .eq("user_id", user.id)
@@ -258,7 +258,7 @@ const parseFilesFromText = (text: string): FileEntry[] => {
         ...fileData,
       ];
 
-      await supabaseAdmin
+      await supabaseAnon
         .from("users")
         .upsert({ user_id: user.id, metadata: { ...existingData?.metadata, generated_files: updatedFiles } });
       setSavedFiles(updatedFiles.map((f: any) => ({ path: f.path, content: f.code, extension: f.extension })));
@@ -274,12 +274,12 @@ const parseFilesFromText = (text: string): FileEntry[] => {
     if (!user) return;
     setLoading(true);
     try {
-      const { data: existingData } = await supabaseAdmin
+      const { data: existingData } = await supabaseAnon
         .from("users")
         .select("metadata")
         .eq("user_id", user.id)
         .single();
-      await supabaseAdmin
+      await supabaseAnon
         .from("users")
         .upsert({ user_id: user.id, metadata: { ...existingData?.metadata, generated_files: [] } });
       setSavedFiles([]);
@@ -443,13 +443,13 @@ const handleCreatePR = async () => {
     if (!user) return;
     setLoading(true);
     try {
-      const { data: existingData } = await supabaseAdmin
+      const { data: existingData } = await supabaseAnon
         .from("users")
         .select("metadata")
         .eq("user_id", user.id)
         .single();
       const updatedFiles = (existingData?.metadata?.generated_files || []).filter((f: any) => f.path !== path);
-      await supabaseAdmin
+      await supabaseAnon
         .from("users")
         .upsert({ user_id: user.id, metadata: { ...existingData?.metadata, generated_files: updatedFiles } });
       setSavedFiles(updatedFiles.map((f: any) => ({ path: f.path, content: f.code, extension: f.extension })));
@@ -471,13 +471,13 @@ const handleCreatePR = async () => {
   const saveCustomLink = async (link: string) => {
     if (!user) return;
     try {
-      const { data: existingData } = await supabaseAdmin
+      const { data: existingData } = await supabaseAnon
         .from("users")
         .select("metadata")
         .eq("user_id", user.id)
         .single();
       const updatedMetadata = { ...existingData?.metadata, customLink: link };
-      await supabaseAdmin
+      await supabaseAnon
         .from("users")
         .upsert({ user_id: user.id, metadata: updatedMetadata });
       setCustomLink(link);

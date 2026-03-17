@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 
 // === REFERRAL LOGIC ===
@@ -87,4 +87,33 @@ export async function getApprovedTestimonials() {
     .order('created_at', { ascending: false })
     .limit(6);
   return { success: true, data: data || [] };
+}
+
+export async function createTestimonial(input: {
+  userId: string;
+  username?: string;
+  content: string;
+  rating: number;
+}) {
+  if (!input.userId) return { success: false, error: "Unauthorized" };
+  if (!input.content || input.content.trim().length < 10) {
+    return { success: false, error: "Минимум 10 символов" };
+  }
+
+  const safeRating = Math.max(1, Math.min(5, Number(input.rating) || 5));
+
+  const { error } = await supabaseAdmin.from('testimonials').insert({
+    user_id: input.userId,
+    username: input.username || 'Anon',
+    content: input.content.trim(),
+    rating: safeRating,
+    is_approved: false,
+  });
+
+  if (error) {
+    logger.error('[Testimonials] Create failed', error);
+    return { success: false, error: 'Ошибка отправки' };
+  }
+
+  return { success: true };
 }

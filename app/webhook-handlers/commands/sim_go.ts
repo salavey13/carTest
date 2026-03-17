@@ -2,7 +2,7 @@ import { logger } from "@/lib/logger";
 import { getArbitrageScannerSettings } from "@/app/elon/arbitrage_scanner_actions";
 import { executeQuantumFluctuation } from "@/app/elon/arbitrage_god_mode_actions";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import type { GodModeDeck } from "@/app/elon/arbitrage_scanner_types";
 
 const INITIAL_BALANCES: Record<string, number> = { "USDT": 50000 };
@@ -13,7 +13,7 @@ export async function simGoCommand(chatId: number, userId: string, args: string[
   
   await sendComplexMessage(chatId, `🚀 *Вмешательство...* Совершаю квантовый взрыв на $${burstAmount.toLocaleString()}...`, []);
 
-  const { data: userProfile, error: readError } = await supabaseAdmin.from('users').select('metadata').eq('user_id', userId).single();
+  const { data: userProfile, error: readError } = await supabaseAnon.from('users').select('metadata').eq('user_id', userId).single();
   
   if (readError || !userProfile) {
     logger.error(`[sim_go] CRITICAL: Cannot read profile from 'users' table for user ${userId}.`, { error: readError });
@@ -45,7 +45,7 @@ export async function simGoCommand(chatId: number, userId: string, args: string[
     updatedMetadata.god_mode_deck = deck;
     
     // 5. Write the entire, safe, updated metadata object back.
-    const { error: writeError } = await supabaseAdmin.from('users').update({ metadata: updatedMetadata }).eq('user_id', userId);
+    const { error: writeError } = await supabaseAnon.from('users').update({ metadata: updatedMetadata }).eq('user_id', userId);
     
     if (writeError) throw new Error(`Ошибка сохранения обновленного профиля: ${writeError.message}`);
 

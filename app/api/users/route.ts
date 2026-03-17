@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 import { type NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
-import { supabaseAdmin } from "@/hooks/supabase"
+import { supabaseAdmin } from "@/lib/supabase-server"
 import { logger } from "@/lib/logger"
 
 const JWT_SECRET = process.env.SUPABASE_JWT_SECRE

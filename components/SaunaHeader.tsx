@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
-import UserInfo from "@/components/user-info";
+import { UserInfo } from "@/components/user-info";
 import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";

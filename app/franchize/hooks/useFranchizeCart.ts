@@ -1,9 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { saveUserFranchizeCartAction } from "@/contexts/actions";
 
 export type FranchizeCartOptions = {
   package: string;
@@ -36,31 +34,19 @@ export function buildCartLineId(itemId: string, options: FranchizeCartOptions) {
 }
 
 const sanitizeCartState = (value: unknown): FranchizeCartState => {
-  if (!value || typeof value !== "object") {
-    return {};
-  }
-
+  if (!value || typeof value !== "object") return {};
+  
   return Object.entries(value as Record<string, unknown>).reduce<FranchizeCartState>((acc, [lineId, entry]) => {
-    // backward compatibility with old format: { [itemId]: qty }
     if (typeof entry === "number" && Number.isFinite(entry) && Math.floor(entry) > 0) {
       const itemId = lineId;
-      const options = { ...DEFAULT_OPTIONS };
-      const normalizedLineId = buildCartLineId(itemId, options);
-      acc[normalizedLineId] = { itemId, qty: Math.floor(entry), options };
+      acc[buildCartLineId(itemId, { ...DEFAULT_OPTIONS })] = { itemId, qty: Math.floor(entry), options: { ...DEFAULT_OPTIONS } };
       return acc;
     }
-
-    if (!entry || typeof entry !== "object") {
-      return acc;
-    }
-
+    if (!entry || typeof entry !== "object") return acc;
     const line = entry as Partial<FranchizeCartLine>;
-    const qty = typeof line.qty === "number" && Number.isFinite(line.qty) ? Math.floor(line.qty) : 0;
+    const qty = typeof line.qty === "number" ? Math.floor(line.qty) : 0;
     const itemId = typeof line.itemId === "string" ? line.itemId : "";
-    if (!itemId || qty <= 0) {
-      return acc;
-    }
-
+    if (!itemId || qty <= 0) return acc;
     const rawOptions = line.options ?? {};
     const options: FranchizeCartOptions = {
       package: typeof rawOptions.package === "string" ? rawOptions.package : DEFAULT_OPTIONS.package,
@@ -68,15 +54,9 @@ const sanitizeCartState = (value: unknown): FranchizeCartState => {
       perk: typeof rawOptions.perk === "string" ? rawOptions.perk : DEFAULT_OPTIONS.perk,
       auction: typeof rawOptions.auction === "string" ? rawOptions.auction : DEFAULT_OPTIONS.auction,
     };
-
     const normalizedLineId = buildCartLineId(itemId, options);
     const prev = acc[normalizedLineId];
-    if (prev) {
-      prev.qty += qty;
-    } else {
-      acc[normalizedLineId] = { itemId, qty, options };
-    }
-
+    if (prev) prev.qty += qty; else acc[normalizedLineId] = { itemId, qty, options };
     return acc;
   }, {});
 };
@@ -84,188 +64,98 @@ const sanitizeCartState = (value: unknown): FranchizeCartState => {
 export const getFranchizeCartStorageKey = (slug: string) => `${CART_STORAGE_PREFIX}:${slug}`;
 
 export function useFranchizeCart(slug: string) {
-  const pathname = usePathname();
   const { dbUser } = useAppContext();
-  const userId = dbUser?.user_id ?? null;
   const storageKey = useMemo(() => getFranchizeCartStorageKey(slug), [slug]);
   const [cart, setCart] = useState<FranchizeCartState>({});
-  const persistInFlightRef = useRef(false);
-  const queuedCartRef = useRef<FranchizeCartState | null>(null);
-  const pendingPersistRef = useRef(false);
-  const lastPersistedSnapshotRef = useRef<string>("{}");
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  const serializeCart = useCallback((state: FranchizeCartState) => JSON.stringify(state), []);
+  // 1. Hydration Logic (Runs Once)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  const persistCartSnapshot = useCallback(async (snapshot: FranchizeCartState) => {
-    if (!userId) return;
+    const rawLocal = window.localStorage.getItem(storageKey);
+    let initialState: FranchizeCartState = {};
 
-    if (persistInFlightRef.current) {
-      queuedCartRef.current = snapshot;
-      return;
-    }
-
-    persistInFlightRef.current = true;
-
-    try {
-      const saveResult = await saveUserFranchizeCartAction(userId, slug, snapshot);
-      if (!saveResult.ok) {
-        pendingPersistRef.current = true;
-        return;
+    if (rawLocal) {
+      try {
+        initialState = sanitizeCartState(JSON.parse(rawLocal));
+      } catch {
+        initialState = {};
       }
-      lastPersistedSnapshotRef.current = serializeCart(snapshot);
-      pendingPersistRef.current = false;
-    } finally {
-      persistInFlightRef.current = false;
-
-      const queued = queuedCartRef.current;
-      queuedCartRef.current = null;
-
-      if (queued) {
-        const queuedSnapshot = serializeCart(queued);
-        if (queuedSnapshot !== lastPersistedSnapshotRef.current) {
-          void persistCartSnapshot(queued);
+    } else if (dbUser?.metadata) {
+      // Fallback to DB metadata if local is empty (Read-Only)
+      const meta = dbUser.metadata as Record<string, any>;
+      const settings = meta.settings as Record<string, any> | undefined;
+      const remoteCart = settings?.franchizeCart?.[slug];
+      
+      if (remoteCart) {
+        initialState = sanitizeCartState(remoteCart);
+        // Sync retrieved DB state to local storage immediately
+        const serialized = JSON.stringify(initialState);
+        if (window.localStorage.getItem(storageKey) !== serialized) {
+            window.localStorage.setItem(storageKey, serialized);
         }
       }
     }
-  }, [serializeCart, slug, userId]);
 
-  const hydrateCartFromStorage = useCallback(() => {
-    if (typeof window === "undefined") return;
+    setCart(initialState);
+    setIsHydrated(true);
+  }, [slug, storageKey, dbUser?.metadata]); 
 
-    const raw = window.localStorage.getItem(storageKey);
-    const localState = raw ? (() => {
-      try {
-        return sanitizeCartState(JSON.parse(raw));
-      } catch {
-        return {};
-      }
-    })() : {};
+  // 2. Persistence Logic (Loop Safe)
+  useEffect(() => {
+    if (!isHydrated || typeof window === "undefined") return;
+    
+    const newState = JSON.stringify(cart);
+    const currentState = window.localStorage.getItem(storageKey);
 
-    const metadataState = (() => {
-      const metadata = dbUser?.metadata;
-      if (!metadata || typeof metadata !== "object") return {};
-      const settings = (metadata as Record<string, unknown>).settings;
-      if (!settings || typeof settings !== "object") return {};
-      const franchizeCart = (settings as Record<string, unknown>).franchizeCart;
-      if (!franchizeCart || typeof franchizeCart !== "object") return {};
-      const slugCart = (franchizeCart as Record<string, unknown>)[slug];
-      return sanitizeCartState(slugCart);
-    })();
-
-    if (Object.keys(localState).length === 0 && Object.keys(metadataState).length > 0) {
-      setCart(metadataState);
-      window.localStorage.setItem(storageKey, JSON.stringify(metadataState));
-      return;
+    // CRITICAL FIX: Only write/dispatch if value actually changed.
+    // This stops the infinite Ping-Pong loop between tabs/components.
+    if (currentState !== newState) {
+        window.localStorage.setItem(storageKey, newState);
+        window.dispatchEvent(new CustomEvent(CART_SYNC_EVENT, { detail: { storageKey } }));
     }
+  }, [cart, storageKey, isHydrated]);
 
-    if (!raw) {
-      setCart({});
-      return;
-    }
-
-    setCart(localState);
-  }, [dbUser?.metadata, slug, storageKey]);
-
-  useEffect(() => {
-    hydrateCartFromStorage();
-  }, [hydrateCartFromStorage]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(storageKey, JSON.stringify(cart));
-    window.dispatchEvent(new CustomEvent(CART_SYNC_EVENT, { detail: { storageKey } }));
-  }, [cart, storageKey]);
-
-  useEffect(() => {
-    if (!userId) return;
-
-    const nextSnapshot = serializeCart(cart);
-    pendingPersistRef.current = nextSnapshot !== lastPersistedSnapshotRef.current;
-  }, [cart, serializeCart, userId]);
-
-  const flushPersistNow = useCallback(() => {
-    if (!userId || !pendingPersistRef.current) return;
-    void persistCartSnapshot(cart);
-  }, [cart, persistCartSnapshot, userId]);
-
-  useEffect(() => {
-    const isCheckoutCheckpoint = pathname === `/franchize/${slug}/cart` || pathname.startsWith(`/franchize/${slug}/order/`);
-    if (!isCheckoutCheckpoint) return;
-    flushPersistNow();
-  }, [flushPersistNow, pathname, slug]);
-
+  // 3. Sync Listener
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const flushOnPageExit = () => {
-      flushPersistNow();
+    const handleSync = (e: Event | StorageEvent) => {
+        const detail = (e as CustomEvent).detail;
+        
+        // Filter out irrelevant events
+        if (e.type === CART_SYNC_EVENT && detail?.storageKey !== storageKey) return;
+        if (e.type === 'storage' && (e as StorageEvent).key !== storageKey) return;
+
+        const raw = window.localStorage.getItem(storageKey);
+        if (!raw) return;
+
+        const newState = sanitizeCartState(JSON.parse(raw));
+        
+        // Loop Breaker: Don't trigger re-render if state is semantically identical
+        setCart(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(newState)) return prev;
+            return newState;
+        });
     };
 
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        flushPersistNow();
-      }
-    };
-
-    window.addEventListener("beforeunload", flushOnPageExit);
-    window.addEventListener("pagehide", flushOnPageExit);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
+    window.addEventListener("storage", handleSync);
+    window.addEventListener(CART_SYNC_EVENT, handleSync);
+    
     return () => {
-      window.removeEventListener("beforeunload", flushOnPageExit);
-      window.removeEventListener("pagehide", flushOnPageExit);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("storage", handleSync);
+      window.removeEventListener(CART_SYNC_EVENT, handleSync);
     };
-  }, [flushPersistNow]);
+  }, [storageKey]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== storageKey) return;
-      hydrateCartFromStorage();
-    };
-
-    const onCartSync = (event: Event) => {
-      const syncEvent = event as CustomEvent<{ storageKey?: string }>;
-      if (syncEvent.detail?.storageKey !== storageKey) return;
-      hydrateCartFromStorage();
-    };
-
-    const onPageRestore = () => hydrateCartFromStorage();
-
-    window.addEventListener("storage", onStorage);
-    window.addEventListener(CART_SYNC_EVENT, onCartSync as EventListener);
-    window.addEventListener("pageshow", onPageRestore);
-    window.addEventListener("popstate", onPageRestore);
-
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener(CART_SYNC_EVENT, onCartSync as EventListener);
-      window.removeEventListener("pageshow", onPageRestore);
-      window.removeEventListener("popstate", onPageRestore);
-    };
-  }, [hydrateCartFromStorage, storageKey]);
-
+  // Actions
   const setLineQty = useCallback((lineId: string, qty: number) => {
     setCart((prev) => {
+      if (qty <= 0) { const next = { ...prev }; delete next[lineId]; return next; }
       const current = prev[lineId];
       if (!current) return prev;
-
-      const normalizedQty = Math.floor(qty);
-      if (normalizedQty <= 0) {
-        const next = { ...prev };
-        delete next[lineId];
-        return next;
-      }
-
-      return {
-        ...prev,
-        [lineId]: {
-          ...current,
-          qty: normalizedQty,
-        },
-      };
+      return { ...prev, [lineId]: { ...current, qty }};
     });
   }, []);
 
@@ -274,11 +164,7 @@ export function useFranchizeCart(slug: string) {
       const current = prev[lineId];
       if (!current) return prev;
       const nextQty = current.qty + delta;
-      if (nextQty <= 0) {
-        const next = { ...prev };
-        delete next[lineId];
-        return next;
-      }
+      if (nextQty <= 0) { const next = { ...prev }; delete next[lineId]; return next; }
       return { ...prev, [lineId]: { ...current, qty: nextQty } };
     });
   }, []);
@@ -288,16 +174,8 @@ export function useFranchizeCart(slug: string) {
     setCart((prev) => {
       const current = prev[lineId];
       const nextQty = (current?.qty ?? 0) + qty;
-      return {
-        ...prev,
-        [lineId]: {
-          itemId,
-          qty: nextQty,
-          options,
-        },
-      };
+      return { ...prev, [lineId]: { itemId, qty: nextQty, options } };
     });
-
     return lineId;
   }, []);
 
@@ -310,18 +188,12 @@ export function useFranchizeCart(slug: string) {
     });
   }, []);
 
-  const clear = useCallback(() => setCart({}), []);
+  const clear = useCallback(() => {
+    setCart({});
+    window.localStorage.removeItem(storageKey);
+  }, [storageKey]);
 
   const itemCount = useMemo(() => Object.values(cart).reduce((sum, line) => sum + line.qty, 0), [cart]);
 
-  return {
-    cart,
-    itemCount,
-    addItem,
-    setLineQty,
-    changeLineQty,
-    removeLine,
-    clear,
-    defaultOptions: DEFAULT_OPTIONS,
-  };
+  return { cart, itemCount, addItem, setLineQty, changeLineQty, removeLine, clear, defaultOptions: DEFAULT_OPTIONS };
 }

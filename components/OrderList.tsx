@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { translations } from "@/components/translations_inventory";
@@ -24,7 +24,7 @@ export default function OrderList() {
     if (!dbUser || !isAdmin()) return;
 
     const fetchOrders = async () => {
-      let query = supabaseAdmin
+      let query = supabaseAnon
         .from("orders")
         .select("*")
         .order("completed_at", { ascending: false });
@@ -41,7 +41,7 @@ export default function OrderList() {
     };
     fetchOrders();
 
-    const channel = supabaseAdmin
+    const channel = supabaseAnon
       .channel("orders_changes")
       .on(
         "postgres_changes",
@@ -65,7 +65,7 @@ export default function OrderList() {
       .subscribe();
 
     return () => {
-      supabaseAdmin.removeChannel(channel);
+      supabaseAnon.removeChannel(channel);
     };
   }, [dbUser, isAdmin, filter]);
 

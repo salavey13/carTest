@@ -1,7 +1,7 @@
 "use server";
 
 import { logger } from "@/lib/logger";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMessage';
 import { KeyboardButton, sendTelegramInvoice } from "@/app/actions";
 
@@ -9,7 +9,7 @@ import { KeyboardButton, sendTelegramInvoice } from "@/app/actions";
 export async function sosCommand(chatId: number, userId: string) {
     logger.info(`[SOS Command] User ${userId} initiated /sos command.`);
 
-    const { data: activeRental, error } = await supabaseAdmin
+    const { data: activeRental, error } = await supabaseAnon
         .from('rentals')
         .select('rental_id, vehicle:cars(crew_id)')
         .eq('user_id', userId)
@@ -30,7 +30,7 @@ export async function sosCommand(chatId: number, userId: string) {
     }
 
     // Put user in a state to await their location
-    await supabaseAdmin
+    await supabaseAnon
         .from('user_states')
         .upsert({
             user_id: userId,
@@ -46,7 +46,7 @@ export async function sosCommand(chatId: number, userId: string) {
 export async function handleSosPaymentChoice(chatId: number, userId: string, choice: string) {
     logger.info(`[SOS Handler] User ${userId} chose payment: "${choice}"`);
 
-    const { data: userState, error: stateError } = await supabaseAdmin
+    const { data: userState, error: stateError } = await supabaseAnon
         .from('user_states').select('*').eq('user_id', userId).single();
 
     if (stateError || !userState || userState.state !== 'awaiting_sos_payment_choice') {
@@ -63,14 +63,14 @@ export async function handleSosPaymentChoice(chatId: number, userId: string, cho
     const type = isFuel ? 'sos_fuel' : 'sos_evac';
 
     if (amount === 0) { // Handle "No payment" case
-        await supabaseAdmin.from('events').insert({
+        await supabaseAnon.from('events').insert({
             rental_id,
             type,
             status: 'pending',
             payload: { xtr_amount: 0, reason: "User requested help without payment", geotag },
             created_by: userId
         });
-        await supabaseAdmin.from('user_states').delete().eq('user_id', userId);
+        await supabaseAnon.from('user_states').delete().eq('user_id', userId);
         await sendComplexMessage(chatId, "✅ Ваша просьба о помощи отправлена! Экипаж уведомлен.", [], { removeKeyboard: true });
         return;
     }
@@ -80,7 +80,7 @@ export async function handleSosPaymentChoice(chatId: number, userId: string, cho
     const description = `Экстренная помощь для аренды ${rental_id}.`;
     
     // We create the invoice in our DB FIRST
-    await supabaseAdmin.from('invoices').insert({
+    await supabaseAnon.from('invoices').insert({
         id: invoicePayload,
         type: type,
         user_id: userId,
@@ -94,5 +94,5 @@ export async function handleSosPaymentChoice(chatId: number, userId: string, cho
     await sendComplexMessage(chatId, `Счет на ${amount} XTR отправлен. После оплаты экипаж будет немедленно уведомлен.`, [], { removeKeyboard: true });
     
     // Clear state after sending invoice
-    await supabaseAdmin.from('user_states').delete().eq('user_id', userId);
+    await supabaseAnon.from('user_states').delete().eq('user_id', userId);
 }

@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { getLobbyGeoData } from "./lobby";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
@@ -38,8 +38,8 @@ export async function executeProximityBoom(attackerId: string, lobbyId: string) 
         if (!nearestVictimId) return { success: false, error: "Out of range" };
 
         // 1. FETCH VICTIM CURRENT METADATA
-        const { data: victim } = await supabaseAdmin.from("users").select("metadata").eq("user_id", nearestVictimId).single();
-        const { data: attacker } = await supabaseAdmin.from("users").select("username").eq("user_id", attackerId).single();
+        const { data: victim } = await supabaseAnon.from("users").select("metadata").eq("user_id", nearestVictimId).single();
+        const { data: attacker } = await supabaseAnon.from("users").select("username").eq("user_id", attackerId).single();
 
         // 2. INJECT HUMILIATION INTO VICTIM'S METADATA
         const newMetadata = { 
@@ -49,7 +49,7 @@ export async function executeProximityBoom(attackerId: string, lobbyId: string) 
             humiliated_at: new Date().toISOString()
         };
 
-        await supabaseAdmin.from("users").update({ metadata: newMetadata }).eq("user_id", nearestVictimId);
+        await supabaseAnon.from("users").update({ metadata: newMetadata }).eq("user_id", nearestVictimId);
 
         // 3. SEND NOTIFICATION WITH "GO CHECK IT" LINK
         const victimMsg = `🛠️ **GEAR INTEGRITY COMPROMISED** 🛠️\n\n@${attacker?.username} just bent your barrel into a croissant.\n\n*Distance:* ${minDistance.toFixed(1)}m\n\n👇 **INSPECT DAMAGE / REPAIR**`;
@@ -69,8 +69,8 @@ export async function executeProximityBoom(attackerId: string, lobbyId: string) 
 }
 
 export async function fieldRepair(userId: string) {
-    const { data: user } = await supabaseAdmin.from("users").select("metadata").eq("user_id", userId).single();
+    const { data: user } = await supabaseAnon.from("users").select("metadata").eq("user_id", userId).single();
     const newMetadata = { ...(user?.metadata || {}), is_humiliated: false };
-    await supabaseAdmin.from("users").update({ metadata: newMetadata }).eq("user_id", userId);
+    await supabaseAnon.from("users").update({ metadata: newMetadata }).eq("user_id", userId);
     return { success: true };
 }

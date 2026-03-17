@@ -37,7 +37,7 @@ export async function generateViewport(): Promise<Viewport> {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru" className="h-full">
+    <html lang="ru" className="h-full" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="format-detection" content="telephone=no" />
@@ -46,6 +46,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png"></link>
         {/* Updated msapplication-TileColor to match light theme background by default */}
         <meta name="msapplication-TileColor" content="hsl(220 25% 98%)"></meta>
+        <Script
+          id="theme-bootstrap-script"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var d=document.documentElement;var stored=localStorage.getItem("theme");var resolved=stored&&stored!=="system"?stored:(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");d.classList.remove("light","dark");d.classList.add(resolved);d.style.colorScheme=resolved;}catch(e){}})();`,
+          }}
+        />
         <Script
           id="telegram-webapp-script"
           src="https://telegram.org/js/telegram-web-app.js"

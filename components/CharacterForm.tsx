@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { supabaseAdmin, uploadImage } from "@/hooks/supabase";
+import { supabaseAnon, uploadImage } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
@@ -31,13 +31,13 @@ export function CharacterForm({ character }: CharacterFormProps) {
   useEffect(() => {
     const checkAndInsertDefaults = async () => {
       for (const char of defaultCharacters) {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAnon
           .from("characters")
           .select("*")
           .eq("name", char.name)
           .single();
         if (error || !data) {
-          await supabaseAdmin.from("characters").insert(char);
+          await supabaseAnon.from("characters").insert(char);
         }
       }
     };
@@ -52,17 +52,17 @@ export function CharacterForm({ character }: CharacterFormProps) {
       let imageUrl = formData.image_url;
       if (imageFile) {
         const bucketName = "character-images";
-        const { data: buckets, error: bucketError } = await supabaseAdmin.storage.listBuckets();
+        const { data: buckets, error: bucketError } = await supabaseAnon.storage.listBuckets();
         if (bucketError) throw bucketError;
         if (!buckets.some((b) => b.name === bucketName)) {
-          await supabaseAdmin.storage.createBucket(bucketName, { public: true });
+          await supabaseAnon.storage.createBucket(bucketName, { public: true });
         }
         imageUrl = await uploadImage(bucketName, imageFile);
       }
 
       if (character) {
         // Update existing character
-        const { error } = await supabaseAdmin
+        const { error } = await supabaseAnon
           .from("characters")
           .update({ ...formData, image_url: imageUrl })
           .eq("id", character.id);
@@ -70,7 +70,7 @@ export function CharacterForm({ character }: CharacterFormProps) {
         toast.success("Character updated successfully!");
       } else {
         // Add new character
-        const { error } = await supabaseAdmin
+        const { error } = await supabaseAnon
           .from("characters")
           .insert({ ...formData, image_url: imageUrl });
         if (error) throw error;

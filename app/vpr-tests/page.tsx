@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { getVprTestsBootstrapAction } from "./actions";
 import { debugLogger } from "@/lib/debugLogger";
 import { 
   Loader2, Trophy, BookOpen, Info, 
@@ -80,15 +80,12 @@ export default function VprTestsListPage() {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                const { data: subjectsData } = await supabaseAdmin
-                    .from('subjects')
-                    .select('*')
-                    .in('grade_level', [6, 7, 8])
-                    .order('grade_level', { ascending: true });
-
-                setAllSubjects(subjectsData as Subject[] || []);
-                const { data: leaderboardData } = await supabaseAdmin.rpc('get_vpr_leaderboard', { limit_count: 5 });
-                setLeaderboard((leaderboardData as LeaderboardEntry[]) || []);
+                const data = await getVprTestsBootstrapAction();
+                if (!data.success) {
+                    debugLogger.warn("VPR bootstrap warning:", data.error);
+                }
+                setAllSubjects(data.subjects as Subject[] || []);
+                setLeaderboard((data.leaderboard as LeaderboardEntry[]) || []);
             } catch (err) {
                 debugLogger.error("Uplink Error:", err);
             } finally {

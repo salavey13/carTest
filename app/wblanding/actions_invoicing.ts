@@ -1,7 +1,7 @@
 "use server";
 
 import { sendTelegramInvoice } from "@/app/actions"; // Core action (transport only)
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { calculateServicePrice } from "./actions_referral";
 import { logger } from "@/lib/logger";
 

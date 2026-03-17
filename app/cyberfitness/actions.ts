@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from '@/hooks/supabase';
+import { supabaseAdmin } from '@/lib/supabase-server';
 import { fetchUserData as genericFetchUserData } from '@/hooks/supabase';
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { 

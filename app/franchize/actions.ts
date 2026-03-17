@@ -1,10 +1,15 @@
 "use server";
 
-import { createInvoice, supabaseAdmin } from "@/hooks/supabase";
-import { sendTelegramInvoice } from "@/app/actions";
+
+import { createInvoice, supabaseAdmin } from "@/lib/supabase-server";
+import { notifyAdmin, sendTelegramDocument, sendTelegramInvoice } from "@/app/actions";
+import { generateDocxBytes } from "@/app/markdown-doc/actions";
+import { applyTemplateVariables } from "@/lib/markdownTemplate";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import { readFile } from "fs/promises";
+import path from "path";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -46,7 +51,6 @@ function resolvePaletteByMode(franchize: UnknownRecord): FranchizeTheme["palette
     borderSoft: readPath(source, ["borderSoft"], defaultTheme.palette.borderSoft),
   };
 }
-
 
 export interface FranchizeTheme {
   mode: string;
@@ -326,7 +330,6 @@ const withSlug = (href: string, slug: string) => {
       return href;
   }
 };
-
 
 function parseSocialLinks(lines: string): Array<{ label: string; href: string }> {
   return lines
@@ -640,7 +643,6 @@ function trimCampaignTitle(title: string, fallback: string): string {
   return normalized.length > 72 ? `${normalized.slice(0, 69)}...` : normalized;
 }
 
-
 function parsePromoBanners(lines: string, slug: string): Array<{ id: string; title: string; subtitle: string; code: string; href: string; imageUrl: string; activeFrom: string; activeTo: string; priority: number; ctaLabel: string }> {
   return lines
     .split("\n")
@@ -705,7 +707,6 @@ function normalizeCatalogOrder(categories: string[]): string[] {
   const wbItems = unique.filter((category) => category.toLowerCase().includes("wbitem"));
   return [...regular, ...wbItems];
 }
-
 
 async function resolveFranchizeEditorAccess(actorUserId: string | undefined, crew: { id: string; owner_id?: string | null }): Promise<boolean> {
   if (!actorUserId) {
@@ -1010,6 +1011,178 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput, actorUser
   };
 }
 
+
+
+function formatMoney(value: number): string {
+  return Number(value || 0).toLocaleString("ru-RU");
+}
+
+type FranchizeOrderNotifyPayload = z.infer<typeof franchizeOrderInvoiceSchema> & {
+  totalAmount: number;
+  subtotal: number;
+  extrasTotal: number;
+};
+
+async function loadFranchizeDealTemplate(): Promise<string> {
+  try {
+    const response = await fetch("https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE_DEMO.md", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`template fetch failed with ${response.status}`);
+    }
+
+    const remoteTemplate = await response.text();
+    if (remoteTemplate.trim().length > 0) {
+      return remoteTemplate;
+    }
+
+    throw new Error("template fetch returned empty content");
+  } catch (error) {
+    logger.warn("[franchize] fallback to local RENTAL_DEAL_TEMPLATE_DEMO.md", error);
+    const localTemplatePath = path.join(process.cwd(), "docs", "RENTAL_DEAL_TEMPLATE_DEMO.md");
+    return readFile(localTemplatePath, "utf8");
+  }
+}
+
+async function createFranchizeOrderNotificationLog(payload: FranchizeOrderNotifyPayload) {
+  const snapshot = {
+    ...payload,
+    persistedAt: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabaseAdmin
+    .from("franchize_order_notifications")
+    .insert({
+      slug: payload.slug,
+      order_id: payload.orderId,
+      payload: snapshot,
+      send_status: "pending",
+      attempts: 1,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to persist order snapshot: ${error.message}`);
+  }
+
+  return data.id as string;
+}
+
+async function updateFranchizeOrderNotificationLog(
+  logId: string,
+  patch: {
+    send_status: "sent" | "failed";
+    rendered_markdown?: string;
+    doc_file_name?: string;
+    last_error?: string;
+  },
+) {
+  const { error } = await supabaseAdmin
+    .from("franchize_order_notifications")
+    .update({
+      ...patch,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", logId);
+
+  if (error) {
+    logger.error("[franchize] failed to update franchize_order_notifications", { logId, error });
+  }
+}
+
+async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayload) {
+  const logId = await createFranchizeOrderNotificationLog(payload);
+
+  try {
+    const { data: cars, error: carsError } = await supabaseAdmin
+    .from("cars")
+    .select("id, make, model, specs")
+    .in("id", payload.cartLines.map((line) => line.itemId));
+
+  if (carsError) {
+    logger.error("[franchize] failed to load cars for order doc", carsError);
+  }
+
+  const byId = new Map((cars || []).map((car) => [car.id, car]));
+  const extrasRows = payload.extras.length
+    ? payload.extras
+        .map((extra) => `| ${extra.label} | 1 | ${formatMoney(extra.amount)} ₽ | ${formatMoney(extra.amount)} ₽ |`)
+        .join("\n")
+    : "| Без доп. опций | 0 | 0 ₽ | 0 ₽ |";
+
+  const firstLine = payload.cartLines[0];
+  const firstCar = firstLine ? byId.get(firstLine.itemId) : null;
+  const firstSpecs = (firstCar?.specs as Record<string, unknown> | null) || {};
+
+  const template = await loadFranchizeDealTemplate();
+
+  const rendered = applyTemplateVariables(template, {
+    contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}`,
+    contract_date: new Date().toLocaleDateString("ru-RU"),
+    renter_full_name: payload.recipient,
+    renter_document_id: "заполняется при выдаче",
+    renter_phone: payload.phone,
+    issuer_name: `Franchize ${payload.slug}`,
+    issuer_signatory: "Администратор экипажа",
+    bike_make_model: firstCar ? `${firstCar.make || "Bike"} ${firstCar.model || "Model"}` : payload.cartLines.map((line) => line.itemId).join(", "),
+    bike_vin: String(firstSpecs.vin || firstSpecs.frame || firstSpecs.vin_number || "уточняется"),
+    bike_plate: String(firstSpecs.plate || firstSpecs.state_number || "уточняется"),
+    rent_start_date: payload.time,
+    rent_end_date: payload.time,
+    rent_days: 1,
+    daily_price_rub: formatMoney(payload.subtotal),
+    subtotal_rub: formatMoney(payload.subtotal),
+    extras_rows: extrasRows,
+    extras_total_rub: formatMoney(payload.extrasTotal),
+    total_price_rub: formatMoney(payload.totalAmount),
+    deposit_rub: "20 000",
+  });
+
+  const bytes = await generateDocxBytes(rendered);
+  const docFileName = `franchize-order-${payload.slug}-${payload.orderId}.docx`;
+
+  const adminChatId = process.env.ADMIN_CHAT_ID;
+  if (!adminChatId) {
+    throw new Error("ADMIN_CHAT_ID not configured");
+  }
+
+  await notifyAdmin(
+    [
+      `🧾 Новый franchize-заказ #${payload.orderId}`,
+      `Crew: ${payload.slug}`,
+      `Получатель: ${payload.recipient}`,
+      `Телефон: ${payload.phone}`,
+      `Время: ${payload.time}`,
+      `Оплата: ${payload.payment}`,
+      `Доставка: ${payload.delivery}`,
+      `Итого: ${formatMoney(payload.totalAmount)} ₽`,
+    ].join("\n"),
+  );
+
+  const sendDocResult = await sendTelegramDocument(adminChatId, new Blob([bytes]), docFileName);
+  if (!sendDocResult.success) {
+    throw new Error(sendDocResult.error || "Failed to send DOCX to admin");
+  }
+
+  await updateFranchizeOrderNotificationLog(logId, {
+    send_status: "sent",
+    rendered_markdown: rendered,
+    doc_file_name: docFileName,
+    last_error: "",
+  });
+
+  return { renderedMarkdown: rendered, docFileName };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to submit order notification";
+    await updateFranchizeOrderNotificationLog(logId, {
+      send_status: "failed",
+      last_error: message,
+    });
+
+    throw error;
+  }
+}
+
 const franchizeOrderInvoiceSchema = z.object({
   slug: z.string().trim().min(1),
   orderId: z.string().trim().min(1),
@@ -1048,6 +1221,57 @@ const franchizeOrderInvoiceSchema = z.object({
       .default({ package: "Base", duration: "1 day", perk: "Стандарт", auction: "Без аукциона" }),
   })).min(1),
 });
+
+export async function submitFranchizeOrderNotification(input: unknown): Promise<{ success: boolean; error?: string }> {
+  const parsed = franchizeOrderInvoiceSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Некорректный payload заказа." };
+  }
+
+  const payload = parsed.data;
+  const effectiveTotal = payload.totalAmount > 0 ? payload.totalAmount : payload.subtotal + payload.extrasTotal;
+
+  try {
+    await buildFranchizeOrderDocAndNotify({ ...payload, totalAmount: effectiveTotal, subtotal: payload.subtotal, extrasTotal: payload.extrasTotal });
+    return { success: true };
+  } catch (error) {
+    logger.error("[franchize] submitFranchizeOrderNotification failed", error);
+    return { success: false, error: error instanceof Error ? error.message : "Failed to submit order notification" };
+  }
+}
+
+const retryFranchizeNotificationSchema = z.object({
+  slug: z.string().trim().min(1),
+  orderId: z.string().trim().min(1),
+});
+
+export async function retryFranchizeOrderNotification(input: unknown): Promise<{ success: boolean; error?: string }> {
+  const parsed = retryFranchizeNotificationSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Некорректный payload для retry." };
+  }
+
+  const { slug, orderId } = parsed.data;
+  const { data: logRow, error } = await supabaseAdmin
+    .from("franchize_order_notifications")
+    .select("payload")
+    .eq("slug", slug)
+    .eq("order_id", orderId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    return { success: false, error: `Не удалось загрузить snapshot для retry: ${error.message}` };
+  }
+
+  if (!logRow?.payload || typeof logRow.payload !== "object") {
+    return { success: false, error: "Snapshot заказа не найден для retry." };
+  }
+
+  return submitFranchizeOrderNotification(logRow.payload);
+}
 
 export async function createFranchizeOrderInvoice(input: unknown): Promise<{ success: boolean; invoiceId?: string; amountXtr?: number; error?: string }> {
   const parsed = franchizeOrderInvoiceSchema.safeParse(input);
@@ -1123,6 +1347,8 @@ export async function createFranchizeOrderInvoice(input: unknown): Promise<{ suc
   };
 
   try {
+    await buildFranchizeOrderDocAndNotify({ ...payload, totalAmount: effectiveTotal, subtotal: payload.subtotal, extrasTotal: payload.extrasTotal });
+
     const invoiceRecord = await createInvoice("franchize_order", invoiceId, payload.telegramUserId, amountXtr, 0, metadata);
     if (!invoiceRecord.success) {
       return { success: false, error: invoiceRecord.error ?? "Не удалось создать запись счёта." };

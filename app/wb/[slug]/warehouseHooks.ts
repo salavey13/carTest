@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getCrewWarehouseItems, updateCrewItemLocationQty } from "./actions_crud";
+import { awardWarehouseActionStats } from "./actions_stats";
 import { logger } from "@/lib/logger";
 import { useAppContext } from "@/contexts/AppContext";
-import { supabaseAdmin } from "@/hooks/supabase"; 
 
 export const getSizePriority = (size: string | null): number => {
   if (!size) return 999;
@@ -212,13 +212,7 @@ export function useCrewWarehouse(slug: string) {
         const gvEarned = Math.abs(delta) * (actionType === 'offload' ? 7 : 3);
         const kvEarned = Math.abs(delta) * 0.5;
 
-        await supabaseAdmin.rpc('update_user_cyber_stats', {
-            p_user_id: dbUser.user_id,
-            p_gv_delta: gvEarned,
-            p_kv_delta: kvEarned,
-            p_feature_key: `last_wh_action`,
-            p_feature_val: { type: actionType, qty: Math.abs(delta), ts: new Date().toISOString() }
-        });
+        await awardWarehouseActionStats(dbUser.user_id, actionType, Math.abs(delta));
       })();
     },
     [slug, gameMode, level, checkAchievements, dbUser, fireNotify, loadItems],

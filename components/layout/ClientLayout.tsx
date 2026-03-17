@@ -30,7 +30,7 @@ import StrikeballBottomNav from "@/app/strikeball/components/StrikeballBottomNav
 import { StrikeballBackground } from "@/app/strikeball/components/StrikeballBackground";
 
 import StickyChatButton from "@/components/StickyChatButton";
-import { AppProvider, useAppContext } from "@/contexts/AppContext";
+import { AppProvider, useAppContext, useStrikeballLobbyContext } from "@/contexts/AppContext";
 import { ThemeProvider } from "@/components/theme-provider"; 
 import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -41,7 +41,7 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import { useFocusTimeTracker } from "@/hooks/useFocusTimeTracker";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { checkAndUnlockFeatureAchievement } from "@/hooks/cyberFitnessSupabase";
+import { checkAndUnlockFeatureAchievement } from "@/lib/cyberFitnessSupabase-server";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { Loading } from "@/components/Loading";
@@ -253,8 +253,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     isLoading: isAppLoading,
     isAuthenticating,
     clearStartParam,
-    activeLobby // GHOST-VIS: Global Active Combat State
   } = useAppContext();
+  const { activeLobby } = useStrikeballLobbyContext(); // GHOST-VIS: Global Active Combat State
   
   const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
   const startParamHandledRef = useRef(false);
@@ -413,7 +413,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/admin",
     "/paddock",
     "/rentals",
-    "/vipbikerental",
+    //"/vipbikerental",
     "/strikeball", 
   ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
@@ -431,6 +431,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname === "/wblanding/referral" ||
         pathname === "/csv-compare" ||
         pathname === "/streamer" ||
+        pathname === "/vipbikerental" ||
         pathname === "/blogger" ||
         pathname?.startsWith("/optimapipe") ||
         pathname?.startsWith("/rules") ||
@@ -512,4 +513,3 @@ const normalizeStartParamPath = (rawParam: string | null) => {
   if (!decoded) return null;
   return decoded.replace(/^\/+/, "").replace(/\/+/g, "/");
 };
-

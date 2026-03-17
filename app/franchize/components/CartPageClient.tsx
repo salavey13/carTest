@@ -1,8 +1,14 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
-import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
+import { useFranchizeCart } from "../hooks/useFranchizeCart"; // Import cart state access
+import { crewPaletteForSurface } from "../lib/theme";
+import { saveUserFranchizeCartAction } from "@/contexts/actions"; // Explicit import
+import { useAppContext } from "@/contexts/AppContext";
+import { Link } from "lucide-react"; // Wait, removing this, using next/link if needed but using router mostly
 
 interface CartPageClientProps {
   crew: FranchizeCrewVM;
@@ -12,11 +18,31 @@ interface CartPageClientProps {
 
 export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const { cartLines, changeLineQty, removeLine, subtotal, itemCount } = useFranchizeCartLines(slug, items);
+  const { cart } = useFranchizeCart(slug); // Get raw cart state to save
   const surface = crewPaletteForSurface(crew.theme);
+  const router = useRouter();
+  const { dbUser } = useAppContext();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleProceed = async () => {
+    setIsSaving(true);
+    // Sync to DB explicitly before navigating
+    if (dbUser?.user_id) {
+        await saveUserFranchizeCartAction(dbUser.user_id, slug, cart);
+    }
+    // Navigate even if save failed (local storage might still be used by next page if hydrated client-side)
+    router.push(`/franchize/${slug}/order/demo-order`);
+  };
 
   return (
-    <section className="mx-auto w-full max-w-4xl px-4 py-6">
-      <p className="text-xs uppercase tracking-[0.2em]" style={{ color: crew.theme.palette.accentMain }}>
+    <section
+      className="mx-auto w-full max-w-4xl px-4 py-6"
+      style={{
+        ["--cart-accent" as string]: crew.theme.palette.accentMain,
+        ["--cart-border" as string]: crew.theme.palette.borderSoft,
+      }}
+    >
+      <p className="text-xs uppercase tracking-[0.2em] text-[var(--cart-accent)]">
         /franchize/{slug}/cart
       </p>
       <h1 className="mt-2 text-2xl font-semibold">Корзина</h1>
@@ -25,14 +51,14 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
       {cartLines.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-dashed p-6 text-sm" style={surface.subtleCard}>
           Корзина пока пустая. Добавьте байк из каталога, чтобы перейти к оформлению.
-          <div>
-            <a
-              href={`/franchize/${slug}`}
-              className="mt-4 inline-flex font-medium underline-offset-4 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-              style={{ color: crew.theme.palette.accentMain, ...focusRingOutlineStyle(crew.theme) }}
-            >
+          <div className="mt-4">
+             {/* Using standard anchor/button for back link to be safe */}
+             <button
+                onClick={() => router.push(`/franchize/${slug}`)}
+                className="inline-flex font-medium text-[var(--cart-accent)] underline-offset-4 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cart-accent)]"
+             >
               Вернуться в каталог
-            </a>
+             </button>
           </div>
         </div>
       ) : (
@@ -48,21 +74,21 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
                     <span className="mt-1 block text-[11px]" style={surface.mutedText}>{line.options.package} · {line.options.duration} · {line.options.perk} · {line.options.auction}</span>
                     </p>
                     {line.item ? (
-                      <p className="mt-1 text-sm font-medium" style={{ color: crew.theme.palette.accentMain }}>
+                      <p className="mt-1 text-sm font-medium text-[var(--cart-accent)]">
                         {line.item.pricePerDay.toLocaleString("ru-RU")} ₽ / день
                       </p>
                     ) : (
                       <p className="mt-1 text-xs" style={surface.mutedText}>Недоступные позиции не участвуют в расчёте суммы.</p>
                     )}
                   </div>
-                  <button className="rounded-md px-1 text-xs transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...surface.mutedText, ...focusRingOutlineStyle(crew.theme) }} onClick={() => removeLine(line.lineId)}>
+                  <button className="rounded-md px-1 text-xs transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cart-accent)]" style={surface.mutedText} onClick={() => removeLine(line.lineId)}>
                     Удалить
                   </button>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                   <button
-                    className="h-8 w-8 rounded-full border transition hover:opacity-90 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                    style={{ borderColor: crew.theme.palette.borderSoft, ...focusRingOutlineStyle(crew.theme) }}
+                    className="h-8 w-8 rounded-full border transition hover:opacity-90 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cart-accent)]"
+                    style={{ borderColor: "var(--cart-border)" }}
                     onClick={() => changeLineQty(line.lineId, -1)}
                     aria-label="Уменьшить"
                   >
@@ -70,8 +96,8 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
                   </button>
                   <span className="min-w-7 text-center text-sm font-medium">{line.qty}</span>
                   <button
-                    className="h-8 w-8 rounded-full border transition hover:opacity-90 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                    style={{ borderColor: crew.theme.palette.borderSoft, ...focusRingOutlineStyle(crew.theme) }}
+                    className="h-8 w-8 rounded-full border transition hover:opacity-90 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cart-accent)]"
+                    style={{ borderColor: "var(--cart-border)" }}
                     onClick={() => changeLineQty(line.lineId, 1)}
                     aria-label="Увеличить"
                   >
@@ -86,16 +112,17 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
             <p className="text-sm" style={surface.mutedText}>Итого позиций</p>
             <p className="text-2xl font-semibold">{itemCount}</p>
             <p className="mt-3 text-sm" style={surface.mutedText}>Сумма за 1 день аренды</p>
-            <p className="text-2xl font-semibold" style={{ color: crew.theme.palette.accentMain }}>
+            <p className="text-2xl font-semibold text-[var(--cart-accent)]">
               {subtotal.toLocaleString("ru-RU")} ₽
             </p>
-            <a
-              href={`/franchize/${slug}/order/demo-order`}
-              className="mt-4 inline-flex w-full justify-center rounded-xl px-4 py-3 text-sm font-semibold transition hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-              style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A", ...focusRingOutlineStyle(crew.theme) }}
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={handleProceed}
+              className="mt-4 inline-flex w-full justify-center rounded-xl bg-[var(--cart-accent)] px-4 py-3 text-sm font-semibold text-[#16130A] transition hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cart-accent)] cursor-pointer disabled:opacity-70"
             >
-              Перейти к оформлению
-            </a>
+              {isSaving ? "Сохранение..." : "Перейти к оформлению"}
+            </button>
           </aside>
         </div>
       )}

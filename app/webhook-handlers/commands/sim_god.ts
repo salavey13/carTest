@@ -2,7 +2,7 @@ import { logger } from "@/lib/logger";
 import { getArbitrageScannerSettings } from "@/app/elon/arbitrage_scanner_actions";
 import { runGodModeSimulation } from "@/app/elon/arbitrage_god_mode_actions";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import type { GodModeDeck, GodModeSimulationResult } from "@/app/elon/arbitrage_scanner_types";
 
 export async function simGodCommand(chatId: number, userId: string, args: string[]) {
@@ -21,7 +21,7 @@ export async function simGodCommand(chatId: number, userId: string, args: string
     const simResult = await runGodModeSimulation(settingsResult.data, burstAmount);
     
     // Сохраняем результат симуляции в новую таблицу для real-time подписки
-    const { error: insertError } = await supabaseAdmin
+    const { error: insertError } = await supabaseAnon
         .from('god_mode_simulations')
         .insert({
             user_id: userId,
@@ -36,7 +36,7 @@ export async function simGodCommand(chatId: number, userId: string, args: string
     }
 
     // Читаем текущий scoreboard из 'users' по 'user_id'
-    const { data: userProfile } = await supabaseAdmin.from('users').select('metadata').eq('user_id', userId).single();
+    const { data: userProfile } = await supabaseAnon.from('users').select('metadata').eq('user_id', userId).single();
     const deck: GodModeDeck = userProfile?.metadata?.god_mode_deck || { balances: {}, total_profit_usd: 0 };
     
     let scoreboardText = "";
