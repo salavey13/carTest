@@ -19,7 +19,7 @@ Goal: Keep pushing the Magic Moment closer to 0 seconds.
 ## Phase 1 — Magic Moment First
 - [x] plugin.ts (manifest with instant-3d-korean-garden capability)
 - [x] hydration.md (context + bathroom-test rule)
-- [ ] page.tsx + layout.tsx (onboarding + root with instant demo garden)
+- [x] page.tsx + layout.tsx (onboarding + root with instant demo garden)
 - [ ] createGardenAction + seedGardenAction in /app/core/garden_actions.ts
 - [ ] Add genie-lamp fake doors (auto irrigation, plant disease sim, AI gardener assistant)
 
