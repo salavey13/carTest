@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useAppContext } from "@/contexts/AppContext";
 
 import {
@@ -90,35 +91,29 @@ function readPath<T>(obj: unknown, path: string[], fallback: T): T {
   return (current as T) ?? fallback;
 }
 
+function getJsonParseHint(error: unknown): string {
+  if (!(error instanceof Error)) return "Не удалось применить JSON: проверьте формат.";
+  const message = error.message || "";
+  const positionMatch = message.match(/position\s+(\d+)/i);
+  if (!positionMatch) return `Не удалось применить JSON: ${message}`;
+  const position = Number(positionMatch[1]);
+  if (!Number.isFinite(position)) return `Не удалось применить JSON: ${message}`;
+  return `Не удалось применить JSON: синтаксическая ошибка возле символа ${position}.`;
+}
 
-type JsonValidationResult =
-  | { ok: true; source: Record<string, unknown> }
-  | { ok: false; message: string };
+function socialLinksToText(source: unknown, fallback: string): string {
+  if (!Array.isArray(source)) return fallback;
+  const lines = source
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return "";
+      const social = entry as Record<string, unknown>;
+      const label = typeof social.label === "string" ? social.label : "";
+      const href = typeof social.href === "string" ? social.href : "";
+      return `${label}|${href}`;
+    })
+    .filter((line) => line !== "");
+  return lines.length > 0 ? lines.join("\n") : fallback;
 
-function validateAdvancedJson(rawJson: string): JsonValidationResult {
-  if (!rawJson.trim()) {
-    return { ok: false, message: "Поле Advanced JSON пустое. Вставьте JSON и повторите." };
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(rawJson);
-  } catch (error) {
-    const details = error instanceof Error ? error.message : "Неизвестная ошибка парсинга";
-    return { ok: false, message: `JSON parse error: ${details}` };
-  }
-
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { ok: false, message: "Advanced JSON должен быть JSON-объектом верхнего уровня." };
-  }
-
-  const root = parsed as Record<string, unknown>;
-  const source = (root.franchize ?? root) as unknown;
-  if (!source || typeof source !== "object" || Array.isArray(source)) {
-    return { ok: false, message: "Ключ franchize должен содержать JSON-объект." };
-  }
-
-  return { ok: true, source: source as Record<string, unknown> };
 }
 
 export default function CreateFranchizeForm() {
@@ -280,10 +275,45 @@ export default function CreateFranchizeForm() {
   };
 
   const applyAdvancedJsonLocally = () => {
-    const validation = validateAdvancedJson(form.advancedJson ?? "");
-    if (!validation.ok) {
-      setMessage(validation.message);
-      return;
+ 
+    try {
+      const parsed = JSON.parse(form.advancedJson || "{}");
+      const source = parsed.franchize ?? parsed;
+      setForm((prev) => ({
+        ...prev,
+        brandName: readPath(source, ["branding", "name"], prev.brandName),
+        tagline: readPath(source, ["branding", "tagline"], prev.tagline),
+        logoUrl: readPath(source, ["branding", "logoUrl"], prev.logoUrl),
+        themeMode: readPath(source, ["theme", "mode"], prev.themeMode),
+        bgBase: readPath(source, ["theme", "palette", "bgBase"], prev.bgBase),
+        bgCard: readPath(source, ["theme", "palette", "bgCard"], prev.bgCard),
+        borderSoft: readPath(source, ["theme", "palette", "borderSoft"], prev.borderSoft),
+        accentMain: readPath(source, ["theme", "palette", "accentMain"], prev.accentMain),
+        accentMainHover: readPath(source, ["theme", "palette", "accentMainHover"], prev.accentMainHover),
+        textPrimary: readPath(source, ["theme", "palette", "textPrimary"], prev.textPrimary),
+        textSecondary: readPath(source, ["theme", "palette", "textSecondary"], prev.textSecondary),
+        lightBgBase: readPath(source, ["theme", "palettes", "light", "bgBase"], prev.lightBgBase),
+        lightBgCard: readPath(source, ["theme", "palettes", "light", "bgCard"], prev.lightBgCard),
+        lightBorderSoft: readPath(source, ["theme", "palettes", "light", "borderSoft"], prev.lightBorderSoft),
+        lightAccentMain: readPath(source, ["theme", "palettes", "light", "accentMain"], prev.lightAccentMain),
+        lightAccentMainHover: readPath(source, ["theme", "palettes", "light", "accentMainHover"], prev.lightAccentMainHover),
+        lightTextPrimary: readPath(source, ["theme", "palettes", "light", "textPrimary"], prev.lightTextPrimary),
+        lightTextSecondary: readPath(source, ["theme", "palettes", "light", "textSecondary"], prev.lightTextSecondary),
+        phone: readPath(source, ["contacts", "phone"], prev.phone),
+        email: readPath(source, ["contacts", "email"], prev.email),
+        address: readPath(source, ["contacts", "address"], prev.address),
+        telegram: readPath(source, ["contacts", "telegram"], prev.telegram),
+        mapGps: readPath(source, ["contacts", "map", "gps"], prev.mapGps),
+        mapImageUrl: readPath(source, ["contacts", "map", "imageUrl"], prev.mapImageUrl),
+        mapBoundsTop: String(readPath(source, ["contacts", "map", "bounds", "top"], prev.mapBoundsTop)),
+        mapBoundsBottom: String(readPath(source, ["contacts", "map", "bounds", "bottom"], prev.mapBoundsBottom)),
+        mapBoundsLeft: String(readPath(source, ["contacts", "map", "bounds", "left"], prev.mapBoundsLeft)),
+        mapBoundsRight: String(readPath(source, ["contacts", "map", "bounds", "right"], prev.mapBoundsRight)),
+        socialLinksText: socialLinksToText(readPath(source, ["footer", "socialLinks"], []), prev.socialLinksText),
+      }));
+      setMessage("JSON применён локально для предпросмотра. Если всё ок — нажимайте сохранить.");
+    } catch (error) {
+      setMessage(getJsonParseHint(error));
     }
 
     const source = validation.source;
@@ -536,9 +566,9 @@ export default function CreateFranchizeForm() {
                   { label: "Контакты", href: `/franchize/${form.slug || "vip-bike"}/contacts` },
                   { label: "Корзина", href: `/franchize/${form.slug || "vip-bike"}/cart` },
                 ].map((item) => (
-                  <a key={item.href} href={item.href} className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90" style={{ borderColor: ui.border, color: ui.text }}>
+                  <Link key={item.href} href={item.href} className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90" style={{ borderColor: ui.border, color: ui.text }}>
                     {item.label}
-                  </a>
+                  </Link>
                 ))}
               </div>
               <div className="mt-4 rounded-xl border p-3" style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>

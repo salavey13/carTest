@@ -1500,11 +1500,19 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T49 — Software-engineering hardening sweep (security/SPA/state/CSS/cart-write load)
 - status: `in_progress`
-- updated_at: `2026-03-06T00:40:00Z`
+ 
+- updated_at: `2026-03-17T10:40:00Z`
+- owner: `codex`
+- notes: Continued hardening pass with two additional guardrails in franchize create: AI JSON local-apply now reports precise parse-position hints without generic crashes, and launch cockpit execution links switched from internal <a> to Next.js Link to preserve SPA navigation contract. Also hardened social links hydration against malformed JSON node shapes.
+- next_step: Continue remaining T49 substeps (theme flash + AppContext decomposition/realtime architecture audit) and run broader Telegram webview smoke around menu/footer overlays.
+- risks: Cart persistence is now safer for DB load but depends on explicit checkpoints (`/cart`, `/order/*`, pagehide); must verify no data loss in abrupt mobile-session kills.
+
+- updated_at: `2026-03-16T00:40:00Z`
 - owner: `codex`
 - notes: T49 remains active parent. Completed T49.5 split in `contexts/AppContext.tsx` (auth/runtime/cart/strikeball boundaries + strikeball-specific hook extraction) and switched active-lobby refresh to realtime event subscriptions instead of timer-only pseudo-realtime. Completed T49.6 by adding first-paint theme bootstrap script in `app/layout.tsx` and precise recoverable Advanced JSON validation in `/app/franchize/create/*`. Follow-up T49.8 fixed franchize admin route normalization (`/franchize/admin`) and adaptive crew-themed styling/linking regressions from review.
 - next_step: Start **T50 — checkout/admin resilience pass** (local template fallback, order retry snapshot, server-side crew ACL scope, and franchize-form tokenization for light-theme parity).
 - risks: Realtime lobby subscription currently listens on full `lobbies` table change feed; verify acceptable event volume for high-match concurrency and tighten filters if needed.
+ 
 - dependencies: T48
 
 - subtask tracking:
@@ -1633,7 +1641,139 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 
 ---
 
+<<<<<<< codex/request-clarification-on-task
+## 7) Progress changelog / diary
+
+### 2026-03-17 — T49 continuation (AI JSON resilience + SPA link contract in create cockpit)
+- Hardened `applyAdvancedJsonLocally` in `CreateFranchizeForm` with actionable parse diagnostics: malformed JSON now surfaces parse-position hint instead of generic failure copy.
+- Added defensive social-links normalization so non-array or malformed link payloads no longer risk runtime mapping errors during local JSON hydration.
+- Replaced internal `<a href>` quick links in launch cockpit with Next.js `Link` to keep franchize internal routing SPA-safe per architecture oath.
+- Captured updated UI screenshot artifact for `/franchize/create` after the change (`artifacts/franchize-create-spa-json-guard.png`).
+
+### 2026-02-23 — T49 continuation (style-token discipline + cart save resilience)
+- Refined franchize pill styling to use CSS-variable-powered Tailwind utilities (`bg-[var(--...)]`, `text-[var(--...)]`) for category/quick-filter controls, reducing inline color dominance while preserving dynamic crew theming.
+- Added retry-safe persistence behavior in franchize cart queue: failed save responses now keep `pendingPersist` true so next checkpoint/page-exit flush can recover instead of falsely marking state persisted.
+- Kept T49 as `in_progress` intentionally: remaining scope still includes broader theme-token migration breadth and AppContext split/realtime architecture hardening.
+
+### 2026-02-23 — T49 hardening pass (security + SPA + cart-write discipline)
+- Removed the most dangerous client/server boundary leak in Telegram auth flow by replacing direct client import of `hooks/supabase` with server actions (`fetchDbUserAction`, `upsertTelegramUserAction`).
+- Deleted hardcoded `SUPABASE_SERVICE_ROLE_KEY` fallback from `hooks/supabase.ts` so service-role access now depends on runtime secret only.
+- Reverted franchize navigation back to SPA-safe transitions (`router.push` / `Link`) in header, profile dropdown, and header menu instead of `window.location.assign` / internal `<a>` workaround.
+- Reworked franchize cart persistence model: removed 350ms per-change metadata writes, added ordered flush queue with explicit checkpoint sync (`/cart`, `/order/*`) and page-exit/visibility flush handlers.
+
+### 2026-02-23 — T48 completion (Pepperolli parity pass shipped)
+- Executed visual parity sweep on `/franchize/vip-bike`: category rail + quick filters now use solid Pepperolli-style pills (active accent, inactive dark solid) without outline-dominant look.
+- Promoted catalog section headers to stronger white hierarchy and shifted count chips to muted-solid bubbles for faster scanning.
+- Updated product card semantics with accent-highlighted price and iconified `Добавить` CTA while preserving premium `Выбрать` threshold behavior.
+- Reworked floating cart to solid accent body with black foreground and overlapping white quantity badge; softened catalog card borders in theme variants for cleaner dark-surface separation.
+
+### 2026-02-23 — AGENTS context diet enabled (archive triggers)
+- Added explicit memory-system policy in `AGENTS.md` so `docs/AGENT_DIARY.md` is no longer treated as default read for every task.
+- Introduced mandatory trigger list for diary reads (Telegram, Slack, screenshot engine, homework pipeline) to keep high-signal lessons accessible without context-window overload.
+- Kept chronology and safety intact: diary remains authoritative archive, but loaded only when relevant.
+- Logged as T49.2 done so plan history stays merge-traceable.
+
+### 2026-02-23 — Architecture commandments added to AGENTS + T49 scope expansion
+- Added a dedicated “Архитектурные заповеди GTC-Daemon” block in `AGENTS.md` to prevent workaround regressions (security boundary, SPA routing oath, z-index/tap root-cause debugging, race-condition discipline, CSS-variable theming, context boundaries).
+- Expanded T49 hardening checklist with additional engineering guardrails from review round 2: theme flash prevention, selective memoization (no cargo-cult `React.memo`), and robust AI JSON validation behavior.
+- Kept operator-requested deferral intact: embeddings fallback redesign remains postponed and out-of-scope for this wave.
+- Preserved ordered flow: T48 remains the immediate executable UI task; T49 remains the architectural hardening pass right after.
+
+### 2026-02-23 — Engineer review intake (architectural risk backlog added)
+- Added a dedicated hardening track after T48 to address root-cause architecture issues surfaced by strict engineering review: admin-key exposure risk, SPA navigation regressions, high-frequency cart metadata writes, CSS inline/tailwind conflicts, and oversized AppContext responsibilities.
+- Marked SPA recovery as critical path and explicitly prioritized replacement of forced full reload navigation with Next.js SPA-safe transitions plus tap-layer root-cause fixes.
+- Captured explicit deferral task for embedding fallback redesign (`T49.1`) per operator instruction to skip that stream for now.
+- Kept sequence deterministic: T48 visual parity remains next, T49 hardening starts immediately after.
+
+### 2026-02-23 — T47 completion (friend review digested into actionable parity backlog)
+- Celebrated the strong baseline feedback first (dark theme, radiuses, layout flow, dynamic theme engine) and treated review as a precision polish input rather than a rewrite request.
+- Converted friend visual-diff notes into deterministic implementation scope with file-level mapping: `CrewHeader`, `CatalogClient`, `FloatingCartIconLink`, and `lib/theme`.
+- Added explicit acceptance criteria for five UI deltas: solid pill states, stronger section hierarchy, accent price + cart icon CTA, overlapping floating badge, and softer card borders.
+- Appended T48 as a strict dependency-locked execution task so next iteration can implement with screenshot-backed verification on `/franchize/vip-bike`.
+
+### 2026-02-22 — T28 completion (launch cockpit inside franchize create)
+- Shifted focus away from order-page micropolish and shipped a broader operator capability: a dedicated `Launch cockpit` stage in `/franchize/create`.
+- Added readiness score engine that distills core rollout constraints into 6 checks (identity, contacts, map kit, canonical routes, catalog readiness, contrast).
+- Added blocker-oriented checklist cards with hints plus quick jump links to canonical `/franchize/{slug}` execution surfaces.
+- This pass translates dispersed runbook ideas into one operational panel for faster franchise sandbox launch decisions.
+- Next beat: T29 can wire this cockpit to automated QA smoke + screenshot evidence generation.
+
+
+
+### 2026-02-22 — T32 completion (quick-filter stabilization + global reset)
+- Addressed feedback on previous quick-filter pass by cleaning implementation and reducing interaction ambiguity.
+- Added live counts to each quick filter chip so users can see expected result volume before tapping.
+- Added `Сбросить всё` action to clear both search and chip filter in one motion.
+- Kept scope catalog-only and non-destructive: no modal/cart/order logic changes.
+- Next beat: T33 can move promo cards from text-only to image-backed campaign blocks.
+
+### 2026-02-22 — T31 completion (quick-filter energy pass, no order-modal changes)
+- Responded to operator feedback ("order modal is boring") by focusing next beat on catalog energy, not checkout surfaces.
+- Added quick filter chips for high-intent browsing: all, budget, premium, and newbie-friendly presets.
+- Combined quick-filter and text search logic so filters stack naturally without breaking existing catalog behavior.
+- Preserved item modal flow, cart pill, and order routes unchanged; this is a safe conversion-oriented catalog enhancement.
+- Next beat: T32 can add image-backed promo tiles with scheduling for campaign precision.
+
+### 2026-02-22 — T30 completion (search reset + section density cues)
+- Closed follow-up review feedback from T29 by shipping practical conversion helpers instead of purely visual additions.
+- Added one-tap `Сброс` action inside catalog search so operators/users can quickly recover full inventory after narrow queries.
+- Added per-section count chips (`N шт.`) in catalog group headers to improve scan confidence and communicate filtered inventory density.
+- Preserved existing modal-first item interaction, floating cart behavior, and checkout flow with no route/data-model churn.
+- Next beat: T31 can add checkout urgency nudge copy if we want one more parity sweep.
+
+
+### 2026-02-22 — T29 completion (Pepperolli subtle-gap audit + promo module pass)
+- Performed side-by-side check of `v0-car-test.vercel.app/franchize/vip-bike` and `пепперолли.рф` to isolate subtle conversion gaps (beyond auction ticker and homepage ad popup already noted by operator).
+- Found our catalog had weaker campaign density right below search compared to Pepperolli's immediate promo card stack.
+- Added compact promo modules (3 max) under search, hydrated from ticker metadata, with concise CTA copy and dark/accent styling aligned to existing crew theme.
+- Kept change additive: no route churn, no modal/cart behavior changes, no inventory schema changes.
+- Next beat: T30 should add local conversion helpers (search clear affordance + category item counts + checkout urgency badges).
+
+### 2026-02-22 — T27 completion (checkout copilot expansion)
+- Upgraded the order sidebar from tiny status chip to a larger `Checkout copilot` module with readiness %, blocker inventory, and guided UX messaging.
+- Added dynamic blocker detection for cart/contact/consent and Telegram Stars context, so users can see exactly what blocks submission.
+- Added next-action helper button that focuses the first unresolved field (`recipient`, `phone`, `time`, `consent`) for faster completion.
+- Kept the whole pass visual/assistive only: checkout payload creation and submit permissions remain unchanged.
+- Next beat: T28 can add post-submit delight continuity so success feels as polished as pre-submit guidance.
+
+### 2026-02-22 — T26 completion (checkout micro-delight readiness meter)
+- Added a compact `Checkout vibe` meter in order sidebar with three milestones (cart/contact/consent) so readiness is visible before submit.
+- Added accent badge that transitions from progress fraction (`N/3`) to `Готово ✨` once all milestones are complete.
+- Kept change visual-only: submit eligibility, payment flow, and cart totals remain unchanged.
+- Captured updated mobile screenshot on `/franchize/vip-bike/order/demo-order` after applying the sidebar polish.
+- Next beat: optional T27 can add tiny celebratory motion states after successful submit for extra delight.
+
+
+### 2026-02-22 — T25 completion (one-go interaction-state styling sweep)
+- Added shared `focusRingOutlineStyle(theme)` helper and applied it to modal/cart/order actionable controls for consistent keyboard-visible focus.
+- Polished controls with subtle hover/press transitions so tactile feedback remains clear in both dark and light crew palettes.
+- Kept checkout/cart/modal behavior unchanged while improving perceived UX responsiveness across high-traffic franchize surfaces.
+- Next beat: T26 can ship “interesting stuff” (micro-delight cues around checkout progression) if operator wants extra vibe boost.
+
+
+### 2026-02-22 — T24 completion (catalog interaction-state polish)
+- Added `interactionRingStyle(theme)` helper in franchize theme utilities to keep focus ring color tied to crew accent tokens.
+- Wired focus-state visuals for catalog search input + `Искать` button and catalog item trigger buttons in `CatalogClient`.
+- Kept behavior unchanged (same modal open/add-to-cart flow) while making keyboard/tap focus affordances visible on `vip-bike` storefront.
+- Next beat: optional T25 can extend the same interaction-state parity to modal/cart/order actionable controls.
+
+
+### 2026-02-22 — T23 completion (catalog tile token isolation)
+- Added `catalogCardVariantStyles(theme, variantIndex)` helper so card variant borders/backgrounds/shadows are fully palette-driven.
+- Replaced catalog card utility class variants with semantic style resolver usage in `CatalogClient`.
+- Updated `/franchize/[slug]` page shell to use `crewPaletteForSurface(crew.theme).page` instead of global `bg-background/text-foreground` utility classes.
+- Next beat: optional T24 can target focus-ring/hover-state parity checks for contrast in extreme custom palettes.
+
+
+### 2026-02-22 — T22 completion (order flow token parity + contacts map bridge)
+- Migrated `OrderPageClient` section cards/inputs/muted labels/summary blocks from global utility token classes to `crewPaletteForSurface` + palette-driven border/input styles.
+- Kept order CTA/payment selection behavior unchanged while improving theme readability consistency for light/dark crew palettes.
+- Added optional `theme` prop to `FranchizeContactsMap` and wired it from contacts page so fallback/frame colors follow crew palette tokens.
+- Next beat: T23 should tackle remaining catalog tile utility background classes for complete storefront token isolation.
+
+=======
 ## 7) Progress changelog / diary is in /docs/AGENT_DIARY.MD
+>>>>>>> main
 
 Historical diary entries were moved to `docs/AGENT_DIARY.md` to keep this execution ledger readable.
 Append only compact session deltas here as pointers when needed; full narrative belongs to the diary archive.
