@@ -1500,10 +1500,10 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T49 — Software-engineering hardening sweep (security/SPA/state/CSS/cart-write load)
 - status: `in_progress`
-- updated_at: `2026-02-23T16:20:00Z`
+- updated_at: `2026-03-17T10:40:00Z`
 - owner: `codex`
-- notes: Continued hardening pass with anti-workaround fixes plus style-system discipline: Telegram auth DB sync now server-action-only, service-role hardcoded fallback removed, SPA routing restored in franchize header/profile/menu, cart writes moved to checkpoint/page-exit queue with retry-on-failed-save, and franchize pill controls switched to CSS variable driven Tailwind utilities instead of direct inline color properties.
-- next_step: Finish remaining T49 substeps — broader franchize style-system variable migration and AppContext decomposition/realtime strategy audit, then run full regression smoke.
+- notes: Continued hardening pass with two additional guardrails in franchize create: AI JSON local-apply now reports precise parse-position hints without generic crashes, and launch cockpit execution links switched from internal <a> to Next.js Link to preserve SPA navigation contract. Also hardened social links hydration against malformed JSON node shapes.
+- next_step: Continue remaining T49 substeps (theme flash + AppContext decomposition/realtime architecture audit) and run broader Telegram webview smoke around menu/footer overlays.
 - risks: Cart persistence is now safer for DB load but depends on explicit checkpoints (`/cart`, `/order/*`, pagehide); must verify no data loss in abrupt mobile-session kills.
 - dependencies: T48
 - deliverables:
@@ -1606,6 +1606,12 @@ This keeps `docs/THE_FRANCHEEZEPLAN.md` merge-friendly even when T8/T9 and polis
 ---
 
 ## 7) Progress changelog / diary
+
+### 2026-03-17 — T49 continuation (AI JSON resilience + SPA link contract in create cockpit)
+- Hardened `applyAdvancedJsonLocally` in `CreateFranchizeForm` with actionable parse diagnostics: malformed JSON now surfaces parse-position hint instead of generic failure copy.
+- Added defensive social-links normalization so non-array or malformed link payloads no longer risk runtime mapping errors during local JSON hydration.
+- Replaced internal `<a href>` quick links in launch cockpit with Next.js `Link` to keep franchize internal routing SPA-safe per architecture oath.
+- Captured updated UI screenshot artifact for `/franchize/create` after the change (`artifacts/franchize-create-spa-json-guard.png`).
 
 ### 2026-02-23 — T49 continuation (style-token discipline + cart save resilience)
 - Refined franchize pill styling to use CSS-variable-powered Tailwind utilities (`bg-[var(--...)]`, `text-[var(--...)]`) for category/quick-filter controls, reducing inline color dominance while preserving dynamic crew theming.

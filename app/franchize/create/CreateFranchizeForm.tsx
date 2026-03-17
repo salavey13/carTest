@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useAppContext } from "@/contexts/AppContext";
 
 import {
@@ -88,6 +89,30 @@ function readPath<T>(obj: unknown, path: string[], fallback: T): T {
     current = (current as Record<string, unknown>)[key];
   }
   return (current as T) ?? fallback;
+}
+
+function getJsonParseHint(error: unknown): string {
+  if (!(error instanceof Error)) return "Не удалось применить JSON: проверьте формат.";
+  const message = error.message || "";
+  const positionMatch = message.match(/position\s+(\d+)/i);
+  if (!positionMatch) return `Не удалось применить JSON: ${message}`;
+  const position = Number(positionMatch[1]);
+  if (!Number.isFinite(position)) return `Не удалось применить JSON: ${message}`;
+  return `Не удалось применить JSON: синтаксическая ошибка возле символа ${position}.`;
+}
+
+function socialLinksToText(source: unknown, fallback: string): string {
+  if (!Array.isArray(source)) return fallback;
+  const lines = source
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return "";
+      const social = entry as Record<string, unknown>;
+      const label = typeof social.label === "string" ? social.label : "";
+      const href = typeof social.href === "string" ? social.href : "";
+      return `${label}|${href}`;
+    })
+    .filter((line) => line !== "");
+  return lines.length > 0 ? lines.join("\n") : fallback;
 }
 
 export default function CreateFranchizeForm() {
@@ -282,14 +307,11 @@ export default function CreateFranchizeForm() {
         mapBoundsBottom: String(readPath(source, ["contacts", "map", "bounds", "bottom"], prev.mapBoundsBottom)),
         mapBoundsLeft: String(readPath(source, ["contacts", "map", "bounds", "left"], prev.mapBoundsLeft)),
         mapBoundsRight: String(readPath(source, ["contacts", "map", "bounds", "right"], prev.mapBoundsRight)),
-        socialLinksText: readPath(source, ["footer", "socialLinks"], [])
-          .map((entry: { label?: string; href?: string }) => `${entry.label ?? ""}|${entry.href ?? ""}`)
-          .filter(Boolean)
-          .join("\n") || prev.socialLinksText,
+        socialLinksText: socialLinksToText(readPath(source, ["footer", "socialLinks"], []), prev.socialLinksText),
       }));
       setMessage("JSON применён локально для предпросмотра. Если всё ок — нажимайте сохранить.");
-    } catch {
-      setMessage("Не удалось применить JSON: проверьте формат.");
+    } catch (error) {
+      setMessage(getJsonParseHint(error));
     }
   };
 
@@ -503,9 +525,9 @@ export default function CreateFranchizeForm() {
                   { label: "Контакты", href: `/franchize/${form.slug || "vip-bike"}/contacts` },
                   { label: "Корзина", href: `/franchize/${form.slug || "vip-bike"}/cart` },
                 ].map((item) => (
-                  <a key={item.href} href={item.href} className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90" style={{ borderColor: ui.border, color: ui.text }}>
+                  <Link key={item.href} href={item.href} className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90" style={{ borderColor: ui.border, color: ui.text }}>
                     {item.label}
-                  </a>
+                  </Link>
                 ))}
               </div>
               <div className="mt-4 rounded-xl border p-3" style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
