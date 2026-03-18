@@ -25,13 +25,9 @@ jobs:
         run: |
           # Safe way to pass PR body (prevents shell injection / command-not-found spam)
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            cat > /tmp/pr_body.txt << 'EOF'
-            ${{ inputs.pr_body }}
-            EOF
+            cat > /tmp/pr_body.txt << ${{ inputs.pr_body }}
           else
-            cat > /tmp/pr_body.txt << 'EOF'
-            ${{ github.event.pull_request.body }}
-            EOF
+            cat > /tmp/pr_body.txt << ${{ github.event.pull_request.body }}
           fi
 
           # Same regex logic as before (case-insensitive, UUID only after "supaplan_task:")
