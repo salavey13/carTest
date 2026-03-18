@@ -30,14 +30,14 @@ Goal: Keep pushing the Magic Moment closer to 0 seconds.
 ## Phase 3 — Auto Extensions (Iterator will pick these up)
 - [ ] pH for dummies genie lamp → instant academy page
 - [ ] Korean 3D voice activation (“ready to garden like a fucking Korean in 3D 24/360?”)
-- [ ] Auto-poliv rule editor
+- [x] Auto-poliv rule editor
 
 ## Fake Doors Register (новый этап «расфейковки»)
 
 ### Группа G1 — Контур датчиков и полива (строго последовательно)
 1. `GBX-G1-S1` Датчики телеметрии: заменить фейковые env-метрики на серверный источник.
-2. `GBX-G1-S2` Полив-очередь: подключить кнопку авто-полива к серверному действию и очереди.
-3. `GBX-G1-S3` История полива: добавить журнал и подтверждение выполнения цикла.
+2. `GBX-G1-S2` Полив-очередь: подключить кнопку авто-полива к серверному действию и очереди. ✅
+3. `GBX-G1-S3` История полива: добавить журнал и подтверждение выполнения цикла. ✅
 
 Зависимость: шаги S1 → S2 → S3 выполняются только подряд.
 
