@@ -1867,3 +1867,20 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 - Formalized `/app/franchize` as extension-style plugin with explicit capabilities/exports/uses manifest.
 - Added hydration and contract docs so agents/operators can reason about public route surface and server/client boundaries.
 - Synced franchize todo checklist for formalization items and documented next split-ready follow-up work.
+
+
+### T49 — Greenbox integration runway decomposition (directional priority)
+- status: `done`
+- updated_at: `2026-03-17T00:00:00Z`
+- owner: `codex`
+- notes: Провёл разбор требований для greenbox integration, оформил новый directional пакет задач GBX-R1..GBX-R6 с фокусом на безопасные границы, матрицу интеграций и порядок рефакторинга на ходу.
+- next_step: Заклаимить первую задачу GBX-R1 в SupaPlan и зафиксировать контракт плагинов v0.1 перед реализацией UI/симулятора.
+- risks: Без фиксации контракта и очереди записи есть риск гонок симулятора и расползания архитектуры по маршрутам.
+- dependencies: T48
+- deliverables:
+  - `docs/GREENBOX_TESSERACT_GAMELAB_PLAN.md`
+
+### 2026-03-17 — T49 completion (Greenbox integration runway decomposition)
+- Added G8 section in `docs/GREENBOX_TESSERACT_GAMELAB_PLAN.md` with six ordered tasks (GBX-R1..GBX-R6) oriented around integration hardening and refactor-on-the-fly execution.
+- Documented concrete blockers: missing manifest validation, missing loader-time ownership gates, undefined sim alert lifecycle contract, and missing cross-route readiness visibility.
+- Prepared SupaPlan task creation scope so execution can start from contract freeze and move sequentially.
