@@ -210,6 +210,30 @@ New: **G7 — Plugin Ecosystem Boom + Distributed Collab**
 - Notes: Open for extensions (e.g., 3D visuals via domain-plugin, AI demon evolutions from web_search); integrate quota-sharing for collaborators' token limits.
 - Next_step: Contrib docs + security hardening (like OpenClaw bursts: type safety/refactors in 1,000 commits/day).
 
+New: **G8 — Greenbox integration runway (directional priority + refactor-on-the-fly)**
+- Status: `todo`
+- Owner: `codex`
+- Notes: Build a strict integration corridor so Greenbox can be shipped safely while architecture is still evolving.
+- Next_step: Execute GBX-R1..GBX-R6 in order; no parallel jumps before interface contracts are locked.
+
+### G8 task bundle (new SupaPlan-ready directional tasks)
+
+| ID | Task | Why now | Refactor-on-the-fly requirement | Exit criteria |
+|---|---|---|---|---|
+| GBX-R1 | Freeze plugin contract v0.1 (`channel-*`, `storage-*`, `sim-*`, `domain-*`) | Current plugin idea is broad but not enforceable | Split registry typings from runtime loader and add capability validation at load time | Contract doc + typed manifest schema + loader guardrails merged |
+| GBX-R2 | Build `greenbox integration matrix` page section in `/nexus` | Need operator visibility before deep implementation | Extract duplicated capability cards into shared component used by `/` + `/nexus` + `/greenbox` | Matrix lists required integrations, owner, risk, readiness score |
+| GBX-R3 | Server action boundary refactor for Greenbox writes | Prevent accidental client leaks while adding features fast | Move all privileged writes into `app/actions/greenbox.ts` and keep client components pure | No client import chain reaches service-role code paths |
+| GBX-R4 | Create simulator persistence queue (ordered writes) | Plant stats will race on mobile lag without ordering | Add write queue helper + explicit checkpoint save strategy for core stat updates | Out-of-order write reproduction test passes |
+| GBX-R5 | Add alert/ack handshake between sim and channel plugins | Gameplay loop needs deterministic incident lifecycle | Normalize alert event payload shape and ack state transition map | Alert appears, ack updates state, replay keeps consistency |
+| GBX-R6 | Add "integration done-check" CLI snapshot for SupaPlan | Need one-command reality check for operators before PR merge | Reuse SupaPlan skill script and export markdown summary of Greenbox integration readiness | CLI prints readiness table + missing blockers in CI-friendly format |
+
+### Integration blockers discovered during this pass
+
+1. There is no enforced plugin manifest schema yet; current manifests are descriptive, not validated.
+2. Runtime ownership boundaries are documented but not yet codified as a loader-time gate.
+3. Simulator lifecycle (`jitter -> alert -> ack -> replay`) is defined conceptually, but lacks a strict event contract.
+4. Cross-route operator visibility for integration readiness is missing, so prioritization depends on memory instead of dashboard truth.
+
 ---
 
 ## 8) Collaboration protocol (enhanced, plugin/game-aware)
