@@ -227,6 +227,21 @@ New: **G8 — Greenbox integration runway (directional priority + refactor-on-th
 | GBX-R5 | Add alert/ack handshake between sim and channel plugins | Gameplay loop needs deterministic incident lifecycle | Normalize alert event payload shape and ack state transition map | Alert appears, ack updates state, replay keeps consistency |
 | GBX-R6 | Add "integration done-check" CLI snapshot for SupaPlan | Need one-command reality check for operators before PR merge | Reuse SupaPlan skill script and export markdown summary of Greenbox integration readiness | CLI prints readiness table + missing blockers in CI-friendly format |
 
+### UX integration guardrails (fake-first visual motivation)
+
+These constraints must be remembered in every GBX-R* implementation step so Greenbox stays emotionally engaging while hardware is still pending:
+
+1. **Pleasant gardener art direction over enterprise dashboard look.**
+   UI should feel warm, alive, and hobby-friendly (home greenhouse mood), not sterile NOC panel style.
+2. **Theme-safe contrast is a release criterion.**
+   Hero titles, key metrics, and CTA labels must remain readable in both light and dark themes (no dark-on-dark, no washed-out light text).
+3. **Fake-first visual shells are strategic, not cosmetic debt.**
+   Before hardware adapters land, each fake door should be visually believable and clearly mapped to an unfake task token.
+4. **Adaptive-by-default layout contract.**
+   Mobile-first readability (no zoom required), tablet continuity, desktop richness. Grid collapse behavior must preserve scanability.
+5. **Unfake work must not degrade UX warmth.**
+   During server wiring/refactors, keep emotional quality bar intact so momentum and operator motivation are preserved.
+
 ### Integration blockers discovered during this pass
 
 1. There is no enforced plugin manifest schema yet; current manifests are descriptive, not validated.
