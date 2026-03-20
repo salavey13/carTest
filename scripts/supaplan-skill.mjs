@@ -3,6 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 const [command, ...args] = process.argv.slice(2);
@@ -154,6 +155,149 @@ function extractTaskIdFromText(text) {
   if (!text) return null;
   const match = text.match(SUPAPLAN_TASK_REF_REGEX);
   return match?.[1] ?? null;
+}
+
+function listPluginManifestFiles(rootDir = 'app') {
+  const manifests = [];
+  const queue = [rootDir];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || !existsSync(current)) continue;
+
+    for (const entry of readdirSync(current)) {
+      const full = `${current}/${entry}`;
+      const stats = statSync(full);
+      if (stats.isDirectory()) {
+        queue.push(full);
+        continue;
+      }
+      if (entry === 'plugin.ts') manifests.push(full);
+    }
+  }
+
+  return manifests;
+}
+
+function parsePluginManifest(filePath) {
+  const source = readFileSync(filePath, 'utf8');
+  const normalized = source.replace(/\r\n/g, '\n');
+  const match = normalized.match(/export\s+const\s+plugin\s*=\s*(\{[\s\S]*?\})\s*;?/);
+  if (!match) {
+    return { ok: false, error: 'Cannot find `export const plugin = { ... }` block.' };
+  }
+
+  let objectLiteral = match[1];
+  objectLiteral = objectLiteral.replace(/(\w+)\s*:/g, '"$1":');
+  objectLiteral = objectLiteral.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+
+  try {
+    return { ok: true, value: JSON.parse(objectLiteral) };
+  } catch (error) {
+    return { ok: false, error: `Failed to parse plugin manifest object: ${normalizeError(error)}` };
+  }
+}
+
+function validatePluginManifestShape(filePath, manifest) {
+  const requiredStringFields = ['name', 'description', 'version'];
+  const requiredArrayFields = ['uses', 'exports', 'capabilities'];
+  const errors = [];
+  const warnings = [];
+
+  for (const key of requiredStringFields) {
+    if (typeof manifest[key] !== 'string' || manifest[key].trim().length === 0) {
+      errors.push(`${key} must be a non-empty string`);
+    }
+  }
+
+  for (const key of requiredArrayFields) {
+    if (!Array.isArray(manifest[key])) {
+      errors.push(`${key} must be an array`);
+      continue;
+    }
+
+    if (manifest[key].length === 0) {
+      warnings.push(`${key} is empty`);
+    }
+
+    for (const item of manifest[key]) {
+      if (typeof item !== 'string' || item.trim().length === 0) {
+        errors.push(`${key} entries must be non-empty strings`);
+        break;
+      }
+    }
+  }
+
+  if (typeof manifest.version === 'string' && !/^\d+\.\d+(\.\d+)?$/.test(manifest.version)) {
+    warnings.push('version should follow semver-like format (x.y or x.y.z)');
+  }
+
+  if (filePath.includes('/greenbox/') && !manifest.capabilities?.some((cap) => String(cap).startsWith('greenbox'))) {
+    warnings.push('greenbox manifest should include at least one capability prefixed with `greenbox`');
+  }
+
+  if (filePath.includes('/franchize/') && !manifest.capabilities?.some((cap) => String(cap).startsWith('franchize'))) {
+    warnings.push('franchize manifest should include at least one capability prefixed with `franchize`');
+  }
+
+  return { errors, warnings };
+}
+
+function validateFranchizeContractDoc() {
+  const contractPath = 'docs/FRANCHIZE_METADATA_CONTRACT.md';
+  if (!existsSync(contractPath)) {
+    return {
+      ok: false,
+      error: `Missing ${contractPath}. FRZ-R1 requires a frozen metadata + fallback contract document.`,
+    };
+  }
+
+  const doc = readFileSync(contractPath, 'utf8');
+  const requiredMarkers = ['## Frozen metadata contract (FRZ-R1)', '## Fallback matrix', '## Compatibility guarantee'];
+  const missingMarkers = requiredMarkers.filter((marker) => !doc.includes(marker));
+
+  if (missingMarkers.length > 0) {
+    return {
+      ok: false,
+      error: `${contractPath} is missing required sections: ${missingMarkers.join(', ')}`,
+    };
+  }
+
+  return { ok: true };
+}
+
+function validatePluginContracts() {
+  const manifestFiles = listPluginManifestFiles();
+  const report = {
+    ok: true,
+    checked: manifestFiles.length,
+    manifests: [],
+    contractGuards: [],
+  };
+
+  for (const filePath of manifestFiles) {
+    const parsed = parsePluginManifest(filePath);
+    if (!parsed.ok) {
+      report.ok = false;
+      report.manifests.push({ file: filePath, ok: false, errors: [parsed.error], warnings: [] });
+      continue;
+    }
+
+    const { errors, warnings } = validatePluginManifestShape(filePath, parsed.value);
+    if (errors.length > 0) report.ok = false;
+    report.manifests.push({ file: filePath, ok: errors.length === 0, errors, warnings });
+  }
+
+  const franchizeContract = validateFranchizeContractDoc();
+  report.contractGuards.push({
+    name: 'franchize-metadata-contract',
+    ok: franchizeContract.ok,
+    error: franchizeContract.ok ? null : franchizeContract.error,
+  });
+  if (!franchizeContract.ok) report.ok = false;
+
+  console.log(JSON.stringify(report, null, 2));
+  if (!report.ok) process.exit(1);
 }
 
 
@@ -644,10 +788,11 @@ const runners = {
   'smoke-flow': smokeFlow,
   'status': status,
   'add-task': addTask,
+  'validate-plugin-contracts': validatePluginContracts,
 };
 
 if (!command || !runners[command]) {
-  console.error('Usage: node scripts/supaplan-skill.mjs <pick-task|update-status|task-status|log-event|inspect-migrations|review-merge-workflow|smoke-flow|status|add-task> [--key value] (pick-task supports --capability <name|auto> --agentId <id> --dry-run; add-task supports --title --capability [--todoPath])');
+  console.error('Usage: node scripts/supaplan-skill.mjs <pick-task|update-status|task-status|log-event|inspect-migrations|review-merge-workflow|smoke-flow|status|add-task|validate-plugin-contracts> [--key value] (pick-task supports --capability <name|auto> --agentId <id> --dry-run; add-task supports --title --capability [--todoPath])');
   process.exit(1);
 }
 
