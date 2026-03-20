@@ -190,6 +190,19 @@ Hard reminder (learned from regressions): do **not** assume one SupaPlan source 
 Cross-check at least map + mindmap + app docs before changing claim/state/merge automation.
 If any referenced file is missing or moved, explicitly log that mismatch in your final report and PR body.
 
+### 6.3) Fast-start protocol for parallel-ready task design (new default for broad asks)
+
+When operator asks for "do several tasks" or broad integration pushes, use this startup sequence:
+
+1. **Claim check first:** run `inspect-migrations` + `pick-task`. If no claimable task exists, explicitly switch to backlog-shaping mode.
+2. **State snapshot:** run `status` and extract open buckets by capability (this is your parallelization map).
+3. **Dependency split:** create one blocking contract task (`R1`) and 2-3 independent tasks (`R2/R3/...`) that can start only after blocker done.
+4. **Hotspot isolation:** assign each independent task a different primary file zone to reduce merge conflicts.
+5. **SupaPlan write-back:** add tasks via CLI (`add-task`) and mirror the dependency plan in the relevant domain docs (`docs/THE_FRANCHEEZEPLAN.md`, Greenbox plan, etc.).
+6. **Execution hinting:** in final summary, suggest which capabilities can run in parallel right now and which one remains the blocker.
+
+This keeps autonomy high while preserving deterministic merge order.
+
 ---
 
 ## 7) Documentation contract
