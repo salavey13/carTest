@@ -1665,6 +1665,7 @@ Append only compact session deltas here as pointers when needed; full narrative 
 - 2026-03-20: Провёл SupaPlan-разбиение franchize интеграции на FRZ-R1/FRZ-R2/FRZ-R3 с явными зависимостями; FRZ-R1 блокирует контракт, FRZ-R2 и FRZ-R3 разрешены параллельно после фикса контракта.
 - 2026-03-20: Выполнен cleanup истории: длинный хвост execution-логов вынесен в `docs/THE_FRANCHEEZEPLAN_HISTORY_ARCHIVE.md`, активный план оставлен компактным для параллельной работы новых участников.
 - 2026-03-20: Добавлены дополнительные клиентские SupaPlan-дорожки FRZ-R4/FRZ-R5 для ускоренного онбординга партнёров и прозрачной KPI-коммуникации.
+- 2026-03-20: FRZ-R1 закрыт как блокирующий шаг: зафиксирован контракт метаданных и fallback-матрица в `docs/FRANCHIZE_METADATA_CONTRACT.md`; FRZ-R2/FRZ-R3/FRZ-R4/FRZ-R5 теперь можно выполнять параллельно.
 
 ---
 

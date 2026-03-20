@@ -1,6 +1,6 @@
 # VIP-BIKE + GREENBOX — Client onboarding brief (parallel-ready)
 
-Status date: 2026-03-20
+Status date: 2026-03-20 (updated after blocker pass)
 Audience: potential partner/client + new contributors joining in parallel.
 
 ## 1) What already works today (VIP-BIKE / franchize)
@@ -22,8 +22,10 @@ Audience: potential partner/client + new contributors joining in parallel.
 
 ## 2) What is planned next (VIP-BIKE / franchize)
 
-### Contract-first blocker (must go first)
-- **FRZ-R1** (`franchize.integration`): freeze metadata + fallback contract.
+### Contract blocker status
+- ✅ **FRZ-R1** (`franchize.integration`) completed:
+  - frozen metadata + fallback contract documented in `docs/FRANCHIZE_METADATA_CONTRACT.md`;
+  - parallel lanes can now proceed without contract drift.
 
 ### Parallel lanes (after FRZ-R1)
 - **FRZ-R2** (`franchize.telegram`): checkout callback parity with Telegram bridge.
@@ -42,14 +44,16 @@ Why this matters for client onboarding:
 - Fake-door UX and scenario framing already make demos understandable for non-technical users.
 
 ### Current gaps (known and planned)
-- No strict runtime manifest validator yet.
+- Manifest validator baseline is now available via SupaPlan CLI (`validate-plugin-contracts`); deeper runtime loader enforcement remains planned.
 - Simulator persistence ordering requires stronger race-condition protection.
 - Franchize x Greenbox shared inventory bridge still conceptual.
 
 ## 4) Greenbox next roadmap (parallel-ready)
 
-### Contract-first blocker
-- **GBX-R7** (`greenbox.platform`): plugin manifest validator + contract guards.
+### Contract blocker status
+- ✅ **GBX-R7** (`greenbox.platform`) completed:
+  - plugin manifest validator command added to SupaPlan CLI;
+  - validator now checks plugin manifests and franchize contract guard doc presence.
 
 ### Parallel lanes (after GBX-R7)
 - **GBX-R8** (`greenbox.simulator`): ordered write queue + replay guard.
@@ -79,5 +83,4 @@ Why this matters for client onboarding:
 - `68db3501-debc-4b7f-8ef1-295d455bf958` — GBX-R10 demo scenario pack.
 - `a4d7a5aa-c820-4002-88c1-fedcdc463ce0` — GBX-R11 storytelling cards.
 
-These can be executed by separate contributors once contract blockers (FRZ-R1 and GBX-R7) are finished.
-
+These are now unblocked and can be executed by separate contributors immediately.
