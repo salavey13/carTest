@@ -18,7 +18,7 @@ type ServiceItem = { icon: string; text: string };
 const InfoItem = ({ icon, children }: { icon: string; children: React.ReactNode }) => (
   <div className="flex items-start gap-3">
     <VibeContentRenderer content={icon} className="mt-1 flex-shrink-0 text-xl text-accent-text" />
-    <p className="text-foreground/90">{children}</p>
+    <p className="text-white/90">{children}</p>
   </div>
 );
 
@@ -46,19 +46,20 @@ const ServiceCard = ({
   imageUrl?: string;
   borderColorClass?: string;
 }) => (
-  <Card className={cn("group relative overflow-hidden border bg-black", borderColorClass || "border-border")}> 
+  <Card className={cn("group relative overflow-hidden border bg-neutral-950/80 shadow-xl shadow-black/20", borderColorClass || "border-border/70")}>
     {imageUrl && (
       <Image
         src={imageUrl}
         alt={title}
         fill
-        className="absolute inset-0 object-cover opacity-40 transition-opacity duration-300 group-hover:opacity-55"
+        className="absolute inset-0 object-cover opacity-55 transition-opacity duration-300 group-hover:opacity-70"
       />
     )}
-    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent/10" />
+    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/45 to-black/10" />
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,170,90,0.18),transparent_52%)]" />
     <div className="relative flex h-full flex-col p-6">
       <CardHeader className="mb-4 p-0">
-        <CardTitle className={cn("flex items-center gap-3 text-2xl", borderColorClass?.replace("border-", "text-"))}>
+        <CardTitle className={cn("flex items-center gap-3 text-2xl text-white drop-shadow-[0_4px_10px_rgba(0,0,0,0.55)]", borderColorClass?.replace("border-", "text-"))}>
           <VibeContentRenderer content={icon} />
           {title}
         </CardTitle>
