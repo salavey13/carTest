@@ -17,7 +17,7 @@ import type { CyberFitnessProfile } from "@/types/cyberFitness";
 
 import { format, subDays, parseISO, isValid } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Sparkles, ExternalLink, GitBranch, Orbit } from "lucide-react";
+import { ArrowRight, BadgePercent, CircleDollarSign, ExternalLink, FileSignature, GitBranch, MessageCircle, Orbit, ShieldCheck, Sparkles } from "lucide-react";
 
 const CHART_COLORS = [
   'hsl(var(--brand-purple))', 'hsl(var(--brand-pink))', 'hsl(var(--brand-cyan))',
@@ -39,7 +39,22 @@ const buildRollingActivityTemplate = (anchorDate: Date): Array<DailyActivityReco
   });
 
 const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png";
-const FEATURED_QUEST_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250510_035401-e6d0b2d8-9f28-4516-a5c7-fe729b31f736.jpg"; // Consider localizing alt text if needed
+const FEATURED_QUEST_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250510_035401-e6d0b2d8-9f28-4516-a5c7-fe729b31f736.jpg";
+const INVESTMENT_HERO_IMAGE = "https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1600&q=80";
+const ILYA_CONTACT_LINK = "https://t.me/salavey13";
+
+const investmentHighlights = [
+  { icon: BadgePercent, title: "20–60% годовых", description: "Доходность зависит от формата участия, сезона и структуры сделки." },
+  { icon: CircleDollarSign, title: "Вход от 500 т₽", description: "Можно зайти с понятным стартовым чеком и масштабировать участие позже." },
+  { icon: FileSignature, title: "Работаем по договору", description: "Фиксируем условия, формат выплат и сценарии выхода заранее." },
+  { icon: ShieldCheck, title: "Выплаты каждый месяц", description: "Регулярный денежный поток и прозрачная логика взаимодействия." },
+];
+
+const conversionBullets = [
+  "Выход из проекта — в любое время за 1 месяц.",
+  "Разные варианты сотрудничества: займ, доля, совместные сделки, развитие парка.",
+  "Подходит тем, кто любит мотоциклы, но хочет зарабатывать на них системно, а не только кататься.",
+];
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -117,7 +132,7 @@ export default function Home() {
   let currentLevel = 0;
 
   if (!isLoading) { 
-    if (appContextError || cyberProfile?.cognitiveOSVersion?.includes("Аномалия") || cyberProfile?.cognitiveOSVersion?.includes("Ошибка") || cyberProfile?.cognitiveOSVersion?.includes("Exception")) { // Assuming Load Exception is in Russian
+    if (appContextError || cyberProfile?.cognitiveOSVersion?.includes("Аномалия") || cyberProfile?.cognitiveOSVersion?.includes("Ошибка") || cyberProfile?.cognitiveOSVersion?.includes("Exception")) {
       userNameDisplay = 'Агент (Аномалия)';
       osVersionDisplay = cyberProfile?.cognitiveOSVersion || "v0.1 Системная Аномалия";
     } else if (dbUser?.user_id && cyberProfile) {
@@ -256,12 +271,75 @@ export default function Home() {
           </Card>
         </motion.div>
 
+        <motion.section variants={itemVariants}>
+          <Card className="overflow-hidden border-white/10 bg-[#050816]/85 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+            <div className="relative isolate overflow-hidden">
+              <div
+                className="absolute inset-0 bg-cover bg-center scale-105"
+                style={{ backgroundImage: `linear-gradient(115deg, rgba(2,6,23,0.92), rgba(17,24,39,0.78), rgba(120,53,15,0.56)), url(${INVESTMENT_HERO_IMAGE})` }}
+              />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.22),transparent_30%),radial-gradient(circle_at_left,rgba(59,130,246,0.16),transparent_35%)]" />
+              <CardContent className="relative z-10 grid gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[1.2fr_0.8fr] lg:gap-8 lg:px-8 lg:py-8">
+                <div className="space-y-5">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-amber-200">
+                    <BadgePercent className="h-3.5 w-3.5" /> Инвестиции в мотоиндустрию
+                  </div>
+                  <div className="space-y-3">
+                    <h2 className="max-w-3xl text-3xl font-black leading-tight text-white sm:text-4xl lg:text-5xl">
+                      Любишь мотоциклы? Сделай их новым источником дохода.
+                    </h2>
+                    <p className="max-w-2xl text-base text-white/80 sm:text-lg">
+                      Зарабатывай на мотоциклах <span className="font-semibold text-amber-300">20–60% годовых</span> — с прозрачными условиями, ежемесячными выплатами и понятной моделью входа.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {investmentHighlights.map(({ icon: Icon, title, description }) => (
+                      <div key={title} className="rounded-2xl border border-white/10 bg-white/8 p-4 backdrop-blur-sm">
+                        <Icon className="mb-3 h-5 w-5 text-amber-300" />
+                        <div className="text-sm font-semibold text-white">{title}</div>
+                        <div className="mt-1 text-sm text-white/70">{description}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Button asChild size="lg" className="bg-amber-400 text-slate-950 hover:bg-amber-300 font-semibold shadow-[0_12px_40px_rgba(251,191,36,0.28)]">
+                      <Link href="/moto-investments">Открыть страницу инвестора <ArrowRight className="ml-2 h-4 w-4" /></Link>
+                    </Button>
+                    <Button asChild size="lg" variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white">
+                      <a href={ILYA_CONTACT_LINK} target="_blank" rel="noopener noreferrer">Написать Илье Сидорову <MessageCircle className="ml-2 h-4 w-4" /></a>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-slate-950/55 p-5 backdrop-blur-md">
+                  <div className="text-sm uppercase tracking-[0.2em] text-amber-200/80">Почему это цепляет</div>
+                  <h3 className="mt-2 text-2xl font-bold text-white">Оффер, который продаёт эмоцию и надёжность одновременно</h3>
+                  <ul className="mt-5 space-y-3 text-sm text-white/75">
+                    {conversionBullets.map((bullet) => (
+                      <li key={bullet} className="flex gap-3">
+                        <span className="mt-1 h-2 w-2 rounded-full bg-amber-300" />
+                        <span>{bullet}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm text-emerald-50">
+                    <div className="font-semibold">Что я улучшил для лучшего привлечения инвестиций</div>
+                    <p className="mt-2 text-emerald-50/85">
+                      Добавил сильный hero-блок с фото, конкретные цифры входа и доходности, блок доверия и мгновенный CTA на личный контакт. Это сокращает путь от интереса к диалогу.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </div>
+          </Card>
+        </motion.section>
+
         <motion.div variants={itemVariants}>
           <Card className="featured-quest-card group">
             <CardHeader className="flex flex-row items-center justify-between pb-2 pt-3 px-4 md:px-5">
               <div>
                 <CardTitle className="text-lg sm:text-xl font-orbitron text-brand-yellow">Приоритетные Директивы</CardTitle>
-                <CardDescription className="text-muted-foreground font-mono text-xs">Задачи для уровня {currentLevel}+</CardDescription>
+                <CardDescription className="text-muted-foreground font-mono text-xs">Задачи для уровня {currentLevel}+ </CardDescription>
               </div>
               <Button asChild variant="outline" size="xs" className="border-brand-yellow text-brand-yellow hover:bg-brand-yellow/10 hover:text-white font-mono text-xs px-2 py-1 h-auto group-hover:border-brand-pink group-hover:text-brand-pink">
                 <Link href="/selfdev/gamified" className="flex items-center">
