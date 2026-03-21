@@ -260,7 +260,8 @@ export default function HomePage() {
           <ServiceCard
             title="Требования"
             icon="::FaClipboardList::"
-            borderColorClass="border-secondary text-secondary"
+            borderColorClass="border-secondary text-accent"
+            imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/fon-8f9c72b7-c622-4159-98da-64173322eae4.jpg"
             items={[
               { icon: "::FaUserClock::", text: "Возраст от 23 лет" },
               { icon: "::FaIdCard::", text: "Паспорт и В/У категории 'А' (есть скутеры без 'А')" },
