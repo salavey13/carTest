@@ -1620,6 +1620,34 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - После FRZ-R1 формат данных заказа детерминированно совпадает между `/franchize` и callback-потоком.
   - FRZ-R2 и FRZ-R3 можно выполнять параллельно без изменения одних и тех же модулей.
 
+
+### T52 — VIP BIKE MapRiders live-map surface
+- status: `done`
+- updated_at: `2026-03-22T11:30:00Z`
+- owner: `codex`
+- notes: По явному запросу оператора добавлена отдельная страница `/franchize/[slug]/map-riders` для VIP BIKE: live-карта райдеров, включение/остановка геошеринга, meetup-пины, маршрутный replay, статистика по заездам и недельный лидерборд. Добавлены API-ручки и миграция таблиц `map_rider_*`, а также кнопки входа с главного VIPBIKE-экрана и футера.
+- next_step: Прогнать миграцию в рабочей Supabase, затем подключить crew-membership ACL и Telegram bot callback для нативного live-location bridge.
+- risks: Текущая версия использует browser geolocation внутри WebApp/браузера; для полного parity с Telegram Live Location нужен отдельный бот-мост на стороне Telegram update handlers.
+- dependencies: none
+- deliverables:
+  - `app/franchize/[slug]/map-riders/page.tsx`
+  - `app/franchize/components/MapRidersClient.tsx`
+  - `app/api/map-riders/*`
+  - `lib/map-riders.ts`
+  - `supabase/migrations/20260322110000_map_riders.sql`
+  - `app/vipbikerental/page.tsx`
+  - `components/BikeFooter.tsx`
+- implementation checklist:
+  1. Добавить отдельный rider-map маршрут в franchize shell с кнопкой входа из VIPBIKE home.
+  2. Собрать live-карту поверх `VibeMap`: активные райдеры, meetup-пины и выбранный route replay.
+  3. Реализовать start/stop session + точечные location updates + weekly leaderboard snapshot через новые API-ручки.
+  4. Вести статистику заезда: дистанция, средняя скорость, максимум, длительность и просмотр сохранённого маршрута.
+  5. Добавить несколько уместных бонусов: Convoy Pulse, Telegram-share мост, meetup-комментарии.
+- acceptance criteria:
+  - У VIP BIKE есть отдельная страница MapRiders, доступная кнопкой с главного экрана.
+  - Авторизованный райдер может включить геошеринг, писать трек и завершать заезд с сохранением статистики.
+  - Все пользователи видят активных райдеров, meetup-точки, историю заездов и недельный лидерборд.
+
 ## 6) Task template for future extension
 
 When adding a new task, copy this block:
