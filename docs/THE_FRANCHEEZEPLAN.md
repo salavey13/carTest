@@ -1620,6 +1620,26 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - После FRZ-R1 формат данных заказа детерминированно совпадает между `/franchize` и callback-потоком.
   - FRZ-R2 и FRZ-R3 можно выполнять параллельно без изменения одних и тех же модулей.
 
+### T52 — Seqvenz Zero catalog sync for VIP Bike
+- status: `done`
+- updated_at: `2026-03-22T00:00:00Z`
+- owner: `codex`
+- notes: Добавил новый электробайк Seqvenz Zero в витрину VIP Bike, загрузил фото в Supabase Storage и синхронизировал запись в `cars` + миграцию для повторяемого bootstrap.
+- next_step: При следующем проходе добавить расширенное описание, точные характеристики батареи/разгона и финальный прайс.
+- risks: Цена пока временная, потому что оператор дал только базовое позиционирование; подробные коммерческие поля нужно уточнить отдельно.
+- dependencies: none
+- deliverables:
+  - `supabase/migrations/20260322120000_add_seqvenz_zero.sql`
+  - `lib/fleet-manifest.ts`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Загрузить операторские фото Seqvenz Zero в публичный bucket.
+  2. Создать/обновить карточку `cars` с VIP Bike `crew_id` и базовыми спеками.
+  3. Зафиксировать изменение миграцией и локальным manifest-списком.
+- acceptance criteria:
+  - Seqvenz Zero доступен в базе и может гидратиться на storefront как bike-карточка.
+  - Галерея содержит все загруженные фото из текущего запроса.
+
 ## 6) Task template for future extension
 
 When adding a new task, copy this block:
@@ -1666,6 +1686,7 @@ Append only compact session deltas here as pointers when needed; full narrative 
 - 2026-03-20: Выполнен cleanup истории: длинный хвост execution-логов вынесен в `docs/THE_FRANCHEEZEPLAN_HISTORY_ARCHIVE.md`, активный план оставлен компактным для параллельной работы новых участников.
 - 2026-03-20: Добавлены дополнительные клиентские SupaPlan-дорожки FRZ-R4/FRZ-R5 для ускоренного онбординга партнёров и прозрачной KPI-коммуникации.
 - 2026-03-20: FRZ-R1 закрыт как блокирующий шаг: зафиксирован контракт метаданных и fallback-матрица в `docs/FRANCHIZE_METADATA_CONTRACT.md`; FRZ-R2/FRZ-R3/FRZ-R4/FRZ-R5 теперь можно выполнять параллельно.
+- 2026-03-22: По операторскому запросу добавлен новый товар Seqvenz Zero для `vip-bike`: фото загружены в Supabase Storage, запись синхронизирована напрямую в `public.cars`, а повторяемый upsert закреплён отдельной миграцией.
 
 ---
 
