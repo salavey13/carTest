@@ -276,6 +276,7 @@ const defaultFranchizeConfig: FranchizeConfigInput = {
   socialLinksText: "Telegram|https://t.me/oneBikePlsBot",
   menuLinksText: [
     "Каталог|/franchize/{slug}",
+    "Map Riders|/franchize/{slug}/map-riders",
     "О нас|/franchize/{slug}/about",
     "Контакты|/franchize/{slug}/contacts",
     "Корзина|/franchize/{slug}/cart",
@@ -303,6 +304,7 @@ function readPath<T>(obj: unknown, path: string[], fallback: T): T {
 
 const fallbackMenuLinks = (slug: string) => [
   { label: "Каталог", href: `/franchize/${slug}` },
+  { label: "Map Riders", href: `/franchize/${slug}/map-riders` },
   { label: "О нас", href: `/franchize/${slug}/about` },
   { label: "Контакты", href: `/franchize/${slug}/contacts` },
   { label: "Корзина", href: `/franchize/${slug}/cart` },
@@ -451,10 +453,17 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const franchize = (metadata.franchize ?? metadata) as UnknownRecord;
 
     const themePalette = resolvePaletteByMode(franchize);
-    const menuLinks = readPath(franchize, ["header", "menuLinks"], fallbackMenuLinks(safeSlug)).map((link) => ({
+    const menuLinksRaw = readPath(franchize, ["header", "menuLinks"], fallbackMenuLinks(safeSlug)).map((link) => ({
       ...link,
       href: withSlug(link.href, crew.slug ?? safeSlug),
     }));
+    const menuLinks = menuLinksRaw.some((link) => link.href === `/franchize/${crew.slug ?? safeSlug}/map-riders`)
+      ? menuLinksRaw
+      : [
+          ...menuLinksRaw.slice(0, 1),
+          { label: "Map Riders", href: `/franchize/${crew.slug ?? safeSlug}/map-riders` },
+          ...menuLinksRaw.slice(1),
+        ];
 
     const metadataShowcaseGroups = readPath(franchize, ["catalog", "showcaseGroups"], []) as Array<UnknownRecord>;
     const defaultShowcaseGroups: FranchizeCrewVM["catalog"]["showcaseGroups"] = [
