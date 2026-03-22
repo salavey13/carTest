@@ -6,6 +6,19 @@ Scope: Motorbike rental franchise-ready public UX (`/franchize/*`) with Pepperol
 
 ---
 
+## Franchise execution diary
+
+### Task FR-019 — VIP Bike marketplace tab from home page
+- status: `done`
+- updated_at: `2026-03-22T00:00:00Z`
+- owner: `codex`
+- notes: `Добавлена новая вкладка /bike-market с витриной продажи новых и Б/У мотоциклов, Avito sync UI, paywall 500₽, блоками безопасной сделки, формой покупки и отзывами; ссылка выведена на главную.`
+- next_step: `Подключить реальные server actions / persistence для объявлений, Avito ingestion и sandbox-оплату.`
+- risks: `Текущая реализация — UI/demo without live backend integration or payment processing.`
+
+### Changelog / diary
+- 2026-03-22 — Добавлен первый публичный marketplace-экран для продажи байков и вход с главной страницы. Зафиксирован как demo-ready слой для следующей серверной итерации.
+
 ## 0) Goal and operating mode
 
 ### Product goal

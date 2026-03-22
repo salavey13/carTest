@@ -232,7 +232,7 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent className="px-4 md:px-5 pb-4 pt-1">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
                 <Button asChild variant="outline" className="justify-between border-brand-cyan/40 hover:border-brand-cyan hover:bg-brand-cyan/10">
                   <a href="https://chatgpt.com/codex" target="_blank" rel="noopener noreferrer">
                     <span className="inline-flex items-center"><ExternalLink className="mr-2 h-4 w-4" />Codex</span>
@@ -249,6 +249,12 @@ export default function Home() {
                   <Link href="/repo-xml">
                     <span className="inline-flex items-center"><GitBranch className="mr-2 h-4 w-4" />Repo XML</span>
                     <span className="text-[10px] font-mono text-muted-foreground">dev flow</span>
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="justify-between border-emerald-400/40 hover:border-emerald-300 hover:bg-emerald-400/10">
+                  <Link href="/bike-market">
+                    <span className="inline-flex items-center">🏍️<span className="ml-2">Bike Market</span></span>
+                    <span className="text-[10px] font-mono text-muted-foreground">new + б/у</span>
                   </Link>
                 </Button>
               </div>
