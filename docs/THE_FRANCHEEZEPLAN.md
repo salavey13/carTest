@@ -1625,7 +1625,7 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - status: `done`
 - updated_at: `2026-03-22T11:30:00Z`
 - owner: `codex`
-- notes: По явному запросу оператора добавлена отдельная страница `/franchize/[slug]/map-riders` для VIP BIKE: live-карта райдеров, включение/остановка геошеринга, meetup-пины, маршрутный replay, статистика по заездам и недельный лидерборд. Добавлены API-ручки и миграция таблиц `map_rider_*`, а также кнопки входа с главного VIPBIKE-экрана и футера.
+- notes: По явному запросу оператора добавлена отдельная страница `/franchize/[slug]/map-riders` для VIP BIKE: live-карта райдеров, включение/остановка геошеринга, meetup-пины, маршрутный replay, статистика по заездам и недельный лидерборд. Добавлены API-ручки и миграция таблиц `map_rider_*`, а также кнопки входа с главного VIPBIKE-экрана, футера и franchize-меню.
 - next_step: Прогнать миграцию в рабочей Supabase, затем подключить crew-membership ACL и Telegram bot callback для нативного live-location bridge.
 - risks: Текущая версия использует browser geolocation внутри WebApp/браузера; для полного parity с Telegram Live Location нужен отдельный бот-мост на стороне Telegram update handlers.
 - dependencies: none
