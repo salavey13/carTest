@@ -115,6 +115,23 @@ export const V_FLEET_ASSETS: VehicleAsset[] = [
     description: "Итальянский шедевр. Экстремальный нейкед с четырехцилиндровым двигателем и потрясающим дизайном. Для самых искушенных пилотов.",
     daily_price_rub: 14000, image_url: '', type: 'bike', owner_id: '356282674', is_verified: false,
     specs: { category: 'Naked', gallery: [] }
+  },
+  {
+    id: 'seqvenz-zero', make: 'Seqvenz', model: 'Zero',
+    description: "Мощный крутой электробайк с дерзким силуэтом и уверенной тягой. Мощность двигателя 15–30 кВт, запас хода до 300 километров. Базовую карточку уже добавили, расширенное описание и детали дополним следующим апдейтом.",
+    daily_price_rub: 15000,
+    image_url: 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/seqvenz-zero/image_1.jpg',
+    type: 'bike', owner_id: '356282674', is_verified: true,
+    specs: { category: 'Naked', gallery: [
+      'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/seqvenz-zero/image_1.jpg',
+      'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/seqvenz-zero/image_2.jpg',
+      'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/seqvenz-zero/image_3.jpg',
+      'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/seqvenz-zero/image_4.jpg',
+      'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/seqvenz-zero/image_5.jpg',
+      'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/seqvenz-zero/image_6.jpg',
+      'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/seqvenz-zero/image_7.jpg',
+      'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/seqvenz-zero/image_8.jpg'
+    ] }
   }
 ];
 
