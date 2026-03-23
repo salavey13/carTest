@@ -1508,6 +1508,13 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 - dependencies: T48
 
 - subtask tracking:
+  - **T49.11 — Item modal gallery rail correction + VIP Bike Rental launch tile**
+    - status: `done`
+    - owner: `codex`
+    - updated_at: `2026-03-23T20:05:00Z`
+    - notes: Narrowed the scope back to the actual storefront ask: item modal gallery now presents the hero image first with a wrapping thumbnail rail below it (no horizontal swipe trap for Telegram webview), modal scroll ownership is simplified to avoid nested-scroll hiccups, modal option copy is Russian-first, and the shared capability launch grid links to `/vipbikerental` instead of Greenbox when the optional fourth tile is enabled.
+    - risks: `/greenbox` now also shows the VIP Bike Rental launch tile because the shared component stays unified across surfaces.
+    - next_step: Keep future shared-launch tweaks scoped to operator-requested destinations only; avoid unrelated Greenbox additions during franchize polish passes.
   - **T49.10 — Remove mistaken flat admin redirects + mobile overflow polish**
     - status: `done`
     - owner: `codex`

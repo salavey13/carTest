@@ -89,6 +89,21 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (!vehicleToEdit) return;
+    setType((vehicleToEdit.type as CarType) ?? "bike");
+    setMake(vehicleToEdit.make ?? "");
+    setModel(vehicleToEdit.model ?? "");
+    setDescription(vehicleToEdit.description ?? "");
+    setDailyPrice(vehicleToEdit.daily_price ? String(vehicleToEdit.daily_price) : "0");
+    setImageUrl(vehicleToEdit.image_url ?? "");
+    setRentLink(vehicleToEdit.rent_link ?? "");
+    setIsTest(Boolean(vehicleToEdit.is_test_result));
+    setOwnerIdState(ownerId ?? vehicleToEdit.owner_id ?? null);
+    setImagePreview(vehicleToEdit.image_url ?? null);
+    setImageFile(null);
+  }, [ownerId, vehicleToEdit]);
+
+  useEffect(() => {
     if (vehicleToEdit?.specs && typeof vehicleToEdit.specs === "object") {
       const s = vehicleToEdit.specs as Record<string, any>;
       const entries = Object.entries(s).filter(([k]) => k !== "gallery" && k !== "title" && k !== "slug" && k !== "excerpt" && k !== "content" && k !== "tags");
@@ -110,8 +125,20 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
         setStreamSlug(vehicleToEdit.model ?? "");
         setStreamSpecsRaw(JSON.stringify(s, null, 2));
       }
+    } else {
+      setSpecs([]);
+      setGallery([]);
+      setVinValue("");
+      setBlogTitle("");
+      setBlogSlug(vehicleToEdit?.model ?? "");
+      setBlogExcerpt("");
+      setBlogContent("");
+      setBlogTags("");
+      setStreamTitle("");
+      setStreamSlug(vehicleToEdit?.model ?? "");
+      setStreamSpecsRaw(defaultStreamTemplate);
     }
-  }, [vehicleToEdit]);
+  }, [defaultStreamTemplate, vehicleToEdit]);
 
   function addSpec() {
     setSpecs((prev) => [...prev, { id: uuidv4(), key: "", value: "" }]);
@@ -319,11 +346,11 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       onSubmit={handleSubmit}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4 bg-card/95 p-4 md:p-6 rounded-xl border border-border shadow-sm"
+      className="space-y-4 rounded-2xl border border-border bg-card/95 p-3 shadow-sm sm:p-4 md:p-6"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-lg font-orbitron text-foreground">Добавить / Редактировать запись</h3>
-        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:items-center sm:justify-end">
+        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end">
           <select value={type} onChange={(e) => setType(e.target.value as CarType)} className="input-cyber w-full text-sm sm:min-w-[140px]">
             <option value="car">Car</option>
             <option value="bike">Bike</option>
@@ -342,12 +369,12 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       </div>
 
       {/* generic fields */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="min-w-0">
           <Label className="text-xs text-foreground">Make / Title</Label> {/* Fixed contrast */}
           <Input value={make} onChange={(e) => setMake(e.target.value)} className="input-cyber" placeholder={type === "blog" ? "Заголовок поста" : "Марка / Title"} />
         </div>
-        <div>
+        <div className="min-w-0">
           <Label className="text-xs text-foreground">Model / Slug</Label> {/* Fixed */}
           <Input value={model} onChange={(e) => setModel(e.target.value)} className="input-cyber" placeholder={type === "blog" ? "slug-для-url" : "Модель / slug"} />
         </div>
@@ -375,9 +402,9 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
                 <Input value={vinValue} onChange={(e) => setVinValue(e.target.value)} placeholder="например JH2PC37A16M301309" className="input-cyber" />
               </div>
             )}
-            <div className="space-y-2">
+            <div className="space-y-2 overflow-hidden">
               {specs.map((s) => (
-                <div key={s.id} className="flex flex-col gap-2 sm:flex-row">
+                <div key={s.id} className="flex flex-col gap-2 lg:flex-row">
                   <Input value={s.key} onChange={(e) => updateSpec(s.id, "key", e.target.value)} placeholder="ключ (например engine_cc)" className="input-cyber" />
                   <Input value={s.value} onChange={(e) => updateSpec(s.id, "value", e.target.value)} placeholder="значение" className="input-cyber" />
                   <Button type="button" variant="destructive" className="sm:w-auto" onClick={() => removeSpec(s.id)}>Удалить</Button>
@@ -398,10 +425,10 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
             <Button type="button" onClick={() => { setGallery([]); toast.info("Галерея очищена"); }} variant="ghost" size="sm">Очистить</Button>
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
           {gallery.length === 0 && <div className="text-xs text-foreground col-span-full">Галерея пуста — добавьте изображения</div>} {/* Fixed */}
           {gallery.map((g, i) => (
-            <div key={g.id} className="relative h-24 rounded overflow-hidden border border-border bg-muted/20">
+            <div key={g.id} className="relative h-24 overflow-hidden rounded-xl border border-border bg-muted/20">
               <Image src={g.url} alt={`gallery-${i}`} fill style={{ objectFit: "cover" }} />
               <div className="absolute top-1 right-1 flex gap-1">
                 <button type="button" onClick={() => navigator.clipboard?.writeText(g.url).then(() => toast.success("URL скопирован"))} className="p-1 bg-black/50 rounded text-xs">Copy</button>
@@ -416,7 +443,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       {type === "blog" && (
         <div>
           <h4 className="text-sm font-semibold text-foreground">Blog post — content</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             <div>
               <Label className="text-xs text-foreground">Title</Label> {/* Fixed */}
               <Input value={blogTitle} onChange={(e) => setBlogTitle(e.target.value)} className="input-cyber" />
@@ -452,7 +479,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
               <Button type="button" variant="ghost" onClick={copyBotPrompt}>Copy bot prompt</Button>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             <div>
               <Label className="text-xs text-foreground">Stream title</Label> {/* Fixed */}
               <Input value={streamTitle} onChange={(e) => setStreamTitle(e.target.value)} className="input-cyber" />
@@ -471,17 +498,17 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       )}
 
       {/* common media / price */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
           <Label className="text-xs text-foreground">Price</Label> {/* Fixed */}
           <Input type="number" value={dailyPrice} onChange={(e) => setDailyPrice(e.target.value)} className="input-cyber" />
         </div>
         <div>
           <Label className="text-xs text-foreground">Image URL or upload</Label> {/* Fixed */}
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-col gap-2 lg:flex-row">
             <Input value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value); }} className="input-cyber flex-1" placeholder="https://..." />
-            <div className="flex gap-2">
-              <Button type="button" variant="ghost" className="sm:w-auto" onClick={() => { const newUrl = RANDOM_UNSPLASH("hero"); setImageUrl(newUrl); setImagePreview(newUrl); toast.info("Случайная обложка обновлена"); }}>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => { const newUrl = RANDOM_UNSPLASH("hero"); setImageUrl(newUrl); setImagePreview(newUrl); toast.info("Случайная обложка обновлена"); }}>
                 Random
               </Button>
               <label htmlFor={`file-${formId}`} className="btn input-cyber cursor-pointer p-2 border border-border rounded-md flex items-center">
@@ -494,22 +521,22 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       </div>
 
       {imagePreview && (
-        <div className="flex items-center justify-center">
-          <Image src={imagePreview} alt="preview" width={420} height={240} className="rounded-lg object-cover" />
+        <div className="flex items-center justify-center overflow-hidden">
+          <Image src={imagePreview} alt="preview" width={420} height={240} className="h-auto max-w-full rounded-lg object-cover" />
         </div>
       )}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center">
         <Button type="submit" disabled={saving} className="w-full">
           {saving ? <><VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> Сохраняю...</> :
             isEdit ? "Обновить запись" : "Поддержать в public.cars"}
         </Button>
 
-        <Button type="button" variant="secondary" className="sm:w-auto" onClick={() => { setIsTest((s) => !s); }} >
+        <Button type="button" variant="secondary" className="w-full md:w-auto" onClick={() => { setIsTest((s) => !s); }} >
           {isTest ? "Marked Test" : "Mark test"}
         </Button>
 
-        <div className="text-xs text-foreground sm:ml-auto">
+        <div className="text-xs text-foreground md:ml-auto">
           {isEdit ? "Редактирование" : "Новая запись"} • type: <span className="font-mono ml-1">{type}</span>
         </div>
       </div>

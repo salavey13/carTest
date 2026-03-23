@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 import { ArrowRight, Cpu, ShieldCheck, Rocket, Network, WandSparkles, FlaskConical, Target, Bot, Crosshair, Store, Brain } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { CapabilityLaunchGrid } from "@/components/CapabilityLaunchGrid";
+import { GreenboxIntegrationMatrix } from "@/components/GreenboxIntegrationMatrix";
 
 const pillars = [
   {
@@ -135,6 +137,21 @@ export default function NexusPage() {
           );
         })}
       </section>
+
+
+      <section className="container mx-auto mt-8 px-4">
+        <Card className="border-zinc-800 bg-zinc-900/60 backdrop-blur">
+          <CardHeader>
+            <CardTitle className="text-zinc-100">Единый вход в исполнительные поверхности</CardTitle>
+            <CardDescription className="text-zinc-400">Те же capability-кнопки вынесены в общий компонент, чтобы /, /nexus и /greenbox держали один и тот же маршрутный контракт.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CapabilityLaunchGrid includeVipBikeRental className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4" />
+          </CardContent>
+        </Card>
+      </section>
+
+      <GreenboxIntegrationMatrix />
 
       <section className="container mx-auto px-4 mt-10">
         <div className="flex items-center justify-between mb-4">
