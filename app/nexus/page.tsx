@@ -146,7 +146,7 @@ export default function NexusPage() {
             <CardDescription className="text-zinc-400">Те же capability-кнопки вынесены в общий компонент, чтобы /, /nexus и /greenbox держали один и тот же маршрутный контракт.</CardDescription>
           </CardHeader>
           <CardContent>
-            <CapabilityLaunchGrid includeGreenbox className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4" />
+            <CapabilityLaunchGrid includeVipBikeRental className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4" />
           </CardContent>
         </Card>
       </section>
