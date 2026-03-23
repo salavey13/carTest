@@ -113,7 +113,7 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/60 p-3 md:items-center"
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/60 p-2 sm:p-3"
       role="dialog"
       aria-modal="true"
       style={{
@@ -124,8 +124,9 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
         ["--item-accent-contrast" as string]: "#16130A",
       }}
     >
-      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border shadow-[0_30px_80px_rgba(0,0,0,0.35)] lg:max-h-[88vh] lg:flex-row" style={surface.card}>
-        <div className="relative flex min-h-[280px] w-full shrink-0 flex-col border-b lg:min-h-full lg:w-[48%] lg:border-b-0 lg:border-r" style={{ borderColor: theme.palette.borderSoft }}>
+      <div className="flex min-h-full items-end justify-center sm:items-center">
+        <div className="my-auto flex max-h-[calc(100dvh-1rem)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border shadow-[0_30px_80px_rgba(0,0,0,0.35)] lg:max-h-[88vh] lg:flex-row" style={surface.card}>
+          <div className="relative flex min-h-[220px] max-h-[42vh] w-full shrink-0 flex-col border-b lg:min-h-full lg:max-h-none lg:w-[48%] lg:border-b-0 lg:border-r" style={{ borderColor: theme.palette.borderSoft }}>
           <div className="relative flex-1 bg-black/25">
             {activeImage ? (
               <>
@@ -239,6 +240,7 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
             >
               Добавить • {item.pricePerDay} ₽
             </button>
+          </div>
           </div>
         </div>
       </div>
