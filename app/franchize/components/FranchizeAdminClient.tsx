@@ -122,7 +122,7 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
 
   return (
     <section
-      className="min-h-screen px-3 pb-10 pt-24 sm:px-4"
+      className="min-h-screen overflow-x-hidden px-3 pb-10 pt-24 sm:px-4"
       style={{
         ...surface.page,
         ["--fr-admin-accent" as string]: crew.theme.palette.accentMain,
@@ -132,7 +132,7 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
         ["--fr-admin-muted" as string]: crew.theme.palette.textSecondary,
       }}
     >
-      <div className="mx-auto max-w-5xl rounded-3xl border p-4 sm:p-6" style={surface.card}>
+      <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl border p-4 sm:p-6" style={surface.card}>
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--fr-admin-accent)]">crew owner console</p>
         <h1 className="mt-2 break-words text-2xl font-semibold text-[var(--fr-admin-text)]">
           {(crew.header.brandName || crew.name || slug).toUpperCase()} — ADMIN GARAGE
@@ -168,6 +168,22 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
           })}
         </div>
 
+
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="min-w-0 rounded-2xl border p-3" style={{ ...surface.subtleCard, borderColor: "var(--fr-admin-border)" }}>
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--fr-admin-muted)]">Всего в scope</p>
+            <p className="mt-2 text-2xl font-semibold text-[var(--fr-admin-text)]">{fleet.length}</p>
+          </div>
+          <div className="min-w-0 rounded-2xl border p-3" style={{ ...surface.subtleCard, borderColor: "var(--fr-admin-border)" }}>
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--fr-admin-muted)]">Байки</p>
+            <p className="mt-2 text-2xl font-semibold text-[var(--fr-admin-text)]">{fleet.filter((v) => v.type === "bike").length}</p>
+          </div>
+          <div className="min-w-0 rounded-2xl border p-3" style={{ ...surface.subtleCard, borderColor: "var(--fr-admin-border)" }}>
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--fr-admin-muted)]">Авто</p>
+            <p className="mt-2 text-2xl font-semibold text-[var(--fr-admin-text)]">{fleet.filter((v) => v.type === "car").length}</p>
+          </div>
+        </div>
         <div className="mt-4 rounded-2xl border p-3 text-sm leading-relaxed" style={{ ...surface.subtleCard, borderColor: "var(--fr-admin-border)" }}>
           <p className="break-words text-[var(--fr-admin-text)]">
             Для doc-шаблона используй specs: <code>vin</code>, <code>plate</code>, <code>frame</code>.
@@ -179,6 +195,23 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
         </div>
 
         <div className="mt-4 rounded-2xl border p-3" style={{ ...surface.subtleCard, borderColor: "var(--fr-admin-border)" }}>
+          <div className="mb-3 flex flex-wrap gap-2">
+            {visible.slice(0, 8).map((vehicle) => (
+              <button
+                key={vehicle.id}
+                type="button"
+                onClick={() => setSelectedVehicle(vehicle)}
+                className="max-w-full rounded-full border px-3 py-1 text-xs font-medium transition hover:opacity-90"
+                style={{
+                  borderColor: selectedVehicle?.id === vehicle.id ? "var(--fr-admin-accent)" : "var(--fr-admin-border)",
+                  color: selectedVehicle?.id === vehicle.id ? accentOn : "var(--fr-admin-text)",
+                  backgroundColor: selectedVehicle?.id === vehicle.id ? "var(--fr-admin-accent)" : "transparent",
+                }}
+              >
+                <span className="block max-w-[220px] truncate">{vehicle.make} {vehicle.model}</span>
+              </button>
+            ))}
+          </div>
           <CarSubmissionForm ownerId={dbUser?.user_id} vehicleToEdit={selectedVehicle} onSuccess={() => loadFleet()} />
         </div>
 

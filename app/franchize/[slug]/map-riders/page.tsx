@@ -11,8 +11,8 @@ export default async function MapRidersPage({ params }: { params: Promise<{ slug
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${slug}/map-riders`} />
-      <MapRidersClient crew={crew} />
+      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/map-riders`} />
+      <MapRidersClient crew={crew} slug={crew.slug || slug} />
       <CrewFooter crew={crew} />
     </main>
   );
