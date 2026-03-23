@@ -21,9 +21,9 @@ interface ItemModalProps {
   onAddToCart: () => void;
 }
 
-const packageOptions = ["Base", "Pro", "Ultra"];
-const durationOptions = ["1 day", "3 days", "7 days"];
-const perkOptions = ["Стандарт", "Шлем+GoPro", "Full gear"];
+const packageOptions = ["Базовый", "Комфорт", "Максимум"];
+const durationOptions = ["1 день", "3 дня", "7 дней"];
+const perkOptions = ["Стандарт", "Шлем + GoPro", "Полный комплект"];
 
 function OptionChips({
   title,
@@ -88,8 +88,8 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
 
   const fallbackSpecs = [
     { label: "Категория", value: item.category },
-    { label: "Тариф", value: `${item.pricePerDay.toLocaleString("ru-RU")} ₽ / day` },
-    { label: "Статус", value: "Ready to ride" },
+    { label: "Тариф", value: `${item.pricePerDay.toLocaleString("ru-RU")} ₽ / день` },
+    { label: "Статус", value: "Готов к выдаче" },
   ];
 
   const normalizedSpecs = item.specs.length > 0 ? item.specs : fallbackSpecs;
@@ -113,7 +113,7 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-2 sm:items-center sm:p-3"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-2 pb-4 sm:items-center sm:p-3"
       role="dialog"
       aria-modal="true"
       style={{
@@ -124,9 +124,9 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
         ["--item-accent-contrast" as string]: "#16130A",
       }}
     >
-      <div className="my-auto flex w-full max-w-4xl flex-col overflow-y-auto rounded-3xl border shadow-[0_30px_80px_rgba(0,0,0,0.35)] lg:max-h-[88vh] lg:overflow-hidden" style={surface.card}>
+      <div className="my-auto flex w-full max-w-4xl flex-col overflow-hidden rounded-[1.75rem] border shadow-[0_30px_80px_rgba(0,0,0,0.35)] sm:rounded-3xl lg:max-h-[88vh]" style={surface.card}>
         <div className="relative flex w-full shrink-0 flex-col border-b" style={{ borderColor: theme.palette.borderSoft }}>
-          <div className="relative aspect-[16/10] w-full bg-black/25 sm:aspect-[16/9] lg:aspect-[21/9]">
+          <div className="relative aspect-[16/11] w-full bg-black/25 sm:aspect-[16/9] lg:aspect-[2.15/1]">
             {activeImage ? (
               <>
                 <Image src={activeImage} alt={item.title} fill sizes="(max-width: 1024px) 100vw, 42vw" className="object-cover" unoptimized />
@@ -173,15 +173,7 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
 
           {gallery.length > 1 ? (
             <div className="border-t px-3 pb-3 pt-3 sm:px-4" style={{ borderColor: theme.palette.borderSoft, backgroundColor: theme.palette.bgBase }}>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="text-[11px] uppercase tracking-[0.14em]" style={{ color: theme.palette.textSecondary }}>
-                  Галерея • миниатюры под главным фото
-                </div>
-                <div className="text-[11px]" style={{ color: theme.palette.textSecondary }}>
-                  Нажми, чтобы переключить кадр
-                </div>
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                 {gallery.map((url, index) => {
                   const active = index === activeMediaIndex;
                   return (
@@ -189,13 +181,13 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
                       key={`${url}-${index}`}
                       type="button"
                       onClick={() => setActiveMediaIndex(index)}
-                      className={`relative h-16 w-20 shrink-0 overflow-hidden rounded-2xl border transition ${active ? "scale-[0.98] opacity-100" : "opacity-80 hover:opacity-100"}`}
+                      className={`relative aspect-[5/4] w-full overflow-hidden rounded-2xl border transition ${active ? "scale-[0.98] opacity-100" : "opacity-85 hover:opacity-100"}`}
                       style={{
                         borderColor: active ? theme.palette.accentMain : theme.palette.borderSoft,
                         boxShadow: active ? `0 0 0 2px ${theme.palette.bgBase}, 0 0 0 4px ${theme.palette.accentMain}` : "none",
                       }}
                     >
-                      <Image src={url} alt={`${item.title} ${index + 1}`} fill sizes="80px" className="object-cover" unoptimized />
+                      <Image src={url} alt={`${item.title} ${index + 1}`} fill sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 120px" className="object-cover" unoptimized />
                     </button>
                   );
                 })}
@@ -205,7 +197,7 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex-1 space-y-4 p-4 lg:overflow-y-auto lg:overscroll-contain [-webkit-overflow-scrolling:touch] sm:p-5">
+          <div className="flex-1 space-y-4 overflow-y-auto p-4 overscroll-contain [-webkit-overflow-scrolling:touch] sm:p-5 lg:max-h-[calc(88vh-20rem)]">
             <div>
               <h3 className="text-lg font-semibold sm:text-xl">{item.title}</h3>
               <p className="text-sm" style={surface.mutedText}>{item.subtitle}</p>
