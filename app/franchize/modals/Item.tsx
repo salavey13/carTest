@@ -172,21 +172,26 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
           </div>
 
           {gallery.length > 1 ? (
-            <div className="grid grid-cols-4 gap-2 p-3 sm:grid-cols-5" style={{ backgroundColor: theme.palette.bgBase }}>
-              {gallery.map((url, index) => {
-                const active = index === activeMediaIndex;
-                return (
-                  <button
-                    key={`${url}-${index}`}
-                    type="button"
-                    onClick={() => setActiveMediaIndex(index)}
-                    className={`relative aspect-[4/3] overflow-hidden rounded-2xl border transition ${active ? "scale-[0.98]" : "opacity-75 hover:opacity-100"}`}
-                    style={{ borderColor: active ? theme.palette.accentMain : theme.palette.borderSoft }}
-                  >
-                    <Image src={url} alt={`${item.title} ${index + 1}`} fill sizes="96px" className="object-cover" unoptimized />
-                  </button>
-                );
-              })}
+            <div className="border-t px-3 pb-3 pt-2" style={{ borderColor: theme.palette.borderSoft, backgroundColor: theme.palette.bgBase }}>
+              <div className="mb-2 text-[11px] uppercase tracking-[0.14em]" style={{ color: theme.palette.textSecondary }}>
+                Галерея • свайп по миниатюрам
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {gallery.map((url, index) => {
+                  const active = index === activeMediaIndex;
+                  return (
+                    <button
+                      key={`${url}-${index}`}
+                      type="button"
+                      onClick={() => setActiveMediaIndex(index)}
+                      className={`relative h-16 w-20 shrink-0 overflow-hidden rounded-2xl border transition ${active ? "scale-[0.98]" : "opacity-80 hover:opacity-100"}`}
+                      style={{ borderColor: active ? theme.palette.accentMain : theme.palette.borderSoft }}
+                    >
+                      <Image src={url} alt={`${item.title} ${index + 1}`} fill sizes="80px" className="object-cover" unoptimized />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
         </div>

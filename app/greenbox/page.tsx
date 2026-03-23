@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { supabaseAdmin } from "@/lib/supabase-server";
+import { CapabilityLaunchGrid } from "@/components/CapabilityLaunchGrid";
 
 import { IrrigationQueueForm } from "./IrrigationQueueForm";
 import { demoTomatoBushes, healthTone } from "./demo-content";
@@ -134,6 +135,12 @@ export default async function GreenboxPage() {
           Вернули живую демо-грядку и вынесли её в отдельный контент-файл до запуска полноценных таблиц растений.
         </p>
       </header>
+
+      <section className="rounded-[2rem] border border-emerald-200/70 bg-white/85 p-4 dark:border-emerald-400/20 dark:bg-slate-950/45">
+        <h2 className="text-xl font-semibold text-emerald-950 dark:text-emerald-50">Маршруты оператора</h2>
+        <p className="mt-2 text-sm text-emerald-900/80 dark:text-emerald-100/80">Тот же capability-пакет, что на главной и в Nexus: вход в Codex, Nexus, Repo XML и обратно в Greenbox без расхождения по CTA.</p>
+        <CapabilityLaunchGrid includeGreenbox className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4" />
+      </section>
 
       <section className="rounded-[2rem] border border-emerald-200/70 bg-white/85 p-4 dark:border-emerald-400/20 dark:bg-slate-950/45">
         <h2 className="text-xl font-semibold text-emerald-950 dark:text-emerald-50">Иконки и цвета (легенда)</h2>
