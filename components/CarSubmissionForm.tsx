@@ -89,6 +89,21 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (!vehicleToEdit) return;
+    setType((vehicleToEdit.type as CarType) ?? "bike");
+    setMake(vehicleToEdit.make ?? "");
+    setModel(vehicleToEdit.model ?? "");
+    setDescription(vehicleToEdit.description ?? "");
+    setDailyPrice(vehicleToEdit.daily_price ? String(vehicleToEdit.daily_price) : "0");
+    setImageUrl(vehicleToEdit.image_url ?? "");
+    setRentLink(vehicleToEdit.rent_link ?? "");
+    setIsTest(Boolean(vehicleToEdit.is_test_result));
+    setOwnerIdState(ownerId ?? vehicleToEdit.owner_id ?? null);
+    setImagePreview(vehicleToEdit.image_url ?? null);
+    setImageFile(null);
+  }, [ownerId, vehicleToEdit]);
+
+  useEffect(() => {
     if (vehicleToEdit?.specs && typeof vehicleToEdit.specs === "object") {
       const s = vehicleToEdit.specs as Record<string, any>;
       const entries = Object.entries(s).filter(([k]) => k !== "gallery" && k !== "title" && k !== "slug" && k !== "excerpt" && k !== "content" && k !== "tags");
@@ -110,8 +125,20 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
         setStreamSlug(vehicleToEdit.model ?? "");
         setStreamSpecsRaw(JSON.stringify(s, null, 2));
       }
+    } else {
+      setSpecs([]);
+      setGallery([]);
+      setVinValue("");
+      setBlogTitle("");
+      setBlogSlug(vehicleToEdit?.model ?? "");
+      setBlogExcerpt("");
+      setBlogContent("");
+      setBlogTags("");
+      setStreamTitle("");
+      setStreamSlug(vehicleToEdit?.model ?? "");
+      setStreamSpecsRaw(defaultStreamTemplate);
     }
-  }, [vehicleToEdit]);
+  }, [defaultStreamTemplate, vehicleToEdit]);
 
   function addSpec() {
     setSpecs((prev) => [...prev, { id: uuidv4(), key: "", value: "" }]);
