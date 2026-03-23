@@ -78,6 +78,7 @@ export interface CatalogItemVM {
   subtitle: string;
   description: string;
   imageUrl: string;
+  mediaUrls: string[];
   pricePerDay: number;
   category: string;
   specs: Array<{ label: string; value: string }>;
@@ -583,12 +584,21 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         (typeof specs.type === "string" && specs.type.trim().toLowerCase() !== "bike" && specs.type.trim()) ||
         "Unsorted";
 
+      const mediaUrls = Array.from(new Set([
+        car.image_url ?? "",
+        ...(Array.isArray(specs.gallery) ? specs.gallery.filter((value): value is string => typeof value === "string") : []),
+        ...(Array.isArray(specs.images) ? specs.images.filter((value): value is string => typeof value === "string") : []),
+        ...(Array.isArray(specs.photos) ? specs.photos.filter((value): value is string => typeof value === "string") : []),
+        ...(Array.isArray(specs.image_urls) ? specs.image_urls.filter((value): value is string => typeof value === "string") : []),
+      ].map((value) => value.trim()).filter(Boolean)));
+
       return {
         id: car.id,
         title: `${car.make} ${car.model}`.trim(),
         subtitle: (typeof specs.subtitle === "string" ? specs.subtitle : "Ready to ride") as string,
         description: car.description ?? (typeof specs.description === "string" ? specs.description : "Подробности откроются в карточке"),
-        imageUrl: car.image_url ?? "",
+        imageUrl: mediaUrls[0] ?? "",
+        mediaUrls,
         pricePerDay: car.daily_price ?? 0,
         category: subtype,
         specs: Object.entries(specs)

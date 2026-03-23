@@ -357,6 +357,11 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
           const franchizeSlug = searchParams.get("slug") || "vip-bike";
           if (rentalId) targetPath = `/franchize/${franchizeSlug}/rental/${rentalId}`;
       }
+      else if (paramToProcess.startsWith("mapriders_") || paramToProcess.startsWith("mapriders-")) {
+          const separator = paramToProcess.includes("_") ? "_" : "-";
+          const slug = paramToProcess.split(separator).slice(1).join(separator) || searchParams.get("slug") || userCrewInfo?.slug || "vip-bike";
+          targetPath = `/franchize/${slug}/map-riders`;
+      }
       else if (paramToProcess.startsWith("rental_") || paramToProcess.startsWith("rentals_")) {
           const parts = paramToProcess.split("_");
           const rentalId = parts.at(-1);
