@@ -91,6 +91,13 @@ const quickActions = [
     cta: "Мои аренды",
   },
   {
+    title: "MapRiders",
+    icon: "::FaMapLocationDot::",
+    text: "Живая карта райдеров, маршруты, точки встречи и недельный лидерборд.",
+    href: "/franchize/vip-bike/map-riders",
+    cta: "Открыть карту",
+  },
+  {
     title: "Быстрый вход",
     icon: "::FaBolt::",
     text: "Прямой сценарий: выбрать → подтвердить → поехать.",
@@ -198,6 +205,11 @@ export default function HomePage() {
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="border-white/55 bg-black/25 font-orbitron text-white backdrop-blur-sm hover:bg-white hover:text-black">
+              <Link href="/franchize/vip-bike/map-riders">
+                <VibeContentRenderer content="::FaMapLocationDot className='mr-2':: MapRiders" />
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="border-white/35 bg-black/15 font-orbitron text-white backdrop-blur-sm hover:bg-white hover:text-black">
               <Link href="/rentals">
                 <VibeContentRenderer content="::FaTicket className='mr-2':: Мои аренды" />
               </Link>
