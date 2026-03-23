@@ -161,15 +161,26 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
           <label className="text-sm font-mono text-muted-foreground">URL Изображения Карты</label>
           <Input value={mapUrl} onChange={(e) => setMapUrl(e.target.value)} className="input-cyber mt-1" />
         </div>
-        <div ref={mapContainerRef} className="relative w-full aspect-[16/10] bg-black/50 rounded-lg overflow-hidden border-2 border-brand-purple/30">
-          {isImageLoading && <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/50"><Loading text="ЗАГРУЗКА КАРТЫ..." /></div>}
+        <div ref={mapContainerRef} className="relative w-full aspect-[16/10] overflow-hidden rounded-[28px] border border-brand-purple/30 bg-slate-950/80 shadow-[0_30px_80px_rgba(0,0,0,0.4)]">
+          {mapUrl && (
+            <>
+              <Image
+                src={mapUrl}
+                alt="Map backdrop"
+                fill
+                className="pointer-events-none object-cover scale-110 opacity-35 blur-2xl saturate-125"
+                unoptimized
+              />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.1),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.14),rgba(2,6,23,0.55))]" />
+            </>
+          )}
+          {isImageLoading && <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40"><Loading text="ЗАГРУЗКА КАРТЫ..." /></div>}
           {mapUrl && 
             <Image 
                 src={mapUrl} 
                 alt="Map Background" 
-                layout="fill"
-                objectFit="contain"
-                className={cn("pointer-events-none transition-opacity duration-300", isImageLoading ? "opacity-0" : "opacity-50")} 
+                fill
+                className={cn("pointer-events-none object-contain p-3 transition-opacity duration-300", isImageLoading ? "opacity-0" : "opacity-100")} 
                 onLoadingComplete={(img) => { 
                     setImageSize({width: img.naturalWidth, height: img.naturalHeight}); 
                     setIsImageLoading(false); 
@@ -177,7 +188,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
                 unoptimized
             />
           }
-          <div style={calibrationBoxStyle()} className="absolute bg-brand-cyan/10 border-2 border-dashed border-brand-cyan pointer-events-none" />
+          <div style={calibrationBoxStyle()} className="absolute border-2 border-dashed border-brand-cyan bg-brand-cyan/10 pointer-events-none rounded-[24px]" />
           {isCalibrating ? (
             REFERENCE_POINTS.map(point => (
               <div
@@ -208,7 +219,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
 
                         setPositions(prev => ({ ...prev, [point.id]: { x: newX, y: newY } }));
                     }}
-                    className="w-8 h-8 bg-brand-lime rounded-full cursor-grab active:cursor-grabbing flex items-center justify-center text-black shadow-lg shadow-brand-lime/50"
+                    className="flex h-9 w-9 cursor-grab items-center justify-center rounded-full bg-brand-lime text-black shadow-lg shadow-brand-lime/50 ring-4 ring-black/30 active:cursor-grabbing"
                     whileDrag={{ scale: 1.2 }}
                 >
                     <Tooltip><TooltipTrigger asChild><span><VibeContentRenderer content="::FaLocationDot::" /></span></TooltipTrigger><TooltipContent><p>{point.name}</p></TooltipContent></Tooltip>

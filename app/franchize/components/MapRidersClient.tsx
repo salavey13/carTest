@@ -16,6 +16,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { formatRideDuration, initialsFromName, riderDisplayName } from "@/lib/map-riders";
 import { useAppContext } from "@/contexts/AppContext";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
+import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 
 type SnapshotData = {
   activeSessions: any[];
@@ -37,6 +38,10 @@ export function MapRidersClient({ crew }: { crew: FranchizeCrewVM }) {
   const crewSlug = crew.slug || userCrewInfo?.slug || "vip-bike";
   const mapBounds = crew.contacts.map.bounds || DEFAULT_BOUNDS;
   const mapImageUrl = crew.contacts.map.imageUrl;
+  const surface = crewPaletteForSurface(crew.theme);
+  const shareStartParam = `mapriders_${crewSlug}`;
+  const shareDeepLink = `https://t.me/oneBikePlsBot/app?startapp=${shareStartParam}`;
+  const shareCopy = `${crew.header.brandName || crew.name || "VIP BIKE"} MapRiders — карта экипажа, live-share и meetup-пины в одном окне`;
   const [snapshot, setSnapshot] = useState<SnapshotData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMeetupPoint, setSelectedMeetupPoint] = useState<[number, number] | null>(null);
@@ -307,31 +312,68 @@ export function MapRidersClient({ crew }: { crew: FranchizeCrewVM }) {
     { label: "Км за 7 дней", value: snapshot?.stats.totalWeeklyDistanceKm ?? 0, icon: "::FaRoad::" },
   ];
 
+  const mapTools = [
+    {
+      title: "Брендинг / карта",
+      description: "Открыть карту внутри франшизного кастомайзера и поправить GPS, bounds и image URL.",
+      href: `/franchize/create?slug=${crewSlug}`,
+      cta: "Открыть branding",
+    },
+    {
+      title: "Контакты с картой",
+      description: "Проверить публичную контактную страницу команды и то, как карта вписана в crew-shell.",
+      href: `/franchize/${crewSlug}/contacts`,
+      cta: "Смотреть contacts",
+    },
+    {
+      title: "Админ-гараж",
+      description: "Быстрый вход в admin-поверхность экипажа: storefront, техника и рядом все map-сценарии.",
+      href: `/franchize/${crewSlug}/admin`,
+      cta: "Открыть admin",
+    },
+    {
+      title: "Калибратор карты",
+      description: "Если картинка карты кривая — открой калибратор и сохрани новый preset с точными bounds.",
+      href: "/admin/map-calibrator",
+      cta: "Калибровать",
+    },
+  ];
+
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-24 md:pt-28">
+    <div
+      className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-24 md:pt-28"
+      style={{
+        ["--mr-accent" as string]: crew.theme.palette.accentMain,
+        ["--mr-accent-hover" as string]: crew.theme.palette.accentMainHover,
+        ["--mr-border" as string]: crew.theme.palette.borderSoft,
+        ["--mr-card" as string]: surface.subtleCard.backgroundColor,
+        ["--mr-text" as string]: crew.theme.palette.textPrimary,
+        ["--mr-muted" as string]: crew.theme.palette.textSecondary,
+      }}
+    >
       <section className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
-        <Card className="border-border/60 bg-card/75 backdrop-blur-sm">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
           <CardHeader>
-            <Badge className="w-fit bg-amber-500/15 text-amber-300 hover:bg-amber-500/15">VIP BIKE • MAPRIDERS</Badge>
-            <CardTitle className="mt-3 font-orbitron text-3xl text-white">Карта райдеров в реальном времени</CardTitle>
-            <CardDescription className="max-w-2xl text-base text-muted-foreground">
-              Один тап — и авторизованный байкер делится маршрутом как в Telegram live location: команда видит движение, точки встречи, скорость и недельный прогресс.
+            <Badge className="w-fit border hover:opacity-100" style={{ borderColor: `${crew.theme.palette.accentMain}55`, backgroundColor: `${crew.theme.palette.accentMain}18`, color: crew.theme.palette.accentMain }}>{(crew.header.brandName || crew.name || "VIP BIKE").toUpperCase()} • MAPRIDERS</Badge>
+            <CardTitle className="mt-3 font-orbitron text-3xl" style={{ color: crew.theme.palette.textPrimary }}>Карта райдеров в реальном времени</CardTitle>
+            <CardDescription className="max-w-2xl text-base" style={{ color: crew.theme.palette.textSecondary }}>
+              Один тап — и авторизованный байкер делится маршрутом как в Telegram live location: команда видит движение, точки встречи, скорость и недельный прогресс. Deeplink уже несёт franchize slug и корректно возвращает в `/franchize/{slug}/map-riders`.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-3">
             {heroStats.map((stat) => (
-              <div key={stat.label} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="mb-2 text-brand-yellow"><VibeContentRenderer content={stat.icon} /></div>
-                <div className="text-2xl font-semibold text-white">{stat.value}</div>
-                <div className="text-sm text-muted-foreground">{stat.label}</div>
+              <div key={stat.label} className="rounded-2xl border p-4" style={{ borderColor: `${crew.theme.palette.borderSoft}aa`, backgroundColor: `${crew.theme.palette.bgBase}66` }}>
+                <div className="mb-2" style={{ color: crew.theme.palette.accentMain }}><VibeContentRenderer content={stat.icon} /></div>
+                <div className="text-2xl font-semibold" style={{ color: crew.theme.palette.textPrimary }}>{stat.value}</div>
+                <div className="text-sm" style={{ color: crew.theme.palette.textSecondary }}>{stat.label}</div>
               </div>
             ))}
           </CardContent>
         </Card>
 
-        <Card className="border-border/60 bg-card/75 backdrop-blur-sm">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
           <CardHeader>
-            <CardTitle className="font-orbitron text-xl text-white">Пульт райдера</CardTitle>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Пульт райдера</CardTitle>
             <CardDescription>{shareStatus}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -350,7 +392,7 @@ export function MapRidersClient({ crew }: { crew: FranchizeCrewVM }) {
               <Button type="button" variant={rideMode === "personal" ? "default" : "outline"} onClick={() => setRideMode("personal")}>Свой байк</Button>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Button type="button" disabled={isSubmitting || shareEnabled} onClick={handleStartSharing} className="bg-amber-500 text-black hover:bg-amber-400">
+              <Button type="button" disabled={isSubmitting || shareEnabled} onClick={handleStartSharing} className="text-black" style={{ backgroundColor: crew.theme.palette.accentMain }}>
                 <VibeContentRenderer content="::FaLocationArrow::" className="mr-2" />
                 Включить live share
               </Button>
@@ -359,16 +401,16 @@ export function MapRidersClient({ crew }: { crew: FranchizeCrewVM }) {
                 Завершить заезд
               </Button>
             </div>
-            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+            <div className="rounded-2xl border p-3 text-sm" style={{ borderColor: `${crew.theme.palette.accentMain}33`, backgroundColor: `${crew.theme.palette.accentMain}12`, color: crew.theme.palette.textPrimary }}>
               <div className="font-medium">Крутые фишки сверху базового запроса</div>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-emerald-50/90">
+              <ul className="mt-2 list-disc space-y-1 pl-5" style={{ color: crew.theme.palette.textSecondary }}>
                 <li>Convoy Pulse: видно, кто в эфире прямо сейчас и с какой скоростью идёт колонна.</li>
                 <li>Meetup Pins: можно ткнуть в карту, задать точку встречи и комментарий для всей команды.</li>
                 <li>Route Replay: любой завершённый заезд открывается по кнопке с визуальным треком и KPI.</li>
               </ul>
             </div>
             <Button asChild variant="outline" className="w-full">
-              <Link href={`https://t.me/share/url?url=${encodeURIComponent(`https://t.me/oneBikePlsBot/app?startapp=mapriders_${crewSlug}`)}&text=${encodeURIComponent("Залетай в VIP BIKE MapRiders — будем катать по карте вживую")}`} target="_blank">
+              <Link href={`https://t.me/share/url?url=${encodeURIComponent(shareDeepLink)}&text=${encodeURIComponent(shareCopy)}`} target="_blank">
                 Открыть Telegram-share мост
               </Link>
             </Button>
@@ -377,22 +419,22 @@ export function MapRidersClient({ crew }: { crew: FranchizeCrewVM }) {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.4fr,0.9fr]">
-        <Card className="border-border/60 bg-card/75 backdrop-blur-sm">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
           <CardHeader>
-            <CardTitle className="font-orbitron text-xl text-white">Городская карта экипажа</CardTitle>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Городская карта экипажа</CardTitle>
             <CardDescription>Тапни по карте, чтобы поставить meetup-поинт. Зелёным — выбранный маршрут, жёлтым/синим — активные райдеры.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[520px] overflow-hidden rounded-3xl">
+            <div className="h-[520px] overflow-hidden rounded-3xl border" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
               <VibeMap points={mapPoints} bounds={mapBounds ?? DEFAULT_BOUNDS} imageUrl={mapImageUrl} isEditable onMapClick={(coords) => setSelectedMeetupPoint(coords)} />
             </div>
           </CardContent>
         </Card>
 
         <div className="flex flex-col gap-6">
-          <Card className="border-border/60 bg-card/75 backdrop-blur-sm">
+          <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
             <CardHeader>
-              <CardTitle className="font-orbitron text-lg text-white">Новая точка встречи</CardTitle>
+              <CardTitle className="font-orbitron text-lg" style={{ color: crew.theme.palette.textPrimary }}>Новая точка встречи</CardTitle>
               <CardDescription>
                 {selectedMeetupPoint ? `Выбрано: ${selectedMeetupPoint[0].toFixed(5)}, ${selectedMeetupPoint[1].toFixed(5)}` : "Нажми на карту, чтобы выбрать точку"}
               </CardDescription>
@@ -410,9 +452,9 @@ export function MapRidersClient({ crew }: { crew: FranchizeCrewVM }) {
             </CardContent>
           </Card>
 
-          <Card className="border-border/60 bg-card/75 backdrop-blur-sm">
+          <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
             <CardHeader>
-              <CardTitle className="font-orbitron text-lg text-white">Онлайн-райдеры</CardTitle>
+              <CardTitle className="font-orbitron text-lg" style={{ color: crew.theme.palette.textPrimary }}>Онлайн-райдеры</CardTitle>
               <CardDescription>{loading ? "Обновляем эфир..." : `${snapshot?.activeSessions.length || 0} райдеров сейчас на карте`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -440,9 +482,9 @@ export function MapRidersClient({ crew }: { crew: FranchizeCrewVM }) {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1.1fr,0.9fr]">
-        <Card className="border-border/60 bg-card/75 backdrop-blur-sm">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
           <CardHeader>
-            <CardTitle className="font-orbitron text-xl text-white">Разбор выбранного заезда</CardTitle>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Разбор выбранного заезда</CardTitle>
             <CardDescription>Показываем маршрут, скорость, среднюю скорость и длительность по кнопке.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -463,9 +505,9 @@ export function MapRidersClient({ crew }: { crew: FranchizeCrewVM }) {
           </CardContent>
         </Card>
 
-        <Card className="border-border/60 bg-card/75 backdrop-blur-sm">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
           <CardHeader>
-            <CardTitle className="font-orbitron text-xl text-white">Недельный зал славы</CardTitle>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Недельный зал славы</CardTitle>
             <CardDescription>Кто больше всех проехал за 7 дней — тот выше в таблице.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -485,9 +527,9 @@ export function MapRidersClient({ crew }: { crew: FranchizeCrewVM }) {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <Card className="border-border/60 bg-card/75 backdrop-blur-sm">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
           <CardHeader>
-            <CardTitle className="font-orbitron text-xl text-white">Последние завершённые выезды</CardTitle>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Последние завершённые выезды</CardTitle>
             <CardDescription>Открывай любой заезд кнопкой, чтобы увидеть маршрут на карте.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -506,9 +548,9 @@ export function MapRidersClient({ crew }: { crew: FranchizeCrewVM }) {
           </CardContent>
         </Card>
 
-        <Card className="border-border/60 bg-card/75 backdrop-blur-sm">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
           <CardHeader>
-            <CardTitle className="font-orbitron text-xl text-white">Как это работает</CardTitle>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Как это работает</CardTitle>
             <CardDescription>Короткий сценарий для байкеров и админов.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
@@ -518,6 +560,22 @@ export function MapRidersClient({ crew }: { crew: FranchizeCrewVM }) {
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><span className="font-medium text-white">4.</span> После завершения поездки маршрут остаётся доступен по кнопке “открыть заезд”.</div>
           </CardContent>
         </Card>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        {mapTools.map((tool) => (
+          <Card key={tool.href} className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold" style={{ color: crew.theme.palette.textPrimary }}>{tool.title}</CardTitle>
+              <CardDescription style={{ color: crew.theme.palette.textSecondary }}>{tool.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="w-full">
+                <Link href={tool.href}>{tool.cta}</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
       </section>
     </div>
   );

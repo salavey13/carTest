@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 
@@ -478,6 +479,24 @@ export default function CreateFranchizeForm() {
           <label className="text-sm md:col-span-2">Соцсети (`название|ссылка`)
             <textarea className={`${inputClass} min-h-28`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.socialLinksText} onChange={(e) => updateField("socialLinksText", e.target.value)} />
           </label>
+          <div className="md:col-span-2 rounded-2xl border p-4" style={{ borderColor: ui.border, backgroundColor: ui.cardBg }}>
+            <p className="text-xs uppercase tracking-[0.16em]" style={{ color: ui.accent }}>Map control center</p>
+            <p className="mt-2 text-sm" style={{ color: ui.muted }}>
+              Вся полезная map-инфраструктура теперь в одном месте: кастомизация, map-riders, публичные контакты и калибратор для новых presets.
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {[
+                { label: "MapRiders preview", href: `/franchize/${form.slug || "vip-bike"}/map-riders` },
+                { label: "Contacts map", href: `/franchize/${form.slug || "vip-bike"}/contacts` },
+                { label: "Franchize admin", href: `/franchize/${form.slug || "vip-bike"}/admin` },
+                { label: "Map calibrator", href: "/admin/map-calibrator" },
+              ].map((item) => (
+                <Link key={item.href} href={item.href} className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90" style={{ borderColor: ui.border, color: ui.text }}>
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </div>
         </section>
       )}
       {stage === "ai" && (
@@ -536,9 +555,9 @@ export default function CreateFranchizeForm() {
                   { label: "Контакты", href: `/franchize/${form.slug || "vip-bike"}/contacts` },
                   { label: "Корзина", href: `/franchize/${form.slug || "vip-bike"}/cart` },
                 ].map((item) => (
-                  <a key={item.href} href={item.href} className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90" style={{ borderColor: ui.border, color: ui.text }}>
+                  <Link key={item.href} href={item.href} className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90" style={{ borderColor: ui.border, color: ui.text }}>
                     {item.label}
-                  </a>
+                  </Link>
                 ))}
               </div>
               <div className="mt-4 rounded-xl border p-3" style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
