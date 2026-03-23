@@ -124,7 +124,7 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
         ["--item-accent-contrast" as string]: "#16130A",
       }}
     >
-      <div className="my-auto flex w-full max-w-4xl flex-col overflow-hidden rounded-[1.75rem] border shadow-[0_30px_80px_rgba(0,0,0,0.35)] sm:rounded-3xl lg:max-h-[88vh]" style={surface.card}>
+      <div className="mt-2 flex w-full max-w-4xl flex-col overflow-hidden rounded-[1.75rem] border shadow-[0_30px_80px_rgba(0,0,0,0.35)] sm:my-auto sm:rounded-3xl sm:max-h-[calc(100dvh-1.5rem)] lg:max-h-[88vh]" style={surface.card}>
         <div className="relative flex w-full shrink-0 flex-col border-b" style={{ borderColor: theme.palette.borderSoft }}>
           <div className="relative aspect-[16/11] w-full bg-black/25 sm:aspect-[16/9] lg:aspect-[2.15/1]">
             {activeImage ? (
@@ -197,7 +197,7 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex-1 space-y-4 overflow-y-auto p-4 overscroll-contain [-webkit-overflow-scrolling:touch] sm:p-5 lg:max-h-[calc(88vh-20rem)]">
+          <div className="flex-1 space-y-4 p-4 sm:p-5 lg:overflow-y-auto lg:overscroll-contain lg:[-webkit-overflow-scrolling:touch] lg:max-h-[calc(88vh-20rem)]">
             <div>
               <h3 className="text-lg font-semibold sm:text-xl">{item.title}</h3>
               <p className="text-sm" style={surface.mutedText}>{item.subtitle}</p>
