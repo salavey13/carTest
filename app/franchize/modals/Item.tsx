@@ -124,9 +124,9 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
         ["--item-accent-contrast" as string]: "#16130A",
       }}
     >
-      <div className="my-auto flex w-full max-w-4xl flex-col overflow-y-auto rounded-3xl border shadow-[0_30px_80px_rgba(0,0,0,0.35)] lg:max-h-[88vh] lg:flex-row lg:overflow-hidden" style={surface.card}>
-        <div className="relative flex min-h-[220px] max-h-[36vh] w-full shrink-0 flex-col border-b lg:min-h-full lg:max-h-none lg:w-[48%] lg:border-b-0 lg:border-r" style={{ borderColor: theme.palette.borderSoft }}>
-          <div className="relative flex-1 bg-black/25">
+      <div className="my-auto flex w-full max-w-4xl flex-col overflow-y-auto rounded-3xl border shadow-[0_30px_80px_rgba(0,0,0,0.35)] lg:max-h-[88vh] lg:overflow-hidden" style={surface.card}>
+        <div className="relative flex w-full shrink-0 flex-col border-b" style={{ borderColor: theme.palette.borderSoft }}>
+          <div className="relative aspect-[16/10] w-full bg-black/25 sm:aspect-[16/9] lg:aspect-[21/9]">
             {activeImage ? (
               <>
                 <Image src={activeImage} alt={item.title} fill sizes="(max-width: 1024px) 100vw, 42vw" className="object-cover" unoptimized />
@@ -172,9 +172,14 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
           </div>
 
           {gallery.length > 1 ? (
-            <div className="border-t px-3 pb-3 pt-2" style={{ borderColor: theme.palette.borderSoft, backgroundColor: theme.palette.bgBase }}>
-              <div className="mb-2 text-[11px] uppercase tracking-[0.14em]" style={{ color: theme.palette.textSecondary }}>
-                Галерея • свайп по миниатюрам
+            <div className="border-t px-3 pb-3 pt-3 sm:px-4" style={{ borderColor: theme.palette.borderSoft, backgroundColor: theme.palette.bgBase }}>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-[11px] uppercase tracking-[0.14em]" style={{ color: theme.palette.textSecondary }}>
+                  Галерея • миниатюры под главным фото
+                </div>
+                <div className="text-[11px]" style={{ color: theme.palette.textSecondary }}>
+                  Нажми, чтобы переключить кадр
+                </div>
               </div>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {gallery.map((url, index) => {
@@ -184,8 +189,11 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
                       key={`${url}-${index}`}
                       type="button"
                       onClick={() => setActiveMediaIndex(index)}
-                      className={`relative h-16 w-20 shrink-0 overflow-hidden rounded-2xl border transition ${active ? "scale-[0.98]" : "opacity-80 hover:opacity-100"}`}
-                      style={{ borderColor: active ? theme.palette.accentMain : theme.palette.borderSoft }}
+                      className={`relative h-16 w-20 shrink-0 overflow-hidden rounded-2xl border transition ${active ? "scale-[0.98] opacity-100" : "opacity-80 hover:opacity-100"}`}
+                      style={{
+                        borderColor: active ? theme.palette.accentMain : theme.palette.borderSoft,
+                        boxShadow: active ? `0 0 0 2px ${theme.palette.bgBase}, 0 0 0 4px ${theme.palette.accentMain}` : "none",
+                      }}
                     >
                       <Image src={url} alt={`${item.title} ${index + 1}`} fill sizes="80px" className="object-cover" unoptimized />
                     </button>

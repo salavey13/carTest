@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink, GitBranch, Orbit, Sprout } from "lucide-react";
+import { Bike, ExternalLink, GitBranch, Orbit } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -14,7 +14,7 @@ type LaunchItem = {
 
 type CapabilityLaunchGridProps = {
   className?: string;
-  includeGreenbox?: boolean;
+  includeVipBikeRental?: boolean;
 };
 
 const baseItems: LaunchItem[] = [
@@ -42,12 +42,12 @@ const baseItems: LaunchItem[] = [
   },
 ];
 
-const greenboxItem: LaunchItem = {
-  title: "Greenbox",
-  href: "/greenbox",
-  caption: "симулятор сада",
-  icon: Sprout,
-  accent: "border-emerald-400/50 hover:border-emerald-300 hover:bg-emerald-500/10",
+const vipBikeRentalItem: LaunchItem = {
+  title: "VIP Bike Rental",
+  href: "/vipbikerental",
+  caption: "rental launchpad",
+  icon: Bike,
+  accent: "border-amber-400/50 hover:border-amber-300 hover:bg-amber-500/10",
 };
 
 function CapabilityLink({ item }: { item: LaunchItem }) {
@@ -79,8 +79,8 @@ function CapabilityLink({ item }: { item: LaunchItem }) {
   );
 }
 
-export function CapabilityLaunchGrid({ className, includeGreenbox = false }: CapabilityLaunchGridProps) {
-  const items = includeGreenbox ? [...baseItems, greenboxItem] : baseItems;
+export function CapabilityLaunchGrid({ className, includeVipBikeRental = false }: CapabilityLaunchGridProps) {
+  const items = includeVipBikeRental ? [...baseItems, vipBikeRentalItem] : baseItems;
 
   return (
     <div className={className ?? "grid grid-cols-1 gap-2 sm:grid-cols-3"}>
