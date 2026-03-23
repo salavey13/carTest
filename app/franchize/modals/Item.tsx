@@ -113,7 +113,7 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/60 p-2 sm:p-3"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-2 sm:items-center sm:p-3"
       role="dialog"
       aria-modal="true"
       style={{
@@ -124,9 +124,8 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
         ["--item-accent-contrast" as string]: "#16130A",
       }}
     >
-      <div className="flex min-h-full items-end justify-center sm:items-center">
-        <div className="my-auto flex max-h-[calc(100dvh-1rem)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border shadow-[0_30px_80px_rgba(0,0,0,0.35)] lg:max-h-[88vh] lg:flex-row" style={surface.card}>
-          <div className="relative flex min-h-[220px] max-h-[42vh] w-full shrink-0 flex-col border-b lg:min-h-full lg:max-h-none lg:w-[48%] lg:border-b-0 lg:border-r" style={{ borderColor: theme.palette.borderSoft }}>
+      <div className="my-auto flex w-full max-w-4xl flex-col overflow-y-auto rounded-3xl border shadow-[0_30px_80px_rgba(0,0,0,0.35)] lg:max-h-[88vh] lg:flex-row lg:overflow-hidden" style={surface.card}>
+        <div className="relative flex min-h-[220px] max-h-[36vh] w-full shrink-0 flex-col border-b lg:min-h-full lg:max-h-none lg:w-[48%] lg:border-b-0 lg:border-r" style={{ borderColor: theme.palette.borderSoft }}>
           <div className="relative flex-1 bg-black/25">
             {activeImage ? (
               <>
@@ -193,7 +192,7 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 [-webkit-overflow-scrolling:touch] sm:p-5">
+          <div className="flex-1 space-y-4 p-4 lg:overflow-y-auto lg:overscroll-contain [-webkit-overflow-scrolling:touch] sm:p-5">
             <div>
               <h3 className="text-lg font-semibold sm:text-xl">{item.title}</h3>
               <p className="text-sm" style={surface.mutedText}>{item.subtitle}</p>
@@ -240,7 +239,6 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
             >
               Добавить • {item.pricePerDay} ₽
             </button>
-          </div>
           </div>
         </div>
       </div>
