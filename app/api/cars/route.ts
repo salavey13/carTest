@@ -1,23 +1,12 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env variables.");
-}
-
-const supabase = createClient(SUPABASE_URL || "", SUPABASE_KEY || "", {
-  auth: { persistSession: false },
-});
+import { supabaseAdmin, upsertRow } from "@/lib/supabaseAdmin";
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const type = url.searchParams.get("type"); // optional filter
     const owner = url.searchParams.get("owner"); // optional
-    let q = supabase
+    let q = supabaseAdmin
       .from("cars")
       .select("id, make, model, description, image_url, rent_link, daily_price, type, specs, owner_id, is_test_result, created_at")
       .order("created_at", { ascending: false })
@@ -74,7 +63,7 @@ export async function POST(request: Request) {
       is_test_result: is_test_result,
     };
 
-    const { data, error } = await supabase.from("cars").upsert(insertRow, { onConflict: "id" }).select();
+    const { data, error } = await upsertRow("cars", insertRow, { onConflict: "id" });
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     return NextResponse.json({ success: true, data });
   } catch (err: any) {
