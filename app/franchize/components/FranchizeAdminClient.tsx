@@ -10,6 +10,7 @@ import { getEditableVehiclesForUser } from "@/app/rentals/actions";
 import { getFranchizeBySlug, type FranchizeCrewVM } from "@/app/franchize/actions";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "@/app/franchize/lib/theme";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Database } from "@/types/database.types";
 
 type Vehicle = Database["public"]["Tables"]["cars"]["Row"];
@@ -195,6 +196,22 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
         </div>
 
         <div className="mt-4 rounded-2xl border p-3" style={{ ...surface.subtleCard, borderColor: "var(--fr-admin-border)" }}>
+          <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr),auto]">
+            <Select value={selectedVehicle?.id ?? "new"} onValueChange={(value) => setSelectedVehicle(value === "new" ? null : visible.find((vehicle) => vehicle.id === value) ?? null)}>
+              <SelectTrigger className="w-full border text-left" style={{ borderColor: "var(--fr-admin-border)", color: "var(--fr-admin-text)", backgroundColor: surface.page.backgroundColor }}>
+                <SelectValue placeholder="Выбери запись для редактирования" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="new">Создать новую запись</SelectItem>
+                {visible.map((vehicle) => (
+                  <SelectItem key={vehicle.id} value={vehicle.id}>{vehicle.type === "car" ? "🚗" : "🏍️"} {vehicle.make} {vehicle.model}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button type="button" variant="outline" onClick={() => setSelectedVehicle(null)} className="w-full sm:w-auto">
+              Новая запись
+            </Button>
+          </div>
           <div className="mb-3 flex flex-wrap gap-2">
             {visible.slice(0, 8).map((vehicle) => (
               <button
