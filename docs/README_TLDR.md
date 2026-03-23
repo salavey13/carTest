@@ -75,9 +75,16 @@ git push origin main
 
 ## 8) SupaPlan-first для агентов
 - По умолчанию сначала брать preplanned задачу через SupaPlan (`AGENT_ENTRY.md`).
-- Быстрый claim: `node scripts/supaplan-skill.mjs pick-task --capability <capability> --agentId <agent_id>`.
+- `node scripts/supaplan-skill.mjs inspect-migrations` теперь показывает capability из живых строк `supaplan_tasks` в Supabase (сначала JS client, потом REST fallback), а не из seed migration файлов.
+- Выбирать `--capability` только из реально показанных capability. Не придумывать capability руками.
+- Быстрый claim: `node scripts/supaplan-skill.mjs pick-task --capability <real_capability_from_inspect> --agentId <agent_id>`.
+- Если `inspect-migrations` показывает 0 реальных capability или 0 claimable задач, писать дословно: `No claimable tasks for any real capability right now. Waiting for operator or new tasks.`
+- Сначала использовать готовые skills/scripts репозитория; не изобретать обходной путь, если уже есть SupaPlan helper, notify helper, screenshot helper или Supabase helper.
+- Если изменение визуальное или его проще проверить картинкой, делать скриншот проактивно, а не только по спец-триггеру.
 - Если задача получена: вести статусы (`running` -> `ready_for_pr`) и логировать прогресс (`log-event`).
-- Импровизация/adhoc — только если нет claimable open задачи или SupaPlan временно недоступен.
+- Для task-bound PR токен обязателен в двух местах: в title `supaplan_task:<task_id>` и отдельной строкой в description `supaplan_task: <task_id>`.
+- Если есть контекст для уведомления, не забывать `scripts/codex-notify.mjs`; если контекста нет, явно писать причину пропуска.
+- Импровизация/adhoc — только если нет claimable open задачи ни для одной реальной capability из `inspect-migrations` или SupaPlan временно недоступен.
 
 ## 9) Automation expansion roadmap
 - See `docs/AUTOMATION_EXPANSION_PLAN.md` for the full phased plan: auto callback execution, lifecycle statuses, preview health checks, and schema-level operator intelligence.
@@ -106,3 +113,6 @@ git push origin main
 - Read/update `docs/AGENT_DIARY.md` for practical runtime lessons (bridge errors, screenshot fallbacks, callback edge-cases).
 
 - Canonical CyberTutor contract: `docs/CYBERTUTOR_RUNTIME_CONTRACT_V1.md`.
+
+## 8.1) Синонимы клиента
+- `vip-bike`, `vip bike`, `franchize` и `FRANCHEEZEPLAN` считать одним и тем же клиентом/тиммейтом, если оператор явно не сказал иначе.
