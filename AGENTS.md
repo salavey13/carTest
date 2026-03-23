@@ -158,6 +158,7 @@ When implementing tasks:
 - run available checks (`lint`, `build`, targeted tests)
 - if environment blocks checks, report exact failure reason
 - for visual UI changes, capture screenshots when runtime is available
+- when screenshots/notifications skills are available and useful, prefer using them proactively rather than waiting for a special trigger
 
 ### 6.1) SupaPlan-first execution protocol (mandatory default)
 
@@ -166,10 +167,16 @@ Before doing ad-hoc coding, agents must check SupaPlan backlog first and execute
 1. Start from `AGENT_ENTRY.md` and treat it as the single-entry workflow.
 2. Run SupaPlan skill/CLI claim flow first:
    - `node scripts/supaplan-skill.mjs inspect-migrations`
-   - `node scripts/supaplan-skill.mjs pick-task --capability <your_capability> --agentId <agent_id>`
-3. If a task is returned, execute only that `todo_path` scope, keep status synced (`running` -> `ready_for_pr`), and log progress events.
-4. Branch/PR title must include `supaplan_task:<uuid>` when task-bound to preserve merge automation traceability.
-5. Only improvise outside SupaPlan when **no open SupaPlan task** can be claimed for current capability (or SupaPlan infra is unavailable). In that case, explicitly note fallback reason in the final report/PR body.
+   - `inspect-migrations` is the capability-discovery step: it reads live `supaplan_tasks` data from Supabase (JS client first, REST fallback second), so capability selection is based on the current DB state rather than stale seed migration files.
+   - ALWAYS choose `--capability` from the real capability names shown by `inspect-migrations`; never hallucinate or guess a capability.
+   - `node scripts/supaplan-skill.mjs pick-task --capability <real_capability_from_inspect> --agentId <agent_id>`
+3. If `inspect-migrations` shows zero real capabilities or zero claimable tasks, report exactly: `No claimable tasks for any real capability right now. Waiting for operator or new tasks.`
+4. Execute with a skills-first bias: if repo-provided skills/scripts already cover the task (SupaPlan, notifications, Supabase access, screenshots, bridge/homework flows), use them before inventing a manual workaround.
+5. If the change is visual, operator-facing, or easier to verify visually, capture a screenshot with the available screenshot/browser skill even outside special-case flows.
+6. If a task is returned, execute only that `todo_path` scope, keep status synced (`running` -> `ready_for_pr`), and log progress events.
+7. When task-bound, include `supaplan_task:<uuid>` in the branch/PR title **and** add `supaplan_task: <uuid>` as its own standalone line in the PR description, or merge automation/status sync will miss the task.
+8. When task execution has notification context available, send updates through `scripts/codex-notify.mjs` instead of silently omitting notification behavior. If context is missing, explicitly report why notification was skipped.
+9. Only improvise outside SupaPlan when **no open SupaPlan task** can be claimed for any real capability returned by `inspect-migrations` (or SupaPlan infra is unavailable). In that case, explicitly note fallback reason in the final report/PR body.
 
 Operator intent mapping:
 - If request is broad/ambiguous (e.g. “continue”, “ебаш”, “do next”), default to SupaPlan claim flow first.
@@ -228,13 +235,13 @@ For any task related to the motorbike franchise/public storefront initiative, ag
 
 Do not mark implementation as complete without reflecting progress in `docs/THE_FRANCHEEZEPLAN.md`.
 
-Keyword auto-trigger rule: if a task mentions `пепперолли`, `pepperolli`, `vip-bike`, `vip bike`, `franchize`, or close variants (`франшиза`, `франчайз`), treat it as FRANCHEEZEPLAN-related even when not explicitly stated. In such cases, create/update an ad-hoc task in `docs/THE_FRANCHEEZEPLAN.md` and execute it so history stays traceable.
+Keyword auto-trigger rule: if a task mentions `пепперолли`, `pepperolli`, `vip-bike`, `vip bike`, `franchize`, `FRANCHEEZEPLAN`, or close variants (`франшиза`, `франчайз`), treat it as the same client/teammate stream and route it through FRANCHEEZEPLAN handling even when not explicitly stated. In such cases, create/update an ad-hoc task in `docs/THE_FRANCHEEZEPLAN.md` and execute it so history stays traceable.
 
 RU-intent shortcut: if task/request text is mostly in Russian, default to FRANCHEEZEPLAN routing unless clearly unrelated.
 
 Trigger shortcut: if operator message contains only/mostly `FRANCHEEZEPLAN` (or asks to continue it) without specific scope, pick the next planned ready task from `docs/THE_FRANCHEEZEPLAN.md` and execute it.
 
-QA slug rule (mandatory): for franchize visual/testing flows, use `vip-bike` as default verification slug for screenshots and smoke checks unless operator explicitly requests another slug.
+QA slug rule (mandatory): for FRANCHEEZEPLAN / franchize / `vip-bike` flows, treat those names as synonyms for the same client/teammate stream and use `vip-bike` as default verification slug for screenshots and smoke checks unless operator explicitly requests another slug.
 
 Current docs style: keep setup docs practical, RU-first, and compact-but-complete in `README.MD`, with `docs/README_TLDR.md` as the extra-short variant.
 For first-time operators, keep token onboarding appendixes up-to-date (Telegram BotFather + Slack app token/channel id steps).
