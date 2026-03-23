@@ -765,11 +765,68 @@ async function inspectMigrations() {
     'Seed SQL creates open tasks; operator must run claim->running->ready_for_pr loop to activate real flow.',
   ];
 
+  let rows = [];
+  let capabilitySource = 'supabase-rest';
+
+  try {
+    const supabase = getAdminClient();
+    const result = await supabase
+      .from('supaplan_tasks')
+      .select('id,title,capability,status,updated_at,todo_path')
+      .order('updated_at', { ascending: false })
+      .limit(200);
+
+    if (result.error) throw result.error;
+    rows = Array.isArray(result.data) ? result.data : [];
+    capabilitySource = 'supabase-js';
+  } catch (error) {
+    if (!isTransientNetworkError(error)) {
+      throw error;
+    }
+
+    const fallbackRows = restRequest(
+      'GET',
+      'supaplan_tasks?select=id,title,capability,status,updated_at,todo_path&order=updated_at.desc&limit=200',
+    );
+    rows = Array.isArray(fallbackRows) ? fallbackRows : [];
+    capabilitySource = 'supabase-rest';
+  }
+
+  const byCapability = rows.reduce((acc, row) => {
+    const cap = row.capability || 'unknown';
+    acc[cap] = acc[cap] || { open: 0, running: 0, ready_for_pr: 0, claimed: 0, done: 0, total: 0 };
+    const status = row.status || 'unknown';
+    if (status in acc[cap]) acc[cap][status] += 1;
+    acc[cap].total += 1;
+    return acc;
+  }, {});
+
+  const capabilities = Object.keys(byCapability).filter((cap) => cap !== 'unknown').sort();
+  const oldestOpen = rows
+    .filter((row) => row.status === 'open')
+    .sort((a, b) => String(a.updated_at || '').localeCompare(String(b.updated_at || '')))
+    .slice(0, 5)
+    .map((row) => ({
+      id: row.id,
+      title: row.title,
+      capability: row.capability,
+      todo_path: row.todo_path,
+      updated_at: row.updated_at,
+    }));
+
   console.log(JSON.stringify({
     lifecycle,
     currentStatus: 'phase-2-live-smoke',
     hasMergeWorkflow,
     fakeDoors,
+    capabilityDiscovery: {
+      source: capabilitySource,
+      description: 'Capabilities are derived from live supaplan_tasks rows in Supabase, not from seed migration files.',
+      capabilities,
+      byCapability,
+      oldestOpen,
+      totalTasksScanned: rows.length,
+    },
     nextFocus: [
       'run one full claim->ready_for_pr smoke in real Supabase',
       'verify merge workflow against a merged PR containing supaplan_task:<uuid>',
