@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Cpu, ShieldCheck, Rocket, Network, WandSparkles, FlaskConical, Target, Bot, Crosshair, Store, Brain } from "lucide-react";
+import { ArrowRight, Cpu, ShieldCheck, Rocket, Network, WandSparkles, FlaskConical, Target, Bot, Crosshair, Store, Brain, Bike, KanbanSquare } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CapabilityLaunchGrid } from "@/components/CapabilityLaunchGrid";
@@ -147,6 +147,32 @@ export default function NexusPage() {
           </CardHeader>
           <CardContent>
             <CapabilityLaunchGrid includeVipBikeRental className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4" />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="container mx-auto mt-8 px-4">
+        <Card className="border-cyan-500/30 bg-cyan-500/5 backdrop-blur">
+          <CardHeader>
+            <CardTitle className="text-zinc-100 flex items-center gap-2">
+              <KanbanSquare className="h-5 w-5 text-cyan-300" />
+              FRZ-R3 analytics deck: VIP Bike franchize status
+            </CardTitle>
+            <CardDescription className="text-zinc-300">
+              Отдельный операторский board сопоставляет клиентские идеи с SupaPlan задачами и статусами на человеческом языке.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-3">
+            <Button asChild className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold">
+              <Link href="/supaplan/franchize">
+                Open /supaplan/franchize <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="border-zinc-700 hover:bg-zinc-800">
+              <Link href="/franchize/vip-bike/map-riders">
+                <Bike className="mr-2 h-4 w-4" /> VIP Bike Map Riders
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       </section>
