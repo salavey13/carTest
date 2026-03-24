@@ -1746,6 +1746,8 @@ Append only compact session deltas here as pointers when needed; full narrative 
 - 2026-03-20: FRZ-R1 закрыт как блокирующий шаг: зафиксирован контракт метаданных и fallback-матрица в `docs/FRANCHIZE_METADATA_CONTRACT.md`; FRZ-R2/FRZ-R3/FRZ-R4/FRZ-R5 теперь можно выполнять параллельно.
 - 2026-03-22: По операторскому запросу добавлен новый товар Seqvenz Zero для `vip-bike`: фото загружены в Supabase Storage, запись синхронизирована напрямую в `public.cars`, а повторяемый upsert закреплён отдельной миграцией.
 - 2026-03-24: Закрыт FRZ-R3 в практическом виде — добавлены операторские виджеты в `/nexus` и новая витрина `/supaplan/franchize` с легендой, фазами и live-сопоставлением SupaPlan задач к клиентским идеям `vip-bike`/`viphbike`.
+- 2026-03-24: FRZ-R10 improvement pass (rental flow hardening): в `/franchize/[slug]` добавлены бейджи availability + HOT на карточки байков, фикс мультидневного ценообразования в cart lines (поддержка `1/3/7` дней RU/EN), а в `order` встроены дата-диапазон и e-signature поля (ФИО + consent fingerprint). DOCX из markdown-шаблона теперь отправляется не только админу, но и арендатору + owner (когда telegram id доступен через users.metadata).
+- 2026-03-24: FRZ-R11 старт/выполнение — добавлена страница `/doc-verifier` для tamper-check DOCX: регистрация оригинала в Supabase Storage + SHA-256 в таблице `doc_verifier_records` (scope-aware для повторного использования в разных интеграциях), затем верификация загруженного файла через сравнение `uploaded hash` vs `db hash` + контроль целостности storage-копии (`storage hash` vs `db hash`).
 
 ---
 
