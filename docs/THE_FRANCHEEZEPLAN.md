@@ -1674,6 +1674,28 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - У VIP BIKE есть отдельная страница MapRiders, доступная кнопкой с главного экрана.
   - Авторизованный райдер может включить геошеринг, писать трек и завершать заезд с сохранением статистики.
   - Все пользователи видят активных райдеров, meetup-точки, историю заездов и недельный лидерборд.
+
+### T54 — SupaPlan franchize human-board + idea-to-task mapping
+- status: `done`
+- updated_at: `2026-03-24T13:20:00Z`
+- owner: `codex`
+- notes: Добавлена выделенная страница `/supaplan/franchize` для crew-потока `vip-bike`/`viphbike`: карта клиентских идей, легенда типов задач (R1-R4), фазовый план (апрель→2027), авто-матчинг по `franchize.*` capability и live-статусы из `supaplan_tasks`.
+- next_step: Расширить табличный блок отдельными задачами для `vip-cross` и добавить фильтр по crew slug, когда в SupaPlan появятся мульти-crew franchize задачи.
+- risks: Если в рантайме отсутствует `SUPABASE_SERVICE_ROLE_KEY`, страница покажет fallback с ошибкой загрузки SupaPlan-данных вместо live-статуса.
+- dependencies: T51
+- deliverables:
+  - `app/supaplan/franchize/page.tsx`
+  - `app/supaplan/page.tsx`
+  - `app/nexus/page.tsx`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Создать dedicated `/supaplan/franchize` страницу c human-first UI и легендой.
+  2. Связать идеи клиента с capability и показать соответствующие SupaPlan task/status.
+  3. Добавить входы из `/supaplan` и `/nexus` как операторские launch-точки.
+- acceptance criteria:
+  - На `/supaplan/franchize` видно соответствие «идея ↔ capability ↔ task/status».
+  - У оператора есть быстрый переход на страницу из `/supaplan` и `/nexus`.
+  - План отражает alias `viphbike` и канонический slug `vip-bike`.
  
 
 ## 6) Task template for future extension
@@ -1723,6 +1745,7 @@ Append only compact session deltas here as pointers when needed; full narrative 
 - 2026-03-20: Добавлены дополнительные клиентские SupaPlan-дорожки FRZ-R4/FRZ-R5 для ускоренного онбординга партнёров и прозрачной KPI-коммуникации.
 - 2026-03-20: FRZ-R1 закрыт как блокирующий шаг: зафиксирован контракт метаданных и fallback-матрица в `docs/FRANCHIZE_METADATA_CONTRACT.md`; FRZ-R2/FRZ-R3/FRZ-R4/FRZ-R5 теперь можно выполнять параллельно.
 - 2026-03-22: По операторскому запросу добавлен новый товар Seqvenz Zero для `vip-bike`: фото загружены в Supabase Storage, запись синхронизирована напрямую в `public.cars`, а повторяемый upsert закреплён отдельной миграцией.
+- 2026-03-24: Закрыт FRZ-R3 в практическом виде — добавлены операторские виджеты в `/nexus` и новая витрина `/supaplan/franchize` с легендой, фазами и live-сопоставлением SupaPlan задач к клиентским идеям `vip-bike`/`viphbike`.
 
 ---
 
