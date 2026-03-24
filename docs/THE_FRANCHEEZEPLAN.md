@@ -1677,11 +1677,11 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T54 — SupaPlan franchize human-board + idea-to-task mapping
 - status: `done`
-- updated_at: `2026-03-24T13:20:00Z`
+- updated_at: `2026-03-24T17:45:00Z`
 - owner: `codex`
-- notes: Добавлена выделенная страница `/supaplan/franchize` для crew-потока `vip-bike`/`viphbike`: карта клиентских идей, легенда типов задач (R1-R4), фазовый план (апрель→2027), авто-матчинг по `franchize.*` capability и live-статусы из `supaplan_tasks`.
-- next_step: Расширить табличный блок отдельными задачами для `vip-cross` и добавить фильтр по crew slug, когда в SupaPlan появятся мульти-crew franchize задачи.
-- risks: Если в рантайме отсутствует `SUPABASE_SERVICE_ROLE_KEY`, страница покажет fallback с ошибкой загрузки SupaPlan-данных вместо live-статуса.
+- notes: Усилен `/supaplan/franchize`: добавлены фазовые секции по плану (апрель→2027), явный `taskType` (R1-R4), расширенные `SupaPlan task details` (task_id, todo_path, updated_at, PR URL, body), а также отдельный блок `Epic decomposition cues` для спауна детальных subtask во время реализации каждого эпика.
+- next_step: Создать и подключить `docs/sql/vip-cross-franchize-hydration.sql` по аналогии с `vip-bike`, затем добавить фильтр по `crew slug` при появлении мульти-crew задач в `supaplan_tasks`.
+- risks: Если в рантайме отсутствует `SUPABASE_SERVICE_ROLE_KEY`, страница покажет fallback с ошибкой загрузки SupaPlan-данных вместо live-статуса; детализация epics зависит от дисциплины заполнения `body/todo_path` в SupaPlan.
 - dependencies: T51
 - deliverables:
   - `app/supaplan/franchize/page.tsx`
