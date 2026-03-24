@@ -22,8 +22,8 @@ const CART_STORAGE_PREFIX = "franchize-cart";
 const CART_SYNC_EVENT = "franchize-cart-sync";
 
 const DEFAULT_OPTIONS: FranchizeCartOptions = {
-  package: "Base",
-  duration: "1 day",
+  package: "Базовый",
+  duration: "1 день",
   perk: "Стандарт",
   auction: "Без аукциона",
 };

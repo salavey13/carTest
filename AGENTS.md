@@ -164,6 +164,11 @@ When implementing tasks:
 
 Before doing ad-hoc coding, agents must check SupaPlan backlog first and execute preplanned work when available.
 
+Explicit operator scope override (highest practical rule):
+- If operator asks for a concrete implementation scope in the current message, execute that scope directly.
+- Do not claim/advance unrelated SupaPlan tasks in that case unless operator explicitly asks to run claim mode (`pick-task`, `continue`, `ебаш`, etc.).
+- Never move unrelated tasks to `ready_for_pr` as a placeholder action.
+
 1. Start from `AGENT_ENTRY.md` and treat it as the single-entry workflow.
 2. Run SupaPlan skill/CLI claim flow first:
    - `node scripts/supaplan-skill.mjs inspect-migrations`
