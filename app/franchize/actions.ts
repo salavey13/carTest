@@ -81,6 +81,9 @@ export interface CatalogItemVM {
   mediaUrls: string[];
   pricePerDay: number;
   category: string;
+  availabilityStatus: "available" | "busy";
+  availabilityLabel: string;
+  isHot: boolean;
   specs: Array<{ label: string; value: string }>;
 }
 
@@ -442,12 +445,41 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const catalogTypes = ["bike", "accessories", "gear", "wbitem"];
     const { data: cars, error: carsError } = await supabaseAdmin
       .from("cars")
-      .select("id, make, model, description, image_url, daily_price, type, specs")
+      .select("id, make, model, description, image_url, daily_price, availability, type, specs")
       .eq("crew_id", crew.id)
       .in("type", catalogTypes);
 
     if (carsError) {
       logger.warn("[franchize] failed to load crew cars", { safeSlug, carsError: carsError.message });
+    }
+
+    const vehicleIds = (cars ?? []).map((car) => car.id).filter(Boolean);
+    const { data: activeRentals, error: rentalsError } = vehicleIds.length
+      ? await supabaseAdmin
+          .from("rentals")
+          .select("vehicle_id, end_date, status")
+          .in("vehicle_id", vehicleIds)
+          .in("status", ["pending_confirmation", "confirmed", "active"])
+      : { data: [], error: null };
+
+    if (rentalsError) {
+      logger.warn("[franchize] failed to load rentals availability", { safeSlug, rentalsError: rentalsError.message });
+    }
+
+    const availabilityByVehicle = new Map<string, { status: "available" | "busy"; label: string }>();
+    const nowTs = Date.now();
+    for (const rental of activeRentals ?? []) {
+      const vehicleId = typeof rental.vehicle_id === "string" ? rental.vehicle_id : "";
+      if (!vehicleId) continue;
+
+      const endTs = rental.end_date ? Date.parse(rental.end_date) : Number.NaN;
+      const isBusy = Number.isNaN(endTs) ? true : endTs >= nowTs - 24 * 60 * 60 * 1000;
+      if (!isBusy) continue;
+
+      const label = Number.isNaN(endTs)
+        ? "Занят — дата возврата уточняется"
+        : `Занят до ${new Date(endTs).toLocaleDateString("ru-RU")}`;
+      availabilityByVehicle.set(vehicleId, { status: "busy", label });
     }
 
     const metadata = ((crew as UnknownRecord).metadata ?? {}) as UnknownRecord;
@@ -601,6 +633,15 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         mediaUrls,
         pricePerDay: car.daily_price ?? 0,
         category: subtype,
+        availabilityStatus: availabilityByVehicle.get(car.id)?.status ?? (car.availability === "available" ? "available" : "busy"),
+        availabilityLabel:
+          availabilityByVehicle.get(car.id)?.label ??
+          (car.availability === "available" ? "Свободен сегодня" : "Временно недоступен"),
+        isHot:
+          Number(car.daily_price ?? 0) >= 7000 ||
+          Boolean(readPath(specs, ["is_hot"], false)) ||
+          Boolean(readPath(specs, ["hot"], false)) ||
+          /hot|🔥/i.test(String(readPath(specs, ["badge"], ""))),
         specs: Object.entries(specs)
           .filter(([, value]) => typeof value === "string" || typeof value === "number")
           .filter(([key]) => !["subtitle", "description", "segment", "subtype", "bike_subtype", "type"].includes(key))
@@ -1036,6 +1077,16 @@ function formatMoney(value: number): string {
   return Number(value || 0).toLocaleString("ru-RU");
 }
 
+function parseDurationDays(rawDuration: string): number {
+  const normalized = String(rawDuration || "").toLowerCase();
+  const numericMatch = normalized.match(/\d+/);
+  const days = numericMatch ? Number(numericMatch[0]) : 1;
+  if (!Number.isFinite(days) || days <= 0) {
+    return 1;
+  }
+  return days;
+}
+
 type FranchizeOrderNotifyPayload = z.infer<typeof franchizeOrderInvoiceSchema> & {
   totalAmount: number;
   subtotal: number;
@@ -1132,6 +1183,10 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
   const firstLine = payload.cartLines[0];
   const firstCar = firstLine ? byId.get(firstLine.itemId) : null;
   const firstSpecs = (firstCar?.specs as Record<string, unknown> | null) || {};
+  const rentDays = Math.max(...payload.cartLines.map((line) => parseDurationDays(line.options.duration)));
+  const rentStartDate = payload.rentalStartDate || payload.time;
+  const rentEndDate = payload.rentalEndDate || payload.time;
+  const dailyPriceRub = firstLine?.pricePerDay || Math.round(payload.subtotal / Math.max(1, rentDays));
 
   const template = await loadFranchizeDealTemplate();
 
@@ -1146,15 +1201,16 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     bike_make_model: firstCar ? `${firstCar.make || "Bike"} ${firstCar.model || "Model"}` : payload.cartLines.map((line) => line.itemId).join(", "),
     bike_vin: String(firstSpecs.vin || firstSpecs.frame || firstSpecs.vin_number || "уточняется"),
     bike_plate: String(firstSpecs.plate || firstSpecs.state_number || "уточняется"),
-    rent_start_date: payload.time,
-    rent_end_date: payload.time,
-    rent_days: 1,
-    daily_price_rub: formatMoney(payload.subtotal),
+    rent_start_date: rentStartDate,
+    rent_end_date: rentEndDate,
+    rent_days: rentDays,
+    daily_price_rub: formatMoney(dailyPriceRub),
     subtotal_rub: formatMoney(payload.subtotal),
     extras_rows: extrasRows,
     extras_total_rub: formatMoney(payload.extrasTotal),
     total_price_rub: formatMoney(payload.totalAmount),
     deposit_rub: "20 000",
+    renter_signature: payload.signatureName || "электронное согласие в Telegram WebApp",
   });
 
   const bytes = await generateDocxBytes(rendered);
@@ -1178,9 +1234,27 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     ].join("\n"),
   );
 
-  const sendDocResult = await sendTelegramDocument(adminChatId, new Blob([bytes]), docFileName);
-  if (!sendDocResult.success) {
-    throw new Error(sendDocResult.error || "Failed to send DOCX to admin");
+  const recipientSet = new Set<string>([adminChatId, payload.telegramUserId]);
+  const { data: crewRow } = await supabaseAdmin.from("crews").select("owner_id").eq("slug", payload.slug).maybeSingle();
+  const ownerId = typeof crewRow?.owner_id === "string" ? crewRow.owner_id : "";
+  if (ownerId) {
+    const { data: ownerUser } = await supabaseAdmin
+      .from("users")
+      .select("metadata")
+      .eq("user_id", ownerId)
+      .maybeSingle();
+    const ownerMeta = (ownerUser?.metadata ?? {}) as Record<string, unknown>;
+    const ownerTelegramId = String(ownerMeta.telegram_id ?? ownerMeta.telegramId ?? "").trim();
+    if (ownerTelegramId) {
+      recipientSet.add(ownerTelegramId);
+    }
+  }
+
+  for (const recipientId of recipientSet) {
+    const sendDocResult = await sendTelegramDocument(recipientId, new Blob([bytes]), docFileName);
+    if (!sendDocResult.success) {
+      throw new Error(sendDocResult.error || `Failed to send DOCX to ${recipientId}`);
+    }
   }
 
   await updateFranchizeOrderNotificationLog(logId, {
@@ -1210,6 +1284,11 @@ const franchizeOrderInvoiceSchema = z.object({
   phone: z.string().trim().min(6),
   time: z.string().trim().min(1),
   comment: z.string().trim().default(""),
+  rentalStartDate: z.string().trim().optional(),
+  rentalEndDate: z.string().trim().optional(),
+  signatureName: z.string().trim().optional(),
+  signatureAccepted: z.boolean().optional(),
+  signatureFingerprint: z.string().trim().optional(),
   payment: z.enum(["telegram_xtr", "card", "cash", "sbp"]),
   delivery: z.enum(["pickup", "delivery"]),
   subtotal: z.number().finite().nonnegative(),
@@ -1232,12 +1311,12 @@ const franchizeOrderInvoiceSchema = z.object({
     lineTotal: z.number().finite().nonnegative(),
     options: z
       .object({
-        package: z.string().trim().default("Base"),
-        duration: z.string().trim().default("1 day"),
+        package: z.string().trim().default("Базовый"),
+        duration: z.string().trim().default("1 день"),
         perk: z.string().trim().default("Стандарт"),
         auction: z.string().trim().default("Без аукциона"),
       })
-      .default({ package: "Base", duration: "1 day", perk: "Стандарт", auction: "Без аукциона" }),
+      .default({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона" }),
   })).min(1),
 });
 

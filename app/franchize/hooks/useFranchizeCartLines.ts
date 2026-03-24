@@ -6,21 +6,36 @@ import { useFranchizeCart } from "./useFranchizeCart";
 
 const packageMultiplier: Record<string, number> = {
   base: 1,
+  "базовый": 1,
   pro: 1.18,
+  "комфорт": 1.18,
   ultra: 1.35,
+  "максимум": 1.35,
 };
 
-const durationMultiplier: Record<string, number> = {
-  "1 day": 1,
-  "3 days": 2.8,
-  "7 days": 6.2,
+const durationDiscountMultiplierByDays: Record<number, number> = {
+  1: 1,
+  3: 0.93,
+  7: 0.89,
 };
 
 const perkSurcharge: Record<string, number> = {
   "стандарт": 0,
   "шлем+gopro": 850,
+  "шлем + gopro": 850,
+  "полный комплект": 1800,
   "full gear": 1800,
 };
+
+function parseDurationDays(rawDuration: string): number {
+  const normalized = rawDuration.toLowerCase();
+  const numericMatch = normalized.match(/\d+/);
+  const days = numericMatch ? Number(numericMatch[0]) : 1;
+  if (!Number.isFinite(days) || days <= 0) {
+    return 1;
+  }
+  return days;
+}
 
 export type FranchizeCartLineVM = {
   lineId: string;
@@ -29,6 +44,7 @@ export type FranchizeCartLineVM = {
   item: CatalogItemVM | null;
   pricePerDay: number;
   lineTotal: number;
+  rentalDays: number;
   options: {
     package: string;
     duration: string;
@@ -47,11 +63,14 @@ export function useFranchizeCartLines(slug: string, items: CatalogItemVM[]) {
       .filter(([, line]) => line.qty > 0)
       .map(([lineId, line]) => {
         const item = itemById.get(line.itemId) ?? null;
-        const pricePerDay = item?.pricePerDay ?? 0;
+        const basePricePerDay = item?.pricePerDay ?? 0;
+        const rentalDays = parseDurationDays(line.options.duration);
         const packageFactor = packageMultiplier[line.options.package.toLowerCase()] ?? 1;
-        const durationFactor = durationMultiplier[line.options.duration.toLowerCase()] ?? 1;
+        const durationDiscount = durationDiscountMultiplierByDays[rentalDays] ?? 1;
         const perkFee = perkSurcharge[line.options.perk.toLowerCase()] ?? 0;
-        const effectiveUnitPrice = Math.round(pricePerDay * packageFactor * durationFactor + perkFee);
+        const lineBase = basePricePerDay * packageFactor * rentalDays + perkFee;
+        const discountedLineBase = Math.round(lineBase * durationDiscount);
+        const effectiveUnitPrice = Math.max(0, Math.round(discountedLineBase / Math.max(1, rentalDays)));
 
         return {
           lineId,
@@ -59,7 +78,8 @@ export function useFranchizeCartLines(slug: string, items: CatalogItemVM[]) {
           qty: line.qty,
           item,
           pricePerDay: effectiveUnitPrice,
-          lineTotal: effectiveUnitPrice * line.qty,
+          lineTotal: discountedLineBase * line.qty,
+          rentalDays,
           options: line.options,
         };
       });
