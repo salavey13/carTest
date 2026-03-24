@@ -286,7 +286,6 @@ export default async function SupaPlanFranchizePage() {
             <>
               <p className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-300" /> Задач найдено: {tasks.length}</p>
               <p className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-cyan-300" /> Обновлено по данным Supabase: {new Date().toISOString()}</p>
-              <p className="flex items-center gap-2"><Layers3 className="h-4 w-4 text-amber-300" /> Для crew alias <strong className="ml-1 text-amber-200">viphbike</strong> используется канонический slug <strong className="ml-1 text-cyan-200">vip-bike</strong>.</p>
             </>
           )}
         </CardContent>
