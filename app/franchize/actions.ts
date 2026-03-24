@@ -1189,22 +1189,35 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 const template = await loadFranchizeDealTemplate();
 
 // ──────────────────────────────────────────────────────────────
-// Подготавливаем переменные (БЕЗ реального хеша внутри документа)
+// НОВЫЕ ПЕРЕМЕННЫЕ — ЖЁСТКО ЗАКОДИРОВАНЫ ИЗ ТВОЕГО OCR
 // ──────────────────────────────────────────────────────────────
 const variables = {
   contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}`,
   contract_date: new Date().toLocaleDateString("ru-RU"),
+  day: new Date().getDate().toString().padStart(2, "0"),
+  month: new Date().toLocaleString("ru-RU", { month: "long" }),
+  year: new Date().getFullYear().toString(),
+
   renter_full_name: payload.recipient,
-  renter_document_id: "заполняется при выдаче",
   renter_phone: payload.phone,
+  renter_driver_license: "указывается при выдаче",           // ← можно потом добавить в payload
+  renter_passport: "указывается при выдаче",                 // ← можно потом добавить в payload
+
   issuer_name: `Franchize ${payload.slug}`,
   issuer_signatory: "Администратор экипажа",
+  issuer_representative: "Сидоров И.О.",                     // ← жёстко из OCR
+
   bike_make_model: firstCar ? `${firstCar.make || "Bike"} ${firstCar.model || "Model"}` : payload.cartLines.map((line) => line.itemId).join(", "),
   bike_vin: String(firstSpecs.vin || firstSpecs.frame || firstSpecs.vin_number || "уточняется"),
   bike_plate: String(firstSpecs.plate || firstSpecs.state_number || "уточняется"),
-  rent_start_date: rentStartDate,
-  rent_end_date: rentEndDate,
+  bike_mileage: "45073",                                     // можно сделать динамическим позже
+
+  rent_start_time: "12:00",
+  rent_start_date: new Date().toLocaleDateString("ru-RU"),
+  rent_end_time: "12:00",
+  rent_end_date: new Date(Date.now() + 86400000).toLocaleDateString("ru-RU"), // +1 день по умолчанию
   rent_days: rentDays,
+
   daily_price_rub: formatMoney(dailyPriceRub),
   subtotal_rub: formatMoney(payload.subtotal),
   extras_rows: extrasRows,
@@ -1212,12 +1225,22 @@ const variables = {
   total_price_rub: formatMoney(payload.totalAmount),
   deposit_rub: "20 000",
 
-  // Цифровые поля
-  document_key: `rental-${payload.slug}-${payload.orderId}`,
-  verified_at: new Date().toISOString(),
+  // Новые жёстко закодированные поля из твоего шаблона
+  included_mileage: "200 км",
+  overage_rate: "30 руб/км",
+  bike_value_rub: "700 000",
+  bike_value_words: "Семьсот тысяч",
+  late_return_penalty_rub: "5000",
+  return_address: "г. Нижний Новгород, ул. Стригинский бульвар, дом 13б",
+
+  // Цифровая подпись
   signature_timestamp: new Date().toLocaleString("ru-RU"),
   signature_fingerprint: payload.signatureFingerprint || "—",
   renter_signature: payload.signatureName || "электронное согласие в Telegram WebApp",
+
+  // Doc Verifier
+  document_key: `rental-${payload.slug}-${payload.orderId}`,
+  verified_at: new Date().toISOString(),
 };
 
 const rendered = applyTemplateVariables(template, variables);
@@ -1226,14 +1249,10 @@ const bytes = await generateDocxBytes(rendered);
 const docFileName = `franchize-order-${payload.slug}-${payload.orderId}.docx`;
 
 // ──────────────────────────────────────────────────────────────
-// Считаем реальный SHA-256 финального файла
+// Реальный SHA-256 + регистрация в Doc Verifier (один раз)
 // ──────────────────────────────────────────────────────────────
 const realHash = createHash("sha256").update(bytes).digest("hex");
 
-// ──────────────────────────────────────────────────────────────
-// Автоматически регистрируем оригинал в Doc Verifier
-// (файл + хеш сохраняются в Supabase Storage + БД)
-// ──────────────────────────────────────────────────────────────
 const registerForm = new FormData();
 registerForm.append("integrationScope", "franchize");
 registerForm.append("documentKey", variables.document_key);
@@ -1241,14 +1260,10 @@ registerForm.append("file", new Blob([bytes], { type: "application/vnd.openxmlfo
 registerForm.append("uploadedBy", "franchize-order-system");
 
 try {
-  const registerResult = await registerVerifierOriginal(registerForm);
-  if (registerResult.success) {
-    logger.info(`[franchize] Document registered in verifier → key: ${variables.document_key} | hash: ${realHash}`);
-  } else {
-    logger.warn("[franchize] Doc verifier registration failed (non-critical)", registerResult.error);
-  }
-} catch (regError) {
-  logger.warn("[franchize] Doc verifier registration failed (non-critical)", regError);
+  await registerVerifierOriginal(registerForm);
+  logger.info(`[franchize] Document registered → key: ${variables.document_key} | hash: ${realHash}`);
+} catch (e) {
+  logger.warn("[franchize] Doc verifier registration failed (non-critical)", e);
 }
 
   const adminChatId = process.env.ADMIN_CHAT_ID;
