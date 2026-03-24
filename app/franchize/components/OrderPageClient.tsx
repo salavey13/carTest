@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
+import { addDays } from "date-fns";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
@@ -37,6 +38,11 @@ type CheckoutPayload = {
   phone: string;
   time: string;
   comment: string;
+  rentalStartDate?: string;
+  rentalEndDate?: string;
+  signatureName?: string;
+  signatureAccepted?: boolean;
+  signatureFingerprint?: string;
   payment: PaymentMethod;
   delivery: "pickup" | "delivery";
   extras: Array<{ id: string; label: string; amount: number }>;
@@ -68,6 +74,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const [phone, setPhone] = useState("");
   const [time, setTime] = useState("");
   const [comment, setComment] = useState("");
+  const [rentalStartDate, setRentalStartDate] = useState("");
+  const [signatureName, setSignatureName] = useState("");
   const [promo, setPromo] = useState("");
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   const [consent, setConsent] = useState(false);
@@ -92,7 +100,20 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     [selectedExtraItems],
   );
   const totalAmount = subtotal + extrasTotal;
-  const isValidForm = recipient.trim().length > 1 && phone.trim().length > 5 && time.trim().length > 0 && consent;
+  const maxRentalDays = useMemo(() => Math.max(1, ...cartLines.map((line) => line.rentalDays ?? 1)), [cartLines]);
+  const rentalEndDate = useMemo(() => {
+    if (!rentalStartDate) return "";
+    const start = new Date(rentalStartDate);
+    if (Number.isNaN(start.getTime())) return "";
+    return addDays(start, maxRentalDays - 1).toISOString().slice(0, 10);
+  }, [maxRentalDays, rentalStartDate]);
+  const isValidForm =
+    recipient.trim().length > 1 &&
+    phone.trim().length > 5 &&
+    time.trim().length > 0 &&
+    Boolean(rentalStartDate) &&
+    signatureName.trim().length > 2 &&
+    consent;
   const requiresTelegram = payment === "telegram_xtr";
   const hasTelegramUser = Boolean(user?.id);
   const canSubmit = isValidForm && !isCartEmpty && (!requiresTelegram || hasTelegramUser);
@@ -100,9 +121,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     () => [
       { id: "cart", label: "Байк выбран", done: !isCartEmpty },
       { id: "contact", label: "Контакт заполнен", done: recipient.trim().length > 1 && phone.trim().length > 5 && time.trim().length > 0 },
+      { id: "dates", label: "Период аренды выбран", done: Boolean(rentalStartDate) },
+      { id: "signature", label: "Электронная подпись задана", done: signatureName.trim().length > 2 },
       { id: "consent", label: "Условия подтверждены", done: consent },
     ],
-    [consent, isCartEmpty, phone, recipient, time],
+    [consent, isCartEmpty, phone, recipient, rentalStartDate, signatureName, time],
   );
   const completedMilestones = checkoutMilestones.filter((step) => step.done).length;
   const readinessPercent = Math.round((completedMilestones / checkoutMilestones.length) * 100);
@@ -112,10 +135,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       { id: "recipient", label: "Укажите имя получателя", active: recipient.trim().length <= 1 },
       { id: "phone", label: "Добавьте контактный номер", active: phone.trim().length <= 5 },
       { id: "time", label: "Выберите удобное время", active: time.trim().length === 0 },
+      { id: "dates", label: "Выберите дату начала аренды", active: !rentalStartDate },
+      { id: "signature", label: "Введите ФИО для электронной подписи", active: signatureName.trim().length <= 2 },
       { id: "consent", label: "Подтвердите условия аренды", active: !consent },
       { id: "telegram", label: "Для Stars откройте страницу через Telegram WebApp", active: requiresTelegram && !hasTelegramUser },
     ].filter((item) => item.active),
-    [consent, hasTelegramUser, isCartEmpty, phone, recipient, requiresTelegram, time],
+    [consent, hasTelegramUser, isCartEmpty, phone, recipient, rentalStartDate, requiresTelegram, signatureName, time],
   );
   const nextAction = checkoutBlockers[0];
 
@@ -126,6 +151,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       phone: phone.trim(),
       time: time.trim(),
       comment: comment.trim(),
+      rentalStartDate: rentalStartDate || undefined,
+      rentalEndDate: rentalEndDate || undefined,
+      signatureName: signatureName.trim() || undefined,
+      signatureAccepted: consent,
+      signatureFingerprint: user?.id ? `tg:${user.id}` : "manual-sign",
       payment,
       delivery: deliveryMode,
       extras: selectedExtraItems.map((extra) => ({ id: extra.id, label: extra.label, amount: extra.amount })),
@@ -140,7 +170,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         options: line.options,
       })),
     }),
-    [cartLines, comment, deliveryMode, extrasTotal, orderId, payment, phone, recipient, selectedExtraItems, time, totalAmount],
+    [cartLines, comment, consent, deliveryMode, extrasTotal, orderId, payment, phone, recipient, rentalEndDate, rentalStartDate, selectedExtraItems, signatureName, time, totalAmount, user?.id],
   );
 
   const submitLabel = isSubmitting
@@ -175,6 +205,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         phone: submitPayload.phone,
         time: submitPayload.time,
         comment: submitPayload.comment,
+        rentalStartDate: submitPayload.rentalStartDate,
+        rentalEndDate: submitPayload.rentalEndDate,
+        signatureName: submitPayload.signatureName,
+        signatureAccepted: submitPayload.signatureAccepted,
+        signatureFingerprint: submitPayload.signatureFingerprint,
         payment: submitPayload.payment,
         delivery: submitPayload.delivery,
         subtotal,
@@ -203,6 +238,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           phone: submitPayload.phone,
           time: submitPayload.time,
           comment: submitPayload.comment,
+          rentalStartDate: submitPayload.rentalStartDate,
+          rentalEndDate: submitPayload.rentalEndDate,
+          signatureName: submitPayload.signatureName,
+          signatureAccepted: submitPayload.signatureAccepted,
+          signatureFingerprint: submitPayload.signatureFingerprint,
           payment: submitPayload.payment,
           delivery: submitPayload.delivery,
           subtotal,
@@ -310,6 +350,35 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               <input ref={recipientRef} className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Имя и фамилия" value={recipient} onChange={(e) => setRecipient(e.target.value)} />
               <input ref={phoneRef} className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Телефон" value={phone} onChange={(e) => setPhone(e.target.value)} />
               <input ref={timeRef} className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Удобное время" value={time} onChange={(e) => setTime(e.target.value)} />
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="text-xs" style={surface.mutedText}>
+                  Дата старта аренды
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                    value={rentalStartDate}
+                    onChange={(e) => setRentalStartDate(e.target.value)}
+                  />
+                </label>
+                <label className="text-xs" style={surface.mutedText}>
+                  Дата окончания (авто)
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded-xl border px-3 py-2 text-sm opacity-80"
+                    style={fieldStyle}
+                    value={rentalEndDate}
+                    readOnly
+                  />
+                </label>
+              </div>
+              <input
+                className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                placeholder="ФИО для электронной подписи"
+                value={signatureName}
+                onChange={(e) => setSignatureName(e.target.value)}
+              />
               <textarea className="min-h-20 w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Комментарий к заказу" value={comment} onChange={(e) => setComment(e.target.value)} />
             </div>
           </div>
@@ -377,7 +446,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
           <label className="flex items-start gap-2 rounded-xl border p-3 text-sm" style={surface.card}>
             <input ref={consentRef} type="checkbox" className="mt-0.5" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-            <span>Согласен с условиями аренды и обработкой персональных данных.</span>
+            <span>Согласен с условиями аренды и подтверждаю электронную подпись в Telegram WebApp.</span>
           </label>
         </div>
 
@@ -489,6 +558,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <div className="mt-3 border-t border-[var(--order-border)] pt-3 text-sm">
             <p className="flex justify-between"><span>Получение</span><span>{deliveryMode === "pickup" ? "Самовывоз" : "Доставка"}</span></p>
             <p className="mt-1 flex justify-between"><span>Оплата</span><span>{payments.find((item) => item.id === payment)?.label ?? payment}</span></p>
+            <p className="mt-1 flex justify-between"><span>Период</span><span>{rentalStartDate || "—"} → {rentalEndDate || "—"}</span></p>
             <p className="mt-2 flex justify-between"><span>Подытог</span><span>{subtotal.toLocaleString("ru-RU")} ₽</span></p>
             <p className="mt-1 flex justify-between"><span>Доп. опции</span><span>{extrasTotal.toLocaleString("ru-RU")} ₽</span></p>
             <p className="mt-2 flex justify-between text-base font-semibold text-[var(--order-accent)]">

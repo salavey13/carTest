@@ -12,12 +12,13 @@ This repository uses **SupaPlan + Artificial General Iterator**.
 **Do NOT** read the entire repo.
 
 Instead:
-0. Call `node scripts/supaplan-skill.mjs inspect-migrations` first. It is now the capability-discovery check: it reports capabilities from live `supaplan_tasks` rows in Supabase (via JS client first, REST fallback second), not from seed migration files. Never guess or hallucinate a capability name.
-1. Pick only a capability that actually appears in `inspect-migrations`, then run `node scripts/supaplan-skill.mjs pick-task --capability <real_capability_from_inspect> --agentId <agent_id>`.
-2. If `inspect-migrations` shows zero real capabilities or zero claimable tasks, report exactly: `No claimable tasks for any real capability right now. Waiting for operator or new tasks.`
-3. Go to the returned `todo_path`
-4. Read hydration.md + todo.md
-5. Execute
+0. If operator gives an explicit scoped implementation request, execute that scope directly first. Do **not** auto-pick unrelated SupaPlan tasks unless operator explicitly asks to run SupaPlan claim flow (or uses trigger phrase like `ебаш`).
+1. Otherwise, call `node scripts/supaplan-skill.mjs inspect-migrations` first. It is now the capability-discovery check: it reports capabilities from live `supaplan_tasks` rows in Supabase (via JS client first, REST fallback second), not from seed migration files. Never guess or hallucinate a capability name.
+2. Pick only a capability that actually appears in `inspect-migrations`, then run `node scripts/supaplan-skill.mjs pick-task --capability <real_capability_from_inspect> --agentId <agent_id>`.
+3. If `inspect-migrations` shows zero real capabilities or zero claimable tasks, report exactly: `No claimable tasks for any real capability right now. Waiting for operator or new tasks.`
+4. Go to the returned `todo_path`
+5. Read hydration.md + todo.md
+6. Execute
 6. Use repo skills/scripts before improvising. If a local skill or helper script already matches the task (SupaPlan, notifications, Supabase access, screenshot capture, homework flow, bridge flow), use it instead of inventing a manual workaround.
 7. If the result is visual, operator-facing, or easier to verify with an image, take a screenshot with the available screenshot/browser skill even when the task is not in a special trigger bucket.
 8. Update status → running → ready_for_pr

@@ -36,7 +36,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const surface = crewPaletteForSurface(crew.theme);
   const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
   const { addItem } = useFranchizeCart(crew.slug || slug);
-  const [selectedOptions, setSelectedOptions] = useState({ package: "Base", duration: "1 day", perk: "Стандарт", auction: "Без аукциона" });
+  const [selectedOptions, setSelectedOptions] = useState({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона" });
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchCtaFocused, setSearchCtaFocused] = useState(false);
@@ -235,8 +235,8 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const openItem = (item: CatalogItemVM) => {
     setSelectedItem(item);
     setSelectedOptions({
-      package: "Base",
-      duration: "1 day",
+      package: "Базовый",
+      duration: "1 день",
       perk: "Стандарт",
       auction: auctionTickOptions[0] ?? "Без аукциона",
     });
@@ -431,16 +431,27 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                           )}
                         </div>
                         <div className="p-3">
-                          {item.category.toLowerCase().includes("bobber") && (
-                            <span className="mb-2 inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
-                              Хит 🔥
+                          <div className="mb-2 flex flex-wrap gap-1.5">
+                            {item.isHot && (
+                              <span className="inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
+                                HOT 🔥
+                              </span>
+                            )}
+                            <span
+                              className="inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold"
+                              style={{
+                                backgroundColor: item.availabilityStatus === "available" ? "#2f9e4455" : "#dc262655",
+                                color: "#f8fafc",
+                              }}
+                            >
+                              {item.availabilityLabel}
                             </span>
-                          )}
+                          </div>
                           <h3 className="mt-1 text-sm font-semibold leading-5">{item.title}</h3>
                           <p className="text-xs" style={surface.mutedText}>{item.description || item.subtitle}</p>
                           <p className="mt-2 text-base font-bold text-[var(--catalog-accent)]">
                             {item.pricePerDay.toLocaleString("ru-RU")} ₽
-                            <span className="ml-1 text-xs font-normal text-[var(--catalog-muted)]">/ day</span>
+                            <span className="ml-1 text-xs font-normal text-[var(--catalog-muted)]">/ день</span>
                           </p>
                           <div className="mt-2 flex gap-2">
                             <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95">
