@@ -1,4 +1,7 @@
 import StatusClient from "./StatusClient";
+import Link from "next/link";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowRight, Bike } from "lucide-react";
 
 export default function SupaPlanPage() {
   return (
@@ -22,6 +25,26 @@ export default function SupaPlanPage() {
           <div className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 backdrop-blur">3. Забрал PR и смёржил</div>
         </div>
       </header>
+
+      <Card className="border-slate-800/70 bg-slate-950 text-slate-100">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Bike className="h-5 w-5 text-cyan-300" />
+            Franchize board for VIP Bike
+          </CardTitle>
+          <CardDescription className="text-slate-400">
+            Отдельная human-first страница: идеи клиента, маппинг в SupaPlan capability и текущие статусы.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link
+            href="/supaplan/franchize"
+            className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-sm text-cyan-200 hover:bg-cyan-400/20"
+          >
+            Открыть /supaplan/franchize <ArrowRight className="h-4 w-4" />
+          </Link>
+        </CardContent>
+      </Card>
 
       <StatusClient />
     </div>
