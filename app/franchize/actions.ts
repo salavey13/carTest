@@ -1,13 +1,13 @@
 "use server";
 
-
 import { createInvoice, supabaseAdmin } from "@/lib/supabase-server";
 import { notifyAdmin, sendTelegramDocument, sendTelegramInvoice } from "@/app/actions";
 import { generateDocxBytes } from "@/app/markdown-doc/actions";
 import { applyTemplateVariables } from "@/lib/markdownTemplate";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
+import { registerVerifierOriginal } from "@/app/doc-verifier/actions";
 import { readFile } from "fs/promises";
 import path from "path";
 
@@ -1071,8 +1071,6 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput, actorUser
   };
 }
 
-
-
 function formatMoney(value: number): string {
   return Number(value || 0).toLocaleString("ru-RU");
 }
@@ -1188,33 +1186,70 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
   const rentEndDate = payload.rentalEndDate || payload.time;
   const dailyPriceRub = firstLine?.pricePerDay || Math.round(payload.subtotal / Math.max(1, rentDays));
 
-  const template = await loadFranchizeDealTemplate();
+const template = await loadFranchizeDealTemplate();
 
-  const rendered = applyTemplateVariables(template, {
-    contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}`,
-    contract_date: new Date().toLocaleDateString("ru-RU"),
-    renter_full_name: payload.recipient,
-    renter_document_id: "заполняется при выдаче",
-    renter_phone: payload.phone,
-    issuer_name: `Franchize ${payload.slug}`,
-    issuer_signatory: "Администратор экипажа",
-    bike_make_model: firstCar ? `${firstCar.make || "Bike"} ${firstCar.model || "Model"}` : payload.cartLines.map((line) => line.itemId).join(", "),
-    bike_vin: String(firstSpecs.vin || firstSpecs.frame || firstSpecs.vin_number || "уточняется"),
-    bike_plate: String(firstSpecs.plate || firstSpecs.state_number || "уточняется"),
-    rent_start_date: rentStartDate,
-    rent_end_date: rentEndDate,
-    rent_days: rentDays,
-    daily_price_rub: formatMoney(dailyPriceRub),
-    subtotal_rub: formatMoney(payload.subtotal),
-    extras_rows: extrasRows,
-    extras_total_rub: formatMoney(payload.extrasTotal),
-    total_price_rub: formatMoney(payload.totalAmount),
-    deposit_rub: "20 000",
-    renter_signature: payload.signatureName || "электронное согласие в Telegram WebApp",
-  });
+// ──────────────────────────────────────────────────────────────
+// Подготавливаем переменные (БЕЗ реального хеша внутри документа)
+// ──────────────────────────────────────────────────────────────
+const variables = {
+  contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}`,
+  contract_date: new Date().toLocaleDateString("ru-RU"),
+  renter_full_name: payload.recipient,
+  renter_document_id: "заполняется при выдаче",
+  renter_phone: payload.phone,
+  issuer_name: `Franchize ${payload.slug}`,
+  issuer_signatory: "Администратор экипажа",
+  bike_make_model: firstCar ? `${firstCar.make || "Bike"} ${firstCar.model || "Model"}` : payload.cartLines.map((line) => line.itemId).join(", "),
+  bike_vin: String(firstSpecs.vin || firstSpecs.frame || firstSpecs.vin_number || "уточняется"),
+  bike_plate: String(firstSpecs.plate || firstSpecs.state_number || "уточняется"),
+  rent_start_date: rentStartDate,
+  rent_end_date: rentEndDate,
+  rent_days: rentDays,
+  daily_price_rub: formatMoney(dailyPriceRub),
+  subtotal_rub: formatMoney(payload.subtotal),
+  extras_rows: extrasRows,
+  extras_total_rub: formatMoney(payload.extrasTotal),
+  total_price_rub: formatMoney(payload.totalAmount),
+  deposit_rub: "20 000",
 
-  const bytes = await generateDocxBytes(rendered);
-  const docFileName = `franchize-order-${payload.slug}-${payload.orderId}.docx`;
+  // Цифровые поля
+  document_key: `rental-${payload.slug}-${payload.orderId}`,
+  verified_at: new Date().toISOString(),
+  signature_timestamp: new Date().toLocaleString("ru-RU"),
+  signature_fingerprint: payload.signatureFingerprint || "—",
+  renter_signature: payload.signatureName || "электронное согласие в Telegram WebApp",
+};
+
+const rendered = applyTemplateVariables(template, variables);
+const bytes = await generateDocxBytes(rendered);
+
+const docFileName = `franchize-order-${payload.slug}-${payload.orderId}.docx`;
+
+// ──────────────────────────────────────────────────────────────
+// Считаем реальный SHA-256 финального файла
+// ──────────────────────────────────────────────────────────────
+const realHash = createHash("sha256").update(bytes).digest("hex");
+
+// ──────────────────────────────────────────────────────────────
+// Автоматически регистрируем оригинал в Doc Verifier
+// (файл + хеш сохраняются в Supabase Storage + БД)
+// ──────────────────────────────────────────────────────────────
+const registerForm = new FormData();
+registerForm.append("integrationScope", "franchize");
+registerForm.append("documentKey", variables.document_key);
+registerForm.append("file", new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }), docFileName);
+registerForm.append("uploadedBy", "franchize-order-system");
+
+try {
+  const registerResult = await registerVerifierOriginal(registerForm);
+  if (registerResult.success) {
+    logger.info(`[franchize] Document registered in verifier → key: ${variables.document_key} | hash: ${realHash}`);
+  } else {
+    logger.warn("[franchize] Doc verifier registration failed (non-critical)", registerResult.error);
+  }
+} catch (regError) {
+  logger.warn("[franchize] Doc verifier registration failed (non-critical)", regError);
+}
 
   const adminChatId = process.env.ADMIN_CHAT_ID;
   if (!adminChatId) {
