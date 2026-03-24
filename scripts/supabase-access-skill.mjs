@@ -178,17 +178,28 @@ function runGrowthMode(ctx) {
   console.log(JSON.stringify(output, null, 2));
 }
 
-function getExposedTables(ctx) {
+function tableExists(ctx, table) {
   const raw = restRequest({
     ...ctx,
-    path: '/rest/v1/',
+    path: `/rest/v1/${table}?select=*&limit=1`,
+    headers: [`Accept-Profile: ${ctx.schema}`],
   });
-  const openApi = JSON.parse(raw);
-  const paths = Object.keys(openApi.paths || {});
-  return paths
-    .map((path) => path.replace(/^\//, '').split('?')[0])
-    .filter((name) => name && !name.startsWith('rpc/'))
-    .sort();
+  const parsed = JSON.parse(raw || 'null');
+  if (Array.isArray(parsed)) return true;
+  if (parsed && typeof parsed === 'object' && parsed.code === 'PGRST205') return false;
+  throw new Error(`Unexpected Supabase response while checking table "${table}": ${raw}`);
+}
+
+function getExposedTables(ctx, tablesToProbe = []) {
+  const existing = [];
+  for (const table of tablesToProbe) {
+    try {
+      if (tableExists(ctx, table)) existing.push(table);
+    } catch {
+      // treat as unavailable for drift reporting
+    }
+  }
+  return existing.sort();
 }
 
 function runUsageMode(ctx) {
@@ -244,16 +255,17 @@ function extractTablesFromMigrations() {
 
 function runMigrationDriftMode(ctx) {
   const expectedFromMigrations = extractTablesFromMigrations();
-  const exposedTables = getExposedTables(ctx);
+  const exposedTables = getExposedTables(ctx, expectedFromMigrations);
 
   const missingInSupabase = expectedFromMigrations.filter((table) => !exposedTables.includes(table));
-  const extraInSupabase = exposedTables.filter((table) => !expectedFromMigrations.includes(table));
+  const extraInSupabase = [];
 
   console.log(JSON.stringify({
     expectedFromMigrations,
     exposedTables,
     missingInSupabase,
     extraInSupabase,
+    note: 'extraInSupabase is empty because this script no longer calls /rest/v1/ OpenAPI root; it probes expected tables directly.',
     summary: {
       expectedCount: expectedFromMigrations.length,
       exposedCount: exposedTables.length,

@@ -96,23 +96,22 @@ function maybeNotify(summary, options = {}) {
   }
 }
 
-function getExposedTables() {
+function tableExists() {
   const { supabaseUrl, headers } = client();
   const raw = curlJson({
-    url: `${supabaseUrl}/rest/v1/`,
+    url: `${supabaseUrl}/rest/v1/${HOMEWORK_TABLE}?select=solution_key&limit=1`,
     headers,
   });
-  const openApi = JSON.parse(raw);
-  const paths = Object.keys(openApi.paths || {});
-  return paths
-    .map((path) => path.replace(/^\//, "").split("?")[0])
-    .filter((name) => name && !name.startsWith("rpc/"))
-    .sort();
-}
 
-function tableExists() {
-  const tables = getExposedTables();
-  return tables.includes(HOMEWORK_TABLE);
+  const parsed = JSON.parse(raw || "null");
+  if (Array.isArray(parsed)) return true;
+
+  if (parsed && typeof parsed === "object") {
+    if (parsed.code === "PGRST205") return false;
+    throw new Error(`Unexpected Supabase response while checking table existence: ${raw}`);
+  }
+
+  throw new Error(`Could not verify table existence, unexpected payload: ${raw}`);
 }
 
 
