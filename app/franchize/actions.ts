@@ -1191,13 +1191,13 @@ const template = await loadFranchizeDealTemplate();
 // ──────────────────────────────────────────────────────────────
 // 1. Загружаем contractDefaults из crew.metadata.franchize
 // ──────────────────────────────────────────────────────────────
-const { data: crewRow } = await supabaseAdmin
+const { data: crewRowMetadata } = await supabaseAdmin
   .from("crews")
   .select("metadata")
   .eq("slug", payload.slug)
   .maybeSingle();
 
-const franchizeMeta = crewRow?.metadata?.franchize || {};
+const franchizeMeta = crewRowMetadata?.metadata?.franchize || {};
 const contractDefaults = franchizeMeta.contractDefaults || {};
 const defaults = contractDefaults.defaults || {};
 
