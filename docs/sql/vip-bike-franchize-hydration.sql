@@ -1,6 +1,7 @@
 -- VIP_BIKE Franchize hydration reference payload
 -- Purpose: provide a production-like, metadata-first seed for /franchize/* runtime.
 -- Safe to re-run: uses jsonb_set merge update scoped to slug = 'vip-bike'.
+-- Updated: 2026-03-26 - added contractDefaults for document generation
 
 begin;
 
@@ -48,7 +49,7 @@ set
     '{franchize}',
     (
       jsonb_build_object(
-        'version', '2026-02-18-v1',
+        'version', '2026-03-26-v2',
         'enabled', true,
         'slug', 'vip-bike',
         'branding', jsonb_build_object(
@@ -211,6 +212,85 @@ set
           'defaultMode', 'pickup',
           'paymentOptions', jsonb_build_array('telegram_xtr', 'card', 'sbp', 'cash'),
           'consentText', 'Я согласен с условиями аренды и обработкой персональных данных.'
+        ),
+        -- NEW: Contract defaults for document generation
+        'contractDefaults', jsonb_build_object(
+          'issuerName', 'Рысан Григорий Константинович',
+          'issuerRepresentative', 'Сидоров Илья Олегович',
+          'returnAddress', 'г. Нижний Новгород, ул. Стригинский переулок, дом 13б',
+          'includedMileage', 200,
+          'overageRate', 30,
+          'lateReturnPenaltyRub', 5000,
+          -- Template field mappings for docx generation
+          'templateFields', jsonb_build_object(
+            'renter_driver_license', jsonb_build_object(
+              'description', 'Водительское удостоверение',
+              'source', 'renter_profile.driver_license',
+              'required', true,
+              'placeholder', '5223 198296'
+            ),
+            'renter_passport', jsonb_build_object(
+              'description', 'Паспорт (серия/номер)',
+              'source', 'renter_profile.passport',
+              'required', true,
+              'placeholder', '2209 384865'
+            ),
+            'included_mileage', jsonb_build_object(
+              'description', 'Включённый пробег (км)',
+              'source', 'contractDefaults.includedMileage',
+              'required', true,
+              'default', 200
+            ),
+            'overage_rate', jsonb_build_object(
+              'description', 'Тариф за превышение пробега (руб/км)',
+              'source', 'contractDefaults.overageRate',
+              'required', true,
+              'default', 30
+            ),
+            'bike_value_rub', jsonb_build_object(
+              'description', 'Полная стоимость мотоцикла (руб)',
+              'source', 'bike.estimated_value_rub',
+              'required', true,
+              'placeholder', '700000'
+            ),
+            'bike_value_words', jsonb_build_object(
+              'description', 'Сумма прописью',
+              'source', 'computed_from_bike_value',
+              'required', true,
+              'computed', true,
+              'placeholder', 'Семьсот тысяч'
+            ),
+            'late_return_penalty_rub', jsonb_build_object(
+              'description', 'Неустойка за просрочку (руб/день)',
+              'source', 'contractDefaults.lateReturnPenaltyRub',
+              'required', true,
+              'default', 5000
+            ),
+            'return_address', jsonb_build_object(
+              'description', 'Адрес возврата мотоцикла',
+              'source', 'contractDefaults.returnAddress',
+              'required', true,
+              'default', 'г. Нижний Новгород, ул. Стригинский переулок, дом 13б'
+            ),
+            'issuer_representative', jsonb_build_object(
+              'description', 'Представитель арендодателя',
+              'source', 'contractDefaults.issuerRepresentative',
+              'required', true,
+              'default', 'Сидоров Илья Олегович'
+            )
+          ),
+          -- Default values for contract generation
+          'defaults', jsonb_build_object(
+            'renter_driver_license', '',
+            'renter_passport', '',
+            'included_mileage', 200,
+            'overage_rate', 30,
+            'bike_value_rub', 700000,
+            'bike_value_words', 'Семьсот тысяч',
+            'late_return_penalty_rub', 5000,
+            'return_address', 'г. Нижний Новгород, ул. Стригинский бульвар, дом 13б',
+            'issuer_representative', 'Сидоров Илья Олегович'
+          )
         )
       )
     ),
@@ -242,9 +322,23 @@ commit;
 
 -- Verification helpers:
 -- select slug, metadata->'franchize'->'branding'->>'name' as brand from public.crews where slug='vip-bike';
--- select jsonb_pretty(metadata->'franchize') from public.crews where slug='vip-bike';
+-- select jsonb_pretty(metadata->'franchize'->'contractDefaults') from public.crews where slug='vip-bike';
+-- select jsonb_pretty(metadata->'franchize'->'contractDefaults'->'templateFields') from public.crews where slug='vip-bike';
 
 
 -- 4) Editor parity note:
 --    /franchize/create currently edits structured slices (branding/theme/contacts/catalog/order/header.menuLinks)
---    and should preserve richer blocks from this payload (about/footer/promo/quickActions).
+--    and should preserve richer blocks from this payload (about/footer/promo/quickActions/contractDefaults).
+
+-- 5) Contract defaults usage:
+--    When generating a contract document, merge:
+--    - contractDefaults.defaults (fallback values)
+--    - contractDefaults.templateFields (field definitions + source hints)
+--    - Runtime data from rental order (renter info, bike info, dates, prices)
+--
+--    Example hydration flow:
+--    1. Fetch crew metadata by slug
+--    2. Extract contractDefaults.templateFields for field definitions
+--    3. For each field, resolve 'source' path (e.g., 'renter_profile.driver_license')
+--    4. Fall back to contractDefaults.defaults if source is empty
+--    5. Generate docx with all {{placeholder}} values populated
