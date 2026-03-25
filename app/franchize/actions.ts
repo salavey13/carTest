@@ -1189,7 +1189,20 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 const template = await loadFranchizeDealTemplate();
 
 // ──────────────────────────────────────────────────────────────
-// НОВЫЕ ПЕРЕМЕННЫЕ — ЖЁСТКО ЗАКОДИРОВАНЫ ИЗ ТВОЕГО OCR
+// 1. Загружаем contractDefaults из crew.metadata.franchize
+// ──────────────────────────────────────────────────────────────
+const { data: crewRow } = await supabaseAdmin
+  .from("crews")
+  .select("metadata")
+  .eq("slug", payload.slug)
+  .maybeSingle();
+
+const franchizeMeta = crewRow?.metadata?.franchize || {};
+const contractDefaults = franchizeMeta.contractDefaults || {};
+const defaults = contractDefaults.defaults || {};
+
+// ──────────────────────────────────────────────────────────────
+// 2. Формируем переменные для шаблона (всё из БД + runtime)
 // ──────────────────────────────────────────────────────────────
 const variables = {
   contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}`,
@@ -1198,26 +1211,31 @@ const variables = {
   month: new Date().toLocaleString("ru-RU", { month: "long" }),
   year: new Date().getFullYear().toString(),
 
+  // Арендатор
   renter_full_name: payload.recipient,
   renter_phone: payload.phone,
-  renter_driver_license: "указывается при выдаче",           // ← можно потом добавить в payload
-  renter_passport: "указывается при выдаче",                 // ← можно потом добавить в payload
+  renter_driver_license: payload.renterDriverLicense || "указывается при выдаче",
+  renter_passport: payload.renterPassport || "указывается при выдаче",
 
-  issuer_name: `Franchize ${payload.slug}`,
+  // Арендодатель (из contractDefaults)
+  issuer_name: defaults.issuerName || `Franchize ${payload.slug}`,
   issuer_signatory: "Администратор экипажа",
-  issuer_representative: "Сидоров И.О.",                     // ← жёстко из OCR
+  issuer_representative: defaults.issuer_representative || "Сидоров Илья Олегович",
 
+  // Мотоцикл
   bike_make_model: firstCar ? `${firstCar.make || "Bike"} ${firstCar.model || "Model"}` : payload.cartLines.map((line) => line.itemId).join(", "),
   bike_vin: String(firstSpecs.vin || firstSpecs.frame || firstSpecs.vin_number || "уточняется"),
   bike_plate: String(firstSpecs.plate || firstSpecs.state_number || "уточняется"),
-  bike_mileage: "45073",                                     // можно сделать динамическим позже
+  bike_mileage: "45073", // можно позже сделать динамическим из bike.specs
 
+  // Даты и срок
   rent_start_time: "12:00",
-  rent_start_date: new Date().toLocaleDateString("ru-RU"),
+  rent_start_date: rentStartDate,
   rent_end_time: "12:00",
-  rent_end_date: new Date(Date.now() + 86400000).toLocaleDateString("ru-RU"), // +1 день по умолчанию
+  rent_end_date: rentEndDate,
   rent_days: rentDays,
 
+  // Деньги
   daily_price_rub: formatMoney(dailyPriceRub),
   subtotal_rub: formatMoney(payload.subtotal),
   extras_rows: extrasRows,
@@ -1225,13 +1243,13 @@ const variables = {
   total_price_rub: formatMoney(payload.totalAmount),
   deposit_rub: "20 000",
 
-  // Новые жёстко закодированные поля из твоего шаблона
-  included_mileage: "200 км",
-  overage_rate: "30 руб/км",
-  bike_value_rub: "700 000",
-  bike_value_words: "Семьсот тысяч",
-  late_return_penalty_rub: "5000",
-  return_address: "г. Нижний Новгород, ул. Стригинский бульвар, дом 13б",
+  // Контрактные дефолты из БД
+  included_mileage: String(defaults.included_mileage || 200),
+  overage_rate: `${defaults.overage_rate || 30} руб/км`,
+  bike_value_rub: String(defaults.bike_value_rub || 700000),
+  bike_value_words: defaults.bike_value_words || "Семьсот тысяч",
+  late_return_penalty_rub: String(defaults.late_return_penalty_rub || 5000),
+  return_address: defaults.return_address || "г. Нижний Новгород, ул. Стригинский переулок, дом 13б",
 
   // Цифровая подпись
   signature_timestamp: new Date().toLocaleString("ru-RU"),
@@ -1249,7 +1267,7 @@ const bytes = await generateDocxBytes(rendered);
 const docFileName = `franchize-order-${payload.slug}-${payload.orderId}.docx`;
 
 // ──────────────────────────────────────────────────────────────
-// Реальный SHA-256 + регистрация в Doc Verifier (один раз)
+// Реальный SHA-256 + регистрация в Doc Verifier
 // ──────────────────────────────────────────────────────────────
 const realHash = createHash("sha256").update(bytes).digest("hex");
 
@@ -1332,6 +1350,8 @@ const franchizeOrderInvoiceSchema = z.object({
   telegramUserId: z.string().trim().min(1),
   recipient: z.string().trim().min(2),
   phone: z.string().trim().min(6),
+  renterDriverLicense: z.string().trim().optional(),
+  renterPassport: z.string().trim().optional(),
   time: z.string().trim().min(1),
   comment: z.string().trim().default(""),
   rentalStartDate: z.string().trim().optional(),
