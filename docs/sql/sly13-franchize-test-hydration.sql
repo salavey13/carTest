@@ -1,6 +1,7 @@
 -- SLY13 Franchize hydration test payload
 -- Purpose: test metadata profile close to current /franchize components + operator vibe (AI studio + sport + coaching).
 -- Assumption: crew with slug='sly13' already exists (manual apply by operator).
+-- Updated: 2026-03-26 - added contractDefaults for document generation
 
 begin;
 
@@ -11,7 +12,7 @@ set
     '{franchize}',
     (
       jsonb_build_object(
-        'version', '2026-02-19-sly13-v1',
+        'version', '2026-03-26-sly13-v2',
         'enabled', true,
         'slug', 'sly13',
         'branding', jsonb_build_object(
@@ -149,6 +150,86 @@ set
           'defaultMode', 'online',
           'paymentOptions', jsonb_build_array('telegram_xtr', 'card', 'sbp', 'cash'),
           'consentText', 'Подтверждаю согласие на обработку данных и условия предоставления услуги.'
+        ),
+        -- NEW: Contract defaults for document generation (service-based, not vehicle rental)
+        'contractDefaults', jsonb_build_object(
+          'issuerName', 'SLY13 CYBERVIBE',
+          'issuerRepresentative', '@SALAVEY13',
+          'returnAddress', 'Онлайн / Telegram @SALAVEY13',
+          'includedMileage', 0,
+          'overageRate', 0,
+          'lateReturnPenaltyRub', 0,
+          'contractType', 'service',
+          -- Template field mappings for docx generation
+          'templateFields', jsonb_build_object(
+            'renter_driver_license', jsonb_build_object(
+              'description', 'Водительское удостоверение (опционально для некоторых услуг)',
+              'source', 'renter_profile.driver_license',
+              'required', false,
+              'placeholder', ''
+            ),
+            'renter_passport', jsonb_build_object(
+              'description', 'Паспорт (серия/номер)',
+              'source', 'renter_profile.passport',
+              'required', false,
+              'placeholder', ''
+            ),
+            'included_mileage', jsonb_build_object(
+              'description', 'Включённый пробег (км) — не применимо для услуг',
+              'source', 'contractDefaults.includedMileage',
+              'required', false,
+              'default', 0
+            ),
+            'overage_rate', jsonb_build_object(
+              'description', 'Тариф за превышение пробега — не применимо для услуг',
+              'source', 'contractDefaults.overageRate',
+              'required', false,
+              'default', 0
+            ),
+            'bike_value_rub', jsonb_build_object(
+              'description', 'Стоимость оборудования/материалов (руб)',
+              'source', 'service.equipment_value_rub',
+              'required', false,
+              'placeholder', '0'
+            ),
+            'bike_value_words', jsonb_build_object(
+              'description', 'Сумма прописью',
+              'source', 'computed_from_equipment_value',
+              'required', false,
+              'computed', true,
+              'placeholder', ''
+            ),
+            'late_return_penalty_rub', jsonb_build_object(
+              'description', 'Неустойка за просрочку (руб/день)',
+              'source', 'contractDefaults.lateReturnPenaltyRub',
+              'required', false,
+              'default', 0
+            ),
+            'return_address', jsonb_build_object(
+              'description', 'Адрес/контакты для связи',
+              'source', 'contractDefaults.returnAddress',
+              'required', true,
+              'default', 'Онлайн / Telegram @SALAVEY13'
+            ),
+            'issuer_representative', jsonb_build_object(
+              'description', 'Представитель исполнителя',
+              'source', 'contractDefaults.issuerRepresentative',
+              'required', true,
+              'default', '@SALAVEY13'
+            )
+          ),
+          -- Default values for contract generation
+          'defaults', jsonb_build_object(
+            'renter_driver_license', '',
+            'renter_passport', '',
+            'included_mileage', 69,
+            'overage_rate', 13,
+            'bike_value_rub', 200000,
+            'bike_value_words', '',
+            'late_return_penalty_rub', 0,
+            'return_address', 'Онлайн / Telegram @SALAVEY13',
+            'issuer_representative', '@SALAVEY13'
+          )
         )
       )
     ),
@@ -170,4 +251,4 @@ commit;
 
 -- Verification helpers:
 -- select slug, metadata->'franchize'->'branding'->>'name' as brand from public.crews where slug='sly13';
--- select jsonb_pretty(metadata->'franchize') from public.crews where slug='sly13';
+-- select jsonb_pretty(metadata->'franchize'->'contractDefaults') from public.crews where slug='sly13';
