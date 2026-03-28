@@ -450,7 +450,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       return { crew: emptyCrew(safeSlug), items: [] };
     }
 
-    const catalogTypes = ["bike", "accessories", "gear", "wbitem"];
+    const catalogTypes = ["bike", "ebike", "accessories", "gear", "wbitem"];
     const { data: cars, error: carsError } = await supabaseAdmin
       .from("cars")
       .select("id, make, model, description, image_url, daily_price, availability, type, specs")
@@ -641,10 +641,12 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         mediaUrls,
         pricePerDay: car.daily_price ?? 0,
         category: subtype,
-        availabilityStatus: availabilityByVehicle.get(car.id)?.status ?? (car.availability === "available" ? "available" : "busy"),
+        availabilityStatus:
+          availabilityByVehicle.get(car.id)?.status ??
+          (car.availability === "busy" ? "busy" : "available"),
         availabilityLabel:
           availabilityByVehicle.get(car.id)?.label ??
-          (car.availability === "available" ? "Свободен сегодня" : "Временно недоступен"),
+          (car.availability === "busy" ? "Временно недоступен" : "Свободен сегодня"),
         isHot:
           Number(car.daily_price ?? 0) >= 7000 ||
           Boolean(readPath(specs, ["is_hot"], false)) ||
@@ -680,6 +682,36 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     logger.error("[franchize] unexpected getFranchizeBySlug failure", error);
     return { crew: emptyCrew(safeSlug), items: [] };
   }
+}
+
+export async function markCrewBikesAvailable(slug: string) {
+  const safeSlug = slug?.trim().toLowerCase().replace(/\s+/g, "-");
+  if (!safeSlug) {
+    return { success: false, error: "slug is required" };
+  }
+
+  const { data: crew, error: crewError } = await supabaseAdmin
+    .from("crews")
+    .select("id")
+    .eq("slug", safeSlug)
+    .maybeSingle();
+
+  if (crewError || !crew) {
+    return { success: false, error: crewError?.message || "crew not found" };
+  }
+
+  const { error } = await supabaseAdmin
+    .from("cars")
+    .update({ availability: "available" })
+    .eq("crew_id", crew.id)
+    .in("type", ["bike", "ebike"])
+    .or("availability.is.null,availability.eq.busy");
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
 }
 
 function splitCsv(text: string): string[] {
