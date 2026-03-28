@@ -113,7 +113,8 @@ set
             jsonb_build_object('label', 'О нас', 'href', '/franchize/{slug}/about'),
             jsonb_build_object('label', 'Контакты', 'href', '/franchize/{slug}/contacts'),
             jsonb_build_object('label', 'Корзина', 'href', '/franchize/{slug}/cart'),
-            jsonb_build_object('label', 'Мои аренды', 'href', '/franchize/{slug}/rentals')
+            jsonb_build_object('label', 'Мои аренды', 'href', '/franchize/{slug}/rentals'),
+            jsonb_build_object('label', 'Конфигуратор', 'href', '/franchize/{slug}/configurator')
           ),
           'quickActions', jsonb_build_array(
             jsonb_build_object('label', 'Мотопарк', 'href', '/franchize/{slug}', 'icon', 'FaMotorcycle'),
