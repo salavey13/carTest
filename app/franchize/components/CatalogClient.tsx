@@ -438,10 +438,11 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                               </span>
                             )}
                             <span
-                              className="inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold"
+                              className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em]"
                               style={{
-                                backgroundColor: item.availabilityStatus === "available" ? "#2f9e4455" : "#dc262655",
-                                color: "#f8fafc",
+                                backgroundColor: item.availabilityStatus === "available" ? "#1f7a3a3d" : "#dc262640",
+                                color: "#e6f4ea",
+                                border: item.availabilityStatus === "available" ? "1px solid rgba(46, 160, 67, 0.45)" : "1px solid rgba(220, 38, 38, 0.45)",
                               }}
                             >
                               {item.availabilityLabel}
