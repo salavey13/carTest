@@ -185,7 +185,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
             {filteredBikes.map((bike) => (
               <article key={bike.id} className="overflow-hidden rounded-2xl border" style={catalogCardVariantStyles(crew.theme, bike.id.length)}>
                 <button
@@ -194,16 +194,16 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                   onClick={() => selectBike(bike.id)}
                   style={selectedBikeId === bike.id ? interactionRingStyle(crew.theme) : undefined}
                 >
-                  <div className="relative h-28 w-full">
+                  <div className="relative aspect-square w-full">
                     <Image src={bike.image_url} alt={`${bike.make} ${bike.model}`} fill className="object-cover" unoptimized />
                   </div>
-                  <div className="p-3">
+                  <div className="p-2.5 sm:p-3">
                     <div className="mb-1 flex items-center justify-between">
-                      <h3 className="text-sm font-semibold">{bike.make} {bike.model}</h3>
-                      {selectedBikeId === bike.id && <Badge>Выбран</Badge>}
+                      <h3 className="line-clamp-1 text-[13px] font-semibold sm:text-sm">{bike.make} {bike.model}</h3>
+                      {selectedBikeId === bike.id && <Badge className="px-2 py-0 text-[10px]">Выбран</Badge>}
                     </div>
-                    <p className="text-xs" style={surface.mutedText}>{bike.description}</p>
-                    <p className="mt-2 text-base font-bold" style={{ color: crew.theme.palette.accentMain }}>{formatPrice(bike.daily_price)}</p>
+                    <p className="line-clamp-2 text-[11px] leading-4 sm:text-xs" style={surface.mutedText}>{bike.description}</p>
+                    <p className="mt-1.5 text-lg font-bold sm:mt-2" style={{ color: crew.theme.palette.accentMain }}>{formatPrice(bike.daily_price)}</p>
                   </div>
                 </button>
               </article>
