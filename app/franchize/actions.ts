@@ -423,7 +423,15 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
 });
 
 export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugResult> {
-  const safeSlug = slug?.trim();
+  const rawSlug = slug?.trim();
+  const safeSlug = rawSlug
+    ? rawSlug
+        .toLowerCase()
+        .replace(/%20/g, " ")
+        .replace(/\s+/g, "-")
+        .replace(/_+/g, "-")
+        .replace(/-+/g, "-")
+    : "";
   if (!safeSlug) {
     return { crew: emptyCrew("unknown"), items: [] };
   }
@@ -445,7 +453,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const catalogTypes = ["bike", "accessories", "gear", "wbitem"];
     const { data: cars, error: carsError } = await supabaseAdmin
       .from("cars")
-      .select("id, make, model, description, image_url, daily_price, availability, type, specs")
+      .select("id, make, model, description, image_url, daily_price, type, specs, availability_rules")
       .eq("crew_id", crew.id)
       .in("type", catalogTypes);
 
@@ -457,7 +465,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const { data: activeRentals, error: rentalsError } = vehicleIds.length
       ? await supabaseAdmin
           .from("rentals")
-          .select("vehicle_id, end_date, status")
+          .select("vehicle_id, status, agreed_start_date, agreed_end_date, end_date")
           .in("vehicle_id", vehicleIds)
           .in("status", ["pending_confirmation", "confirmed", "active"])
       : { data: [], error: null };
@@ -472,13 +480,22 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       const vehicleId = typeof rental.vehicle_id === "string" ? rental.vehicle_id : "";
       if (!vehicleId) continue;
 
-      const endTs = rental.end_date ? Date.parse(rental.end_date) : Number.NaN;
-      const isBusy = Number.isNaN(endTs) ? true : endTs >= nowTs - 24 * 60 * 60 * 1000;
+      const startTs = rental.agreed_start_date ? Date.parse(rental.agreed_start_date) : Number.NaN;
+      const endTs = rental.agreed_end_date
+        ? Date.parse(rental.agreed_end_date)
+        : rental.end_date
+          ? Date.parse(rental.end_date)
+          : Number.NaN;
+      const rentalStatus = typeof rental.status === "string" ? rental.status : "pending_confirmation";
+
+      const isActiveNow = rentalStatus === "active" || (!Number.isNaN(startTs) && startTs <= nowTs && (Number.isNaN(endTs) || endTs >= nowTs));
+      const isUpcomingBooking = ["pending_confirmation", "confirmed"].includes(rentalStatus) && (Number.isNaN(endTs) || endTs >= nowTs);
+      const isBusy = isActiveNow || isUpcomingBooking;
       if (!isBusy) continue;
 
-      const label = Number.isNaN(endTs)
-        ? "Занят — дата возврата уточняется"
-        : `Занят до ${new Date(endTs).toLocaleDateString("ru-RU")}`;
+      const label = isActiveNow
+        ? (Number.isNaN(endTs) ? "В аренде сейчас" : `В аренде до ${new Date(endTs).toLocaleDateString("ru-RU")}`)
+        : (Number.isNaN(startTs) ? "Забронирован" : `Забронирован с ${new Date(startTs).toLocaleDateString("ru-RU")}`);
       availabilityByVehicle.set(vehicleId, { status: "busy", label });
     }
 
@@ -624,6 +641,33 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         ...(Array.isArray(specs.image_urls) ? specs.image_urls.filter((value): value is string => typeof value === "string") : []),
       ].map((value) => value.trim()).filter(Boolean)));
 
+      const availabilityRulesRaw = (
+        car.availability_rules && typeof car.availability_rules === "object" && !Array.isArray(car.availability_rules)
+          ? (car.availability_rules as Record<string, unknown>)
+          : {}
+      );
+      const rulesType = typeof availabilityRulesRaw.type === "string" ? availabilityRulesRaw.type : "";
+      const manualStatus = typeof availabilityRulesRaw.manual_status === "string"
+        ? availabilityRulesRaw.manual_status
+        : typeof availabilityRulesRaw.manualStatus === "string"
+          ? availabilityRulesRaw.manualStatus
+          : "";
+      const isWeekend = [6, 7].includes(new Date().getDay() === 0 ? 7 : new Date().getDay());
+      const blockedByRules =
+        manualStatus === "busy" ||
+        manualStatus === "unavailable" ||
+        (rulesType === "weekends_only" && !isWeekend);
+
+      const fallbackStatus: "available" | "busy" = blockedByRules ? "busy" : "available";
+      const fallbackLabel =
+        manualStatus === "busy"
+          ? "Временно занят"
+          : manualStatus === "unavailable"
+            ? "Временно недоступен"
+            : rulesType === "weekends_only" && !isWeekend
+              ? "Доступен только по выходным"
+              : "Свободен сегодня";
+
       return {
         id: car.id,
         title: `${car.make} ${car.model}`.trim(),
@@ -633,10 +677,8 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         mediaUrls,
         pricePerDay: car.daily_price ?? 0,
         category: subtype,
-        availabilityStatus: availabilityByVehicle.get(car.id)?.status ?? (car.availability === "available" ? "available" : "busy"),
-        availabilityLabel:
-          availabilityByVehicle.get(car.id)?.label ??
-          (car.availability === "available" ? "Свободен сегодня" : "Временно недоступен"),
+        availabilityStatus: availabilityByVehicle.get(car.id)?.status ?? fallbackStatus,
+        availabilityLabel: availabilityByVehicle.get(car.id)?.label ?? fallbackLabel,
         isHot:
           Number(car.daily_price ?? 0) >= 7000 ||
           Boolean(readPath(specs, ["is_hot"], false)) ||
@@ -672,6 +714,57 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     logger.error("[franchize] unexpected getFranchizeBySlug failure", error);
     return { crew: emptyCrew(safeSlug), items: [] };
   }
+}
+
+export async function markCrewBikesAvailable(slug: string) {
+  const safeSlug = slug?.trim().toLowerCase().replace(/\s+/g, "-");
+  if (!safeSlug) {
+    return { success: false, error: "slug is required" };
+  }
+
+  const { data: crew, error: crewError } = await supabaseAdmin
+    .from("crews")
+    .select("id")
+    .eq("slug", safeSlug)
+    .maybeSingle();
+
+  if (crewError || !crew) {
+    return { success: false, error: crewError?.message || "crew not found" };
+  }
+
+  const { data: cars, error: carsError } = await supabaseAdmin
+    .from("cars")
+    .select("id, availability_rules")
+    .eq("crew_id", crew.id)
+    .in("type", ["bike", "ebike"]);
+
+  if (carsError) {
+    return { success: false, error: carsError.message };
+  }
+
+  for (const car of cars ?? []) {
+    const currentRules = (car.availability_rules && typeof car.availability_rules === "object" && !Array.isArray(car.availability_rules))
+      ? (car.availability_rules as Record<string, unknown>)
+      : {};
+
+    const nextRules = {
+      ...currentRules,
+      manual_status: "available",
+      initialized_by: "markCrewBikesAvailable",
+      initialized_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabaseAdmin
+      .from("cars")
+      .update({ availability_rules: nextRules })
+      .eq("id", car.id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  return { success: true };
 }
 
 function splitCsv(text: string): string[] {
