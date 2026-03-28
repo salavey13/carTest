@@ -423,7 +423,15 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
 });
 
 export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugResult> {
-  const safeSlug = slug?.trim();
+  const rawSlug = slug?.trim();
+  const safeSlug = rawSlug
+    ? rawSlug
+        .toLowerCase()
+        .replace(/%20/g, " ")
+        .replace(/\s+/g, "-")
+        .replace(/_+/g, "-")
+        .replace(/-+/g, "-")
+    : "";
   if (!safeSlug) {
     return { crew: emptyCrew("unknown"), items: [] };
   }
