@@ -1,0 +1,888 @@
+{
+  "items": [
+    {
+      "id": "vipbike-g8",
+      "make": "VipBike",
+      "model": "G8",
+      "description": "Электромотоцикл VipBike G8 с мощным двигателем 3000 Вт и максимальной скоростью до 150 км/ч. Современный дизайн, надежная конструкция, идеальный выбор для городской езды и загородных поездок. Оснащен дисковыми тормозами, LED освещением и цифровым дисплеем.",
+      "daily_price": 120800,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-g8/image_1.jpg",
+      "rent_link": "/rent/vipbike-g8",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 3000,
+        "power_kw": 3,
+        "max_speed_kmh": "90-150",
+        "subtitle": "Электромотоцикл VipBike G8",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-g8/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-g8/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-g8/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 120800,
+          "batteries": [
+            {"capacity": "50Ah", "type": "regular", "battery_price": 44500, "total_price": 165300, "range_km": "70-110"},
+            {"capacity": "60Ah", "type": "regular", "battery_price": 55000, "total_price": 175800, "range_km": "80-120"},
+            {"capacity": "80Ah", "type": "regular", "battery_price": 59000, "total_price": 179800, "range_km": "90-150"}
+          ]
+        },
+        "tier": "standard"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-g8-2",
+      "make": "VipBike",
+      "model": "G8-2",
+      "description": "Электромотоцикл VipBike G8-2 - обновленная версия популярной модели G8. Двигатель 3000 Вт, скорость до 150 км/ч. Улучшенная эргономика и стильный современный дизайн. Отличный выбор для ежедневных поездок.",
+      "daily_price": 124400,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-g8-2/image_1.jpg",
+      "rent_link": "/rent/vipbike-g8-2",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 3000,
+        "power_kw": 3,
+        "max_speed_kmh": "90-150",
+        "subtitle": "Электромотоцикл VipBike G8-2",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-g8-2/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-g8-2/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-g8-2/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 124400,
+          "batteries": [
+            {"capacity": "50Ah", "type": "regular", "battery_price": 44500, "total_price": 168900, "range_km": "70-110"},
+            {"capacity": "60Ah", "type": "regular", "battery_price": 55000, "total_price": 179400, "range_km": "80-120"},
+            {"capacity": "80Ah", "type": "regular", "battery_price": 59000, "total_price": 183400, "range_km": "90-150"}
+          ]
+        },
+        "tier": "standard"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-dmg",
+      "make": "VipBike",
+      "model": "DMG",
+      "description": "Премиальный электромотоцикл VipBike DMG с двигателем 3000 Вт. Высококлассные материалы отделки, улучшенная подвеска и тормозная система. Максимальная скорость до 150 км/ч. Идеальный баланс стиля и производительности.",
+      "daily_price": 159200,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-dmg/image_1.jpg",
+      "rent_link": "/rent/vipbike-dmg",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 3000,
+        "power_kw": 3,
+        "max_speed_kmh": "90-150",
+        "subtitle": "Премиальный электромотоцикл VipBike DMG",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-dmg/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-dmg/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-dmg/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 159200,
+          "batteries": [
+            {"capacity": "50Ah", "type": "regular", "battery_price": 44500, "total_price": 203700, "range_km": "70-110"},
+            {"capacity": "60Ah", "type": "regular", "battery_price": 55000, "total_price": 214200, "range_km": "80-120"},
+            {"capacity": "80Ah", "type": "regular", "battery_price": 59000, "total_price": 218200, "range_km": "90-150"}
+          ]
+        },
+        "tier": "premium"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-dk",
+      "make": "VipBike",
+      "model": "DK",
+      "description": "Электромотоцикл VipBike DK - надежный городской байк с двигателем 3000 Вт. Скорость до 150 км/ч, отличная маневренность. Подходит для ежедневных поездок на работу и прогулок по городу.",
+      "daily_price": 128000,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-dk/image_1.jpg",
+      "rent_link": "/rent/vipbike-dk",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 3000,
+        "power_kw": 3,
+        "max_speed_kmh": "90-150",
+        "subtitle": "Электромотоцикл VipBike DK",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-dk/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-dk/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-dk/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 128000,
+          "batteries": [
+            {"capacity": "50Ah", "type": "regular", "battery_price": 44500, "total_price": 172500, "range_km": "70-110"},
+            {"capacity": "60Ah", "type": "regular", "battery_price": 55000, "total_price": 183000, "range_km": "80-120"},
+            {"capacity": "80Ah", "type": "regular", "battery_price": 59000, "total_price": 187000, "range_km": "90-150"}
+          ]
+        },
+        "tier": "mid-range"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-r1",
+      "make": "VipBike",
+      "model": "R1",
+      "description": "Электромотоцикл VipBike R1 - стильный городской байк с двигателем 3000 Вт. Максимальная скорость до 150 км/ч. Спортивный дизайн, отличная управляемость. Идеален для динамичной городской езды.",
+      "daily_price": 124400,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r1/image_1.jpg",
+      "rent_link": "/rent/vipbike-r1",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 3000,
+        "power_kw": 3,
+        "max_speed_kmh": "90-150",
+        "subtitle": "Электромотоцикл VipBike R1",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r1/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r1/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r1/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 124400,
+          "batteries": [
+            {"capacity": "50Ah", "type": "regular", "battery_price": 44500, "total_price": 168900, "range_km": "70-110"},
+            {"capacity": "60Ah", "type": "regular", "battery_price": 55000, "total_price": 179400, "range_km": "80-120"},
+            {"capacity": "80Ah", "type": "regular", "battery_price": 59000, "total_price": 183400, "range_km": "90-150"}
+          ]
+        },
+        "tier": "standard"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-r2",
+      "make": "VipBike",
+      "model": "R2",
+      "description": "Электромотоцикл VipBike R2 - второе поколение популярной R-серии. Двигатель 3000 Вт, скорость до 150 км/ч. Улучшенная аэродинамика и обновленный дизайн. Отличный выбор для ценителей стиля.",
+      "daily_price": 124400,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r2/image_1.jpg",
+      "rent_link": "/rent/vipbike-r2",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 3000,
+        "power_kw": 3,
+        "max_speed_kmh": "90-150",
+        "subtitle": "Электромотоцикл VipBike R2",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r2/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r2/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r2/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 124400,
+          "batteries": [
+            {"capacity": "50Ah", "type": "regular", "battery_price": 44500, "total_price": 168900, "range_km": "70-110"},
+            {"capacity": "60Ah", "type": "regular", "battery_price": 55000, "total_price": 179400, "range_km": "80-120"},
+            {"capacity": "80Ah", "type": "regular", "battery_price": 59000, "total_price": 183400, "range_km": "90-150"}
+          ]
+        },
+        "tier": "standard"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-r3",
+      "make": "VipBike",
+      "model": "R3",
+      "description": "Электромотоцикл VipBike R3 - доступный городской байк с двигателем 3000 Вт. Максимальная скорость до 150 км/ч. Отличное соотношение цены и качества. Идеален для начинающих райдеров.",
+      "daily_price": 114800,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r3/image_1.jpg",
+      "rent_link": "/rent/vipbike-r3",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 3000,
+        "power_kw": 3,
+        "max_speed_kmh": "90-150",
+        "subtitle": "Электромотоцикл VipBike R3",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r3/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r3/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r3/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 114800,
+          "batteries": [
+            {"capacity": "50Ah", "type": "regular", "battery_price": 44500, "total_price": 159300, "range_km": "70-110"},
+            {"capacity": "60Ah", "type": "regular", "battery_price": 55000, "total_price": 169800, "range_km": "80-120"},
+            {"capacity": "80Ah", "type": "regular", "battery_price": 59000, "total_price": 173800, "range_km": "90-150"}
+          ]
+        },
+        "tier": "budget"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-r6",
+      "make": "VipBike",
+      "model": "R6",
+      "description": "Спортивный электромотоцикл VipBike R6 с двигателем 3000 Вт. Агрессивный дизайн, максимальная скорость до 150 км/ч. Улучшенная тормозная система и спортивная подвеска. Для любителей динамичной езды.",
+      "daily_price": 148400,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r6/image_1.jpg",
+      "rent_link": "/rent/vipbike-r6",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 3000,
+        "power_kw": 3,
+        "max_speed_kmh": "90-150",
+        "subtitle": "Спортивный электромотоцикл VipBike R6",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r6/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r6/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-r6/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 148400,
+          "batteries": [
+            {"capacity": "50Ah", "type": "regular", "battery_price": 44500, "total_price": 192900, "range_km": "70-110"},
+            {"capacity": "60Ah", "type": "regular", "battery_price": 55000, "total_price": 203400, "range_km": "80-120"},
+            {"capacity": "80Ah", "type": "regular", "battery_price": 59000, "total_price": 207400, "range_km": "90-150"}
+          ]
+        },
+        "tier": "sport"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-rz",
+      "make": "VipBike",
+      "model": "RZ",
+      "description": "Бюджетный электромотоцикл VipBike RZ с двигателем 3000 Вт. Максимальная скорость до 150 км/ч. Компактный, экономичный и надежный. Отличный выбор для первой покупки электробайка.",
+      "daily_price": 112400,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-rz/image_1.jpg",
+      "rent_link": "/rent/vipbike-rz",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 3000,
+        "power_kw": 3,
+        "max_speed_kmh": "90-150",
+        "subtitle": "Электромотоцикл VipBike RZ",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-rz/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-rz/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-rz/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 112400,
+          "batteries": [
+            {"capacity": "50Ah", "type": "regular", "battery_price": 44500, "total_price": 156900, "range_km": "70-110"},
+            {"capacity": "60Ah", "type": "regular", "battery_price": 55000, "total_price": 167400, "range_km": "80-120"},
+            {"capacity": "80Ah", "type": "regular", "battery_price": 59000, "total_price": 171400, "range_km": "90-150"}
+          ]
+        },
+        "tier": "budget"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-v6",
+      "make": "VipBike",
+      "model": "V6",
+      "description": "Электромотоцикл VipBike V6 с двигателем 3000 Вт. Скорость до 150 км/ч. Классический дизайн в современном исполнении. Надежный и комфортный для ежедневного использования.",
+      "daily_price": 114800,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-v6/image_1.jpg",
+      "rent_link": "/rent/vipbike-v6",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 3000,
+        "power_kw": 3,
+        "max_speed_kmh": "90-150",
+        "subtitle": "Электромотоцикл VipBike V6",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-v6/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-v6/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-v6/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 114800,
+          "batteries": [
+            {"capacity": "50Ah", "type": "regular", "battery_price": 44500, "total_price": 159300, "range_km": "70-110"},
+            {"capacity": "60Ah", "type": "regular", "battery_price": 55000, "total_price": 169800, "range_km": "80-120"},
+            {"capacity": "80Ah", "type": "regular", "battery_price": 59000, "total_price": 173800, "range_km": "90-150"}
+          ]
+        },
+        "tier": "budget"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-jy",
+      "make": "VipBike",
+      "model": "JY",
+      "description": "Электромотоцикл VipBike JY с двигателем 3000 Вт. Максимальная скорость до 150 км/ч. Оригинальный дизайн, хорошая комплектация. Подходит для города и пригорода.",
+      "daily_price": 128000,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-jy/image_1.jpg",
+      "rent_link": "/rent/vipbike-jy",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 3000,
+        "power_kw": 3,
+        "max_speed_kmh": "90-150",
+        "subtitle": "Электромотоцикл VipBike JY",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-jy/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-jy/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-jy/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 128000,
+          "batteries": [
+            {"capacity": "50Ah", "type": "regular", "battery_price": 44500, "total_price": 172500, "range_km": "70-110"},
+            {"capacity": "60Ah", "type": "regular", "battery_price": 55000, "total_price": 183000, "range_km": "80-120"},
+            {"capacity": "80Ah", "type": "regular", "battery_price": 59000, "total_price": 187000, "range_km": "90-150"}
+          ]
+        },
+        "tier": "mid-range"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-xf",
+      "make": "VipBike",
+      "model": "XF",
+      "description": "Электромотоцикл VipBike XF с двигателем 3000 Вт. Скорость до 150 км/ч. Динамичный дизайн, отличные ходовые качества. Для тех, кто ценит стиль и производительность.",
+      "daily_price": 120800,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-xf/image_1.jpg",
+      "rent_link": "/rent/vipbike-xf",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 3000,
+        "power_kw": 3,
+        "max_speed_kmh": "90-150",
+        "subtitle": "Электромотоцикл VipBike XF",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-xf/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-xf/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-xf/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 120800,
+          "batteries": [
+            {"capacity": "50Ah", "type": "regular", "battery_price": 44500, "total_price": 165300, "range_km": "70-110"},
+            {"capacity": "60Ah", "type": "regular", "battery_price": 55000, "total_price": 175800, "range_km": "80-120"},
+            {"capacity": "80Ah", "type": "regular", "battery_price": 59000, "total_price": 179800, "range_km": "90-150"}
+          ]
+        },
+        "tier": "standard"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-z1000",
+      "make": "VipBike",
+      "model": "Z1000",
+      "description": "Электромотоцикл VipBike Z1000 с двигателем 3000 Вт. Максимальная скорость до 150 км/ч. Мощный и стремительный дизайн в стиле японских стритфайтеров. Для истинных ценителей мотокультуры.",
+      "daily_price": 128000,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-z1000/image_1.jpg",
+      "rent_link": "/rent/vipbike-z1000",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 3000,
+        "power_kw": 3,
+        "max_speed_kmh": "90-150",
+        "subtitle": "Электромотоцикл VipBike Z1000",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-z1000/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-z1000/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-z1000/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 128000,
+          "batteries": [
+            {"capacity": "50Ah", "type": "regular", "battery_price": 44500, "total_price": 172500, "range_km": "70-110"},
+            {"capacity": "60Ah", "type": "regular", "battery_price": 55000, "total_price": 183000, "range_km": "80-120"},
+            {"capacity": "80Ah", "type": "regular", "battery_price": 59000, "total_price": 187000, "range_km": "90-150"}
+          ]
+        },
+        "tier": "mid-range"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-dn",
+      "make": "VipBike",
+      "model": "DN",
+      "description": "Спортивный электромотоцикл VipBike DN с двигателем 3000 Вт. Максимальная скорость до 150 км/ч. Агрессивный нейкед-стиль, спортивная посадка. Для любителей активной езды и эффектного внешнего вида.",
+      "daily_price": 148400,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-dn/image_1.jpg",
+      "rent_link": "/rent/vipbike-dn",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 3000,
+        "power_kw": 3,
+        "max_speed_kmh": "90-150",
+        "subtitle": "Спортивный электромотоцикл VipBike DN",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-dn/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-dn/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-dn/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 148400,
+          "batteries": [
+            {"capacity": "50Ah", "type": "regular", "battery_price": 44500, "total_price": 192900, "range_km": "70-110"},
+            {"capacity": "60Ah", "type": "regular", "battery_price": 55000, "total_price": 203400, "range_km": "80-120"},
+            {"capacity": "80Ah", "type": "regular", "battery_price": 59000, "total_price": 207400, "range_km": "90-150"}
+          ]
+        },
+        "tier": "sport"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-a4",
+      "make": "VipBike",
+      "model": "A4",
+      "description": "Флагманский высокопроизводительный электромотоцикл VipBike A4 с мощным двигателем 10000 Вт (10 кВт). Максимальная скорость более 150 км/ч. Премиальная комплектация, передовые технологии, исключительная динамика. Вершина линейки VipBike для истинных ценителей скорости и комфорта.",
+      "daily_price": 490000,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-a4/image_1.jpg",
+      "rent_link": "/rent/vipbike-a4",
+      "is_test_result": false,
+      "specs": {
+        "type": "Electric",
+        "engine": "Электро",
+        "power_w": 10000,
+        "power_kw": 10,
+        "max_speed_kmh": "150+",
+        "subtitle": "Флагманский электромотоцикл VipBike A4",
+        "bike_subtype": "Electric",
+        "gallery": [
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-a4/image_1.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-a4/image_2.jpg",
+          "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vipbike-a4/image_3.jpg"
+        ],
+        "battery_options": {
+          "base_price": 490000,
+          "batteries": [
+            {"capacity": "Included", "type": "lithium", "battery_price": 0, "total_price": 490000, "range_km": "200+"}
+          ]
+        },
+        "tier": "high-performance"
+      },
+      "type": "bike",
+      "quantity": 1
+    },
+    {
+      "id": "vipbike-battery-50ah-regular",
+      "make": "VipBike",
+      "model": "Аккумулятор 50Ah (Regular)",
+      "description": "Стандартная аккумуляторная батарея емкостью 50Ah для электромотоциклов VipBike. Примерный запас хода: 70-110 км. Подходит для всех моделей серии.",
+      "daily_price": 44500,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/battery_50ah.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Battery",
+        "capacity": "50Ah",
+        "battery_type": "regular",
+        "range_km": "70-110",
+        "category": "battery",
+        "compatible_models": ["G8", "G8-2", "DMG", "DK", "R1", "R2", "R3", "R6", "RZ", "V6", "JY", "XF", "Z1000", "DN"]
+      },
+      "type": "parts",
+      "quantity": 50
+    },
+    {
+      "id": "vipbike-battery-60ah-regular",
+      "make": "VipBike",
+      "model": "Аккумулятор 60Ah (Regular)",
+      "description": "Стандартная аккумуляторная батарея емкостью 60Ah для электромотоциклов VipBike. Примерный запас хода: 80-120 км.",
+      "daily_price": 55000,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/battery_60ah.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Battery",
+        "capacity": "60Ah",
+        "battery_type": "regular",
+        "range_km": "80-120",
+        "category": "battery",
+        "compatible_models": ["G8", "G8-2", "DMG", "DK", "R1", "R2", "R3", "R6", "RZ", "V6", "JY", "XF", "Z1000", "DN"]
+      },
+      "type": "parts",
+      "quantity": 50
+    },
+    {
+      "id": "vipbike-battery-80ah-regular",
+      "make": "VipBike",
+      "model": "Аккумулятор 80Ah (Regular)",
+      "description": "Стандартная аккумуляторная батарея емкостью 80Ah для электромотоциклов VipBike. Примерный запас хода: 90-150 км.",
+      "daily_price": 59000,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/battery_80ah.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Battery",
+        "capacity": "80Ah",
+        "battery_type": "regular",
+        "range_km": "90-150",
+        "category": "battery",
+        "compatible_models": ["G8", "G8-2", "DMG", "DK", "R1", "R2", "R3", "R6", "RZ", "V6", "JY", "XF", "Z1000", "DN"]
+      },
+      "type": "parts",
+      "quantity": 50
+    },
+    {
+      "id": "vipbike-battery-50ah-lithium",
+      "make": "VipBike",
+      "model": "Литиевая батарея 50Ah",
+      "description": "Литиевая аккумуляторная батарея емкостью 50Ah. Легче, долговечнее и надежнее стандартных батарей.",
+      "daily_price": 82000,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/battery_li_50ah.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Battery",
+        "capacity": "50Ah",
+        "battery_type": "lithium",
+        "range_km": "70-110",
+        "category": "battery",
+        "compatible_models": ["G8", "G8-2", "DMG", "DK", "R1", "R2", "R3", "R6", "RZ", "V6", "JY", "XF", "Z1000", "DN"]
+      },
+      "type": "parts",
+      "quantity": 30
+    },
+    {
+      "id": "vipbike-battery-60ah-lithium",
+      "make": "VipBike",
+      "model": "Литиевая батарея 60Ah",
+      "description": "Литиевая аккумуляторная батарея емкостью 60Ah. Оптимальный выбор для ежедневного использования.",
+      "daily_price": 90000,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/battery_li_60ah.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Battery",
+        "capacity": "60Ah",
+        "battery_type": "lithium",
+        "range_km": "80-120",
+        "category": "battery",
+        "compatible_models": ["G8", "G8-2", "DMG", "DK", "R1", "R2", "R3", "R6", "RZ", "V6", "JY", "XF", "Z1000", "DN"]
+      },
+      "type": "parts",
+      "quantity": 30
+    },
+    {
+      "id": "vipbike-battery-80ah-lithium",
+      "make": "VipBike",
+      "model": "Литиевая батарея 80Ah",
+      "description": "Литиевая аккумуляторная батарея емкостью 80Ah. Увеличенная дальность с преимуществами литий-ионной технологии.",
+      "daily_price": 98000,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/battery_li_80ah.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Battery",
+        "capacity": "80Ah",
+        "battery_type": "lithium",
+        "range_km": "90-150",
+        "category": "battery",
+        "compatible_models": ["G8", "G8-2", "DMG", "DK", "R1", "R2", "R3", "R6", "RZ", "V6", "JY", "XF", "Z1000", "DN"]
+      },
+      "type": "parts",
+      "quantity": 30
+    },
+    {
+      "id": "vipbike-front-shock",
+      "make": "VipBike",
+      "model": "Амортизатор передний",
+      "description": "Передний амортизатор для электромотоциклов VipBike. Улучшенная подвеска для комфортной езды.",
+      "daily_price": 38600,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/front_shock.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Suspension",
+        "position": "front",
+        "category": "suspension"
+      },
+      "type": "parts",
+      "quantity": 20
+    },
+    {
+      "id": "vipbike-rear-shock",
+      "make": "VipBike",
+      "model": "Амортизатор задний",
+      "description": "Задний амортизатор для электромотоциклов VipBike. Плавный ход и отличная управляемость.",
+      "daily_price": 16500,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/rear_shock.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Suspension",
+        "position": "rear",
+        "category": "suspension"
+      },
+      "type": "parts",
+      "quantity": 20
+    },
+    {
+      "id": "vipbike-rear-tire",
+      "make": "VipBike",
+      "model": "Задняя шина",
+      "description": "Задняя шина для электромотоциклов VipBike. Отличное сцепление с дорогой.",
+      "daily_price": 4200,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/rear_tire.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Tire",
+        "position": "rear",
+        "category": "wheels"
+      },
+      "type": "parts",
+      "quantity": 30
+    },
+    {
+      "id": "vipbike-brembo-brakes",
+      "make": "VipBike",
+      "model": "Тормоза Brembo",
+      "description": "Премиальные тормоза Brembo для электромотоциклов. Исключительная тормозная мощность.",
+      "daily_price": 12400,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/brembo_brakes.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Brakes",
+        "brand": "Brembo",
+        "category": "brakes"
+      },
+      "type": "parts",
+      "quantity": 25
+    },
+    {
+      "id": "vipbike-helmet-e4",
+      "make": "VipBike",
+      "model": "Шлем E4 (Tensun)",
+      "description": "Мотоциклетный шлем E4 от Tensun. Надежная защита и комфорт.",
+      "daily_price": 8300,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/helmet_e4.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Helmet",
+        "brand": "Tensun",
+        "model": "E4",
+        "category": "accessories"
+      },
+      "type": "parts",
+      "quantity": 40
+    },
+    {
+      "id": "vipbike-tft-display",
+      "make": "VipBike",
+      "model": "TFT дисплей",
+      "description": "TFT дисплей с поддержкой мобильного телефона. Современный интерфейс и навигация.",
+      "daily_price": 8300,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/tft_display.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Display",
+        "technology": "TFT",
+        "category": "electronics"
+      },
+      "type": "parts",
+      "quantity": 30
+    },
+    {
+      "id": "vipbike-motorcycle-helmet",
+      "make": "VipBike",
+      "model": "Мотошлем",
+      "description": "Качественный мотошлем для безопасной езды.",
+      "daily_price": 4200,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/helmet.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Helmet",
+        "category": "accessories"
+      },
+      "type": "parts",
+      "quantity": 50
+    },
+    {
+      "id": "vipbike-bluetooth-alarm",
+      "make": "VipBike",
+      "model": "Противоугонная Bluetooth",
+      "description": "Противоугонная система с Bluetooth. Защита и отслеживание мотоцикла.",
+      "daily_price": 5600,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/bluetooth_alarm.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Security",
+        "technology": "Bluetooth",
+        "category": "electronics"
+      },
+      "type": "parts",
+      "quantity": 35
+    },
+    {
+      "id": "vipbike-cnc-footpegs",
+      "make": "VipBike",
+      "model": "CNC подножки",
+      "description": "CNC передние и задние подножки. Стильный дизайн и надежность.",
+      "daily_price": 9700,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/cnc_footpegs.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Footpegs",
+        "material": "CNC Aluminum",
+        "category": "accessories"
+      },
+      "type": "parts",
+      "quantity": 25
+    },
+    {
+      "id": "vipbike-abs-system",
+      "make": "VipBike",
+      "model": "ABS система",
+      "description": "Система ABS для безопасного торможения. Предотвращает блокировку колес.",
+      "daily_price": 16700,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/abs_system.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Safety",
+        "system": "ABS",
+        "category": "brakes"
+      },
+      "type": "parts",
+      "quantity": 20
+    },
+    {
+      "id": "vipbike-cbs-system",
+      "make": "VipBike",
+      "model": "Система CBS",
+      "description": "Combi Brake System для сбалансированного торможения.",
+      "daily_price": 4200,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/cbs_system.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Safety",
+        "system": "CBS",
+        "category": "brakes"
+      },
+      "type": "parts",
+      "quantity": 25
+    },
+    {
+      "id": "vipbike-motor-10000w",
+      "make": "VipBike",
+      "model": "Мотор 10000W",
+      "description": "Мощный электромотор 10000W. Скорость до 140-160 км/ч.",
+      "daily_price": 167000,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/motor_10000w.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Motor",
+        "power_w": 10000,
+        "max_speed_kmh": "140-160",
+        "category": "motor"
+      },
+      "type": "parts",
+      "quantity": 10
+    },
+    {
+      "id": "vipbike-motor-8000w",
+      "make": "VipBike",
+      "model": "Мотор 8000W",
+      "description": "Электромотор 8000W. Скорость до 160-180 км/ч.",
+      "daily_price": 90000,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/motor_8000w.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Motor",
+        "power_w": 8000,
+        "max_speed_kmh": "160-180",
+        "category": "motor"
+      },
+      "type": "parts",
+      "quantity": 10
+    },
+    {
+      "id": "vipbike-motor-5000w",
+      "make": "VipBike",
+      "model": "Мотор 5000W",
+      "description": "Электромотор 5000W. Скорость до 120-140 км/ч.",
+      "daily_price": 79000,
+      "image_url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/motor_5000w.jpg",
+      "rent_link": null,
+      "is_test_result": false,
+      "specs": {
+        "type": "Motor",
+        "power_w": 5000,
+        "max_speed_kmh": "120-140",
+        "category": "motor"
+      },
+      "type": "parts",
+      "quantity": 15
+    }
+  ]
+}
