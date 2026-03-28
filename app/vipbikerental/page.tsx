@@ -77,6 +77,13 @@ const ServiceCard = ({
 
 const quickActions = [
   {
+    title: "Купить электромотоцикл",
+    icon: "::FaCartShopping::",
+    text: "Открыть конфигуратор с выбором модели, мотора, батареи и допов.",
+    href: "/franchize/vip-bike/configurator",
+    cta: "Купить",
+  },
+  {
     title: "Каталог байков",
     icon: "::FaMotorcycle::",
     text: "Подбор модели под стиль езды, бюджет и маршрут.",
@@ -202,6 +209,11 @@ export default function HomePage() {
             <Button asChild size="lg" variant="accent" className="font-orbitron text-base shadow-lg shadow-accent/35 transition-all hover:scale-105 hover:shadow-accent/70">
               <Link href="/franchize/vip-bike">
                 <VibeContentRenderer content="::FaMotorcycle className='mr-2':: Выбрать байк" />
+              </Link>
+            </Button>
+            <Button asChild size="lg" className="font-orbitron text-base">
+              <Link href="/franchize/vip-bike/configurator">
+                <VibeContentRenderer content="::FaCartShopping className='mr-2':: Купить электромотоцикл" />
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="border-white/55 bg-black/25 font-orbitron text-white backdrop-blur-sm hover:bg-white hover:text-black">
