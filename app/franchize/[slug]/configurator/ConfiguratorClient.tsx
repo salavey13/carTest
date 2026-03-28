@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { Battery, Check, Gauge, MessageCircle, Shield, Truck, Wrench, Zap } from 'lucide-react'
+import { MessageCircle, Truck } from 'lucide-react'
 
 import { type FranchizeCrewVM } from '../../actions'
 import { catalogCardVariantStyles, crewPaletteForSurface, interactionRingStyle } from '../../lib/theme'
@@ -170,7 +170,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-2 sm:grid-cols-4">
           <TabsTrigger value="model">1. Модель</TabsTrigger>
           <TabsTrigger value="config" disabled={!selectedBike}>2. Конфиг</TabsTrigger>
           <TabsTrigger value="addons" disabled={!selectedBike}>3. Опции</TabsTrigger>
@@ -185,7 +185,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {filteredBikes.map((bike) => (
               <article key={bike.id} className="overflow-hidden rounded-2xl border" style={catalogCardVariantStyles(crew.theme, bike.id.length)}>
                 <button
@@ -220,7 +220,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                   <CardDescription>Выбор мотора, батареи и обзор фото модели.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {(selectedBike.specs.gallery?.length ? selectedBike.specs.gallery : [selectedBike.image_url]).map((image) => (
                       <div key={image} className="relative h-24 overflow-hidden rounded-lg border">
                         <Image src={image} alt={selectedBike.model} fill className="object-cover" unoptimized />
@@ -277,7 +277,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
               <CardTitle>Доп. опции (правая часть прайса)</CardTitle>
               <CardDescription>Выберите нужные компоненты.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-2 sm:grid-cols-2">
+            <CardContent className="grid gap-2 md:grid-cols-2">
               {parts.map((part) => {
                 const checked = selectedAccessories.includes(part.id)
                 return (
@@ -329,17 +329,6 @@ export function ConfiguratorClient({ crew, slug }: Props) {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="space-y-1 p-4 text-xs" style={surface.mutedText}>
-              <p className="font-medium" style={{ color: crew.theme.palette.textPrimary }}>Что проверено по прайсу:</p>
-              <p className="flex items-center gap-2"><Battery className="h-3.5 w-3.5" />Аккумы regular/lithium и цены.</p>
-              <p className="flex items-center gap-2"><Zap className="h-3.5 w-3.5" />Моторы: 3000 / 5000 / 8000 / 10000W.</p>
-              <p className="flex items-center gap-2"><Wrench className="h-3.5 w-3.5" />Опции из правой части прайса (ABS, Brembo, TFT и т.д.).</p>
-              <p className="flex items-center gap-2"><Shield className="h-3.5 w-3.5" />Fallback оставлен полным, пока live `type=ebike` наполняется.</p>
-              <p className="flex items-center gap-2"><Gauge className="h-3.5 w-3.5" />Выделение выбранного байка + шаговые табы для UX.</p>
-              <p className="flex items-center gap-2"><Check className="h-3.5 w-3.5" />Доставка временно фиксированная: {formatPrice(DELIVERY_AVERAGE)}.</p>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </section>
