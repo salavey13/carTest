@@ -195,77 +195,7 @@ begin
   end if;
 end $$;
 ```
-          const MIN_DISTANCE_M = 15;
-
-export function useLiveRiders(crewSlug: string) {
-  const { dbUser } = useAppContext();
-  const lastSentRef = useRef<{ lat: number; lng: number; ts: number } | null>(null);
-  const channelRef = useRef<any>(null);
-
-  const sendPosition = async (position: GeolocationPosition) => {
-    if (!dbUser?.user_id || !crewSlug) return;
-
-    const { latitude: lat, longitude: lng, speed, heading, accuracy } = position.coords;
-    const now = Date.now();
-
-    const last = lastSentRef.current;
-    if (last) {
-      const distance = Math.hypot(lat - last.lat, lng - last.lng) * 111_000;
-      if (distance < MIN_DISTANCE_M && now - last.ts < THROTTLE_MS) return;
-    }
-
-    const payload = {
-      user_id: dbUser.user_id,
-      crew_slug: crewSlug,
-      lat,
-      lng,
-      speed_kmh: (speed || 0) * 3.6,
-      heading: heading || null,
-      is_riding: true,
-    };
-
-    // 1. Fast broadcast (instant for everyone)
-    supabaseAnon.channel(`map:${crewSlug}`).send({
-      type: "broadcast",
-      event: "position",
-      payload,
-    });
-
-    // 2. Upsert to live_locations (ephemeral + spatial RLS)
-    await supabaseAnon.from("live_locations").upsert(payload, { onConflict: "user_id" });
-
-    lastSentRef.current = { lat, lng, ts: now };
-  };
-
-  // Subscribe to live positions
-  useEffect(() => {
-    if (!crewSlug) return;
-    const channel = supabaseAnon.channel(`map:${crewSlug}`);
-
-    channel.on("broadcast", { event: "position" }, ({ payload }) => {
-      // TODO: your VibeMap will listen to this via a global store or prop later
-      window.dispatchEvent(new CustomEvent("live-rider-update", { detail: payload }));
-    }).subscribe();
-
-    channelRef.current = channel;
-
-    return () => supabaseAnon.removeChannel(channel);
-  }, [crewSlug]);
-
-  // GPS watcher
-  useEffect(() => {
-    if (!navigator.geolocation || !dbUser?.user_id) return;
-    const watchId = navigator.geolocation.watchPosition(sendPosition, console.error, {
-      enableHighAccuracy: true,
-      maximumAge: 5000,
-      timeout: 10000,
-    });
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [dbUser?.user_id, crewSlug]);
-
-  return { sendPosition };
-}
-```
+          
 
 # MapRiders Optimization for 100+ Concurrent Riders
 
@@ -323,34 +253,2148 @@ On Stop → Batch INSERT to map_rider_points (1 write per ride)
 /sql/weekly_leaderboard_function.sql  # Leaderboard SQL function
 ```
 
-## Database Schema
 
-### live_locations (NEW - ephemeral)
-```sql
-CREATE TABLE public.live_locations (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id text NOT NULL REFERENCES public.users(user_id),
-  crew_slug text,
-  lat double precision NOT NULL,
-  lng double precision NOT NULL,
-  speed_kmh double precision,
-  heading double precision,
-  is_riding boolean DEFAULT true,
-  updated_at timestamptz DEFAULT now(),
-  location geography(POINT, 4326) GENERATED ALWAYS AS (ST_MakePoint(lng, lat)) STORED
-);
+##SUGGESTED CHANGESV
+```tsx
+"use client";
 
--- Indexes for performance
-CREATE INDEX idx_live_locations_location ON public.live_locations USING GIST (location);
-CREATE INDEX idx_live_locations_user_crew ON public.live_locations (user_id, crew_slug);
-CREATE INDEX idx_live_locations_crew ON public.live_locations (crew_slug);
-CREATE INDEX idx_live_locations_updated ON public.live_locations (updated_at);
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { VibeMap } from "@/components/VibeMap";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { formatRideDuration, initialsFromName, riderDisplayName } from "@/lib/map-riders";
+import { useAppContext } from "@/contexts/AppContext";
+import { useLiveRiders, type LiveRiderPosition } from "@/hooks/useLiveRiders";
+import type { FranchizeCrewVM } from "@/app/franchize/actions";
+import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+
+type SnapshotData = {
+  activeSessions: any[];
+  meetups: any[];
+  weeklyLeaderboard: Array<{ rank: number; riderName: string; distanceKm: number; sessions: number; avgSpeedKmh: number; maxSpeedKmh: number }>;
+  latestCompleted: any[];
+  stats: { activeRiders: number; meetupCount: number; totalWeeklyDistanceKm: number };
+};
+
+type SessionDetail = {
+  session: any;
+  points: Array<{ lat: number; lon: number; speedKmh: number; capturedAt: string }>;
+};
+
+// Accumulated points during active ride (for batch insert on stop)
+type AccumulatedPoint = {
+  lat: number;
+  lon: number;
+  speedKmh: number;
+  headingDeg: number | null;
+  accuracyMeters: number | null;
+  capturedAt: string;
+};
+
+const DEFAULT_BOUNDS = { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 };
+
+export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: string }) {
+  const { dbUser, userCrewInfo } = useAppContext();
+  const crewSlug = crew.slug || slug || userCrewInfo?.slug || "vip-bike";
+  const mapBounds = crew.contacts.map.bounds || DEFAULT_BOUNDS;
+  const mapImageUrl = crew.contacts.map.imageUrl;
+  const surface = crewPaletteForSurface(crew.theme);
+  const shareStartParam = `mapriders_${crewSlug}`;
+  const shareDeepLink = `https://t.me/oneBikePlsBot/app?startapp=${shareStartParam}`;
+  const shareCopy = `${crew.header.brandName || crew.name || "VIP BIKE"} MapRiders — карта экипажа, live-share и meetup-пины в одном окне`;
+
+  const [snapshot, setSnapshot] = useState<SnapshotData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedMeetupPoint, setSelectedMeetupPoint] = useState<[number, number] | null>(null);
+  const [meetupTitle, setMeetupTitle] = useState("Точка сбора");
+  const [meetupComment, setMeetupComment] = useState("");
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [rideName, setRideName] = useState("Вечерний выезд");
+  const [vehicleLabel, setVehicleLabel] = useState("VIP bike");
+  const [rideMode, setRideMode] = useState<"rental" | "personal">("rental");
+  const [shareEnabled, setShareEnabled] = useState(false);
+  const [shareStatus, setShareStatus] = useState("Геошеринг выключен");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Live riders state - updated via broadcast (NOT database polling)
+  const [liveRiders, setLiveRiders] = useState<Record<string, LiveRiderPosition & { receivedAt: number }>>({});
+
+  // Accumulated points during active ride (batch insert on stop)
+  const accumulatedPointsRef = useRef<AccumulatedPoint[]>([]);
+  const watchRef = useRef<number | null>(null);
+  const lastCoordsRef = useRef<{ lat: number; lon: number } | null>(null);
+
+  const supabase = getSupabaseBrowserClient();
+
+  // Start live riders hook (broadcast + upsert to live_locations)
+  const { sendPosition } = useLiveRiders(crewSlug);
+
+  const activeOwnSession = useMemo(
+    () => snapshot?.activeSessions.find((session) => session.user_id === dbUser?.user_id) || null,
+    [snapshot?.activeSessions, dbUser?.user_id],
+  );
+
+  // Fetch initial live_locations from DB (for riders already broadcasting)
+  const fetchInitialLiveLocations = useCallback(async () => {
+    if (!crewSlug) return;
+
+    const { data, error } = await supabase
+      .from("live_locations")
+      .select("*")
+      .eq("crew_slug", crewSlug)
+      .gt("updated_at", new Date(Date.now() - 5 * 60 * 1000).toISOString()); // Only recent (< 5 min)
+
+    if (error) {
+      console.error("[fetchInitialLiveLocations] Error:", error);
+      return;
+    }
+
+    if (data) {
+      const ridersMap: Record<string, LiveRiderPosition & { receivedAt: number }> = {};
+      data.forEach((rider) => {
+        ridersMap[rider.user_id] = {
+          user_id: rider.user_id,
+          crew_slug: rider.crew_slug,
+          lat: rider.lat,
+          lng: rider.lng,
+          speed_kmh: rider.speed_kmh || 0,
+          heading: rider.heading,
+          is_riding: rider.is_riding ?? true,
+          receivedAt: Date.now(),
+        };
+      });
+      setLiveRiders(ridersMap);
+    }
+  }, [crewSlug, supabase]);
+
+  // Listen to live rider updates from broadcast
+  useEffect(() => {
+    const handler = (e: CustomEvent<LiveRiderPosition>) => {
+      const payload = e.detail;
+      if (!payload?.user_id) return;
+
+      setLiveRiders((prev) => ({
+        ...prev,
+        [payload.user_id]: { ...payload, receivedAt: Date.now() },
+      }));
+    };
+
+    window.addEventListener("live-rider-update", handler as EventListener);
+    return () => window.removeEventListener("live-rider-update", handler as EventListener);
+  }, []);
+
+  const fetchSnapshot = useCallback(async () => {
+    setLoading((prev) => prev && !snapshot);
+    try {
+      const response = await fetch(`/api/map-riders?slug=${encodeURIComponent(crewSlug)}`, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || "Не удалось загрузить MapRiders");
+      setSnapshot(result.data);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось загрузить карту райдеров");
+    } finally {
+      setLoading(false);
+    }
+  }, [crewSlug, snapshot]);
+
+  const fetchSessionDetail = useCallback(async (nextSessionId: string) => {
+    try {
+      const response = await fetch(`/api/map-riders/session/${nextSessionId}`, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || "Не удалось загрузить трек");
+      setSessionDetail(result.data);
+      setSelectedSessionId(nextSessionId);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось открыть маршрут");
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    fetchSnapshot();
+    fetchInitialLiveLocations();
+  }, [fetchSnapshot, fetchInitialLiveLocations]);
+
+  // Auto-select latest completed session on first load
+  useEffect(() => {
+    if (!snapshot || selectedSessionId || !snapshot.latestCompleted[0]?.id) return;
+    fetchSessionDetail(snapshot.latestCompleted[0].id);
+  }, [snapshot, selectedSessionId, fetchSessionDetail]);
+
+  // Realtime subscriptions (LIGHTWEIGHT - only sessions and meetups, NOT points)
+  useEffect(() => {
+    const channel = supabase
+      .channel(`map-riders-meta:${crewSlug}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "map_rider_sessions", filter: `crew_slug=eq.${crewSlug}` }, () => fetchSnapshot())
+      .on("postgres_changes", { event: "*", schema: "public", table: "map_rider_meetups", filter: `crew_slug=eq.${crewSlug}` }, () => fetchSnapshot())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [crewSlug, fetchSnapshot, supabase]);
+
+  // Sync active session state
+  useEffect(() => {
+    if (activeOwnSession?.id) {
+      setSessionId(activeOwnSession.id);
+      setShareEnabled(true);
+      setShareStatus("Ты сейчас в эфире на карте");
+    } else {
+      setSessionId(null);
+      setShareEnabled(false);
+      setShareStatus("Геошеринг выключен");
+    }
+  }, [activeOwnSession?.id]);
+
+  const stopWatcher = useCallback(() => {
+    if (watchRef.current !== null) {
+      navigator.geolocation.clearWatch(watchRef.current);
+      watchRef.current = null;
+    }
+  }, []);
+
+  // Push location to live_locations (lightweight) + accumulate for batch insert on stop
+  const pushLocation = useCallback(async (position: GeolocationPosition, nextSessionId: string) => {
+    const lat = position.coords.latitude;
+    const lon = position.coords.longitude;
+    const prev = lastCoordsRef.current;
+
+    // Skip if moved less than ~3 meters
+    if (prev && Math.abs(prev.lat - lat) < 0.00003 && Math.abs(prev.lon - lon) < 0.00003) {
+      return;
+    }
+    lastCoordsRef.current = { lat, lon };
+
+    // 1. Send to live_locations via hook (broadcast + upsert)
+    await sendPosition(position);
+
+    // 2. Accumulate point for batch insert on session stop
+    const point: AccumulatedPoint = {
+      lat,
+      lon,
+      speedKmh: Math.max(0, Number(position.coords.speed || 0) * 3.6),
+      headingDeg: position.coords.heading || null,
+      accuracyMeters: position.coords.accuracy || null,
+      capturedAt: new Date(position.timestamp).toISOString(),
+    };
+    accumulatedPointsRef.current.push(point);
+
+    // 3. Update session last_ping_at (lightweight, no points insert)
+    await fetch("/api/map-riders/ping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: nextSessionId,
+        lat,
+        lon,
+        speedKmh: point.speedKmh,
+      }),
+    });
+  }, [sendPosition]);
+
+  const beginWatch = useCallback((nextSessionId: string) => {
+    if (!navigator.geolocation) {
+      toast.error("Браузер не поддерживает геолокацию");
+      return;
+    }
+    stopWatcher();
+    accumulatedPointsRef.current = []; // Clear accumulated points
+
+    watchRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        pushLocation(position, nextSessionId).catch((error) => {
+          console.error("[pushLocation] Error:", error);
+        });
+      },
+      (error) => {
+        toast.error(`Геолокация недоступна: ${error.message}`);
+        setShareStatus("Нет доступа к GPS");
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 12000 },
+    );
+  }, [pushLocation, stopWatcher]);
+
+  const handleStartSharing = useCallback(async () => {
+    if (!dbUser?.user_id) {
+      toast.error("Сначала авторизуйся в Telegram/VIP BIKE");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/map-riders/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "start",
+          userId: dbUser.user_id,
+          crewSlug,
+          rideName,
+          vehicleLabel,
+          rideMode,
+          visibility: "crew",
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || "Не удалось запустить заезд");
+
+      const nextSessionId = result.data.id as string;
+      setSessionId(nextSessionId);
+      setShareEnabled(true);
+      setShareStatus("Делимся локацией в реальном времени");
+      beginWatch(nextSessionId);
+      await fetchSnapshot();
+      toast.success("MapRiders активирован. Экипаж видит твой маршрут.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось запустить MapRiders");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [beginWatch, crewSlug, dbUser?.user_id, fetchSnapshot, rideMode, rideName, vehicleLabel]);
+
+  const handleStopSharing = useCallback(async () => {
+    if (!dbUser?.user_id || !sessionId) return;
+
+    setIsSubmitting(true);
+    try {
+      // 1. Stop GPS watcher
+      stopWatcher();
+
+      // 2. Batch insert all accumulated points to map_rider_points (HISTORY)
+      const points = accumulatedPointsRef.current;
+      if (points.length > 0) {
+        const response = await fetch("/api/map-riders/batch-points", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            crewSlug,
+            userId: dbUser.user_id,
+            points,
+          }),
+        });
+        if (!response.ok) {
+          console.error("[handleStopSharing] Failed to batch insert points");
+        }
+      }
+
+      // 3. Stop session
+      const response = await fetch("/api/map-riders/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "stop", sessionId, userId: dbUser.user_id, crewSlug }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || "Не удалось завершить заезд");
+
+      // 4. Delete from live_locations (cleanup)
+      await supabase.from("live_locations").delete().eq("user_id", dbUser.user_id);
+
+      // 5. Reset state
+      setShareEnabled(false);
+      setSessionId(null);
+      accumulatedPointsRef.current = [];
+      setShareStatus("Заезд завершён и сохранён в статистику");
+      await fetchSnapshot();
+      toast.success(`Маршрут закрыт. Сохранено ${points.length} точек. Статистика обновлена.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось завершить заезд");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [crewSlug, dbUser?.user_id, fetchSnapshot, sessionId, stopWatcher, supabase]);
+
+  // Cleanup on unmount
+  useEffect(() => () => stopWatcher(), [stopWatcher]);
+
+  const handleCreateMeetup = useCallback(async () => {
+    if (!dbUser?.user_id || !selectedMeetupPoint) {
+      toast.error("Выбери точку на карте и авторизуйся");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/map-riders/meetups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          crewSlug,
+          userId: dbUser.user_id,
+          title: meetupTitle,
+          comment: meetupComment,
+          lat: selectedMeetupPoint[0],
+          lon: selectedMeetupPoint[1],
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || "Не удалось создать точку встречи");
+      toast.success("Точка встречи сохранена для всего экипажа");
+      setMeetupComment("");
+      setSelectedMeetupPoint(null);
+      await fetchSnapshot();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось сохранить meetup");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [crewSlug, dbUser?.user_id, fetchSnapshot, meetupComment, meetupTitle, selectedMeetupPoint]);
+
+  // Cleanup stale live riders from state (> 5 minutes old)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setLiveRiders((prev) => {
+        const cleaned: Record<string, LiveRiderPosition & { receivedAt: number }> = {};
+        Object.entries(prev).forEach(([userId, rider]) => {
+          if (now - rider.receivedAt < 5 * 60 * 1000) {
+            cleaned[userId] = rider;
+          }
+        });
+        return cleaned;
+      });
+    }, 30000); // Every 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Merge live riders with snapshot sessions for display
+  const mergedActiveSessions = useMemo(() => {
+    const snapshotSessions = snapshot?.activeSessions || [];
+
+    // Create a map of live riders that are NOT in snapshot yet
+    const liveRiderSessions = Object.values(liveRiders)
+      .filter((rider) => {
+        // Skip if already in snapshot
+        return !snapshotSessions.some((s) => s.user_id === rider.user_id);
+      })
+      .map((rider) => ({
+        id: `live-${rider.user_id}`,
+        user_id: rider.user_id,
+        latest_lat: rider.lat,
+        latest_lon: rider.lng,
+        latest_speed_kmh: rider.speed_kmh,
+        ride_name: "Live",
+        vehicle_label: "",
+        total_distance_km: 0,
+        users: null,
+        isLiveRider: true, // Flag to identify live-only riders
+      }));
+
+    // Merge snapshot sessions with live position updates
+    const mergedSnapshotSessions = snapshotSessions.map((session) => {
+      const liveUpdate = liveRiders[session.user_id];
+      if (liveUpdate) {
+        return {
+          ...session,
+          latest_lat: liveUpdate.lat,
+          latest_lon: liveUpdate.lng,
+          latest_speed_kmh: liveUpdate.speed_kmh,
+        };
+      }
+      return session;
+    });
+
+    return [...mergedSnapshotSessions, ...liveRiderSessions];
+  }, [liveRiders, snapshot?.activeSessions]);
+
+  const mapPoints = useMemo(() => {
+    // Live rider points (from broadcast) - INSTANT updates, no DB load
+    const riderPoints = mergedActiveSessions
+      .filter((session) => typeof session.latest_lat === "number" && typeof session.latest_lon === "number")
+      .map((session) => ({
+        id: `rider-${session.id}`,
+        name: `${riderDisplayName(session.users, session.user_id)} • ${Math.round(Number(session.latest_speed_kmh || 0))} км/ч`,
+        type: "point" as const,
+        icon: `image:https://placehold.co/56x56/${session.user_id === dbUser?.user_id ? "facc15" : "111827"}/ffffff?text=${encodeURIComponent(initialsFromName(riderDisplayName(session.users, session.user_id)))}`,
+        color: session.user_id === dbUser?.user_id ? "#facc15" : "#60a5fa",
+        coords: [[Number(session.latest_lat), Number(session.latest_lon)]],
+      }));
+
+    const meetupPoints = (snapshot?.meetups || []).map((meetup) => ({
+      id: `meetup-${meetup.id}`,
+      name: `${meetup.title}${meetup.comment ? ` — ${meetup.comment}` : ""}`,
+      type: "point" as const,
+      icon: "::FaLocationDot::",
+      color: "#f97316",
+      coords: [[Number(meetup.lat), Number(meetup.lon)]],
+    }));
+
+    const routePoints = sessionDetail?.points?.length
+      ? [{
+          id: `route-${sessionDetail.session.id}`,
+          name: `Маршрут ${sessionDetail.session.rider_name}`,
+          type: "path" as const,
+          icon: "::FaRoute::",
+          color: "#22c55e",
+          coords: sessionDetail.points.map((point) => [point.lat, point.lon] as [number, number]),
+        }]
+      : [];
+
+    return [...routePoints, ...riderPoints, ...meetupPoints];
+  }, [dbUser?.user_id, mergedActiveSessions, sessionDetail, snapshot?.meetups]);
+
+  const heroStats = [
+    { label: "В эфире", value: mergedActiveSessions.length ?? 0, icon: "::FaSatelliteDish::" },
+    { label: "Точки встречи", value: snapshot?.stats.meetupCount ?? 0, icon: "::FaUsersViewfinder::" },
+    { label: "Км за 7 дней", value: snapshot?.stats.totalWeeklyDistanceKm ?? 0, icon: "::FaRoad::" },
+  ];
+
+  const mapTools = [
+    {
+      title: "Брендинг / карта",
+      description: "Открыть карту внутри франшизного кастомайзера и поправить GPS, bounds и image URL.",
+      href: `/franchize/create?slug=${crewSlug}`,
+      cta: "Открыть branding",
+    },
+    {
+      title: "Контакты с картой",
+      description: "Проверить публичную контактную страницу команды и то, как карта вписана в crew-shell.",
+      href: `/franchize/${crewSlug}/contacts`,
+      cta: "Смотреть contacts",
+    },
+    {
+      title: "Админ-гараж",
+      description: "Быстрый вход в admin-поверхность экипажа: storefront, техника и рядом все map-сценарии.",
+      href: `/franchize/${crewSlug}/admin`,
+      cta: "Открыть admin",
+    },
+    {
+      title: "Калибратор карты",
+      description: "Если картинка карты кривая — открой калибратор и сохрани новый preset с точными bounds.",
+      href: "/admin/map-calibrator",
+      cta: "Калибровать",
+    },
+  ];
+
+  return (
+    <div
+      className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-24 md:pt-28"
+      style={{
+        ["--mr-accent" as string]: crew.theme.palette.accentMain,
+        ["--mr-accent-hover" as string]: crew.theme.palette.accentMainHover,
+        ["--mr-border" as string]: crew.theme.palette.borderSoft,
+        ["--mr-card" as string]: surface.subtleCard.backgroundColor,
+        ["--mr-text" as string]: crew.theme.palette.textPrimary,
+        ["--mr-muted" as string]: crew.theme.palette.textSecondary,
+      }}
+    >
+      <section className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+          <CardHeader>
+            <Badge className="w-fit border hover:opacity-100" style={{ borderColor: `${crew.theme.palette.accentMain}55`, backgroundColor: `${crew.theme.palette.accentMain}18`, color: crew.theme.palette.accentMain }}>{(crew.header.brandName || crew.name || "VIP BIKE").toUpperCase()} • MAPRIDERS</Badge>
+            <CardTitle className="mt-3 font-orbitron text-3xl" style={{ color: crew.theme.palette.textPrimary }}>Карта райдеров в реальном времени</CardTitle>
+            <CardDescription className="max-w-2xl text-base" style={{ color: crew.theme.palette.textSecondary }}>
+              Один тап — и авторизованный байкер делится маршрутом как в Telegram live location: команда видит движение, точки встречи, скорость и недельный прогресс. Deeplink уже несёт franchize slug и корректно возвращает в `/franchize/{slug}/map-riders`.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-3">
+            {heroStats.map((stat) => (
+              <div key={stat.label} className="rounded-2xl border p-4" style={{ borderColor: `${crew.theme.palette.borderSoft}aa`, backgroundColor: `${crew.theme.palette.bgBase}66` }}>
+                <div className="mb-2" style={{ color: crew.theme.palette.accentMain }}><VibeContentRenderer content={stat.icon} /></div>
+                <div className="text-2xl font-semibold" style={{ color: crew.theme.palette.textPrimary }}>{stat.value}</div>
+                <div className="text-sm" style={{ color: crew.theme.palette.textSecondary }}>{stat.label}</div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+          <CardHeader>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Пульт райдера</CardTitle>
+            <CardDescription>{shareStatus}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="ride-name">Название заезда</Label>
+                <Input id="ride-name" value={rideName} onChange={(event) => setRideName(event.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vehicle-label">Байк</Label>
+                <Input id="vehicle-label" value={vehicleLabel} onChange={(event) => setVehicleLabel(event.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Button type="button" variant={rideMode === "rental" ? "default" : "outline"} onClick={() => setRideMode("rental")}>Арендный байк</Button>
+              <Button type="button" variant={rideMode === "personal" ? "default" : "outline"} onClick={() => setRideMode("personal")}>Свой байк</Button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button type="button" disabled={isSubmitting || shareEnabled} onClick={handleStartSharing} className="text-black" style={{ backgroundColor: crew.theme.palette.accentMain }}>
+                <VibeContentRenderer content="::FaLocationArrow::" className="mr-2" />
+                Включить live share
+              </Button>
+              <Button type="button" variant="outline" disabled={isSubmitting || !shareEnabled} onClick={handleStopSharing}>
+                <VibeContentRenderer content="::FaPowerOff::" className="mr-2" />
+                Завершить заезд
+              </Button>
+            </div>
+            <div className="rounded-2xl border p-3 text-sm" style={{ borderColor: `${crew.theme.palette.accentMain}33`, backgroundColor: `${crew.theme.palette.accentMain}12`, color: crew.theme.palette.textPrimary }}>
+              <div className="font-medium">Крутые фишки сверху базового запроса</div>
+              <ul className="mt-2 list-disc space-y-1 pl-5" style={{ color: crew.theme.palette.textSecondary }}>
+                <li>Convoy Pulse: видно, кто в эфире прямо сейчас и с какой скоростью идёт колонна.</li>
+                <li>Meetup Pins: можно ткнуть в карту, задать точку встречи и комментарий для всей команды.</li>
+                <li>Route Replay: любой завершённый заезд открывается по кнопке с визуальным треком и KPI.</li>
+              </ul>
+            </div>
+            <Button asChild variant="outline" className="w-full">
+              <Link href={`https://t.me/share/url?url=${encodeURIComponent(shareDeepLink)}&text=${encodeURIComponent(shareCopy)}`} target="_blank">
+                Открыть Telegram-share мост
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.4fr,0.9fr]">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+          <CardHeader>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Городская карта экипажа</CardTitle>
+            <CardDescription>Тапни по карте, чтобы поставить meetup-поинт. Зелёным — выбранный маршрут, жёлтым/синим — активные райдеры.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[520px] overflow-hidden rounded-3xl border" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
+              <VibeMap points={mapPoints} bounds={mapBounds ?? DEFAULT_BOUNDS} imageUrl={mapImageUrl} isEditable onMapClick={(coords) => setSelectedMeetupPoint(coords)} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-col gap-6">
+          <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+            <CardHeader>
+              <CardTitle className="font-orbitron text-lg" style={{ color: crew.theme.palette.textPrimary }}>Новая точка встречи</CardTitle>
+              <CardDescription>
+                {selectedMeetupPoint ? `Выбрано: ${selectedMeetupPoint[0].toFixed(5)}, ${selectedMeetupPoint[1].toFixed(5)}` : "Нажми на карту, чтобы выбрать точку"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="meetup-title">Заголовок</Label>
+                <Input id="meetup-title" value={meetupTitle} onChange={(event) => setMeetupTitle(event.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="meetup-comment">Комментарий</Label>
+                <Textarea id="meetup-comment" value={meetupComment} onChange={(event) => setMeetupComment(event.target.value)} placeholder="Например: собираемся тут в 21:00, есть парковка и кофе" />
+              </div>
+              <Button type="button" className="w-full" disabled={isSubmitting || !selectedMeetupPoint} onClick={handleCreateMeetup}>Сохранить meetup</Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+            <CardHeader>
+              <CardTitle className="font-orbitron text-lg" style={{ color: crew.theme.palette.textPrimary }}>Онлайн-райдеры</CardTitle>
+              <CardDescription>{loading ? "Обновляем эфир..." : `${mergedActiveSessions.length || 0} райдеров сейчас на карте`}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {mergedActiveSessions.map((session) => (
+                <button
+                  key={session.id}
+                  type="button"
+                  onClick={() => !session.isLiveRider && fetchSessionDetail(session.id)}
+                  className={`flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left transition ${session.isLiveRider ? '' : 'hover:border-amber-400/50'}`}
+                >
+                  <div>
+                    <div className="font-medium text-white">{riderDisplayName(session.users, session.user_id)}</div>
+                    <div className="text-xs text-muted-foreground">{session.ride_name || "Без названия"} • {session.vehicle_label || "байк не указан"}</div>
+                  </div>
+                  <div className="text-right text-sm text-amber-200">
+                    <div>{Number(session.total_distance_km || 0).toFixed(1)} км</div>
+                    <div>{Number(session.latest_speed_kmh || 0).toFixed(0)} км/ч</div>
+                  </div>
+                </button>
+              ))}
+              {!mergedActiveSessions.length && <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-muted-foreground">Пока никто не в эфире. Запусти live share первым.</div>}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[1.1fr,0.9fr]">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+          <CardHeader>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Разбор выбранного заезда</CardTitle>
+            <CardDescription>Показываем маршрут, скорость, среднюю скорость и длительность по кнопке.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {sessionDetail ? (
+              <>
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><div className="text-xs text-muted-foreground">Райдер</div><div className="mt-1 text-lg text-white">{sessionDetail.session.rider_name}</div></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><div className="text-xs text-muted-foreground">Дистанция</div><div className="mt-1 text-lg text-white">{Number(sessionDetail.session.total_distance_km || 0).toFixed(1)} км</div></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><div className="text-xs text-muted-foreground">Средняя скорость</div><div className="mt-1 text-lg text-white">{Number(sessionDetail.session.avg_speed_kmh || 0).toFixed(1)} км/ч</div></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><div className="text-xs text-muted-foreground">Максимум</div><div className="mt-1 text-lg text-white">{Number(sessionDetail.session.max_speed_kmh || 0).toFixed(1)} км/ч</div></div>
+                </div>
+                <Separator />
+                <div className="text-sm text-muted-foreground">Длительность: {formatRideDuration(Number(sessionDetail.session.duration_seconds || 0))}. Точек в треке: {sessionDetail.points.length}.</div>
+              </>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-white/10 p-6 text-sm text-muted-foreground">Выбери активный или завершённый заезд, чтобы раскрыть маршрут и статистику.</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+          <CardHeader>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Недельный зал славы</CardTitle>
+            <CardDescription>Кто больше всех проехал за 7 дней — тот выше в таблице.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(snapshot?.weeklyLeaderboard || []).map((row) => (
+              <div key={`${row.rank}-${row.riderName}`} className="grid grid-cols-[56px,1fr,88px] items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                <div className="text-center font-orbitron text-xl text-amber-300">#{row.rank}</div>
+                <div>
+                  <div className="font-medium text-white">{row.riderName}</div>
+                  <div className="text-xs text-muted-foreground">{row.sessions} заезд(ов) • ср. {row.avgSpeedKmh} км/ч • max {row.maxSpeedKmh} км/ч</div>
+                </div>
+                <div className="text-right text-lg text-white">{row.distanceKm} км</div>
+              </div>
+            ))}
+            {!snapshot?.weeklyLeaderboard?.length && <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-muted-foreground">Лидерборд наполнится после первых треков.</div>}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+          <CardHeader>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Последние завершённые выезды</CardTitle>
+            <CardDescription>Открывай любой заезд кнопкой, чтобы увидеть маршрут на карте.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(snapshot?.latestCompleted || []).map((session) => (
+              <button key={session.id} type="button" onClick={() => fetchSessionDetail(session.id)} className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left transition hover:border-emerald-400/50">
+                <div>
+                  <div className="font-medium text-white">{session.rider_name}</div>
+                  <div className="text-xs text-muted-foreground">{session.ride_name || "Без названия"} • {formatRideDuration(Number(session.duration_seconds || 0))}</div>
+                </div>
+                <div className="text-right text-sm text-emerald-200">
+                  <div>{Number(session.total_distance_km || 0).toFixed(1)} км</div>
+                  <div>avg {Number(session.avg_speed_kmh || 0).toFixed(1)}</div>
+                </div>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+          <CardHeader>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Как это работает</CardTitle>
+            <CardDescription>Короткий сценарий для байкеров и админов.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><span className="font-medium text-white">1.</span> Авторизованный райдер жмёт "Включить live share", выбирает: арендный или свой байк.</div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><span className="font-medium text-white">2.</span> MapRiders начинает писать точки маршрута, считает дистанцию, среднюю и максимальную скорость.</div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><span className="font-medium text-white">3.</span> Любой участник видит всех активных райдеров, meetup-пины и недельный лидерборд.</div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><span className="font-medium text-white">4.</span> После завершения поездки маршрут остаётся доступен по кнопке "открыть заезд".</div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        {mapTools.map((tool) => (
+          <Card key={tool.href} className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold" style={{ color: crew.theme.palette.textPrimary }}>{tool.title}</CardTitle>
+              <CardDescription style={{ color: crew.theme.palette.textSecondary }}>{tool.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="w-full">
+                <Link href={tool.href}>{tool.cta}</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+    </div>
+  );
+}
 ```
 
-### Existing Tables (Unchanged)
-- `map_rider_sessions` - Session metadata, history, stats
-- `map_rider_points` - Persistent route points (batch inserted on stop)
-- `map_rider_meetups` - Meetup pins
+hook:
+```ts
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { VibeMap } from "@/components/VibeMap";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { formatRideDuration, initialsFromName, riderDisplayName } from "@/lib/map-riders";
+import { useAppContext } from "@/contexts/AppContext";
+import { useLiveRiders, type LiveRiderPosition } from "@/hooks/useLiveRiders";
+import type { FranchizeCrewVM } from "@/app/franchize/actions";
+import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+
+type SnapshotData = {
+  activeSessions: any[];
+  meetups: any[];
+  weeklyLeaderboard: Array<{ rank: number; riderName: string; distanceKm: number; sessions: number; avgSpeedKmh: number; maxSpeedKmh: number }>;
+  latestCompleted: any[];
+  stats: { activeRiders: number; meetupCount: number; totalWeeklyDistanceKm: number };
+};
+
+type SessionDetail = {
+  session: any;
+  points: Array<{ lat: number; lon: number; speedKmh: number; capturedAt: string }>;
+};
+
+// Accumulated points during active ride (for batch insert on stop)
+type AccumulatedPoint = {
+  lat: number;
+  lon: number;
+  speedKmh: number;
+  headingDeg: number | null;
+  accuracyMeters: number | null;
+  capturedAt: string;
+};
+
+const DEFAULT_BOUNDS = { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 };
+
+export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: string }) {
+  const { dbUser, userCrewInfo } = useAppContext();
+  const crewSlug = crew.slug || slug || userCrewInfo?.slug || "vip-bike";
+  const mapBounds = crew.contacts.map.bounds || DEFAULT_BOUNDS;
+  const mapImageUrl = crew.contacts.map.imageUrl;
+  const surface = crewPaletteForSurface(crew.theme);
+  const shareStartParam = `mapriders_${crewSlug}`;
+  const shareDeepLink = `https://t.me/oneBikePlsBot/app?startapp=${shareStartParam}`;
+  const shareCopy = `${crew.header.brandName || crew.name || "VIP BIKE"} MapRiders — карта экипажа, live-share и meetup-пины в одном окне`;
+
+  const [snapshot, setSnapshot] = useState<SnapshotData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedMeetupPoint, setSelectedMeetupPoint] = useState<[number, number] | null>(null);
+  const [meetupTitle, setMeetupTitle] = useState("Точка сбора");
+  const [meetupComment, setMeetupComment] = useState("");
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [rideName, setRideName] = useState("Вечерний выезд");
+  const [vehicleLabel, setVehicleLabel] = useState("VIP bike");
+  const [rideMode, setRideMode] = useState<"rental" | "personal">("rental");
+  const [shareEnabled, setShareEnabled] = useState(false);
+  const [shareStatus, setShareStatus] = useState("Геошеринг выключен");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Live riders state - updated via broadcast (NOT database polling)
+  const [liveRiders, setLiveRiders] = useState<Record<string, LiveRiderPosition & { receivedAt: number }>>({});
+
+  // Accumulated points during active ride (batch insert on stop)
+  const accumulatedPointsRef = useRef<AccumulatedPoint[]>([]);
+  const watchRef = useRef<number | null>(null);
+  const lastCoordsRef = useRef<{ lat: number; lon: number } | null>(null);
+
+  const supabase = getSupabaseBrowserClient();
+
+  // Start live riders hook (broadcast + upsert to live_locations)
+  const { sendPosition } = useLiveRiders(crewSlug);
+
+  const activeOwnSession = useMemo(
+    () => snapshot?.activeSessions.find((session) => session.user_id === dbUser?.user_id) || null,
+    [snapshot?.activeSessions, dbUser?.user_id],
+  );
+
+  // Fetch initial live_locations from DB (for riders already broadcasting)
+  const fetchInitialLiveLocations = useCallback(async () => {
+    if (!crewSlug) return;
+
+    const { data, error } = await supabase
+      .from("live_locations")
+      .select("*")
+      .eq("crew_slug", crewSlug)
+      .gt("updated_at", new Date(Date.now() - 5 * 60 * 1000).toISOString()); // Only recent (< 5 min)
+
+    if (error) {
+      console.error("[fetchInitialLiveLocations] Error:", error);
+      return;
+    }
+
+    if (data) {
+      const ridersMap: Record<string, LiveRiderPosition & { receivedAt: number }> = {};
+      data.forEach((rider) => {
+        ridersMap[rider.user_id] = {
+          user_id: rider.user_id,
+          crew_slug: rider.crew_slug,
+          lat: rider.lat,
+          lng: rider.lng,
+          speed_kmh: rider.speed_kmh || 0,
+          heading: rider.heading,
+          is_riding: rider.is_riding ?? true,
+          receivedAt: Date.now(),
+        };
+      });
+      setLiveRiders(ridersMap);
+    }
+  }, [crewSlug, supabase]);
+
+  // Listen to live rider updates from broadcast
+  useEffect(() => {
+    const handler = (e: CustomEvent<LiveRiderPosition>) => {
+      const payload = e.detail;
+      if (!payload?.user_id) return;
+
+      setLiveRiders((prev) => ({
+        ...prev,
+        [payload.user_id]: { ...payload, receivedAt: Date.now() },
+      }));
+    };
+
+    window.addEventListener("live-rider-update", handler as EventListener);
+    return () => window.removeEventListener("live-rider-update", handler as EventListener);
+  }, []);
+
+  const fetchSnapshot = useCallback(async () => {
+    setLoading((prev) => prev && !snapshot);
+    try {
+      const response = await fetch(`/api/map-riders?slug=${encodeURIComponent(crewSlug)}`, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || "Не удалось загрузить MapRiders");
+      setSnapshot(result.data);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось загрузить карту райдеров");
+    } finally {
+      setLoading(false);
+    }
+  }, [crewSlug, snapshot]);
+
+  const fetchSessionDetail = useCallback(async (nextSessionId: string) => {
+    try {
+      const response = await fetch(`/api/map-riders/session/${nextSessionId}`, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || "Не удалось загрузить трек");
+      setSessionDetail(result.data);
+      setSelectedSessionId(nextSessionId);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось открыть маршрут");
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    fetchSnapshot();
+    fetchInitialLiveLocations();
+  }, [fetchSnapshot, fetchInitialLiveLocations]);
+
+  // Auto-select latest completed session on first load
+  useEffect(() => {
+    if (!snapshot || selectedSessionId || !snapshot.latestCompleted[0]?.id) return;
+    fetchSessionDetail(snapshot.latestCompleted[0].id);
+  }, [snapshot, selectedSessionId, fetchSessionDetail]);
+
+  // Realtime subscriptions (LIGHTWEIGHT - only sessions and meetups, NOT points)
+  useEffect(() => {
+    const channel = supabase
+      .channel(`map-riders-meta:${crewSlug}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "map_rider_sessions", filter: `crew_slug=eq.${crewSlug}` }, () => fetchSnapshot())
+      .on("postgres_changes", { event: "*", schema: "public", table: "map_rider_meetups", filter: `crew_slug=eq.${crewSlug}` }, () => fetchSnapshot())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [crewSlug, fetchSnapshot, supabase]);
+
+  // Sync active session state
+  useEffect(() => {
+    if (activeOwnSession?.id) {
+      setSessionId(activeOwnSession.id);
+      setShareEnabled(true);
+      setShareStatus("Ты сейчас в эфире на карте");
+    } else {
+      setSessionId(null);
+      setShareEnabled(false);
+      setShareStatus("Геошеринг выключен");
+    }
+  }, [activeOwnSession?.id]);
+
+  const stopWatcher = useCallback(() => {
+    if (watchRef.current !== null) {
+      navigator.geolocation.clearWatch(watchRef.current);
+      watchRef.current = null;
+    }
+  }, []);
+
+  // Push location to live_locations (lightweight) + accumulate for batch insert on stop
+  const pushLocation = useCallback(async (position: GeolocationPosition, nextSessionId: string) => {
+    const lat = position.coords.latitude;
+    const lon = position.coords.longitude;
+    const prev = lastCoordsRef.current;
+
+    // Skip if moved less than ~3 meters
+    if (prev && Math.abs(prev.lat - lat) < 0.00003 && Math.abs(prev.lon - lon) < 0.00003) {
+      return;
+    }
+    lastCoordsRef.current = { lat, lon };
+
+    // 1. Send to live_locations via hook (broadcast + upsert)
+    await sendPosition(position);
+
+    // 2. Accumulate point for batch insert on session stop
+    const point: AccumulatedPoint = {
+      lat,
+      lon,
+      speedKmh: Math.max(0, Number(position.coords.speed || 0) * 3.6),
+      headingDeg: position.coords.heading || null,
+      accuracyMeters: position.coords.accuracy || null,
+      capturedAt: new Date(position.timestamp).toISOString(),
+    };
+    accumulatedPointsRef.current.push(point);
+
+    // 3. Update session last_ping_at (lightweight, no points insert)
+    await fetch("/api/map-riders/ping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: nextSessionId,
+        lat,
+        lon,
+        speedKmh: point.speedKmh,
+      }),
+    });
+  }, [sendPosition]);
+
+  const beginWatch = useCallback((nextSessionId: string) => {
+    if (!navigator.geolocation) {
+      toast.error("Браузер не поддерживает геолокацию");
+      return;
+    }
+    stopWatcher();
+    accumulatedPointsRef.current = []; // Clear accumulated points
+
+    watchRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        pushLocation(position, nextSessionId).catch((error) => {
+          console.error("[pushLocation] Error:", error);
+        });
+      },
+      (error) => {
+        toast.error(`Геолокация недоступна: ${error.message}`);
+        setShareStatus("Нет доступа к GPS");
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 12000 },
+    );
+  }, [pushLocation, stopWatcher]);
+
+  const handleStartSharing = useCallback(async () => {
+    if (!dbUser?.user_id) {
+      toast.error("Сначала авторизуйся в Telegram/VIP BIKE");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/map-riders/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "start",
+          userId: dbUser.user_id,
+          crewSlug,
+          rideName,
+          vehicleLabel,
+          rideMode,
+          visibility: "crew",
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || "Не удалось запустить заезд");
+
+      const nextSessionId = result.data.id as string;
+      setSessionId(nextSessionId);
+      setShareEnabled(true);
+      setShareStatus("Делимся локацией в реальном времени");
+      beginWatch(nextSessionId);
+      await fetchSnapshot();
+      toast.success("MapRiders активирован. Экипаж видит твой маршрут.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось запустить MapRiders");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [beginWatch, crewSlug, dbUser?.user_id, fetchSnapshot, rideMode, rideName, vehicleLabel]);
+
+  const handleStopSharing = useCallback(async () => {
+    if (!dbUser?.user_id || !sessionId) return;
+
+    setIsSubmitting(true);
+    try {
+      // 1. Stop GPS watcher
+      stopWatcher();
+
+      // 2. Batch insert all accumulated points to map_rider_points (HISTORY)
+      const points = accumulatedPointsRef.current;
+      if (points.length > 0) {
+        const response = await fetch("/api/map-riders/batch-points", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            crewSlug,
+            userId: dbUser.user_id,
+            points,
+          }),
+        });
+        if (!response.ok) {
+          console.error("[handleStopSharing] Failed to batch insert points");
+        }
+      }
+
+      // 3. Stop session
+      const response = await fetch("/api/map-riders/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "stop", sessionId, userId: dbUser.user_id, crewSlug }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || "Не удалось завершить заезд");
+
+      // 4. Delete from live_locations (cleanup)
+      await supabase.from("live_locations").delete().eq("user_id", dbUser.user_id);
+
+      // 5. Reset state
+      setShareEnabled(false);
+      setSessionId(null);
+      accumulatedPointsRef.current = [];
+      setShareStatus("Заезд завершён и сохранён в статистику");
+      await fetchSnapshot();
+      toast.success(`Маршрут закрыт. Сохранено ${points.length} точек. Статистика обновлена.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось завершить заезд");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [crewSlug, dbUser?.user_id, fetchSnapshot, sessionId, stopWatcher, supabase]);
+
+  // Cleanup on unmount
+  useEffect(() => () => stopWatcher(), [stopWatcher]);
+
+  const handleCreateMeetup = useCallback(async () => {
+    if (!dbUser?.user_id || !selectedMeetupPoint) {
+      toast.error("Выбери точку на карте и авторизуйся");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/map-riders/meetups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          crewSlug,
+          userId: dbUser.user_id,
+          title: meetupTitle,
+          comment: meetupComment,
+          lat: selectedMeetupPoint[0],
+          lon: selectedMeetupPoint[1],
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || "Не удалось создать точку встречи");
+      toast.success("Точка встречи сохранена для всего экипажа");
+      setMeetupComment("");
+      setSelectedMeetupPoint(null);
+      await fetchSnapshot();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось сохранить meetup");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [crewSlug, dbUser?.user_id, fetchSnapshot, meetupComment, meetupTitle, selectedMeetupPoint]);
+
+  // Cleanup stale live riders from state (> 5 minutes old)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setLiveRiders((prev) => {
+        const cleaned: Record<string, LiveRiderPosition & { receivedAt: number }> = {};
+        Object.entries(prev).forEach(([userId, rider]) => {
+          if (now - rider.receivedAt < 5 * 60 * 1000) {
+            cleaned[userId] = rider;
+          }
+        });
+        return cleaned;
+      });
+    }, 30000); // Every 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Merge live riders with snapshot sessions for display
+  const mergedActiveSessions = useMemo(() => {
+    const snapshotSessions = snapshot?.activeSessions || [];
+
+    // Create a map of live riders that are NOT in snapshot yet
+    const liveRiderSessions = Object.values(liveRiders)
+      .filter((rider) => {
+        // Skip if already in snapshot
+        return !snapshotSessions.some((s) => s.user_id === rider.user_id);
+      })
+      .map((rider) => ({
+        id: `live-${rider.user_id}`,
+        user_id: rider.user_id,
+        latest_lat: rider.lat,
+        latest_lon: rider.lng,
+        latest_speed_kmh: rider.speed_kmh,
+        ride_name: "Live",
+        vehicle_label: "",
+        total_distance_km: 0,
+        users: null,
+        isLiveRider: true, // Flag to identify live-only riders
+      }));
+
+    // Merge snapshot sessions with live position updates
+    const mergedSnapshotSessions = snapshotSessions.map((session) => {
+      const liveUpdate = liveRiders[session.user_id];
+      if (liveUpdate) {
+        return {
+          ...session,
+          latest_lat: liveUpdate.lat,
+          latest_lon: liveUpdate.lng,
+          latest_speed_kmh: liveUpdate.speed_kmh,
+        };
+      }
+      return session;
+    });
+
+    return [...mergedSnapshotSessions, ...liveRiderSessions];
+  }, [liveRiders, snapshot?.activeSessions]);
+
+  const mapPoints = useMemo(() => {
+    // Live rider points (from broadcast) - INSTANT updates, no DB load
+    const riderPoints = mergedActiveSessions
+      .filter((session) => typeof session.latest_lat === "number" && typeof session.latest_lon === "number")
+      .map((session) => ({
+        id: `rider-${session.id}`,
+        name: `${riderDisplayName(session.users, session.user_id)} • ${Math.round(Number(session.latest_speed_kmh || 0))} км/ч`,
+        type: "point" as const,
+        icon: `image:https://placehold.co/56x56/${session.user_id === dbUser?.user_id ? "facc15" : "111827"}/ffffff?text=${encodeURIComponent(initialsFromName(riderDisplayName(session.users, session.user_id)))}`,
+        color: session.user_id === dbUser?.user_id ? "#facc15" : "#60a5fa",
+        coords: [[Number(session.latest_lat), Number(session.latest_lon)]],
+      }));
+
+    const meetupPoints = (snapshot?.meetups || []).map((meetup) => ({
+      id: `meetup-${meetup.id}`,
+      name: `${meetup.title}${meetup.comment ? ` — ${meetup.comment}` : ""}`,
+      type: "point" as const,
+      icon: "::FaLocationDot::",
+      color: "#f97316",
+      coords: [[Number(meetup.lat), Number(meetup.lon)]],
+    }));
+
+    const routePoints = sessionDetail?.points?.length
+      ? [{
+          id: `route-${sessionDetail.session.id}`,
+          name: `Маршрут ${sessionDetail.session.rider_name}`,
+          type: "path" as const,
+          icon: "::FaRoute::",
+          color: "#22c55e",
+          coords: sessionDetail.points.map((point) => [point.lat, point.lon] as [number, number]),
+        }]
+      : [];
+
+    return [...routePoints, ...riderPoints, ...meetupPoints];
+  }, [dbUser?.user_id, mergedActiveSessions, sessionDetail, snapshot?.meetups]);
+
+  const heroStats = [
+    { label: "В эфире", value: mergedActiveSessions.length ?? 0, icon: "::FaSatelliteDish::" },
+    { label: "Точки встречи", value: snapshot?.stats.meetupCount ?? 0, icon: "::FaUsersViewfinder::" },
+    { label: "Км за 7 дней", value: snapshot?.stats.totalWeeklyDistanceKm ?? 0, icon: "::FaRoad::" },
+  ];
+
+  const mapTools = [
+    {
+      title: "Брендинг / карта",
+      description: "Открыть карту внутри франшизного кастомайзера и поправить GPS, bounds и image URL.",
+      href: `/franchize/create?slug=${crewSlug}`,
+      cta: "Открыть branding",
+    },
+    {
+      title: "Контакты с картой",
+      description: "Проверить публичную контактную страницу команды и то, как карта вписана в crew-shell.",
+      href: `/franchize/${crewSlug}/contacts`,
+      cta: "Смотреть contacts",
+    },
+    {
+      title: "Админ-гараж",
+      description: "Быстрый вход в admin-поверхность экипажа: storefront, техника и рядом все map-сценарии.",
+      href: `/franchize/${crewSlug}/admin`,
+      cta: "Открыть admin",
+    },
+    {
+      title: "Калибратор карты",
+      description: "Если картинка карты кривая — открой калибратор и сохрани новый preset с точными bounds.",
+      href: "/admin/map-calibrator",
+      cta: "Калибровать",
+    },
+  ];
+
+  return (
+    <div
+      className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-24 md:pt-28"
+      style={{
+        ["--mr-accent" as string]: crew.theme.palette.accentMain,
+        ["--mr-accent-hover" as string]: crew.theme.palette.accentMainHover,
+        ["--mr-border" as string]: crew.theme.palette.borderSoft,
+        ["--mr-card" as string]: surface.subtleCard.backgroundColor,
+        ["--mr-text" as string]: crew.theme.palette.textPrimary,
+        ["--mr-muted" as string]: crew.theme.palette.textSecondary,
+      }}
+    >
+      <section className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+          <CardHeader>
+            <Badge className="w-fit border hover:opacity-100" style={{ borderColor: `${crew.theme.palette.accentMain}55`, backgroundColor: `${crew.theme.palette.accentMain}18`, color: crew.theme.palette.accentMain }}>{(crew.header.brandName || crew.name || "VIP BIKE").toUpperCase()} • MAPRIDERS</Badge>
+            <CardTitle className="mt-3 font-orbitron text-3xl" style={{ color: crew.theme.palette.textPrimary }}>Карта райдеров в реальном времени</CardTitle>
+            <CardDescription className="max-w-2xl text-base" style={{ color: crew.theme.palette.textSecondary }}>
+              Один тап — и авторизованный байкер делится маршрутом как в Telegram live location: команда видит движение, точки встречи, скорость и недельный прогресс. Deeplink уже несёт franchize slug и корректно возвращает в `/franchize/{slug}/map-riders`.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-3">
+            {heroStats.map((stat) => (
+              <div key={stat.label} className="rounded-2xl border p-4" style={{ borderColor: `${crew.theme.palette.borderSoft}aa`, backgroundColor: `${crew.theme.palette.bgBase}66` }}>
+                <div className="mb-2" style={{ color: crew.theme.palette.accentMain }}><VibeContentRenderer content={stat.icon} /></div>
+                <div className="text-2xl font-semibold" style={{ color: crew.theme.palette.textPrimary }}>{stat.value}</div>
+                <div className="text-sm" style={{ color: crew.theme.palette.textSecondary }}>{stat.label}</div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+          <CardHeader>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Пульт райдера</CardTitle>
+            <CardDescription>{shareStatus}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="ride-name">Название заезда</Label>
+                <Input id="ride-name" value={rideName} onChange={(event) => setRideName(event.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vehicle-label">Байк</Label>
+                <Input id="vehicle-label" value={vehicleLabel} onChange={(event) => setVehicleLabel(event.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Button type="button" variant={rideMode === "rental" ? "default" : "outline"} onClick={() => setRideMode("rental")}>Арендный байк</Button>
+              <Button type="button" variant={rideMode === "personal" ? "default" : "outline"} onClick={() => setRideMode("personal")}>Свой байк</Button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button type="button" disabled={isSubmitting || shareEnabled} onClick={handleStartSharing} className="text-black" style={{ backgroundColor: crew.theme.palette.accentMain }}>
+                <VibeContentRenderer content="::FaLocationArrow::" className="mr-2" />
+                Включить live share
+              </Button>
+              <Button type="button" variant="outline" disabled={isSubmitting || !shareEnabled} onClick={handleStopSharing}>
+                <VibeContentRenderer content="::FaPowerOff::" className="mr-2" />
+                Завершить заезд
+              </Button>
+            </div>
+            <div className="rounded-2xl border p-3 text-sm" style={{ borderColor: `${crew.theme.palette.accentMain}33`, backgroundColor: `${crew.theme.palette.accentMain}12`, color: crew.theme.palette.textPrimary }}>
+              <div className="font-medium">Крутые фишки сверху базового запроса</div>
+              <ul className="mt-2 list-disc space-y-1 pl-5" style={{ color: crew.theme.palette.textSecondary }}>
+                <li>Convoy Pulse: видно, кто в эфире прямо сейчас и с какой скоростью идёт колонна.</li>
+                <li>Meetup Pins: можно ткнуть в карту, задать точку встречи и комментарий для всей команды.</li>
+                <li>Route Replay: любой завершённый заезд открывается по кнопке с визуальным треком и KPI.</li>
+              </ul>
+            </div>
+            <Button asChild variant="outline" className="w-full">
+              <Link href={`https://t.me/share/url?url=${encodeURIComponent(shareDeepLink)}&text=${encodeURIComponent(shareCopy)}`} target="_blank">
+                Открыть Telegram-share мост
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.4fr,0.9fr]">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+          <CardHeader>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Городская карта экипажа</CardTitle>
+            <CardDescription>Тапни по карте, чтобы поставить meetup-поинт. Зелёным — выбранный маршрут, жёлтым/синим — активные райдеры.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[520px] overflow-hidden rounded-3xl border" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
+              <VibeMap points={mapPoints} bounds={mapBounds ?? DEFAULT_BOUNDS} imageUrl={mapImageUrl} isEditable onMapClick={(coords) => setSelectedMeetupPoint(coords)} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-col gap-6">
+          <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+            <CardHeader>
+              <CardTitle className="font-orbitron text-lg" style={{ color: crew.theme.palette.textPrimary }}>Новая точка встречи</CardTitle>
+              <CardDescription>
+                {selectedMeetupPoint ? `Выбрано: ${selectedMeetupPoint[0].toFixed(5)}, ${selectedMeetupPoint[1].toFixed(5)}` : "Нажми на карту, чтобы выбрать точку"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="meetup-title">Заголовок</Label>
+                <Input id="meetup-title" value={meetupTitle} onChange={(event) => setMeetupTitle(event.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="meetup-comment">Комментарий</Label>
+                <Textarea id="meetup-comment" value={meetupComment} onChange={(event) => setMeetupComment(event.target.value)} placeholder="Например: собираемся тут в 21:00, есть парковка и кофе" />
+              </div>
+              <Button type="button" className="w-full" disabled={isSubmitting || !selectedMeetupPoint} onClick={handleCreateMeetup}>Сохранить meetup</Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+            <CardHeader>
+              <CardTitle className="font-orbitron text-lg" style={{ color: crew.theme.palette.textPrimary }}>Онлайн-райдеры</CardTitle>
+              <CardDescription>{loading ? "Обновляем эфир..." : `${mergedActiveSessions.length || 0} райдеров сейчас на карте`}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {mergedActiveSessions.map((session) => (
+                <button
+                  key={session.id}
+                  type="button"
+                  onClick={() => !session.isLiveRider && fetchSessionDetail(session.id)}
+                  className={`flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left transition ${session.isLiveRider ? '' : 'hover:border-amber-400/50'}`}
+                >
+                  <div>
+                    <div className="font-medium text-white">{riderDisplayName(session.users, session.user_id)}</div>
+                    <div className="text-xs text-muted-foreground">{session.ride_name || "Без названия"} • {session.vehicle_label || "байк не указан"}</div>
+                  </div>
+                  <div className="text-right text-sm text-amber-200">
+                    <div>{Number(session.total_distance_km || 0).toFixed(1)} км</div>
+                    <div>{Number(session.latest_speed_kmh || 0).toFixed(0)} км/ч</div>
+                  </div>
+                </button>
+              ))}
+              {!mergedActiveSessions.length && <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-muted-foreground">Пока никто не в эфире. Запусти live share первым.</div>}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[1.1fr,0.9fr]">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+          <CardHeader>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Разбор выбранного заезда</CardTitle>
+            <CardDescription>Показываем маршрут, скорость, среднюю скорость и длительность по кнопке.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {sessionDetail ? (
+              <>
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><div className="text-xs text-muted-foreground">Райдер</div><div className="mt-1 text-lg text-white">{sessionDetail.session.rider_name}</div></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><div className="text-xs text-muted-foreground">Дистанция</div><div className="mt-1 text-lg text-white">{Number(sessionDetail.session.total_distance_km || 0).toFixed(1)} км</div></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><div className="text-xs text-muted-foreground">Средняя скорость</div><div className="mt-1 text-lg text-white">{Number(sessionDetail.session.avg_speed_kmh || 0).toFixed(1)} км/ч</div></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><div className="text-xs text-muted-foreground">Максимум</div><div className="mt-1 text-lg text-white">{Number(sessionDetail.session.max_speed_kmh || 0).toFixed(1)} км/ч</div></div>
+                </div>
+                <Separator />
+                <div className="text-sm text-muted-foreground">Длительность: {formatRideDuration(Number(sessionDetail.session.duration_seconds || 0))}. Точек в треке: {sessionDetail.points.length}.</div>
+              </>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-white/10 p-6 text-sm text-muted-foreground">Выбери активный или завершённый заезд, чтобы раскрыть маршрут и статистику.</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+          <CardHeader>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Недельный зал славы</CardTitle>
+            <CardDescription>Кто больше всех проехал за 7 дней — тот выше в таблице.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(snapshot?.weeklyLeaderboard || []).map((row) => (
+              <div key={`${row.rank}-${row.riderName}`} className="grid grid-cols-[56px,1fr,88px] items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                <div className="text-center font-orbitron text-xl text-amber-300">#{row.rank}</div>
+                <div>
+                  <div className="font-medium text-white">{row.riderName}</div>
+                  <div className="text-xs text-muted-foreground">{row.sessions} заезд(ов) • ср. {row.avgSpeedKmh} км/ч • max {row.maxSpeedKmh} км/ч</div>
+                </div>
+                <div className="text-right text-lg text-white">{row.distanceKm} км</div>
+              </div>
+            ))}
+            {!snapshot?.weeklyLeaderboard?.length && <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-muted-foreground">Лидерборд наполнится после первых треков.</div>}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+          <CardHeader>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Последние завершённые выезды</CardTitle>
+            <CardDescription>Открывай любой заезд кнопкой, чтобы увидеть маршрут на карте.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(snapshot?.latestCompleted || []).map((session) => (
+              <button key={session.id} type="button" onClick={() => fetchSessionDetail(session.id)} className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left transition hover:border-emerald-400/50">
+                <div>
+                  <div className="font-medium text-white">{session.rider_name}</div>
+                  <div className="text-xs text-muted-foreground">{session.ride_name || "Без названия"} • {formatRideDuration(Number(session.duration_seconds || 0))}</div>
+                </div>
+                <div className="text-right text-sm text-emerald-200">
+                  <div>{Number(session.total_distance_km || 0).toFixed(1)} км</div>
+                  <div>avg {Number(session.avg_speed_kmh || 0).toFixed(1)}</div>
+                </div>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
+          <CardHeader>
+            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Как это работает</CardTitle>
+            <CardDescription>Короткий сценарий для байкеров и админов.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><span className="font-medium text-white">1.</span> Авторизованный райдер жмёт "Включить live share", выбирает: арендный или свой байк.</div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><span className="font-medium text-white">2.</span> MapRiders начинает писать точки маршрута, считает дистанцию, среднюю и максимальную скорость.</div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><span className="font-medium text-white">3.</span> Любой участник видит всех активных райдеров, meetup-пины и недельный лидерборд.</div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4"><span className="font-medium text-white">4.</span> После завершения поездки маршрут остаётся доступен по кнопке "открыть заезд".</div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        {mapTools.map((tool) => (
+          <Card key={tool.href} className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold" style={{ color: crew.theme.palette.textPrimary }}>{tool.title}</CardTitle>
+              <CardDescription style={{ color: crew.theme.palette.textSecondary }}>{tool.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="w-full">
+                <Link href={tool.href}>{tool.cta}</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+    </div>
+  );
+}
+```
+
+
+
+api routes:
+```ts
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
+
+/**
+ * Get session details with points
+ * GET /api/map-riders/session/:id
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: "Session ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    // Get session with user info
+    const { data: session, error: sessionError } = await supabase
+      .from("map_rider_sessions")
+      .select(`
+        *,
+        users:user_id (username, full_name, avatar_url)
+      `)
+      .eq("id", id)
+      .single();
+
+    if (sessionError || !session) {
+      return NextResponse.json(
+        { success: false, error: "Session not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get points for the session
+    const { data: points, error: pointsError } = await supabase
+      .from("map_rider_points")
+      .select("lat, lon, speed_kmh, captured_at")
+      .eq("session_id", id)
+      .order("captured_at", { ascending: true });
+
+    if (pointsError) {
+      console.error("[session/detail] Points error:", pointsError);
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        session: {
+          ...session,
+          rider_name:
+            session.users?.full_name ||
+            session.users?.username ||
+            session.user_id,
+        },
+        points: points || [],
+      },
+    });
+  } catch (error) {
+    console.error("[session/detail] Error:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+```ts
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
+
+/**
+ * Session management API
+ * POST /api/map-riders/session
+ * Body: { action: "start" | "stop", ... }
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { action } = body;
+
+    if (!action || !["start", "stop"].includes(action)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid action" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    if (action === "start") {
+      const {
+        userId,
+        crewSlug,
+        rideName,
+        vehicleLabel,
+        rideMode,
+        visibility,
+      } = body;
+
+      if (!userId || !crewSlug) {
+        return NextResponse.json(
+          { success: false, error: "User ID and crew slug are required" },
+          { status: 400 }
+        );
+      }
+
+      // Check for existing active session
+      const { data: existingSession } = await supabase
+        .from("map_rider_sessions")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (existingSession) {
+        return NextResponse.json({
+          success: true,
+          data: { id: existingSession.id, resumed: true },
+        });
+      }
+
+      // Create new session
+      const { data, error } = await supabase
+        .from("map_rider_sessions")
+        .insert({
+          crew_slug: crewSlug,
+          user_id: userId,
+          ride_name: rideName || null,
+          vehicle_label: vehicleLabel || null,
+          ride_mode: rideMode || "rental",
+          visibility: visibility || "crew",
+          status: "active",
+          sharing_enabled: true,
+          started_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("[session/start] Error:", error);
+        return NextResponse.json(
+          { success: false, error: "Failed to start session" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ success: true, data });
+    }
+
+    if (action === "stop") {
+      const { sessionId, userId, crewSlug } = body;
+
+      if (!sessionId || !userId) {
+        return NextResponse.json(
+          { success: false, error: "Session ID and user ID are required" },
+          { status: 400 }
+        );
+      }
+
+      // Get session data for final calculations
+      const { data: session } = await supabase
+        .from("map_rider_sessions")
+        .select("*")
+        .eq("id", sessionId)
+        .eq("user_id", userId)
+        .single();
+
+      if (!session) {
+        return NextResponse.json(
+          { success: false, error: "Session not found" },
+          { status: 404 }
+        );
+      }
+
+      // Calculate final stats
+      const startedAt = new Date(session.started_at).getTime();
+      const endedAt = Date.now();
+      const durationSeconds = Math.round((endedAt - startedAt) / 1000);
+
+      // Update session to completed
+      const { error } = await supabase
+        .from("map_rider_sessions")
+        .update({
+          status: "completed",
+          ended_at: new Date(endedAt).toISOString(),
+          duration_seconds: durationSeconds,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sessionId);
+
+      if (error) {
+        console.error("[session/stop] Error:", error);
+        return NextResponse.json(
+          { success: false, error: "Failed to stop session" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json(
+      { success: false, error: "Invalid action" },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error("[session] Error:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+```ts
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
+
+interface Point {
+  lat: number;
+  lon: number;
+  speedKmh: number;
+  headingDeg: number | null;
+  accuracyMeters: number | null;
+  capturedAt: string;
+}
+
+/**
+ * Batch insert points endpoint
+ * Accumulates points client-side during ride, batch-inserts on session stop
+ * This reduces DB writes from N per ride to 1 per ride
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { sessionId, crewSlug, userId, points } = body;
+
+    if (!sessionId || !crewSlug || !userId || !Array.isArray(points)) {
+      return NextResponse.json(
+        { success: false, error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    if (points.length === 0) {
+      return NextResponse.json({ success: true, inserted: 0 });
+    }
+
+    // Limit batch size to prevent abuse
+    const MAX_POINTS = 5000;
+    const pointsToInsert = points.slice(0, MAX_POINTS);
+
+    const supabase = await createClient();
+
+    // Prepare batch insert
+    const rows = pointsToInsert.map((point: Point) => ({
+      session_id: sessionId,
+      crew_slug: crewSlug,
+      user_id: userId,
+      lat: point.lat,
+      lon: point.lon,
+      speed_kmh: point.speedKmh ?? 0,
+      heading_deg: point.headingDeg,
+      accuracy_meters: point.accuracyMeters,
+      captured_at: point.capturedAt,
+    }));
+
+    const { error, count } = await supabase
+      .from("map_rider_points")
+      .insert(rows);
+
+    if (error) {
+      console.error("[batch-points] Insert error:", error);
+      return NextResponse.json(
+        { success: false, error: "Failed to insert points" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      inserted: pointsToInsert.length,
+    });
+  } catch (error) {
+    console.error("[batch-points] Error:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+
+```ts
+import { NextRequest, NextResponse } from "next/server";
+
+/**
+ * DEPRECATED: Use /api/map-riders/ping for session updates
+ * and client-side accumulation + /api/map-riders/batch-points on stop
+ * 
+ * This endpoint is kept for backward compatibility but should not be used
+ * for new implementations. It performs heavy inserts on every GPS update.
+ */
+export async function POST(request: NextRequest) {
+  // Return deprecation notice
+  return NextResponse.json(
+    {
+      success: false,
+      error: "This endpoint is deprecated. Use /api/map-riders/ping for lightweight session updates and accumulate points client-side for batch insert on session stop.",
+    },
+    { status: 410 }
+  );
+}
+```
+
+```ts
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
+
+/**
+ * Meetups API
+ * POST /api/map-riders/meetups - Create a new meetup
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { crewSlug, userId, title, comment, lat, lon, scheduledAt } = body;
+
+    if (!crewSlug || !userId || !title || lat == null || lon == null) {
+      return NextResponse.json(
+        { success: false, error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("map_rider_meetups")
+      .insert({
+        crew_slug: crewSlug,
+        created_by_user_id: userId,
+        title,
+        comment: comment || null,
+        lat,
+        lon,
+        scheduled_at: scheduledAt || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[meetups] Create error:", error);
+      return NextResponse.json(
+        { success: false, error: "Failed to create meetup" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    console.error("[meetups] Error:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * GET /api/map-riders/meetups - List meetups for a crew
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const slug = searchParams.get("slug");
+
+    if (!slug) {
+      return NextResponse.json(
+        { success: false, error: "Crew slug is required" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("map_rider_meetups")
+      .select(`
+        *,
+        users:created_by_user_id (username, full_name)
+      `)
+      .eq("crew_slug", slug)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[meetups] List error:", error);
+      return NextResponse.json(
+        { success: false, error: "Failed to fetch meetups" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    console.error("[meetups] Error:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+
+```ts
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
+
+/**
+ * Lightweight ping endpoint - updates session metadata only
+ * Does NOT insert points (those are accumulated client-side and batch-inserted on stop)
+ * This keeps the database load minimal during active rides
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { sessionId, lat, lon, speedKmh } = body;
+
+    if (!sessionId) {
+      return NextResponse.json(
+        { success: false, error: "Session ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    // Only update session metadata - NO points insert (keeps DB load minimal)
+    const { error } = await supabase
+      .from("map_rider_sessions")
+      .update({
+        last_ping_at: new Date().toISOString(),
+        latest_lat: lat,
+        latest_lon: lon,
+        latest_speed_kmh: speedKmh ?? 0,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", sessionId)
+      .eq("status", "active");
+
+    if (error) {
+      console.error("[ping] Update error:", error);
+      return NextResponse.json(
+        { success: false, error: "Failed to update session" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[ping] Error:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+```ts
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
+
+/**
+ * Get MapRiders snapshot
+ * Returns active sessions, meetups, leaderboard, and stats
+ * Optimized for scale: uses live_locations for real-time positions,
+ * map_rider_sessions for metadata, map_rider_points only for completed routes
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const slug = searchParams.get("slug");
+
+    if (!slug) {
+      return NextResponse.json(
+        { success: false, error: "Crew slug is required" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    // Run queries in parallel for performance
+    const [
+      activeSessionsResult,
+      meetupsResult,
+      leaderboardResult,
+      latestCompletedResult,
+    ] = await Promise.all([
+      // Active sessions with user info
+      supabase
+        .from("map_rider_sessions")
+        .select(`
+          *,
+          users:user_id (username, full_name, avatar_url)
+        `)
+        .eq("crew_slug", slug)
+        .eq("status", "active")
+        .order("started_at", { ascending: false }),
+
+      // Meetups with creator info
+      supabase
+        .from("map_rider_meetups")
+        .select(`
+          *,
+          users:created_by_user_id (username, full_name)
+        `)
+        .eq("crew_slug", slug)
+        .order("created_at", { ascending: false })
+        .limit(20),
+
+      // Weekly leaderboard (aggregated from completed sessions)
+      supabase.rpc("get_weekly_leaderboard", { p_crew_slug: slug }),
+
+      // Latest completed sessions
+      supabase
+        .from("map_rider_sessions")
+        .select(`
+          *,
+          users:user_id (username, full_name)
+        `)
+        .eq("crew_slug", slug)
+        .eq("status", "completed")
+        .order("ended_at", { ascending: false })
+        .limit(10),
+    ]);
+
+    if (activeSessionsResult.error) {
+      console.error("[map-riders] Active sessions error:", activeSessionsResult.error);
+    }
+    if (meetupsResult.error) {
+      console.error("[map-riders] Meetups error:", meetupsResult.error);
+    }
+
+    // Calculate stats
+    const activeSessions = activeSessionsResult.data || [];
+    const meetups = meetupsResult.data || [];
+    const weeklyLeaderboard = leaderboardResult.data || [];
+    const latestCompleted = latestCompletedResult.data || [];
+
+    const totalWeeklyDistanceKm = weeklyLeaderboard.reduce(
+      (sum: number, row: any) => sum + (row.distance_km || 0),
+      0
+    );
+
+    const stats = {
+      activeRiders: activeSessions.length,
+      meetupCount: meetups.length,
+      totalWeeklyDistanceKm: Math.round(totalWeeklyDistanceKm * 10) / 10,
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        activeSessions,
+        meetups,
+        weeklyLeaderboard: weeklyLeaderboard.map((row: any, index: number) => ({
+          rank: index + 1,
+          riderName: row.rider_name || row.user_id,
+          distanceKm: Math.round((row.distance_km || 0) * 10) / 10,
+          sessions: row.session_count || 0,
+          avgSpeedKmh: Math.round((row.avg_speed_kmh || 0) * 10) / 10,
+          maxSpeedKmh: Math.round((row.max_speed_kmh || 0) * 10) / 10,
+        })),
+        latestCompleted,
+        stats,
+      },
+    });
+  } catch (error) {
+    console.error("[map-riders] Error:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+
+
+
 
 ## Key Features
 
