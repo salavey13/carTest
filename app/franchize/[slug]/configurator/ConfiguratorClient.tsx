@@ -316,9 +316,9 @@ export function ConfiguratorClient({ crew, slug }: Props) {
           --cfg-text: #fafafa;
           --cfg-text-muted: #a1a1aa;
           --cfg-text-dim: #71717a;
-          --cfg-accent: #c8ff00;
-          --cfg-accent-dim: #c8ff0030;
-          --cfg-accent-glow: #c8ff0015;
+          --cfg-accent: #00ffea;
+          --cfg-accent-dim: #00ffea30;
+          --cfg-accent-glow: #00ffea15;
           --cfg-danger: #ef4444;
         }
 
