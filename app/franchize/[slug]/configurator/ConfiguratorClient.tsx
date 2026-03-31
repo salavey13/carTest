@@ -42,19 +42,186 @@ const fallbackBikes: ConfiguratorBike[] = [
   { id: 'vipbike-a4', make: 'VipBike', model: 'A4', description: 'Флагманский электромотоцикл с двигателем 10000 Вт.', daily_price: 490000, image_url: `${CARPIX_BASE}/vipbike-a4/image_0.jpg`, rent_link: '/rent/vipbike-a4', specs: { power_w: 10000, power_kw: 10, max_speed_kmh: '150+', tier: 'high-performance', gallery: [`${CARPIX_BASE}/vipbike-a4/image_1.jpg`, `${CARPIX_BASE}/vipbike-a4/image_2.jpg`, `${CARPIX_BASE}/vipbike-a4/image_3.jpg`], battery_options: { base_price: 490000, batteries: [{ capacity: 'Included', type: 'lithium', battery_price: 0, total_price: 490000, range_km: '200+' }] } }, type: 'bike', quantity: 1 },
 ]
 
+// ==================== IMPROVED FALLBACK PARTS (real data from JSON) ====================
 const fallbackParts: ConfiguratorPart[] = [
-  { id: 'helmet', make: 'VipBike', model: 'Мотошлем', description: 'Качественный мотошлем', daily_price: 4200, image_url: `${CARPIX_BASE}/parts/helmet.jpg`, specs: { category: 'safety' }, type: 'parts' },
-  { id: 'helmet-e4', make: 'VipBike', model: 'Шлем E4 (Tensun)', description: 'Премиальный шлем Tensun E4', daily_price: 8300, image_url: `${CARPIX_BASE}/parts/helmet_e4.jpg`, specs: { category: 'safety' }, type: 'parts' },
-  { id: 'abs', make: 'VipBike', model: 'ABS система', description: 'Система антиблокировки тормозов', daily_price: 16700, image_url: `${CARPIX_BASE}/parts/abs_system.jpg`, specs: { category: 'safety' }, type: 'parts' },
-  { id: 'cbs', make: 'VipBike', model: 'Система CBS', description: 'Combi Brake System', daily_price: 4200, image_url: `${CARPIX_BASE}/parts/cbs_system.jpg`, specs: { category: 'safety' }, type: 'parts' },
-  { id: 'brembo', make: 'VipBike', model: 'Тормоза Brembo', description: 'Премиальные тормоза', daily_price: 12400, image_url: `${CARPIX_BASE}/parts/brembo_brakes.jpg`, specs: { category: 'performance' }, type: 'parts' },
-  { id: 'tft', make: 'VipBike', model: 'TFT дисплей', description: 'Цифровой дисплей', daily_price: 8300, image_url: `${CARPIX_BASE}/parts/tft_display.jpg`, specs: { category: 'electronics' }, type: 'parts' },
-  { id: 'alarm', make: 'VipBike', model: 'Противоугонная Bluetooth', description: 'Сигнализация с отслеживанием', daily_price: 5600, image_url: `${CARPIX_BASE}/parts/bluetooth_alarm.jpg`, specs: { category: 'security' }, type: 'parts' },
-  { id: 'footpegs', make: 'VipBike', model: 'CNC подножки', description: 'Алюминиевые подножки', daily_price: 9700, image_url: `${CARPIX_BASE}/parts/cnc_footpegs.jpg`, specs: { category: 'accessories' }, type: 'parts' },
-  { id: 'front-shock', make: 'VipBike', model: 'Амортизатор передний', description: 'Передний амортизатор', daily_price: 38600, image_url: `${CARPIX_BASE}/parts/front_shock.jpg`, specs: { category: 'suspension' }, type: 'parts' },
-  { id: 'rear-shock', make: 'VipBike', model: 'Амортизатор задний', description: 'Задний амортизатор', daily_price: 16500, image_url: `${CARPIX_BASE}/parts/rear_shock.jpg`, specs: { category: 'suspension' }, type: 'parts' },
+  // Regular Batteries
+  {
+    id: 'vipbike-battery-50ah-regular',
+    make: 'VipBike',
+    model: 'Аккумулятор 50Ah (Regular)',
+    description: 'Стандартная аккумуляторная батарея емкостью 50Ah для электромотоциклов VipBike. Примерный запас хода: 70-110 км.',
+    daily_price: 44500,
+    image_url: `${CARPIX_BASE}/parts/battery_50ah.jpg`,
+    specs: { type: 'Battery', capacity: '50Ah', battery_type: 'regular', range_km: '70-110', category: 'battery' },
+    type: 'parts'
+  },
+  {
+    id: 'vipbike-battery-60ah-regular',
+    make: 'VipBike',
+    model: 'Аккумулятор 60Ah (Regular)',
+    description: 'Стандартная аккумуляторная батарея емкостью 60Ah для электромотоциклов VipBike. Примерный запас хода: 80-120 км.',
+    daily_price: 55000,
+    image_url: `${CARPIX_BASE}/parts/battery_60ah.jpg`,
+    specs: { type: 'Battery', capacity: '60Ah', battery_type: 'regular', range_km: '80-120', category: 'battery' },
+    type: 'parts'
+  },
+  {
+    id: 'vipbike-battery-80ah-regular',
+    make: 'VipBike',
+    model: 'Аккумулятор 80Ah (Regular)',
+    description: 'Стандартная аккумуляторная батарея емкостью 80Ah для электромотоциклов VipBike. Примерный запас хода: 90-150 км.',
+    daily_price: 59000,
+    image_url: `${CARPIX_BASE}/parts/battery_80ah.jpg`,
+    specs: { type: 'Battery', capacity: '80Ah', battery_type: 'regular', range_km: '90-150', category: 'battery' },
+    type: 'parts'
+  },
+
+  // Lithium Batteries
+  {
+    id: 'vipbike-battery-50ah-lithium',
+    make: 'VipBike',
+    model: 'Литиевая батарея 50Ah',
+    description: 'Литиевая аккумуляторная батарея емкостью 50Ah. Легче, долговечнее и надежнее стандартных батарей.',
+    daily_price: 82000,
+    image_url: `${CARPIX_BASE}/parts/battery_li_50ah.jpg`,
+    specs: { type: 'Battery', capacity: '50Ah', battery_type: 'lithium', range_km: '70-110', category: 'battery' },
+    type: 'parts'
+  },
+  {
+    id: 'vipbike-battery-60ah-lithium',
+    make: 'VipBike',
+    model: 'Литиевая батарея 60Ah',
+    description: 'Литиевая аккумуляторная батарея емкостью 60Ah. Оптимальный выбор для ежедневного использования.',
+    daily_price: 90000,
+    image_url: `${CARPIX_BASE}/parts/battery_li_60ah.jpg`,
+    specs: { type: 'Battery', capacity: '60Ah', battery_type: 'lithium', range_km: '80-120', category: 'battery' },
+    type: 'parts'
+  },
+  {
+    id: 'vipbike-battery-80ah-lithium',
+    make: 'VipBike',
+    model: 'Литиевая батарея 80Ah',
+    description: 'Литиевая аккумуляторная батарея емкостью 80Ah. Увеличенная дальность с преимуществами литий-ионной технологии.',
+    daily_price: 98000,
+    image_url: `${CARPIX_BASE}/parts/battery_li_80ah.jpg`,
+    specs: { type: 'Battery', capacity: '80Ah', battery_type: 'lithium', range_km: '90-150', category: 'battery' },
+    type: 'parts'
+  },
+
+  // Other parts (real data)
+  {
+    id: 'vipbike-helmet-e4',
+    make: 'VipBike',
+    model: 'Шлем E4 (Tensun)',
+    description: 'Мотоциклетный шлем E4 от Tensun. Надежная защита и комфорт.',
+    daily_price: 8300,
+    image_url: `${CARPIX_BASE}/parts/helmet_e4.jpg`,
+    specs: { type: 'Helmet', brand: 'Tensun', category: 'safety' },
+    type: 'parts'
+  },
+  {
+    id: 'vipbike-motorcycle-helmet',
+    make: 'VipBike',
+    model: 'Мотошлем',
+    description: 'Качественный мотошлем для безопасной езды.',
+    daily_price: 4200,
+    image_url: `${CARPIX_BASE}/parts/helmet.jpg`,
+    specs: { type: 'Helmet', category: 'safety' },
+    type: 'parts'
+  },
+  {
+    id: 'vipbike-abs-system',
+    make: 'VipBike',
+    model: 'ABS система',
+    description: 'Система ABS для безопасного торможения.',
+    daily_price: 16700,
+    image_url: `${CARPIX_BASE}/parts/abs_system.jpg`,
+    specs: { type: 'Safety', system: 'ABS', category: 'brakes' },
+    type: 'parts'
+  },
+  {
+    id: 'vipbike-cbs-system',
+    make: 'VipBike',
+    model: 'Система CBS',
+    description: 'Combi Brake System для сбалансированного торможения.',
+    daily_price: 4200,
+    image_url: `${CARPIX_BASE}/parts/cbs_system.jpg`,
+    specs: { type: 'Safety', system: 'CBS', category: 'brakes' },
+    type: 'parts'
+  },
+  {
+    id: 'vipbike-brembo-brakes',
+    make: 'VipBike',
+    model: 'Тормоза Brembo',
+    description: 'Премиальные тормоза Brembo.',
+    daily_price: 12400,
+    image_url: `${CARPIX_BASE}/parts/brembo_brakes.jpg`,
+    specs: { type: 'Brakes', brand: 'Brembo', category: 'performance' },
+    type: 'parts'
+  },
+  {
+    id: 'vipbike-tft-display',
+    make: 'VipBike',
+    model: 'TFT дисплей',
+    description: 'Цифровой дисплей с поддержкой мобильного телефона.',
+    daily_price: 8300,
+    image_url: `${CARPIX_BASE}/parts/tft_display.jpg`,
+    specs: { type: 'Display', technology: 'TFT', category: 'electronics' },
+    type: 'parts'
+  },
+  {
+    id: 'vipbike-bluetooth-alarm',
+    make: 'VipBike',
+    model: 'Противоугонная Bluetooth',
+    description: 'Противоугонная система с Bluetooth.',
+    daily_price: 5600,
+    image_url: `${CARPIX_BASE}/parts/bluetooth_alarm.jpg`,
+    specs: { type: 'Security', technology: 'Bluetooth', category: 'electronics' },
+    type: 'parts'
+  },
+  {
+    id: 'vipbike-cnc-footpegs',
+    make: 'VipBike',
+    model: 'CNC подножки',
+    description: 'CNC передние и задние подножки.',
+    daily_price: 9700,
+    image_url: `${CARPIX_BASE}/parts/cnc_footpegs.jpg`,
+    specs: { type: 'Footpegs', material: 'CNC Aluminum', category: 'accessories' },
+    type: 'parts'
+  },
+  {
+    id: 'vipbike-front-shock',
+    make: 'VipBike',
+    model: 'Амортизатор передний',
+    description: 'Передний амортизатор.',
+    daily_price: 38600,
+    image_url: `${CARPIX_BASE}/parts/front_shock.jpg`,
+    specs: { type: 'Suspension', position: 'front', category: 'suspension' },
+    type: 'parts'
+  },
+  {
+    id: 'vipbike-rear-shock',
+    make: 'VipBike',
+    model: 'Амортизатор задний',
+    description: 'Задний амортизатор.',
+    daily_price: 16500,
+    image_url: `${CARPIX_BASE}/parts/rear_shock.jpg`,
+    specs: { type: 'Suspension', position: 'rear', category: 'suspension' },
+    type: 'parts'
+  },
+  {
+    id: 'vipbike-rear-tire',
+    make: 'VipBike',
+    model: 'Задняя шина',
+    description: 'Задняя шина для электромотоциклов VipBike.',
+    daily_price: 4200,
+    image_url: `${CARPIX_BASE}/parts/rear_tire.jpg`,
+    specs: { type: 'Tire', position: 'rear', category: 'wheels' },
+    type: 'parts'
+  }
 ]
 
+// Lithium battery options (used when user selects Lithium mode)
 const lithiumBatteries: ConfiguratorBatteryOption[] = [
   { capacity: '50Ah', type: 'lithium', battery_price: 82000, total_price: 0, range_km: '70-110' },
   { capacity: '60Ah', type: 'lithium', battery_price: 90000, total_price: 0, range_km: '80-120' },
