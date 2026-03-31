@@ -530,7 +530,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
         </div>
 
         {/* ── MAIN CONTENT ── */}
-        <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+        <div className="mx-auto max-w-6xl px-4 py-6 pb-20 sm:py-8">
           <StepBar current={tab} goTo={(s) => setTab(s as typeof tab)} disabled={tabDisabled} />
 
           {/* ═══════════════════ STEP 1: MODEL ═══════════════════ */}
@@ -1087,6 +1087,8 @@ export function ConfiguratorClient({ crew, slug }: Props) {
             </div>
           </div>
         )}
+      {/* Bottom spacer so last content isn't hidden behind sticky bar on mobile */}
+        <div className="h-20 sm:h-0" />
       </section>
     </>
   )
