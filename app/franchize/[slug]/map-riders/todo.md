@@ -253,8 +253,59 @@ On Stop → Batch INSERT to map_rider_points (1 write per ride)
 /sql/weekly_leaderboard_function.sql  # Leaderboard SQL function
 ```
 
+##HISTORY:
+```
+### Core Realization
+You noticed that both your projects (motorbike rental + electrobike configurator) are essentially the same "form → business logic → document" pattern.  
+I confirmed this is extremely common in business software, but the real "spice" lives in **real-time flowing state** (chat, games, live maps).
 
-##SUGGESTED CHANGESV
+You already built:
+- Strikeball companion app (real-time scores/positions)
+- `/map-riders` for electrobikes (live GPS + meetups + sessions + history)
+
+### The Scaling Challenge
+You’re using Supabase Realtime and were worried it wouldn’t handle 100 riders (or 10–100 player strikeball games) on the **free tier**.  
+We analyzed your stack (Next.js + Supabase + Telegram WebApp + custom VibeMap) and confirmed the free tier **can** handle it comfortably — if done right.
+
+### Key Technical Decisions We Made
+1. **live_locations table** (new, ephemeral + spatial)
+   - Uses PostGIS for fast "nearby riders" queries
+   - Proper RLS using your existing JWT pattern (`auth.jwt() ->> 'chat_id'`)
+   - Final polished SQL was applied successfully
+
+2. **Best practices for 100 riders on free tier**:
+   - Throttle GPS updates (every 3s + min 15m movement)
+   - Use **broadcast** for instant live positions (fastest)
+   - Upsert to `live_locations` for spatial filtering + RLS
+   - Spatial filtering (15 km radius) + zone channels to stay under 100 msg/sec limit
+   - Keep your existing `map_rider_sessions` + `map_rider_points` for persistent history/stats
+
+3. **Implementation plan we created**
+   - New hook: `useLiveRiders.ts` (handles GPS watching, throttling, broadcast + upsert)
+   - Minimal integration into your existing `MapRidersClient.tsx` + `VibeMap`
+   - Your current heavy point-by-point inserts move to "only on ride end"
+   - Strikeball can reuse the same pattern
+
+4. **Your current MapRiders architecture** (what we’re optimizing)
+   - Persistent sessions + points table (good for history)
+   - Heavy realtime on `postgres_changes` + frequent writes
+   - Custom VibeMap (no Mapbox dependency needed)
+   - Meetups, leaderboards, route replay all stay untouched
+
+### Current Status
+- SQL for `live_locations` + correct RLS is applied
+- You have the full optimized architecture ready
+- The only remaining step is integrating the new `useLiveRiders` hook + broadcast listener into your component (and lightening the live-write API route)
+
+### Next Brainstorming Directions (you can jump from here)
+- How to merge live riders from broadcast into your `VibeMap` points array
+- Whether to keep `map_rider_points` only for completed rides or also snapshot every N minutes
+- Strikeball companion — should we apply the same live_locations pattern there too?
+- UI/UX improvements for the rider control panel ("I'm in the air" status, convoy view, etc.)
+- Performance testing plan 
+```
+
+##SUGGESTED CHANGES:
 ```tsx
 "use client";
 
