@@ -3,10 +3,10 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { MessageCircle, Truck } from 'lucide-react'
+import { MessageCircle, Truck, ChevronRight, Check, Zap, Battery, Shield, Gauge, X, Sparkles } from 'lucide-react'
 
 import { type FranchizeCrewVM } from '../../actions'
-import { catalogCardVariantStyles, crewPaletteForSurface, interactionRingStyle } from '../../lib/theme'
+import { crewPaletteForSurface } from '../../lib/theme'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,7 +15,6 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
 import { Slider } from '@/components/ui/slider'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
 
 import { loadConfiguratorCatalog, sendConfiguratorLead, type ConfiguratorBatteryOption, type ConfiguratorBike, type ConfiguratorPart } from './actions_configurator'
@@ -42,186 +41,26 @@ const fallbackBikes: ConfiguratorBike[] = [
   { id: 'vipbike-a4', make: 'VipBike', model: 'A4', description: 'Флагманский электромотоцикл с двигателем 10000 Вт.', daily_price: 490000, image_url: `${CARPIX_BASE}/vipbike-a4/image_0.jpg`, rent_link: '/rent/vipbike-a4', specs: { power_w: 10000, power_kw: 10, max_speed_kmh: '150+', tier: 'high-performance', gallery: [`${CARPIX_BASE}/vipbike-a4/image_1.jpg`, `${CARPIX_BASE}/vipbike-a4/image_2.jpg`, `${CARPIX_BASE}/vipbike-a4/image_3.jpg`], battery_options: { base_price: 490000, batteries: [{ capacity: 'Included', type: 'lithium', battery_price: 0, total_price: 490000, range_km: '200+' }] } }, type: 'bike', quantity: 1 },
 ]
 
-// ==================== IMPROVED FALLBACK PARTS (real data from JSON) ====================
 const fallbackParts: ConfiguratorPart[] = [
-  // Regular Batteries
-  {
-    id: 'vipbike-battery-50ah-regular',
-    make: 'VipBike',
-    model: 'Аккумулятор 50Ah (Regular)',
-    description: 'Стандартная аккумуляторная батарея емкостью 50Ah для электромотоциклов VipBike. Примерный запас хода: 70-110 км.',
-    daily_price: 44500,
-    image_url: `${CARPIX_BASE}/parts/battery_50ah.jpg`,
-    specs: { type: 'Battery', capacity: '50Ah', battery_type: 'regular', range_km: '70-110', category: 'battery' },
-    type: 'parts'
-  },
-  {
-    id: 'vipbike-battery-60ah-regular',
-    make: 'VipBike',
-    model: 'Аккумулятор 60Ah (Regular)',
-    description: 'Стандартная аккумуляторная батарея емкостью 60Ah для электромотоциклов VipBike. Примерный запас хода: 80-120 км.',
-    daily_price: 55000,
-    image_url: `${CARPIX_BASE}/parts/battery_60ah.jpg`,
-    specs: { type: 'Battery', capacity: '60Ah', battery_type: 'regular', range_km: '80-120', category: 'battery' },
-    type: 'parts'
-  },
-  {
-    id: 'vipbike-battery-80ah-regular',
-    make: 'VipBike',
-    model: 'Аккумулятор 80Ah (Regular)',
-    description: 'Стандартная аккумуляторная батарея емкостью 80Ah для электромотоциклов VipBike. Примерный запас хода: 90-150 км.',
-    daily_price: 59000,
-    image_url: `${CARPIX_BASE}/parts/battery_80ah.jpg`,
-    specs: { type: 'Battery', capacity: '80Ah', battery_type: 'regular', range_km: '90-150', category: 'battery' },
-    type: 'parts'
-  },
-
-  // Lithium Batteries
-  {
-    id: 'vipbike-battery-50ah-lithium',
-    make: 'VipBike',
-    model: 'Литиевая батарея 50Ah',
-    description: 'Литиевая аккумуляторная батарея емкостью 50Ah. Легче, долговечнее и надежнее стандартных батарей.',
-    daily_price: 82000,
-    image_url: `${CARPIX_BASE}/parts/battery_li_50ah.jpg`,
-    specs: { type: 'Battery', capacity: '50Ah', battery_type: 'lithium', range_km: '70-110', category: 'battery' },
-    type: 'parts'
-  },
-  {
-    id: 'vipbike-battery-60ah-lithium',
-    make: 'VipBike',
-    model: 'Литиевая батарея 60Ah',
-    description: 'Литиевая аккумуляторная батарея емкостью 60Ah. Оптимальный выбор для ежедневного использования.',
-    daily_price: 90000,
-    image_url: `${CARPIX_BASE}/parts/battery_li_60ah.jpg`,
-    specs: { type: 'Battery', capacity: '60Ah', battery_type: 'lithium', range_km: '80-120', category: 'battery' },
-    type: 'parts'
-  },
-  {
-    id: 'vipbike-battery-80ah-lithium',
-    make: 'VipBike',
-    model: 'Литиевая батарея 80Ah',
-    description: 'Литиевая аккумуляторная батарея емкостью 80Ah. Увеличенная дальность с преимуществами литий-ионной технологии.',
-    daily_price: 98000,
-    image_url: `${CARPIX_BASE}/parts/battery_li_80ah.jpg`,
-    specs: { type: 'Battery', capacity: '80Ah', battery_type: 'lithium', range_km: '90-150', category: 'battery' },
-    type: 'parts'
-  },
-
-  // Other parts (real data)
-  {
-    id: 'vipbike-helmet-e4',
-    make: 'VipBike',
-    model: 'Шлем E4 (Tensun)',
-    description: 'Мотоциклетный шлем E4 от Tensun. Надежная защита и комфорт.',
-    daily_price: 8300,
-    image_url: `${CARPIX_BASE}/parts/helmet_e4.jpg`,
-    specs: { type: 'Helmet', brand: 'Tensun', category: 'safety' },
-    type: 'parts'
-  },
-  {
-    id: 'vipbike-motorcycle-helmet',
-    make: 'VipBike',
-    model: 'Мотошлем',
-    description: 'Качественный мотошлем для безопасной езды.',
-    daily_price: 4200,
-    image_url: `${CARPIX_BASE}/parts/helmet.jpg`,
-    specs: { type: 'Helmet', category: 'safety' },
-    type: 'parts'
-  },
-  {
-    id: 'vipbike-abs-system',
-    make: 'VipBike',
-    model: 'ABS система',
-    description: 'Система ABS для безопасного торможения.',
-    daily_price: 16700,
-    image_url: `${CARPIX_BASE}/parts/abs_system.jpg`,
-    specs: { type: 'Safety', system: 'ABS', category: 'brakes' },
-    type: 'parts'
-  },
-  {
-    id: 'vipbike-cbs-system',
-    make: 'VipBike',
-    model: 'Система CBS',
-    description: 'Combi Brake System для сбалансированного торможения.',
-    daily_price: 4200,
-    image_url: `${CARPIX_BASE}/parts/cbs_system.jpg`,
-    specs: { type: 'Safety', system: 'CBS', category: 'brakes' },
-    type: 'parts'
-  },
-  {
-    id: 'vipbike-brembo-brakes',
-    make: 'VipBike',
-    model: 'Тормоза Brembo',
-    description: 'Премиальные тормоза Brembo.',
-    daily_price: 12400,
-    image_url: `${CARPIX_BASE}/parts/brembo_brakes.jpg`,
-    specs: { type: 'Brakes', brand: 'Brembo', category: 'performance' },
-    type: 'parts'
-  },
-  {
-    id: 'vipbike-tft-display',
-    make: 'VipBike',
-    model: 'TFT дисплей',
-    description: 'Цифровой дисплей с поддержкой мобильного телефона.',
-    daily_price: 8300,
-    image_url: `${CARPIX_BASE}/parts/tft_display.jpg`,
-    specs: { type: 'Display', technology: 'TFT', category: 'electronics' },
-    type: 'parts'
-  },
-  {
-    id: 'vipbike-bluetooth-alarm',
-    make: 'VipBike',
-    model: 'Противоугонная Bluetooth',
-    description: 'Противоугонная система с Bluetooth.',
-    daily_price: 5600,
-    image_url: `${CARPIX_BASE}/parts/bluetooth_alarm.jpg`,
-    specs: { type: 'Security', technology: 'Bluetooth', category: 'electronics' },
-    type: 'parts'
-  },
-  {
-    id: 'vipbike-cnc-footpegs',
-    make: 'VipBike',
-    model: 'CNC подножки',
-    description: 'CNC передние и задние подножки.',
-    daily_price: 9700,
-    image_url: `${CARPIX_BASE}/parts/cnc_footpegs.jpg`,
-    specs: { type: 'Footpegs', material: 'CNC Aluminum', category: 'accessories' },
-    type: 'parts'
-  },
-  {
-    id: 'vipbike-front-shock',
-    make: 'VipBike',
-    model: 'Амортизатор передний',
-    description: 'Передний амортизатор.',
-    daily_price: 38600,
-    image_url: `${CARPIX_BASE}/parts/front_shock.jpg`,
-    specs: { type: 'Suspension', position: 'front', category: 'suspension' },
-    type: 'parts'
-  },
-  {
-    id: 'vipbike-rear-shock',
-    make: 'VipBike',
-    model: 'Амортизатор задний',
-    description: 'Задний амортизатор.',
-    daily_price: 16500,
-    image_url: `${CARPIX_BASE}/parts/rear_shock.jpg`,
-    specs: { type: 'Suspension', position: 'rear', category: 'suspension' },
-    type: 'parts'
-  },
-  {
-    id: 'vipbike-rear-tire',
-    make: 'VipBike',
-    model: 'Задняя шина',
-    description: 'Задняя шина для электромотоциклов VipBike.',
-    daily_price: 4200,
-    image_url: `${CARPIX_BASE}/parts/rear_tire.jpg`,
-    specs: { type: 'Tire', position: 'rear', category: 'wheels' },
-    type: 'parts'
-  }
+  { id: 'vipbike-battery-50ah-regular', make: 'VipBike', model: 'Аккумулятор 50Ah (Regular)', description: 'Стандартная аккумуляторная батарея емкостью 50Ah. Запас хода: 70-110 км.', daily_price: 44500, image_url: `${CARPIX_BASE}/parts/battery_50ah.jpg`, specs: { type: 'Battery', capacity: '50Ah', battery_type: 'regular', range_km: '70-110', category: 'battery' }, type: 'parts' },
+  { id: 'vipbike-battery-60ah-regular', make: 'VipBike', model: 'Аккумулятор 60Ah (Regular)', description: 'Стандартная аккумуляторная батарея емкостью 60Ah. Запас хода: 80-120 км.', daily_price: 55000, image_url: `${CARPIX_BASE}/parts/battery_60ah.jpg`, specs: { type: 'Battery', capacity: '60Ah', battery_type: 'regular', range_km: '80-120', category: 'battery' }, type: 'parts' },
+  { id: 'vipbike-battery-80ah-regular', make: 'VipBike', model: 'Аккумулятор 80Ah (Regular)', description: 'Стандартная аккумуляторная батарея емкостью 80Ah. Запас хода: 90-150 км.', daily_price: 59000, image_url: `${CARPIX_BASE}/parts/battery_80ah.jpg`, specs: { type: 'Battery', capacity: '80Ah', battery_type: 'regular', range_km: '90-150', category: 'battery' }, type: 'parts' },
+  { id: 'vipbike-battery-50ah-lithium', make: 'VipBike', model: 'Литиевая батарея 50Ah', description: 'Литиевая аккумуляторная батарея 50Ah. Легче и долговечнее.', daily_price: 82000, image_url: `${CARPIX_BASE}/parts/battery_li_50ah.jpg`, specs: { type: 'Battery', capacity: '50Ah', battery_type: 'lithium', range_km: '70-110', category: 'battery' }, type: 'parts' },
+  { id: 'vipbike-battery-60ah-lithium', make: 'VipBike', model: 'Литиевая батарея 60Ah', description: 'Литиевая аккумуляторная батарея 60Ah. Оптимальный выбор.', daily_price: 90000, image_url: `${CARPIX_BASE}/parts/battery_li_60ah.jpg`, specs: { type: 'Battery', capacity: '60Ah', battery_type: 'lithium', range_km: '80-120', category: 'battery' }, type: 'parts' },
+  { id: 'vipbike-battery-80ah-lithium', make: 'VipBike', model: 'Литиевая батарея 80Ah', description: 'Литиевая аккумуляторная батарея 80Ah. Увеличенная дальность.', daily_price: 98000, image_url: `${CARPIX_BASE}/parts/battery_li_80ah.jpg`, specs: { type: 'Battery', capacity: '80Ah', battery_type: 'lithium', range_km: '90-150', category: 'battery' }, type: 'parts' },
+  { id: 'vipbike-helmet-e4', make: 'VipBike', model: 'Шлем E4 (Tensun)', description: 'Мотоциклетный шлем E4 от Tensun.', daily_price: 8300, image_url: `${CARPIX_BASE}/parts/helmet_e4.jpg`, specs: { type: 'Helmet', brand: 'Tensun', category: 'safety' }, type: 'parts' },
+  { id: 'vipbike-motorcycle-helmet', make: 'VipBike', model: 'Мотошлем', description: 'Качественный мотошлем для безопасной езды.', daily_price: 4200, image_url: `${CARPIX_BASE}/parts/helmet.jpg`, specs: { type: 'Helmet', category: 'safety' }, type: 'parts' },
+  { id: 'vipbike-abs-system', make: 'VipBike', model: 'ABS система', description: 'Система ABS для безопасного торможения.', daily_price: 16700, image_url: `${CARPIX_BASE}/parts/abs_system.jpg`, specs: { type: 'Safety', system: 'ABS', category: 'brakes' }, type: 'parts' },
+  { id: 'vipbike-cbs-system', make: 'VipBike', model: 'Система CBS', description: 'Combi Brake System для сбалансированного торможения.', daily_price: 4200, image_url: `${CARPIX_BASE}/parts/cbs_system.jpg`, specs: { type: 'Safety', system: 'CBS', category: 'brakes' }, type: 'parts' },
+  { id: 'vipbike-brembo-brakes', make: 'VipBike', model: 'Тормоза Brembo', description: 'Премиальные тормоза Brembo.', daily_price: 12400, image_url: `${CARPIX_BASE}/parts/brembo_brakes.jpg`, specs: { type: 'Brakes', brand: 'Brembo', category: 'performance' }, type: 'parts' },
+  { id: 'vipbike-tft-display', make: 'VipBike', model: 'TFT дисплей', description: 'Цифровой дисплей с поддержкой мобильного телефона.', daily_price: 8300, image_url: `${CARPIX_BASE}/parts/tft_display.jpg`, specs: { type: 'Display', technology: 'TFT', category: 'electronics' }, type: 'parts' },
+  { id: 'vipbike-bluetooth-alarm', make: 'VipBike', model: 'Противоугонная Bluetooth', description: 'Противоугонная система с Bluetooth.', daily_price: 5600, image_url: `${CARPIX_BASE}/parts/bluetooth_alarm.jpg`, specs: { type: 'Security', technology: 'Bluetooth', category: 'electronics' }, type: 'parts' },
+  { id: 'vipbike-cnc-footpegs', make: 'VipBike', model: 'CNC подножки', description: 'CNC передние и задние подножки.', daily_price: 9700, image_url: `${CARPIX_BASE}/parts/cnc_footpegs.jpg`, specs: { type: 'Footpegs', material: 'CNC Aluminum', category: 'accessories' }, type: 'parts' },
+  { id: 'vipbike-front-shock', make: 'VipBike', model: 'Амортизатор передний', description: 'Передний амортизатор.', daily_price: 38600, image_url: `${CARPIX_BASE}/parts/front_shock.jpg`, specs: { type: 'Suspension', position: 'front', category: 'suspension' }, type: 'parts' },
+  { id: 'vipbike-rear-shock', make: 'VipBike', model: 'Амортизатор задний', description: 'Задний амортизатор.', daily_price: 16500, image_url: `${CARPIX_BASE}/parts/rear_shock.jpg`, specs: { type: 'Suspension', position: 'rear', category: 'suspension' }, type: 'parts' },
+  { id: 'vipbike-rear-tire', make: 'VipBike', model: 'Задняя шина', description: 'Задняя шина для электромотоциклов VipBike.', daily_price: 4200, image_url: `${CARPIX_BASE}/parts/rear_tire.jpg`, specs: { type: 'Tire', position: 'rear', category: 'wheels' }, type: 'parts' },
 ]
 
-// Lithium battery options (used when user selects Lithium mode)
 const lithiumBatteries: ConfiguratorBatteryOption[] = [
   { capacity: '50Ah', type: 'lithium', battery_price: 82000, total_price: 0, range_km: '70-110' },
   { capacity: '60Ah', type: 'lithium', battery_price: 90000, total_price: 0, range_km: '80-120' },
@@ -230,11 +69,115 @@ const lithiumBatteries: ConfiguratorBatteryOption[] = [
   { capacity: '160Ah', type: 'lithium', battery_price: 106000, total_price: 0, range_km: '160-260' },
 ]
 
+const TIER_META: Record<string, { label: string; color: string }> = {
+  budget: { label: 'Бюджет', color: '#6ee7b7' },
+  standard: { label: 'Стандарт', color: '#60a5fa' },
+  'mid-range': { label: 'Оптимум', color: '#a78bfa' },
+  premium: { label: 'Премиум', color: '#fbbf24' },
+  sport: { label: 'Спорт', color: '#f87171' },
+  'high-performance': { label: 'Флагман', color: '#fb923c' },
+}
+
+const PART_CATEGORY_ICONS: Record<string, typeof Zap> = {
+  battery: Battery,
+  safety: Shield,
+  brakes: Shield,
+  performance: Gauge,
+  electronics: Zap,
+  accessories: Sparkles,
+  suspension: Gauge,
+  wheels: Gauge,
+}
+
 interface Props {
   crew: FranchizeCrewVM
   slug: string
 }
 
+/* ──────────────── STEP INDICATOR ──────────────── */
+const STEPS = [
+  { key: 'model', label: 'Модель', num: '01' },
+  { key: 'config', label: 'Конфиг', num: '02' },
+  { key: 'addons', label: 'Опции', num: '03' },
+  { key: 'summary', label: 'Итог', num: '04' },
+] as const
+
+function StepBar({ current, goTo, disabled }: { current: string; goTo: (s: string) => void; disabled: Record<string, boolean> }) {
+  const idx = STEPS.findIndex((s) => s.key === current)
+  return (
+    <nav className="mb-8 flex items-center gap-1 overflow-x-auto pb-2">
+      {STEPS.map((step, i) => {
+        const active = step.key === current
+        const done = i < idx
+        const dis = disabled[step.key]
+        return (
+          <button
+            key={step.key}
+            disabled={dis}
+            onClick={() => goTo(step.key)}
+            className={[
+              'group relative flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold tracking-wide transition-all duration-300 sm:text-sm',
+              active
+                ? 'bg-white text-black shadow-lg shadow-white/10 scale-105'
+                : done
+                  ? 'bg-white/10 text-white/80 hover:bg-white/15'
+                  : dis
+                    ? 'text-white/20 cursor-not-allowed'
+                    : 'text-white/40 hover:text-white/60 hover:bg-white/5',
+            ].join(' ')}
+          >
+            <span
+              className={[
+                'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold transition-colors',
+                active ? 'bg-black text-white' : done ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10 text-white/30',
+              ].join(' ')}
+            >
+              {done ? <Check className="h-3 w-3" /> : step.num}
+            </span>
+            <span className="hidden sm:inline">{step.label}</span>
+            {i < STEPS.length - 1 && (
+              <ChevronRight className="ml-1 h-3 w-3 text-white/20 hidden sm:block" />
+            )}
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
+/* ──────────────── TIER BADGE ──────────────── */
+function TierBadge({ tier }: { tier?: string }) {
+  if (!tier || !TIER_META[tier]) return null
+  const meta = TIER_META[tier]
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest"
+      style={{ background: `${meta.color}18`, color: meta.color, border: `1px solid ${meta.color}30` }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: meta.color }} />
+      {meta.label}
+    </span>
+  )
+}
+
+/* ──────────────── LIVE PRICE TICKER ──────────────── */
+function LivePrice({ value, label }: { value: number; label?: string }) {
+  const [display, setDisplay] = useState(value)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setDisplay(value))
+    return () => cancelAnimationFrame(id)
+  }, [value])
+  return (
+    <div className="flex flex-col items-end">
+      {label && <span className="text-[10px] uppercase tracking-widest text-white/40">{label}</span>}
+      <span className="font-mono text-2xl font-bold tracking-tight text-white sm:text-3xl transition-all duration-300">
+        {formatPrice(display)}
+      </span>
+    </div>
+  )
+}
+
+/* ──────────────── MAIN COMPONENT ──────────────── */
 export function ConfiguratorClient({ crew, slug }: Props) {
   const { toast } = useToast()
   const surface = crewPaletteForSurface(crew.theme)
@@ -250,6 +193,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
   const [batteryCapacity, setBatteryCapacity] = useState('')
   const [selectedAccessories, setSelectedAccessories] = useState<string[]>([])
   const [deliveryApplied, setDeliveryApplied] = useState(false)
+  const [hoveredBike, setHoveredBike] = useState<string | null>(null)
 
   useEffect(() => {
     startTransition(async () => {
@@ -320,7 +264,6 @@ export function ConfiguratorClient({ crew, slug }: Props) {
         deliveryPrice: DELIVERY_AVERAGE,
         total,
       })
-
       if (response.success) {
         toast({ title: 'Конфигурация отправлена', description: 'Мы отправили оповещение в Telegram.' })
       } else {
@@ -329,175 +272,821 @@ export function ConfiguratorClient({ crew, slug }: Props) {
     })
   }
 
+  const tabDisabled: Record<string, boolean> = {
+    model: false,
+    config: !selectedBike,
+    addons: !selectedBike,
+    summary: !selectedBike,
+  }
+
+  // Group parts by category for addons
+  const partsByCategory = useMemo(() => {
+    const groups: Record<string, ConfiguratorPart[]> = {}
+    for (const p of parts) {
+      const cat = (p.specs as any)?.category ?? 'other'
+      if (!groups[cat]) groups[cat] = []
+      groups[cat].push(p)
+    }
+    return groups
+  }, [parts])
+
+  const CATEGORY_LABELS: Record<string, string> = {
+    battery: 'Аккумуляторы',
+    safety: 'Безопасность',
+    brakes: 'Тормоза',
+    performance: 'Производительность',
+    electronics: 'Электроника',
+    accessories: 'Аксессуары',
+    suspension: 'Подвеска',
+    wheels: 'Колёса',
+  }
+
   return (
-    <section className="mx-auto w-full max-w-5xl px-4 pb-8 pt-8" style={surface.page}>
-      <div className="mb-5 rounded-2xl border p-4" style={surface.card}>
-        <h1 className="text-2xl font-semibold">Конфигуратор покупки электробайка</h1>
-        <p className="mt-2 text-sm" style={surface.mutedText}>Электробайк выгоден уже сегодня: ниже эксплуатационные расходы, мгновенный отклик мотора и меньше обслуживания.</p>
-      </div>
+    <>
+      {/* ── Global styles injected once ── */}
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-2 sm:grid-cols-4">
-          <TabsTrigger value="model">1. Модель</TabsTrigger>
-          <TabsTrigger value="config" disabled={!selectedBike}>2. Конфиг</TabsTrigger>
-          <TabsTrigger value="addons" disabled={!selectedBike}>3. Опции</TabsTrigger>
-          <TabsTrigger value="summary" disabled={!selectedBike}>4. Итог</TabsTrigger>
-        </TabsList>
+        :root {
+          --cfg-bg: #09090b;
+          --cfg-surface: #111113;
+          --cfg-surface-raised: #1a1a1f;
+          --cfg-border: #27272a;
+          --cfg-border-hover: #3f3f46;
+          --cfg-text: #fafafa;
+          --cfg-text-muted: #a1a1aa;
+          --cfg-text-dim: #71717a;
+          --cfg-accent: #c8ff00;
+          --cfg-accent-dim: #c8ff0030;
+          --cfg-accent-glow: #c8ff0015;
+          --cfg-danger: #ef4444;
+        }
 
-        <TabsContent value="model" className="space-y-4">
-          <Card>
-            <CardContent className="pt-4">
-              <Label>Диапазон цены: {formatPrice(priceRange[0])} — {formatPrice(priceRange[1])}</Label>
-              <Slider value={priceRange} onValueChange={setPriceRange} min={100000} max={500000} step={10000} className="mt-3" />
-            </CardContent>
-          </Card>
+        .cfg-root {
+          font-family: 'Inter', system-ui, sans-serif;
+          background: var(--cfg-bg);
+          color: var(--cfg-text);
+          -webkit-font-smoothing: antialiased;
+        }
 
-          <div className="grid grid-cols-2 gap-2 sm:gap-3">
-            {filteredBikes.map((bike) => (
-              <article key={bike.id} className="overflow-hidden rounded-2xl border" style={catalogCardVariantStyles(crew.theme, bike.id.length)}>
-                <button
-                  type="button"
-                  className="block w-full text-left"
-                  onClick={() => selectBike(bike.id)}
-                  style={selectedBikeId === bike.id ? interactionRingStyle(crew.theme) : undefined}
-                >
-                  <div className="relative aspect-square w-full">
-                    <Image src={bike.image_url} alt={`${bike.make} ${bike.model}`} fill className="object-cover" unoptimized />
-                  </div>
-                  <div className="p-2.5 sm:p-3">
-                    <div className="mb-1 flex items-center justify-between">
-                      <h3 className="line-clamp-1 text-[13px] font-semibold sm:text-sm">{bike.make} {bike.model}</h3>
-                      {selectedBikeId === bike.id && <Badge className="px-2 py-0 text-[10px]">Выбран</Badge>}
-                    </div>
-                    <p className="line-clamp-2 text-[11px] leading-4 sm:text-xs" style={surface.mutedText}>{bike.description}</p>
-                    <p className="mt-1.5 text-lg font-bold sm:mt-2" style={{ color: crew.theme.palette.accentMain }}>{formatPrice(bike.daily_price)}</p>
-                  </div>
-                </button>
-              </article>
-            ))}
+        .cfg-mono {
+          font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Smooth page transitions */
+        .cfg-fade-in {
+          animation: cfgFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes cfgFadeIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Card hover lift */
+        .cfg-card-hover {
+          transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease, border-color 0.3s ease;
+        }
+        .cfg-card-hover:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 20px 60px -15px rgba(0,0,0,0.5);
+          border-color: var(--cfg-border-hover);
+        }
+
+        /* Selected ring pulse */
+        .cfg-selected-ring {
+          box-shadow: 0 0 0 2px var(--cfg-accent), 0 0 30px var(--cfg-accent-dim);
+          border-color: var(--cfg-accent) !important;
+        }
+
+        /* Motor / battery option hover */
+        .cfg-option {
+          transition: all 0.2s ease;
+          cursor: pointer;
+        }
+        .cfg-option:hover {
+          background: var(--cfg-surface-raised);
+          border-color: var(--cfg-border-hover);
+        }
+        .cfg-option-active {
+          background: var(--cfg-accent-glow) !important;
+          border-color: var(--cfg-accent) !important;
+          box-shadow: 0 0 20px var(--cfg-accent-dim);
+        }
+
+        /* Custom radio dot */
+        .cfg-radio-dot {
+          appearance: none;
+          width: 18px; height: 18px;
+          border: 2px solid var(--cfg-border-hover);
+          border-radius: 50%;
+          position: relative;
+          transition: all 0.2s ease;
+          flex-shrink: 0;
+        }
+        .cfg-radio-dot:checked {
+          border-color: var(--cfg-accent);
+          background: var(--cfg-accent);
+          box-shadow: inset 0 0 0 3px var(--cfg-bg);
+        }
+
+        /* Custom checkbox */
+        .cfg-check {
+          appearance: none;
+          width: 18px; height: 18px;
+          border: 2px solid var(--cfg-border-hover);
+          border-radius: 5px;
+          position: relative;
+          transition: all 0.2s ease;
+          flex-shrink: 0;
+          cursor: pointer;
+        }
+        .cfg-check:checked {
+          border-color: var(--cfg-accent);
+          background: var(--cfg-accent);
+        }
+        .cfg-check:checked::after {
+          content: '✓';
+          position: absolute;
+          top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          font-size: 11px;
+          font-weight: 900;
+          color: #000;
+        }
+
+        /* Price range slider override */
+        .cfg-slider [role="slider"] {
+          background: var(--cfg-accent) !important;
+          border: 3px solid var(--cfg-bg) !important;
+          box-shadow: 0 0 10px var(--cfg-accent-dim) !important;
+        }
+        .cfg-slider span[data-orientation="horizontal"] {
+          background: var(--cfg-accent) !important;
+        }
+
+        /* Sticky price bar */
+        .cfg-sticky-bar {
+          backdrop-filter: blur(20px) saturate(150%);
+          -webkit-backdrop-filter: blur(20px) saturate(150%);
+        }
+
+        /* Grain overlay */
+        .cfg-grain::before {
+          content: '';
+          position: fixed;
+          inset: 0;
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+          pointer-events: none;
+          z-index: 9999;
+        }
+
+        /* Scrollbar */
+        .cfg-root::-webkit-scrollbar { width: 6px; }
+        .cfg-root::-webkit-scrollbar-track { background: transparent; }
+        .cfg-root::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
+
+        /* Image shimmer on load */
+        .cfg-img-wrap {
+          background: linear-gradient(110deg, #1a1a1f 8%, #222 18%, #1a1a1f 33%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s linear infinite;
+        }
+        @keyframes shimmer {
+          to { background-position: -200% 0; }
+        }
+
+        /* Staggered grid entrance */
+        .cfg-stagger > * {
+          opacity: 0;
+          animation: cfgFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .cfg-stagger > *:nth-child(1)  { animation-delay: 0.02s; }
+        .cfg-stagger > *:nth-child(2)  { animation-delay: 0.06s; }
+        .cfg-stagger > *:nth-child(3)  { animation-delay: 0.10s; }
+        .cfg-stagger > *:nth-child(4)  { animation-delay: 0.14s; }
+        .cfg-stagger > *:nth-child(5)  { animation-delay: 0.18s; }
+        .cfg-stagger > *:nth-child(6)  { animation-delay: 0.22s; }
+        .cfg-stagger > *:nth-child(7)  { animation-delay: 0.26s; }
+        .cfg-stagger > *:nth-child(8)  { animation-delay: 0.30s; }
+        .cfg-stagger > *:nth-child(9)  { animation-delay: 0.34s; }
+        .cfg-stagger > *:nth-child(10) { animation-delay: 0.38s; }
+        .cfg-stagger > *:nth-child(11) { animation-delay: 0.42s; }
+        .cfg-stagger > *:nth-child(12) { animation-delay: 0.46s; }
+        .cfg-stagger > *:nth-child(13) { animation-delay: 0.50s; }
+        .cfg-stagger > *:nth-child(14) { animation-delay: 0.54s; }
+        .cfg-stagger > *:nth-child(15) { animation-delay: 0.58s; }
+        .cfg-stagger > *:nth-child(16) { animation-delay: 0.62s; }
+
+        /* Glow button */
+        .cfg-glow-btn {
+          position: relative;
+          overflow: hidden;
+          transition: all 0.3s ease;
+        }
+        .cfg-glow-btn::before {
+          content: '';
+          position: absolute;
+          inset: -2px;
+          background: conic-gradient(from 0deg, var(--cfg-accent), transparent, var(--cfg-accent));
+          border-radius: inherit;
+          animation: spin 3s linear infinite;
+          opacity: 0;
+          transition: opacity 0.3s;
+          z-index: -1;
+        }
+        .cfg-glow-btn:hover::before {
+          opacity: 1;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+
+      <section className="cfg-root cfg-grain relative min-h-screen">
+        {/* ── HERO HEADER ── */}
+        <div className="relative overflow-hidden border-b border-[#27272a]">
+          {/* Ambient glow */}
+          <div className="absolute -top-40 left-1/2 h-[500px] w-[800px] -translate-x-1/2 rounded-full opacity-20" style={{ background: 'radial-gradient(ellipse, #c8ff00 0%, transparent 70%)' }} />
+
+          <div className="relative mx-auto max-w-6xl px-4 pb-8 pt-10 sm:pt-14">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="cfg-mono mb-2 text-[11px] font-medium uppercase tracking-[0.25em] text-[#c8ff00]">Конфигуратор</p>
+                <h1 className="text-3xl font-black leading-[1.1] tracking-tight sm:text-5xl">
+                  Собери свой
+                  <br />
+                  <span className="text-[#c8ff00]">электробайк</span>
+                </h1>
+                <p className="mt-3 max-w-md text-sm leading-relaxed text-[#a1a1aa]">
+                  Выбери модель, настрой мотор и батарею, добавь опции — получи точную цену за секунды.
+                </p>
+              </div>
+              {selectedBike && (
+                <LivePrice value={total} label="Текущая конфигурация" />
+              )}
+            </div>
           </div>
-        </TabsContent>
+        </div>
 
-        <TabsContent value="config" className="space-y-4">
-          {selectedBike && (
-            <>
-              <Card>
-                <CardHeader>
-                  <CardTitle>{selectedBike.make} {selectedBike.model}</CardTitle>
-                  <CardDescription>Выбор мотора, батареи и обзор фото модели.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-5">
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {(selectedBike.specs.gallery?.length ? selectedBike.specs.gallery : [selectedBike.image_url]).map((image) => (
-                      <div key={image} className="relative h-24 overflow-hidden rounded-lg border">
-                        <Image src={image} alt={selectedBike.model} fill className="object-cover" unoptimized />
+        {/* ── MAIN CONTENT ── */}
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+          <StepBar current={tab} goTo={(s) => setTab(s as typeof tab)} disabled={tabDisabled} />
+
+          {/* ═══════════════════ STEP 1: MODEL ═══════════════════ */}
+          {tab === 'model' && (
+            <div className="cfg-fade-in space-y-6">
+              {/* Price filter */}
+              <div className="rounded-2xl border border-[#27272a] bg-[#111113] p-5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium uppercase tracking-widest text-[#71717a]">Диапазон цены</Label>
+                  <span className="cfg-mono text-sm font-bold text-[#c8ff00]">
+                    {formatPrice(priceRange[0])} — {formatPrice(priceRange[1])}
+                  </span>
+                </div>
+                <Slider
+                  value={priceRange}
+                  onValueChange={setPriceRange}
+                  min={100000}
+                  max={500000}
+                  step={10000}
+                  className="cfg-slider mt-4"
+                />
+                <div className="mt-2 flex justify-between text-[10px] text-[#71717a]">
+                  <span>100 000 ₽</span>
+                  <span>500 000 ₽</span>
+                </div>
+              </div>
+
+              {/* Results count */}
+              <p className="cfg-mono text-xs text-[#71717a]">
+                Найдено: <span className="font-bold text-white">{filteredBikes.length}</span> моделей
+              </p>
+
+              {/* Bike grid */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 cfg-stagger">
+                {filteredBikes.map((bike) => {
+                  const isSelected = selectedBikeId === bike.id
+                  const tier = bike.specs.tier
+                  return (
+                    <article
+                      key={bike.id}
+                      className={[
+                        'group relative overflow-hidden rounded-2xl border bg-[#111113] cfg-card-hover',
+                        isSelected ? 'cfg-selected-ring border-[#c8ff00]' : 'border-[#27272a]',
+                      ].join(' ')}
+                      onMouseEnter={() => setHoveredBike(bike.id)}
+                      onMouseLeave={() => setHoveredBike(null)}
+                    >
+                      <button
+                        type="button"
+                        className="block w-full text-left"
+                        onClick={() => selectBike(bike.id)}
+                      >
+                        {/* Image */}
+                        <div className="cfg-img-wrap relative aspect-[4/3] w-full overflow-hidden">
+                          <Image
+                            src={bike.image_url}
+                            alt={`${bike.make} ${bike.model}`}
+                            fill
+                            className="object-cover transition-transform duration-700 group-hover:scale-105"
+                            unoptimized
+                          />
+                          {/* Overlay gradient */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-transparent to-transparent opacity-60" />
+
+                          {/* Tier badge */}
+                          <div className="absolute left-3 top-3">
+                            <TierBadge tier={tier} />
+                          </div>
+
+                          {/* Selected indicator */}
+                          {isSelected && (
+                            <div className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-[#c8ff00] shadow-lg shadow-[#c8ff00]/30">
+                              <Check className="h-4 w-4 text-black" />
+                            </div>
+                          )}
+
+                          {/* Price overlay */}
+                          <div className="absolute bottom-3 left-3 right-3">
+                            <p className="cfg-mono text-xl font-bold text-white drop-shadow-lg">
+                              {formatPrice(bike.daily_price)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Info */}
+                        <div className="p-4">
+                          <div className="mb-1.5 flex items-center gap-2">
+                            <h3 className="text-sm font-bold tracking-tight text-white">
+                              {bike.make} {bike.model}
+                            </h3>
+                          </div>
+                          <p className="line-clamp-2 text-xs leading-relaxed text-[#a1a1aa]">
+                            {bike.description}
+                          </p>
+                          {/* Specs row */}
+                          <div className="mt-3 flex items-center gap-3 text-[10px] uppercase tracking-widest text-[#71717a]">
+                            <span className="flex items-center gap-1">
+                              <Zap className="h-3 w-3" />
+                              {bike.specs.power_w}W
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Gauge className="h-3 w-3" />
+                              {bike.specs.max_speed_kmh} км/ч
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    </article>
+                  )
+                })}
+              </div>
+
+              {filteredBikes.length === 0 && (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#27272a] py-16">
+                  <p className="text-sm text-[#71717a]">Нет моделей в этом диапазоне цен</p>
+                  <Button variant="ghost" className="mt-3 text-xs text-[#a1a1aa]" onClick={() => setPriceRange([100000, 500000])}>
+                    Сбросить фильтр
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ═══════════════════ STEP 2: CONFIG ═══════════════════ */}
+          {tab === 'config' && selectedBike && (
+            <div className="cfg-fade-in space-y-6">
+              {/* Bike header with gallery */}
+              <div className="overflow-hidden rounded-2xl border border-[#27272a] bg-[#111113]">
+                <div className="relative aspect-[21/9] w-full overflow-hidden sm:aspect-[3/1]">
+                  <Image
+                    src={selectedBike.image_url}
+                    alt={`${selectedBike.make} ${selectedBike.model}`}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#09090b] via-[#09090b]/60 to-transparent" />
+                  <div className="absolute bottom-0 left-0 p-6 sm:p-8">
+                    <TierBadge tier={selectedBike.specs.tier} />
+                    <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-4xl">
+                      {selectedBike.make} {selectedBike.model}
+                    </h2>
+                    <p className="mt-1 max-w-lg text-sm text-[#a1a1aa]">{selectedBike.description}</p>
+                  </div>
+                </div>
+
+                {/* Gallery thumbnails */}
+                {selectedBike.specs.gallery && selectedBike.specs.gallery.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto border-t border-[#27272a] p-3">
+                    {[selectedBike.image_url, ...selectedBike.specs.gallery].map((img, i) => (
+                      <div key={img + i} className="relative h-16 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-[#27272a]">
+                        <Image src={img} alt="" fill className="object-cover" unoptimized />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Motor selection */}
+              <div className="rounded-2xl border border-[#27272a] bg-[#111113] p-5 sm:p-6">
+                <div className="mb-4 flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#c8ff00]/10">
+                    <Zap className="h-4 w-4 text-[#c8ff00]" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold">Мощность мотора</h3>
+                    <p className="text-[11px] text-[#71717a]">Влияет на динамику и максимальную скорость</p>
+                  </div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {availableMotors.map((motor) => {
+                    const active = motorPower === motor.value
+                    return (
+                      <label
+                        key={motor.value}
+                        className={[
+                          'cfg-option flex items-center justify-between rounded-xl border p-4',
+                          active ? 'cfg-option-active' : 'border-[#27272a]',
+                        ].join(' ')}
+                      >
+                        <span className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="motor"
+                            className="cfg-radio-dot"
+                            value={motor.value}
+                            checked={active}
+                            onChange={() => setMotorPower(motor.value)}
+                          />
+                          <span>
+                            <span className="block text-sm font-semibold">{motor.value}W</span>
+                            <span className="block text-[11px] text-[#71717a]">
+                              {motor.extra === 0 ? 'Базовая комплектация' : `+${formatPrice(motor.extra)}`}
+                            </span>
+                          </span>
+                        </span>
+                        {motor.extra > 0 && (
+                          <span className="cfg-mono text-xs font-medium text-[#a1a1aa]">+{formatPrice(motor.extra)}</span>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Battery selection */}
+              {selectedBike.model !== 'A4' && (
+                <div className="rounded-2xl border border-[#27272a] bg-[#111113] p-5 sm:p-6">
+                  <div className="mb-4 flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
+                      <Battery className="h-4 w-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold">Аккумулятор</h3>
+                      <p className="text-[11px] text-[#71717a]">Тип и ёмкость определяют запас хода</p>
+                    </div>
+                  </div>
+
+                  {/* Battery type toggle */}
+                  <div className="mb-4 inline-flex rounded-xl border border-[#27272a] bg-[#09090b] p-1">
+                    {(['regular', 'lithium'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => {
+                          setBatteryMode(mode)
+                          const first = mode === 'regular' ? regularBatteries[0] : lithiumBatteries[0]
+                          setBatteryCapacity(first?.capacity ?? '')
+                        }}
+                        className={[
+                          'rounded-lg px-4 py-2 text-xs font-semibold transition-all',
+                          batteryMode === mode
+                            ? 'bg-[#c8ff00] text-black shadow-md'
+                            : 'text-[#71717a] hover:text-white',
+                        ].join(' ')}
+                      >
+                        {mode === 'regular' ? 'Regular' : 'Lithium'}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Battery capacity options */}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {(batteryMode === 'regular' ? regularBatteries : lithiumBatteries).map((battery) => {
+                      const active = batteryCapacity === battery.capacity
+                      return (
+                        <label
+                          key={`${batteryMode}-${battery.capacity}`}
+                          className={[
+                            'cfg-option flex items-center justify-between rounded-xl border p-4',
+                            active ? 'cfg-option-active' : 'border-[#27272a]',
+                          ].join(' ')}
+                        >
+                          <span className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="battery"
+                              className="cfg-radio-dot"
+                              value={battery.capacity}
+                              checked={active}
+                              onChange={() => setBatteryCapacity(battery.capacity)}
+                            />
+                            <span>
+                              <span className="block text-sm font-semibold">{battery.capacity}</span>
+                              <span className="block text-[11px] text-[#71717a]">
+                                Запас хода: {battery.range_km} км
+                              </span>
+                            </span>
+                          </span>
+                          <span className="cfg-mono text-xs font-medium text-[#a1a1aa]">
+                            {battery.battery_price === 0 ? 'Вкл.' : `+${formatPrice(battery.battery_price)}`}
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Navigation */}
+              <div className="flex gap-3">
+                <Button
+                  variant="ghost"
+                  onClick={() => setTab('model')}
+                  className="text-[#71717a] hover:text-white"
+                >
+                  ← Назад
+                </Button>
+                <Button
+                  onClick={() => setTab('addons')}
+                  className="cfg-glow-btn flex-1 bg-[#c8ff00] font-bold text-black hover:bg-[#d4ff33] sm:flex-none"
+                >
+                  Дальше: опции
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ═══════════════════ STEP 3: ADDONS ═══════════════════ */}
+          {tab === 'addons' && selectedBike && (
+            <div className="cfg-fade-in space-y-6">
+              {Object.entries(partsByCategory).map(([category, categoryParts]) => {
+                const Icon = PART_CATEGORY_ICONS[category] || Sparkles
+                return (
+                  <div key={category} className="rounded-2xl border border-[#27272a] bg-[#111113] p-5 sm:p-6">
+                    <div className="mb-4 flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5">
+                        <Icon className="h-4 w-4 text-[#a1a1aa]" />
+                      </div>
+                      <h3 className="text-sm font-bold">{CATEGORY_LABELS[category] ?? category}</h3>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {categoryParts.map((part) => {
+                        const checked = selectedAccessories.includes(part.id)
+                        return (
+                          <label
+                            key={part.id}
+                            className={[
+                              'cfg-option flex items-start justify-between gap-3 rounded-xl border p-4',
+                              checked ? 'cfg-option-active' : 'border-[#27272a]',
+                            ].join(' ')}
+                          >
+                            <span className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                className="cfg-check mt-0.5"
+                                checked={checked}
+                                onChange={() =>
+                                  setSelectedAccessories((prev) =>
+                                    prev.includes(part.id)
+                                      ? prev.filter((id) => id !== part.id)
+                                      : [...prev, part.id],
+                                  )
+                                }
+                              />
+                              <span>
+                                <span className="block text-sm font-semibold">{part.model}</span>
+                                <span className="mt-0.5 block text-[11px] leading-relaxed text-[#71717a]">
+                                  {part.description}
+                                </span>
+                              </span>
+                            </span>
+                            <span className="cfg-mono whitespace-nowrap text-xs font-medium text-[#a1a1aa]">
+                              +{formatPrice(part.daily_price)}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Selected count */}
+              {selectedAccessories.length > 0 && (
+                <div className="flex items-center justify-between rounded-xl border border-[#c8ff00]/20 bg-[#c8ff00]/5 px-4 py-3">
+                  <span className="text-sm text-[#a1a1aa]">
+                    Выбрано опций: <span className="font-bold text-white">{selectedAccessories.length}</span>
+                  </span>
+                  <span className="cfg-mono text-sm font-bold text-[#c8ff00]">
+                    +{formatPrice(accessoriesTotal)}
+                  </span>
+                </div>
+              )}
+
+              {/* Navigation */}
+              <div className="flex gap-3">
+                <Button variant="ghost" onClick={() => setTab('config')} className="text-[#71717a] hover:text-white">
+                  ← Назад
+                </Button>
+                <Button
+                  onClick={() => setTab('summary')}
+                  className="cfg-glow-btn flex-1 bg-[#c8ff00] font-bold text-black hover:bg-[#d4ff33] sm:flex-none"
+                >
+                  Дальше: итог
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ═══════════════════ STEP 4: SUMMARY ═══════════════════ */}
+          {tab === 'summary' && selectedBike && (
+            <div className="cfg-fade-in space-y-6">
+              <div className="grid gap-6 lg:grid-cols-5">
+                {/* Left: config breakdown */}
+                <div className="lg:col-span-3 space-y-4">
+                  {/* Bike hero */}
+                  <div className="overflow-hidden rounded-2xl border border-[#27272a] bg-[#111113]">
+                    <div className="relative aspect-[16/7] w-full overflow-hidden">
+                      <Image src={selectedBike.image_url} alt="" fill className="object-cover" unoptimized />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#111113] via-transparent to-transparent" />
+                    </div>
+                    <div className="p-5">
+                      <TierBadge tier={selectedBike.specs.tier} />
+                      <h2 className="mt-2 text-xl font-black">{selectedBike.make} {selectedBike.model}</h2>
+                    </div>
+                  </div>
+
+                  {/* Specs grid */}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {[
+                      { icon: Zap, label: 'Мотор', value: `${selectedMotor?.value ?? '3000'}W` },
+                      { icon: Battery, label: 'Батарея', value: activeBattery ? activeBattery.capacity : '—' },
+                      { icon: Gauge, label: 'Скорость', value: `${selectedBike.specs.max_speed_kmh} км/ч` },
+                      { icon: Shield, label: 'Запас хода', value: activeBattery ? `${activeBattery.range_km} км` : '—' },
+                    ].map(({ icon: Icon, label, value }) => (
+                      <div key={label} className="rounded-xl border border-[#27272a] bg-[#111113] p-3">
+                        <Icon className="mb-1.5 h-4 w-4 text-[#71717a]" />
+                        <p className="cfg-mono text-lg font-bold">{value}</p>
+                        <p className="text-[10px] uppercase tracking-widest text-[#71717a]">{label}</p>
                       </div>
                     ))}
                   </div>
 
-                  <div>
-                    <Label className="mb-2 block">Мощность мотора</Label>
-                    <RadioGroup value={motorPower} onValueChange={setMotorPower} className="grid gap-2 sm:grid-cols-2">
-                      {availableMotors.map((motor) => (
-                        <Label key={motor.value} className="flex items-center gap-3 rounded-lg border p-3">
-                          <RadioGroupItem value={motor.value} />
-                          {motor.label}
-                        </Label>
-                      ))}
-                    </RadioGroup>
-                  </div>
-
-                  {selectedBike.model !== 'A4' && (
-                    <>
-                      <div>
-                        <Label className="mb-2 block">Тип батареи</Label>
-                        <RadioGroup value={batteryMode} onValueChange={(v) => setBatteryMode(v as 'regular' | 'lithium')} className="grid grid-cols-2 gap-2">
-                          <Label className="flex items-center gap-2 rounded-lg border p-3"><RadioGroupItem value="regular" />Regular</Label>
-                          <Label className="flex items-center gap-2 rounded-lg border p-3"><RadioGroupItem value="lithium" />Lithium</Label>
-                        </RadioGroup>
+                  {/* Selected accessories */}
+                  {selectedAccessories.length > 0 && (
+                    <div className="rounded-xl border border-[#27272a] bg-[#111113] p-4">
+                      <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-[#71717a]">Доп. опции</h4>
+                      <div className="space-y-2">
+                        {selectedAccessories.map((id) => {
+                          const part = parts.find((p) => p.id === id)
+                          if (!part) return null
+                          return (
+                            <div key={id} className="flex items-center justify-between text-sm">
+                              <span className="flex items-center gap-2 text-[#a1a1aa]">
+                                <Check className="h-3.5 w-3.5 text-[#c8ff00]" />
+                                {part.model}
+                              </span>
+                              <span className="cfg-mono text-xs">+{formatPrice(part.daily_price)}</span>
+                            </div>
+                          )
+                        })}
                       </div>
-
-                      <div>
-                        <Label className="mb-2 block">Размер батареи</Label>
-                        <RadioGroup value={batteryCapacity} onValueChange={setBatteryCapacity} className="grid gap-2 sm:grid-cols-2">
-                          {(batteryMode === 'regular' ? regularBatteries : lithiumBatteries).map((battery) => (
-                            <Label key={`${batteryMode}-${battery.capacity}`} className="flex items-center justify-between rounded-lg border p-3">
-                              <span className="flex items-center gap-2"><RadioGroupItem value={battery.capacity} />{battery.capacity}</span>
-                              <span className="text-sm">+{formatPrice(battery.battery_price)}</span>
-                            </Label>
-                          ))}
-                        </RadioGroup>
-                      </div>
-                    </>
+                    </div>
                   )}
+                </div>
 
-                  <Button onClick={() => setTab('addons')} className="w-full">Дальше: доп. опции</Button>
-                </CardContent>
-              </Card>
-            </>
+                {/* Right: price breakdown + CTA */}
+                <div className="lg:col-span-2">
+                  <div className="sticky top-6 space-y-4">
+                    <div className="rounded-2xl border border-[#27272a] bg-[#111113] p-5 sm:p-6">
+                      <h3 className="mb-4 text-sm font-bold uppercase tracking-widest text-[#71717a]">Расчёт стоимости</h3>
+
+                      <div className="space-y-3 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-[#a1a1aa]">{selectedBike.make} {selectedBike.model}</span>
+                          <span className="cfg-mono font-medium">{formatPrice(selectedBike.daily_price)}</span>
+                        </div>
+                        {(selectedMotor?.extra ?? 0) > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-[#a1a1aa]">Мотор {selectedMotor?.value}W</span>
+                            <span className="cfg-mono font-medium">+{formatPrice(selectedMotor?.extra ?? 0)}</span>
+                          </div>
+                        )}
+                        {selectedBike.model !== 'A4' && activeBattery && activeBattery.battery_price > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-[#a1a1aa]">Батарея {activeBattery.capacity}</span>
+                            <span className="cfg-mono font-medium">+{formatPrice(activeBattery.battery_price)}</span>
+                          </div>
+                        )}
+                        {accessoriesTotal > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-[#a1a1aa]">Доп. опции ({selectedAccessories.length})</span>
+                            <span className="cfg-mono font-medium">+{formatPrice(accessoriesTotal)}</span>
+                          </div>
+                        )}
+                        {deliveryApplied && (
+                          <div className="flex justify-between">
+                            <span className="text-[#a1a1aa]">Доставка</span>
+                            <span className="cfg-mono font-medium">+{formatPrice(DELIVERY_AVERAGE)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <Separator className="my-4 bg-[#27272a]" />
+
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-sm font-bold uppercase tracking-widest text-[#71717a]">Итого</span>
+                        <span className="cfg-mono text-3xl font-black text-[#c8ff00]">{formatPrice(total)}</span>
+                      </div>
+
+                      {/* Delivery toggle */}
+                      <button
+                        onClick={() => setDeliveryApplied((v) => !v)}
+                        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#27272a] py-3 text-xs text-[#71717a] transition-all hover:border-[#c8ff00]/30 hover:text-white"
+                      >
+                        <Truck className="h-4 w-4" />
+                        {deliveryApplied ? 'Убрать доставку' : `Добавить доставку (+${formatPrice(DELIVERY_AVERAGE)})`}
+                      </button>
+                    </div>
+
+                    {/* CTA buttons */}
+                    <div className="space-y-2">
+                      <Button
+                        onClick={submitLead}
+                        disabled={isPending}
+                        className="cfg-glow-btn w-full bg-[#c8ff00] py-6 text-sm font-bold text-black hover:bg-[#d4ff33]"
+                      >
+                        <MessageCircle className="mr-2 h-4 w-4" />
+                        Отправить в Telegram
+                      </Button>
+                      <Button
+                        asChild
+                        variant="outline"
+                        className="w-full border-[#27272a] bg-transparent py-6 text-sm font-semibold text-white hover:bg-white/5 hover:text-white"
+                      >
+                        <a href="https://t.me/I_O_S_NN" target="_blank" rel="noopener noreferrer">
+                          Оформить покупку
+                        </a>
+                      </Button>
+                      <Button
+                        asChild
+                        variant="ghost"
+                        className="w-full text-xs text-[#71717a] hover:text-white"
+                      >
+                        <Link href={`/franchize/${crew.slug || slug}/contacts`}>
+                          Контакты франшизы
+                        </Link>
+                      </Button>
+                    </div>
+
+                    {/* Back */}
+                    <Button
+                      variant="ghost"
+                      onClick={() => setTab('addons')}
+                      className="w-full text-[#71717a] hover:text-white"
+                    >
+                      ← Вернуться к опциям
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
-        </TabsContent>
+        </div>
 
-        <TabsContent value="addons" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Доп. опции (правая часть прайса)</CardTitle>
-              <CardDescription>Выберите нужные компоненты.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-2 md:grid-cols-2">
-              {parts.map((part) => {
-                const checked = selectedAccessories.includes(part.id)
-                return (
-                  <label key={part.id} className="flex cursor-pointer items-start justify-between gap-2 rounded-lg border p-3">
-                    <span className="flex items-start gap-2">
-                      <Checkbox checked={checked} onCheckedChange={() => setSelectedAccessories((prev) => prev.includes(part.id) ? prev.filter((id) => id !== part.id) : [...prev, part.id])} />
-                      <span>
-                        <span className="block text-sm font-medium">{part.model}</span>
-                        <span className="block text-xs" style={surface.mutedText}>{part.description}</span>
-                      </span>
-                    </span>
-                    <span className="text-xs font-semibold">+{formatPrice(part.daily_price)}</span>
-                  </label>
-                )
-              })}
-              <Button onClick={() => setTab('summary')} className="sm:col-span-2">Дальше: итог</Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="summary" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Итог конфигурации</CardTitle>
-              <CardDescription>Выбранный байк и мгновенный расчёт суммы.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between"><span>Модель</span><span>{selectedBike?.make} {selectedBike?.model}</span></div>
-              <div className="flex justify-between"><span>Мотор</span><span>{selectedMotor?.label}</span></div>
-              <div className="flex justify-between"><span>Батарея</span><span>{activeBattery ? `${activeBattery.capacity} / ${activeBattery.range_km} км` : '—'}</span></div>
-              <Separator />
-              <div className="flex justify-between"><span>База</span><span>{formatPrice(selectedBike?.daily_price ?? 0)}</span></div>
-              <div className="flex justify-between"><span>Мотор</span><span>{formatPrice(selectedMotor?.extra ?? 0)}</span></div>
-              <div className="flex justify-between"><span>Батарея</span><span>{formatPrice(selectedBike?.model === 'A4' ? 0 : (activeBattery?.battery_price ?? 0))}</span></div>
-              <div className="flex justify-between"><span>Опции</span><span>{formatPrice(accessoriesTotal)}</span></div>
-              <div className="rounded-lg border border-dashed p-3">
-                <p className="mb-2 text-xs">Доставка (средняя): {formatPrice(DELIVERY_AVERAGE)}</p>
-                <Button variant="outline" className="w-full" onClick={() => setDeliveryApplied((v) => !v)}>
-                  <Truck className="mr-2 h-4 w-4" />{deliveryApplied ? 'Убрать доставку' : 'Рассчитать доставку (+95 000 ₽)'}
-                </Button>
+        {/* ── FLOATING MOBILE PRICE BAR ── */}
+        {selectedBike && (
+          <div className="cfg-sticky-bar fixed inset-x-0 bottom-0 z-50 border-t border-[#27272a] bg-[#09090b]/90 px-4 py-3 sm:hidden">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-[#71717a]">{selectedBike.make} {selectedBike.model}</p>
+                <p className="cfg-mono text-xl font-black text-[#c8ff00]">{formatPrice(total)}</p>
               </div>
-              <div className="flex justify-between text-base font-bold"><span>Итого</span><span>{formatPrice(total)}</span></div>
-
-              <div className="grid gap-2 pt-2 sm:grid-cols-2">
-                <Button onClick={submitLead} disabled={isPending}><MessageCircle className="mr-2 h-4 w-4" />Отправить в Telegram</Button>
-                <Button asChild variant="secondary"><a href="https://t.me/I_O_S_NN" target="_blank" rel="noopener noreferrer">Оформить покупку</a></Button>
-                <Button asChild variant="ghost" className="sm:col-span-2"><Link href={`/franchize/${crew.slug || slug}/contacts`}>Контакты франшизы</Link></Button>
-              </div>
-            </CardContent>
-          </Card>
-
-        </TabsContent>
-      </Tabs>
-    </section>
+              <Button
+                onClick={() => setTab('summary')}
+                size="sm"
+                className="bg-[#c8ff00] font-bold text-black"
+              >
+                Итог
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </section>
+    </>
   )
 }
