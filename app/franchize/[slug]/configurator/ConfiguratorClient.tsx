@@ -507,16 +507,16 @@ export function ConfiguratorClient({ crew, slug }: Props) {
         {/* ── HERO HEADER ── */}
         <div className="relative overflow-hidden border-b border-[#27272a]">
           {/* Ambient glow */}
-          <div className="absolute -top-40 left-1/2 h-[500px] w-[800px] -translate-x-1/2 rounded-full opacity-20" style={{ background: 'radial-gradient(ellipse, #c8ff00 0%, transparent 70%)' }} />
+          <div className="absolute -top-40 left-1/2 h-[500px] w-[800px] -translate-x-1/2 rounded-full opacity-20" style={{ background: 'radial-gradient(ellipse, #00ffea 0%, transparent 70%)' }} />
 
           <div className="relative mx-auto max-w-6xl px-4 pb-8 pt-10 sm:pt-14">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="cfg-mono mb-2 text-[11px] font-medium uppercase tracking-[0.25em] text-[#c8ff00]">Конфигуратор</p>
+                <p className="cfg-mono mb-2 text-[11px] font-medium uppercase tracking-[0.25em] text-[#00ffea]">Конфигуратор</p>
                 <h1 className="text-3xl font-black leading-[1.1] tracking-tight sm:text-5xl">
                   Собери свой
                   <br />
-                  <span className="text-[#c8ff00]">электробайк</span>
+                  <span className="text-[#00ffea]">электробайк</span>
                 </h1>
                 <p className="mt-3 max-w-md text-sm leading-relaxed text-[#a1a1aa]">
                   Выбери модель, настрой мотор и батарею, добавь опции — получи точную цену за секунды.
@@ -540,7 +540,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
               <div className="rounded-2xl border border-[#27272a] bg-[#111113] p-5">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-medium uppercase tracking-widest text-[#71717a]">Диапазон цены</Label>
-                  <span className="cfg-mono text-sm font-bold text-[#c8ff00]">
+                  <span className="cfg-mono text-sm font-bold text-[#00ffea]">
                     {formatPrice(priceRange[0])} — {formatPrice(priceRange[1])}
                   </span>
                 </div>
@@ -573,7 +573,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                       key={bike.id}
                       className={[
                         'group relative overflow-hidden rounded-2xl border bg-[#111113] cfg-card-hover',
-                        isSelected ? 'cfg-selected-ring border-[#c8ff00]' : 'border-[#27272a]',
+                        isSelected ? 'cfg-selected-ring border-[#00ffea]' : 'border-[#27272a]',
                       ].join(' ')}
                       onMouseEnter={() => setHoveredBike(bike.id)}
                       onMouseLeave={() => setHoveredBike(null)}
@@ -602,7 +602,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
 
                           {/* Selected indicator */}
                           {isSelected && (
-                            <div className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-[#c8ff00] shadow-lg shadow-[#c8ff00]/30">
+                            <div className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-[#00ffea] shadow-lg shadow-[#00ffea]/30">
                               <Check className="h-4 w-4 text-black" />
                             </div>
                           )}
@@ -692,8 +692,8 @@ export function ConfiguratorClient({ crew, slug }: Props) {
               {/* Motor selection */}
               <div className="rounded-2xl border border-[#27272a] bg-[#111113] p-5 sm:p-6">
                 <div className="mb-4 flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#c8ff00]/10">
-                    <Zap className="h-4 w-4 text-[#c8ff00]" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#00ffea]/10">
+                    <Zap className="h-4 w-4 text-[#00ffea]" />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold">Мощность мотора</h3>
@@ -762,7 +762,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                         className={[
                           'rounded-lg px-4 py-2 text-xs font-semibold transition-all',
                           batteryMode === mode
-                            ? 'bg-[#c8ff00] text-black shadow-md'
+                            ? 'bg-[#00ffea] text-black shadow-md'
                             : 'text-[#71717a] hover:text-white',
                         ].join(' ')}
                       >
@@ -820,7 +820,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                 </Button>
                 <Button
                   onClick={() => setTab('addons')}
-                  className="cfg-glow-btn flex-1 bg-[#c8ff00] font-bold text-black hover:bg-[#d4ff33] sm:flex-none"
+                  className="cfg-glow-btn flex-1 bg-[#00ffea] font-bold text-black hover:bg-[#d4ff33] sm:flex-none"
                 >
                   Дальше: опции
                   <ChevronRight className="ml-1 h-4 w-4" />
@@ -886,11 +886,11 @@ export function ConfiguratorClient({ crew, slug }: Props) {
 
               {/* Selected count */}
               {selectedAccessories.length > 0 && (
-                <div className="flex items-center justify-between rounded-xl border border-[#c8ff00]/20 bg-[#c8ff00]/5 px-4 py-3">
+                <div className="flex items-center justify-between rounded-xl border border-[#00ffea]/20 bg-[#00ffea]/5 px-4 py-3">
                   <span className="text-sm text-[#a1a1aa]">
                     Выбрано опций: <span className="font-bold text-white">{selectedAccessories.length}</span>
                   </span>
-                  <span className="cfg-mono text-sm font-bold text-[#c8ff00]">
+                  <span className="cfg-mono text-sm font-bold text-[#00ffea]">
                     +{formatPrice(accessoriesTotal)}
                   </span>
                 </div>
@@ -903,7 +903,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                 </Button>
                 <Button
                   onClick={() => setTab('summary')}
-                  className="cfg-glow-btn flex-1 bg-[#c8ff00] font-bold text-black hover:bg-[#d4ff33] sm:flex-none"
+                  className="cfg-glow-btn flex-1 bg-[#00ffea] font-bold text-black hover:bg-[#d4ff33] sm:flex-none"
                 >
                   Дальше: итог
                   <ChevronRight className="ml-1 h-4 w-4" />
@@ -957,7 +957,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                           return (
                             <div key={id} className="flex items-center justify-between text-sm">
                               <span className="flex items-center gap-2 text-[#a1a1aa]">
-                                <Check className="h-3.5 w-3.5 text-[#c8ff00]" />
+                                <Check className="h-3.5 w-3.5 text-[#00ffea]" />
                                 {part.model}
                               </span>
                               <span className="cfg-mono text-xs">+{formatPrice(part.daily_price)}</span>
@@ -1010,13 +1010,13 @@ export function ConfiguratorClient({ crew, slug }: Props) {
 
                       <div className="flex items-baseline justify-between">
                         <span className="text-sm font-bold uppercase tracking-widest text-[#71717a]">Итого</span>
-                        <span className="cfg-mono text-3xl font-black text-[#c8ff00]">{formatPrice(total)}</span>
+                        <span className="cfg-mono text-3xl font-black text-[#00ffea]">{formatPrice(total)}</span>
                       </div>
 
                       {/* Delivery toggle */}
                       <button
                         onClick={() => setDeliveryApplied((v) => !v)}
-                        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#27272a] py-3 text-xs text-[#71717a] transition-all hover:border-[#c8ff00]/30 hover:text-white"
+                        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#27272a] py-3 text-xs text-[#71717a] transition-all hover:border-[#00ffea]/30 hover:text-white"
                       >
                         <Truck className="h-4 w-4" />
                         {deliveryApplied ? 'Убрать доставку' : `Добавить доставку (+${formatPrice(DELIVERY_AVERAGE)})`}
@@ -1028,7 +1028,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                       <Button
                         onClick={submitLead}
                         disabled={isPending}
-                        className="cfg-glow-btn w-full bg-[#c8ff00] py-6 text-sm font-bold text-black hover:bg-[#d4ff33]"
+                        className="cfg-glow-btn w-full bg-[#00ffea] py-6 text-sm font-bold text-black hover:bg-[#d4ff33]"
                       >
                         <MessageCircle className="mr-2 h-4 w-4" />
                         Отправить в Telegram
@@ -1074,12 +1074,12 @@ export function ConfiguratorClient({ crew, slug }: Props) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] uppercase tracking-widest text-[#71717a]">{selectedBike.make} {selectedBike.model}</p>
-                <p className="cfg-mono text-xl font-black text-[#c8ff00]">{formatPrice(total)}</p>
+                <p className="cfg-mono text-xl font-black text-[#00ffea]">{formatPrice(total)}</p>
               </div>
               <Button
                 onClick={() => setTab('summary')}
                 size="sm"
-                className="bg-[#c8ff00] font-bold text-black"
+                className="bg-[#00ffea] font-bold text-black"
               >
                 Итог
                 <ChevronRight className="ml-1 h-4 w-4" />
