@@ -17,7 +17,7 @@ export default async function ConfiguratorPage({ params }: ConfiguratorPageProps
     <main className="min-h-screen" style={surface.page}>
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/configurator`} groupLinks={items.map((item) => item.category)} />
       <ConfiguratorClient crew={crew} slug={slug} />
-      <CrewFooter crew={crew} />
+      {/* <CrewFooter crew={crew} />*/}
     </main>
   )
 }
