@@ -18,12 +18,13 @@ import { Slider } from '@/components/ui/slider'
 import { useToast } from '@/hooks/use-toast'
 
 import { loadConfiguratorCatalog, sendConfiguratorLead, type ConfiguratorBatteryOption, type ConfiguratorBike, type ConfiguratorPart } from './actions_configurator'
+import { fallbackBikes, fallbackParts, lithiumBatteries, TIER_META, CARPIX_BASE } from './fallback-catalog'
 
 const DELIVERY_AVERAGE = 95_000
-const CARPIX_BASE = 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix'
+//const CARPIX_BASE = 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix'
 const formatPrice = (price: number) => `${price.toLocaleString('ru-RU')} ₽`
 
-const fallbackBikes: ConfiguratorBike[] = [
+/*const fallbackBikes: ConfiguratorBike[] = [
   { id: 'vipbike-g8', make: 'VipBike', model: 'G8', description: 'Электромотоцикл VipBike G8 с мощным двигателем 3000 Вт и максимальной скоростью до 150 км/ч.', daily_price: 120800, image_url: `${CARPIX_BASE}/vipbike-g8/image_0.jpg`, rent_link: '/rent/vipbike-g8', specs: { power_w: 3000, power_kw: 3, max_speed_kmh: '90-150', subtitle: 'Электромотоцикл VipBike G8', tier: 'standard', gallery: [`${CARPIX_BASE}/vipbike-g8/image_1.jpg`, `${CARPIX_BASE}/vipbike-g8/image_2.jpg`, `${CARPIX_BASE}/vipbike-g8/image_3.jpg`], battery_options: { base_price: 120800, batteries: [{ capacity: '50Ah', type: 'regular', battery_price: 44500, total_price: 165300, range_km: '70-110' }, { capacity: '60Ah', type: 'regular', battery_price: 55000, total_price: 175800, range_km: '80-120' }, { capacity: '80Ah', type: 'regular', battery_price: 59000, total_price: 179800, range_km: '90-150' }] } }, type: 'bike', quantity: 1 },
   { id: 'vipbike-g8-2', make: 'VipBike', model: 'G8-2', description: 'Обновленная версия популярной модели G8. Двигатель 3000 Вт, скорость до 150 км/ч.', daily_price: 124400, image_url: `${CARPIX_BASE}/vipbike-g8-2/image_0.jpg`, rent_link: '/rent/vipbike-g8-2', specs: { power_w: 3000, power_kw: 3, max_speed_kmh: '90-150', subtitle: 'Электромотоцикл VipBike G8-2', tier: 'standard', gallery: [`${CARPIX_BASE}/vipbike-g8-2/image_1.jpg`, `${CARPIX_BASE}/vipbike-g8-2/image_2.jpg`, `${CARPIX_BASE}/vipbike-g8-2/image_3.jpg`], battery_options: { base_price: 124400, batteries: [{ capacity: '50Ah', type: 'regular', battery_price: 44500, total_price: 168900, range_km: '70-110' }, { capacity: '60Ah', type: 'regular', battery_price: 55000, total_price: 179400, range_km: '80-120' }, { capacity: '80Ah', type: 'regular', battery_price: 59000, total_price: 183400, range_km: '90-150' }] } }, type: 'bike', quantity: 1 },
   { id: 'vipbike-dmg', make: 'VipBike', model: 'DMG', description: 'Премиальный электромотоцикл VipBike DMG с двигателем 3000 Вт.', daily_price: 159200, image_url: `${CARPIX_BASE}/vipbike-dmg/image_0.jpg`, rent_link: '/rent/vipbike-dmg', specs: { power_w: 3000, power_kw: 3, max_speed_kmh: '90-150', subtitle: 'Премиальный электромотоцикл VipBike DMG', tier: 'premium', gallery: [`${CARPIX_BASE}/vipbike-dmg/image_1.jpg`, `${CARPIX_BASE}/vipbike-dmg/image_2.jpg`, `${CARPIX_BASE}/vipbike-dmg/image_3.jpg`], battery_options: { base_price: 159200, batteries: [{ capacity: '50Ah', type: 'regular', battery_price: 44500, total_price: 203700, range_km: '70-110' }, { capacity: '60Ah', type: 'regular', battery_price: 55000, total_price: 214200, range_km: '80-120' }, { capacity: '80Ah', type: 'regular', battery_price: 59000, total_price: 218200, range_km: '90-150' }] } }, type: 'bike', quantity: 1 },
@@ -76,7 +77,7 @@ const TIER_META: Record<string, { label: string; color: string }> = {
   premium: { label: 'Премиум', color: '#fbbf24' },
   sport: { label: 'Спорт', color: '#f87171' },
   'high-performance': { label: 'Флагман', color: '#fb923c' },
-}
+}*/
 
 const PART_CATEGORY_ICONS: Record<string, typeof Zap> = {
   battery: Battery,
