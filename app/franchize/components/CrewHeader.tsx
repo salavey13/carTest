@@ -55,11 +55,11 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
       setIsCompact((prev) => {
         const scrollY = window.scrollY;
         // If the header is full-size, wait until we scroll well PAST the threshold (60px) to collapse it
-        if (!prev && scrollY > 60) {
+        if (!prev && scrollY > 90) {
           return true;
         }
         // If the header is collapsed, wait until we scroll well ABOVE the threshold (20px) to expand it
-        if (prev && scrollY < 20) {
+        if (prev && scrollY < 13) {
           return false;
         }
         // If we are in the "dead zone" between 20 and 60, change nothing. (Breaks the loop!)
