@@ -17,10 +17,12 @@ import { formatRideDuration, initialsFromName, riderDisplayName } from "@/lib/ma
 import { useAppContext } from "@/contexts/AppContext";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+import { useLiveRiders } from "@/hooks/useLiveRiders";
 
 type SnapshotData = {
   activeSessions: any[];
   meetups: any[];
+  liveLocations?: any[];
   weeklyLeaderboard: Array<{ rank: number; riderName: string; distanceKm: number; sessions: number; avgSpeedKmh: number; maxSpeedKmh: number }>;
   latestCompleted: any[];
   stats: { activeRiders: number; meetupCount: number; totalWeeklyDistanceKm: number };
@@ -56,8 +58,8 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
   const [shareEnabled, setShareEnabled] = useState(false);
   const [shareStatus, setShareStatus] = useState("Геошеринг выключен");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const watchRef = useRef<number | null>(null);
-  const lastCoordsRef = useRef<{ lat: number; lon: number } | null>(null);
+  const [liveRiders, setLiveRiders] = useState<any[]>([]);
+  const pendingRoutePointsRef = useRef<Array<{ lat: number; lon: number; speedKmh: number; headingDeg: number | null; accuracyMeters: number | null; capturedAt: string }>>([]);
   const activeOwnSession = useMemo(
     () => snapshot?.activeSessions.find((session) => session.user_id === dbUser?.user_id) || null,
     [snapshot?.activeSessions, dbUser?.user_id],
@@ -123,58 +125,53 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
     }
   }, [activeOwnSession?.id]);
 
-  const stopWatcher = useCallback(() => {
-    if (watchRef.current !== null) {
-      navigator.geolocation.clearWatch(watchRef.current);
-      watchRef.current = null;
-    }
-  }, []);
 
-  const pushLocation = useCallback(async (position: GeolocationPosition, nextSessionId: string) => {
-    const lat = position.coords.latitude;
-    const lon = position.coords.longitude;
-    const prev = lastCoordsRef.current;
-    if (prev && Math.abs(prev.lat - lat) < 0.00003 && Math.abs(prev.lon - lon) < 0.00003) {
-      return;
-    }
-    lastCoordsRef.current = { lat, lon };
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<any>).detail;
+      if (!detail?.user_id || detail?.crew_slug !== crewSlug) return;
+      setLiveRiders((prev) => {
+        const exists = prev.find((r) => r.user_id === detail.user_id);
+        if (exists) return prev.map((r) => (r.user_id === detail.user_id ? detail : r));
+        return [...prev, detail];
+      });
+    };
 
-    await fetch("/api/map-riders/location", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sessionId: nextSessionId,
-        userId: dbUser?.user_id,
-        crewSlug,
-        lat,
-        lon,
-        speedKmh: Math.max(0, Number(position.coords.speed || 0) * 3.6),
-        headingDeg: position.coords.heading || null,
-        accuracyMeters: position.coords.accuracy || null,
-        capturedAt: new Date(position.timestamp).toISOString(),
-      }),
-    });
-  }, [crewSlug, dbUser?.user_id]);
+    window.addEventListener("live-rider-update", handler);
+    return () => window.removeEventListener("live-rider-update", handler);
+  }, [crewSlug]);
 
-  const beginWatch = useCallback((nextSessionId: string) => {
-    if (!navigator.geolocation) {
-      toast.error("Браузер не поддерживает геолокацию");
-      return;
-    }
-    stopWatcher();
-    watchRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        pushLocation(position, nextSessionId).catch((error) => {
-          toast.error(error instanceof Error ? error.message : "Не удалось отправить геопоинт");
-        });
-      },
-      (error) => {
-        toast.error(`Геолокация недоступна: ${error.message}`);
-        setShareStatus("Нет доступа к GPS");
-      },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 12000 },
-    );
-  }, [pushLocation, stopWatcher]);
+  useLiveRiders(crewSlug, {
+    enabled: shareEnabled && Boolean(sessionId),
+    onPosition: async (point) => {
+      pendingRoutePointsRef.current.push({
+        lat: point.lat,
+        lon: point.lng,
+        speedKmh: point.speedKmh,
+        headingDeg: point.heading,
+        accuracyMeters: point.accuracyMeters,
+        capturedAt: point.capturedAt,
+      });
+
+      if (!sessionId || !dbUser?.user_id) return;
+
+      await fetch("/api/map-riders/location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          userId: dbUser.user_id,
+          crewSlug,
+          lat: point.lat,
+          lon: point.lng,
+          speedKmh: point.speedKmh,
+          headingDeg: point.heading,
+          accuracyMeters: point.accuracyMeters,
+          capturedAt: point.capturedAt,
+        }),
+      });
+    },
+  });
 
   const handleStartSharing = useCallback(async () => {
     if (!dbUser?.user_id) {
@@ -203,7 +200,7 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
       setSessionId(nextSessionId);
       setShareEnabled(true);
       setShareStatus("Делимся локацией в реальном времени");
-      beginWatch(nextSessionId);
+      pendingRoutePointsRef.current = [];
       await fetchSnapshot();
       toast.success("MapRiders активирован. Экипаж видит твой маршрут.");
     } catch (error) {
@@ -211,7 +208,7 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
     } finally {
       setIsSubmitting(false);
     }
-  }, [beginWatch, crewSlug, dbUser?.user_id, fetchSnapshot, rideMode, rideName, vehicleLabel]);
+  }, [crewSlug, dbUser?.user_id, fetchSnapshot, rideMode, rideName, vehicleLabel]);
 
   const handleStopSharing = useCallback(async () => {
     if (!dbUser?.user_id || !sessionId) return;
@@ -220,14 +217,21 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
       const response = await fetch("/api/map-riders/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "stop", sessionId, userId: dbUser.user_id, crewSlug }),
+        body: JSON.stringify({
+          action: "stop",
+          sessionId,
+          userId: dbUser.user_id,
+          crewSlug,
+          routePoints: pendingRoutePointsRef.current,
+        }),
       });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.error || "Не удалось завершить заезд");
-      stopWatcher();
       setShareEnabled(false);
       setSessionId(null);
       setShareStatus("Заезд завершён и сохранён в статистику");
+      pendingRoutePointsRef.current = [];
+      setLiveRiders((prev) => prev.filter((r) => r.user_id !== dbUser.user_id));
       await fetchSnapshot();
       toast.success("Маршрут закрыт. Статистика обновлена.");
     } catch (error) {
@@ -235,9 +239,7 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
     } finally {
       setIsSubmitting(false);
     }
-  }, [crewSlug, dbUser?.user_id, fetchSnapshot, sessionId, stopWatcher]);
-
-  useEffect(() => () => stopWatcher(), [stopWatcher]);
+  }, [crewSlug, dbUser?.user_id, fetchSnapshot, sessionId]);
 
   const handleCreateMeetup = useCallback(async () => {
     if (!dbUser?.user_id || !selectedMeetupPoint) {
@@ -271,17 +273,75 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
     }
   }, [crewSlug, dbUser?.user_id, fetchSnapshot, meetupComment, meetupTitle, selectedMeetupPoint]);
 
-  const mapPoints = useMemo(() => {
-    const riderPoints = (snapshot?.activeSessions || [])
+
+  useEffect(() => {
+    if (!snapshot?.activeSessions && !snapshot?.liveLocations) return;
+    const fromLiveTable = (snapshot?.liveLocations || []).map((row) => ({
+      user_id: row.user_id,
+      crew_slug: row.crew_slug || crewSlug,
+      lat: Number(row.lat),
+      lng: Number(row.lng),
+      speed_kmh: Number(row.speed_kmh || 0),
+    }));
+
+    const fromSessions = snapshot.activeSessions
       .filter((session) => typeof session.latest_lat === "number" && typeof session.latest_lon === "number")
       .map((session) => ({
-        id: `rider-${session.id}`,
-        name: `${riderDisplayName(session.users, session.user_id)} • ${Math.round(Number(session.latest_speed_kmh || 0))} км/ч`,
-        type: "point" as const,
-        icon: `image:https://placehold.co/56x56/${session.user_id === dbUser?.user_id ? "facc15" : "111827"}/ffffff?text=${encodeURIComponent(initialsFromName(riderDisplayName(session.users, session.user_id)))}`,
-        color: session.user_id === dbUser?.user_id ? "#facc15" : "#60a5fa",
-        coords: [[Number(session.latest_lat), Number(session.latest_lon)]],
+        user_id: session.user_id,
+        crew_slug: crewSlug,
+        lat: Number(session.latest_lat),
+        lng: Number(session.latest_lon),
+        speed_kmh: Number(session.latest_speed_kmh || 0),
       }));
+
+    const merged = [...fromSessions, ...fromLiveTable];
+
+    if (merged.length) {
+      setLiveRiders((prev) => {
+        const map = new Map(prev.map((item) => [item.user_id, item]));
+        for (const item of merged) map.set(item.user_id, item);
+        return Array.from(map.values());
+      });
+    }
+  }, [crewSlug, snapshot?.activeSessions, snapshot?.liveLocations]);
+
+  const mapPoints = useMemo(() => {
+    const activeByUser = new Map((snapshot?.activeSessions || []).map((session) => [session.user_id, session]));
+    const riderPoints = liveRiders
+      .filter((rider) => typeof rider?.lat === "number" && typeof rider?.lng === "number")
+      .map((rider) => {
+        const session = activeByUser.get(rider.user_id);
+        const riderName = riderDisplayName(session?.users, rider.user_id);
+        return {
+          id: `live-rider-${rider.user_id}`,
+          name: `${riderName} • ${Math.round(Number(rider.speed_kmh || 0))} км/ч`,
+          type: "point" as const,
+          icon: `image:https://placehold.co/56x56/${rider.user_id === dbUser?.user_id ? "facc15" : "111827"}/ffffff?text=${encodeURIComponent(initialsFromName(riderName))}`,
+          color: rider.user_id === dbUser?.user_id ? "#facc15" : "#60a5fa",
+          coords: [[Number(rider.lat), Number(rider.lng)]],
+        };
+      });
+
+    const demoRiderPoints = riderPoints.length
+      ? []
+      : [
+          {
+            id: "demo-rider-alpha",
+            name: "Demo Rider Alpha • 18 км/ч",
+            type: "point" as const,
+            icon: "image:https://placehold.co/56x56/111827/ffffff?text=DA",
+            color: "#60a5fa",
+            coords: [[56.2339, 43.9801]],
+          },
+          {
+            id: "demo-rider-beta",
+            name: "Demo Rider Beta • 23 км/ч",
+            type: "point" as const,
+            icon: "image:https://placehold.co/56x56/facc15/111827?text=DB",
+            color: "#facc15",
+            coords: [[56.2251, 43.9924]],
+          },
+        ];
 
     const meetupPoints = (snapshot?.meetups || []).map((meetup) => ({
       id: `meetup-${meetup.id}`,
@@ -303,8 +363,8 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
         }]
       : [];
 
-    return [...routePoints, ...riderPoints, ...meetupPoints];
-  }, [dbUser?.user_id, sessionDetail, snapshot?.activeSessions, snapshot?.meetups]);
+    return [...routePoints, ...riderPoints, ...demoRiderPoints, ...meetupPoints];
+  }, [dbUser?.user_id, liveRiders, sessionDetail, snapshot?.activeSessions, snapshot?.meetups]);
 
   const heroStats = [
     { label: "В эфире", value: snapshot?.stats.activeRiders ?? 0, icon: "::FaSatelliteDish::" },
