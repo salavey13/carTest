@@ -1555,6 +1555,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   vehicleTitle: string;
   renterId: string;
   ownerId: string;
+  metadata: Record<string, unknown> | null;
   telegramDeepLink: string;
 }> {
   const safeSlug = slug.trim();
@@ -1570,13 +1571,14 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       vehicleTitle: "—",
       renterId: "",
       ownerId: "",
+      metadata: null,
       telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${safeRentalId}`,
     };
   }
 
   const { data, error } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, vehicle:cars(make, model)")
+    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, metadata, vehicle:cars(make, model)")
     .eq("rental_id", safeRentalId)
     .maybeSingle();
 
@@ -1591,6 +1593,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       vehicleTitle: "—",
       renterId: "",
       ownerId: "",
+      metadata: null,
       telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${safeRentalId}`,
     };
   }
@@ -1607,6 +1610,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     vehicleTitle: `${vehicle?.make ?? "Vehicle"} ${vehicle?.model ?? ""}`.trim(),
     renterId: data.user_id ?? "",
     ownerId: data.owner_id ?? "",
+    metadata: (data.metadata as Record<string, unknown> | null) ?? null,
     telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${data.rental_id}`,
   };
 }
