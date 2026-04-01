@@ -5,7 +5,7 @@ import { calcDurationSeconds, riderDisplayName, safeAverageSpeed } from "@/lib/m
 export async function GET(request: NextRequest) {
   const crewSlug = request.nextUrl.searchParams.get("slug") || "vip-bike";
 
-  const [sessionsRes, meetupsRes] = await Promise.all([
+  const [sessionsRes, meetupsRes, liveRes] = await Promise.all([
     supabaseAdmin
       .from("map_rider_sessions")
       .select("*, users:user_id(username, full_name, avatar_url)")
@@ -18,6 +18,12 @@ export async function GET(request: NextRequest) {
       .eq("crew_slug", crewSlug)
       .order("created_at", { ascending: false })
       .limit(20),
+    supabaseAdmin
+      .from("live_locations")
+      .select("user_id, crew_slug, lat, lng, speed_kmh, updated_at")
+      .eq("crew_slug", crewSlug)
+      .order("updated_at", { ascending: false })
+      .limit(150),
   ]);
 
   if (sessionsRes.error) {
@@ -26,9 +32,13 @@ export async function GET(request: NextRequest) {
   if (meetupsRes.error) {
     return NextResponse.json({ success: false, error: meetupsRes.error.message }, { status: 500 });
   }
+  if (liveRes.error) {
+    return NextResponse.json({ success: false, error: liveRes.error.message }, { status: 500 });
+  }
 
   const sessions = (sessionsRes.data || []) as any[];
   const meetups = (meetupsRes.data || []) as any[];
+  const liveLocations = (liveRes.data || []) as any[];
   const activeSessions = sessions.filter((session) => session.status === "active" && session.sharing_enabled);
   const completedSessions = sessions.filter((session) => session.status === "completed");
 
@@ -78,11 +88,12 @@ export async function GET(request: NextRequest) {
     success: true,
     data: {
       activeSessions,
+      liveLocations,
       meetups,
       weeklyLeaderboard,
       latestCompleted,
       stats: {
-        activeRiders: activeSessions.length,
+        activeRiders: Math.max(activeSessions.length, liveLocations.length),
         meetupCount: meetups.length,
         totalWeeklyDistanceKm: Number(weeklyLeaderboard.reduce((sum, row) => sum + row.distanceKm, 0).toFixed(1)),
       },
