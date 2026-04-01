@@ -130,7 +130,7 @@ interface Props {
 
 export function ConfiguratorClient({ crew, slug }: Props) {
   const { toast } = useToast()
-  const { dbUser } = useAppContext()
+  const { dbUser, user: tgUser } = useAppContext()
   const [isPending, startTransition] = useTransition()
   const [tab, setTab] = useState<ConfigStep>('model')
   const [priceRange, setPriceRange] = useState([100000, 500000])
@@ -151,28 +151,38 @@ export function ConfiguratorClient({ crew, slug }: Props) {
     return String(meta.telegram_id ?? meta.telegramId ?? '').trim()
   }, [dbUser])
 
+
+  const userTelegramId = useMemo(() => {
+    if (tgUser?.id) return String(tgUser.id)
+    // fallback: try dbUser columns then metadata
+    const row = dbUser as Record<string, unknown> | null
+    if (!row) return ''
+    const direct = String(row.telegram_id ?? '').trim()
+    if (direct) return direct
+    const meta = (row.metadata as Record<string, unknown>) ?? {}
+    return String(meta.telegram_id ?? meta.telegramId ?? '').trim()
+  }, [tgUser, dbUser])
+
   const userName = useMemo(() => {
-    if (!dbUser) return ''
-    return (dbUser as Record<string, unknown>).display_name as string
-      || (dbUser as Record<string, unknown>).name as string
-      || userTelegramId
-      || 'Неизвестный'
-  }, [dbUser, userTelegramId])
-
-  useEffect(() => {
-    startTransition(async () => {
-      const data = await loadConfiguratorCatalog()
-      if (data.hasLiveEbikeData) {
-        setBikes(data.ebikes)
-        setSelectedBikeId(data.ebikes[0]?.id ?? '')
-      }
-      if (data.hasLivePartsData) setParts(data.parts)
-      if (!data.hasLiveEbikeData) {
-        toast({ title: 'Используется fallback-каталог', description: 'Показываем полный локальный прайс из хардкода.' })
-      }
-    })
-  }, [toast])
-
+    if (tgUser) {
+      const parts = [tgUser.first_name, tgUser.last_name].filter(Boolean)
+      if (parts.length) return parts.join(' ')
+      if (tgUser.username) return tgUser.username
+    }
+    // fallback: dbUser display fields
+    const row = dbUser as Record<string, unknown> | null
+    if (!row) return 'Неизвестный'
+    const meta = (row.metadata as Record<string, unknown>) ?? {}
+    return (
+      String(row.display_name ?? '').trim() ||
+      String(row.name ?? '').trim() ||
+      String(row.username ?? '').trim() ||
+      String(meta.first_name ?? '').trim() ||
+      String(meta.display_name ?? '').trim() ||
+      'Неизвестный'
+    )
+  }, [tgUser, dbUser])
+  
   const selectedBike = useMemo(() => bikes.find((b) => b.id === selectedBikeId) ?? null, [bikes, selectedBikeId])
   const regularBatteries = useMemo(() => selectedBike?.specs.battery_options?.batteries ?? [], [selectedBike])
 
