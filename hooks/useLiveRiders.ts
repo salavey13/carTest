@@ -1,19 +1,41 @@
 "use client";
-import { useEffect, useRef } from "react";
-import { supabaseAnon } from "@/lib/supabase-browser";
+
+import { useCallback, useEffect, useRef } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useAppContext } from "@/contexts/AppContext";
 
-const THROTTLE_MS = 3000;        // 3 seconds
+const THROTTLE_MS = 3000;
 const MIN_DISTANCE_M = 15;
 
-export function useLiveRiders(crewSlug: string) {
+type LiveRiderPoint = {
+  lat: number;
+  lng: number;
+  speedKmh: number;
+  heading: number | null;
+  accuracyMeters: number | null;
+  capturedAt: string;
+};
+
+export function useLiveRiders(
+  crewSlug: string,
+  options?: {
+    enabled?: boolean;
+    onPosition?: (point: LiveRiderPoint) => void | Promise<void>;
+  },
+) {
   const { dbUser } = useAppContext();
+  const enabled = options?.enabled ?? true;
   const lastSentRef = useRef<{ lat: number; lng: number; ts: number } | null>(null);
-  const channelRef = useRef<any>(null);
+  const onPositionRef = useRef(options?.onPosition);
 
-  const sendPosition = async (position: GeolocationPosition) => {
-    if (!dbUser?.user_id || !crewSlug) return;
+  useEffect(() => {
+    onPositionRef.current = options?.onPosition;
+  }, [options?.onPosition]);
 
+  const sendPosition = useCallback(async (position: GeolocationPosition) => {
+    if (!dbUser?.user_id || !crewSlug || !enabled) return;
+
+    const supabase = getSupabaseBrowserClient();
     const { latitude: lat, longitude: lng, speed, heading, accuracy } = position.coords;
     const now = Date.now();
 
@@ -23,54 +45,67 @@ export function useLiveRiders(crewSlug: string) {
       if (distance < MIN_DISTANCE_M && now - last.ts < THROTTLE_MS) return;
     }
 
+    const speedKmh = Math.max(0, Number(speed || 0) * 3.6);
     const payload = {
       user_id: dbUser.user_id,
       crew_slug: crewSlug,
       lat,
       lng,
-      speed_kmh: (speed || 0) * 3.6,
+      speed_kmh: speedKmh,
       heading: heading || null,
       is_riding: true,
     };
 
-    // 1. Fast broadcast (instant for everyone)
-    supabaseAnon.channel(`map:${crewSlug}`).send({
+    supabase.channel(`map:${crewSlug}`).send({
       type: "broadcast",
       event: "position",
       payload,
     });
 
-    // 2. Upsert to live_locations (ephemeral + spatial RLS)
-    await supabaseAnon.from("live_locations").upsert(payload, { onConflict: "user_id" });
+    const { error } = await supabase.from("live_locations").upsert(payload, { onConflict: "user_id" });
+    if (error) {
+      console.error("[useLiveRiders] upsert failed", error.message);
+    }
+
+    if (onPositionRef.current) {
+      await onPositionRef.current({
+        lat,
+        lng,
+        speedKmh,
+        heading: heading || null,
+        accuracyMeters: accuracy || null,
+        capturedAt: new Date(position.timestamp).toISOString(),
+      });
+    }
 
     lastSentRef.current = { lat, lng, ts: now };
-  };
+  }, [crewSlug, dbUser?.user_id, enabled]);
 
-  // Subscribe to live positions
   useEffect(() => {
     if (!crewSlug) return;
-    const channel = supabaseAnon.channel(`map:${crewSlug}`);
+    const supabase = getSupabaseBrowserClient();
+    const channel = supabase.channel(`map:${crewSlug}`);
 
     channel.on("broadcast", { event: "position" }, ({ payload }) => {
-      // TODO: your VibeMap will listen to this via a global store or prop later
       window.dispatchEvent(new CustomEvent("live-rider-update", { detail: payload }));
     }).subscribe();
 
-    channelRef.current = channel;
-
-    return () => supabaseAnon.removeChannel(channel);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [crewSlug]);
 
-  // GPS watcher
   useEffect(() => {
-    if (!navigator.geolocation || !dbUser?.user_id) return;
+    if (!navigator.geolocation || !dbUser?.user_id || !crewSlug || !enabled) return;
+
     const watchId = navigator.geolocation.watchPosition(sendPosition, console.error, {
       enableHighAccuracy: true,
       maximumAge: 5000,
       timeout: 10000,
     });
+
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [dbUser?.user_id, crewSlug]);
+  }, [crewSlug, dbUser?.user_id, enabled, sendPosition]);
 
   return { sendPosition };
 }
