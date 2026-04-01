@@ -144,13 +144,19 @@ export function ConfiguratorClient({ crew, slug }: Props) {
   const [selectedAccessories, setSelectedAccessories] = useState<string[]>([])
   const [deliveryApplied, setDeliveryApplied] = useState(false)
 
-  // ── Resolve user telegram ID from dbUser ──
-  const userTelegramId = useMemo(() => {
-    if (!dbUser?.metadata) return ''
-    const meta = dbUser.metadata as Record<string, unknown>
-    return String(meta.telegram_id ?? meta.telegramId ?? '').trim()
-  }, [dbUser])
-
+  useEffect(() => {
+    startTransition(async () => {
+      const data = await loadConfiguratorCatalog()
+      if (data.hasLiveEbikeData) {
+        setBikes(data.ebikes)
+        setSelectedBikeId(data.ebikes[0]?.id ?? '')
+      }
+      if (data.hasLivePartsData) setParts(data.parts)
+      if (!data.hasLiveEbikeData) {
+        toast({ title: 'Используется fallback-каталог', description: 'Показываем полный локальный прайс из хардкода.' })
+      }
+    })
+  }, [toast])
 
   const userTelegramId = useMemo(() => {
     if (tgUser?.id) return String(tgUser.id)
