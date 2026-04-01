@@ -733,10 +733,13 @@ export async function confirmVehiclePickup(rentalId: string, userId: string) {
         const { data: rental, error: fetchError } = await supabaseAdmin.from('rentals').select('owner_id, metadata').eq('rental_id', rentalId).single();
         if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
         if (rental.owner_id !== userId) return { success: false, error: "Только владелец может подтвердить получение." };
-        
-        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-        // Шаг 1: Обновляем JSON metadata и статус в ОДНОМ запросе
         const currentMetadata = (rental.metadata as Record<string, any>) || {};
+        const hasPickupFreeze = Boolean(currentMetadata.pickup_freeze?.frozen_at);
+        if (!hasPickupFreeze) {
+            return { success: false, error: "Сначала заполните Pickup Freeze в блоке Rental Documents." };
+        }
+        
+        // Шаг 1: Обновляем JSON metadata и статус в ОДНОМ запросе
         const newMetadata = {
             ...currentMetadata,
             pickup_confirmed_at: new Date().toISOString()
@@ -763,6 +766,154 @@ export async function confirmVehiclePickup(rentalId: string, userId: string) {
     } catch (e: any) {
         logger.error(`[confirmVehiclePickup] Error:`, e);
         return { success: false, error: e.message };
+    }
+}
+
+type PickupFreezePayload = {
+    odometerKm: number;
+    fuelLevel: string;
+    checklist: string[];
+    notes?: string;
+    photoUrls?: string[];
+};
+
+export async function saveRentalPickupFreeze(
+    rentalId: string,
+    userId: string,
+    payload: PickupFreezePayload
+): Promise<{ success: boolean; error?: string }> {
+    noStore();
+    if (!rentalId || !userId) return { success: false, error: "Missing rentalId or userId." };
+    if (!Number.isFinite(payload.odometerKm) || payload.odometerKm < 0) {
+        return { success: false, error: "Пробег должен быть неотрицательным числом." };
+    }
+
+    try {
+        const { data: rental, error: fetchError } = await supabaseAdmin
+            .from("rentals")
+            .select("owner_id, status, metadata")
+            .eq("rental_id", rentalId)
+            .single();
+        if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
+        if (rental.owner_id !== userId) return { success: false, error: "Только владелец может зафиксировать выдачу." };
+        if (!["pending_confirmation", "confirmed"].includes(rental.status)) {
+            return { success: false, error: "Pickup Freeze доступен только до подтверждения выдачи." };
+        }
+
+        const checklist = (payload.checklist || []).map((item) => String(item || "").trim()).filter(Boolean).slice(0, 12);
+        const photoUrls = (payload.photoUrls || []).map((url) => String(url || "").trim()).filter(Boolean).slice(0, 8);
+        const currentMetadata = (rental.metadata as Record<string, any>) || {};
+        const pickupFreeze = {
+            version: 1,
+            frozen_at: new Date().toISOString(),
+            frozen_by: userId,
+            odometer_km: Math.round(payload.odometerKm),
+            fuel_level: String(payload.fuelLevel || "").trim() || "не указано",
+            checklist,
+            notes: String(payload.notes || "").trim(),
+            photo_urls: photoUrls,
+        };
+
+        const { error: updateError } = await supabaseAdmin
+            .from("rentals")
+            .update({
+                metadata: { ...currentMetadata, pickup_freeze: pickupFreeze },
+                updated_at: new Date().toISOString(),
+            })
+            .eq("rental_id", rentalId);
+        if (updateError) throw updateError;
+
+        const { error: eventError } = await supabaseAdmin.from("events").insert({
+            rental_id: rentalId,
+            type: "pickup_freeze_created",
+            status: "completed",
+            created_by: userId,
+            payload: {
+                odometer_km: pickupFreeze.odometer_km,
+                fuel_level: pickupFreeze.fuel_level,
+                checklist_count: checklist.length,
+                photos_count: photoUrls.length,
+            },
+        });
+        if (eventError) logger.error("[saveRentalPickupFreeze] Event insert failed:", eventError);
+        return { success: true };
+    } catch (e: any) {
+        logger.error("[saveRentalPickupFreeze] Error:", e);
+        return { success: false, error: e.message || "Unknown error." };
+    }
+}
+
+type DamageReportPayload = {
+    phase: "pickup" | "return";
+    severity: "minor" | "major";
+    notes: string;
+    photoUrls?: string[];
+};
+
+export async function addRentalDamageReport(
+    rentalId: string,
+    userId: string,
+    payload: DamageReportPayload
+): Promise<{ success: boolean; error?: string }> {
+    noStore();
+    if (!rentalId || !userId) return { success: false, error: "Missing rentalId or userId." };
+    const notes = String(payload.notes || "").trim();
+    if (notes.length < 5) return { success: false, error: "Добавьте краткое описание повреждения (минимум 5 символов)." };
+
+    try {
+        const { data: rental, error: fetchError } = await supabaseAdmin
+            .from("rentals")
+            .select("user_id, owner_id, metadata")
+            .eq("rental_id", rentalId)
+            .single();
+        if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
+        const isOwner = rental.owner_id === userId;
+        const isRenter = rental.user_id === userId;
+        if (!isOwner && !isRenter) return { success: false, error: "Недостаточно прав для отчета о повреждении." };
+
+        const photoUrls = (payload.photoUrls || []).map((url) => String(url || "").trim()).filter(Boolean).slice(0, 8);
+        const currentMetadata = (rental.metadata as Record<string, any>) || {};
+        const existingReports = Array.isArray(currentMetadata.damage_reports) ? currentMetadata.damage_reports : [];
+        const report = {
+            report_id: uuidv4(),
+            phase: payload.phase,
+            severity: payload.severity,
+            notes,
+            photo_urls: photoUrls,
+            reported_at: new Date().toISOString(),
+            reported_by: userId,
+            reporter_role: isOwner ? "owner" : "renter",
+        };
+
+        const { error: updateError } = await supabaseAdmin
+            .from("rentals")
+            .update({
+                metadata: {
+                    ...currentMetadata,
+                    damage_reports: [report, ...existingReports].slice(0, 20),
+                },
+                updated_at: new Date().toISOString(),
+            })
+            .eq("rental_id", rentalId);
+        if (updateError) throw updateError;
+
+        const { error: eventError } = await supabaseAdmin.from("events").insert({
+            rental_id: rentalId,
+            type: "damage_report_added",
+            status: "completed",
+            created_by: userId,
+            payload: {
+                phase: report.phase,
+                severity: report.severity,
+                reporter_role: report.reporter_role,
+                photos_count: photoUrls.length,
+            },
+        });
+        if (eventError) logger.error("[addRentalDamageReport] Event insert failed:", eventError);
+        return { success: true };
+    } catch (e: any) {
+        logger.error("[addRentalDamageReport] Error:", e);
+        return { success: false, error: e.message || "Unknown error." };
     }
 }
 
