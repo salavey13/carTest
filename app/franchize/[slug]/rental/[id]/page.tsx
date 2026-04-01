@@ -1,8 +1,10 @@
 import { ExternalLink, Info, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
 import { CrewFooter } from "../../../components/CrewFooter";
 import { FranchizeRentalLifecycleActions } from "../../../components/FranchizeRentalLifecycleActions";
+import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRentalDocumentsPanel";
 
 interface FranchizeRentalPageProps {
   params: Promise<{ slug: string; id: string }>;
@@ -56,24 +58,30 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           </div>
 
           <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            <a
+            <Link
               href={`/franchize/${slug}/order/demo-order`}
               className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
               style={{ backgroundColor: crew.theme.palette.accentMain, color: "#16130A" }}
             >
               <Sparkles className="h-4 w-4" />
               Продолжить оформление
-            </a>
-            <a
+            </Link>
+            <Link
               href={`/franchize/${slug}`}
               className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm"
               style={{ borderColor: crew.theme.palette.borderSoft, color: crew.theme.palette.textPrimary }}
             >
               К каталогу
-            </a>
+            </Link>
           </div>
 
-
+          <FranchizeRentalDocumentsPanel
+            rentalId={rental.rentalId}
+            ownerId={rental.ownerId}
+            status={rental.status}
+            metadata={rental.metadata}
+            palette={crew.theme.palette}
+          />
 
           <FranchizeRentalLifecycleActions
             rentalId={rental.rentalId}
