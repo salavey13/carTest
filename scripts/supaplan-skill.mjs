@@ -723,6 +723,30 @@ async function addTask() {
     throw new Error('Invalid --status. For planned tasks use status=open');
   }
 
+  let knownCapabilities = [];
+  try {
+    const rows = restRequest(
+      'GET',
+      'supaplan_tasks?select=capability&limit=500',
+    );
+    knownCapabilities = Array.from(
+      new Set(
+        (Array.isArray(rows) ? rows : [])
+          .map((row) => row?.capability)
+          .filter((value) => typeof value === 'string' && value.trim().length > 0),
+      ),
+    ).sort();
+  } catch (error) {
+    if (!isTransientNetworkError(error)) throw error;
+  }
+
+  if (knownCapabilities.length > 0 && !knownCapabilities.includes(capability)) {
+    throw new Error(
+      `Invalid --capability=${capability}. Use one of: ${knownCapabilities.join(', ')}. ` +
+      'Run `node scripts/supaplan-skill.mjs inspect-migrations` to discover real capabilities.',
+    );
+  }
+
   const payload = {
     title,
     capability,
