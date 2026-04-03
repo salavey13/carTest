@@ -29,7 +29,7 @@ type RenderBox = {
   offsetY: number;
 };
 
-const DEFAULT_VIBE_MAP_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg";
+const DEFAULT_VIBE_MAP_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/nnmap.jpg";
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
