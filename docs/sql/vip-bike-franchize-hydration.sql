@@ -1,11 +1,12 @@
--- VIP_BIKE Franchize hydration reference payload
--- Purpose: provide a production-like, metadata-first seed for /franchize/* runtime.
--- Safe to re-run: uses jsonb_set merge update scoped to slug = 'vip-bike'.
--- Updated: 2026-03-26 - added contractDefaults for document generation
+-- /docs/sql/vip-bike-franchize-hydration.sql
+-- VIP_BIKE Franchize hydration reference payload (2026 edition)
+-- Purpose: production-like seed with metadata-first approach + private.crew_secrets extraction
+-- Safe to re-run: uses ON CONFLICT + jsonb_set + private upsert
+-- Updated: 2026-04-03 — moved contractDefaults to private.crew_secrets + fresh 2026 creative ticker/ads
 
 begin;
 
--- 1) Ensure crew exists (id from operator dataset). If row already exists, only minimal fields are refreshed.
+-- 1) Ensure crew exists
 insert into public.crews (
   id,
   name,
@@ -40,8 +41,7 @@ set
   hq_location = excluded.hq_location,
   updated_at = now();
 
--- 2) Canonical franchize metadata payload.
---    We keep legacy keys and inject `metadata.franchize` for new runtime surfaces.
+-- 2) Canonical franchize metadata payload (contractDefaults stays in public for backward compatibility)
 update public.crews c
 set
   metadata = jsonb_set(
@@ -49,7 +49,7 @@ set
     '{franchize}',
     (
       jsonb_build_object(
-        'version', '2026-03-26-v2',
+        'version', '2026-04-03-v3',
         'enabled', true,
         'slug', 'vip-bike',
         'branding', jsonb_build_object(
@@ -190,19 +190,31 @@ set
         'catalog', jsonb_build_object(
           'groupOrder', jsonb_build_array('Naked', 'Supersport', 'Enduro', 'Touring', 'Neo-retro', 'Power-cruiser'),
           'quickLinks', jsonb_build_array('23 февраля', 'Все по 549', 'Выгодное комбо', 'Cruiser week'),
+          -- 2026 fresh & creative ticker (no more 2025 vibes)
           'tickerItems', jsonb_build_array(
-            jsonb_build_object('id', 'vip-hot-weekend', 'text', '🔥 Weekend auction: -15% на cruiser пакеты', 'href', '/franchize/vip-bike#category-cruiser'),
-            jsonb_build_object('id', 'vip-auction-night', 'text', '⚡ Ночной аукцион экипа: шлем + перчатки бонусом', 'href', '/franchize/vip-bike#category-supersport'),
-            jsonb_build_object('id', 'vip-telegram-fast', 'text', '📣 Быстрый выкуп слотов через Telegram @I_O_S_NN', 'href', '/franchize/vip-bike/contacts')
+            jsonb_build_object('id', '2026-neural-drop', 'text', '🚀 2026 Neural Drop: новые power-cruisers с AI-ассистентом уже в парке!', 'href', '/franchize/vip-bike#category-power-cruiser'),
+            jsonb_build_object('id', 'electro-spring', 'text', '⚡ Электро-весна 2026: -25% на e-cruisers + бесплатная зарядка + GoPro в подарок', 'href', '/franchize/vip-bike#catalog-sections'),
+            jsonb_build_object('id', 'ai-route-master', 'text', '🧬 AI Route Master 2026: нейросеть строит идеальный маршрут под твой вайб', 'href', '/franchize/vip-bike/contacts')
           ),
           'showTwoColumnsMobile', true,
           'useModalDetails', true,
+          -- 2026 creative promo banner
           'promoBanners', jsonb_build_array(
-            jsonb_build_object('id', 'summer-2025', 'title', 'Промокод ЛЕТО2025 для длинного летнего маршрута по набережной и центру города', 'subtitle', '-10% на первую аренду', 'code', 'ЛЕТО2025', 'activeFrom', '2026-02-01', 'activeTo', '2026-12-31', 'priority', 90, 'ctaLabel', 'Забрать скидку')
+            jsonb_build_object(
+              'id', 'spring-2026-blast',
+              'title', 'Весенний нейро-бласт 2026',
+              'subtitle', '-20% на первую аренду + AI-маршрут в подарок',
+              'code', 'NEURO2026',
+              'activeFrom', '2026-03-01',
+              'activeTo', '2026-05-31',
+              'priority', 95,
+              'ctaLabel', 'Забрать нейро-скидку'
+            )
           ),
+          -- 2026 creative ad cards
           'adCards', jsonb_build_array(
-            jsonb_build_object('id', 'helmet-upgrade', 'title', 'PRO экипировка', 'subtitle', 'Добавь комплект защиты к аренде', 'href', '', 'imageUrl', '', 'badge', 'Safety', 'activeFrom', '2026-02-01', 'activeTo', '2026-12-31', 'priority', 70, 'ctaLabel', 'Смотреть детали'),
-            jsonb_build_object('id', 'photo-ride', 'title', 'Photo ride add-on', 'subtitle', 'Контент-съёмка + маршрут от куратора', 'href', '/franchize/{slug}/contacts', 'imageUrl', '', 'badge', 'Boost', 'activeFrom', '2026-02-01', 'activeTo', '2026-12-31', 'priority', 60, 'ctaLabel', 'Открыть')
+            jsonb_build_object('id', 'neural-helmet', 'title', 'Neural Helmet PRO', 'subtitle', 'AR-шлем с проекцией маршрута и музыкой 2026', 'href', '', 'imageUrl', '', 'badge', 'Future', 'activeFrom', '2026-01-01', 'activeTo', '2026-12-31', 'priority', 80, 'ctaLabel', 'Смотреть'),
+            jsonb_build_object('id', 'drone-ride', 'title', 'Drone Ride Experience', 'subtitle', 'Профессиональная съёмка с дрона + нейро-монтаж видео', 'href', '/franchize/{slug}/contacts', 'imageUrl', '', 'badge', 'Content', 'activeFrom', '2026-02-01', 'activeTo', '2026-12-31', 'priority', 75, 'ctaLabel', 'Заказать')
           ),
           'floatingCart', jsonb_build_object('showOn', jsonb_build_array('catalog', 'about', 'contacts', 'order'), 'showScrollTopButton', true)
         ),
@@ -214,7 +226,7 @@ set
           'paymentOptions', jsonb_build_array('telegram_xtr', 'card', 'sbp', 'cash'),
           'consentText', 'Я согласен с условиями аренды и обработкой персональных данных.'
         ),
-        -- NEW: Contract defaults for document generation
+        -- contractDefaults stays in public metadata for now (backward compatibility)
         'contractDefaults', jsonb_build_object(
           'issuerName', 'Рысан Григорий Константинович',
           'issuerRepresentative', 'Сидоров Илья Олегович',
@@ -222,65 +234,17 @@ set
           'includedMileage', 200,
           'overageRate', 30,
           'lateReturnPenaltyRub', 5000,
-          -- Template field mappings for docx generation
           'templateFields', jsonb_build_object(
-            'renter_driver_license', jsonb_build_object(
-              'description', 'Водительское удостоверение',
-              'source', 'renter_profile.driver_license',
-              'required', true,
-              'placeholder', '5223 198296'
-            ),
-            'renter_passport', jsonb_build_object(
-              'description', 'Паспорт (серия/номер)',
-              'source', 'renter_profile.passport',
-              'required', true,
-              'placeholder', '2209 384865'
-            ),
-            'included_mileage', jsonb_build_object(
-              'description', 'Включённый пробег (км)',
-              'source', 'contractDefaults.includedMileage',
-              'required', true,
-              'default', 200
-            ),
-            'overage_rate', jsonb_build_object(
-              'description', 'Тариф за превышение пробега (руб/км)',
-              'source', 'contractDefaults.overageRate',
-              'required', true,
-              'default', 30
-            ),
-            'bike_value_rub', jsonb_build_object(
-              'description', 'Полная стоимость мотоцикла (руб)',
-              'source', 'bike.estimated_value_rub',
-              'required', true,
-              'placeholder', '700000'
-            ),
-            'bike_value_words', jsonb_build_object(
-              'description', 'Сумма прописью',
-              'source', 'computed_from_bike_value',
-              'required', true,
-              'computed', true,
-              'placeholder', 'Семьсот тысяч'
-            ),
-            'late_return_penalty_rub', jsonb_build_object(
-              'description', 'Неустойка за просрочку (руб/день)',
-              'source', 'contractDefaults.lateReturnPenaltyRub',
-              'required', true,
-              'default', 5000
-            ),
-            'return_address', jsonb_build_object(
-              'description', 'Адрес возврата мотоцикла',
-              'source', 'contractDefaults.returnAddress',
-              'required', true,
-              'default', 'г. Нижний Новгород, ул. Стригинский переулок, дом 13б'
-            ),
-            'issuer_representative', jsonb_build_object(
-              'description', 'Представитель арендодателя',
-              'source', 'contractDefaults.issuerRepresentative',
-              'required', true,
-              'default', 'Сидоров Илья Олегович'
-            )
+            'renter_driver_license', jsonb_build_object('description', 'Водительское удостоверение', 'source', 'renter_profile.driver_license', 'required', true, 'placeholder', '5223 198296'),
+            'renter_passport', jsonb_build_object('description', 'Паспорт (серия/номер)', 'source', 'renter_profile.passport', 'required', true, 'placeholder', '2209 384865'),
+            'included_mileage', jsonb_build_object('description', 'Включённый пробег (км)', 'source', 'contractDefaults.includedMileage', 'required', true, 'default', 200),
+            'overage_rate', jsonb_build_object('description', 'Тариф за превышение пробега (руб/км)', 'source', 'contractDefaults.overageRate', 'required', true, 'default', 30),
+            'bike_value_rub', jsonb_build_object('description', 'Полная стоимость мотоцикла (руб)', 'source', 'bike.estimated_value_rub', 'required', true, 'placeholder', '700000'),
+            'bike_value_words', jsonb_build_object('description', 'Сумма прописью', 'source', 'computed_from_bike_value', 'required', true, 'computed', true, 'placeholder', 'Семьсот тысяч'),
+            'late_return_penalty_rub', jsonb_build_object('description', 'Неустойка за просрочку (руб/день)', 'source', 'contractDefaults.lateReturnPenaltyRub', 'required', true, 'default', 5000),
+            'return_address', jsonb_build_object('description', 'Адрес возврата мотоцикла', 'source', 'contractDefaults.returnAddress', 'required', true, 'default', 'г. Нижний Новгород, ул. Стригинский переулок, дом 13б'),
+            'issuer_representative', jsonb_build_object('description', 'Представитель арендодателя', 'source', 'contractDefaults.issuerRepresentative', 'required', true, 'default', 'Сидоров Илья Олегович')
           ),
-          -- Default values for contract generation
           'defaults', jsonb_build_object(
             'renter_driver_license', '',
             'renter_passport', '',
@@ -289,7 +253,7 @@ set
             'bike_value_rub', 700000,
             'bike_value_words', 'Семьсот тысяч',
             'late_return_penalty_rub', 5000,
-            'return_address', 'г. Нижний Новгород, ул. Стригинский бульвар, дом 13б',
+            'return_address', 'г. Нижний Новгород, ул. Стригинский переулок, дом 13б',
             'issuer_representative', 'Сидоров Илья Олегович'
           )
         )
@@ -300,7 +264,7 @@ set
   updated_at = now()
 where c.slug = 'vip-bike';
 
--- 3) Keep important legacy top-level metadata keys available for old routes/components.
+-- 3) Legacy top-level metadata (unchanged)
 update public.crews c
 set
   metadata = coalesce(c.metadata, '{}'::jsonb)
@@ -319,27 +283,26 @@ set
     )
 where c.slug = 'vip-bike';
 
+-- 4) ★ Stage 2 extraction: move contractDefaults into private.crew_secrets
+insert into private.crew_secrets (
+  crew_slug,
+  contract_defaults,
+  updated_at
+)
+select
+  'vip-bike',
+  (metadata->'franchize'->'contractDefaults')::text,
+  now()
+from public.crews
+where slug = 'vip-bike'
+on conflict (crew_slug) do update
+set
+  contract_defaults = excluded.contract_defaults,
+  updated_at = now();
+
 commit;
 
--- Verification helpers:
+-- Verification helpers (updated 2026)
 -- select slug, metadata->'franchize'->'branding'->>'name' as brand from public.crews where slug='vip-bike';
+-- select jsonb_pretty((select contract_defaults::jsonb from private.crew_secrets where crew_slug='vip-bike')) as private_contract_defaults;
 -- select jsonb_pretty(metadata->'franchize'->'contractDefaults') from public.crews where slug='vip-bike';
--- select jsonb_pretty(metadata->'franchize'->'contractDefaults'->'templateFields') from public.crews where slug='vip-bike';
-
-
--- 4) Editor parity note:
---    /franchize/create currently edits structured slices (branding/theme/contacts/catalog/order/header.menuLinks)
---    and should preserve richer blocks from this payload (about/footer/promo/quickActions/contractDefaults).
-
--- 5) Contract defaults usage:
---    When generating a contract document, merge:
---    - contractDefaults.defaults (fallback values)
---    - contractDefaults.templateFields (field definitions + source hints)
---    - Runtime data from rental order (renter info, bike info, dates, prices)
---
---    Example hydration flow:
---    1. Fetch crew metadata by slug
---    2. Extract contractDefaults.templateFields for field definitions
---    3. For each field, resolve 'source' path (e.g., 'renter_profile.driver_license')
---    4. Fall back to contractDefaults.defaults if source is empty
---    5. Generate docx with all {{placeholder}} values populated
