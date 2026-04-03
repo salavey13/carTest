@@ -247,6 +247,22 @@ set
     || jsonb_build_object('rating', 5)
 where c.slug = 'sly13';
 
+insert into private.crew_secrets (
+  crew_slug,
+  contract_defaults,
+  updated_at
+)
+select
+  'sly13',
+  (metadata->'franchize'->'contractDefaults')::text,
+  now()
+from public.crews
+where slug = 'sly13'
+on conflict (crew_slug) do update
+set
+  contract_defaults = excluded.contract_defaults,
+  updated_at = now();
+
 commit;
 
 -- Verification helpers:
