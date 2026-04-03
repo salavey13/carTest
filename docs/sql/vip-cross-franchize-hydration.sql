@@ -320,6 +320,22 @@ set
     )
 where c.slug = 'vip-cross';
 
+insert into private.crew_secrets (
+  crew_slug,
+  contract_defaults,
+  updated_at
+)
+select
+  'vip-cross',
+  (metadata->'franchize'->'contractDefaults')::text,
+  now()
+from public.crews
+where slug = 'vip-cross'
+on conflict (crew_slug) do update
+set
+  contract_defaults = excluded.contract_defaults,
+  updated_at = now();
+
 commit;
 
 -- Verification helpers:
