@@ -1,34 +1,37 @@
 "use client";
 
 import Image from "next/image";
-import { motion, useMotionValue, useTransform } from "framer-motion";
+import { motion, useMotionValue } from "framer-motion";
 import { VibeContentRenderer } from "./VibeContentRenderer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Button } from "./ui/button";
 import { useGesture } from "@use-gesture/react";
-import { project, unproject, PointOfInterest, MapBounds, getRenderBox, getDragLimits } from "@/lib/map-utils";
+import { 
+  project, 
+  unproject, 
+  PointOfInterest, 
+  GeoBounds, 
+  getRenderBox, 
+  getDragLimits,
+  clamp,
+  percentToPixel,
+  DEFAULT_MAP_IMAGE,
+  MIN_MAP_SCALE,
+  MAX_MAP_SCALE,
+  MAP_ZOOM_FACTOR
+} from "@/lib/map-utils";
 
 interface VibeMapProps {
   points: PointOfInterest[];
-  bounds: MapBounds;
+  bounds: GeoBounds;
   imageUrl?: string;
   highlightedPointId?: string | null;
   className?: string;
   isEditable?: boolean;
   onMapClick?: (coords: [number, number]) => void;
 }
-
-type Size = { width: number; height: number };
-type RenderBox = { width: number; height: number; offsetX: number; offsetY: number };
-
-const DEFAULT_VIBE_MAP_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/nnmap.jpg";
-const MIN_SCALE = 1;
-const MAX_SCALE = 6;
-const ZOOM_FACTOR = 1.18;
-
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 export function VibeMap({
   points,
@@ -39,35 +42,30 @@ export function VibeMap({
   isEditable = false,
   onMapClick,
 }: VibeMapProps) {
-  // State
   const [viewState, setViewState] = useState({ x: 0, y: 0, scale: 1 });
-  const [imageSize, setImageSize] = useState<Size>({ width: 1, height: 1 });
-  const [containerSize, setContainerSize] = useState<Size>({ width: 1, height: 1 });
+  const [imageSize, setImageSize] = useState<{ width: number; height: number }>({ width: 1, height: 1 });
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 1, height: 1 });
   
-  // Refs
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapContentRef = useRef<HTMLDivElement>(null);
   
-  // Motion values for smooth transforms
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-  const scale = useMotionValue(1);
-  
-  // Derived values
+  const scaleMotion = useMotionValue(1);
+
+  // Derived: render box for contain-fit layout
   const renderBox = useMemo(() => 
     getRenderBox(containerSize, imageSize), 
     [containerSize, imageSize]
   );
-  
-  // Sync motion values with state for external access
+
   const syncViewState = useCallback((next: { x: number; y: number; scale: number }) => {
     setViewState(next);
     x.set(next.x);
     y.set(next.y);
-    scale.set(next.scale);
-  }, [x, y, scale]);
-  
-  // Clamp translation to prevent panning beyond bounds
+    scaleMotion.set(next.scale);
+  }, [x, y, scaleMotion]);
+
   const clampTranslation = useCallback((nextX: number, nextY: number, nextScale: number) => {
     const limits = getDragLimits(containerSize, imageSize, nextScale);
     return {
@@ -75,8 +73,8 @@ export function VibeMap({
       y: clamp(nextY, -limits.maxY, limits.maxY),
     };
   }, [containerSize, imageSize]);
-  
-  // Handle container resize with ResizeObserver
+
+  // ResizeObserver for precise container tracking
   useEffect(() => {
     const el = mapContainerRef.current;
     if (!el) return;
@@ -86,15 +84,13 @@ export function VibeMap({
     };
     
     updateSize();
-    
-    // Use ResizeObserver for precise resize detection
     const resizeObserver = new ResizeObserver(updateSize);
     resizeObserver.observe(el);
     
     return () => resizeObserver.disconnect();
   }, []);
-  
-  // Gesture handlers
+
+  // Gesture handlers with improved focal point math
   useGesture(
     {
       onDrag: ({ offset: [dx, dy], active }) => {
@@ -105,16 +101,21 @@ export function VibeMap({
       onPinch: ({ offset: [d], origin: [ox, oy], active }) => {
         if (!active || !mapContainerRef.current) return;
         
-        const nextScale = clamp(d, MIN_SCALE, MAX_SCALE);
-        
-        // Zoom toward pinch focal point
+        const nextScale = clamp(d, MIN_MAP_SCALE, MAX_MAP_SCALE);
         const containerRect = mapContainerRef.current.getBoundingClientRect();
-        const focalX = ox - containerRect.left - containerSize.width / 2 - viewState.x;
-        const focalY = oy - containerRect.top - containerSize.height / 2 - viewState.y;
+        
+        // Model-space focal point calculation (stable across zoom levels)
+        const pointerX = ox - containerRect.left;
+        const pointerY = oy - containerRect.top;
+        const centerX = containerSize.width / 2;
+        const centerY = containerSize.height / 2;
+        
+        const focalX = (pointerX - centerX - viewState.x) / viewState.scale;
+        const focalY = (pointerY - centerY - viewState.y) / viewState.scale;
         
         const scaleRatio = nextScale / viewState.scale;
-        let nextX = viewState.x * scaleRatio - focalX * (scaleRatio - 1);
-        let nextY = viewState.y * scaleRatio - focalY * (scaleRatio - 1);
+        const nextX = viewState.x + focalX * (1 - scaleRatio) * viewState.scale;
+        const nextY = viewState.y + focalY * (1 - scaleRatio) * viewState.scale;
         
         const clamped = clampTranslation(nextX, nextY, nextScale);
         syncViewState({ scale: nextScale, ...clamped });
@@ -123,106 +124,88 @@ export function VibeMap({
     {
       target: mapContainerRef,
       eventOptions: { passive: false },
-      drag: { 
-        from: () => [viewState.x, viewState.y] as const, 
-        preventDefault: true,
-        filterTaps: true,
-      },
-      pinch: { 
-        from: () => [viewState.scale, 0] as const,
-        preventDefault: true,
-      },
+      drag: { from: () => [viewState.x, viewState.y] as const, preventDefault: true, filterTaps: true },
+      pinch: { from: () => [viewState.scale, 0] as const, preventDefault: true },
     },
   );
-  
-  // Zoom controls with cursor-aware positioning
-  const handleZoom = useCallback((direction: "in" | "out", factor = ZOOM_FACTOR, cursorPos?: { x: number; y: number }) => {
+
+  // Zoom controls with cursor-aware focal point
+  const handleZoom = useCallback((direction: "in" | "out", factor = MAP_ZOOM_FACTOR, cursorPos?: { x: number; y: number }) => {
     const nextScale = clamp(
       direction === "in" ? viewState.scale * factor : viewState.scale / factor, 
-      MIN_SCALE, 
-      MAX_SCALE
+      MIN_MAP_SCALE, 
+      MAX_MAP_SCALE
     );
     
     if (cursorPos && mapContainerRef.current) {
-      // Zoom toward cursor position
       const containerRect = mapContainerRef.current.getBoundingClientRect();
-      const focalX = cursorPos.x - containerRect.left - containerSize.width / 2 - viewState.x;
-      const focalY = cursorPos.y - containerRect.top - containerSize.height / 2 - viewState.y;
+      const pointerX = cursorPos.x - containerRect.left;
+      const pointerY = cursorPos.y - containerRect.top;
+      const centerX = containerSize.width / 2;
+      const centerY = containerSize.height / 2;
+      
+      const focalX = (pointerX - centerX - viewState.x) / viewState.scale;
+      const focalY = (pointerY - centerY - viewState.y) / viewState.scale;
       
       const scaleRatio = nextScale / viewState.scale;
-      let nextX = viewState.x * scaleRatio - focalX * (scaleRatio - 1);
-      let nextY = viewState.y * scaleRatio - focalY * (scaleRatio - 1);
+      const nextX = viewState.x + focalX * (1 - scaleRatio) * viewState.scale;
+      const nextY = viewState.y + focalY * (1 - scaleRatio) * viewState.scale;
       
       const clamped = clampTranslation(nextX, nextY, nextScale);
       syncViewState({ scale: nextScale, ...clamped });
     } else {
-      // Default: zoom from center
       const clamped = clampTranslation(viewState.x, viewState.y, nextScale);
       syncViewState({ scale: nextScale, ...clamped });
     }
   }, [clampTranslation, syncViewState, viewState, containerSize]);
-  
+
   const resetView = useCallback(() => {
     syncViewState({ x: 0, y: 0, scale: 1 });
   }, [syncViewState]);
-  
-  // Precise click handling with coordinate transformation
+
+  // FIXED: Clean, transform-aware click handler using Framer Motion inversion
   const handleMapClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!onMapClick || !mapContainerRef.current || !mapContentRef.current) return;
+    if (!onMapClick || !mapContentRef.current) return;
+
+    const rect = mapContentRef.current.getBoundingClientRect();
     
-    const containerRect = mapContainerRef.current.getBoundingClientRect();
-    const contentRect = mapContentRef.current.getBoundingClientRect();
-    
-    // Calculate click position relative to scaled/translated content
-    const clickX = e.clientX - containerRect.left;
-    const clickY = e.clientY - containerRect.top;
-    
-    // Account for render box offset and current transform
-    const imageLeft = renderBox.offsetX * viewState.scale + viewState.x + containerSize.width / 2;
-    const imageTop = renderBox.offsetY * viewState.scale + viewState.y + containerSize.height / 2;
-    const imageWidth = renderBox.width * viewState.scale;
-    const imageHeight = renderBox.height * viewState.scale;
-    
-    // Check if click is within the rendered image area
+    // Invert the transform: screen → local image coordinates
+    let localX = (e.clientX - rect.left - viewState.x) / viewState.scale;
+    let localY = (e.clientY - rect.top - viewState.y) / viewState.scale;
+
+    // Check if click is within the rendered image area (accounting for contain-fit)
     if (
-      clickX < imageLeft - imageWidth / 2 ||
-      clickX > imageLeft + imageWidth / 2 ||
-      clickY < imageTop - imageHeight / 2 ||
-      clickY > imageTop + imageHeight / 2
-    ) {
-      return;
-    }
-    
-    // Convert to percentage within image
-    const relativeX = (clickX - (imageLeft - imageWidth / 2)) / imageWidth;
-    const relativeY = (clickY - (imageTop - imageHeight / 2)) / imageHeight;
-    
-    // Convert to lat/lon using inverse projection
-    const result = unproject(relativeX * 100, relativeY * 100, bounds);
-    if (result) {
-      onMapClick(result);
-    }
-  }, [onMapClick, bounds, viewState, renderBox, containerSize]);
-  
-  // Wheel zoom with cursor awareness
+      localX < renderBox.offsetX ||
+      localX > renderBox.offsetX + renderBox.width ||
+      localY < renderBox.offsetY ||
+      localY > renderBox.offsetY + renderBox.height
+    ) return;
+
+    // Convert to percentage within the image
+    const relX = ((localX - renderBox.offsetX) / renderBox.width) * 100;
+    const relY = ((localY - renderBox.offsetY) / renderBox.height) * 100;
+
+    // Project to lat/lon
+    const coords = unproject(relX, relY, bounds);
+    if (coords) onMapClick(coords);
+  }, [onMapClick, viewState, renderBox, bounds]);
+
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    const cursorPos = { x: e.clientX, y: e.clientY };
-    handleZoom(e.deltaY < 0 ? "in" : "out", ZOOM_FACTOR, cursorPos);
+    handleZoom(e.deltaY < 0 ? "in" : "out", MAP_ZOOM_FACTOR, { x: e.clientX, y: e.clientY });
   }, [handleZoom]);
-  
-  // Pre-calculate projected paths for SVG overlay
+
+  // Memoized path projections
   const projectedPaths = useMemo(() => {
     return points
       .filter(p => p.type !== "point" && p.coords?.length >= 2)
       .map(point => {
         const pathPoints = point.coords
           .map(c => project(c[0], c[1], bounds))
-          .filter((p): p is ProjectedPoint => p !== null);
+          .filter((p): p is { x: number; y: number } => p !== null);
         
         if (pathPoints.length < 2) return null;
         
-        // Convert percentage to SVG coordinates based on image dimensions
         const d = pathPoints
           .map((p, i) => {
             const px = (p.x / 100) * imageSize.width;
@@ -240,8 +223,8 @@ export function VibeMap({
       })
       .filter(Boolean);
   }, [points, bounds, imageSize.width, imageSize.height, isEditable]);
-  
-  // Pre-calculate marker positions
+
+  // FIXED: Memoized marker positions with renderBox-aware coordinates
   const markerPositions = useMemo(() => {
     return points
       .filter(p => (p.type === "point" || p.coords?.length === 1) && p.coords?.[0])
@@ -266,7 +249,7 @@ export function VibeMap({
       })
       .filter(Boolean);
   }, [points, bounds, highlightedPointId]);
-  
+
   return (
     <TooltipProvider delayDuration={100}>
       <div
@@ -278,9 +261,9 @@ export function VibeMap({
         style={{ touchAction: "none" }}
         onContextMenu={(e) => e.preventDefault()}
       >
-        {/* Ambient background image */}
+        {/* Ambient background */}
         <Image
-          src={imageUrl || DEFAULT_VIBE_MAP_IMAGE}
+          src={imageUrl || DEFAULT_MAP_IMAGE}
           alt="Vibe City Map backdrop"
           fill
           className="pointer-events-none object-cover scale-110 opacity-35 blur-2xl saturate-125"
@@ -289,11 +272,11 @@ export function VibeMap({
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.1),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.14),rgba(2,6,23,0.55))]" />
         
-        {/* Interactive map layer */}
+        {/* Interactive layer */}
         <motion.div
           ref={mapContentRef}
           className="relative h-full w-full will-change-transform"
-          style={{ x, y, scale }}
+          style={{ x, y, scale: scaleMotion }}
           onWheel={handleWheel}
         >
           <div 
@@ -303,7 +286,7 @@ export function VibeMap({
             tabIndex={isEditable ? 0 : undefined}
             onKeyDown={isEditable ? (e) => e.key === "Enter" && handleMapClick(e as any) : undefined}
           >
-            {/* Main map image container */}
+            {/* Main map image */}
             <div
               className="absolute rounded-[24px] border border-white/12 shadow-[0_20px_70px_rgba(15,23,42,0.45)] overflow-hidden bg-slate-900/30"
               style={{
@@ -314,7 +297,7 @@ export function VibeMap({
               }}
             >
               <Image
-                src={imageUrl || DEFAULT_VIBE_MAP_IMAGE}
+                src={imageUrl || DEFAULT_MAP_IMAGE}
                 alt="Vibe City Map"
                 fill
                 className="pointer-events-none object-contain"
@@ -324,7 +307,7 @@ export function VibeMap({
               />
             </div>
             
-            {/* SVG overlay for paths - aligned with image coordinate system */}
+            {/* SVG overlay for paths */}
             <svg
               className="absolute left-0 top-0 h-full w-full pointer-events-none overflow-visible"
               style={{
@@ -356,16 +339,17 @@ export function VibeMap({
               ))}
             </svg>
             
-            {/* Interactive markers */}
+            {/* FIXED MARKERS: positioned using renderBox offsets for pixel-perfect alignment */}
             {markerPositions.map((marker) => marker && (
               <Tooltip key={marker.id}>
                 <TooltipTrigger asChild>
                   <motion.div
                     className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-lime/50 rounded-full"
                     style={{
-                      left: `${marker.x}%`,
-                      top: `${marker.y}%`,
-                      // Counter-scale markers so they appear consistent size regardless of zoom
+                      // Convert percentage to absolute pixels within renderBox
+                      left: percentToPixel(marker.x, renderBox.offsetX, renderBox.width),
+                      top: percentToPixel(marker.y, renderBox.offsetY, renderBox.height),
+                      // Counter-scale markers for consistent visual size
                       scale: (marker.isHighlighted ? 1.5 : 1) / viewState.scale,
                       zIndex: marker.isHighlighted ? 50 : 10,
                     }}
@@ -413,7 +397,7 @@ export function VibeMap({
           </div>
         </motion.div>
         
-        {/* HUD: Top bar */}
+        {/* HUD */}
         <div className="absolute inset-x-0 top-0 z-40 flex items-start justify-between gap-3 p-3 sm:p-4 pointer-events-none">
           <div className="pointer-events-auto rounded-full border border-white/10 bg-black/45 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.22em] text-white/75 backdrop-blur-md">
             VibeMap • drag / pinch / scroll
@@ -423,7 +407,7 @@ export function VibeMap({
           </div>
         </div>
         
-        {/* Controls: Bottom-right */}
+        {/* Controls */}
         <div className="absolute bottom-4 right-4 z-50 flex flex-col gap-2">
           <Button 
             size="icon" 
@@ -451,7 +435,7 @@ export function VibeMap({
           </Button>
         </div>
         
-        {/* Subtle edge fade for depth */}
+        {/* Edge fade */}
         <div className="absolute inset-0 pointer-events-none rounded-[28px] shadow-[inset_0_0_60px_rgba(2,6,23,0.6)]" />
       </div>
     </TooltipProvider>
