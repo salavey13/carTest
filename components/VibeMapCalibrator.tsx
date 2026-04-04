@@ -44,16 +44,16 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
   const [containerSize, setContainerSize] = useState<Size>({ width: 1, height: 1 });
   const [coordFormat, setCoordFormat] = useState<'dd' | 'dms'>('dd');
   
-  // ✅ ALWAYS-VISIBLE DEBUG LOGS (no cropping, scrollable)
+  // ✅ ALWAYS-VISIBLE DEBUG LOGS
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const log = useCallback((msg: string) => {
     const timestamp = new Date().toLocaleTimeString('ru-RU', { hour12: false });
     const entry = `[${timestamp}] ${msg}`;
     console.log(`[Calibrator] ${msg}`);
-    setDebugLogs(prev => [...prev, entry].slice(-50)); // Keep last 50 lines
+    setDebugLogs(prev => [...prev, entry].slice(-50));
   }, []);
   
-  // ✅ REFS FOR FRESH VALUES IN CALLBACKS (avoid stale closures)
+  // ✅ REFS FOR FRESH VALUES
   const imageSizeRef = useRef<Size | null>(null);
   const renderBoxRef = useRef<ReturnType<typeof getRenderBox> | null>(null);
   const positionsRef = useRef<Record<string, PixelPosition>>({});
@@ -62,7 +62,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const storageKey = useMemo(() => generateStorageKey(initialBounds, "vibecal"), [initialBounds]);
 
-  // Update refs when state changes
   useEffect(() => { imageSizeRef.current = imageSize; }, [imageSize]);
   useEffect(() => { positionsRef.current = positions; }, [positions]);
   useEffect(() => { containerSizeRef.current = containerSize; }, [containerSize]);
@@ -142,7 +141,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     log(`   RenderBox: ${renderBox ? `${renderBox.width.toFixed(0)}x${renderBox.height.toFixed(0)} +${renderBox.offsetX.toFixed(0)},+${renderBox.offsetY.toFixed(0)}` : 'null'}`);
     
     const initialPositions: Record<string, PixelPosition> = {};
-    let hasValidProjection = true;
     
     REFERENCE_POINTS.forEach(p => {
       const pos = project(p.coords[0], p.coords[1], bounds);
@@ -151,7 +149,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
       if (pos && pos.x >= 10 && pos.x <= 90 && pos.y >= 10 && pos.y <= 90) {
         initialPositions[p.id] = pos;
       } else {
-        hasValidProjection = false;
         initialPositions[p.id] = p.id === 'aska' ? { x: 25, y: 70 } : { x: 75, y: 30 };
         log(`   → Using fallback for ${p.id}: ${JSON.stringify(initialPositions[p.id])}`);
       }
@@ -165,7 +162,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     toast.info("Перетащите точки на реальные позиции", { duration: 3000 });
   }, [bounds, imageSize, containerSize, renderBox, log]);
 
-  // ✅ BOUNDS RECALC — USES REFS FOR FRESH VALUES
+  // ✅ BOUNDS RECALC — USES REFS
   const recalcBounds = useCallback((currentPositions: Record<string, PixelPosition>) => {
     log(`🔄 recalcBounds called`);
     
@@ -194,7 +191,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     const y2 = (pos2.y / 100) * imgSize.height;
     
     log(`   Natural pixels: P1=(${x1.toFixed(1)}, ${y1.toFixed(1)}) | P2=(${x2.toFixed(1)}, ${y2.toFixed(1)})`);
-    log(`   Image size: ${imgSize.width}x${imgSize.height}`);
     
     // Validate bounds
     const margin = 20;
@@ -226,15 +222,15 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
         setCalculatedBounds(newBounds);
         log(`✅✅✅ BOUNDS UPDATED: ${newBounds.top.toFixed(4)}, ${newBounds.left.toFixed(4)}, ${newBounds.bottom.toFixed(4)}, ${newBounds.right.toFixed(4)}`);
       } else {
-        log(`⚠️ Validation errors: ${errors.join('; ')} (keeping previous bounds)`);
+        log(`⚠️ Validation: ${errors.join('; ')} (keeping previous)`);
       }
     } else {
-      log(`⚠️ Calculation returned null (keeping previous bounds)`);
+      log(`⚠️ Calc returned null (keeping previous)`);
     }
   }, [log]);
 
-  // ✅ DRAG HANDLER — USES REFS + ABSOLUTE POSITIONING
-  const handlePointDragEnd = useCallback((pointId: string, _event: any, info: any) => {
+  // ✅ FIXED: Use native event.clientX/clientY instead of info.point
+  const handlePointDragEnd = useCallback((pointId: string, event: any, _info: any) => {
     log(`🖱️ DragEnd ${pointId}`);
     
     if (!mapContainerRef.current) { log("❌ No container ref"); return; }
@@ -245,14 +241,15 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     if (!prev) { log(`❌ No prev position for ${pointId}`); return; }
     log(`   Prev: ${prev.x.toFixed(1)}%, ${prev.y.toFixed(1)}%`);
     
-    // Get final pointer position (absolute screen coords)
-    const finalX = info.point?.[0];
-    const finalY = info.point?.[1];
+    // ✅ Use native event coordinates (more reliable than info.point)
+    const clientX = event?.clientX ?? event?.sourceEvent?.clientX;
+    const clientY = event?.clientY ?? event?.sourceEvent?.clientY;
     
-    log(`   Pointer: ${finalX}, ${finalY} (container: ${rect.left}, ${rect.top})`);
+    log(`   Event coords: clientX=${clientX}, clientY=${clientY}`);
+    log(`   Container rect: left=${rect.left}, top=${rect.top}, width=${rect.width}, height=${rect.height}`);
     
-    if (!isFinite(finalX) || !isFinite(finalY)) {
-      log("❌ Invalid pointer position");
+    if (!isFinite(clientX) || !isFinite(clientY)) {
+      log("❌ Invalid event coordinates");
       return;
     }
     
@@ -262,11 +259,11 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
       return;
     }
     
-    // Convert to percentage of container
-    const percentX = clamp(((finalX - rect.left) / cs.width) * 100, 0, 100);
-    const percentY = clamp(((finalY - rect.top) / cs.height) * 100, 0, 100);
+    // Convert screen pixels to percentage of container (0-100)
+    const percentX = clamp(((clientX - rect.left) / cs.width) * 100, 0, 100);
+    const percentY = clamp(((clientY - rect.top) / cs.height) * 100, 0, 100);
     
-    log(`   New: ${percentX.toFixed(1)}%, ${percentY.toFixed(1)}%`);
+    log(`   New position: ${percentX.toFixed(1)}%, ${percentY.toFixed(1)}%`);
     
     // Update state
     const newPositions = { ...positionsRef.current, [pointId]: { x: percentX, y: percentY } };
@@ -436,7 +433,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
           )}
         </div>
 
-        {/* ✅ ALWAYS-VISIBLE DEBUG PANEL — SCROLLABLE, NO CROPPING */}
+        {/* ✅ ALWAYS-VISIBLE DEBUG PANEL */}
         <div className="bg-black/60 rounded-lg border border-white/10 p-3 font-mono text-[10px] text-zinc-300">
           <div className="flex items-center justify-between mb-2 sticky top-0 bg-black/80 py-1">
             <span className="text-xs text-brand-cyan font-bold">🔍 DEBUG LOGS (live)</span>
