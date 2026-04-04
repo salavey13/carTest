@@ -14,9 +14,9 @@ import { cn } from '@/lib/utils';
 import { Loading } from './Loading';
 import Image from 'next/image';
 import { 
-  project, unproject, GeoBounds, ViewState,
+  project, unproject, GeoBounds,
   getRenderBox, calculateBoundsFromPoints, validateBounds, formatBounds,
-  clamp, pixelToPercent, percentToPixel, snapToGrid, formatCoordinate,
+  clamp, pixelToPercent, percentToPixel, formatCoordinate,
   DEFAULT_MAP_IMAGE, FALLBACK_MAP_IMAGE, generateStorageKey
 } from "@/lib/map-utils";
 
@@ -28,9 +28,6 @@ const REFERENCE_POINTS: Point[] = [
   { id: 'aska', name: 'Аська', coords: [56.330, 44.018] },
   { id: 'airport', name: 'Аэропорт Стригино', coords: [56.229, 43.784] },
 ];
-const GRID_SNAP_ENABLED = true;
-const GRID_SIZE = 2;
-const SNAP_THRESHOLD = 0.5;
 
 export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds }) {
   const { dbUser } = useAppContext();
@@ -46,7 +43,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
   const [isImageLoading, setIsImageLoading] = useState(true);
   const [containerSize, setContainerSize] = useState<Size>({ width: 1, height: 1 });
   const [coordFormat, setCoordFormat] = useState<'dd' | 'dms'>('dd');
-  const [snapEnabled, setSnapEnabled] = useState(GRID_SNAP_ENABLED);
   
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const storageKey = useMemo(() => generateStorageKey(initialBounds, "vibecal"), [initialBounds]);
@@ -109,120 +105,95 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     }
     
     const initialPositions: Record<string, PixelPosition> = {};
-    let hasValidProjection = true;
-    
     REFERENCE_POINTS.forEach(p => {
       const pos = project(p.coords[0], p.coords[1], bounds);
-      if (!pos || pos.x < 5 || pos.x > 95 || pos.y < 5 || pos.y > 95) {
-        hasValidProjection = false;
-      }
-      if (pos && hasValidProjection) {
+      // Use projected position if valid, otherwise smart defaults
+      if (pos && pos.x >= 10 && pos.x <= 90 && pos.y >= 10 && pos.y <= 90) {
         initialPositions[p.id] = pos;
       } else {
-        if (p.id === 'aska') {
-          initialPositions[p.id] = { x: 25, y: 70 };
-        } else if (p.id === 'airport') {
-          initialPositions[p.id] = { x: 75, y: 30 };
-        } else {
-          initialPositions[p.id] = { x: 50, y: 50 };
-        }
+        // Smart defaults for NN map layout
+        initialPositions[p.id] = p.id === 'aska' ? { x: 25, y: 70 } : { x: 75, y: 30 };
       }
     });
     
     setPositions(initialPositions);
     setCalculatedBounds(null);
     setIsCalibrating(true);
-    
-    toast.info(hasValidProjection 
-      ? "Перетащите точки на реальные позиции" 
-      : "Точки размещены по умолчанию — перетащите их на правильные места", 
-      { duration: 4000 });
+    toast.info("Перетащите точки на реальные позиции", { duration: 3000 });
   }, [bounds, imageSize]);
 
-  // ✅ FIXED: Simple, linear drag handler - no nested callbacks
-  const handlePointDragEnd = useCallback((pointId: string, _event: unknown, info: any) => {
+  // ✅ SIMPLE DRAG: Just update position, then recalc bounds
+  const handlePointDragEnd = useCallback((pointId: string, _event: any, info: any) => {
     if (!mapContainerRef.current || !imageSize) return;
     
     const rect = mapContainerRef.current.getBoundingClientRect();
-    const prevPos = positions[pointId];
-    if (!prevPos || !isFinite(prevPos.x) || !isFinite(prevPos.y)) return;
+    const prev = positions[pointId];
+    if (!prev) return;
     
-    // Try absolute positioning first (more reliable than offset)
-    const clientX = info.point?.[0];
-    const clientY = info.point?.[1];
+    // Get final pointer position (absolute, not offset)
+    const finalX = info.point?.[0];
+    const finalY = info.point?.[1];
     
-    let newX: number, newY: number;
-    
-    if (isFinite(clientX) && isFinite(clientY) && containerSize.width > 0 && containerSize.height > 0) {
-      const pointerX = clientX - rect.left;
-      const pointerY = clientY - rect.top;
-      newX = clamp((pointerX / containerSize.width) * 100, 0, 100);
-      newY = clamp((pointerY / containerSize.height) * 100, 0, 100);
-    } else {
-      // Fallback to offset
-      const offsetX = Number(info.offset?.[0]) || 0;
-      const offsetY = Number(info.offset?.[1]) || 0;
-      const deltaX = containerSize.width > 0 ? (offsetX / containerSize.width) * 100 : 0;
-      const deltaY = containerSize.height > 0 ? (offsetY / containerSize.height) * 100 : 0;
-      newX = clamp(prevPos.x + deltaX, 0, 100);
-      newY = clamp(prevPos.y + deltaY, 0, 100);
+    if (!isFinite(finalX) || !isFinite(finalY) || containerSize.width <= 0 || containerSize.height <= 0) {
+      return;
     }
     
-    if (snapEnabled) {
-      newX = snapToGrid(newX, GRID_SIZE, SNAP_THRESHOLD);
-      newY = snapToGrid(newY, GRID_SIZE, SNAP_THRESHOLD);
-    }
+    // Convert screen pixels to percentage (0-100) of container
+    const percentX = clamp(((finalX - rect.left) / containerSize.width) * 100, 0, 100);
+    const percentY = clamp(((finalY - rect.top) / containerSize.height) * 100, 0, 100);
     
-    if (!isFinite(newX) || !isFinite(newY)) {
-      newX = prevPos.x;
-      newY = prevPos.y;
-    }
-    
-    // Update positions first
-    const newPositions = { ...positions, [pointId]: { x: newX, y: newY } };
+    // Update positions
+    const newPositions = { ...positions, [pointId]: { x: percentX, y: percentY } };
     setPositions(newPositions);
     
-    // Then recalculate bounds in a separate step (avoids TDZ)
-    if (imageSize && renderBox) {
-      const p1 = REFERENCE_POINTS[0];
-      const p2 = REFERENCE_POINTS[1];
-      const pos1 = newPositions[p1.id];
-      const pos2 = newPositions[p2.id];
-      
-      if (pos1 && pos2 && isFinite(pos1.x) && isFinite(pos1.y) && isFinite(pos2.x) && isFinite(pos2.y)) {
-        const x1_img = (pos1.x / 100) * imageSize.width;
-        const y1_img = (pos1.y / 100) * imageSize.height;
-        const x2_img = (pos2.x / 100) * imageSize.width;
-        const y2_img = (pos2.y / 100) * imageSize.height;
-        
-        const margin = 50;
-        const inBounds = !(
-          x1_img < -margin || x1_img > imageSize.width + margin || 
-          y1_img < -margin || y1_img > imageSize.height + margin ||
-          x2_img < -margin || x2_img > imageSize.width + margin ||
-          y2_img < -margin || y2_img > imageSize.height + margin
-        );
-        
-        const notTooClose = Math.abs(x2_img - x1_img) >= 1 && Math.abs(y2_img - y1_img) >= 1;
-        
-        if (inBounds && notTooClose) {
-          const newBounds = calculateBoundsFromPoints(
-            { lat: p1.coords[0], lon: p1.coords[1], pixelX: x1_img, pixelY: y1_img },
-            { lat: p2.coords[0], lon: p2.coords[1], pixelX: x2_img, pixelY: y2_img },
-            imageSize.width,
-            imageSize.height
-          );
-          
-          if (newBounds) {
-            const errors = validateBounds(newBounds);
-            if (errors.length === 0) {
-              setCalculatedBounds(newBounds);
-            }
-          }
-        }
+    // Recalculate bounds immediately
+    recalcBounds(newPositions);
+  }, [positions, imageSize, containerSize, renderBox]);
+
+  // ✅ SIMPLE BOUNDS RECALC: Inline, no useCallback, no circular deps
+  const recalcBounds = (currentPositions: Record<string, PixelPosition>) => {
+    if (!imageSize || !renderBox) return;
+    
+    const p1 = REFERENCE_POINTS[0];
+    const p2 = REFERENCE_POINTS[1];
+    const pos1 = currentPositions[p1.id];
+    const pos2 = currentPositions[p2.id];
+    
+    if (!pos1 || !pos2 || !isFinite(pos1.x) || !isFinite(pos1.y) || !isFinite(pos2.x) || !isFinite(pos2.y)) {
+      return;
+    }
+    
+    // Convert percentage (0-100) to natural image pixels
+    const x1 = (pos1.x / 100) * imageSize.width;
+    const y1 = (pos1.y / 100) * imageSize.height;
+    const x2 = (pos2.x / 100) * imageSize.width;
+    const y2 = (pos2.y / 100) * imageSize.height;
+    
+    // Skip if points are too close or outside image
+    const margin = 20;
+    if (Math.abs(x2 - x1) < 5 || Math.abs(y2 - y1) < 5 ||
+        x1 < -margin || x1 > imageSize.width + margin ||
+        y1 < -margin || y1 > imageSize.height + margin ||
+        x2 < -margin || x2 > imageSize.width + margin ||
+        y2 < -margin || y2 > imageSize.height + margin) {
+      return;
+    }
+    
+    const newBounds = calculateBoundsFromPoints(
+      { lat: p1.coords[0], lon: p1.coords[1], pixelX: x1, pixelY: y1 },
+      { lat: p2.coords[0], lon: p2.coords[1], pixelX: x2, pixelY: y2 },
+      imageSize.width,
+      imageSize.height
+    );
+    
+    // ✅ ONLY update on success, NEVER clear on failure
+    if (newBounds) {
+      const errors = validateBounds(newBounds);
+      if (errors.length === 0) {
+        setCalculatedBounds(newBounds);
       }
     }
-  }, [positions, snapEnabled, imageSize, renderBox, containerSize]);
+  };
 
   const calibrationBoxStyle = useMemo(() => {
     if (!isCalibrating || !renderBox) return { display: 'none' };
@@ -328,7 +299,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
           
           <div style={calibrationBoxStyle} className="absolute border-2 border-dashed border-brand-cyan/70 bg-brand-cyan/5 pointer-events-none rounded-xl transition-all duration-200 z-10" />
           
-          {isCalibrating && snapEnabled && renderBox && (
+          {isCalibrating && renderBox && (
             <svg className="absolute pointer-events-none opacity-20 z-0" style={{ left: renderBox.offsetX, top: renderBox.offsetY, width: renderBox.width, height: renderBox.height }}>
               {[...Array(11)].map((_, i) => (
                 <g key={i}>
@@ -341,13 +312,31 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
           
           {isCalibrating ? (
             REFERENCE_POINTS.map(point => (
-              <motion.div key={point.id} className="absolute z-20" style={{ left: `${positions[point.id]?.x ?? 50}%`, top: `${positions[point.id]?.y ?? 50}%`, transform: 'translate(-50%, -50%)' }}>
-                <motion.div drag dragMomentum={false} dragElastic={0.1} onDragEnd={(e, info) => handlePointDragEnd(point.id, e, info)} className={cn("flex h-10 w-10 sm:h-12 sm:w-12 cursor-grab items-center justify-center rounded-full", "bg-gradient-to-br from-brand-lime to-brand-cyan text-black", "shadow-lg shadow-brand-lime/40 ring-2 ring-white/30", "active:cursor-grabbing active:scale-95 transition-transform", snapEnabled && "ring-4 ring-brand-cyan/50")} whileHover={{ scale: 1.1, boxShadow: "0 0 25px rgba(124,244,120,0.6)" }} whileTap={{ scale: 0.95 }}>
+              <motion.div 
+                key={point.id} 
+                className="absolute z-20" 
+                style={{ 
+                  left: `${positions[point.id]?.x ?? 50}%`, 
+                  top: `${positions[point.id]?.y ?? 50}%`, 
+                  transform: 'translate(-50%, -50%)' 
+                }}
+              >
+                {/* ✅ NO SPRINGS, NO SNAP: Just basic drag */}
+                <motion.div 
+                  drag 
+                  dragMomentum={false}
+                  dragElastic={0}
+                  onDragEnd={(e, info) => handlePointDragEnd(point.id, e, info)}
+                  className="flex h-10 w-10 sm:h-12 sm:w-12 cursor-grab items-center justify-center rounded-full bg-gradient-to-br from-brand-lime to-brand-cyan text-black shadow-lg ring-2 ring-white/30 active:cursor-grabbing"
+                >
                   <Tooltip>
-                    <TooltipTrigger asChild><button className="focus:outline-none focus:ring-2 focus:ring-brand-lime rounded-full"><VibeContentRenderer content="::FaLocationDot::" className="h-5 w-5 sm:h-6 sm:w-6" /></button></TooltipTrigger>
+                    <TooltipTrigger asChild>
+                      <button className="focus:outline-none focus:ring-2 focus:ring-brand-lime rounded-full">
+                        <VibeContentRenderer content="::FaLocationDot::" className="h-5 w-5 sm:h-6 sm:w-6" />
+                      </button>
+                    </TooltipTrigger>
                     <TooltipContent side="top" className="bg-dark-card/95 border-brand-lime/30">
                       <p className="font-mono text-sm">{point.name}</p>
-                      <p className="text-xs text-zinc-400 mt-0.5">{positions[point.id]?.x.toFixed(1)}%, {positions[point.id]?.y.toFixed(1)}%{snapEnabled && <span className="text-brand-cyan ml-1">• snapped</span>}</p>
                     </TooltipContent>
                   </Tooltip>
                 </motion.div>
@@ -359,7 +348,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
               if (!projected) return null;
               const pixelX = percentToPixel(projected.x, renderBox.offsetX, renderBox.width);
               const pixelY = percentToPixel(projected.y, renderBox.offsetY, renderBox.height);
-              return <div key={point.id} className="absolute w-3 h-3 sm:w-4 sm:h-4 rounded-full ring-2 ring-white/50 z-10 animate-pulse" style={{ left: `${(pixelX / containerSize.width) * 100}%`, top: `${(pixelY / containerSize.height) * 100}%`, transform: 'translate(-50%, -50%)', backgroundColor: point.id === 'aska' ? '#FF69B4' : '#00CED1' }} />;
+              return <div key={point.id} className="absolute w-3 h-3 sm:w-4 sm:h-4 rounded-full ring-2 ring-white/50 z-10" style={{ left: `${(pixelX / containerSize.width) * 100}%`, top: `${(pixelY / containerSize.height) * 100}%`, transform: 'translate(-50%, -50%)', backgroundColor: point.id === 'aska' ? '#FF69B4' : '#00CED1' }} />;
             })
           )}
         </div>
@@ -373,27 +362,17 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
           <div className="bg-card/50 p-4 sm:p-6 rounded-xl space-y-4 border border-white/10">
             <div className="flex items-center justify-between">
               <h3 className="font-orbitron text-lg text-white">Калибровка</h3>
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant={snapEnabled ? "default" : "outline"} onClick={() => setSnapEnabled(!snapEnabled)} className={cn("text-xs", snapEnabled && "bg-brand-cyan text-black")}>{snapEnabled ? "✓ Snap" : "○ Snap"}</Button>
-                {calculatedBounds && <Badge className="bg-brand-lime/20 text-brand-lime border-brand-lime/30 text-xs">✓ Границы вычислены</Badge>}
-              </div>
+              {calculatedBounds && <Badge className="bg-brand-lime/20 text-brand-lime border-brand-lime/30 text-xs">✓ Границы вычислены</Badge>}
             </div>
             
             {calculatedBounds ? (
               <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs text-zinc-400">
-                  <span>Проверка валидности:</span>
-                  <span className={validateBounds(calculatedBounds).length === 0 ? 'text-brand-lime' : 'text-amber-400'}>
-                    {validateBounds(calculatedBounds).length === 0 ? '✓ Все параметры в норме' : '⚠ Требуется проверка'}
-                  </span>
-                </div>
-                
                 <div className="relative">
                   <label className="text-xs font-mono text-zinc-400 mb-1.5 block">Вычисленные GeoBounds:</label>
                   <pre className="text-[10px] sm:text-[11px] bg-black/40 p-3 rounded-lg overflow-x-auto font-mono text-brand-cyan/90 max-h-32 simple-scrollbar border border-white/10">{formatBounds(calculatedBounds)}</pre>
                   <div className="absolute top-2 right-2 flex gap-1">
                     <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-zinc-400 hover:text-white" onClick={() => { navigator.clipboard.writeText(formatBounds(calculatedBounds)); toast.success("Границы скопированы"); }}><VibeContentRenderer content="::FaCopy::" /></Button>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-zinc-400 hover:text-white" onClick={() => { if (!calculatedBounds) return; const blob = new Blob([formatBounds(calculatedBounds)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `${presetName || "map-bounds"}.json`; a.click(); URL.revokeObjectURL(url); toast.success("Bounds exported as JSON"); }}><VibeContentRenderer content="::FaDownload::" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-zinc-400 hover:text-white" onClick={() => { if (!calculatedBounds) return; const blob = new Blob([formatBounds(calculatedBounds)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `${presetName || "map-bounds"}.json`; a.click(); URL.revokeObjectURL(url); toast.success("Bounds exported"); }}><VibeContentRenderer content="::FaDownload::" /></Button>
                   </div>
                 </div>
                 
@@ -403,10 +382,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
                 </div>
               </div>
             ) : (
-              <div className="py-4 text-center">
-                <p className="text-sm text-zinc-400 italic mb-2">Переместите обе опорные точки на карте для вычисления границ...</p>
-                {snapEnabled && <p className="text-xs text-brand-cyan">💡 Подсказка: точки привязываются к сетке</p>}
-              </div>
+              <p className="text-sm text-zinc-400 italic text-center py-4">Переместите обе опорные точки на карте для вычисления границ...</p>
             )}
             
             <div className="flex gap-2 pt-2">
