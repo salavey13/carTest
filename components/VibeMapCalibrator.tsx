@@ -52,7 +52,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const storageKey = useMemo(() => generateStorageKey(initialBounds, "vibecal"), [initialBounds]);
 
-  // Helper: Add to debug log
   const log = useCallback((msg: string) => {
     console.log(`[Calibrator] ${msg}`);
     setDebugLog(prev => [...prev.slice(-9), `[${new Date().toLocaleTimeString()}] ${msg}`]);
@@ -144,12 +143,11 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
       if (pos && hasValidProjection) {
         initialPositions[p.id] = pos;
       } else {
-        // Smart defaults for NN map layout
         if (p.id === 'aska') {
-          initialPositions[p.id] = { x: 25, y: 70 }; // Southwest
+          initialPositions[p.id] = { x: 25, y: 70 };
           log(`Using fallback for ${p.id}: 25%,70%`);
         } else if (p.id === 'airport') {
-          initialPositions[p.id] = { x: 75, y: 30 }; // Northeast
+          initialPositions[p.id] = { x: 75, y: 30 };
           log(`Using fallback for ${p.id}: 75%,30%`);
         } else {
           initialPositions[p.id] = { x: 50, y: 50 };
@@ -168,31 +166,70 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
       { duration: 4000 });
   }, [bounds, imageSize, log]);
 
-  // FIXED: Only recalc on drag END
-  const handlePointDragEnd = useCallback((pointId: string, _event: unknown, info: any) => {
+  // ✅ FIXED: Use functional update + Number() coercion + absolute positioning fallback
+  const handlePointDragEnd = useCallback((pointId: string, event: any, info: any) => {
     if (!mapContainerRef.current) return;
-    const rect = mapContainerRef.current.getBoundingClientRect();
     
-    const initialPos = positions[pointId] || { x: 50, y: 50 };
-    const deltaX = (info.offset[0] / rect.width) * 100;
-    const deltaY = (info.offset[1] / rect.height) * 100;
-    
-    let newX = clamp(initialPos.x + deltaX, 0, 100);
-    let newY = clamp(initialPos.y + deltaY, 0, 100);
-    
-    if (snapEnabled) {
-      newX = snapToGrid(newX, GRID_SIZE, SNAP_THRESHOLD);
-      newY = snapToGrid(newY, GRID_SIZE, SNAP_THRESHOLD);
-    }
-    
-    log(`DragEnd ${pointId}: ${initialPos.x.toFixed(1)}%,${initialPos.y.toFixed(1)}% → ${newX.toFixed(1)}%,${newY.toFixed(1)}%`);
-    
-    const newPositions = { ...positions, [pointId]: { x: newX, y: newY } };
-    setPositions(newPositions);
-    recalculateBounds(newPositions);
-  }, [positions, snapEnabled, log]);
+    setPositions(prev => {
+      const initialPos = prev[pointId];
+      if (!initialPos || !isFinite(initialPos.x) || !isFinite(initialPos.y)) {
+        log(`❌ Invalid initial position for ${pointId}`);
+        return prev;
+      }
+      
+      // Validate container size
+      if (containerSize.width <= 0 || containerSize.height <= 0) {
+        log(`❌ Invalid containerSize: ${containerSize.width}x${containerSize.height}`);
+        return prev;
+      }
+      
+      // Try absolute positioning first (more reliable)
+      const rect = mapContainerRef.current!.getBoundingClientRect();
+      const clientX = info.point?.[0];
+      const clientY = info.point?.[1];
+      
+      let newX: number, newY: number;
+      
+      if (isFinite(clientX) && isFinite(clientY)) {
+        // Use absolute pointer position
+        const pointerX = clientX - rect.left;
+        const pointerY = clientY - rect.top;
+        newX = clamp((pointerX / containerSize.width) * 100, 0, 100);
+        newY = clamp((pointerY / containerSize.height) * 100, 0, 100);
+        log(`DragEnd ${pointId} (absolute): ${initialPos.x.toFixed(1)}%,${initialPos.y.toFixed(1)}% → ${newX.toFixed(1)}%,${newY.toFixed(1)}%`);
+      } else {
+        // Fallback to offset-based calculation with Number() coercion
+        const offsetX = Number(info.offset?.[0]) || 0;
+        const offsetY = Number(info.offset?.[1]) || 0;
+        
+        const deltaX = (offsetX / containerSize.width) * 100;
+        const deltaY = (offsetY / containerSize.height) * 100;
+        
+        newX = clamp(initialPos.x + deltaX, 0, 100);
+        newY = clamp(initialPos.y + deltaY, 0, 100);
+        log(`DragEnd ${pointId} (offset): ${initialPos.x.toFixed(1)}%,${initialPos.y.toFixed(1)}% → ${newX.toFixed(1)}%,${newY.toFixed(1)}%`);
+      }
+      
+      // Apply snap-to-grid
+      if (snapEnabled) {
+        newX = snapToGrid(newX, GRID_SIZE, SNAP_THRESHOLD);
+        newY = snapToGrid(newY, GRID_SIZE, SNAP_THRESHOLD);
+      }
+      
+      // Final validation - fallback to initial position if NaN
+      if (!isFinite(newX) || !isFinite(newY)) {
+        log(`❌ Final position invalid, keeping initial: newX=${newX}, newY=${newY}`);
+        newX = initialPos.x;
+        newY = initialPos.y;
+      }
+      
+      const newPositions = { ...prev, [pointId]: { x: newX, y: newY } };
+      recalculateBounds(newPositions);
+      return newPositions;
+    });
+  }, [snapEnabled, containerSize, recalculateBounds, log]);
 
-  // Extracted bounds calculation with MAXIMUM debug logging
+  // Bounds calculation with defensive checks
   const recalculateBounds = useCallback((currentPositions: Record<string, PixelPosition>) => {
     log(`recalculateBounds called`);
     
@@ -210,24 +247,23 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     const pos1 = currentPositions[p1.id];
     const pos2 = currentPositions[p2.id];
     
-    if (!pos1 || !pos2) {
-      log("❌ Missing point positions");
+    if (!pos1 || !pos2 || !isFinite(pos1.x) || !isFinite(pos1.y) || !isFinite(pos2.x) || !isFinite(pos2.y)) {
+      log("❌ Missing or invalid point positions");
       return;
     }
     
     log(`Positions: P1=${pos1.x.toFixed(1)}%,${pos1.y.toFixed(1)}% | P2=${pos2.x.toFixed(1)}%,${pos2.y.toFixed(1)}%`);
     
     try {
-      // ✅ FIXED: Convert percentage (0-100) directly to NATURAL image pixels
+      // Convert percentage (0-100) directly to NATURAL image pixels
       const x1_img = (pos1.x / 100) * imageSize.width;
       const y1_img = (pos1.y / 100) * imageSize.height;
       const x2_img = (pos2.x / 100) * imageSize.width;
       const y2_img = (pos2.y / 100) * imageSize.height;
       
       log(`Natural pixels: P1=(${x1_img.toFixed(1)}, ${y1_img.toFixed(1)}) | P2=(${x2_img.toFixed(1)}, ${y2_img.toFixed(1)})`);
-      log(`Image size: ${imageSize.width}x${imageSize.height}`);
       
-      // Check if pixels are within reasonable bounds
+      // Validate pixels are within reasonable bounds
       const margin = 50;
       if (x1_img < -margin || x1_img > imageSize.width + margin || 
           y1_img < -margin || y1_img > imageSize.height + margin ||
@@ -239,7 +275,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
       
       // Check if points are too close
       if (Math.abs(x2_img - x1_img) < 1 || Math.abs(y2_img - y1_img) < 1) {
-        log(`⚠️ Points too close together: dx=${Math.abs(x2_img - x1_img).toFixed(1)}, dy=${Math.abs(y2_img - y1_img).toFixed(1)}`);
+        log(`⚠️ Points too close: dx=${Math.abs(x2_img - x1_img).toFixed(1)}, dy=${Math.abs(y2_img - y1_img).toFixed(1)}`);
         return;
       }
       
@@ -258,19 +294,16 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
         const errors = validateBounds(newBounds);
         if (errors.length === 0) {
           setCalculatedBounds(newBounds);
-          log(`✅ Bounds calculated: ${newBounds.top.toFixed(4)}, ${newBounds.left.toFixed(4)}, ${newBounds.bottom.toFixed(4)}, ${newBounds.right.toFixed(4)}`);
+          log(`✅ Bounds: ${newBounds.top.toFixed(4)}, ${newBounds.left.toFixed(4)}, ${newBounds.bottom.toFixed(4)}, ${newBounds.right.toFixed(4)}`);
         } else {
-          log(`⚠️ Validation errors: ${errors.join('; ')} (keeping previous bounds)`);
-          // ✅ NEVER clear calculatedBounds on validation error
+          log(`⚠️ Validation: ${errors.join('; ')} (keeping previous)`);
         }
       } else {
-        log(`⚠️ calculateBoundsFromPoints returned null (keeping previous bounds)`);
-        // ✅ NEVER clear calculatedBounds on calc failure
+        log(`⚠️ Calc returned null (keeping previous)`);
       }
     } catch (error) {
       log(`❌ Exception: ${error instanceof Error ? error.message : String(error)}`);
       console.error('[Calibrator] Error:', error);
-      // ✅ NEVER clear calculatedBounds on exception
     }
   }, [imageSize, renderBox, log]);
 
