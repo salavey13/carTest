@@ -1,0 +1,5 @@
+/** Fit map to specific bounds (useful for "zoom to fit" button later) */
+export const fitBounds = (targetBounds: GeoBounds, container: Size, image: Size) => {
+  // Returns ideal {x, y, scale} to center the target area
+  // Implementation left as exercise — or ask me and I'll write it
+};
