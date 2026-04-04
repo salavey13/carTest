@@ -113,16 +113,36 @@ export const calculateBoundsFromPoints = (
   const { lat: latA, lon: lonA, pixelX: xA, pixelY: yA } = pointA;
   const { lat: latB, lon: lonB, pixelX: xB, pixelY: yB } = pointB;
   
-  if (Math.abs(xB - xA) < 0.001 || Math.abs(yB - yA) < 0.001) return null;
+  // Prevent division by zero on degenerate point placement
+  if (Math.abs(xB - xA) < 0.001 || Math.abs(yB - yA) < 0.001) {
+    console.warn('[calculateBoundsFromPoints] Points too close together');
+    return null;
+  }
   
+  // Validate pixel coordinates are within image bounds
+  if (xA < 0 || xA > imageWidth || xB < 0 || xB > imageWidth ||
+      yA < 0 || yA > imageHeight || yB < 0 || yB > imageHeight) {
+    console.warn('[calculateBoundsFromPoints] Points outside image bounds');
+    return null;
+  }
+  
+  // Calculate degrees per pixel
   const lonPerPixel = (lonB - lonA) / (xB - xA);
   const latPerPixel = (latB - latA) / (yB - yA);
   
+  // Calculate bounds using point A as reference
   const left = lonA - xA * lonPerPixel;
   const right = left + imageWidth * lonPerPixel;
   const top = latA - yA * latPerPixel;
   const bottom = top + imageHeight * latPerPixel;
   
+  // Validate results are reasonable
+  if (!isFinite(left) || !isFinite(right) || !isFinite(top) || !isFinite(bottom)) {
+    console.warn('[calculateBoundsFromPoints] Calculated NaN bounds');
+    return null;
+  }
+  
+  // Normalize: ensure top > bottom (north > south), left < right (west < east)
   return {
     top: Math.max(top, bottom),
     bottom: Math.min(top, bottom),
