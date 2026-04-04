@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { VibeContentRenderer } from './VibeContentRenderer';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
@@ -13,9 +14,9 @@ import { cn } from '@/lib/utils';
 import { Loading } from './Loading';
 import Image from 'next/image';
 import { 
-  project, unproject, GeoBounds, ViewState,
+  project, unproject, GeoBounds,
   getRenderBox, calculateBoundsFromPoints, validateBounds, formatBounds,
-  clamp, pixelToPercent, percentToPixel, snapToGrid, formatCoordinate,
+  clamp, pixelToPercent, percentToPixel, formatCoordinate,
   DEFAULT_MAP_IMAGE, FALLBACK_MAP_IMAGE, generateStorageKey
 } from "@/lib/map-utils";
 
@@ -27,9 +28,6 @@ const REFERENCE_POINTS: Point[] = [
   { id: 'aska', name: 'Аська', coords: [56.330, 44.018] },
   { id: 'airport', name: 'Аэропорт Стригино', coords: [56.229, 43.784] },
 ];
-const GRID_SNAP_ENABLED = true;
-const GRID_SIZE = 2; // percent
-const SNAP_THRESHOLD = 0.5; // percent
 
 export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds }) {
   const { dbUser } = useAppContext();
@@ -45,12 +43,36 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
   const [isImageLoading, setIsImageLoading] = useState(true);
   const [containerSize, setContainerSize] = useState<Size>({ width: 1, height: 1 });
   const [coordFormat, setCoordFormat] = useState<'dd' | 'dms'>('dd');
-  const [snapEnabled, setSnapEnabled] = useState(GRID_SNAP_ENABLED);
+  
+  // ✅ DEBUG LOGS — moved to bottom of UI
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const log = useCallback((msg: string) => {
+    const timestamp = new Date().toLocaleTimeString('ru-RU', { hour12: false });
+    const entry = `[${timestamp}] ${msg}`;
+    console.log(`[Calibrator] ${msg}`);
+    setDebugLogs(prev => [...prev, entry].slice(-50));
+  }, []);
+  
+  // ✅ REFS FOR FRESH VALUES (avoid stale closures)
+  const imageSizeRef = useRef<Size | null>(null);
+  const renderBoxRef = useRef<ReturnType<typeof getRenderBox> | null>(null);
+  const positionsRef = useRef<Record<string, PixelPosition>>({});
+  const containerSizeRef = useRef<Size>({ width: 1, height: 1 });
   
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const storageKey = useMemo(() => generateStorageKey(initialBounds, "vibecal"), [initialBounds]);
 
-  // Restore calibrator state
+  useEffect(() => { imageSizeRef.current = imageSize; }, [imageSize]);
+  useEffect(() => { positionsRef.current = positions; }, [positions]);
+  useEffect(() => { containerSizeRef.current = containerSize; }, [containerSize]);
+  
+  const renderBox = useMemo(() => {
+    const box = imageSize ? getRenderBox(containerSize, imageSize) : null;
+    renderBoxRef.current = box;
+    return box;
+  }, [containerSize, imageSize]);
+
+  // Restore state
   useEffect(() => {
     try {
       const saved = localStorage.getItem(storageKey);
@@ -58,24 +80,34 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
         const parsed = JSON.parse(saved);
         if (parsed.presetName) setPresetName(parsed.presetName);
         if (parsed.coordFormat) setCoordFormat(parsed.coordFormat);
+        if (parsed.mapUrl) {
+          setMapUrl(parsed.mapUrl);
+          setCurrentImageUrl(parsed.mapUrl);
+        }
       }
-    } catch {}
-  }, [storageKey]);
+    } catch (e) {
+      log(`Restore failed: ${e}`);
+    }
+  }, [storageKey, log]);
 
-  // Persist calibrator state
+  // Persist state
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem(storageKey, JSON.stringify({ presetName, coordFormat }));
-      } catch {}
+        localStorage.setItem(storageKey, JSON.stringify({ presetName, coordFormat, mapUrl }));
+      } catch (e) {
+        log(`Persist failed: ${e}`);
+      }
     }, 500);
     return () => clearTimeout(timer);
-  }, [presetName, coordFormat, storageKey]);
+  }, [presetName, coordFormat, mapUrl, storageKey, log]);
 
   useEffect(() => {
     setIsImageLoading(true);
     setImageSize(null);
-  }, [mapUrl]);
+    setCalculatedBounds(null);
+    log(`Image URL changed: ${mapUrl?.slice(0, 50)}...`);
+  }, [mapUrl, log]);
 
   useEffect(() => {
     if (mapUrl) setCurrentImageUrl(mapUrl);
@@ -84,95 +116,165 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
   useEffect(() => {
     const el = mapContainerRef.current;
     if (!el) return;
-    const updateSize = () => setContainerSize({ width: el.offsetWidth, height: el.offsetHeight });
+    const updateSize = () => {
+      const newSize = { width: el.offsetWidth, height: el.offsetHeight };
+      setContainerSize(newSize);
+      log(`Container: ${newSize.width}x${newSize.height}`);
+    };
     updateSize();
     const observer = new ResizeObserver(updateSize);
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
-
-  const renderBox = useMemo(() => 
-    imageSize ? getRenderBox(containerSize, imageSize) : null,
-    [containerSize, imageSize]
-  );
+  }, [log]);
 
   const startCalibration = useCallback(() => {
     if (!imageSize || !mapContainerRef.current) {
       toast.warning("Изображение карты еще не загружено.");
+      log("❌ Start blocked: missing imageSize or container");
       return;
     }
     
+    log(`✅ Starting calibration`);
+    log(`   Bounds: ${JSON.stringify(bounds)}`);
+    log(`   Image: ${imageSize.width}x${imageSize.height}`);
+    log(`   Container: ${containerSize.width}x${containerSize.height}`);
+    log(`   RenderBox: ${renderBox ? `${renderBox.width.toFixed(0)}x${renderBox.height.toFixed(0)} +${renderBox.offsetX.toFixed(0)},+${renderBox.offsetY.toFixed(0)}` : 'null'}`);
+    
     const initialPositions: Record<string, PixelPosition> = {};
+    
     REFERENCE_POINTS.forEach(p => {
       const pos = project(p.coords[0], p.coords[1], bounds);
-      initialPositions[p.id] = pos || { x: 50, y: 50 };
+      log(`   Project ${p.id}: ${p.coords} → ${pos ? `${pos.x.toFixed(1)}%,${pos.y.toFixed(1)}%` : 'null'}`);
+      
+      if (pos && pos.x >= 10 && pos.x <= 90 && pos.y >= 10 && pos.y <= 90) {
+        initialPositions[p.id] = pos;
+      } else {
+        initialPositions[p.id] = p.id === 'aska' ? { x: 25, y: 70 } : { x: 75, y: 30 };
+        log(`   → Using fallback for ${p.id}: ${JSON.stringify(initialPositions[p.id])}`);
+      }
     });
+    
     setPositions(initialPositions);
     setCalculatedBounds(null);
     setIsCalibrating(true);
+    log(`✅ Calibration started with positions: ${JSON.stringify(initialPositions)}`);
+    
     toast.info("Перетащите точки на реальные позиции", { duration: 3000 });
-  }, [bounds, imageSize]);
+  }, [bounds, imageSize, containerSize, renderBox, log]);
 
-  const handlePointDragEnd = useCallback((pointId: string, _event: unknown, info: any) => {
-    if (!mapContainerRef.current) return;
-    const rect = mapContainerRef.current.getBoundingClientRect();
+  // ✅ BOUNDS RECALC — USES REFS, NEVER CLEARS ON ERROR
+  const recalcBounds = useCallback((currentPositions: Record<string, PixelPosition>) => {
+    log(`🔄 recalcBounds called`);
     
-    const initialPos = positions[pointId] || { x: 50, y: 50 };
-    const deltaX = (info.offset[0] / rect.width) * 100;
-    const deltaY = (info.offset[1] / rect.height) * 100;
+    const imgSize = imageSizeRef.current;
+    const rBox = renderBoxRef.current;
     
-    let newX = clamp(initialPos.x + deltaX, 0, 100);
-    let newY = clamp(initialPos.y + deltaY, 0, 100);
-    
-    // Optional grid snapping
-    if (snapEnabled) {
-      newX = snapToGrid(newX, GRID_SIZE, SNAP_THRESHOLD);
-      newY = snapToGrid(newY, GRID_SIZE, SNAP_THRESHOLD);
-    }
-    
-    setPositions(prev => ({ ...prev, [pointId]: { x: newX, y: newY } }));
-  }, [positions, snapEnabled]);
-
-  useEffect(() => {
-    if (!isCalibrating || !imageSize || !renderBox) return;
+    if (!imgSize) { log("❌ imageSizeRef is null"); return; }
+    if (!rBox) { log("❌ renderBoxRef is null"); return; }
     
     const p1 = REFERENCE_POINTS[0];
     const p2 = REFERENCE_POINTS[1];
-    const pos1 = positions[p1.id];
-    const pos2 = positions[p2.id];
+    const pos1 = currentPositions[p1.id];
+    const pos2 = currentPositions[p2.id];
     
-    if (!pos1 || !pos2) return;
+    log(`   Positions: P1=${pos1?.x?.toFixed(1) ?? 'null'}%,${pos1?.y?.toFixed(1) ?? 'null'}% | P2=${pos2?.x?.toFixed(1) ?? 'null'}%,${pos2?.y?.toFixed(1) ?? 'null'}%`);
     
-    const toImagePixel = (percent: number, offset: number, size: number) => {
-      return (percent / 100) * size + offset;
-    };
+    if (!pos1 || !pos2 || !isFinite(pos1.x) || !isFinite(pos1.y) || !isFinite(pos2.x) || !isFinite(pos2.y)) {
+      log("❌ Invalid positions");
+      return;
+    }
     
-    const x1_img = toImagePixel(pos1.x, -renderBox.offsetX, renderBox.width);
-    const y1_img = toImagePixel(pos1.y, -renderBox.offsetY, renderBox.height);
-    const x2_img = toImagePixel(pos2.x, -renderBox.offsetX, renderBox.width);
-    const y2_img = toImagePixel(pos2.y, -renderBox.offsetY, renderBox.height);
+    // Convert percentage (0-100) to NATURAL image pixels
+    const x1 = (pos1.x / 100) * imgSize.width;
+    const y1 = (pos1.y / 100) * imgSize.height;
+    const x2 = (pos2.x / 100) * imgSize.width;
+    const y2 = (pos2.y / 100) * imgSize.height;
+    
+    log(`   Natural pixels: P1=(${x1.toFixed(1)}, ${y1.toFixed(1)}) | P2=(${x2.toFixed(1)}, ${y2.toFixed(1)})`);
+    
+    // Validate bounds
+    const margin = 20;
+    if (x1 < -margin || x1 > imgSize.width + margin || y1 < -margin || y1 > imgSize.height + margin ||
+        x2 < -margin || x2 > imgSize.width + margin || y2 < -margin || y2 > imgSize.height + margin) {
+      log(`⚠️ Pixels outside image (margin=${margin})`);
+      return;
+    }
+    
+    if (Math.abs(x2 - x1) < 5 || Math.abs(y2 - y1) < 5) {
+      log(`⚠️ Points too close: dx=${Math.abs(x2-x1).toFixed(1)}, dy=${Math.abs(y2-y1).toFixed(1)}`);
+      return;
+    }
+    
+    log(`🧮 Calling calculateBoundsFromPoints...`);
     
     const newBounds = calculateBoundsFromPoints(
-      { lat: p1.coords[0], lon: p1.coords[1], pixelX: x1_img, pixelY: y1_img },
-      { lat: p2.coords[0], lon: p2.coords[1], pixelX: x2_img, pixelY: y2_img },
-      imageSize.width,
-      imageSize.height
+      { lat: p1.coords[0], lon: p1.coords[1], pixelX: x1, pixelY: y1 },
+      { lat: p2.coords[0], lon: p2.coords[1], pixelX: x2, pixelY: y2 },
+      imgSize.width,
+      imgSize.height
     );
+    
+    log(`📦 calculateBoundsFromPoints returned: ${newBounds ? JSON.stringify(newBounds) : 'null'}`);
     
     if (newBounds) {
       const errors = validateBounds(newBounds);
       if (errors.length === 0) {
         setCalculatedBounds(newBounds);
+        log(`✅✅✅ BOUNDS UPDATED: ${newBounds.top.toFixed(4)}, ${newBounds.left.toFixed(4)}, ${newBounds.bottom.toFixed(4)}, ${newBounds.right.toFixed(4)}`);
       } else {
-        setCalculatedBounds(null);
-        toast.warning(`Проверьте позиции точек: ${errors[0]}`, { duration: 4000 });
+        log(`⚠️ Validation: ${errors.join('; ')} (keeping previous)`);
       }
+    } else {
+      log(`⚠️ Calc returned null (keeping previous)`);
     }
-  }, [positions, isCalibrating, imageSize, renderBox]);
+  }, [log]);
+
+  // ✅ FIXED: Use native event.clientX/clientY instead of info.point
+  const handlePointDragEnd = useCallback((pointId: string, event: any, _info: any) => {
+    log(`🖱️ DragEnd ${pointId}`);
+    
+    if (!mapContainerRef.current) { log("❌ No container ref"); return; }
+    
+    const rect = mapContainerRef.current.getBoundingClientRect();
+    const prev = positionsRef.current[pointId];
+    
+    if (!prev) { log(`❌ No prev position for ${pointId}`); return; }
+    log(`   Prev: ${prev.x.toFixed(1)}%, ${prev.y.toFixed(1)}%`);
+    
+    // ✅ Use native event coordinates (reliable across environments)
+    const clientX = event?.clientX ?? event?.sourceEvent?.clientX;
+    const clientY = event?.clientY ?? event?.sourceEvent?.clientY;
+    
+    log(`   Event coords: clientX=${clientX}, clientY=${clientY}`);
+    log(`   Container rect: left=${rect.left}, top=${rect.top}, width=${rect.width}, height=${rect.height}`);
+    
+    if (!isFinite(clientX) || !isFinite(clientY)) {
+      log("❌ Invalid event coordinates");
+      return;
+    }
+    
+    const cs = containerSizeRef.current;
+    if (cs.width <= 0 || cs.height <= 0) {
+      log(`❌ Invalid containerSize: ${cs.width}x${cs.height}`);
+      return;
+    }
+    
+    // Convert screen pixels to percentage of container (0-100)
+    const percentX = clamp(((clientX - rect.left) / cs.width) * 100, 0, 100);
+    const percentY = clamp(((clientY - rect.top) / cs.height) * 100, 0, 100);
+    
+    log(`   New position: ${percentX.toFixed(1)}%, ${percentY.toFixed(1)}%`);
+    
+    // Update state
+    const newPositions = { ...positionsRef.current, [pointId]: { x: percentX, y: percentY } };
+    setPositions(newPositions);
+    
+    // Recalc bounds
+    recalcBounds(newPositions);
+  }, [recalcBounds, log]);
 
   const calibrationBoxStyle = useMemo(() => {
     if (!isCalibrating || !renderBox) return { display: 'none' };
-    
     const pos1 = positions[REFERENCE_POINTS[0].id];
     const pos2 = positions[REFERENCE_POINTS[1].id];
     if (!pos1 || !pos2) return { display: 'none' };
@@ -197,47 +299,45 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
       return;
     }
     
-    const validationErrors = validateBounds(calculatedBounds);
-    if (validationErrors.length > 0) {
-      toast.error(`Некорректные границы: ${validationErrors.join('; ')}`);
+    const errors = validateBounds(calculatedBounds);
+    if (errors.length > 0) {
+      toast.error(`Некорректные границы: ${errors.join('; ')}`);
       return;
     }
     
     setIsSaving(true);
-    const promise = saveMapPreset(dbUser.user_id, presetName.trim(), currentImageUrl, calculatedBounds, false);
-    toast.promise(promise, {
-      loading: "Сохранение пресета карты...",
-      success: (res) => {
-        if (res.success) {
-          setIsCalibrating(false);
-          setBounds(calculatedBounds);
-          setPresetName("");
-          return `Пресет "${res.data?.name}" успешно сохранен!`;
-        }
-        throw new Error(res.error);
-      },
-      error: (err) => `Ошибка сохранения: ${err.message}`,
-      finally: () => setIsSaving(false),
-    });
+    try {
+      const result = await saveMapPreset(dbUser.user_id, presetName.trim(), currentImageUrl, calculatedBounds, false);
+      if (result.success && result.data) {
+        setIsCalibrating(false);
+        setBounds(calculatedBounds);
+        setPresetName("");
+        toast.success(`Пресет "${result.data.name}" сохранен!`);
+        log(`✅ Preset saved: ${result.data.name}`);
+      } else {
+        throw new Error(result.error || "Неизвестная ошибка");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Ошибка сохранения");
+      log(`❌ Save error: ${error}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleTestClick = useCallback((e: React.MouseEvent) => {
     if (!calculatedBounds || !imageSize || !renderBox) return;
-    
     const rect = mapContainerRef.current?.getBoundingClientRect();
     if (!rect) return;
     
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
-    
     const imgX = pixelToPercent(clickX, renderBox.offsetX, renderBox.width);
     const imgY = pixelToPercent(clickY, renderBox.offsetY, renderBox.height);
     
     const result = unproject(imgX, imgY, calculatedBounds);
     if (result) {
-      const lat = formatCoordinate(result[0], true, coordFormat);
-      const lon = formatCoordinate(result[1], false, coordFormat);
-      toast.info(`🎯 ${lat} ${lon}`, { duration: 3000 });
+      toast.info(`🎯 ${formatCoordinate(result[0], true, coordFormat)} ${formatCoordinate(result[1], false, coordFormat)}`, { duration: 3000 });
     }
   }, [calculatedBounds, imageSize, renderBox, coordFormat]);
 
@@ -245,102 +345,43 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     if (currentImageUrl !== FALLBACK_MAP_IMAGE) {
       setCurrentImageUrl(FALLBACK_MAP_IMAGE);
       toast.error("Изображение не загрузилось — используем fallback", { duration: 4000 });
+      log(`❌ Image error, switched to fallback`);
     }
-  }, [currentImageUrl]);
+  }, [currentImageUrl, log]);
 
   return (
     <TooltipProvider>
       <div className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="text-sm font-mono text-muted-foreground">URL Изображения Карты</label>
-            <Input 
-              value={mapUrl} 
-              onChange={(e) => setMapUrl(e.target.value)} 
-              className="input-cyber mt-1 font-mono text-xs"
-              placeholder="https://..."
-            />
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="sm:col-span-2">
+            <label className="text-sm font-mono text-zinc-400 mb-1.5 block">URL Изображения Карты</label>
+            <Input value={mapUrl} onChange={(e) => setMapUrl(e.target.value)} className="input-cyber font-mono text-xs" placeholder="https://..." />
           </div>
           <div>
-            <label className="text-sm font-mono text-muted-foreground">Формат Координат</label>
-            <div className="flex gap-2 mt-1">
-              <Button 
-                size="sm" 
-                variant={coordFormat === 'dd' ? 'default' : 'outline'}
-                onClick={() => setCoordFormat('dd')}
-                className={cn("flex-1 text-xs", coordFormat === 'dd' && "bg-brand-lime text-black")}
-              >
-                Decimal
-              </Button>
-              <Button 
-                size="sm" 
-                variant={coordFormat === 'dms' ? 'default' : 'outline'}
-                onClick={() => setCoordFormat('dms')}
-                className={cn("flex-1 text-xs", coordFormat === 'dms' && "bg-brand-lime text-black")}
-              >
-                DMS
-              </Button>
+            <label className="text-sm font-mono text-zinc-400 mb-1.5 block">Формат Координат</label>
+            <div className="flex gap-1 p-1 rounded-lg bg-white/5">
+              <Button size="sm" variant={coordFormat === 'dd' ? 'default' : 'ghost'} onClick={() => setCoordFormat('dd')} className={cn("flex-1 text-xs", coordFormat === 'dd' && "bg-brand-lime text-black")}>Decimal</Button>
+              <Button size="sm" variant={coordFormat === 'dms' ? 'default' : 'ghost'} onClick={() => setCoordFormat('dms')} className={cn("flex-1 text-xs", coordFormat === 'dms' && "bg-brand-lime text-black")}>DMS</Button>
             </div>
           </div>
         </div>
         
-        <div 
-          ref={mapContainerRef} 
-          className="relative w-full aspect-[16/10] overflow-hidden rounded-[28px] border border-brand-purple/30 bg-slate-950/80 shadow-[0_30px_80px_rgba(0,0,0,0.4)]"
-          onClick={calculatedBounds ? handleTestClick : undefined}
-        >
+        <div ref={mapContainerRef} className="relative w-full aspect-[3/4] sm:aspect-[16/9] lg:aspect-[21/8] overflow-hidden rounded-2xl border border-brand-purple/30 bg-slate-950/80 shadow-2xl" onClick={calculatedBounds ? handleTestClick : undefined}>
           {currentImageUrl && (
             <>
-              <Image
-                src={currentImageUrl}
-                alt="Map backdrop"
-                fill
-                className="pointer-events-none object-cover scale-110 opacity-35 blur-2xl saturate-125"
-                unoptimized
-                onError={handleImageError}
-              />
+              <Image src={currentImageUrl} alt="Map backdrop" fill className="pointer-events-none object-cover scale-110 opacity-35 blur-2xl saturate-125" unoptimized onError={handleImageError} />
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.1),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.14),rgba(2,6,23,0.55))]" />
             </>
           )}
           
-          {isImageLoading && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40">
-              <Loading text="ЗАГРУЗКА КАРТЫ..." />
-            </div>
-          )}
+          {isImageLoading && <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40"><Loading text="ЗАГРУЗКА КАРТЫ..." /></div>}
           
-          {currentImageUrl && 
-            <Image 
-              src={currentImageUrl} 
-              alt="Map Background" 
-              fill
-              className={cn("pointer-events-none object-contain transition-opacity duration-300", isImageLoading ? "opacity-0" : "opacity-100")} 
-              onLoadingComplete={(img) => { 
-                setImageSize({width: img.naturalWidth, height: img.naturalHeight}); 
-                setIsImageLoading(false); 
-              }}
-              onError={handleImageError}
-              unoptimized
-            />
-          }
+          {currentImageUrl && <Image src={currentImageUrl} alt="Map Background" fill className={cn("pointer-events-none object-contain transition-opacity duration-300", isImageLoading ? "opacity-0" : "opacity-100")} onLoadingComplete={(img) => { setImageSize({width: img.naturalWidth, height: img.naturalHeight}); setIsImageLoading(false); log(`✅ Image loaded: ${img.naturalWidth}x${img.naturalHeight}`); }} onError={handleImageError} unoptimized />}
           
-          {/* Calibration box — pixel-perfect with renderBox */}
-          <div 
-            style={calibrationBoxStyle} 
-            className="absolute border-2 border-dashed border-brand-cyan/70 bg-brand-cyan/5 pointer-events-none rounded-[24px] transition-all duration-200" 
-          />
+          <div style={calibrationBoxStyle} className="absolute border-2 border-dashed border-brand-cyan/70 bg-brand-cyan/5 pointer-events-none rounded-xl transition-all duration-200 z-10" />
           
-          {/* Grid overlay when snapping enabled */}
-          {isCalibrating && snapEnabled && renderBox && (
-            <svg
-              className="absolute pointer-events-none opacity-20"
-              style={{
-                left: renderBox.offsetX,
-                top: renderBox.offsetY,
-                width: renderBox.width,
-                height: renderBox.height,
-              }}
-            >
+          {isCalibrating && renderBox && (
+            <svg className="absolute pointer-events-none opacity-20 z-0" style={{ left: renderBox.offsetX, top: renderBox.offsetY, width: renderBox.width, height: renderBox.height }}>
               {[...Array(11)].map((_, i) => (
                 <g key={i}>
                   <line x1={`${i * 10}%`} y1="0" x2={`${i * 10}%`} y2="100%" stroke="white" strokeWidth="0.5" />
@@ -352,42 +393,30 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
           
           {isCalibrating ? (
             REFERENCE_POINTS.map(point => (
-              <motion.div
-                key={point.id}
-                className="absolute z-20"
-                style={{
-                  left: `${positions[point.id]?.x ?? 50}%`,
-                  top: `${positions[point.id]?.y ?? 50}%`,
-                  transform: 'translate(-50%, -50%)',
+              <motion.div 
+                key={point.id} 
+                className="absolute z-20" 
+                style={{ 
+                  left: `${positions[point.id]?.x ?? 50}%`, 
+                  top: `${positions[point.id]?.y ?? 50}%`, 
+                  transform: 'translate(-50%, -50%)' 
                 }}
               >
-                <motion.div
-                  drag
+                <motion.div 
+                  drag 
                   dragMomentum={false}
-                  dragElastic={0.1}
+                  dragElastic={0}
                   onDragEnd={(e, info) => handlePointDragEnd(point.id, e, info)}
-                  className={cn(
-                    "flex h-10 w-10 cursor-grab items-center justify-center rounded-full",
-                    "bg-gradient-to-br from-brand-lime to-brand-cyan text-black",
-                    "shadow-lg shadow-brand-lime/40 ring-2 ring-white/30",
-                    "active:cursor-grabbing active:scale-95 transition-transform",
-                    snapEnabled && "ring-4 ring-brand-cyan/50"
-                  )}
-                  whileHover={{ scale: 1.1, boxShadow: "0 0 25px rgba(124,244,120,0.6)" }}
-                  whileTap={{ scale: 0.95 }}
+                  className="flex h-10 w-10 sm:h-12 sm:w-12 cursor-grab items-center justify-center rounded-full bg-gradient-to-br from-brand-lime to-brand-cyan text-black shadow-lg ring-2 ring-white/30 active:cursor-grabbing"
                 >
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button className="focus:outline-none focus:ring-2 focus:ring-brand-lime rounded-full">
-                        <VibeContentRenderer content="::FaLocationDot::" className="h-5 w-5" />
+                        <VibeContentRenderer content="::FaLocationDot::" className="h-5 w-5 sm:h-6 sm:w-6" />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="bg-dark-card/95 border-brand-lime/30">
                       <p className="font-mono text-sm">{point.name}</p>
-                      <p className="text-xs text-zinc-400 mt-0.5">
-                        {positions[point.id]?.x.toFixed(1)}%, {positions[point.id]?.y.toFixed(1)}%
-                        {snapEnabled && <span className="text-brand-cyan ml-1">• snapped</span>}
-                      </p>
                     </TooltipContent>
                   </Tooltip>
                 </motion.div>
@@ -397,140 +426,69 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
             imageSize && renderBox && REFERENCE_POINTS.map(point => {
               const projected = project(point.coords[0], point.coords[1], bounds);
               if (!projected) return null;
-              
               const pixelX = percentToPixel(projected.x, renderBox.offsetX, renderBox.width);
               const pixelY = percentToPixel(projected.y, renderBox.offsetY, renderBox.height);
-              
-              return (
-                <div 
-                  key={point.id} 
-                  className="absolute w-3 h-3 rounded-full ring-2 ring-white/50 z-10 animate-pulse"
-                  style={{ 
-                    left: `${(pixelX / containerSize.width) * 100}%`, 
-                    top: `${(pixelY / containerSize.height) * 100}%`,
-                    transform: 'translate(-50%, -50%)',
-                    backgroundColor: point.id === 'aska' ? '#FF69B4' : '#00CED1'
-                  }} 
-                />
-              );
+              return <div key={point.id} className="absolute w-3 h-3 sm:w-4 sm:h-4 rounded-full ring-2 ring-white/50 z-10" style={{ left: `${(pixelX / containerSize.width) * 100}%`, top: `${(pixelY / containerSize.height) * 100}%`, transform: 'translate(-50%, -50%)', backgroundColor: point.id === 'aska' ? '#FF69B4' : '#00CED1' }} />;
             })
           )}
         </div>
         
+        {/* Main UI Section */}
         {!isCalibrating ? (
-          <Button onClick={startCalibration} disabled={isImageLoading} className="w-full group">
+          <Button onClick={startCalibration} disabled={isImageLoading} className="w-full group h-12 text-base">
             <VibeContentRenderer content="::FaRulerCombined::" className="mr-2 group-hover:scale-110 transition-transform" />
             Начать Калибровку
           </Button>
         ) : (
-          <div className="bg-card/50 p-4 rounded-xl space-y-4 border border-white/10">
+          <div className="bg-card/50 p-4 sm:p-6 rounded-xl space-y-4 border border-white/10">
             <div className="flex items-center justify-between">
               <h3 className="font-orbitron text-lg text-white">Калибровка</h3>
-              <div className="flex items-center gap-2">
-                <Button 
-                  size="sm" 
-                  variant={snapEnabled ? "default" : "outline"}
-                  onClick={() => setSnapEnabled(!snapEnabled)}
-                  className={cn("text-xs", snapEnabled && "bg-brand-cyan text-black")}
-                >
-                  {snapEnabled ? "✓ Snap" : "○ Snap"}
-                </Button>
-                {calculatedBounds && (
-                  <span className="text-xs font-mono text-brand-lime bg-brand-lime/10 px-2 py-1 rounded">
-                    ✓ Границы вычислены
-                  </span>
-                )}
-              </div>
+              {calculatedBounds && <Badge className="bg-brand-lime/20 text-brand-lime border-brand-lime/30 text-xs">✓ Границы вычислены</Badge>}
             </div>
             
             {calculatedBounds ? (
               <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs text-zinc-400">
-                  <span>Проверка валидности:</span>
-                  <span className={validateBounds(calculatedBounds).length === 0 ? 'text-brand-lime' : 'text-amber-400'}>
-                    {validateBounds(calculatedBounds).length === 0 ? '✓ Все параметры в норме' : '⚠ Требуется проверка'}
-                  </span>
-                </div>
-                
                 <div className="relative">
-                  <label className="text-xs font-mono text-muted-foreground mb-1 block">
-                    Вычисленные GeoBounds:
-                  </label>
-                  <pre className="text-[11px] bg-black/40 p-3 rounded-lg overflow-x-auto font-mono text-brand-cyan/90 max-h-32 simple-scrollbar">
-                    {formatBounds(calculatedBounds)}
-                  </pre>
+                  <label className="text-xs font-mono text-zinc-400 mb-1.5 block">Вычисленные GeoBounds:</label>
+                  <pre className="text-[10px] sm:text-[11px] bg-black/40 p-3 rounded-lg overflow-x-auto font-mono text-brand-cyan/90 max-h-32 simple-scrollbar border border-white/10 whitespace-pre-wrap break-all">{formatBounds(calculatedBounds)}</pre>
                   <div className="absolute top-2 right-2 flex gap-1">
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="h-6 w-6 p-0 text-zinc-400 hover:text-white"
-                      onClick={() => {
-                        navigator.clipboard.writeText(formatBounds(calculatedBounds));
-                        toast.success("Границы скопированы");
-                      }}
-                    >
-                      <VibeContentRenderer content="::FaCopy::" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="h-6 w-6 p-0 text-zinc-400 hover:text-white"
-                      onClick={() => {
-                        if (!calculatedBounds) return;
-                        const blob = new Blob([formatBounds(calculatedBounds)], { type: "application/json" });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `${presetName || "map-bounds"}.json`;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                        toast.success("Bounds exported as JSON");
-                      }}
-                    >
-                      <VibeContentRenderer content="::FaDownload::" />
-                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-zinc-400 hover:text-white" onClick={() => { navigator.clipboard.writeText(formatBounds(calculatedBounds)); toast.success("Границы скопированы"); }}><VibeContentRenderer content="::FaCopy::" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-zinc-400 hover:text-white" onClick={() => { if (!calculatedBounds) return; const blob = new Blob([formatBounds(calculatedBounds)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `${presetName || "map-bounds"}.json`; a.click(); URL.revokeObjectURL(url); toast.success("Bounds exported"); }}><VibeContentRenderer content="::FaDownload::" /></Button>
                   </div>
                 </div>
                 
-                <Input 
-                  value={presetName} 
-                  onChange={(e) => setPresetName(e.target.value)} 
-                  placeholder="Название пресета (например: Nizhny Novgorod Center)" 
-                  className="input-cyber font-mono" 
-                />
+                <div>
+                  <label className="text-xs font-mono text-zinc-400 mb-1.5 block">Название пресета</label>
+                  <Input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Например: Nizhny Novgorod Center" className="input-cyber font-mono" />
+                </div>
               </div>
             ) : (
-              <p className="text-sm text-zinc-400 italic">
-                Переместите обе опорные точки на карте для вычисления границ...
-                {snapEnabled && <span className="text-brand-cyan block mt-1">💡 Подсказка: точки привязываются к сетке</span>}
-              </p>
+              <p className="text-sm text-zinc-400 italic text-center py-4">Переместите обе опорные точки на карте для вычисления границ...</p>
             )}
             
             <div className="flex gap-2 pt-2">
-              <Button 
-                onClick={handleSave} 
-                disabled={!calculatedBounds || !presetName.trim() || isSaving || (calculatedBounds && validateBounds(calculatedBounds).length > 0)} 
-                className="flex-1 bg-gradient-to-r from-brand-lime to-brand-cyan text-black font-medium hover:opacity-90"
-              >
-                {isSaving ? (
-                  <Loading className="h-4 w-4 text-black" />
-                ) : (
-                  <>
-                    <VibeContentRenderer content="::FaSave::" className="mr-2" />
-                    Сохранить Пресет
-                  </>
-                )}
+              <Button onClick={handleSave} disabled={!calculatedBounds || !presetName.trim() || isSaving || (calculatedBounds && validateBounds(calculatedBounds).length > 0)} className="flex-1 bg-gradient-to-r from-brand-lime to-brand-cyan text-black font-medium hover:opacity-90 h-11">
+                {isSaving ? <Loading className="h-4 w-4 text-black" /> : <><VibeContentRenderer content="::FaSave::" className="mr-2" />Сохранить Пресет</>}
               </Button>
-              <Button 
-                onClick={() => setIsCalibrating(false)} 
-                variant="outline" 
-                className="flex-1 border-white/20 hover:bg-white/10"
-              >
-                Отмена
-              </Button>
+              <Button onClick={() => setIsCalibrating(false)} variant="outline" className="flex-1 border-white/20 hover:bg-white/10 h-11">Отмена</Button>
             </div>
           </div>
         )}
+
+        {/* ✅ DEBUG LOGS — AT THE BOTTOM, SCROLLABLE */}
+        <div className="bg-black/60 rounded-lg border border-white/10 p-3 font-mono text-[10px] text-zinc-300">
+          <div className="flex items-center justify-between mb-2 sticky top-0 bg-black/80 py-1">
+            <span className="text-xs text-brand-cyan font-bold">🔍 DEBUG LOGS (live)</span>
+            <button onClick={() => setDebugLogs([])} className="text-[10px] text-brand-lime hover:underline">Clear</button>
+          </div>
+          <div className="max-h-48 overflow-y-auto whitespace-pre-wrap break-all simple-scrollbar">
+            {debugLogs.length === 0 ? (
+              <span className="text-zinc-500">No logs yet — start calibration to see debug output</span>
+            ) : (
+              debugLogs.map((entry, i) => <div key={i} className="border-b border-white/5 py-0.5 last:border-0">{entry}</div>)
+            )}
+          </div>
+        </div>
       </div>
     </TooltipProvider>
   );

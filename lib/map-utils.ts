@@ -113,16 +113,36 @@ export const calculateBoundsFromPoints = (
   const { lat: latA, lon: lonA, pixelX: xA, pixelY: yA } = pointA;
   const { lat: latB, lon: lonB, pixelX: xB, pixelY: yB } = pointB;
   
-  if (Math.abs(xB - xA) < 0.001 || Math.abs(yB - yA) < 0.001) return null;
+  // Prevent division by zero on degenerate point placement
+  if (Math.abs(xB - xA) < 0.001 || Math.abs(yB - yA) < 0.001) {
+    console.warn('[calculateBoundsFromPoints] Points too close together');
+    return null;
+  }
   
+  // Validate pixel coordinates are within image bounds
+  if (xA < 0 || xA > imageWidth || xB < 0 || xB > imageWidth ||
+      yA < 0 || yA > imageHeight || yB < 0 || yB > imageHeight) {
+    console.warn('[calculateBoundsFromPoints] Points outside image bounds');
+    return null;
+  }
+  
+  // Calculate degrees per pixel
   const lonPerPixel = (lonB - lonA) / (xB - xA);
   const latPerPixel = (latB - latA) / (yB - yA);
   
+  // Calculate bounds using point A as reference
   const left = lonA - xA * lonPerPixel;
   const right = left + imageWidth * lonPerPixel;
   const top = latA - yA * latPerPixel;
   const bottom = top + imageHeight * latPerPixel;
   
+  // Validate results are reasonable
+  if (!isFinite(left) || !isFinite(right) || !isFinite(top) || !isFinite(bottom)) {
+    console.warn('[calculateBoundsFromPoints] Calculated NaN bounds');
+    return null;
+  }
+  
+  // Normalize: ensure top > bottom (north > south), left < right (west < east)
   return {
     top: Math.max(top, bottom),
     bottom: Math.min(top, bottom),
@@ -195,16 +215,19 @@ export const snapToGrid = (value: number, grid: number, threshold: number): numb
 
 export const fitBounds = (targetBounds: GeoBounds, container: Size, image: Size): ViewState => {
   const renderBox = getRenderBox(container, image);
+  
+  // Center is always 50% in percentage coordinates
+  const centerX = 50;
+  const centerY = 50;
+  
+  // Calculate scale to fit target bounds with 90% padding
   const targetWidth = targetBounds.right - targetBounds.left;
   const targetHeight = targetBounds.top - targetBounds.bottom;
-  
   const scaleX = renderBox.width / targetWidth;
   const scaleY = renderBox.height / targetHeight;
   const scale = clamp(Math.min(scaleX, scaleY) * 0.9, MIN_MAP_SCALE, MAX_MAP_SCALE);
   
-  const centerX = ((targetBounds.left + targetBounds.right) / 2 - (targetBounds.left + targetBounds.right) / 2) / (targetBounds.right - targetBounds.left) * 100;
-  const centerY = ((targetBounds.top + targetBounds.bottom) / 2 - targetBounds.bottom) / (targetBounds.top - targetBounds.bottom) * 100;
-  
+  // Convert center percentage to pixel within renderBox
   const targetPixelX = percentToPixel(centerX, renderBox.offsetX, renderBox.width);
   const targetPixelY = percentToPixel(centerY, renderBox.offsetY, renderBox.height);
   
