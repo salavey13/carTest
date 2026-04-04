@@ -28,8 +28,8 @@ const REFERENCE_POINTS: Point[] = [
   { id: 'airport', name: 'Аэропорт Стригино', coords: [56.229, 43.784] },
 ];
 const GRID_SNAP_ENABLED = true;
-const GRID_SIZE = 2; // percent
-const SNAP_THRESHOLD = 0.5; // percent
+const GRID_SIZE = 2;
+const SNAP_THRESHOLD = 0.5;
 
 export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds }) {
   const { dbUser } = useAppContext();
@@ -51,7 +51,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const storageKey = useMemo(() => generateStorageKey(initialBounds, "vibecal"), [initialBounds]);
 
-  // Restore calibrator state
   useEffect(() => {
     try {
       const saved = localStorage.getItem(storageKey);
@@ -69,7 +68,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     }
   }, [storageKey]);
 
-  // Persist calibrator state
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
@@ -118,23 +116,20 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     REFERENCE_POINTS.forEach(p => {
       const pos = project(p.coords[0], p.coords[1], bounds);
       
-      // Check if projection is valid and within reasonable bounds
       if (!pos || pos.x < 5 || pos.x > 95 || pos.y < 5 || pos.y > 95) {
         hasValidProjection = false;
         console.warn(`[Calibrator] Point ${p.id} projected to edge:`, pos);
       }
       
-      // Use projected position if valid, otherwise use smart defaults
       if (pos && hasValidProjection) {
         initialPositions[p.id] = pos;
       } else {
-        // Smart defaults based on typical NN map layout
         if (p.id === 'aska') {
-          initialPositions[p.id] = { x: 35, y: 65 }; // Southwest area
+          initialPositions[p.id] = { x: 35, y: 65 };
         } else if (p.id === 'airport') {
-          initialPositions[p.id] = { x: 65, y: 35 }; // Northeast area
+          initialPositions[p.id] = { x: 65, y: 35 };
         } else {
-          initialPositions[p.id] = { x: 50, y: 50 }; // Center fallback
+          initialPositions[p.id] = { x: 50, y: 50 };
         }
       }
     });
@@ -165,7 +160,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     let newX = clamp(initialPos.x + deltaX, 0, 100);
     let newY = clamp(initialPos.y + deltaY, 0, 100);
     
-    // Optional grid snapping
     if (snapEnabled) {
       newX = snapToGrid(newX, GRID_SIZE, SNAP_THRESHOLD);
       newY = snapToGrid(newY, GRID_SIZE, SNAP_THRESHOLD);
@@ -174,7 +168,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     setPositions(prev => ({ ...prev, [pointId]: { x: newX, y: newY } }));
   }, [positions, snapEnabled]);
 
-  // Recalculate bounds when positions change
   useEffect(() => {
     if (!isCalibrating || !imageSize || !renderBox) return;
     
@@ -189,7 +182,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     }
     
     try {
-      // Convert percentage positions to pixel coordinates within the IMAGE
       const toImagePixel = (percent: number, offset: number, size: number) => {
         return (percent / 100) * size + offset;
       };
@@ -229,7 +221,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     }
   }, [positions, isCalibrating, imageSize, renderBox]);
 
-  // Calibration box style
   const calibrationBoxStyle = useMemo(() => {
     if (!isCalibrating || !renderBox) return { display: 'none' };
     
@@ -312,7 +303,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
   return (
     <TooltipProvider>
       <div className="space-y-4">
-        {/* URL Input */}
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="sm:col-span-2">
             <label className="text-sm font-mono text-zinc-400 mb-1.5 block">URL Изображения Карты</label>
@@ -346,10 +336,9 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
           </div>
         </div>
         
-        {/* Map Container - Larger */}
         <div 
           ref={mapContainerRef} 
-          className="relative w-full aspect-[16/9] sm:aspect-[21/9] lg:aspect-[21/8] overflow-hidden rounded-2xl border border-brand-purple/30 bg-slate-950/80 shadow-2xl"
+          className="relative w-full aspect-[3/4] sm:aspect-[16/9] lg:aspect-[21/8] overflow-hidden rounded-2xl border border-brand-purple/30 bg-slate-950/80 shadow-2xl"
           onClick={calculatedBounds ? handleTestClick : undefined}
         >
           {currentImageUrl && (
@@ -387,13 +376,11 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
             />
           }
           
-          {/* Calibration box */}
           <div 
             style={calibrationBoxStyle} 
             className="absolute border-2 border-dashed border-brand-cyan/70 bg-brand-cyan/5 pointer-events-none rounded-xl transition-all duration-200 z-10" 
           />
           
-          {/* Grid overlay when snapping enabled */}
           {isCalibrating && snapEnabled && renderBox && (
             <svg
               className="absolute pointer-events-none opacity-20 z-0"
@@ -413,7 +400,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
             </svg>
           )}
           
-          {/* Calibration Points */}
           {isCalibrating ? (
             REFERENCE_POINTS.map(point => (
               <motion.div
@@ -458,7 +444,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
               </motion.div>
             ))
           ) : (
-            // Preview points (colored dots)
             imageSize && renderBox && REFERENCE_POINTS.map(point => {
               const projected = project(point.coords[0], point.coords[1], bounds);
               if (!projected) return null;
@@ -482,14 +467,12 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
           )}
         </div>
 
-        {/* Debug Info (dev only) */}
         {process.env.NODE_ENV === 'development' && debugInfo && (
           <div className="text-xs font-mono text-zinc-500 bg-black/30 px-3 py-2 rounded">
             {debugInfo}
           </div>
         )}
         
-        {/* Controls */}
         {!isCalibrating ? (
           <Button onClick={startCalibration} disabled={isImageLoading} className="w-full group h-12 text-base">
             <VibeContentRenderer content="::FaRulerCombined::" className="mr-2 group-hover:scale-110 transition-transform" />
@@ -562,8 +545,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
                     >
                       <VibeContentRenderer content="::FaDownload::" />
                     </Button>
-        
-          </div>
+                  </div>
                 </div>
                 
                 <div>
