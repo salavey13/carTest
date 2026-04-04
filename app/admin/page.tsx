@@ -126,7 +126,7 @@ function MapToolsPanel({ crewSlug }: { crewSlug: string }) {
     {
       title: "POI Editor",
       description: "Редактировать точки интереса на карте",
-      href: `/franchize/${crewSlug}/admin?tab=map`,
+      href: `/franchize/${crewSlug}/map-riders`,
       icon: "::FaLocationDot::",
       color: "from-amber-400 to-orange-500",
     },
@@ -406,7 +406,7 @@ function AdminPageContent() {
                 {/* Search + Actions */}
                 <div className="flex flex-col sm:flex-row gap-2">
                   <div className="relative flex-1 min-w-0">
-                    <VibeContentRenderer content="::FaSearch::" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                    <VibeContentRenderer content="::FaSearchengin::" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
                     <Input
                       placeholder="Поиск в гараже..."
                       value={searchQuery}
