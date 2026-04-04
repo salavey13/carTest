@@ -25,7 +25,6 @@ const packageOptions = ["Базовый", "Комфорт", "Максимум"];
 const durationOptions = ["1 день", "3 дня", "7 дней"];
 const perkOptions = ["Стандарт", "Шлем + GoPro", "Полный комплект"];
 
-// Helper to safely type CSS custom properties
 const getModalThemeVars = (theme: FranchizeTheme) =>
   ({
     "--item-accent": theme.palette.accentMain,
@@ -72,8 +71,6 @@ function OptionChips({
   );
 }
 
-// Extracted Gallery Component
-// Note: If you have a shared Gallery component in your project, you can replace this with it.
 interface ItemGalleryProps {
   images: string[];
   activeIndex: number;
@@ -95,7 +92,7 @@ function ItemGallery({ images, activeIndex, onNavigate, onSelect, altText, borde
   }
 
   return (
-    <>
+    <div className="relative flex w-full shrink-0 flex-col border-b" style={{ borderColor }}>
       <div className="relative aspect-[16/11] w-full bg-black/25 sm:aspect-[16/9] lg:aspect-[2.15/1]">
         <Image src={images[activeIndex]} alt={`${altText} ${activeIndex + 1}`} fill sizes="(max-width: 1024px) 100vw, 42vw" className="object-cover" unoptimized />
         {images.length > 1 && (
@@ -147,7 +144,7 @@ function ItemGallery({ images, activeIndex, onNavigate, onSelect, altText, borde
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -157,7 +154,6 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [isAdding, setIsAdding] = useState(false);
 
-  // Memoize expensive/derived values
   const gallery = useMemo(() => {
     if (!item) return [];
     const urls = item.mediaUrls?.length ? item.mediaUrls : item.imageUrl ? [item.imageUrl] : [];
@@ -171,13 +167,11 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
   const surface = useMemo(() => crewPaletteForSurface(theme), [theme]);
   const themeVars = useMemo(() => getModalThemeVars(theme), [theme]);
 
-  // Reset internal state when item changes
   useEffect(() => {
     setDescriptionExpanded(false);
     setActiveMediaIndex(0);
   }, [item?.id]);
 
-  // Focus management, Escape key, Body scroll lock, Keyboard gallery nav
   useEffect(() => {
     if (!item) return;
 
@@ -205,7 +199,6 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    // Focus trap target
     modalRef.current?.focus();
 
     return () => {
@@ -263,9 +256,13 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
       tabIndex={-1}
       style={themeVars}
     >
-      <div className="mt-2 flex w-full max-w-4xl min-h-0 flex-col overflow-hidden rounded-[1.75rem] border shadow-[0_30px_80px_rgba(0,0,0,0.35)] sm:my-auto sm:max-h-[calc(100dvh-1.5rem)] sm:rounded-3xl lg:max-h-[88vh] max-h-[calc(100dvh-2rem)]" style={surface.card}>
-        {/* Header / Gallery */}
-        <div className="relative flex w-full shrink-0 flex-col border-b" style={{ borderColor: theme.palette.borderSoft }}>
+      {/* Modal Card - NO max-h constraint, allows full height */}
+      <div className="flex w-full max-w-4xl min-h-0 flex-col overflow-hidden rounded-[1.75rem] border shadow-[0_30px_80px_rgba(0,0,0,0.35)] sm:my-auto sm:rounded-3xl" style={surface.card}>
+        
+        {/* ENTIRE CONTENT SCROLLS TOGETHER */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] [touch-action:pan-y] [overscroll-behavior:contain]">
+          
+          {/* Gallery - scrolls with content */}
           <ItemGallery
             images={gallery}
             activeIndex={activeMediaIndex}
@@ -276,19 +273,21 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
             accentColor={theme.palette.accentMain}
             bgColor={theme.palette.bgBase}
           />
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-            aria-label="Закрыть"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
 
-        {/* Scrollable Content */}
-        <div className="flex min-w-0 min-h-0 flex-1 flex-col">
-          <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] [touch-action:pan-y] sm:p-5">
+          {/* Close button at top (sticky or just in flow) */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] sm:hidden"
+              aria-label="Закрыть"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="space-y-4 p-4 sm:p-5">
             <div>
               <h3 id={`item-modal-title-${item.id}`} className="text-lg font-semibold sm:text-xl">{item.title}</h3>
               <p className="text-sm" style={surface.mutedText}>{item.subtitle}</p>
@@ -326,7 +325,7 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
             <OptionChips title="Аукцион / тик" options={auctionOptions} selected={options.auction} onSelect={(v) => onChangeOption("auction", v)} />
           </div>
 
-          {/* Footer */}
+          {/* Footer Buttons - also scrollable (at bottom of content) */}
           <div className="grid shrink-0 grid-cols-1 gap-2 border-t p-3 sm:grid-cols-2" style={{ ...surface.card, borderColor: theme.palette.borderSoft }}>
             <button type="button" onClick={onClose} className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]" style={surface.subtleCard}>
               Закрыть
