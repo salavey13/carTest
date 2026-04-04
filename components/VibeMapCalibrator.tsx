@@ -44,7 +44,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
   const [containerSize, setContainerSize] = useState<Size>({ width: 1, height: 1 });
   const [coordFormat, setCoordFormat] = useState<'dd' | 'dms'>('dd');
   
-  // ✅ ALWAYS-VISIBLE DEBUG LOGS
+  // ✅ DEBUG LOGS — moved to bottom of UI
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const log = useCallback((msg: string) => {
     const timestamp = new Date().toLocaleTimeString('ru-RU', { hour12: false });
@@ -53,7 +53,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     setDebugLogs(prev => [...prev, entry].slice(-50));
   }, []);
   
-  // ✅ REFS FOR FRESH VALUES
+  // ✅ REFS FOR FRESH VALUES (avoid stale closures)
   const imageSizeRef = useRef<Size | null>(null);
   const renderBoxRef = useRef<ReturnType<typeof getRenderBox> | null>(null);
   const positionsRef = useRef<Record<string, PixelPosition>>({});
@@ -162,7 +162,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     toast.info("Перетащите точки на реальные позиции", { duration: 3000 });
   }, [bounds, imageSize, containerSize, renderBox, log]);
 
-  // ✅ BOUNDS RECALC — USES REFS
+  // ✅ BOUNDS RECALC — USES REFS, NEVER CLEARS ON ERROR
   const recalcBounds = useCallback((currentPositions: Record<string, PixelPosition>) => {
     log(`🔄 recalcBounds called`);
     
@@ -241,7 +241,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     if (!prev) { log(`❌ No prev position for ${pointId}`); return; }
     log(`   Prev: ${prev.x.toFixed(1)}%, ${prev.y.toFixed(1)}%`);
     
-    // ✅ Use native event coordinates (more reliable than info.point)
+    // ✅ Use native event coordinates (reliable across environments)
     const clientX = event?.clientX ?? event?.sourceEvent?.clientX;
     const clientY = event?.clientY ?? event?.sourceEvent?.clientY;
     
@@ -432,22 +432,8 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
             })
           )}
         </div>
-
-        {/* ✅ ALWAYS-VISIBLE DEBUG PANEL */}
-        <div className="bg-black/60 rounded-lg border border-white/10 p-3 font-mono text-[10px] text-zinc-300">
-          <div className="flex items-center justify-between mb-2 sticky top-0 bg-black/80 py-1">
-            <span className="text-xs text-brand-cyan font-bold">🔍 DEBUG LOGS (live)</span>
-            <button onClick={() => setDebugLogs([])} className="text-[10px] text-brand-lime hover:underline">Clear</button>
-          </div>
-          <div className="max-h-48 overflow-y-auto whitespace-pre-wrap break-all simple-scrollbar">
-            {debugLogs.length === 0 ? (
-              <span className="text-zinc-500">No logs yet — start calibration to see debug output</span>
-            ) : (
-              debugLogs.map((entry, i) => <div key={i} className="border-b border-white/5 py-0.5 last:border-0">{entry}</div>)
-            )}
-          </div>
-        </div>
         
+        {/* Main UI Section */}
         {!isCalibrating ? (
           <Button onClick={startCalibration} disabled={isImageLoading} className="w-full group h-12 text-base">
             <VibeContentRenderer content="::FaRulerCombined::" className="mr-2 group-hover:scale-110 transition-transform" />
@@ -488,6 +474,21 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
             </div>
           </div>
         )}
+
+        {/* ✅ DEBUG LOGS — AT THE BOTTOM, SCROLLABLE */}
+        <div className="bg-black/60 rounded-lg border border-white/10 p-3 font-mono text-[10px] text-zinc-300">
+          <div className="flex items-center justify-between mb-2 sticky top-0 bg-black/80 py-1">
+            <span className="text-xs text-brand-cyan font-bold">🔍 DEBUG LOGS (live)</span>
+            <button onClick={() => setDebugLogs([])} className="text-[10px] text-brand-lime hover:underline">Clear</button>
+          </div>
+          <div className="max-h-48 overflow-y-auto whitespace-pre-wrap break-all simple-scrollbar">
+            {debugLogs.length === 0 ? (
+              <span className="text-zinc-500">No logs yet — start calibration to see debug output</span>
+            ) : (
+              debugLogs.map((entry, i) => <div key={i} className="border-b border-white/5 py-0.5 last:border-0">{entry}</div>)
+            )}
+          </div>
+        </div>
       </div>
     </TooltipProvider>
   );
