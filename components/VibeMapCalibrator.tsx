@@ -13,17 +13,10 @@ import { cn } from '@/lib/utils';
 import { Loading } from './Loading';
 import Image from 'next/image';
 import { 
-  project, 
-  unproject, 
-  GeoBounds, 
-  getRenderBox, 
-  calculateBoundsFromPoints,
-  validateBounds,
-  formatBounds,
-  clamp,
-  pixelToPercent,
-  percentToPixel,
-  DEFAULT_MAP_IMAGE
+  project, unproject, GeoBounds, ViewState,
+  getRenderBox, calculateBoundsFromPoints, validateBounds, formatBounds,
+  clamp, pixelToPercent, percentToPixel, snapToGrid, formatCoordinate,
+  DEFAULT_MAP_IMAGE, FALLBACK_MAP_IMAGE, generateStorageKey
 } from "@/lib/map-utils";
 
 interface Point { id: string; name: string; coords: [number, number]; }
@@ -34,10 +27,14 @@ const REFERENCE_POINTS: Point[] = [
   { id: 'aska', name: 'Аська', coords: [56.330, 44.018] },
   { id: 'airport', name: 'Аэропорт Стригино', coords: [56.229, 43.784] },
 ];
+const GRID_SNAP_ENABLED = true;
+const GRID_SIZE = 2; // percent
+const SNAP_THRESHOLD = 0.5; // percent
 
 export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds }) {
   const { dbUser } = useAppContext();
   const [mapUrl, setMapUrl] = useState(DEFAULT_MAP_IMAGE);
+  const [currentImageUrl, setCurrentImageUrl] = useState(DEFAULT_MAP_IMAGE);
   const [presetName, setPresetName] = useState("");
   const [bounds, setBounds] = useState<GeoBounds>(initialBounds);
   const [isCalibrating, setIsCalibrating] = useState(false);
@@ -47,15 +44,43 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
   const [imageSize, setImageSize] = useState<Size | null>(null);
   const [isImageLoading, setIsImageLoading] = useState(true);
   const [containerSize, setContainerSize] = useState<Size>({ width: 1, height: 1 });
+  const [coordFormat, setCoordFormat] = useState<'dd' | 'dms'>('dd');
+  const [snapEnabled, setSnapEnabled] = useState(GRID_SNAP_ENABLED);
   
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const storageKey = useMemo(() => generateStorageKey(initialBounds, "vibecal"), [initialBounds]);
+
+  // Restore calibrator state
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.presetName) setPresetName(parsed.presetName);
+        if (parsed.coordFormat) setCoordFormat(parsed.coordFormat);
+      }
+    } catch {}
+  }, [storageKey]);
+
+  // Persist calibrator state
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify({ presetName, coordFormat }));
+      } catch {}
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [presetName, coordFormat, storageKey]);
 
   useEffect(() => {
     setIsImageLoading(true);
     setImageSize(null);
   }, [mapUrl]);
 
-  // Track container resize
+  useEffect(() => {
+    if (mapUrl) setCurrentImageUrl(mapUrl);
+  }, [mapUrl]);
+
   useEffect(() => {
     const el = mapContainerRef.current;
     if (!el) return;
@@ -85,25 +110,29 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     setPositions(initialPositions);
     setCalculatedBounds(null);
     setIsCalibrating(true);
+    toast.info("Перетащите точки на реальные позиции", { duration: 3000 });
   }, [bounds, imageSize]);
 
-  // FIXED: Use info.offset for reliable drag positioning
   const handlePointDragEnd = useCallback((pointId: string, _event: unknown, info: any) => {
     if (!mapContainerRef.current) return;
     const rect = mapContainerRef.current.getBoundingClientRect();
     
-    // Use offset (relative to drag start) + initial position for stability
     const initialPos = positions[pointId] || { x: 50, y: 50 };
     const deltaX = (info.offset[0] / rect.width) * 100;
     const deltaY = (info.offset[1] / rect.height) * 100;
     
-    const newX = clamp(initialPos.x + deltaX, 0, 100);
-    const newY = clamp(initialPos.y + deltaY, 0, 100);
+    let newX = clamp(initialPos.x + deltaX, 0, 100);
+    let newY = clamp(initialPos.y + deltaY, 0, 100);
+    
+    // Optional grid snapping
+    if (snapEnabled) {
+      newX = snapToGrid(newX, GRID_SIZE, SNAP_THRESHOLD);
+      newY = snapToGrid(newY, GRID_SIZE, SNAP_THRESHOLD);
+    }
     
     setPositions(prev => ({ ...prev, [pointId]: { x: newX, y: newY } }));
-  }, [positions]);
+  }, [positions, snapEnabled]);
 
-  // Recalculate bounds when positions change
   useEffect(() => {
     if (!isCalibrating || !imageSize || !renderBox) return;
     
@@ -114,7 +143,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     
     if (!pos1 || !pos2) return;
     
-    // Convert percentage positions to pixel coordinates within the IMAGE
     const toImagePixel = (percent: number, offset: number, size: number) => {
       return (percent / 100) * size + offset;
     };
@@ -137,11 +165,11 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
         setCalculatedBounds(newBounds);
       } else {
         setCalculatedBounds(null);
+        toast.warning(`Проверьте позиции точек: ${errors[0]}`, { duration: 4000 });
       }
     }
   }, [positions, isCalibrating, imageSize, renderBox]);
 
-  // FIXED: Calibration box uses pixel-perfect renderBox alignment
   const calibrationBoxStyle = useMemo(() => {
     if (!isCalibrating || !renderBox) return { display: 'none' };
     
@@ -176,13 +204,14 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     }
     
     setIsSaving(true);
-    const promise = saveMapPreset(dbUser.user_id, presetName.trim(), mapUrl, calculatedBounds, false);
+    const promise = saveMapPreset(dbUser.user_id, presetName.trim(), currentImageUrl, calculatedBounds, false);
     toast.promise(promise, {
       loading: "Сохранение пресета карты...",
       success: (res) => {
         if (res.success) {
           setIsCalibrating(false);
           setBounds(calculatedBounds);
+          setPresetName("");
           return `Пресет "${res.data?.name}" успешно сохранен!`;
         }
         throw new Error(res.error);
@@ -206,19 +235,53 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     
     const result = unproject(imgX, imgY, calculatedBounds);
     if (result) {
-      toast.info(`Тест: ${result[0].toFixed(5)}, ${result[1].toFixed(5)}`, {
-        duration: 3000,
-        icon: '🎯'
-      });
+      const lat = formatCoordinate(result[0], true, coordFormat);
+      const lon = formatCoordinate(result[1], false, coordFormat);
+      toast.info(`🎯 ${lat} ${lon}`, { duration: 3000 });
     }
-  }, [calculatedBounds, imageSize, renderBox]);
+  }, [calculatedBounds, imageSize, renderBox, coordFormat]);
+
+  const handleImageError = useCallback(() => {
+    if (currentImageUrl !== FALLBACK_MAP_IMAGE) {
+      setCurrentImageUrl(FALLBACK_MAP_IMAGE);
+      toast.error("Изображение не загрузилось — используем fallback", { duration: 4000 });
+    }
+  }, [currentImageUrl]);
 
   return (
     <TooltipProvider>
       <div className="space-y-4">
-        <div>
-          <label className="text-sm font-mono text-muted-foreground">URL Изображения Карты</label>
-          <Input value={mapUrl} onChange={(e) => setMapUrl(e.target.value)} className="input-cyber mt-1" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="text-sm font-mono text-muted-foreground">URL Изображения Карты</label>
+            <Input 
+              value={mapUrl} 
+              onChange={(e) => setMapUrl(e.target.value)} 
+              className="input-cyber mt-1 font-mono text-xs"
+              placeholder="https://..."
+            />
+          </div>
+          <div>
+            <label className="text-sm font-mono text-muted-foreground">Формат Координат</label>
+            <div className="flex gap-2 mt-1">
+              <Button 
+                size="sm" 
+                variant={coordFormat === 'dd' ? 'default' : 'outline'}
+                onClick={() => setCoordFormat('dd')}
+                className={cn("flex-1 text-xs", coordFormat === 'dd' && "bg-brand-lime text-black")}
+              >
+                Decimal
+              </Button>
+              <Button 
+                size="sm" 
+                variant={coordFormat === 'dms' ? 'default' : 'outline'}
+                onClick={() => setCoordFormat('dms')}
+                className={cn("flex-1 text-xs", coordFormat === 'dms' && "bg-brand-lime text-black")}
+              >
+                DMS
+              </Button>
+            </div>
+          </div>
         </div>
         
         <div 
@@ -226,14 +289,15 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
           className="relative w-full aspect-[16/10] overflow-hidden rounded-[28px] border border-brand-purple/30 bg-slate-950/80 shadow-[0_30px_80px_rgba(0,0,0,0.4)]"
           onClick={calculatedBounds ? handleTestClick : undefined}
         >
-          {mapUrl && (
+          {currentImageUrl && (
             <>
               <Image
-                src={mapUrl}
+                src={currentImageUrl}
                 alt="Map backdrop"
                 fill
                 className="pointer-events-none object-cover scale-110 opacity-35 blur-2xl saturate-125"
                 unoptimized
+                onError={handleImageError}
               />
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.1),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.14),rgba(2,6,23,0.55))]" />
             </>
@@ -245,9 +309,9 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
             </div>
           )}
           
-          {mapUrl && 
+          {currentImageUrl && 
             <Image 
-              src={mapUrl} 
+              src={currentImageUrl} 
               alt="Map Background" 
               fill
               className={cn("pointer-events-none object-contain transition-opacity duration-300", isImageLoading ? "opacity-0" : "opacity-100")} 
@@ -255,15 +319,36 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
                 setImageSize({width: img.naturalWidth, height: img.naturalHeight}); 
                 setIsImageLoading(false); 
               }}
+              onError={handleImageError}
               unoptimized
             />
           }
           
-          {/* FIXED: Calibration box aligned with renderBox */}
+          {/* Calibration box — pixel-perfect with renderBox */}
           <div 
             style={calibrationBoxStyle} 
             className="absolute border-2 border-dashed border-brand-cyan/70 bg-brand-cyan/5 pointer-events-none rounded-[24px] transition-all duration-200" 
           />
+          
+          {/* Grid overlay when snapping enabled */}
+          {isCalibrating && snapEnabled && renderBox && (
+            <svg
+              className="absolute pointer-events-none opacity-20"
+              style={{
+                left: renderBox.offsetX,
+                top: renderBox.offsetY,
+                width: renderBox.width,
+                height: renderBox.height,
+              }}
+            >
+              {[...Array(11)].map((_, i) => (
+                <g key={i}>
+                  <line x1={`${i * 10}%`} y1="0" x2={`${i * 10}%`} y2="100%" stroke="white" strokeWidth="0.5" />
+                  <line x1="0" y1={`${i * 10}%`} x2="100%" y2={`${i * 10}%`} stroke="white" strokeWidth="0.5" />
+                </g>
+              ))}
+            </svg>
+          )}
           
           {isCalibrating ? (
             REFERENCE_POINTS.map(point => (
@@ -281,10 +366,13 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
                   dragMomentum={false}
                   dragElastic={0.1}
                   onDragEnd={(e, info) => handlePointDragEnd(point.id, e, info)}
-                  className="flex h-10 w-10 cursor-grab items-center justify-center rounded-full 
-                           bg-gradient-to-br from-brand-lime to-brand-cyan text-black 
-                           shadow-lg shadow-brand-lime/40 ring-2 ring-white/30 
-                           active:cursor-grabbing active:scale-95 transition-transform"
+                  className={cn(
+                    "flex h-10 w-10 cursor-grab items-center justify-center rounded-full",
+                    "bg-gradient-to-br from-brand-lime to-brand-cyan text-black",
+                    "shadow-lg shadow-brand-lime/40 ring-2 ring-white/30",
+                    "active:cursor-grabbing active:scale-95 transition-transform",
+                    snapEnabled && "ring-4 ring-brand-cyan/50"
+                  )}
                   whileHover={{ scale: 1.1, boxShadow: "0 0 25px rgba(124,244,120,0.6)" }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -298,6 +386,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
                       <p className="font-mono text-sm">{point.name}</p>
                       <p className="text-xs text-zinc-400 mt-0.5">
                         {positions[point.id]?.x.toFixed(1)}%, {positions[point.id]?.y.toFixed(1)}%
+                        {snapEnabled && <span className="text-brand-cyan ml-1">• snapped</span>}
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -315,7 +404,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
               return (
                 <div 
                   key={point.id} 
-                  className="absolute w-3 h-3 rounded-full ring-2 ring-white/50 z-10"
+                  className="absolute w-3 h-3 rounded-full ring-2 ring-white/50 z-10 animate-pulse"
                   style={{ 
                     left: `${(pixelX / containerSize.width) * 100}%`, 
                     top: `${(pixelY / containerSize.height) * 100}%`,
@@ -337,11 +426,21 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
           <div className="bg-card/50 p-4 rounded-xl space-y-4 border border-white/10">
             <div className="flex items-center justify-between">
               <h3 className="font-orbitron text-lg text-white">Калибровка</h3>
-              {calculatedBounds && (
-                <span className="text-xs font-mono text-brand-lime bg-brand-lime/10 px-2 py-1 rounded">
-                  ✓ Границы вычислены
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                <Button 
+                  size="sm" 
+                  variant={snapEnabled ? "default" : "outline"}
+                  onClick={() => setSnapEnabled(!snapEnabled)}
+                  className={cn("text-xs", snapEnabled && "bg-brand-cyan text-black")}
+                >
+                  {snapEnabled ? "✓ Snap" : "○ Snap"}
+                </Button>
+                {calculatedBounds && (
+                  <span className="text-xs font-mono text-brand-lime bg-brand-lime/10 px-2 py-1 rounded">
+                    ✓ Границы вычислены
+                  </span>
+                )}
+              </div>
             </div>
             
             {calculatedBounds ? (
@@ -355,34 +454,55 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
                 
                 <div className="relative">
                   <label className="text-xs font-mono text-muted-foreground mb-1 block">
-                    Вычисленные GeoBounds (копировать):
+                    Вычисленные GeoBounds:
                   </label>
                   <pre className="text-[11px] bg-black/40 p-3 rounded-lg overflow-x-auto font-mono text-brand-cyan/90 max-h-32 simple-scrollbar">
                     {formatBounds(calculatedBounds)}
                   </pre>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="absolute top-2 right-2 h-6 w-6 p-0 text-zinc-400 hover:text-white"
-                    onClick={() => {
-                      navigator.clipboard.writeText(formatBounds(calculatedBounds));
-                      toast.success("Границы скопированы в буфер");
-                    }}
-                  >
-                    <VibeContentRenderer content="::FaCopy::" />
-                  </Button>
+                  <div className="absolute top-2 right-2 flex gap-1">
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-6 w-6 p-0 text-zinc-400 hover:text-white"
+                      onClick={() => {
+                        navigator.clipboard.writeText(formatBounds(calculatedBounds));
+                        toast.success("Границы скопированы");
+                      }}
+                    >
+                      <VibeContentRenderer content="::FaCopy::" />
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-6 w-6 p-0 text-zinc-400 hover:text-white"
+                      onClick={() => {
+                        if (!calculatedBounds) return;
+                        const blob = new Blob([formatBounds(calculatedBounds)], { type: "application/json" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `${presetName || "map-bounds"}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        toast.success("Bounds exported as JSON");
+                      }}
+                    >
+                      <VibeContentRenderer content="::FaDownload::" />
+                    </Button>
+                  </div>
                 </div>
                 
                 <Input 
                   value={presetName} 
                   onChange={(e) => setPresetName(e.target.value)} 
                   placeholder="Название пресета (например: Nizhny Novgorod Center)" 
-                  className="input-cyber" 
+                  className="input-cyber font-mono" 
                 />
               </div>
             ) : (
               <p className="text-sm text-zinc-400 italic">
                 Переместите обе опорные точки на карте для вычисления границ...
+                {snapEnabled && <span className="text-brand-cyan block mt-1">💡 Подсказка: точки привязываются к сетке</span>}
               </p>
             )}
             
