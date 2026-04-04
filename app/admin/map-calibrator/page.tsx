@@ -61,7 +61,7 @@ export default function MapCalibratorPage() {
           </Card>
         </div>
 
-        {/* Main Calibrator - Full Width, Larger Map */}
+        {/* Main Calibrator - Full Width, MUCH LARGER MAP ON MOBILE */}
         <Card className="border-brand-purple/30 bg-slate-950/70 backdrop-blur-xl overflow-hidden">
           <CardContent className="p-3 sm:p-6">
             <VibeMapCalibrator initialBounds={INITIAL_MAP_BOUNDS} />
