@@ -264,7 +264,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     
     // Convert to percentage of container
     const percentX = clamp(((finalX - rect.left) / cs.width) * 100, 0, 100);
-    const percentY = clamp(((finalY - rect.top) cs.height) * 100, 0, 100);
+    const percentY = clamp(((finalY - rect.top) / cs.height) * 100, 0, 100);
     
     log(`   New: ${percentX.toFixed(1)}%, ${percentY.toFixed(1)}%`);
     
