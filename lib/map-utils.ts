@@ -215,16 +215,19 @@ export const snapToGrid = (value: number, grid: number, threshold: number): numb
 
 export const fitBounds = (targetBounds: GeoBounds, container: Size, image: Size): ViewState => {
   const renderBox = getRenderBox(container, image);
+  
+  // Center is always 50% in percentage coordinates
+  const centerX = 50;
+  const centerY = 50;
+  
+  // Calculate scale to fit target bounds with 90% padding
   const targetWidth = targetBounds.right - targetBounds.left;
   const targetHeight = targetBounds.top - targetBounds.bottom;
-  
   const scaleX = renderBox.width / targetWidth;
   const scaleY = renderBox.height / targetHeight;
   const scale = clamp(Math.min(scaleX, scaleY) * 0.9, MIN_MAP_SCALE, MAX_MAP_SCALE);
   
-  const centerX = ((targetBounds.left + targetBounds.right) / 2 - (targetBounds.left + targetBounds.right) / 2) / (targetBounds.right - targetBounds.left) * 100;
-  const centerY = ((targetBounds.top + targetBounds.bottom) / 2 - targetBounds.bottom) / (targetBounds.top - targetBounds.bottom) * 100;
-  
+  // Convert center percentage to pixel within renderBox
   const targetPixelX = percentToPixel(centerX, renderBox.offsetX, renderBox.width);
   const targetPixelY = percentToPixel(centerY, renderBox.offsetY, renderBox.height);
   
