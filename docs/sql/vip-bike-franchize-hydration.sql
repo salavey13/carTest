@@ -180,7 +180,7 @@ set
           'telegram', '@I_O_S_NN',
           'workingHours', '10:00 - 22:00 (ежедневно)',
           'map', jsonb_build_object(
-            'imageUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg',
+            'imageUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/nnmap.jpg',
             'bounds', jsonb_build_object('top', 56.42, 'bottom', 56.08, 'left', 43.66, 'right', 44.12),
             'gps', '56.20420451632873, 43.798582127051695',
             'publicTransport', 'Ближайшие остановки и маршруты уточняйте по телефону',
