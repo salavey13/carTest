@@ -364,7 +364,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
           )}
         </div>
 
-        {process.env.NODE_ENV === 'development' && debugInfo && (
+        {debugInfo && (
           <div className="text-xs font-mono text-zinc-500 bg-black/30 px-3 py-2 rounded">{debugInfo}</div>
         )}
         
