@@ -255,7 +255,7 @@ export async function fetchRepoContents_pro(repoUrl: string, customToken?: strin
 }
 
 export async function fetchRepoContents(repoUrl: string, customToken?: string, branchName?: string | null) {
-  console.log(`[Action] Fetching: ${repoUrl}${branchName ? \` @ \${branchName}\` : ' (default)'}`);
+  console.log(`[Action] Fetching: ${repoUrl}${branchName ? ` @${branchName}` : ' (default)'}`);
   const startTime = Date.now(); let owner: string | undefined, repo: string | undefined; let targetBranch = branchName; let isDefaultFetched = false;
   try {
     const token = customToken || process.env.GITHUB_TOKEN; if (!token) throw new Error("GH token missing");
