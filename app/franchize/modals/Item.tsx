@@ -85,14 +85,14 @@ interface ItemGalleryProps {
 function ItemGallery({ images, activeIndex, onNavigate, onSelect, altText, borderColor, accentColor, bgColor }: ItemGalleryProps) {
   if (images.length === 0) {
     return (
-      <div className="flex h-full w-full items-center justify-center px-4 text-center text-sm" style={{ color: "var(--item-muted-text)" }}>
+      <div className="flex h-64 w-full items-center justify-center px-4 text-center text-sm sm:h-72" style={{ color: "var(--item-muted-text)", backgroundColor: "var(--item-card-bg, #111)" }}>
         Изображение байка скоро загрузим
       </div>
     );
   }
 
   return (
-    <div className="relative flex w-full shrink-0 flex-col border-b" style={{ borderColor }}>
+    <div className="relative w-full shrink-0 border-b" style={{ borderColor }}>
       <div className="relative aspect-[16/11] w-full bg-black/25 sm:aspect-[16/9] lg:aspect-[2.15/1]">
         <Image src={images[activeIndex]} alt={`${altText} ${activeIndex + 1}`} fill sizes="(max-width: 1024px) 100vw, 42vw" className="object-cover" unoptimized />
         {images.length > 1 && (
@@ -256,13 +256,18 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
       tabIndex={-1}
       style={themeVars}
     >
-      {/* Modal Card - NO max-h constraint, allows full height */}
-      <div className="flex w-full max-w-4xl min-h-0 flex-col overflow-hidden rounded-[1.75rem] border shadow-[0_30px_80px_rgba(0,0,0,0.35)] sm:my-auto sm:rounded-3xl" style={surface.card}>
+      {/* 
+        📐 SCROLL ARCHITECTURE:
+        1. Card has max-h constraint → creates boundary for overflow
+        2. Inner div has flex-1 + overflow-y-auto → becomes scroll container
+        3. Gallery, content, and footer live inside → all scroll together
+      */}
+      <div className="flex w-full max-w-4xl flex-col overflow-hidden rounded-[1.75rem] border shadow-[0_30px_80px_rgba(0,0,0,0.35)] sm:my-auto sm:rounded-3xl max-h-[calc(100dvh-1.5rem)]" style={surface.card}>
         
-        {/* ENTIRE CONTENT SCROLLS TOGETHER */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] [touch-action:pan-y] [overscroll-behavior:contain]">
+        {/* Scrollable Wrapper */}
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
           
-          {/* Gallery - scrolls with content */}
+          {/* Gallery (scrolls out of view naturally) */}
           <ItemGallery
             images={gallery}
             activeIndex={activeMediaIndex}
@@ -274,17 +279,15 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
             bgColor={theme.palette.bgBase}
           />
 
-          {/* Close button at top (sticky or just in flow) */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={onClose}
-              className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] sm:hidden"
-              aria-label="Закрыть"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+          {/* Quick Close (absolute, scrolls with gallery) */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+            aria-label="Закрыть"
+          >
+            <X className="h-4 w-4" />
+          </button>
 
           {/* Content */}
           <div className="space-y-4 p-4 sm:p-5">
@@ -325,7 +328,7 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
             <OptionChips title="Аукцион / тик" options={auctionOptions} selected={options.auction} onSelect={(v) => onChangeOption("auction", v)} />
           </div>
 
-          {/* Footer Buttons - also scrollable (at bottom of content) */}
+          {/* Footer Buttons (scroll to bottom) */}
           <div className="grid shrink-0 grid-cols-1 gap-2 border-t p-3 sm:grid-cols-2" style={{ ...surface.card, borderColor: theme.palette.borderSoft }}>
             <button type="button" onClick={onClose} className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]" style={surface.subtleCard}>
               Закрыть
