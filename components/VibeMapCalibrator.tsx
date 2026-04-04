@@ -126,9 +126,9 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
         initialPositions[p.id] = pos;
       } else {
         if (p.id === 'aska') {
-          initialPositions[p.id] = { x: 35, y: 65 };
+          initialPositions[p.id] = { x: 25, y: 70 };
         } else if (p.id === 'airport') {
-          initialPositions[p.id] = { x: 65, y: 35 };
+          initialPositions[p.id] = { x: 75, y: 30 };
         } else {
           initialPositions[p.id] = { x: 50, y: 50 };
         }
@@ -150,6 +150,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     }
   }, [bounds, imageSize]);
 
+  // FIXED: Only recalculate bounds on drag END, not during drag
   const handlePointDragEnd = useCallback((pointId: string, _event: unknown, info: any) => {
     if (!mapContainerRef.current) return;
     const rect = mapContainerRef.current.getBoundingClientRect();
@@ -166,74 +167,81 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
       newY = snapToGrid(newY, GRID_SIZE, SNAP_THRESHOLD);
     }
     
+    // Update position first
     setPositions(prev => ({ ...prev, [pointId]: { x: newX, y: newY } }));
-  }, [positions, snapEnabled]);
-
-  // In the useEffect that calculates bounds (around line 180), replace with this:
-
-useEffect(() => {
-  if (!isCalibrating || !imageSize || !renderBox) {
-    console.log('[Calibrator] Skipping calc - missing deps', { isCalibrating, hasImage: !!imageSize, hasRenderBox: !!renderBox });
-    return;
-  }
-  
-  const p1 = REFERENCE_POINTS[0];
-  const p2 = REFERENCE_POINTS[1];
-  const pos1 = positions[p1.id];
-  const pos2 = positions[p2.id];
-  
-  if (!pos1 || !pos2) {
-    console.log('[Calibrator] Missing positions');
-    return;
-  }
-  
-  try {
-    const toImagePixel = (percent: number, offset: number, size: number) => {
-      return (percent / 100) * size + offset;
-    };
     
-    const x1_img = toImagePixel(pos1.x, -renderBox.offsetX, renderBox.width);
-    const y1_img = toImagePixel(pos1.y, -renderBox.offsetY, renderBox.height);
-    const x2_img = toImagePixel(pos2.x, -renderBox.offsetX, renderBox.width);
-    const y2_img = toImagePixel(pos2.y, -renderBox.offsetY, renderBox.height);
-    
-    // Validate pixel coordinates are within reasonable bounds
-    if (x1_img < -100 || x1_img > imageSize.width + 100 || 
-        y1_img < -100 || y1_img > imageSize.height + 100 ||
-        x2_img < -100 || x2_img > imageSize.width + 100 ||
-        y2_img < -100 || y2_img > imageSize.height + 100) {
-      console.warn('[Calibrator] Points outside image bounds during drag');
-      return; // Don't clear bounds, just skip this update
+    // Then trigger bounds recalc AFTER position update
+    recalculateBounds({ ...positions, [pointId]: { x: newX, y: newY } });
+  }, [positions, snapEnabled, imageSize, renderBox]);
+
+  // Extracted bounds calculation function - only called on drag end
+  const recalculateBounds = useCallback((currentPositions: Record<string, PixelPosition>) => {
+    if (!imageSize || !renderBox) {
+      console.log('[Calibrator] Skip recalc - missing imageSize or renderBox');
+      return;
     }
     
-    const newBounds = calculateBoundsFromPoints(
-      { lat: p1.coords[0], lon: p1.coords[1], pixelX: x1_img, pixelY: y1_img },
-      { lat: p2.coords[0], lon: p2.coords[1], pixelX: x2_img, pixelY: y2_img },
-      imageSize.width,
-      imageSize.height
-    );
+    const p1 = REFERENCE_POINTS[0];
+    const p2 = REFERENCE_POINTS[1];
+    const pos1 = currentPositions[p1.id];
+    const pos2 = currentPositions[p2.id];
     
-    if (newBounds) {
-      const errors = validateBounds(newBounds);
-      if (errors.length === 0) {
-        setCalculatedBounds(newBounds);
-        setDebugInfo(`✅ Bounds: ${newBounds.top.toFixed(4)}, ${newBounds.left.toFixed(4)}`);
-      } else {
-        // Don't clear bounds on validation error during drag
-        setDebugInfo(`⚠️ Validation: ${errors[0]}`);
-        console.warn('[Calibrator] Validation errors:', errors);
+    if (!pos1 || !pos2) {
+      setDebugInfo("❌ Missing point positions");
+      return;
+    }
+    
+    try {
+      const toImagePixel = (percent: number, offset: number, size: number) => {
+        return (percent / 100) * size + offset;
+      };
+      
+      const x1_img = toImagePixel(pos1.x, -renderBox.offsetX, renderBox.width);
+      const y1_img = toImagePixel(pos1.y, -renderBox.offsetY, renderBox.height);
+      const x2_img = toImagePixel(pos2.x, -renderBox.offsetX, renderBox.width);
+      const y2_img = toImagePixel(pos2.y, -renderBox.offsetY, renderBox.height);
+      
+      // Validate pixel coordinates are within reasonable image bounds
+      if (x1_img < -50 || x1_img > imageSize.width + 50 || 
+          y1_img < -50 || y1_img > imageSize.height + 50 ||
+          x2_img < -50 || x2_img > imageSize.width + 50 ||
+          y2_img < -50 || y2_img > imageSize.height + 50) {
+        console.warn('[Calibrator] Points outside image bounds');
+        setDebugInfo("⚠️ Points outside image - keeping previous bounds");
+        return; // Don't clear bounds, just skip
       }
-    } else {
-      // Don't clear bounds if calculation fails
-      setDebugInfo("⚠️ Calc failed - keeping previous");
-      console.warn('[Calibrator] calculateBoundsFromPoints returned null');
+      
+      const newBounds = calculateBoundsFromPoints(
+        { lat: p1.coords[0], lon: p1.coords[1], pixelX: x1_img, pixelY: y1_img },
+        { lat: p2.coords[0], lon: p2.coords[1], pixelX: x2_img, pixelY: y2_img },
+        imageSize.width,
+        imageSize.height
+      );
+      
+      if (newBounds) {
+        const errors = validateBounds(newBounds);
+        if (errors.length === 0) {
+          setCalculatedBounds(newBounds);
+          setDebugInfo(`✅ Bounds: ${newBounds.top.toFixed(4)}, ${newBounds.left.toFixed(4)}`);
+        } else {
+          setDebugInfo(`⚠️ Validation: ${errors[0]} (keeping previous)`);
+          console.warn('[Calibrator] Validation errors:', errors);
+          // Don't clear bounds on validation error
+        }
+      } else {
+        setDebugInfo("⚠️ Calc returned null (keeping previous)");
+        console.warn('[Calibrator] calculateBoundsFromPoints returned null');
+        // Don't clear bounds if calculation fails
+      }
+    } catch (error) {
+      console.error('[Calibrator] Error in bounds calculation:', error);
+      setDebugInfo(`⚠️ Error: ${error instanceof Error ? error.message : 'Unknown'}`);
+      // Never clear bounds on error
     }
-  } catch (error) {
-    console.error('[Calibrator] Error in bounds calculation:', error);
-    setDebugInfo(`⚠️ Error: ${error instanceof Error ? error.message : 'Unknown'}`);
-    // Don't clear bounds on error - keep the last good value
-  }
-}, [positions, isCalibrating, imageSize, renderBox]);
+  }, [imageSize, renderBox]);
+
+  // REMOVED: The old useEffect that recalculated on every position change
+  // Bounds now only recalc on drag end via handlePointDragEnd → recalculateBounds
 
   const calibrationBoxStyle = useMemo(() => {
     if (!isCalibrating || !renderBox) return { display: 'none' };
