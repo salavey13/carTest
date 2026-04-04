@@ -46,8 +46,14 @@ const BOT_PROMPT = `Сделай персональный franchize JSON под 
 Сфокусируйся на: стиль, тексты, меню, контакты, tone of voice.
 Верни только JSON без пояснений.`;
 
-function toRgb(hex: string) {
-  const cleaned = hex.trim().replace("#", "");
+function safeString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
+function toRgb(hex: unknown) {
+  const cleaned = safeString(hex).trim().replace("#", "");
   if (!/^[0-9a-fA-F]{6}$/.test(cleaned)) return null;
   return {
     r: Number.parseInt(cleaned.slice(0, 2), 16),
@@ -56,7 +62,7 @@ function toRgb(hex: string) {
   };
 }
 
-function relativeLuminance(hex: string) {
+function relativeLuminance(hex: unknown) {
   const rgb = toRgb(hex);
   if (!rgb) return null;
   const normalize = (v: number) => {
@@ -66,7 +72,7 @@ function relativeLuminance(hex: string) {
   return 0.2126 * normalize(rgb.r) + 0.7152 * normalize(rgb.g) + 0.0722 * normalize(rgb.b);
 }
 
-function contrastRatio(bg: string, fg: string) {
+function contrastRatio(bg: unknown, fg: unknown) {
   const l1 = relativeLuminance(bg);
   const l2 = relativeLuminance(fg);
   if (l1 === null || l2 === null) return null;
@@ -173,7 +179,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
 
   const initialSlugAppliedRef = useRef(false);
 
-  const isDark = useMemo(() => form.themeMode.toLowerCase().includes("dark"), [form.themeMode]);
+  const isDark = useMemo(() => safeString(form.themeMode).toLowerCase().includes("dark"), [form.themeMode]);
 
   const ui = useMemo(
     () => ({
@@ -208,13 +214,13 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
   );
   const launchChecks = useMemo(
     () => {
-      const hasSlug = form.slug.trim().length >= 3;
-      const hasBrand = form.brandName.trim().length >= 3;
-      const hasTagline = form.tagline.trim().length >= 4;
-      const hasContacts = form.phone.trim().length >= 6 && form.telegram.trim().length >= 2;
-      const hasMap = form.mapGps.includes(",") && form.mapImageUrl.startsWith("http");
-      const hasMenuLinks = form.menuLinksText.includes("/franchize/{slug}");
-      const hasCategories = form.categoryOrderText.split(",").map((x) => x.trim()).filter(Boolean).length >= 3;
+      const hasSlug = safeString(form.slug).trim().length >= 3;
+      const hasBrand = safeString(form.brandName).trim().length >= 3;
+      const hasTagline = safeString(form.tagline).trim().length >= 4;
+      const hasContacts = safeString(form.phone).trim().length >= 6 && safeString(form.telegram).trim().length >= 2;
+      const hasMap = safeString(form.mapGps).includes(",") && safeString(form.mapImageUrl).startsWith("http");
+      const hasMenuLinks = safeString(form.menuLinksText).includes("/franchize/{slug}");
+      const hasCategories = safeString(form.categoryOrderText).split(",").map((x) => x.trim()).filter(Boolean).length >= 3;
       const darkContrastPass = contrastRatio(form.bgCard, form.textPrimary);
       const lightContrastPass = contrastRatio(form.lightBgCard, form.lightTextPrimary);
       const hasContrast = (darkContrastPass ?? 0) >= 4.5 && (lightContrastPass ?? 0) >= 4.5;
@@ -331,7 +337,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
 
   const onLoad = useCallback((slugOverride?: string) => {
     startTransition(async () => {
-      const slugToLoad = (slugOverride ?? form.slug).trim();
+      const slugToLoad = safeString(slugOverride ?? form.slug).trim();
       const result = await loadFranchizeConfigBySlug(slugToLoad, actorUserId);
       if (!result.ok || !result.data) return setMessage(result.message);
       setForm(result.data);
@@ -356,7 +362,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
 
 
   useEffect(() => {
-    const normalized = initialSlug.trim();
+    const normalized = safeString(initialSlug).trim();
     if (!normalized || initialSlugAppliedRef.current) return;
     initialSlugAppliedRef.current = true;
     setForm((prev) => ({ ...prev, slug: normalized }));
