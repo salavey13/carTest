@@ -169,58 +169,71 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
     setPositions(prev => ({ ...prev, [pointId]: { x: newX, y: newY } }));
   }, [positions, snapEnabled]);
 
-  useEffect(() => {
-    if (!isCalibrating || !imageSize || !renderBox) return;
+  // In the useEffect that calculates bounds (around line 180), replace with this:
+
+useEffect(() => {
+  if (!isCalibrating || !imageSize || !renderBox) {
+    console.log('[Calibrator] Skipping calc - missing deps', { isCalibrating, hasImage: !!imageSize, hasRenderBox: !!renderBox });
+    return;
+  }
+  
+  const p1 = REFERENCE_POINTS[0];
+  const p2 = REFERENCE_POINTS[1];
+  const pos1 = positions[p1.id];
+  const pos2 = positions[p2.id];
+  
+  if (!pos1 || !pos2) {
+    console.log('[Calibrator] Missing positions');
+    return;
+  }
+  
+  try {
+    const toImagePixel = (percent: number, offset: number, size: number) => {
+      return (percent / 100) * size + offset;
+    };
     
-    const p1 = REFERENCE_POINTS[0];
-    const p2 = REFERENCE_POINTS[1];
-    const pos1 = positions[p1.id];
-    const pos2 = positions[p2.id];
+    const x1_img = toImagePixel(pos1.x, -renderBox.offsetX, renderBox.width);
+    const y1_img = toImagePixel(pos1.y, -renderBox.offsetY, renderBox.height);
+    const x2_img = toImagePixel(pos2.x, -renderBox.offsetX, renderBox.width);
+    const y2_img = toImagePixel(pos2.y, -renderBox.offsetY, renderBox.height);
     
-    if (!pos1 || !pos2) {
-      setDebugInfo("❌ Missing point positions");
-      return;
+    // Validate pixel coordinates are within reasonable bounds
+    if (x1_img < -100 || x1_img > imageSize.width + 100 || 
+        y1_img < -100 || y1_img > imageSize.height + 100 ||
+        x2_img < -100 || x2_img > imageSize.width + 100 ||
+        y2_img < -100 || y2_img > imageSize.height + 100) {
+      console.warn('[Calibrator] Points outside image bounds during drag');
+      return; // Don't clear bounds, just skip this update
     }
     
-    try {
-      const toImagePixel = (percent: number, offset: number, size: number) => {
-        return (percent / 100) * size + offset;
-      };
-      
-      const x1_img = toImagePixel(pos1.x, -renderBox.offsetX, renderBox.width);
-      const y1_img = toImagePixel(pos1.y, -renderBox.offsetY, renderBox.height);
-      const x2_img = toImagePixel(pos2.x, -renderBox.offsetX, renderBox.width);
-      const y2_img = toImagePixel(pos2.y, -renderBox.offsetY, renderBox.height);
-      
-      setDebugInfo(`P1: (${x1_img.toFixed(0)}, ${y1_img.toFixed(0)}) | P2: (${x2_img.toFixed(0)}, ${y2_img.toFixed(0)})`);
-      
-      const newBounds = calculateBoundsFromPoints(
-        { lat: p1.coords[0], lon: p1.coords[1], pixelX: x1_img, pixelY: y1_img },
-        { lat: p2.coords[0], lon: p2.coords[1], pixelX: x2_img, pixelY: y2_img },
-        imageSize.width,
-        imageSize.height
-      );
-      
-      if (newBounds) {
-        const errors = validateBounds(newBounds);
-        if (errors.length === 0) {
-          setCalculatedBounds(newBounds);
-          setDebugInfo(`✅ Bounds calculated: ${newBounds.top.toFixed(4)}, ${newBounds.left.toFixed(4)}`);
-        } else {
-          setCalculatedBounds(null);
-          setDebugInfo(`❌ Validation: ${errors[0]}`);
-          toast.warning(`Проверьте позиции точек: ${errors[0]}`, { duration: 4000 });
-        }
+    const newBounds = calculateBoundsFromPoints(
+      { lat: p1.coords[0], lon: p1.coords[1], pixelX: x1_img, pixelY: y1_img },
+      { lat: p2.coords[0], lon: p2.coords[1], pixelX: x2_img, pixelY: y2_img },
+      imageSize.width,
+      imageSize.height
+    );
+    
+    if (newBounds) {
+      const errors = validateBounds(newBounds);
+      if (errors.length === 0) {
+        setCalculatedBounds(newBounds);
+        setDebugInfo(`✅ Bounds: ${newBounds.top.toFixed(4)}, ${newBounds.left.toFixed(4)}`);
       } else {
-        setCalculatedBounds(null);
-        setDebugInfo("❌ Failed to calculate bounds");
+        // Don't clear bounds on validation error during drag
+        setDebugInfo(`⚠️ Validation: ${errors[0]}`);
+        console.warn('[Calibrator] Validation errors:', errors);
       }
-    } catch (error) {
-      console.error('[Calibrator] Error calculating bounds:', error);
-      setDebugInfo(`❌ Error: ${error instanceof Error ? error.message : 'Unknown'}`);
-      setCalculatedBounds(null);
+    } else {
+      // Don't clear bounds if calculation fails
+      setDebugInfo("⚠️ Calc failed - keeping previous");
+      console.warn('[Calibrator] calculateBoundsFromPoints returned null');
     }
-  }, [positions, isCalibrating, imageSize, renderBox]);
+  } catch (error) {
+    console.error('[Calibrator] Error in bounds calculation:', error);
+    setDebugInfo(`⚠️ Error: ${error instanceof Error ? error.message : 'Unknown'}`);
+    // Don't clear bounds on error - keep the last good value
+  }
+}, [positions, isCalibrating, imageSize, renderBox]);
 
   const calibrationBoxStyle = useMemo(() => {
     if (!isCalibrating || !renderBox) return { display: 'none' };
