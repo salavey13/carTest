@@ -10,8 +10,6 @@ interface GitTreeResponseData { sha: string; url: string; tree: GitTreeFile[]; t
 interface SimplePullRequest { id: number; number: number; title: string; html_url: string; user?: { login?: string }; head: { ref: string }; base: { ref: string }; updated_at: string; } // Added base ref
 
 // --- Константы ---
-const BATCH_SIZE = 269;
-const DELAY_BETWEEN_BATCHES_MS = 113;
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // --- Улучшенная parseRepoUrl ---
@@ -144,8 +142,8 @@ export async function fetchRepoContents_pro(repoUrl: string, customToken?: strin
     // Фильтры из оригинала
     const allowedRootFiles = new Set(['package.json','tailwind.config.ts','tsconfig.json','next.config.js','next.config.mjs','vite.config.ts','vite.config.js','README.md','AGENTS.md','AGENT_ENTRY.md','AI_MAP.md','seed.sql','autoresearch.md']);
     const allowedPrefixes = ['app/','components/','contexts/','hooks/','lib/','types/','utils/','core/','skills/','infrastructure/','system/'];
-    const excludedExactPaths = new Set([]);
-    const excludedPrefixes = ['.git/','node_modules/','.next/','dist/','build/','out/','public/','supabase/','Configame/','components/ui/','.vscode/','.idea/','coverage/','storybook-static/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/'];
+    const excludedExactPaths = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'bio30']);
+    const excludedPrefixes = ['.git/','node_modules/','.next/','dist/','build/','out/','public/','supabase/','Configame/','components/ui/','.vscode/','.idea/','coverage/','storybook-static/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/','bio30/'];
     const excludedExtensions = ['.pl','.json','.png','.jpg','.jpeg','.gif','.svg','.ico','.webp','.avif','.mp4','.webm','.mov','.mp3','.wav','.ogg','.pdf','.woff','.woff2','.ttf','.otf','.eot','.zip','.gz','.tar','.rar','.env','.lock','.log','.DS_Store','.csv','.xlsx','.xls','.yaml','.yml','.bak','.tmp','.swp','.map','.dll','.exe','.so','.dylib'];
 
     // Определяем ветку
@@ -179,23 +177,9 @@ export async function fetchRepoContents_pro(repoUrl: string, customToken?: strin
     const { data: commitData } = await octokit.git.getCommit({ owner, repo, commit_sha: latestCommitSha });
     const treeSha = commitData.tree.sha;
 
-    // Рекурсивно обходим дерево, чтобы избежать 504
-    async function fetchTreeRecursive(sha: string, pathPrefix = ''): Promise<any[]> {
-      const { data } = await octokit.git.getTree({ owner, repo, tree_sha: sha });
-      let files: any[] = [];
-      for (const item of data.tree) {
-        if (item.type === 'tree') {
-          const nested = await fetchTreeRecursive(item.sha, `${pathPrefix}${item.path}/`);
-          files = files.concat(nested);
-        } else {
-          item.path = `${pathPrefix}${item.path}`;
-          files.push(item);
-        }
-      }
-      return files;
-    }
-
-    const allTreeItems = await fetchTreeRecursive(treeSha);
+    // Используем recursive: '1' для мгновенного получения всего дерева (избегаем таймаутов Vercel)
+    const { data: treeData } = await octokit.git.getTree({ owner, repo, tree_sha: treeSha, recursive: '1' });
+    const allTreeItems = treeData.tree || [];
 
     // Фильтрация
     let filesToFetch = allTreeItems.filter((item): item is GitTreeFile => {
@@ -217,8 +201,8 @@ export async function fetchRepoContents_pro(repoUrl: string, customToken?: strin
 
     if (!filesToFetch.length) return { success: true, files: [] };
 
-    // Ограничение параллельных запросов
-    const CONCURRENCY = 5;
+    // Ограничение параллельных запросов (увеличено для скорости, Vercel timeout 10s)
+    const CONCURRENCY = 25;
     const results: FileNode[] = [];
     async function fetchInBatches(items: GitTreeFile[]) {
       let index = 0;
@@ -270,16 +254,14 @@ export async function fetchRepoContents_pro(repoUrl: string, customToken?: strin
   }
 }
 
- 
-
 export async function fetchRepoContents(repoUrl: string, customToken?: string, branchName?: string | null) {
-  console.log(`[Action] Fetching: ${repoUrl}${branchName ? ` @ ${branchName}` : ' (default)'}`);
+  console.log(`[Action] Fetching: ${repoUrl}${branchName ? \` @ \${branchName}\` : ' (default)'}`);
   const startTime = Date.now(); let owner: string | undefined, repo: string | undefined; let targetBranch = branchName; let isDefaultFetched = false;
   try {
     const token = customToken || process.env.GITHUB_TOKEN; if (!token) throw new Error("GH token missing");
     const repoInfo = parseRepoUrl(repoUrl); owner = repoInfo.owner; repo = repoInfo.repo;
     const octokit = new Octokit({ auth: token });
-    const allowedRootFiles = new Set(['package.json','tailwind.config.ts','tsconfig.json','next.config.js','next.config.mjs','vite.config.ts','vite.config.js','README.md','AI_MAP.md','AGENTS.md','AGENT_ENTRY.md','seed.sql','autoresearch.md']); const allowedPrefixes = ['app/','components/','contexts/','hooks/','lib/','styles/','types/','utils/','data/','core/','docs/','skills/','infrastructure/','system/']; const excludedExactPaths = new Set([]); const excludedPrefixes = ['.git/','node_modules/','.next/','dist/','build/','out/','public/','supabase/migrations/','Configame/','components/ui/','.vscode/','.idea/','coverage/','storybook-static/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/']; const excludedExtensions = ['.pl','.json','.png','.jpg','.jpeg','.gif','.svg','.ico','.webp','.avif','.mp4','.webm','.mov','.mp3','.wav','.ogg','.pdf','.woff','.woff2','.ttf','.otf','.eot','.zip','.gz','.tar','.rar','.env','.lock','.log','.DS_Store','.csv','.xlsx','.xls','.yaml','.yml','.bak','.tmp','.swp','.map','.dll','.exe','.so','.dylib'];
+    const allowedRootFiles = new Set(['package.json','tailwind.config.ts','tsconfig.json','next.config.js','next.config.mjs','vite.config.ts','vite.config.js','README.md','AI_MAP.md','AGENTS.md','AGENT_ENTRY.md','seed.sql','autoresearch.md']); const allowedPrefixes = ['app/','components/','contexts/','hooks/','lib/','styles/','types/','utils/','data/','core/','docs/','skills/','infrastructure/','system/']; const excludedExactPaths = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'bio30']); const excludedPrefixes = ['.git/','node_modules/','.next/','dist/','build/','out/','public/','supabase/migrations/','Configame/','components/ui/','.vscode/','.idea/','coverage/','storybook-static/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/','bio30/']; const excludedExtensions = ['.pl','.json','.png','.jpg','.jpeg','.gif','.svg','.ico','.webp','.avif','.mp4','.webm','.mov','.mp3','.wav','.ogg','.pdf','.woff','.woff2','.ttf','.otf','.eot','.zip','.gz','.tar','.rar','.env','.lock','.log','.DS_Store','.csv','.xlsx','.xls','.yaml','.yml','.bak','.tmp','.swp','.map','.dll','.exe','.so','.dylib'];
     if (!targetBranch || targetBranch === 'default') {
         console.log("[Action] Fetching repo info for default...");
         try { const { data: repoData } = await octokit.repos.get({ owner, repo }); targetBranch = repoData.default_branch; isDefaultFetched = true; console.log(`[Action] Default branch via repos.get: ${targetBranch}`); }
@@ -296,7 +278,8 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
     const MAX_FILES_TO_FETCH = 790; if (filesToFetch.length > MAX_FILES_TO_FETCH) { console.warn(`[Action] Count (${filesToFetch.length}) > limit (${MAX_FILES_TO_FETCH}). Truncating.`); await notifyAdmin(`⚠️ High file count (${filesToFetch.length}) ${owner}/${repo} ${targetBranch}. Truncated.`); filesToFetch = filesToFetch.slice(0, MAX_FILES_TO_FETCH); }
     const allFiles: FileNode[] = []; const totalFiles = filesToFetch.length; if (totalFiles === 0) { console.warn("[Action] No relevant files found."); return { success: true, files: [] }; }
     console.log(`[Action] Fetching content for ${totalFiles} files...`);
-    for (let i = 0; i < totalFiles; i += BATCH_SIZE) { const bF = filesToFetch.slice(i, i + BATCH_SIZE); const bN = Math.floor(i / BATCH_SIZE) + 1; const tB = Math.ceil(totalFiles / BATCH_SIZE); console.log(`[Action] Batch ${bN}/${tB}...`); const bP = bF.map(async (fI) => { try { const { data: bD } = await octokit.git.getBlob({ owner: owner!, repo: repo!, file_sha: fI.sha! }); if (typeof bD.content !== 'string' || typeof bD.encoding !== 'string') { console.warn(`[Action] Invalid blob ${fI.path}. Skip.`); return null; } let cnt: string; if (bD.encoding === 'base64') { cnt = Buffer.from(bD.content, 'base64').toString('utf-8'); } else if (bD.encoding === 'utf-8') { cnt = bD.content; } else { console.warn(`[Action] Unsup. encoding '${bD.encoding}' ${fI.path}. Skip.`); return null; } const MAX_BYTES = 750*1024; if (Buffer.byteLength(cnt, 'utf8') > MAX_BYTES) { console.warn(`[Action] Skip large (${(Buffer.byteLength(cnt,'utf8')/1024).toFixed(0)} KB): ${fI.path}`); return null; } let pC: string; const fE = fI.path!.split('.').pop()?.toLowerCase()||''; switch(fE){ case 'ts': case 'tsx': case 'js': case 'jsx': pC=`// /${fI.path}`; break; case 'css': case 'scss': pC=`/* /${fI.path} */`; break; case 'sql': pC=`-- /${fI.path}`; break; case 'py': case 'rb': case 'sh': case 'yml': case 'yaml': case 'env': pC=`# /${fI.path}`; break; case 'html': case 'xml': case 'vue': case 'svelte': pC=`<!-- /${fI.path} -->`; break;  default: pC=`// /${fI.path}`; } if(cnt.trim()&&!cnt.trimStart().startsWith(pC)){cnt=`${pC}\n${cnt}`;} else if(!cnt.trim()){cnt=pC;} return { path: fI.path!, content: cnt }; } catch (fE: any) { console.error(`[Action] Err fetch blob ${fI.path}:`, fE.status?`${fE.message} (${fE.status})`:fE); return null; } }); const bR = await Promise.all(bP); const vR = bR.filter((r): r is FileNode => r !== null); allFiles.push(...vR); if (vR.length < bR.length) { console.warn(`[Action] ${bR.length - vR.length} files batch ${bN} failed/skipped.`); } if (i + BATCH_SIZE < totalFiles) { console.log(`[Action] Wait ${DELAY_BETWEEN_BATCHES_MS}ms...`); await delay(DELAY_BETWEEN_BATCHES_MS); } }
+    const FETCH_CONCURRENCY = 30;
+    for (let i = 0; i < totalFiles; i += FETCH_CONCURRENCY) { const bF = filesToFetch.slice(i, i + FETCH_CONCURRENCY); const bN = Math.floor(i / FETCH_CONCURRENCY) + 1; const tB = Math.ceil(totalFiles / FETCH_CONCURRENCY); console.log(`[Action] Batch ${bN}/${tB}...`); const bP = bF.map(async (fI) => { try { const { data: bD } = await octokit.git.getBlob({ owner: owner!, repo: repo!, file_sha: fI.sha! }); if (typeof bD.content !== 'string' || typeof bD.encoding !== 'string') { console.warn(`[Action] Invalid blob ${fI.path}. Skip.`); return null; } let cnt: string; if (bD.encoding === 'base64') { cnt = Buffer.from(bD.content, 'base64').toString('utf-8'); } else if (bD.encoding === 'utf-8') { cnt = bD.content; } else { console.warn(`[Action] Unsup. encoding '${bD.encoding}' ${fI.path}. Skip.`); return null; } const MAX_BYTES = 750*1024; if (Buffer.byteLength(cnt, 'utf8') > MAX_BYTES) { console.warn(`[Action] Skip large (${(Buffer.byteLength(cnt,'utf8')/1024).toFixed(0)} KB): ${fI.path}`); return null; } let pC: string; const fE = fI.path!.split('.').pop()?.toLowerCase()||''; switch(fE){ case 'ts': case 'tsx': case 'js': case 'jsx': pC=`// /${fI.path}`; break; case 'css': case 'scss': pC=`/* /${fI.path} */`; break; case 'sql': pC=`-- /${fI.path}`; break; case 'py': case 'rb': case 'sh': case 'yml': case 'yaml': case 'env': pC=`# /${fI.path}`; break; case 'html': case 'xml': case 'vue': case 'svelte': pC=`<!-- /${fI.path} -->`; break;  default: pC=`// /${fI.path}`; } if(cnt.trim()&&!cnt.trimStart().startsWith(pC)){cnt=`${pC}\n${cnt}`;} else if(!cnt.trim()){cnt=pC;} return { path: fI.path!, content: cnt }; } catch (fE: any) { console.error(`[Action] Err fetch blob ${fI.path}:`, fE.status?`${fE.message} (${fE.status})`:fE); return null; } }); const bR = await Promise.all(bP); const vR = bR.filter((r): r is FileNode => r !== null); allFiles.push(...vR); if (vR.length < bR.length) { console.warn(`[Action] ${bR.length - vR.length} files batch ${bN} failed/skipped.`); } }
     const endTime = Date.now(); console.log(`[Action] Success: ${allFiles.length} files from '${targetBranch}' (${((endTime-startTime)/1000).toFixed(1)}s).`); return { success: true, files: allFiles };
   } catch (error: any) {
     const endTime=Date.now(); const repoId=owner&&repo?`${owner}/${repo}`:repoUrl; const bInfo=targetBranch?` on ${targetBranch}`:''; console.error(`[Action] CRITICAL Error fetch ${repoId}${bInfo}:`,error);
