@@ -1,12 +1,10 @@
 "use client";
 /**
- * Vibe Control Center — Admin Dashboard v2.0
+ * Vibe Control Center — Admin Dashboard v2.1
  * 
- * 🎯 Modernized from GPT-4 era → Production polish
- * ✨ Added: Map Tools hub, vehicle grid view, quick stats, keyboard shortcuts
- * 🛠️ Fully backward compatible — all existing functionality preserved
+ * 🎯 Fixed: Mobile overflow, removed footer, improved calibrator integration
+ * 🛠️ Mobile-first responsive design with proper overflow handling
  */
-
 
 import { useEffect, useState, useCallback, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -46,7 +44,7 @@ function AdminQuickStats({ vehicles, isAdmin }: { vehicles: Vehicle[]; isAdmin: 
   }, [vehicles, isAdmin]);
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-4 sm:mb-6">
       {stats.map((stat, i) => (
         <motion.div
           key={stat.label}
@@ -85,8 +83,8 @@ function VehicleCard({ vehicle, onSelect, isSelected }: { vehicle: Vehicle; onSe
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-lg">{vehicle.type === 'bike' ? '🏍️' : '🚗'}</span>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span className="text-lg shrink-0">{vehicle.type === 'bike' ? '🏍️' : '🚗'}</span>
           <div className="min-w-0">
             <div className="font-medium text-white truncate">{vehicle.make} {vehicle.model}</div>
             <div className="text-xs text-zinc-400 truncate">{vehicle.year || '—'} • {vehicle.color || '—'}</div>
@@ -135,7 +133,7 @@ function MapToolsPanel({ crewSlug }: { crewSlug: string }) {
   ];
 
   return (
-    <Card className="border-brand-purple/30 bg-slate-950/60 backdrop-blur-xl">
+    <Card className="border-brand-purple/30 bg-slate-950/60 backdrop-blur-xl overflow-hidden">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg text-white">
           <VibeContentRenderer content="::FaMap::" className="text-brand-cyan" />
@@ -157,8 +155,8 @@ function MapToolsPanel({ crewSlug }: { crewSlug: string }) {
                 "bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
               )}
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className={cn("p-2 rounded-lg bg-gradient-to-br", tool.color)}>
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className={cn("p-2 rounded-lg bg-gradient-to-br shrink-0", tool.color)}>
                   <VibeContentRenderer content={tool.icon} className="h-4 w-4 text-black" />
                 </div>
                 <div className="min-w-0">
@@ -166,9 +164,9 @@ function MapToolsPanel({ crewSlug }: { crewSlug: string }) {
                   <div className="text-xs text-zinc-400 truncate">{tool.description}</div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 {tool.badge && (
-                  <Badge className="bg-brand-lime/20 text-brand-lime border-brand-lime/30 text-[10px] shrink-0">
+                  <Badge className="bg-brand-lime/20 text-brand-lime border-brand-lime/30 text-[10px]">
                     {tool.badge}
                   </Badge>
                 )}
@@ -192,7 +190,7 @@ function KeyboardShortcutsPanel() {
   ];
 
   return (
-    <Card className="border-white/10 bg-slate-950/40 backdrop-blur-sm">
+    <Card className="border-white/10 bg-slate-950/40 backdrop-blur-sm overflow-hidden">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
           <VibeContentRenderer content="::FaKeyboard::" className="text-brand-cyan" />
@@ -350,34 +348,34 @@ function AdminPageContent() {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(124,244,120,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(124,244,120,0.03)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
       </div>
 
-      <main className="container mx-auto pt-4 sm:pt-6 px-3 sm:px-4 relative z-10 pb-16">
+      <main className="container mx-auto pt-4 sm:pt-6 px-3 sm:px-4 relative z-10 pb-16 max-w-7xl">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 sm:mb-8"
+          className="mb-4 sm:mb-6"
         >
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="flex items-center gap-3 text-2xl sm:text-3xl font-bold text-white font-orbitron">
-                <VibeContentRenderer content="::FaSatelliteDish::" className="h-7 w-7 sm:h-8 sm:w-8 text-brand-cyan animate-pulse" />
-                VIBE CONTROL CENTER
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="flex items-center gap-2 sm:gap-3 text-xl sm:text-3xl font-bold text-white font-orbitron">
+                <VibeContentRenderer content="::FaSatelliteDish::" className="h-6 w-6 sm:h-8 sm:w-8 text-brand-cyan animate-pulse shrink-0" />
+                <span className="truncate">VIBE CONTROL CENTER</span>
               </h1>
-              <p className="mt-1 text-sm sm:text-base text-zinc-400 font-mono">
+              <p className="mt-1 text-xs sm:text-base text-zinc-400 font-mono truncate">
                 {selectedVehicle 
                   ? `Редактирование: ${selectedVehicle.make} ${selectedVehicle.model}` 
                   : 'Управление флотом • Добавляй технику, настраивай карты, управляй экипажем'}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="border-brand-lime/30 text-brand-lime text-xs hidden sm:flex">
+            <div className="flex items-center gap-2 shrink-0">
+              <Badge variant="outline" className="border-brand-lime/30 text-brand-lime text-[10px] sm:text-xs hidden sm:flex">
                 <VibeContentRenderer content="::FaBolt::" className="mr-1" />
                 {isTrulyAdmin ? "ADMIN MODE" : "USER MODE"}
               </Badge>
               <Button 
                 size="sm" 
                 variant="ghost" 
-                className="text-zinc-400 hover:text-white"
+                className="text-zinc-400 hover:text-white shrink-0"
                 onClick={() => setShowShortcuts(prev => !prev)}
                 title="Показать горячие клавиши (?)"
               >
@@ -391,35 +389,35 @@ function AdminPageContent() {
         <AdminQuickStats vehicles={userVehicles} isAdmin={isTrulyAdmin} />
 
         {/* Main Grid */}
-        <div className="grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
+        <div className="grid gap-4 sm:gap-6 lg:grid-cols-[1.2fr,0.8fr]">
           {/* Left Column: Vehicle Management */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6 min-w-0">
             {/* Vehicle Selector Card */}
-            <Card className="border-brand-purple/30 bg-slate-950/60 backdrop-blur-xl">
+            <Card className="border-brand-purple/30 bg-slate-950/60 backdrop-blur-xl overflow-hidden">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg text-white">Гараж</CardTitle>
-                  <Badge variant="outline" className="text-xs border-white/20 text-zinc-400">
+                  <CardTitle className="text-base sm:text-lg text-white">Гараж</CardTitle>
+                  <Badge variant="outline" className="text-[10px] sm:text-xs border-white/20 text-zinc-400 shrink-0">
                     {visibleVehicles.length} из {userVehicles.length}
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3 sm:space-y-4">
                 {/* Search + Actions */}
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <div className="relative flex-1">
+                  <div className="relative flex-1 min-w-0">
                     <VibeContentRenderer content="::FaSearch::" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
                     <Input
                       placeholder="Поиск в гараже..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9 input-cyber"
+                      className="pl-9 input-cyber text-sm"
                     />
                   </div>
                   <Button 
                     variant="outline" 
                     onClick={() => { setSelectedVehicle(null); router.push('/admin'); }}
-                    className="shrink-0"
+                    className="shrink-0 text-sm"
                   >
                     <VibeContentRenderer content="::FaPlus::" className="mr-1.5" />
                     Новый
@@ -445,8 +443,9 @@ function AdminPageContent() {
                           : "text-zinc-400 hover:text-white hover:bg-white/10"
                       )}
                     >
-                      <VibeContentRenderer content={f.icon} className="mr-1.5" />
-                      {f.label}
+                      <VibeContentRenderer content={f.icon} className="mr-1.5 h-3 w-3" />
+                      <span className="hidden sm:inline">{f.label}</span>
+                      <span className="sm:hidden">{f.label[0]}</span>
                     </Button>
                   ))}
                 </div>
@@ -484,7 +483,7 @@ function AdminPageContent() {
                 </div>
 
                 {/* VIN Hint */}
-                <p className="text-[11px] text-zinc-500 font-mono bg-black/30 px-3 py-2 rounded">
+                <p className="text-[10px] sm:text-[11px] text-zinc-500 font-mono bg-black/30 px-3 py-2 rounded">
                   💡 Для генерации договоров добавляй <code className="text-brand-lime">vin</code> в specs карточки
                 </p>
               </CardContent>
@@ -496,6 +495,7 @@ function AdminPageContent() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
+              className="min-w-0"
             >
               <CarSubmissionForm 
                 ownerId={dbUser?.user_id} 
@@ -506,7 +506,7 @@ function AdminPageContent() {
           </div>
 
           {/* Right Column: Tools & Quick Links */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6 min-w-0">
             {/* Map Tools */}
             <MapToolsPanel crewSlug={crewSlug} />
 
@@ -526,7 +526,7 @@ function AdminPageContent() {
             </AnimatePresence>
 
             {/* Quick Navigation */}
-            <Card className="border-white/10 bg-slate-950/40 backdrop-blur-sm">
+            <Card className="border-white/10 bg-slate-950/40 backdrop-blur-sm overflow-hidden">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm text-zinc-300">Быстрые переходы</CardTitle>
               </CardHeader>
@@ -541,9 +541,9 @@ function AdminPageContent() {
                       whileHover={{ x: 4 }}
                       className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/5 transition-colors group"
                     >
-                      <VibeContentRenderer content={link.icon} className={cn("h-4 w-4", link.color)} />
-                      <span className="text-sm text-zinc-300 group-hover:text-white transition-colors">{link.label}</span>
-                      <VibeContentRenderer content="::FaArrowRight::" className="h-3 w-3 text-zinc-600 ml-auto group-hover:text-zinc-400 transition-colors" />
+                      <VibeContentRenderer content={link.icon} className={cn("h-4 w-4 shrink-0", link.color)} />
+                      <span className="text-sm text-zinc-300 group-hover:text-white transition-colors truncate">{link.label}</span>
+                      <VibeContentRenderer content="::FaArrowRight::" className="h-3 w-3 text-zinc-600 ml-auto shrink-0 group-hover:text-zinc-400 transition-colors" />
                     </motion.div>
                   </Link>
                 ))}
@@ -551,11 +551,11 @@ function AdminPageContent() {
             </Card>
 
             {/* Help / Support */}
-            <Card className="border-brand-cyan/20 bg-gradient-to-br from-brand-cyan/5 to-transparent">
-              <CardContent className="p-4">
+            <Card className="border-brand-cyan/20 bg-gradient-to-br from-brand-cyan/5 to-transparent overflow-hidden">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-start gap-3">
-                  <VibeContentRenderer content="::FaCircleQuestion::" className="h-5 w-5 text-brand-cyan mt-0.5" />
-                  <div>
+                  <VibeContentRenderer content="::FaCircleQuestion::" className="h-5 w-5 text-brand-cyan mt-0.5 shrink-0" />
+                  <div className="min-w-0">
                     <div className="text-sm font-medium text-white">Нужна помощь?</div>
                     <p className="text-xs text-zinc-400 mt-1">
                       Напиши в <Link href="https://t.me/oneBikePlsBot" className="text-brand-cyan hover:underline">@oneBikePlsBot</Link> или открой <Link href="/docs/admin" className="text-brand-cyan hover:underline">документацию</Link>.
@@ -566,18 +566,6 @@ function AdminPageContent() {
             </Card>
           </div>
         </div>
-
-        {/* Footer */}
-        <motion.footer
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="mt-12 pt-6 border-t border-white/10 text-center"
-        >
-          <p className="text-xs text-zinc-500 font-mono">
-            Vibe Control Center v2.0 • <span className="text-brand-lime">●</span> Все системы в норме
-          </p>
-        </motion.footer>
       </main>
 
       {/* Mobile FAB for new vehicle */}

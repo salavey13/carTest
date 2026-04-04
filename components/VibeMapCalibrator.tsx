@@ -97,21 +97,33 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: GeoBounds 
   );
 
   const startCalibration = useCallback(() => {
-    if (!imageSize || !mapContainerRef.current) {
-      toast.warning("Изображение карты еще не загружено.");
-      return;
+  if (!imageSize || !mapContainerRef.current) {
+    toast.warning("Изображение карты еще не загружено.");
+    return;
+  }
+  
+  const initialPositions: Record<string, PixelPosition> = {};
+  REFERENCE_POINTS.forEach(p => {
+    const pos = project(p.coords[0], p.coords[1], bounds);
+    // If projection fails or returns edge values, use center positions
+    if (!pos || pos.x === 0 || pos.x === 100 || pos.y === 0 || pos.y === 100) {
+      // Place points in reasonable default positions
+      if (p.id === 'aska') {
+        initialPositions[p.id] = { x: 30, y: 60 };
+      } else if (p.id === 'airport') {
+        initialPositions[p.id] = { x: 70, y: 40 };
+      } else {
+        initialPositions[p.id] = { x: 50, y: 50 };
+      }
+    } else {
+      initialPositions[p.id] = pos;
     }
-    
-    const initialPositions: Record<string, PixelPosition> = {};
-    REFERENCE_POINTS.forEach(p => {
-      const pos = project(p.coords[0], p.coords[1], bounds);
-      initialPositions[p.id] = pos || { x: 50, y: 50 };
-    });
-    setPositions(initialPositions);
-    setCalculatedBounds(null);
-    setIsCalibrating(true);
-    toast.info("Перетащите точки на реальные позиции", { duration: 3000 });
-  }, [bounds, imageSize]);
+  });
+  setPositions(initialPositions);
+  setCalculatedBounds(null);
+  setIsCalibrating(true);
+  toast.info("Перетащите точки на реальные позиции", { duration: 3000 });
+}, [bounds, imageSize]);
 
   const handlePointDragEnd = useCallback((pointId: string, _event: unknown, info: any) => {
     if (!mapContainerRef.current) return;
