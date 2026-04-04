@@ -135,10 +135,6 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
     return windowed;
   }, [campaignIndex, promoModules]);
 
-
-
-
-
   const auctionTickOptions = useMemo(() => {
     const fromCampaigns = promoModules
       .map((module) => module.badge?.trim() || module.title?.trim())
@@ -146,6 +142,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
 
     return ["Без аукциона", ...Array.from(new Set(fromCampaigns)).slice(0, 6)];
   }, [promoModules]);
+
   const promoGradientByIndex = (index: number) => {
     const gradients = [
       `linear-gradient(130deg, ${crew.theme.palette.accentMain}E0, #FF7F50D0)`,
@@ -165,26 +162,20 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
     if (filter === "budget") {
       return item.pricePerDay <= 5000;
     }
-
     if (filter === "premium") {
       return item.pricePerDay >= 7000;
     }
-
     if (filter === "newbie") {
       return /naked|neo|scooter|300|400/i.test(`${item.category} ${item.title}`);
     }
-
     return true;
   };
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-
     return items.filter((item) => {
       const matchesSearch = !query || [item.title, item.subtitle, item.description, item.category].join(" ").toLowerCase().includes(query);
-      if (!matchesSearch) {
-        return false;
-      }
+      if (!matchesSearch) return false;
       return matchesQuickFilter(item, quickFilter);
     });
   }, [items, quickFilter, searchQuery]);
@@ -192,7 +183,6 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const quickFilterCounts = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
     const searchFiltered = items.filter((item) => !query || [item.title, item.subtitle, item.description, item.category].join(" ").toLowerCase().includes(query));
-
     return QUICK_FILTERS.reduce<Record<QuickFilterKey, number>>(
       (acc, filter) => {
         acc[filter.key] = searchFiltered.filter((item) => matchesQuickFilter(item, filter.key)).length;
@@ -216,16 +206,11 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
           if (group.mode === "subtype") {
             return item.category.toLowerCase().includes((group.subtype ?? "").toLowerCase());
           }
-
           const minPrice = group.minPrice ?? Number.NEGATIVE_INFINITY;
           const maxPrice = group.maxPrice ?? Number.POSITIVE_INFINITY;
           return item.pricePerDay >= minPrice && item.pricePerDay <= maxPrice;
         });
-
-        return {
-          category: group.label,
-          items: showcaseItems,
-        };
+        return { category: group.label, items: showcaseItems };
       })
       .filter((group) => group.items.length > 0);
 
@@ -321,7 +306,6 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
           <div className="mb-5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
             {visiblePromoModules.map((module, index) => {
               const isExternal = /^(https?:|mailto:|tel:)/.test(module.href);
-
               return (
                 <Link
                   key={module.id}
@@ -342,9 +326,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                   <p className="mt-1 text-sm font-semibold leading-5 text-[var(--catalog-accent-contrast)]">
                     {module.title}
                   </p>
-                  {module.subtitle ? (
-                    <p className="mt-1 text-xs text-[var(--catalog-accent-muted-contrast)]">{module.subtitle}</p>
-                  ) : null}
+                  {module.subtitle && <p className="mt-1 text-xs text-[var(--catalog-accent-muted-contrast)]">{module.subtitle}</p>}
                   <p className="mt-2 text-xs font-semibold text-[var(--catalog-accent-contrast)]">
                     {module.ctaLabel} →
                   </p>
@@ -456,17 +438,8 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                           </p>
                           <div className="mt-2 flex gap-2">
                             <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95">
-                              {item.pricePerDay >= 6000 ? (
-                                <>
-                                  <ShoppingCart className="h-4 w-4" />
-                                  Выбрать
-                                </>
-                              ) : (
-                                <>
-                                  <ShoppingCart className="h-4 w-4" />
-                                  Добавить
-                                </>
-                              )}
+                              <ShoppingCart className="h-4 w-4" />
+                              {item.pricePerDay >= 6000 ? "Выбрать" : "Добавить"}
                             </span>
                           </div>
                         </div>
@@ -480,15 +453,18 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
         )}
       </section>
 
-      <FloatingCartIconLinkBySlug
-        slug={crew.slug || slug}
-        href={`/franchize/${crew.slug || slug}/cart`}
-        items={items}
-        accentColor={crew.theme.palette.accentMain}
-        textColor={crew.theme.palette.textPrimary}
-        borderColor={crew.theme.palette.borderSoft}
-        theme={crew.theme}
-      />
+      {/* 🛒 Floating Cart: Hide when modal is open to avoid z-index overlap */}
+      {!selectedItem && (
+        <FloatingCartIconLinkBySlug
+          slug={crew.slug || slug}
+          href={`/franchize/${crew.slug || slug}/cart`}
+          items={items}
+          accentColor={crew.theme.palette.accentMain}
+          textColor={crew.theme.palette.textPrimary}
+          borderColor={crew.theme.palette.borderSoft}
+          theme={crew.theme}
+        />
+      )}
 
       <ItemModal
         item={selectedItem}
