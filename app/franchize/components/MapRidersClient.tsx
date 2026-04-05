@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,11 @@ import { useAppContext } from "@/contexts/AppContext";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { useLiveRiders } from "@/hooks/useLiveRiders";
+import { useMaps } from "@/lib/maps/useMaps";
+
+const RacingMap = dynamic(() => import("@/components/maps/RacingMap").then((mod) => mod.RacingMap), {
+  ssr: false,
+});
 
 type SnapshotData = {
   activeSessions: any[];
@@ -40,6 +46,13 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
   const crewSlug = crew.slug || slug || userCrewInfo?.slug || "vip-bike";
   const mapBounds = crew.contacts.map.bounds || DEFAULT_BOUNDS;
   const mapImageUrl = crew.contacts.map.imageUrl;
+  const mapEngine = process.env.NEXT_PUBLIC_MAP_ENGINE || "leaflet";
+  const useLeafletMap = mapEngine !== "vibemap";
+  const { mapData } = useMaps({
+    mapId: crew.contacts.map?.id || undefined,
+    crewSlug,
+    defaultTileLayer: "cartodb-dark",
+  });
   const surface = crewPaletteForSurface(crew.theme);
   const shareStartParam = `mapriders_${crewSlug}`;
   const shareDeepLink = `https://t.me/oneBikePlsBot/app?startapp=${shareStartParam}`;
@@ -363,14 +376,15 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
         }]
       : [];
 
-    return [...routePoints, ...riderPoints, ...demoRiderPoints, ...meetupPoints];
-  }, [dbUser?.user_id, liveRiders, sessionDetail, snapshot?.activeSessions, snapshot?.meetups]);
+    return [...(mapData?.points || []), ...routePoints, ...riderPoints, ...demoRiderPoints, ...meetupPoints];
+  }, [dbUser?.user_id, liveRiders, mapData?.points, sessionDetail, snapshot?.activeSessions, snapshot?.meetups]);
 
   const heroStats = [
     { label: "В эфире", value: snapshot?.stats.activeRiders ?? 0, icon: "::FaSatelliteDish::" },
     { label: "Точки встречи", value: snapshot?.stats.meetupCount ?? 0, icon: "::FaUsersViewfinder::" },
     { label: "Км за 7 дней", value: snapshot?.stats.totalWeeklyDistanceKm ?? 0, icon: "::FaRoad::" },
   ];
+  const isDemoDataMode = !liveRiders.length && !(snapshot?.meetups?.length);
 
   const mapTools = [
     {
@@ -478,66 +492,75 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
         </Card>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.4fr,0.9fr]">
-        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
-          <CardHeader>
-            <CardTitle className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Городская карта экипажа</CardTitle>
-            <CardDescription>Тапни по карте, чтобы поставить meetup-поинт. Зелёным — выбранный маршрут, жёлтым/синим — активные райдеры.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[520px] overflow-hidden rounded-3xl border" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
-              <VibeMap points={mapPoints} bounds={mapBounds ?? DEFAULT_BOUNDS} imageUrl={mapImageUrl} isEditable onMapClick={(coords) => setSelectedMeetupPoint(coords)} />
-            </div>
-          </CardContent>
-        </Card>
+      <section className="relative overflow-hidden rounded-3xl border" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
+        <div className="absolute inset-0">
+          {useLeafletMap ? (
+            <RacingMap
+              points={mapPoints}
+              bounds={(mapData?.bounds || mapBounds || DEFAULT_BOUNDS)}
+              className="h-full min-h-[72vh] w-full md:min-h-[82vh]"
+              tileLayer={mapData?.meta.tileLayer || "cartodb-dark"}
+              onMapClick={(coords) => setSelectedMeetupPoint(coords)}
+            />
+          ) : (
+            <VibeMap points={mapPoints} bounds={mapBounds ?? DEFAULT_BOUNDS} imageUrl={mapImageUrl} isEditable onMapClick={(coords) => setSelectedMeetupPoint(coords)} />
+          )}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/55 via-black/20 to-black/65" />
+        </div>
 
-        <div className="flex flex-col gap-6">
-          <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
-            <CardHeader>
-              <CardTitle className="font-orbitron text-lg" style={{ color: crew.theme.palette.textPrimary }}>Новая точка встречи</CardTitle>
-              <CardDescription>
-                {selectedMeetupPoint ? `Выбрано: ${selectedMeetupPoint[0].toFixed(5)}, ${selectedMeetupPoint[1].toFixed(5)}` : "Нажми на карту, чтобы выбрать точку"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="meetup-title">Заголовок</Label>
-                <Input id="meetup-title" value={meetupTitle} onChange={(event) => setMeetupTitle(event.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="meetup-comment">Комментарий</Label>
-                <Textarea id="meetup-comment" value={meetupComment} onChange={(event) => setMeetupComment(event.target.value)} placeholder="Например: собираемся тут в 21:00, есть парковка и кофе" />
-              </div>
-              <Button type="button" className="w-full" disabled={isSubmitting || !selectedMeetupPoint} onClick={handleCreateMeetup}>Сохранить meetup</Button>
-            </CardContent>
-          </Card>
+        <div className="relative z-10 flex min-h-[72vh] flex-col justify-between gap-4 p-3 md:min-h-[82vh] md:p-6">
+          <div className="flex flex-wrap items-start gap-2">
+            <Badge className="border bg-black/55 backdrop-blur-md" style={{ borderColor: `${crew.theme.palette.accentMain}66`, color: crew.theme.palette.accentMain }}>
+              {useLeafletMap ? "Leaflet • default" : "VibeMap • env override"}
+            </Badge>
+            {isDemoDataMode ? (
+              <Badge className="border border-emerald-300/40 bg-emerald-500/20 text-emerald-100 backdrop-blur-md">Demo data active</Badge>
+            ) : null}
+            <Badge className="border border-white/30 bg-black/50 text-white backdrop-blur-md">
+              {selectedMeetupPoint ? `Point: ${selectedMeetupPoint[0].toFixed(4)}, ${selectedMeetupPoint[1].toFixed(4)}` : "Tap map to place meetup"}
+            </Badge>
+          </div>
 
-          <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
-            <CardHeader>
-              <CardTitle className="font-orbitron text-lg" style={{ color: crew.theme.palette.textPrimary }}>Онлайн-райдеры</CardTitle>
-              <CardDescription>{loading ? "Обновляем эфир..." : `${snapshot?.activeSessions.length || 0} райдеров сейчас на карте`}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {(snapshot?.activeSessions || []).map((session) => (
-                <button
-                  key={session.id}
-                  type="button"
-                  onClick={() => fetchSessionDetail(session.id)}
-                  className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left transition hover:border-amber-400/50"
-                >
-                  <div>
-                    <div className="font-medium text-white">{riderDisplayName(session.users, session.user_id)}</div>
-                    <div className="text-xs text-muted-foreground">{session.ride_name || "Без названия"} • {session.vehicle_label || "байк не указан"}</div>
-                  </div>
-                  <div className="text-right text-sm text-amber-200">
-                    <div>{Number(session.total_distance_km || 0).toFixed(1)} км</div>
-                    <div>{Number(session.latest_speed_kmh || 0).toFixed(0)} км/ч</div>
-                  </div>
-                </button>
-              ))}
-              {!snapshot?.activeSessions?.length && <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-muted-foreground">Пока никто не в эфире. Запусти live share первым.</div>}
-            </CardContent>
-          </Card>
+          <div className="grid gap-3 lg:grid-cols-[1fr,360px] lg:items-end">
+            <Card className="border-white/25 bg-black/50 backdrop-blur-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="font-orbitron text-lg text-white">Новая точка встречи</CardTitle>
+                <CardDescription className="text-zinc-200">Тапни по карте, задай заголовок, и пин улетит всему экипажу.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-[1fr,1fr,auto]">
+                <Input id="meetup-title" value={meetupTitle} onChange={(event) => setMeetupTitle(event.target.value)} className="bg-black/40 text-white" />
+                <Input id="meetup-comment" value={meetupComment} onChange={(event) => setMeetupComment(event.target.value)} placeholder="Комментарий / ориентир" className="bg-black/40 text-white" />
+                <Button type="button" className="w-full md:w-auto" disabled={isSubmitting || !selectedMeetupPoint} onClick={handleCreateMeetup}>Сохранить meetup</Button>
+              </CardContent>
+            </Card>
+
+            <Card className="max-h-[300px] border-white/25 bg-black/55 backdrop-blur-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="font-orbitron text-base text-white">Онлайн-райдеры</CardTitle>
+                <CardDescription className="text-zinc-300">{loading ? "Обновляем эфир..." : `${snapshot?.activeSessions.length || 0} райдеров`}</CardDescription>
+              </CardHeader>
+              <CardContent className="max-h-[220px] space-y-2 overflow-auto pr-1">
+                {(snapshot?.activeSessions || []).map((session) => (
+                  <button
+                    key={session.id}
+                    type="button"
+                    onClick={() => fetchSessionDetail(session.id)}
+                    className="flex w-full items-center justify-between rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-left transition hover:border-amber-300/70"
+                  >
+                    <div>
+                      <div className="text-sm font-medium text-white">{riderDisplayName(session.users, session.user_id)}</div>
+                      <div className="text-[11px] text-zinc-300">{session.ride_name || "Без названия"}</div>
+                    </div>
+                    <div className="text-right text-xs text-amber-100">
+                      <div>{Number(session.total_distance_km || 0).toFixed(1)} км</div>
+                      <div>{Number(session.latest_speed_kmh || 0).toFixed(0)} км/ч</div>
+                    </div>
+                  </button>
+                ))}
+                {!snapshot?.activeSessions?.length ? <div className="rounded-xl border border-dashed border-white/25 p-3 text-xs text-zinc-300">Пока никто не в эфире. Запусти live share.</div> : null}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </section>
 
@@ -636,6 +659,41 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
             </CardContent>
           </Card>
         ))}
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold" style={{ color: crew.theme.palette.textPrimary }}>Demo & smoke инструкции</CardTitle>
+            <CardDescription style={{ color: crew.theme.palette.textSecondary }}>
+              Быстрый прогон для оператора: проверить адаптив, live-share и meetup за 2-3 минуты.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3"><span className="font-medium text-white">1.</span> Открой страницу на телефоне и на десктопе: карта должна занимать фон и оставаться интерактивной.</div>
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3"><span className="font-medium text-white">2.</span> Нажми по карте, сохрани meetup-пин, обнови страницу и убедись что пин остался.</div>
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3"><span className="font-medium text-white">3.</span> Запусти live share на одном устройстве и проверь отображение rider-маркера на втором.</div>
+          </CardContent>
+        </Card>
+
+        <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold" style={{ color: crew.theme.palette.textPrimary }}>Engine overrides</CardTitle>
+            <CardDescription style={{ color: crew.theme.palette.textSecondary }}>
+              Leaflet теперь дефолтный. При необходимости можно быстро откатиться без кода.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <div className="font-mono text-xs text-emerald-200">NEXT_PUBLIC_MAP_ENGINE=leaflet</div>
+              <div className="mt-1">Рекомендуемый режим (по умолчанию).</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <div className="font-mono text-xs text-amber-200">NEXT_PUBLIC_MAP_ENGINE=vibemap</div>
+              <div className="mt-1">Fallback режим, если нужно быстрый rollback.</div>
+            </div>
+          </CardContent>
+        </Card>
       </section>
     </div>
   );

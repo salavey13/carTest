@@ -39,6 +39,28 @@ export interface PointOfInterest {
   icon: string;
   color: string;
   coords: [number, number][];
+  geojson?: {
+    type: "Feature" | "FeatureCollection";
+    geometry?: {
+      type: string;
+      coordinates: any;
+    };
+    features?: Array<{
+      type: "Feature";
+      geometry: {
+        type: string;
+        coordinates: any;
+      };
+      properties?: Record<string, unknown>;
+    }>;
+    properties?: Record<string, unknown>;
+  };
+  roadHighlight?: {
+    weight?: number;
+    glow?: boolean;
+    animated?: boolean;
+    dashArray?: string;
+  };
 }
 
 // === CORE PROJECTION MATH ===
