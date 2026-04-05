@@ -162,6 +162,16 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
     deliveryModesText: "pickup, delivery",
     paymentOptionsText: "telegram_xtr, card, sbp, cash",
     defaultMode: "pickup",
+    issuerName: "",
+    issuerRepresentative: "",
+    includedMileage: "200",
+    overageRateRub: "30",
+    bikeValueRub: "700000",
+    bikeValueWords: "Семьсот тысяч",
+    lateReturnPenaltyRub: "5000",
+    returnAddress: "г. Нижний Новгород, ул. Стригинский переулок, дом 13б",
+    contractDefaultsJson: "",
+    docTemplatesJson: "",
     advancedJson: "",
   });
   const [message, setMessage] = useState("Укажите slug, подберите цвета, проверьте локально и сохраните.");
@@ -356,7 +366,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
 
 
   useEffect(() => {
-    const normalized = initialSlug.trim();
+    const normalized = String(initialSlug || "").trim();
     if (!normalized || initialSlugAppliedRef.current) return;
     initialSlugAppliedRef.current = true;
     setForm((prev) => ({ ...prev, slug: normalized }));
@@ -472,6 +482,21 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
           <label className="text-sm">Режимы выдачи (CSV)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.deliveryModesText} onChange={(e) => updateField("deliveryModesText", e.target.value)} /></label>
           <label className="text-sm">Оплата (CSV: telegram_xtr, card, sbp, cash ...)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.paymentOptionsText} onChange={(e) => updateField("paymentOptionsText", e.target.value)} /></label>
           <label className="text-sm">Режим по умолчанию<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.defaultMode} onChange={(e) => updateField("defaultMode", e.target.value)} /></label>
+          <h3 className="md:col-span-3 mt-2 text-base font-semibold" style={{ color: ui.text }}>Private crew secrets (contract defaults)</h3>
+          <label className="text-sm">Юрлицо / issuerName<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.issuerName} onChange={(e) => updateField("issuerName", e.target.value)} /></label>
+          <label className="text-sm">Представитель / issuer_representative<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.issuerRepresentative} onChange={(e) => updateField("issuerRepresentative", e.target.value)} /></label>
+          <label className="text-sm">Пробег включён (км)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.includedMileage} onChange={(e) => updateField("includedMileage", e.target.value)} /></label>
+          <label className="text-sm">Перепробег руб/км<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.overageRateRub} onChange={(e) => updateField("overageRateRub", e.target.value)} /></label>
+          <label className="text-sm">Оценка байка (руб)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.bikeValueRub} onChange={(e) => updateField("bikeValueRub", e.target.value)} /></label>
+          <label className="text-sm">Оценка байка (прописью)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.bikeValueWords} onChange={(e) => updateField("bikeValueWords", e.target.value)} /></label>
+          <label className="text-sm">Штраф за просрочку (руб)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.lateReturnPenaltyRub} onChange={(e) => updateField("lateReturnPenaltyRub", e.target.value)} /></label>
+          <label className="text-sm md:col-span-2">Адрес возврата<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.returnAddress} onChange={(e) => updateField("returnAddress", e.target.value)} /></label>
+          <label className="text-sm md:col-span-3">Contract defaults JSON (private.crew_secrets.contract_defaults)
+            <textarea className={`${inputClass} min-h-24 font-mono text-xs`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.contractDefaultsJson} onChange={(e) => updateField("contractDefaultsJson", e.target.value)} />
+          </label>
+          <label className="text-sm md:col-span-3">DOC templates JSON (private.crew_secrets.doc_templates)
+            <textarea className={`${inputClass} min-h-24 font-mono text-xs`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.docTemplatesJson} onChange={(e) => updateField("docTemplatesJson", e.target.value)} />
+          </label>
         </section>
       )}
 

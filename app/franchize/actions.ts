@@ -2,14 +2,13 @@
 
 import { createInvoice, supabaseAdmin } from "@/lib/supabase-server";
 import { notifyAdmin, sendTelegramDocument, sendTelegramInvoice } from "@/app/actions";
-import { generateDocxBytes } from "@/app/markdown-doc/actions";
-import { applyTemplateVariables } from "@/lib/markdownTemplate";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
-import { createHash, randomUUID } from "crypto";
-import { registerVerifierOriginal } from "@/app/doc-verifier/actions";
+import { randomUUID } from "crypto";
 import { readFile } from "fs/promises";
 import path from "path";
+import { getCrewSensitiveData, getUserSensitiveData, saveCrewSensitiveData } from "@/app/lib/private-secrets";
+import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -181,6 +180,16 @@ export interface FranchizeConfigInput {
   deliveryModesText: string;
   paymentOptionsText: string;
   defaultMode: string;
+  issuerName: string;
+  issuerRepresentative: string;
+  includedMileage: string;
+  overageRateRub: string;
+  bikeValueRub: string;
+  bikeValueWords: string;
+  lateReturnPenaltyRub: string;
+  returnAddress: string;
+  contractDefaultsJson: string;
+  docTemplatesJson: string;
   advancedJson: string;
 }
 
@@ -244,6 +253,16 @@ const franchizeConfigSchema = z.object({
   deliveryModesText: z.string().default("pickup,delivery"),
   paymentOptionsText: z.string().default("telegram_xtr,card,sbp,cash"),
   defaultMode: z.string().trim().default("pickup"),
+  issuerName: z.string().trim().default(""),
+  issuerRepresentative: z.string().trim().default(""),
+  includedMileage: z.string().trim().default(""),
+  overageRateRub: z.string().trim().default(""),
+  bikeValueRub: z.string().trim().default(""),
+  bikeValueWords: z.string().trim().default(""),
+  lateReturnPenaltyRub: z.string().trim().default(""),
+  returnAddress: z.string().trim().default(""),
+  contractDefaultsJson: z.string().default(""),
+  docTemplatesJson: z.string().default(""),
   advancedJson: z.string().default(""),
 });
 
@@ -292,6 +311,16 @@ const defaultFranchizeConfig: FranchizeConfigInput = {
   deliveryModesText: "pickup, delivery",
   paymentOptionsText: "telegram_xtr, card, sbp, cash",
   defaultMode: "pickup",
+  issuerName: "",
+  issuerRepresentative: "",
+  includedMileage: "200",
+  overageRateRub: "30",
+  bikeValueRub: "700000",
+  bikeValueWords: "Семьсот тысяч",
+  lateReturnPenaltyRub: "5000",
+  returnAddress: "г. Нижний Новгород, ул. Стригинский переулок, дом 13б",
+  contractDefaultsJson: "",
+  docTemplatesJson: "",
   advancedJson: "",
 };
 
@@ -313,6 +342,16 @@ const fallbackMenuLinks = (slug: string) => [
   { label: "Контакты", href: `/franchize/${slug}/contacts` },
   { label: "Корзина", href: `/franchize/${slug}/cart` },
 ];
+
+function normalizeCrewSlug(value: string): string {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/%20/g, " ")
+    .replace(/\s+/g, "-")
+    .replace(/_+/g, "-")
+    .replace(/-+/g, "-");
+}
 
 const withSlug = (href: string, slug: string) => {
   if (!href) {
@@ -423,15 +462,7 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
 });
 
 export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugResult> {
-  const rawSlug = slug?.trim();
-  const safeSlug = rawSlug
-    ? rawSlug
-        .toLowerCase()
-        .replace(/%20/g, " ")
-        .replace(/\s+/g, "-")
-        .replace(/_+/g, "-")
-        .replace(/-+/g, "-")
-    : "";
+  const safeSlug = normalizeCrewSlug(slug ?? "");
   if (!safeSlug) {
     return { crew: emptyCrew("unknown"), items: [] };
   }
@@ -891,7 +922,7 @@ async function resolveFranchizeEditorAccess(actorUserId: string | undefined, cre
   return membership?.membership_status === "active" && membership.role === "owner";
 }
 
-function toFranchizeConfigInput(crew: UnknownRecord, slug: string): FranchizeConfigInput {
+async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promise<FranchizeConfigInput> {
   const metadata = (crew.metadata ?? {}) as UnknownRecord;
   const franchize = (metadata.franchize ?? {}) as UnknownRecord;
   const themePalette = resolvePaletteByMode(franchize);
@@ -905,6 +936,11 @@ function toFranchizeConfigInput(crew: UnknownRecord, slug: string): FranchizeCon
     borderSoft: readPath(franchize, ["theme", "palettes", "light", "borderSoft"], readPath(franchize, ["theme", "palette", "light", "borderSoft"], defaultFranchizeConfig.lightBorderSoft)),
   };
   const menuLinks = readPath(franchize, ["header", "menuLinks"], fallbackMenuLinks(slug));
+
+  const crewSecrets = await getCrewSensitiveData(slug);
+  const contractDefaults = (crewSecrets.contractDefaults ?? {}) as UnknownRecord;
+  const defaults = (readPath(contractDefaults, ["defaults"], {}) ?? {}) as UnknownRecord;
+  const docTemplates = (crewSecrets.docTemplates ?? {}) as UnknownRecord;
 
   return {
     ...defaultFranchizeConfig,
@@ -982,12 +1018,22 @@ function toFranchizeConfigInput(crew: UnknownRecord, slug: string): FranchizeCon
     deliveryModesText: readPath(franchize, ["order", "deliveryModes"], ["pickup", "delivery"]).join(", "),
     paymentOptionsText: readPath(franchize, ["order", "paymentOptions"], ["telegram_xtr", "card", "sbp", "cash"]).join(", "),
     defaultMode: readPath(franchize, ["order", "defaultMode"], "pickup"),
+    issuerName: readPath(defaults, ["issuerName"], ""),
+    issuerRepresentative: readPath(defaults, ["issuer_representative"], ""),
+    includedMileage: String(readPath(defaults, ["included_mileage"], defaultFranchizeConfig.includedMileage)),
+    overageRateRub: String(readPath(defaults, ["overage_rate"], defaultFranchizeConfig.overageRateRub)),
+    bikeValueRub: String(readPath(defaults, ["bike_value_rub"], defaultFranchizeConfig.bikeValueRub)),
+    bikeValueWords: readPath(defaults, ["bike_value_words"], defaultFranchizeConfig.bikeValueWords),
+    lateReturnPenaltyRub: String(readPath(defaults, ["late_return_penalty_rub"], defaultFranchizeConfig.lateReturnPenaltyRub)),
+    returnAddress: readPath(defaults, ["return_address"], defaultFranchizeConfig.returnAddress),
+    contractDefaultsJson: JSON.stringify(contractDefaults, null, 2),
+    docTemplatesJson: JSON.stringify(docTemplates, null, 2),
     advancedJson: JSON.stringify(franchize, null, 2),
   };
 }
 
 export async function loadFranchizeConfigBySlug(slug: string, actorUserId?: string): Promise<FranchizeConfigState> {
-  const safeSlug = slug.trim();
+  const safeSlug = normalizeCrewSlug(String(slug ?? ""));
   if (!safeSlug) {
     return { ok: false, message: "Сначала укажите slug экипажа." };
   }
@@ -1004,7 +1050,7 @@ export async function loadFranchizeConfigBySlug(slug: string, actorUserId?: stri
     message: canEdit
       ? `Конфиг для ${safeSlug} загружен.`
       : `Конфиг для ${safeSlug} загружен в read-only режиме.`,
-    data: toFranchizeConfigInput(crew as UnknownRecord, safeSlug),
+    data: await toFranchizeConfigInput(crew as UnknownRecord, safeSlug),
     canEdit,
   };
 }
@@ -1021,7 +1067,10 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput, actorUser
   }
 
   const payload = parsed.data;
-  const { data: crew, error: crewError } = await supabaseAdmin.from("crews").select("id, slug, metadata, owner_id").eq("slug", payload.slug).maybeSingle();
+  const normalizedSlug = normalizeCrewSlug(payload.slug);
+  payload.slug = normalizedSlug;
+
+  const { data: crew, error: crewError } = await supabaseAdmin.from("crews").select("id, slug, metadata, owner_id").eq("slug", normalizedSlug).maybeSingle();
   if (crewError || !crew) {
     return { ok: false, message: "Slug не найден: сохранение не выполнено.", data: payload };
   }
@@ -1040,6 +1089,30 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput, actorUser
       }
     } catch {
       return { ok: false, message: "Advanced JSON должен быть валидным JSON-объектом.", data: payload };
+    }
+  }
+
+  let contractDefaultsOverrides: UnknownRecord = {};
+  if (payload.contractDefaultsJson.trim()) {
+    try {
+      const parsedJson = JSON.parse(payload.contractDefaultsJson) as unknown;
+      if (parsedJson && typeof parsedJson === "object" && !Array.isArray(parsedJson)) {
+        contractDefaultsOverrides = parsedJson as UnknownRecord;
+      }
+    } catch {
+      return { ok: false, message: "Contract defaults JSON должен быть валидным JSON-объектом.", data: payload };
+    }
+  }
+
+  let docTemplatesOverrides: UnknownRecord = {};
+  if (payload.docTemplatesJson.trim()) {
+    try {
+      const parsedJson = JSON.parse(payload.docTemplatesJson) as unknown;
+      if (parsedJson && typeof parsedJson === "object" && !Array.isArray(parsedJson)) {
+        docTemplatesOverrides = parsedJson as UnknownRecord;
+      }
+    } catch {
+      return { ok: false, message: "Doc templates JSON должен быть валидным JSON-объектом.", data: payload };
     }
   }
 
@@ -1156,6 +1229,26 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput, actorUser
     return { ok: false, message: "Не удалось сохранить конфиг в metadata экипажа.", data: payload, canEdit: true };
   }
 
+  const mergedContractDefaults: UnknownRecord = {
+    ...contractDefaultsOverrides,
+    defaults: {
+      ...(readPath(contractDefaultsOverrides, ["defaults"], {}) as UnknownRecord),
+      issuerName: payload.issuerName || defaultFranchizeConfig.issuerName,
+      issuer_representative: payload.issuerRepresentative || defaultFranchizeConfig.issuerRepresentative,
+      included_mileage: Number(payload.includedMileage) || Number(defaultFranchizeConfig.includedMileage),
+      overage_rate: Number(payload.overageRateRub) || Number(defaultFranchizeConfig.overageRateRub),
+      bike_value_rub: Number(payload.bikeValueRub) || Number(defaultFranchizeConfig.bikeValueRub),
+      bike_value_words: payload.bikeValueWords || defaultFranchizeConfig.bikeValueWords,
+      late_return_penalty_rub: Number(payload.lateReturnPenaltyRub) || Number(defaultFranchizeConfig.lateReturnPenaltyRub),
+      return_address: payload.returnAddress || defaultFranchizeConfig.returnAddress,
+    },
+  };
+
+  await saveCrewSensitiveData(payload.slug, {
+    contractDefaults: mergedContractDefaults,
+    docTemplates: docTemplatesOverrides,
+  });
+
   return {
     ok: true,
     message: `Франшизный конфиг сохранён в crews.metadata.franchize для ${payload.slug}.`,
@@ -1184,7 +1277,13 @@ type FranchizeOrderNotifyPayload = z.infer<typeof franchizeOrderInvoiceSchema> &
   extrasTotal: number;
 };
 
-async function loadFranchizeDealTemplate(): Promise<string> {
+async function loadFranchizeDealTemplate(slug: string): Promise<string> {
+  const crewSensitive = await getCrewSensitiveData(slug);
+  const secureTemplate = readPath(crewSensitive.docTemplates ?? {}, ["rentalDealTemplate"], "");
+  if (typeof secureTemplate === "string" && secureTemplate.trim().length > 0) {
+    return secureTemplate;
+  }
+
   try {
     const response = await fetch("https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE_DEMO.md", { cache: "no-store" });
     if (!response.ok) {
@@ -1256,176 +1355,137 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
   try {
     const { data: cars, error: carsError } = await supabaseAdmin
-    .from("cars")
-    .select("id, make, model, specs")
-    .in("id", payload.cartLines.map((line) => line.itemId));
+      .from("cars")
+      .select("id, make, model, specs")
+      .in("id", payload.cartLines.map((line) => line.itemId));
 
-  if (carsError) {
-    logger.error("[franchize] failed to load cars for order doc", carsError);
-  }
-
-  const byId = new Map((cars || []).map((car) => [car.id, car]));
-  const extrasRows = payload.extras.length
-    ? payload.extras
-        .map((extra) => `| ${extra.label} | 1 | ${formatMoney(extra.amount)} ₽ | ${formatMoney(extra.amount)} ₽ |`)
-        .join("\n")
-    : "| Без доп. опций | 0 | 0 ₽ | 0 ₽ |";
-
-  const firstLine = payload.cartLines[0];
-  const firstCar = firstLine ? byId.get(firstLine.itemId) : null;
-  const firstSpecs = (firstCar?.specs as Record<string, unknown> | null) || {};
-  const rentDays = Math.max(...payload.cartLines.map((line) => parseDurationDays(line.options.duration)));
-  const rentStartDate = payload.rentalStartDate || payload.time;
-  const rentEndDate = payload.rentalEndDate || payload.time;
-  const dailyPriceRub = firstLine?.pricePerDay || Math.round(payload.subtotal / Math.max(1, rentDays));
-
-const template = await loadFranchizeDealTemplate();
-
-// ──────────────────────────────────────────────────────────────
-// 1. Загружаем contractDefaults из crew.metadata.franchize
-// ──────────────────────────────────────────────────────────────
-const { data: crewRowMetadata } = await supabaseAdmin
-  .from("crews")
-  .select("metadata")
-  .eq("slug", payload.slug)
-  .maybeSingle();
-
-const franchizeMeta = crewRowMetadata?.metadata?.franchize || {};
-const contractDefaults = franchizeMeta.contractDefaults || {};
-const defaults = contractDefaults.defaults || {};
-
-// ──────────────────────────────────────────────────────────────
-// 2. Формируем переменные для шаблона (всё из БД + runtime)
-// ──────────────────────────────────────────────────────────────
-const variables = {
-  contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}`,
-  contract_date: new Date().toLocaleDateString("ru-RU"),
-  day: new Date().getDate().toString().padStart(2, "0"),
-  month: new Date().toLocaleString("ru-RU", { month: "long" }),
-  year: new Date().getFullYear().toString(),
-
-  // Арендатор
-  renter_full_name: payload.recipient,
-  renter_phone: payload.phone,
-  renter_driver_license: payload.renterDriverLicense || "указывается при выдаче",
-  renter_passport: payload.renterPassport || "указывается при выдаче",
-
-  // Арендодатель (из contractDefaults)
-  issuer_name: defaults.issuerName || `Franchize ${payload.slug}`,
-  issuer_signatory: "Администратор экипажа",
-  issuer_representative: defaults.issuer_representative || "Сидоров Илья Олегович",
-
-  // Мотоцикл
-  bike_make_model: firstCar ? `${firstCar.make || "Bike"} ${firstCar.model || "Model"}` : payload.cartLines.map((line) => line.itemId).join(", "),
-  bike_vin: String(firstSpecs.vin || firstSpecs.frame || firstSpecs.vin_number || "уточняется"),
-  bike_plate: String(firstSpecs.plate || firstSpecs.state_number || "уточняется"),
-  bike_mileage: "45073", // можно позже сделать динамическим из bike.specs
-
-  // Даты и срок
-  rent_start_time: "12:00",
-  rent_start_date: rentStartDate,
-  rent_end_time: "12:00",
-  rent_end_date: rentEndDate,
-  rent_days: rentDays,
-
-  // Деньги
-  daily_price_rub: formatMoney(dailyPriceRub),
-  subtotal_rub: formatMoney(payload.subtotal),
-  extras_rows: extrasRows,
-  extras_total_rub: formatMoney(payload.extrasTotal),
-  total_price_rub: formatMoney(payload.totalAmount),
-  deposit_rub: "20 000",
-
-  // Контрактные дефолты из БД
-  included_mileage: String(defaults.included_mileage || 200),
-  overage_rate: `${defaults.overage_rate || 30} руб/км`,
-  bike_value_rub: String(defaults.bike_value_rub || 700000),
-  bike_value_words: defaults.bike_value_words || "Семьсот тысяч",
-  late_return_penalty_rub: String(defaults.late_return_penalty_rub || 5000),
-  return_address: defaults.return_address || "г. Нижний Новгород, ул. Стригинский переулок, дом 13б",
-
-  // Цифровая подпись
-  signature_timestamp: new Date().toLocaleString("ru-RU"),
-  signature_fingerprint: payload.signatureFingerprint || "—",
-  renter_signature: payload.signatureName || "электронное согласие в Telegram WebApp",
-
-  // Doc Verifier
-  document_key: `rental-${payload.slug}-${payload.orderId}`,
-  verified_at: new Date().toISOString(),
-};
-
-const rendered = applyTemplateVariables(template, variables);
-const bytes = await generateDocxBytes(rendered);
-
-const docFileName = `franchize-order-${payload.slug}-${payload.orderId}.docx`;
-
-// ──────────────────────────────────────────────────────────────
-// Реальный SHA-256 + регистрация в Doc Verifier
-// ──────────────────────────────────────────────────────────────
-const realHash = createHash("sha256").update(bytes).digest("hex");
-
-const registerForm = new FormData();
-registerForm.append("integrationScope", "franchize");
-registerForm.append("documentKey", variables.document_key);
-registerForm.append("file", new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }), docFileName);
-registerForm.append("uploadedBy", "franchize-order-system");
-
-try {
-  await registerVerifierOriginal(registerForm);
-  logger.info(`[franchize] Document registered → key: ${variables.document_key} | hash: ${realHash}`);
-} catch (e) {
-  logger.warn("[franchize] Doc verifier registration failed (non-critical)", e);
-}
-
-  const adminChatId = process.env.ADMIN_CHAT_ID;
-  if (!adminChatId) {
-    throw new Error("ADMIN_CHAT_ID not configured");
-  }
-
-  await notifyAdmin(
-    [
-      `🧾 Новый franchize-заказ #${payload.orderId}`,
-      `Crew: ${payload.slug}`,
-      `Получатель: ${payload.recipient}`,
-      `Телефон: ${payload.phone}`,
-      `Время: ${payload.time}`,
-      `Оплата: ${payload.payment}`,
-      `Доставка: ${payload.delivery}`,
-      `Итого: ${formatMoney(payload.totalAmount)} ₽`,
-    ].join("\n"),
-  );
-
-  const recipientSet = new Set<string>([adminChatId, payload.telegramUserId]);
-  const { data: crewRow } = await supabaseAdmin.from("crews").select("owner_id").eq("slug", payload.slug).maybeSingle();
-  const ownerId = typeof crewRow?.owner_id === "string" ? crewRow.owner_id : "";
-  if (ownerId) {
-    const { data: ownerUser } = await supabaseAdmin
-      .from("users")
-      .select("metadata")
-      .eq("user_id", ownerId)
-      .maybeSingle();
-    const ownerMeta = (ownerUser?.metadata ?? {}) as Record<string, unknown>;
-    const ownerTelegramId = String(ownerMeta.telegram_id ?? ownerMeta.telegramId ?? "").trim();
-    if (ownerTelegramId) {
-      recipientSet.add(ownerTelegramId);
+    if (carsError) {
+      logger.error("[franchize] failed to load cars for order doc", carsError);
     }
-  }
 
-  for (const recipientId of recipientSet) {
-    const sendDocResult = await sendTelegramDocument(recipientId, new Blob([bytes]), docFileName);
-    if (!sendDocResult.success) {
-      throw new Error(sendDocResult.error || `Failed to send DOCX to ${recipientId}`);
+    const byId = new Map((cars || []).map((car) => [car.id, car]));
+    const extrasRows = payload.extras.length
+      ? payload.extras
+          .map((extra) => `| ${extra.label} | 1 | ${formatMoney(extra.amount)} ₽ | ${formatMoney(extra.amount)} ₽ |`)
+          .join("\n")
+      : "| Без доп. опций | 0 | 0 ₽ | 0 ₽ |";
+
+    const firstLine = payload.cartLines[0];
+    const firstCar = firstLine ? byId.get(firstLine.itemId) : null;
+    const firstSpecs = (firstCar?.specs as Record<string, unknown> | null) || {};
+    const rentDays = Math.max(...payload.cartLines.map((line) => parseDurationDays(line.options.duration)));
+    const rentStartDate = payload.rentalStartDate || payload.time;
+    const rentEndDate = payload.rentalEndDate || payload.time;
+    const dailyPriceRub = firstLine?.pricePerDay || Math.round(payload.subtotal / Math.max(1, rentDays));
+
+    const template = await loadFranchizeDealTemplate(payload.slug);
+    const userSensitive = await getUserSensitiveData(payload.telegramUserId);
+    const crewSensitive = await getCrewSensitiveData(payload.slug);
+    const contractDefaults = (crewSensitive.contractDefaults ?? {}) as UnknownRecord;
+    const defaults = (readPath(contractDefaults, ["defaults"], {}) ?? {}) as UnknownRecord;
+
+    const variables = {
+      contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}`,
+      contract_date: new Date().toLocaleDateString("ru-RU"),
+      day: new Date().getDate().toString().padStart(2, "0"),
+      month: new Date().toLocaleString("ru-RU", { month: "long" }),
+      year: new Date().getFullYear().toString(),
+      renter_full_name: payload.recipient,
+      renter_phone: payload.phone,
+      renter_driver_license: userSensitive.driverLicense || payload.renterDriverLicense || "указывается при выдаче",
+      renter_passport: userSensitive.passport || payload.renterPassport || "указывается при выдаче",
+      issuer_name: String(readPath(defaults, ["issuerName"], `Franchize ${payload.slug}`)),
+      issuer_signatory: "Администратор экипажа",
+      issuer_representative: String(readPath(defaults, ["issuer_representative"], "Сидоров Илья Олегович")),
+      bike_make_model: firstCar
+        ? `${firstCar.make || "Bike"} ${firstCar.model || "Model"}`
+        : payload.cartLines.map((line) => line.itemId).join(", "),
+      bike_vin: String(firstSpecs.vin || firstSpecs.frame || firstSpecs.vin_number || "уточняется"),
+      bike_plate: String(firstSpecs.plate || firstSpecs.state_number || "уточняется"),
+      bike_mileage: "45073",
+      rent_start_time: "12:00",
+      rent_start_date: rentStartDate,
+      rent_end_time: "12:00",
+      rent_end_date: rentEndDate,
+      rent_days: rentDays,
+      daily_price_rub: formatMoney(dailyPriceRub),
+      subtotal_rub: formatMoney(payload.subtotal),
+      extras_rows: extrasRows,
+      extras_total_rub: formatMoney(payload.extrasTotal),
+      total_price_rub: formatMoney(payload.totalAmount),
+      deposit_rub: "20 000",
+      included_mileage: String(readPath(defaults, ["included_mileage"], 200)),
+      overage_rate: `${readPath(defaults, ["overage_rate"], 30)} руб/км`,
+      bike_value_rub: String(readPath(defaults, ["bike_value_rub"], 700000)),
+      bike_value_words: String(readPath(defaults, ["bike_value_words"], "Семьсот тысяч")),
+      late_return_penalty_rub: String(readPath(defaults, ["late_return_penalty_rub"], 5000)),
+      return_address: String(readPath(defaults, ["return_address"], "г. Нижний Новгород, ул. Стригинский переулок, дом 13б")),
+      signature_timestamp: new Date().toLocaleString("ru-RU"),
+      signature_fingerprint: payload.signatureFingerprint || "—",
+      renter_signature: payload.signatureName || "электронное согласие в Telegram WebApp",
+      document_key: `rental-${payload.slug}-${payload.orderId}`,
+      verified_at: new Date().toISOString(),
+    } as const;
+
+    const docFileName = `franchize-order-${payload.slug}-${payload.orderId}.docx`;
+    const { bytes, renderedMarkdown } = await buildFranchizeDocxFromTemplate({
+      integrationScope: "franchize",
+      uploadedBy: "franchize-order-system",
+      documentKey: variables.document_key,
+      fileName: docFileName,
+      template,
+      variables,
+    });
+
+    const adminChatId = process.env.ADMIN_CHAT_ID;
+    if (!adminChatId) {
+      throw new Error("ADMIN_CHAT_ID not configured");
     }
-  }
 
-  await updateFranchizeOrderNotificationLog(logId, {
-    send_status: "sent",
-    rendered_markdown: rendered,
-    doc_file_name: docFileName,
-    last_error: "",
-  });
+    await notifyAdmin(
+      [
+        `🧾 Новый franchize-заказ #${payload.orderId}`,
+        `Crew: ${payload.slug}`,
+        `Получатель: ${payload.recipient}`,
+        `Телефон: ${payload.phone}`,
+        `Время: ${payload.time}`,
+        `Оплата: ${payload.payment}`,
+        `Доставка: ${payload.delivery}`,
+        `Итого: ${formatMoney(payload.totalAmount)} ₽`,
+      ].join("\n"),
+    );
 
-  return { renderedMarkdown: rendered, docFileName };
+    const recipientSet = new Set<string>([adminChatId, payload.telegramUserId]);
+    const { data: crewRow } = await supabaseAdmin.from("crews").select("owner_id").eq("slug", payload.slug).maybeSingle();
+    const ownerId = typeof crewRow?.owner_id === "string" ? crewRow.owner_id : "";
+    if (ownerId) {
+      const { data: ownerUser } = await supabaseAdmin
+        .from("users")
+        .select("metadata")
+        .eq("user_id", ownerId)
+        .maybeSingle();
+      const ownerMeta = (ownerUser?.metadata ?? {}) as Record<string, unknown>;
+      const ownerTelegramId = String(ownerMeta.telegram_id ?? ownerMeta.telegramId ?? "").trim();
+      if (ownerTelegramId) {
+        recipientSet.add(ownerTelegramId);
+      }
+    }
+
+    for (const recipientId of recipientSet) {
+      const sendDocResult = await sendTelegramDocument(recipientId, new Blob([bytes]), docFileName);
+      if (!sendDocResult.success) {
+        throw new Error(sendDocResult.error || `Failed to send DOCX to ${recipientId}`);
+      }
+    }
+
+    await updateFranchizeOrderNotificationLog(logId, {
+      send_status: "sent",
+      rendered_markdown: renderedMarkdown,
+      doc_file_name: docFileName,
+      last_error: "",
+    });
+
+    return { renderedMarkdown, docFileName };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to submit order notification";
     await updateFranchizeOrderNotificationLog(logId, {
@@ -1436,6 +1496,7 @@ try {
     throw error;
   }
 }
+
 
 const franchizeOrderInvoiceSchema = z.object({
   slug: z.string().trim().min(1),
