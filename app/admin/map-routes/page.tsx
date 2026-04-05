@@ -6,15 +6,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { useAppContext } from '@/contexts/AppContext';
+import { Badge } from '@/components/ui/badge';
 
 export default function AdminMapRoutesPage() {
+  const { dbUser } = useAppContext();
   const [routes, setRoutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('Road-snapped route');
   const [color, setColor] = useState('#4D99FF');
   const [type, setType] = useState<'path' | 'loop'>('path');
   const [geojson, setGeojson] = useState('');
-  const [userId, setUserId] = useState('');
   const [message, setMessage] = useState('');
 
   async function load() {
@@ -30,11 +32,15 @@ export default function AdminMapRoutesPage() {
   }, []);
 
   async function save() {
+    if (!dbUser?.user_id) {
+      setMessage('Авторизуйся в Telegram как admin/vprAdmin, чтобы сохранять маршруты');
+      return;
+    }
     setMessage('Saving...');
     const response = await fetch('/api/maps/routes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, name, color, type, geojson }),
+      body: JSON.stringify({ userId: dbUser.user_id, name, color, type, geojson }),
     });
 
     const result = await response.json();
@@ -56,9 +62,14 @@ export default function AdminMapRoutesPage() {
           <CardDescription>Create GeoJSON routes and push them into public.maps through server actions.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
-          <div className="grid gap-2">
-            <Label>User ID (admin/vprAdmin)</Label>
-            <Input value={userId} onChange={(event) => setUserId(event.target.value)} placeholder="Telegram chat_id / users.user_id" />
+          <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+            <div className="text-xs text-muted-foreground">Actor from AppContext</div>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <Badge variant={dbUser?.user_id ? 'default' : 'secondary'}>
+                {dbUser?.user_id ? 'Authenticated' : 'Not authenticated'}
+              </Badge>
+              <span className="text-sm text-muted-foreground">{dbUser?.user_id || 'No dbUser yet'}</span>
+            </div>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div className="grid gap-2">
