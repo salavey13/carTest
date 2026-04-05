@@ -2,10 +2,10 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
-import { generateDocxBytes } from "@/app/markdown-doc/actions";
-import { applyTemplateVariables } from "@/lib/markdownTemplate";
 import { logger } from "@/lib/logger";
-import { createHash, randomUUID } from "crypto";
+import { randomUUID } from "crypto";
+import { getCrewSensitiveData } from "@/app/lib/private-secrets";
+import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 import type {
   ConfiguratorLeadInput,
   ConfiguratorBike,
@@ -65,7 +65,7 @@ export async function loadConfiguratorCatalog(): Promise<{
 // Configurator DOCX template
 // ─────────────────────────────────────────────
 
-const CONFIGURATOR_DOC_TEMPLATE = `# ⚡ Конфигурация электробайка VipBike
+const CONFIGURATOR_DOC_TEMPLATE = `# ⚡ Конфигурация электробайка {{brand_name}}
 
 **Дата:** {{config_date}}
 **Номер конфигурации:** {{config_id}}
@@ -76,11 +76,11 @@ const CONFIGURATOR_DOC_TEMPLATE = `# ⚡ Конфигурация электро
 
 | | |
 |---|---|
-| **Компания** | ООО "Вип Байк" (VipBike LLC) |
-| **Адрес** | г. Нижний Новгород, Комсомольская пл. 2 |
-| **Контактное лицо** | Сидоров Илья |
-| **Телефон** | +79200789888 |
-| **Telegram** | @I_O_S_NN |
+| **Компания** | {{issuer_name}} |
+| **Адрес** | {{issuer_address}} |
+| **Контактное лицо** | {{issuer_representative}} |
+| **Телефон** | {{issuer_phone}} |
+| **Telegram** | {{issuer_telegram}} |
 
 ---
 
@@ -125,7 +125,7 @@ const CONFIGURATOR_DOC_TEMPLATE = `# ⚡ Конфигурация электро
 
 ---
 
-*Документ сгенерирован автоматически конфигуратором VipBike*
+*Документ сгенерирован автоматически конфигуратором {{brand_name}}*
 *{{config_timestamp}}*
 `;
 
@@ -136,6 +136,11 @@ const CONFIGURATOR_DOC_TEMPLATE = `# ⚡ Конфигурация электро
 async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
   const configId = randomUUID().slice(0, 8);
   const now = new Date();
+  const crewSensitive = await getCrewSensitiveData(input.crewSlug);
+  const contractDefaults = (crewSensitive.contractDefaults ?? {}) as Record<string, unknown>;
+  const defaults = ((contractDefaults.defaults ?? {}) as Record<string, unknown>);
+  const docTemplates = (crewSensitive.docTemplates ?? {}) as Record<string, unknown>;
+  const secureTemplate = typeof docTemplates.configuratorTemplate === "string" ? docTemplates.configuratorTemplate : "";
 
   const fmt = (n: number) => n.toLocaleString("ru-RU");
 
@@ -147,9 +152,15 @@ async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
       : "| — | — | 0 ₽ |";
 
   const variables = {
+    brand_name: input.crewSlug,
     config_date: now.toLocaleDateString("ru-RU"),
     config_id: configId,
     config_timestamp: now.toLocaleString("ru-RU"),
+    issuer_name: String(defaults.issuerName ?? `Franchize ${input.crewSlug}`),
+    issuer_address: String(defaults.return_address ?? "г. Нижний Новгород, Комсомольская пл. 2"),
+    issuer_representative: String(defaults.issuer_representative ?? "Сидоров Илья"),
+    issuer_phone: String(defaults.phone ?? "не указан"),
+    issuer_telegram: String(defaults.telegram ?? "@oneBikePlsBot"),
     client_name: input.userName || "не указано",
     client_telegram_id: input.userTelegramId || "не указано",
     client_user_id: input.userId || "—",
@@ -172,10 +183,15 @@ async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
     total_price: fmt(input.total),
   };
 
-  const rendered = applyTemplateVariables(CONFIGURATOR_DOC_TEMPLATE, variables);
-  const bytes = await generateDocxBytes(rendered);
-
   const docFileName = `vipbike-config-${input.crewSlug}-${configId}.docx`;
+  const { bytes } = await buildFranchizeDocxFromTemplate({
+    integrationScope: "franchize-configurator",
+    uploadedBy: "franchize-configurator",
+    fileName: docFileName,
+    documentKey: `configurator-${input.crewSlug}-${configId}`,
+    template: secureTemplate.trim().length > 0 ? secureTemplate : CONFIGURATOR_DOC_TEMPLATE,
+    variables,
+  });
 
   // ── Collect recipient Telegram IDs ──
 
