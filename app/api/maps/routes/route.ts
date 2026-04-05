@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPublicRacingRoutes, saveRoute } from '@/lib/map-actions';
+import { deleteRoute, getPublicRoutesForAdmin, saveRoute, updateRoute } from '@/lib/map-actions';
 
 export async function GET() {
-  const result = await getPublicRacingRoutes();
+  const result = await getPublicRoutesForAdmin();
   if (!result.success) {
     return NextResponse.json({ success: false, error: result.error || 'Failed to load routes' }, { status: 500 });
   }
@@ -36,4 +36,43 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ success: true, data: result.data });
+}
+
+export async function PUT(request: NextRequest) {
+  const body = await request.json();
+  const userId = body?.userId ? String(body.userId) : '';
+  const mapId = body?.mapId ? String(body.mapId) : '';
+  const routeId = body?.routeId ? String(body.routeId) : '';
+  if (!userId || !mapId || !routeId) {
+    return NextResponse.json({ success: false, error: 'userId, mapId and routeId are required' }, { status: 400 });
+  }
+
+  const result = await updateRoute(userId, {
+    mapId,
+    routeId,
+    name: body?.name ? String(body.name) : undefined,
+    color: body?.color ? String(body.color) : undefined,
+    type: body?.type === 'loop' ? 'loop' : body?.type === 'path' ? 'path' : undefined,
+    geojson: body?.geojson ? String(body.geojson) : undefined,
+  });
+  if (!result.success) {
+    return NextResponse.json({ success: false, error: result.error || 'Failed to update route' }, { status: 500 });
+  }
+  return NextResponse.json({ success: true });
+}
+
+export async function DELETE(request: NextRequest) {
+  const body = await request.json();
+  const userId = body?.userId ? String(body.userId) : '';
+  const mapId = body?.mapId ? String(body.mapId) : '';
+  const routeId = body?.routeId ? String(body.routeId) : '';
+  if (!userId || !mapId || !routeId) {
+    return NextResponse.json({ success: false, error: 'userId, mapId and routeId are required' }, { status: 400 });
+  }
+
+  const result = await deleteRoute(userId, mapId, routeId);
+  if (!result.success) {
+    return NextResponse.json({ success: false, error: result.error || 'Failed to delete route' }, { status: 500 });
+  }
+  return NextResponse.json({ success: true });
 }
