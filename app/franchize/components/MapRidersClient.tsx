@@ -425,7 +425,39 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
         ["--mr-muted" as string]: crew.theme.palette.textSecondary,
       }}
     >
-      <section className="order-2 grid gap-4 lg:grid-cols-[1.5fr,1fr]">
+      <section className="relative overflow-hidden rounded-3xl border" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
+        <div className="absolute inset-0 z-0">
+          {useLeafletMap ? (
+            <RacingMap
+              points={mapPoints}
+              bounds={(mapData?.bounds || mapBounds || DEFAULT_BOUNDS)}
+              className="h-full min-h-[78vh] w-full md:min-h-[84vh]"
+              tileLayer={mapData?.meta.tileLayer || "cartodb-dark"}
+              onMapClick={(coords) => setSelectedMeetupPoint(coords)}
+            />
+          ) : (
+            <VibeMap points={mapPoints} bounds={mapBounds ?? DEFAULT_BOUNDS} imageUrl={mapImageUrl} isEditable onMapClick={(coords) => setSelectedMeetupPoint(coords)} />
+          )}
+          <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-black/30 via-transparent to-black/30" />
+        </div>
+        <div className="pointer-events-none relative z-20 flex min-h-[78vh] flex-col justify-between p-3 md:min-h-[84vh] md:p-6">
+          <div className="flex flex-wrap gap-2">
+            <Badge className="border bg-black/55 text-white backdrop-blur-md">
+              {useLeafletMap ? "Leaflet" : "VibeMap fallback"}
+            </Badge>
+            {mapData?.routes?.length ? <Badge className="border border-sky-300/50 bg-sky-500/20 text-sky-100">{mapData.routes.length} routes</Badge> : null}
+            {mapData?.pois?.length ? <Badge className="border border-fuchsia-300/50 bg-fuchsia-500/20 text-fuchsia-100">{mapData.pois.length} POI</Badge> : null}
+            {isDemoDataMode ? <Badge className="border border-emerald-300/40 bg-emerald-500/20 text-emerald-100">Demo mode</Badge> : null}
+          </div>
+          <div className="flex justify-end">
+            <div className="rounded-xl border border-white/30 bg-black/50 px-3 py-1 text-xs text-white">
+              {selectedMeetupPoint ? `Point: ${selectedMeetupPoint[0].toFixed(4)}, ${selectedMeetupPoint[1].toFixed(4)}` : "Tap map to place meetup"}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
         <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
           <CardHeader>
             <Badge className="w-fit border hover:opacity-100" style={{ borderColor: `${crew.theme.palette.accentMain}55`, backgroundColor: `${crew.theme.palette.accentMain}18`, color: crew.theme.palette.accentMain }}>{(crew.header.brandName || crew.name || "VIP BIKE").toUpperCase()} • MAPRIDERS</Badge>
@@ -490,56 +522,6 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
             </Button>
           </CardContent>
         </Card>
-      </section>
-
-      <section className="order-1 relative overflow-hidden rounded-3xl border" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
-        <div className="absolute inset-0 z-0">
-          {useLeafletMap ? (
-            <RacingMap
-              points={mapPoints}
-              bounds={(mapData?.bounds || mapBounds || DEFAULT_BOUNDS)}
-              className="h-full min-h-[78vh] w-full md:min-h-[84vh]"
-              tileLayer={mapData?.meta.tileLayer || "cartodb-dark"}
-              onMapClick={(coords) => setSelectedMeetupPoint(coords)}
-            />
-          ) : (
-            <VibeMap points={mapPoints} bounds={mapBounds ?? DEFAULT_BOUNDS} imageUrl={mapImageUrl} isEditable onMapClick={(coords) => setSelectedMeetupPoint(coords)} />
-          )}
-          <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-black/55 via-black/20 to-black/65" />
-        </div>
-
-        <div className="relative z-30 flex min-h-[78vh] flex-col justify-between gap-4 p-3 md:min-h-[84vh] md:p-6">
-          <div className="flex flex-wrap items-start gap-2">
-            <Badge className="border bg-black/55 backdrop-blur-md" style={{ borderColor: `${crew.theme.palette.accentMain}66`, color: crew.theme.palette.accentMain }}>
-              {useLeafletMap ? "Leaflet • default" : "VibeMap • env override"}
-            </Badge>
-            {mapData?.routes?.length ? (
-              <Badge className="border border-sky-300/50 bg-sky-500/20 text-sky-100 backdrop-blur-md">
-                {mapData.routes.length} public routes
-              </Badge>
-            ) : null}
-            {mapData?.pois?.length ? (
-              <Badge className="border border-fuchsia-300/50 bg-fuchsia-500/20 text-fuchsia-100 backdrop-blur-md">
-                {mapData.pois.length} POI
-              </Badge>
-            ) : null}
-            {isDemoDataMode ? (
-              <Badge className="border border-emerald-300/40 bg-emerald-500/20 text-emerald-100 backdrop-blur-md">Demo data active</Badge>
-            ) : null}
-            {loading ? (
-              <Badge className="border border-white/40 bg-black/60 text-white backdrop-blur-md">Syncing live data…</Badge>
-            ) : null}
-            <Badge className="border border-white/30 bg-black/50 text-white backdrop-blur-md">
-              {selectedMeetupPoint ? `Point: ${selectedMeetupPoint[0].toFixed(4)}, ${selectedMeetupPoint[1].toFixed(4)}` : "Tap map to place meetup"}
-            </Badge>
-          </div>
-
-          <div className="flex items-end justify-end">
-            <Button asChild variant="secondary" className="bg-black/55 text-white backdrop-blur-md hover:bg-black/70">
-              <Link href="#map-riders-controls">Управление и детали ниже</Link>
-            </Button>
-          </div>
-        </div>
       </section>
 
       <section id="map-riders-controls" className="grid gap-3 lg:grid-cols-[1fr,360px]">

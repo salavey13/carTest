@@ -24,6 +24,13 @@ Optimize live rider tracking for **100+ concurrent riders** on Supabase Free Tie
 3. Meetup flow test: tap map -> create pin -> reload -> pin persists.
 4. Admin flow test: generate route from waypoints, save, edit color/name, delete, confirm immediate map refresh.
 
+### Execution backlog (continued)
+- [ ] Add stale-live marker eviction in UI (`updated_at` timeout) + faded visual state before removal.
+- [ ] Add route quality badges in admin (`manual`, `road-snapped`, `legacy`) from GeoJSON properties.
+- [ ] Add one-click “seed VIP demo routes” admin action (idempotent) to avoid manual SQL/REST patching.
+- [ ] Add lightweight smoke endpoint for MapRiders health (`sessions/live/meetups` counters + p95 fetch duration).
+- [ ] Introduce write queue for `/api/map-riders/location` with per-rider mutual exclusion to avoid out-of-order updates on bad mobile links.
+
 ## Ccreateonstraints
 - Keep historical/stat tables as-is:
   - `map_rider_sessions`
