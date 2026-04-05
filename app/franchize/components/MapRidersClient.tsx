@@ -339,19 +339,19 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
       : [
           {
             id: "demo-rider-alpha",
-            name: "Demo Rider Alpha • 18 км/ч",
+            name: "Demo Rider База • 14 км/ч",
             type: "point" as const,
-            icon: "image:https://placehold.co/56x56/111827/ffffff?text=DA",
+            icon: "image:https://placehold.co/56x56/111827/ffffff?text=SB",
             color: "#60a5fa",
-            coords: [[56.2339, 43.9801]],
+            coords: [[56.1864, 43.7851]],
           },
           {
             id: "demo-rider-beta",
-            name: "Demo Rider Beta • 23 км/ч",
+            name: "Demo Rider Река • 19 км/ч",
             type: "point" as const,
-            icon: "image:https://placehold.co/56x56/facc15/111827?text=DB",
+            icon: "image:https://placehold.co/56x56/facc15/111827?text=SR",
             color: "#facc15",
-            coords: [[56.2251, 43.9924]],
+            coords: [[56.1891, 43.7896]],
           },
         ];
 
@@ -383,7 +383,8 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
     { label: "Точки встречи", value: snapshot?.stats.meetupCount ?? 0, icon: "::FaUsersViewfinder::" },
     { label: "Км за 7 дней", value: snapshot?.stats.totalWeeklyDistanceKm ?? 0, icon: "::FaRoad::" },
   ];
-  const isDemoDataMode = !liveRiders.length && !(snapshot?.meetups?.length);
+  const hasRealRiderSignals = Boolean((snapshot?.stats.activeRiders || 0) > 0 || (snapshot?.activeSessions?.length || 0) > 0 || liveRiders.length > 0);
+  const isDemoDataMode = !hasRealRiderSignals && !(snapshot?.meetups?.length);
 
   const mapTools = [
     {
@@ -492,7 +493,7 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
       </section>
 
       <section className="order-1 relative overflow-hidden rounded-3xl border" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 z-0">
           {useLeafletMap ? (
             <RacingMap
               points={mapPoints}
@@ -504,10 +505,10 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
           ) : (
             <VibeMap points={mapPoints} bounds={mapBounds ?? DEFAULT_BOUNDS} imageUrl={mapImageUrl} isEditable onMapClick={(coords) => setSelectedMeetupPoint(coords)} />
           )}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/55 via-black/20 to-black/65" />
+          <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-black/55 via-black/20 to-black/65" />
         </div>
 
-        <div className="relative z-10 flex min-h-[78vh] flex-col justify-between gap-4 p-3 md:min-h-[84vh] md:p-6">
+        <div className="relative z-30 flex min-h-[78vh] flex-col justify-between gap-4 p-3 md:min-h-[84vh] md:p-6">
           <div className="flex flex-wrap items-start gap-2">
             <Badge className="border bg-black/55 backdrop-blur-md" style={{ borderColor: `${crew.theme.palette.accentMain}66`, color: crew.theme.palette.accentMain }}>
               {useLeafletMap ? "Leaflet • default" : "VibeMap • env override"}
