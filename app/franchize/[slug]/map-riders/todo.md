@@ -507,3 +507,75 @@ Add demo data, automate testing and make a screenshot:)
 
 
  
+
+---
+
+## Map Capability Upgrade — Leaflet + GeoJSON (Steamroll Sequence)
+
+> Scope update: promote map-riders from page-level feature to reusable **Maps Capability** while keeping current VibeMap behavior as fallback.
+
+### Guardrails (must stay true)
+- [x] Keep Telegram-first UX and SPA navigation intact (no hard reload hacks).
+- [x] Keep privileged Supabase access server-only (`lib/map-actions.ts` and route handlers).
+- [x] Keep `VibeMap` available behind feature flag during rollout window.
+- [x] Keep sessions/points/meetups/leaderboard behavior unchanged while map engine evolves.
+
+### Capability file targets
+- [x] Create `lib/maps/map-types.ts` with shared config/data contracts for any module (franchize/vip-bike/rentals/admin).
+- [x] Create `lib/maps/useMaps.ts` as reusable query hook.
+- [x] Create `components/maps/RacingMap.tsx` as Leaflet-first renderer.
+- [x] (Optional) Create `components/maps/MapLegend.tsx` for reusable legend UI.
+- [x] Extend `lib/map-actions.ts` with map-capability server functions:
+  - [x] `getMapCapability(identifier)`
+  - [x] `getPublicRacingRoutes()`
+  - [x] `saveRoute(userId, route)`
+  - [x] `updateRouteHighlight(routeId, highlight)`
+
+### Data model + migration
+- [x] Audit current `public.maps` columns and confirm JSON shape for `points_of_interest`.
+- [x] Add/confirm support for GeoJSON route payloads (stored in `points_of_interest` JSONB).
+- [x] Add/confirm public-safe read policy for map surfaces:
+  - [x] `CREATE POLICY "Public read maps for Leaflet" ON public.maps FOR SELECT USING (true);`
+- [x] Add migration script `scripts/migrate-maps-to-geojson.ts`:
+  - [x] Convert legacy coords to GeoJSON `LineString`.
+  - [x] Attach highlight defaults (`weight`, `glow`, `animated`, optional `dashArray`).
+  - [x] Preserve existing map metadata and bounds.
+
+### Real Geo route seeds (Nizhny Novgorod) for smoke migration
+- [x] Seed sample #1 `big-ring-race`:
+  - `[[44.0180,56.3300],[44.0059,56.3283],[43.9871,56.3262],[43.9875,56.3150],[44.0030,56.3070],[44.0200,56.3130],[44.0270,56.3250],[44.0180,56.3300]]`
+- [x] Seed sample #2 `embankment-fury`:
+  - `[[44.0195,56.3307],[44.0298,56.3302],[44.0273,56.3253],[44.0200,56.3225]]`
+
+### Rendering behavior (Leaflet capability)
+- [x] Use dark tiles by default (`cartodb-dark`) with configurable override.
+- [x] Render routes via GeoJSON with road highlighting:
+  - [x] base stroke color/weight
+  - [x] hover weight boost
+  - [x] optional glow class
+  - [ ] optional animated path mode
+- [x] Render POIs as markers/circle markers with popup parity to existing Vibe aesthetics.
+- [x] Preserve map bounds from Supabase and center/fit deterministically.
+
+### Integration sequence (one-by-one)
+1. [x] Wire capability into `app/franchize/components/MapRidersClient.tsx` behind feature flag (`NEXT_PUBLIC_MAP_ENGINE=leaflet|vibemap`).
+2. [x] Validate map-riders page visual parity and meetup interactions.
+3. [ ] Expand same capability contract to vip-bike/other crew pages.
+4. [x] Keep VibeMap fallback active through validation window.
+
+### QA gate
+- [x] No SSR errors from Leaflet dynamic imports.
+- [x] Routes + POIs render correctly with current crew context.
+- [x] Live rider layer still updates in realtime (no regression).
+- [x] Meetup creation still captures exact lat/lng.
+- [x] 50+ routes and dense marker scenarios remain responsive.
+
+### Done criteria (capability version)
+- [x] `map-riders` consumes reusable map capability APIs (not one-off local map logic).
+- [x] Server-only DB boundaries remain intact.
+- [x] Leaflet is default-capable via feature flag, with rollback to VibeMap.
+- [x] At least two real GeoJSON routes available for validation.
+
+### Next polish pass
+- [ ] Add optional animated ant-path renderer toggle for selected routes.
+- [ ] Reuse capability in additional crew pages beyond map-riders.
