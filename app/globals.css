@@ -1,6 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@import 'leaflet/dist/leaflet.css';
 
 /* Font Imports */
 @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&display=swap");
@@ -623,4 +624,19 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-cl
   text-shadow: -1px 0 #00fff9;
   clip: rect(44px, 450px, 56px, 0);
   animation: glitch-anim-2 5s infinite linear alternate-reverse;
+}
+
+.leaflet-road-glow {
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.leaflet-container {
+  background: #0b1220;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.leaflet-popup-content-wrapper {
+  background: rgba(15, 23, 42, 0.95);
+  color: #ffffff;
+  border: 1px solid rgba(56, 189, 248, 0.45);
 }

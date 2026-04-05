@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from 'next/cache';
 import { GeoBounds, validateBounds, PointOfInterest } from "@/lib/map-utils";
 import type { MapPreset } from '@/lib/types';
+import type { RacingMapData, TileLayerPreset } from "@/lib/maps/map-types";
 
 /**
  * VibeMap Server Actions
@@ -108,6 +109,192 @@ export async function updateMapPois(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     logger.error("[updateMapPois] Error:", errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+function normalizePoi(raw: any): PointOfInterest {
+  const coords = Array.isArray(raw?.coords)
+    ? raw.coords
+        .filter((item: any) => Array.isArray(item) && item.length >= 2)
+        .map((item: any) => [Number(item[0]), Number(item[1])] as [number, number])
+    : [];
+
+  return {
+    id: String(raw?.id || crypto.randomUUID()),
+    name: String(raw?.name || "Route"),
+    type: raw?.type === "point" ? "point" : raw?.type === "loop" ? "loop" : "path",
+    icon: String(raw?.icon || "::FaRoute::"),
+    color: String(raw?.color || "#22c55e"),
+    coords,
+    geojson: raw?.geojson,
+    roadHighlight: raw?.roadHighlight,
+  };
+}
+
+function parseTileLayer(value?: string): TileLayerPreset {
+  if (value === "cartodb-light" || value === "osm") return value;
+  return "cartodb-dark";
+}
+
+export async function getMapCapability(identifier?: string): Promise<{ success: boolean; data?: RacingMapData; error?: string; }> {
+  noStore();
+  try {
+    let query = supabaseAdmin.from("maps").select("*");
+    let source: RacingMapData["meta"]["source"] = "default";
+
+    if (identifier) {
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier)) {
+        query = query.eq("id", identifier);
+        source = "map-id";
+      } else {
+        query = query.ilike("name", `%${identifier}%`);
+        source = "crew-slug";
+      }
+    } else {
+      query = query.eq("is_default", true);
+    }
+
+    const { data, error } = await query.order("is_default", { ascending: false }).limit(1).maybeSingle();
+    if (error) throw error;
+    if (!data) {
+      return { success: false, error: "Map preset not found" };
+    }
+
+    const points = Array.isArray(data.points_of_interest) ? data.points_of_interest.map(normalizePoi) : [];
+    const routes = points.filter((p) => p.type !== "point");
+    const pois = points.filter((p) => p.type === "point");
+    const metadata = (data.metadata || {}) as Record<string, any>;
+
+    return {
+      success: true,
+      data: {
+        mapId: data.id,
+        mapName: data.name,
+        bounds: data.bounds as GeoBounds,
+        points,
+        routes,
+        pois,
+        meta: {
+          tileLayer: parseTileLayer(metadata.tileLayer),
+          defaultZoom: Number(metadata.defaultZoom || 13),
+          minZoom: Number(metadata.minZoom || 10),
+          maxZoom: Number(metadata.maxZoom || 19),
+          lastUpdated: data.created_at || new Date().toISOString(),
+          source,
+        },
+      },
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    logger.error("[getMapCapability] Error:", errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+export async function getPublicRacingRoutes(): Promise<{ success: boolean; data?: PointOfInterest[]; error?: string; }> {
+  noStore();
+  const capability = await getMapCapability();
+  if (!capability.success || !capability.data) {
+    return { success: false, error: capability.error || "Capability unavailable" };
+  }
+  return { success: true, data: capability.data.routes };
+}
+
+export async function saveRoute(
+  userId: string,
+  route: {
+    name: string;
+    color: string;
+    geojson: string;
+    type: "path" | "loop" | "route";
+    mapId?: string;
+    icon?: string;
+    highlight?: { weight?: number; glow?: boolean; animated?: boolean; dashArray?: string };
+  },
+): Promise<{ success: boolean; data?: PointOfInterest; error?: string; }> {
+  try {
+    const { data: user, error: userError } = await supabaseAdmin
+      .from("users")
+      .select("role")
+      .eq("user_id", userId)
+      .single();
+
+    if (userError || !["admin", "vprAdmin"].includes(user?.role || "")) {
+      throw new Error("Unauthorized: Only admins/vprAdmin can save routes.");
+    }
+
+    const mapQuery = route.mapId
+      ? supabaseAdmin.from("maps").select("id,points_of_interest").eq("id", route.mapId).single()
+      : supabaseAdmin.from("maps").select("id,points_of_interest").eq("is_default", true).single();
+
+    const { data: mapPreset, error: mapError } = await mapQuery;
+    if (mapError || !mapPreset) throw new Error(mapError?.message || "Default map not found");
+
+    const parsedGeo = JSON.parse(route.geojson);
+    const nextRoute: PointOfInterest = {
+      id: `route-${crypto.randomUUID()}`,
+      name: route.name,
+      type: route.type === "loop" ? "loop" : "path",
+      icon: route.icon || "::FaRoute::",
+      color: route.color,
+      coords: [],
+      geojson: parsedGeo,
+      roadHighlight: {
+        weight: route.highlight?.weight ?? (route.type === "loop" ? 6 : 4),
+        glow: route.highlight?.glow ?? true,
+        animated: route.highlight?.animated ?? false,
+        dashArray: route.highlight?.dashArray,
+      },
+    };
+
+    const existing = Array.isArray(mapPreset.points_of_interest) ? mapPreset.points_of_interest.map(normalizePoi) : [];
+    const nextPois = [...existing, nextRoute];
+
+    const { error: updateError } = await supabaseAdmin
+      .from("maps")
+      .update({ points_of_interest: nextPois as any })
+      .eq("id", mapPreset.id);
+
+    if (updateError) throw updateError;
+    return { success: true, data: nextRoute };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    logger.error("[saveRoute] Error:", errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+export async function updateRouteHighlight(
+  routeId: string,
+  highlight: { weight?: number; glow?: boolean; animated?: boolean; dashArray?: string },
+): Promise<{ success: boolean; error?: string; }> {
+  try {
+    const { data: mapPreset, error: mapError } = await supabaseAdmin
+      .from("maps")
+      .select("id,points_of_interest")
+      .filter("points_of_interest", "cs", `[{"id":"${routeId}"}]`)
+      .limit(1)
+      .maybeSingle();
+
+    if (mapError) throw mapError;
+    if (!mapPreset) return { success: false, error: "Route not found" };
+
+    const existing = Array.isArray(mapPreset.points_of_interest) ? mapPreset.points_of_interest.map(normalizePoi) : [];
+    const next = existing.map((poi) =>
+      poi.id === routeId ? { ...poi, roadHighlight: { ...poi.roadHighlight, ...highlight } } : poi,
+    );
+
+    const { error: updateError } = await supabaseAdmin
+      .from("maps")
+      .update({ points_of_interest: next as any })
+      .eq("id", mapPreset.id);
+    if (updateError) throw updateError;
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    logger.error("[updateRouteHighlight] Error:", errorMessage);
     return { success: false, error: errorMessage };
   }
 }
