@@ -3,6 +3,34 @@
 ## Objective
 Optimize live rider tracking for **100+ concurrent riders** on Supabase Free Tier by moving the realtime layer to `live_locations` + broadcast, while preserving all current features (`sessions`, `points`, `meetups`, `leaderboard`, replay, stats, VibeMap).
 
+## Status update — 2026-04-05
+
+### ✅ Done in current iteration
+- [x] Mobile UX: map is visually primary and control cards moved below map to avoid covering viewport.
+- [x] Leaflet overlay layering: raised floating UI z-index above map panes (`z-30`) and forced map container into lower stacking context.
+- [x] Demo riders relocated to base area around **Стригинский бульвар / Стригинский переулок** for realistic smoke runs.
+- [x] Admin routes upgraded: create + edit + delete existing routes, plus road-snapped GeoJSON generator from waypoint list.
+- [x] Public route loading improved: routes now carry map-id context so admin UI can safely mutate exact route objects.
+
+### 🔍 Blind spots / risks found
+- [ ] `fetchSnapshot` currently re-fetches entire payload on every sessions/meetups realtime event; under high load this can become noisy.
+- [ ] `useLiveRiders` still posts every accepted GPS sample; for 100+ riders we need explicit distance/time threshold + queue backpressure metrics.
+- [ ] No stale marker timeout in UI yet (e.g., auto-hide riders not updated > 20-30s).
+- [ ] Route generation depends on external OSRM endpoint; if unavailable, admin flow needs explicit fallback path + retry UX.
+
+### Next practical checks for real users
+1. Two-phone test: rider A starts share, rider B sees marker within 2-5 seconds.
+2. Kill-network test: disable data for rider A and confirm stale marker removal behavior.
+3. Meetup flow test: tap map -> create pin -> reload -> pin persists.
+4. Admin flow test: generate route from waypoints, save, edit color/name, delete, confirm immediate map refresh.
+
+### Execution backlog (continued)
+- [ ] Add stale-live marker eviction in UI (`updated_at` timeout) + faded visual state before removal.
+- [ ] Add route quality badges in admin (`manual`, `road-snapped`, `legacy`) from GeoJSON properties.
+- [ ] Add one-click “seed VIP demo routes” admin action (idempotent) to avoid manual SQL/REST patching.
+- [ ] Add lightweight smoke endpoint for MapRiders health (`sessions/live/meetups` counters + p95 fetch duration).
+- [ ] Introduce write queue for `/api/map-riders/location` with per-rider mutual exclusion to avoid out-of-order updates on bad mobile links.
+
 ## Ccreateonstraints
 - Keep historical/stat tables as-is:
   - `map_rider_sessions`
