@@ -140,38 +140,63 @@ function parseTileLayer(value?: string): TileLayerPreset {
 export async function getMapCapability(identifier?: string): Promise<{ success: boolean; data?: RacingMapData; error?: string; }> {
   noStore();
   try {
-    let query = supabaseAdmin.from("maps").select("*");
     let source: RacingMapData["meta"]["source"] = "default";
+    const isUuidIdentifier = Boolean(identifier && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier));
+    if (isUuidIdentifier) source = "map-id";
+    if (identifier && !isUuidIdentifier) source = "crew-slug";
 
-    if (identifier) {
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier)) {
-        query = query.eq("id", identifier);
-        source = "map-id";
-      } else {
-        query = query.ilike("name", `%${identifier}%`);
-        source = "crew-slug";
-      }
-    } else {
-      query = query.eq("is_default", true);
-    }
+    const { data: maps, error } = await supabaseAdmin
+      .from("maps")
+      .select("id,name,bounds,points_of_interest,metadata,is_default,created_at")
+      .order("is_default", { ascending: false })
+      .order("created_at", { ascending: false });
 
-    const { data, error } = await query.order("is_default", { ascending: false }).limit(1).maybeSingle();
     if (error) throw error;
-    if (!data) {
+    if (!maps?.length) {
       return { success: false, error: "Map preset not found" };
     }
 
-    const points = Array.isArray(data.points_of_interest) ? data.points_of_interest.map(normalizePoi) : [];
+    const defaultMap = maps.find((map) => map.is_default) || maps[0];
+    const normalizedIdentifier = identifier?.trim().toLowerCase();
+
+    const primaryMap = isUuidIdentifier
+      ? maps.find((map) => map.id === identifier) || defaultMap
+      : normalizedIdentifier
+        ? maps.find((map) => {
+            const metadata = (map.metadata || {}) as Record<string, unknown>;
+            const metadataCrewSlug =
+              String(metadata.crew_slug || metadata.crewSlug || metadata.slug || "")
+                .trim()
+                .toLowerCase();
+            const matchesName = map.name?.toLowerCase().includes(normalizedIdentifier);
+            return metadataCrewSlug === normalizedIdentifier || Boolean(matchesName);
+          }) || defaultMap
+        : defaultMap;
+
+    const overlayMaps = maps.filter((map) => {
+      if (map.id === primaryMap.id || map.id === defaultMap.id) return true;
+      if (!normalizedIdentifier || isUuidIdentifier) return false;
+      const metadata = (map.metadata || {}) as Record<string, unknown>;
+      const metadataCrewSlug = String(metadata.crew_slug || metadata.crewSlug || metadata.slug || "")
+        .trim()
+        .toLowerCase();
+      return metadataCrewSlug === normalizedIdentifier;
+    });
+
+    const mapWithPoints = overlayMaps.length ? overlayMaps : [primaryMap];
+    const points = mapWithPoints
+      .flatMap((map) => (Array.isArray(map.points_of_interest) ? map.points_of_interest.map(normalizePoi).map((poi) => ({ ...poi, id: `${map.id}-${poi.id}` })) : []));
+
     const routes = points.filter((p) => p.type !== "point");
     const pois = points.filter((p) => p.type === "point");
-    const metadata = (data.metadata || {}) as Record<string, any>;
+    const metadata = (primaryMap.metadata || {}) as Record<string, any>;
 
     return {
       success: true,
       data: {
-        mapId: data.id,
-        mapName: data.name,
-        bounds: data.bounds as GeoBounds,
+        mapId: primaryMap.id,
+        mapName: primaryMap.name,
+        bounds: primaryMap.bounds as GeoBounds,
         points,
         routes,
         pois,
@@ -180,7 +205,7 @@ export async function getMapCapability(identifier?: string): Promise<{ success: 
           defaultZoom: Number(metadata.defaultZoom || 13),
           minZoom: Number(metadata.minZoom || 10),
           maxZoom: Number(metadata.maxZoom || 19),
-          lastUpdated: data.created_at || new Date().toISOString(),
+          lastUpdated: primaryMap.created_at || new Date().toISOString(),
           source,
         },
       },
