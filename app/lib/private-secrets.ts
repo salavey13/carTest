@@ -2,6 +2,21 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 
+function parseJsonRecord(raw: unknown): Record<string, unknown> {
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function getUserSensitiveData(userId: string) {
   const { data } = await supabaseAdmin
     .schema("private")
@@ -35,23 +50,25 @@ export async function getCrewSensitiveData(crewSlug: string) {
   const { data } = await supabaseAdmin
     .schema("private")
     .from("crew_secrets")
-    .select("contract_defaults")
+    .select("contract_defaults, doc_templates")
     .eq("crew_slug", crewSlug)
     .maybeSingle();
 
   return {
-    contractDefaults: data?.contract_defaults ? JSON.parse(data.contract_defaults) : {},
+    contractDefaults: parseJsonRecord(data?.contract_defaults),
+    docTemplates: parseJsonRecord(data?.doc_templates),
   };
 }
 
 export async function saveCrewSensitiveData(crewSlug: string, data: {
-  contractDefaults?: Record<string, any>;
-  // docTemplates?: Record<string, any>;     // ← future
+  contractDefaults?: Record<string, unknown>;
+  docTemplates?: Record<string, unknown>;
   // priceLists?: Record<string, any>;       // ← future
 }) {
   await supabaseAdmin.schema("private").from("crew_secrets").upsert({
     crew_slug: crewSlug,
     contract_defaults: data.contractDefaults ? JSON.stringify(data.contractDefaults) : undefined,
+    doc_templates: data.docTemplates ? JSON.stringify(data.docTemplates) : undefined,
     updated_at: new Date().toISOString(),
   });
 }
