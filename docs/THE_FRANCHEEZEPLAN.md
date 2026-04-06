@@ -1701,10 +1701,10 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T55 — MapRiders goldmine ingestion + phased SupaPlan decomposition
 - status: `in_progress`
-- updated_at: `2026-04-06T00:35:00Z`
+- updated_at: `2026-04-06T01:05:00Z`
 - owner: `codex`
-- notes: Проанализирован `goldmine` пакет (код + deep research + design docx), собран итеративный backlog в `app/franchize/[slug]/map-riders/todo.md`, добавлена контрактная миграция `live_locations + weekly leaderboard` без destructive drop/recreate, и зарегистрированы 3 SupaPlan задачи для I2/I3/I4.
-- next_step: Выполнить I2 backend split (`/overview`, `/leaderboard`, `/health`) и перевести текущий client snapshot на новые ручки c fallback на legacy endpoint.
+- notes: Проанализирован `goldmine` пакет (код + deep research + design docx), собран итеративный backlog в `app/franchize/[slug]/map-riders/todo.md`, добавлена контрактная миграция `live_locations + weekly leaderboard` без destructive drop/recreate, зарегистрированы 3 SupaPlan задачи для I2/I3/I4, и закрыт I2 API split (`/overview`, `/leaderboard`, `/health`) c общей server-side data layer и legacy-compatible `/api/map-riders`.
+- next_step: Перейти к I3 write-path hardening: `/batch-points`, deprecation header на `/location`, и client-side flush queue для устойчивости под лагами.
 - risks: текущая `MapRidersClient` всё ещё монолитная; смешанный snapshot+realtime поток пока может дублировать/перезаписывать rider marker состояние под лагами.
 - dependencies: T53
 - deliverables:
@@ -1773,6 +1773,8 @@ Append only compact session deltas here as pointers when needed; full narrative 
 - 2026-03-24: FRZ-R10 improvement pass (rental flow hardening): в `/franchize/[slug]` добавлены бейджи availability + HOT на карточки байков, фикс мультидневного ценообразования в cart lines (поддержка `1/3/7` дней RU/EN), а в `order` встроены дата-диапазон и e-signature поля (ФИО + consent fingerprint). DOCX из markdown-шаблона теперь отправляется не только админу, но и арендатору + owner (когда telegram id доступен через users.metadata).
 - 2026-03-24: FRZ-R11 старт/выполнение — добавлена страница `/doc-verifier` для tamper-check DOCX: регистрация оригинала в Supabase Storage + SHA-256 в таблице `doc_verifier_records` (scope-aware для повторного использования в разных интеграциях), затем верификация загруженного файла через сравнение `uploaded hash` vs `db hash` + контроль целостности storage-копии (`storage hash` vs `db hash`).
 - 2026-04-06: Стартован T55 (MapRiders goldmine ingestion) — собран phased backlog I1..I5, подготовлена migration-заготовка `20260406113000_map_riders_live_layer_foundation.sql`, создано 3 SupaPlan task-а для I2/I3/I4 (IDs: `c7af132c-3f44-4129-a4d7-e50b2e2e593c`, `a947b563-1fd2-4459-84bc-8978c6f520eb`, `3da1fba0-84bc-4afb-ada0-42240f625999`).
+
+- 2026-04-06: Выполнен SupaPlan task `c7af132c-3f44-4129-a4d7-e50b2e2e593c` (I2) — добавлены `GET /api/map-riders/overview`, `GET /api/map-riders/leaderboard`, `GET /api/map-riders/health`, вынесен общий data-layer `app/api/map-riders/_lib/shared.ts`, legacy `GET /api/map-riders` оставлен backward-compatible через shared fetch-пайплайн.
 
 ---
 

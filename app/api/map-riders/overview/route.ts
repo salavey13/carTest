@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchOverviewData, fetchWeeklyLeaderboard, totalWeeklyDistance } from "./_lib/shared";
+import { fetchOverviewData, fetchWeeklyLeaderboard, totalWeeklyDistance } from "../_lib/shared";
 
 export async function GET(request: NextRequest) {
   const crewSlug = request.nextUrl.searchParams.get("slug") || "vip-bike";
@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
         activeSessions: overview.activeSessions,
         liveLocations: overview.liveLocations,
         meetups: overview.meetups,
-        weeklyLeaderboard,
         latestCompleted: overview.latestCompleted,
         stats: {
           ...overview.stats,
@@ -23,6 +22,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error?.message || "Failed to fetch map riders snapshot" }, { status: 500 });
+    return NextResponse.json({ success: false, error: error?.message || "Failed to fetch map riders overview" }, { status: 500 });
   }
 }

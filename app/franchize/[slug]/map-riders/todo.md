@@ -28,10 +28,10 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 - [x] Create SupaPlan task decomposition for phased port.
 
 ### I2 — Backend contract (next)
-- [ ] Add `/api/map-riders/overview` (sessions + meetups + live locations).
-- [ ] Add `/api/map-riders/leaderboard` (read from materialized/aggregation view).
-- [ ] Add `/api/map-riders/health` (ops counters + freshness).
-- [ ] Keep legacy `/api/map-riders` endpoint backward-compatible during transition.
+- [x] Add `/api/map-riders/overview` (sessions + meetups + live locations).
+- [x] Add `/api/map-riders/leaderboard` (read from materialized/aggregation view).
+- [x] Add `/api/map-riders/health` (ops counters + freshness).
+- [x] Keep legacy `/api/map-riders` endpoint backward-compatible during transition.
 
 ### I3 — Write-path hardening
 - [ ] Add `/api/map-riders/batch-points` endpoint and queue-based client flush.
