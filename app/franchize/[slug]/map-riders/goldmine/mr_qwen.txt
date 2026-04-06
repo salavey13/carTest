@@ -1,0 +1,827 @@
+# MapRiders Design Document v2.0
+## Next-Generation Real-Time Tracking Platform
+
+---
+
+## Executive Summary
+
+Current implementation provides solid real-time tracking foundation with Supabase, but requires architectural refinement for scale, UX polish, and maintainability. This document outlines best practices from leading map-based applications (Strava, Uber, Telegram Live Location, Google Maps) and proposes a comprehensive redesign.
+
+---
+
+## 1. Current State Analysis
+
+### ✅ Strengths
+- **Real-time architecture**: `live_locations` + broadcast pattern is production-ready
+- **Database design**: Proper separation of live vs historical data
+- **Throttling logic**: 3s + 15m distance thresholds prevent DB spam
+- **Map engine abstraction**: Leaflet/VibeMap switch shows good foresight
+- **Session management**: Complete ride lifecycle tracking
+
+### ⚠️ Critical Issues
+1. **UI/UX Chaos**: Floating controls, inconsistent spacing, poor mobile ergonomics
+2. **State Management**: Multiple `useState` without proper orchestration
+3. **Performance**: No marker clustering, potential re-render storms
+4. **Accessibility**: Missing keyboard navigation, screen reader support
+5. **Offline Support**: No queue/retry mechanism for dropped connections
+6. **Battery Drain**: GPS watching without intelligent sampling
+7. **Visual Hierarchy**: No clear primary/secondary actions
+8. **Error Handling**: Silent failures, no user feedback
+
+---
+
+## 2. Industry Best Practices Research
+
+### 2.1 Real-Time Location Apps
+
+**Telegram Live Location**
+- ✅ Auto-expire markers (1/5/15/60 min presets)
+- ✅ Smooth marker interpolation between updates
+- ✅ Battery-optimized background updates
+- ✅ One-tap stop sharing
+
+**Strava**
+- ✅ Segment leaderboards with filters
+- ✅ Activity feed with social features
+- ✅ Route heatmaps (aggregated, privacy-preserving)
+- ✅ Performance metrics visualization
+
+**Uber/Lyft**
+- ✅ Optimistic UI updates
+- ✅ Driver/rider state machines
+- ✅ ETA calculations with confidence intervals
+- ✅ Geofencing for pickup/dropoff
+
+**Google Maps Timeline**
+- ✅ Activity detection (walking/driving/cycling)
+- ✅ Place detection (auto-label stops)
+- ✅ Privacy controls per-location
+- ✅ Data export capabilities
+
+### 2.2 Map UX Patterns
+
+**Interaction Design**
+- **Tap vs Long-Press**: Tap for info, long-press for actions
+- **Bottom Sheets**: Swipeable panels for details (Google Maps pattern)
+- **Floating Action Buttons**: Primary action always accessible
+- **Contextual Toolbars**: Show relevant controls based on state
+
+**Visual Design**
+- **Z-index layering**: Markers > Routes > Map tiles > UI chrome
+- **Color semantics**: Blue=self, Green=active, Gray=inactive, Red=alert
+- **Motion design**: 300ms transitions, ease-in-out curves
+- **Depth cues**: Shadows, elevation, blur effects
+
+**Performance**
+- **Marker clustering**: Combine nearby markers at low zoom
+- **Viewport culling**: Only render visible elements
+- **Debounced pan/zoom**: 150ms delay before re-query
+- **Progressive loading**: Load high-priority data first
+
+---
+
+## 3. Proposed Architecture
+
+### 3.1 Component Hierarchy (Redesigned)
+
+```
+MapRidersPage (Server Component)
+└── MapRidersProvider (Context)
+    ├── MapCanvas (Leaflet wrapper)
+    │   ├── RiderMarkersLayer (clustered)
+    │   ├── ActiveRoutesLayer (polylines)
+    │   ├── MeetupMarkersLayer
+    │   └── HeatmapLayer (optional)
+    ├── BottomSheet (draggable)
+    │   ├── RiderDetailPanel
+    │   ├── SessionControls
+    │   └── MeetupCreator
+    ├── TopBar (stats + filters)
+    ├── FloatingActionButton (primary action)
+    └── ToastNotifications
+```
+
+### 3.2 State Management Strategy
+
+**Replace multiple useState with Zustand**
+
+```typescript
+// stores/mapRidersStore.ts
+interface MapRidersState {
+  // Session state
+  activeSession: Session | null
+  isRecording: boolean
+  
+  // Live data
+  riders: Map<UserId, RiderPosition>
+  meetups: Meetup[]
+  
+  // UI state
+  selectedRiderId: UserId | null
+  bottomSheetOpen: boolean
+  mapBounds: GeoBounds
+  
+  // Actions
+  startSession: () => Promise<void>
+  stopSession: () => Promise<void>
+  updatePosition: (pos: Position) => void
+  createMeetup: (pos: LatLon) => Promise<void>
+}
+```
+
+**Benefits:**
+- Single source of truth
+- DevTools integration
+- Persistence middleware
+- Computed selectors
+
+### 3.3 Real-Time Data Flow
+
+```
+GPS Sensor
+    ↓ (throttle: 3s, 15m)
+PositionQueue (FIFO, max 100)
+    ↓
+Broadcast Channel (instant)
+    ↓
+live_locations UPSERT (every 30s)
+    ↓
+Supabase Realtime (postgres_changes)
+    ↓
+Client Store (Zustand)
+    ↓
+React Components (selectors)
+```
+
+**Optimization:**
+- Use `useShallow` selector to prevent re-renders
+- Memoize marker components with `React.memo`
+- Virtualize long lists (recent rides)
+
+---
+
+## 4. Feature Specifications
+
+### 4.1 Core Features (MVP)
+
+#### A. Live Tracking 2.0
+**Requirements:**
+- [ ] Smooth marker interpolation (lerp between last 2 positions)
+- [ ] Heading indicator (arrow rotation based on bearing)
+- [ ] Speed badge (color-coded: green <40, yellow 40-80, red >80 km/h)
+- [ ] Last-seen timestamp (fade opacity if >30s old)
+- [ ] Tap marker → bottom sheet with rider info
+
+**Technical:**
+```typescript
+interface RiderMarker {
+  userId: string
+  position: { lat: number; lng: number }
+  speed: number
+  heading: number // degrees 0-360
+  lastUpdate: Date
+  opacity: number // calculated from lastUpdate
+}
+```
+
+#### B. Session Recording 2.0
+**Requirements:**
+- [ ] One-tap start/stop (FAB)
+- [ ] Pre-ride checklist (bike selection, ride name)
+- [ ] Live stats overlay (distance, time, avg speed)
+- [ ] Pause/resume capability
+- [ ] Auto-save on crash (beforeunload handler)
+
+**UX Flow:**
+```
+Tap FAB → Bottom sheet slides up
+  → Select bike (dropdown)
+  → Enter ride name (optional)
+  → "Start Riding" button
+  → FAB changes to red "Stop" with pulsing animation
+  → Stats overlay appears (top-right)
+```
+
+#### C. Meetups 2.0
+**Requirements:**
+- [ ] Long-press map → pin drop
+- [ ] Quick actions: "I'm here", "Meet here", "Comment"
+- [ ] Time-to-arrival calculation (from current position)
+- [ ] Notifications when riders approach (geofence 500m)
+- [ ] Auto-expire meetups (24h TTL)
+
+#### D. Leaderboards 2.0
+**Requirements:**
+- [ ] Time filters: Today/Week/Month/All-time
+- [ ] Category filters: Distance/Speed/Elevation
+- [ ] Friend-only toggle
+- [ ] Personal bests highlighting
+- [ ] Export to image (shareable card)
+
+### 4.2 Advanced Features (Post-MVP)
+
+#### A. Route Planning
+- Import GPX/KML files
+- Draw custom routes
+- Elevation profile visualization
+- Turn-by-turn navigation (optional)
+
+#### B. Social Features
+- Follow riders
+- Activity feed
+- Kudos/comments on rides
+- Group rides (multi-rider sessions)
+
+#### C. Analytics Dashboard
+- Weekly/monthly summaries
+- Heatmap of ridden routes
+- Performance trends (charts)
+- Bike utilization stats
+
+#### D. Offline Mode
+- Queue location updates in IndexedDB
+- Sync when connection restored
+- Download offline map tiles
+- Cache rider profiles
+
+---
+
+## 5. UI/UX Design System
+
+### 5.1 Layout Principles
+
+**Mobile-First (375px width)**
+```
+┌─────────────────────┐
+│ TopBar (64px)       │ ← Stats, filters
+├─────────────────────┤
+│                     │
+│   Map Canvas        │ ← Full viewport
+│                     │
+├─────────────────────┤
+│ BottomSheet (280px) │ ← Draggable, snap points
+└─────────────────────┘
+     FAB (56px)        ← Fixed, bottom-right
+```
+
+**Desktop (1440px width)**
+```
+┌──────────┬──────────────────────────┐
+│ Sidebar  │                          │
+│ (320px)  │     Map Canvas           │ ← Full height
+│          │                          │
+└────────────────────────────────────┘
+```
+
+### 5.2 Color Palette (Adaptive)
+
+```typescript
+// Light mode
+const lightTheme = {
+  primary: '#D99A00',      // Gold accent
+  secondary: '#22c55e',    // Green for active
+  surface: 'rgba(255,255,255,0.95)',
+  elevation: 'rgba(0,0,0,0.1)',
+  text: '#1a1a1a',
+  muted: '#666666',
+}
+
+// Dark mode
+const darkTheme = {
+  primary: '#E2A812',
+  secondary: '#52C26D',
+  surface: 'rgba(17,18,23,0.95)',
+  elevation: 'rgba(0,0,0,0.3)',
+  text: '#f2f2f3',
+  muted: '#a7abb4',
+}
+
+// Semantic colors
+const semantic = {
+  self: '#facc15',         // Yellow
+  crew: '#60a5fa',         // Blue
+  inactive: '#6b7280',     // Gray
+  alert: '#ef4444',        // Red
+  success: '#10b981',      // Emerald
+}
+```
+
+### 5.3 Typography
+
+```typescript
+const typography = {
+  fontFamily: {
+    sans: 'Inter, system-ui, sans-serif',
+    mono: 'JetBrains Mono, monospace',
+    display: 'Orbitron, sans-serif', // For stats
+  },
+  scale: {
+    xs: '0.75rem',    // 12px - captions
+    sm: '0.875rem',   // 14px - body
+    base: '1rem',     // 16px - default
+    lg: '1.125rem',   // 18px - subtitles
+    xl: '1.25rem',    // 20px - cards
+    '2xl': '1.5rem',  // 24px - headers
+    '3xl': '2rem',    // 32px - titles
+  }
+}
+```
+
+### 5.4 Component Specifications
+
+#### FloatingActionButton
+```typescript
+interface FABProps {
+  state: 'idle' | 'recording' | 'paused'
+  onClick: () => void
+  disabled?: boolean
+}
+
+// States:
+// idle: Gold background, play icon
+// recording: Red background, pulse animation, stop icon
+// paused: Yellow background, resume icon
+```
+
+#### BottomSheet
+```typescript
+interface BottomSheetProps {
+  isOpen: boolean
+  onClose: () => void
+  snapPoints: number[] // [280, 480, '100%']
+  children: ReactNode
+}
+
+// Features:
+// - Drag handle (grip lines)
+// - Smooth spring animation
+// - Backdrop blur
+// - Swipe-to-dismiss
+```
+
+#### RiderMarker
+```typescript
+interface RiderMarkerProps {
+  rider: RiderPosition
+  isSelected: boolean
+  onClick: () => void
+}
+
+// Visual:
+// - Circle (16px) with 2px border
+// - Inner arrow (rotated by heading)
+// - Speed badge (top-right corner)
+// - Pulse ring if recording
+```
+
+---
+
+## 6. Performance Optimization
+
+### 6.1 Rendering Strategy
+
+**Marker Virtualization**
+```typescript
+// Only render markers in viewport + 20% buffer
+const visibleRiders = useViewportFilter(riders, mapBounds, {
+  buffer: 0.2
+})
+
+// Cluster markers when zoom < 14
+const clusteredMarkers = useMarkerClustering(visibleRiders, zoomLevel)
+```
+
+**Memoization**
+```typescript
+const RiderMarkerComponent = memo(({ rider }) => {
+  // Only re-render if position changed > 5m
+  const shouldUpdate = usePositionChanged(rider, 5)
+  
+  if (!shouldUpdate) return null
+  return <Marker position={rider.position} />
+}, (prev, next) => {
+  return distance(prev.rider, next.rider) < 5
+})
+```
+
+### 6.2 Network Optimization
+
+**Request Batching**
+```typescript
+// Batch location updates (max 10 per request)
+const locationQueue = useRef<Position[]>([])
+
+const flushQueue = async () => {
+  if (locationQueue.current.length === 0) return
+  
+  await fetch('/api/map-riders/batch-locations', {
+    method: 'POST',
+    body: JSON.stringify({
+      sessionId,
+      points: locationQueue.current.slice(-10)
+    })
+  })
+  
+  locationQueue.current = []
+}
+
+// Flush every 5s or when queue > 10
+useInterval(flushQueue, 5000)
+```
+
+**Incremental Loading**
+```typescript
+// Load recent rides first, then paginate
+const { data, fetchNextPage, hasNextPage } = useInfiniteQuery({
+  queryKey: ['sessions', userId],
+  queryFn: ({ pageParam = 0 }) => fetchSessions(userId, pageParam),
+  getNextPageParam: (lastPage) => lastPage.nextCursor
+})
+```
+
+### 6.3 Battery Optimization
+
+**Intelligent GPS Sampling**
+```typescript
+const useSmartGPS = (isActive: boolean) => {
+  useEffect(() => {
+    if (!isActive) return
+    
+    let watchId: number
+    
+    const enableHighAccuracy = isRecording // Only high accuracy when recording
+    const timeout = isRecording ? 10000 : 30000
+    const maximumAge = isRecording ? 0 : 60000
+    
+    watchId = navigator.geolocation.watchPosition(
+      handlePosition,
+      handleError,
+      { enableHighAccuracy, timeout, maximumAge }
+    )
+    
+    return () => navigator.geolocation.clearWatch(watchId)
+  }, [isActive, isRecording])
+}
+```
+
+**Background Throttling**
+```typescript
+// Reduce update frequency when tab hidden
+useEffect(() => {
+  const handleVisibilityChange = () => {
+    if (document.hidden) {
+      setUpdateInterval(30000) // 30s when background
+    } else {
+      setUpdateInterval(3000)  // 3s when foreground
+    }
+  }
+  
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+}, [])
+```
+
+---
+
+## 7. Accessibility
+
+### 7.1 Keyboard Navigation
+```typescript
+// Map controls
+const handleMapKeyDown = (e: KeyboardEvent) => {
+  switch (e.key) {
+    case 'ArrowUp': map.panBy([0, -50]); break
+    case 'ArrowDown': map.panBy([0, 50]); break
+    case 'ArrowLeft': map.panBy([-50, 0]); break
+    case 'ArrowRight': map.panBy([50, 0]); break
+    case '+': map.zoomIn(); break
+    case '-': map.zoomOut(); break
+    case 'Escape': setSelectedRider(null); break
+  }
+}
+```
+
+### 7.2 Screen Reader Support
+```typescript
+// Live regions for dynamic updates
+<div role="status" aria-live="polite">
+  {activeRiders.length} riders currently active
+</div>
+
+// Descriptive labels
+<Marker
+  aria-label={`Rider ${riderName} at ${speed} km/h, heading ${heading} degrees`}
+/>
+```
+
+### 7.3 Color Contrast
+- All text meets WCAG AA (4.5:1 ratio)
+- Don't rely on color alone (use icons + text)
+- Provide high-contrast mode option
+
+---
+
+## 8. Privacy & Security
+
+### 8.1 Location Privacy
+```typescript
+// User controls
+interface PrivacySettings {
+  visibility: 'private' | 'crew' | 'public'
+  shareExactLocation: boolean
+  autoExpireMinutes: number | null
+  blurHomeLocation: boolean // Fuzz coordinates within 500m
+}
+
+// Server-side enforcement
+const sanitizePosition = (pos: Position, userId: string, viewerId: string) => {
+  const settings = getUserPrivacySettings(userId)
+  
+  if (settings.visibility === 'private') return null
+  if (settings.visibility === 'crew' && !isSameCrew(userId, viewerId)) return null
+  
+  if (settings.blurHomeLocation && isNearHome(pos, userId)) {
+    return blurCoordinates(pos, 500) // Add random offset up to 500m
+  }
+  
+  return pos
+}
+```
+
+### 8.2 Data Retention
+```sql
+-- Auto-delete old live locations
+CREATE POLICY "Auto-expire live locations"
+ON live_locations
+FOR DELETE
+USING (updated_at < NOW() - INTERVAL '24 hours');
+
+-- Archive completed sessions after 90 days
+CREATE EXTENSION pg_cron;
+SELECT cron.schedule(
+  'archive-old-sessions',
+  '0 3 * * *', -- 3 AM daily
+  $$UPDATE map_rider_sessions SET archived = true WHERE created_at < NOW() - INTERVAL '90 days'$$
+);
+```
+
+---
+
+## 9. Testing Strategy
+
+### 9.1 Unit Tests
+```typescript
+// Test throttling logic
+describe('useLiveRiders', () => {
+  it('throttles updates to 3s minimum', async () => {
+    const { sendPosition } = renderHook(() => useLiveRiders())
+    
+    // Send 10 rapid updates
+    for (let i = 0; i < 10; i++) {
+      sendPosition(mockPosition)
+    }
+    
+    // Should only send 1 (first) immediately
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    
+    // Wait 3s
+    await advanceTimers(3000)
+    
+    // Should send accumulated updates
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+  })
+})
+```
+
+### 9.2 Integration Tests
+```typescript
+// Test full ride flow
+describe('Ride Session Flow', () => {
+  it('completes full ride lifecycle', async () => {
+    const page = await browser.newPage()
+    await page.goto('/franchize/vip-bike/map-riders')
+    
+    // Start session
+    await page.click('[data-testid="start-ride-fab"]')
+    await page.select('[data-testid="bike-select"]', 'Yamaha MT-07')
+    await page.fill('[data-testid="ride-name"]', 'Evening Cruise')
+    await page.click('[data-testid="confirm-start"]')
+    
+    // Verify recording state
+    await expect(page.locator('[data-testid="recording-indicator"]')).toBeVisible()
+    
+    // Simulate GPS updates
+    await emulateGPS(page, routeCoordinates)
+    
+    // Stop session
+    await page.click('[data-testid="stop-ride-fab"]')
+    await page.click('[data-testid="confirm-stop"]')
+    
+    // Verify session saved
+    await expect(page.locator('[data-testid="session-saved-toast"]')).toBeVisible()
+  })
+})
+```
+
+### 9.3 Performance Tests
+```typescript
+// Test with 100 concurrent riders
+describe('Performance: 100 Riders', () => {
+  it('maintains 60fps with 100 markers', async () => {
+    const page = await browser.newPage()
+    await page.goto('/franchize/vip-bike/map-riders')
+    
+    // Inject 100 rider markers
+    await page.evaluate(() => {
+      window.injectTestRiders(100)
+    })
+    
+    // Measure FPS
+    const fps = await measureFPS(page, 5000)
+    
+    expect(fps).toBeGreaterThan(50)
+  })
+  
+  it('loads initial map in <2s', async () => {
+    const page = await browser.newPage()
+    
+    const start = Date.now()
+    await page.goto('/franchize/vip-bike/map-riders')
+    await page.waitForSelector('[data-testid="map-loaded"]')
+    const duration = Date.now() - start
+    
+    expect(duration).toBeLessThan(2000)
+  })
+})
+```
+
+---
+
+## 10. Migration Plan
+
+### Phase 1: Foundation (Week 1-2)
+- [ ] Set up Zustand store
+- [ ] Implement new component structure
+- [ ] Add TypeScript strict mode
+- [ ] Configure ESLint + Prettier
+
+### Phase 2: Core Features (Week 3-4)
+- [ ] Redesign live tracking UI
+- [ ] Implement smooth marker interpolation
+- [ ] Add session recording 2.0
+- [ ] Build bottom sheet component
+
+### Phase 3: Polish (Week 5-6)
+- [ ] Performance optimization (virtualization, memoization)
+- [ ] Accessibility audit + fixes
+- [ ] Mobile responsiveness testing
+- [ ] Error handling + offline support
+
+### Phase 4: Advanced (Week 7-8)
+- [ ] Leaderboards redesign
+- [ ] Analytics dashboard
+- [ ] Social features (follow, kudos)
+- [ ] Export functionality
+
+### Phase 5: Launch (Week 9)
+- [ ] Beta testing with 10 users
+- [ ] Bug fixes
+- [ ] Performance tuning
+- [ ] Production deployment
+
+---
+
+## 11. Success Metrics
+
+### Performance KPIs
+- **Time to Interactive**: < 2s on 3G
+- **FPS during tracking**: > 50fps with 100 riders
+- **Battery usage**: < 5% per hour of tracking
+- **API requests**: < 100/hour per active rider
+
+### UX KPIs
+- **Task completion rate**: > 95% (start/stop ride)
+- **Error rate**: < 1% of sessions
+- **User satisfaction**: > 4.5/5 (post-ride survey)
+- **Adoption rate**: > 60% of crew members using weekly
+
+### Business KPIs
+- **Active riders**: 100+ concurrent
+- **Rides per week**: 500+
+- **Retention**: 70% weekly active users
+- **NPS**: > 50
+
+---
+
+## 12. Risk Mitigation
+
+| Risk | Impact | Probability | Mitigation |
+|------|--------|-------------|------------|
+| Supabase rate limits | High | Medium | Implement request queue + exponential backoff |
+| GPS drift in urban areas | Medium | High | Snap-to-road algorithm, filter outliers |
+| Battery drain complaints | High | High | Smart sampling, background throttling |
+| Privacy concerns | Critical | Medium | Granular controls, data retention policy |
+| Map tile loading slow | Medium | Medium | Cache tiles, use CDN, lazy loading |
+
+---
+
+## 13. Future Enhancements
+
+### AI-Powered Features
+- **Route suggestions**: ML-based on rider preferences
+- **Anomaly detection**: Alert on unusual riding patterns
+- **Predictive ETA**: Account for traffic, weather, rider history
+
+### AR Integration
+- **AR navigation**: Overlay directions on camera view
+- **Rider visualization**: See nearby riders through phone camera
+
+### Blockchain
+- **NFT ride badges**: Mint achievements as NFTs
+- **Token rewards**: Earn tokens for milestones
+
+---
+
+## Appendix A: Technology Stack
+
+### Current
+- **Frontend**: Next.js 14, React 18, TypeScript
+- **Maps**: Leaflet, React-Leaflet
+- **State**: React hooks (migrating to Zustand)
+- **Backend**: Supabase (PostgreSQL + Realtime)
+- **Styling**: Tailwind CSS, shadcn/ui
+
+### Proposed Additions
+- **State**: Zustand + Immer
+- **Maps**: Leaflet.markercluster, leaflet.heat
+- **Charts**: Recharts (for analytics)
+- **Testing**: Playwright, Vitest
+- **Monitoring**: Sentry, LogRocket
+- **Analytics**: PostHog (self-hosted)
+
+---
+
+## Appendix B: File Structure
+
+```
+/app/franchize/[slug]/map-riders/
+├── page.tsx (server component)
+├── layout.tsx
+└── components/
+    ├── MapRidersProvider.tsx
+    ├── MapCanvas/
+    │   ├── index.tsx
+    │   ├── layers/
+    │   │   ├── RiderMarkersLayer.tsx
+    │   │   ├── ActiveRoutesLayer.tsx
+    │   │   └── MeetupMarkersLayer.tsx
+    │   └── controls/
+    │       ├── ZoomControl.tsx
+    │       └── LayerToggle.tsx
+    ├── BottomSheet/
+    │   ├── index.tsx
+    │   ├── RiderDetailPanel.tsx
+    │   ├── SessionControls.tsx
+    │   └── MeetupCreator.tsx
+    ├── TopBar/
+    │   ├── index.tsx
+    │   ├── StatsDisplay.tsx
+    │   └── FilterControls.tsx
+    ├── FloatingActionButton.tsx
+    └── ToastNotifications.tsx
+/hooks/
+├── useLiveRiders.ts
+├── useSessionRecording.ts
+├── useMapInteractions.ts
+└── usePrivacySettings.ts
+/stores/
+└── mapRidersStore.ts
+/lib/
+├── map-utils.ts
+├── location-utils.ts
+├── performance-utils.ts
+└── privacy-utils.ts
+/types/
+└── map-riders.ts
+```
+
+---
+
+## Conclusion
+
+This design document provides a comprehensive roadmap for transforming MapRiders from a functional prototype into a production-grade, scalable real-time tracking platform. By following industry best practices from leaders like Strava, Uber, and Telegram, and implementing the proposed architecture, you'll achieve:
+
+✅ **10x better performance** (60fps with 100+ riders)  
+✅ **50% battery savings** (intelligent GPS sampling)  
+✅ **99.9% uptime** (robust error handling + offline support)  
+✅ **Accessible to all** (WCAG AA compliance)  
+✅ **Privacy-first** (granular controls + auto-expiry)
+
+**Next Steps:**
+1. Review and approve this design doc
+2. Set up development environment with new dependencies
+3. Begin Phase 1 implementation (Foundation)
+4. Schedule weekly design reviews
+5. Recruit beta testers for Phase 5
+
+Let's build the best rider tracking platform in the game! 🏍️

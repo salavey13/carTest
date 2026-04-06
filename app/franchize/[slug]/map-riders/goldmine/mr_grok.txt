@@ -1,0 +1,168 @@
+**MapRiders Overhaul Design Document**  
+**Version:** 1.0 (April 2026)  
+**Author:** Grok + Team (research synthesis + architecture proposal)  
+**Status:** Ready for implementation planning  
+
+### 1. Executive Summary / Vision
+MapRiders is the **live heartbeat** of VIP_BIKE — a real-time, crew-first ride-tracking platform for motorcyclists in Nizhny Novgorod and beyond.  
+
+**Core Vision (2026):**  
+A beautiful, performant, mobile-first (Telegram WebApp) map experience where riders instantly see who’s riding, where meetups are happening, and replay completed rides — all wrapped in the signature **cyber-moto aesthetic** of the VIP_BIKE brand (dark neon/gold/orange glows, Orbitron typography, subtle animations).
+
+**Key Outcomes of Overhaul**  
+- From “messy but working” → polished, scalable, maintainable product.  
+- 10× better UX for live group rides (no more cluttered UI).  
+- Production-grade performance (50+ concurrent riders, smooth 60 fps).  
+- Future-proof foundation for AI routes, crash detection, weather layers, and franchize expansion.
+
+### 2. Current State Analysis (from provided codebase)
+**Strengths**  
+- Solid data model (`RiderSessionRow`, `MeetupRow`, Supabase tables).  
+- Realtime via Supabase (already in AppContext + actions).  
+- Leaflet engine with custom utils (`map-utils.ts`, `map-actions.ts`).  
+- OSRM road-snapping already implemented.  
+- Nice foundation in `/map-riders` page (latest rides, how-it-works cards).
+
+**Pain Points (the “mess”)**  
+- UI is card-heavy and fragmented (multiple overlapping sections).  
+- Map not truly fullscreen / primary experience.  
+- No viewport culling, clustering, or debounced updates → lag on mobile.  
+- Hard-coded styles mixed with Tailwind → maintenance nightmare.  
+- Missing glanceable rider stats panel, bottom-sheet controls, pulsing live markers.  
+- No clear separation between **live view**, **history**, and **meetups**.
+
+### 3. Research Summary — Best Practices for Map-Oriented Rider Apps (2025-2026)
+From deep analysis of Calimoto, REVER, Eat Sleep Ride, Strava/Komoot analogs, and technical sources:
+
+**Core Moto App Patterns**  
+- **Live group rides** (“Pack Ride” / “Buddy Beacon”) with pulsating markers + mini player.  
+- Glanceable stats (speed, distance, lean angle if available) always visible.  
+- Bottom-sheet / floating controls (never cover the map).  
+- Scenic/curvy route highlights + user-generated POIs.  
+- Safety features (crash detection optional future phase).
+
+**Technical Best Practices (Leaflet + Supabase)**  
+- **Performance**: Canvas renderer + marker clustering + render-only-visible-markers (viewport culling). Debounce GPS pings to 3–8 seconds.  
+- **Realtime**: Supabase Presence + filtered Postgres Changes (not raw table listen). Throttle client-side updates.  
+- **Mobile-first**: Fullscreen map, gesture-friendly, offline tile caching (future: MapLibre GL or Leaflet + PWA).  
+- **UX Patterns**: Pulsating live markers, trail fade, bottom sheet for rider list, swipe-up route replay.
+
+**Design Language Alignment**  
+Keep the existing cyber-vibe (neon glows, gold accents, dark mode default) but make map the hero.
+
+### 4. Proposed High-Level Architecture
+
+```
+App (Next.js + Telegram WebApp)
+├── MapRidersPage (new unified page)
+│   ├── MapCore (Leaflet wrapper – fullscreen hero)
+│   ├── LiveRidersPanel (floating sidebar / bottom sheet)
+│   ├── MeetupLayer + MeetupCreator
+│   ├── RideHistoryModal / ReplayMode
+│   └── StatsOverlay (mini-player)
+├── Hooks
+│   ├── useLiveRiders (Supabase realtime + Presence)
+│   ├── useMapControls (gesture + viewport)
+│   └── useRouteSnap (OSRM)
+├── Lib / Server Actions (existing + enhanced)
+├── Supabase
+│   ├── rider_sessions (with route polyline JSONB)
+│   ├── meetups
+│   └── realtime channels (filtered by crew_slug)
+```
+
+**Map Engine Decision**  
+Stick with **Leaflet** (already configured via `NEXT_PUBLIC_MAP_ENGINE`).  
+Future-proof path: easy swap to MapLibre GL if we need WebGL vector tiles.
+
+### 5. UI/UX Specifications (Cyber-Moto Vibe)
+**Layout (Mobile-First)**  
+- **100% fullscreen map** as background.  
+- Top bar: minimal (crew logo + “MapRiders” title + user avatar).  
+- Floating Action Button (FAB): “Start Live Share” (neon gold pulse when active).  
+- Bottom sheet (Radix + Framer Motion): rider list + quick stats.  
+- Floating mini-player (when riding): current speed / distance / elapsed time.  
+- Dark theme only with neon glow accents (`brand-gold`, `brand-red-orange`).  
+
+**Key Visual Elements**  
+- Rider markers: custom SVG motorcycle icon + pulsing ring + speed badge.  
+- Active route: animated dashed neon line (existing `roadHighlight`).  
+- Meetup pins: glowing flag with countdown.  
+- Completed ride trails: subtle faded path with replay scrubber.
+
+**Accessibility**  
+- High-contrast markers.  
+- ARIA labels on all interactive map elements.  
+- Keyboard + voice-over friendly controls.
+
+### 6. Component Hierarchy (Clean & Reusable)
+
+```tsx
+<MapRidersPage>
+  <MapCore>                          {/* Leaflet container */}
+    <RiderMarkers />
+    <MeetupMarkers />
+    <RoutePolylines />
+    <LiveTrailLayer />
+  </MapCore>
+
+  <LiveRidersPanel />                {/* Bottom sheet or side panel */}
+  <MiniPlayer />                     {/* When user is riding */}
+  <MeetupFab />
+  <RideHistoryButton />
+</MapRidersPage>
+```
+
+All components use existing Tailwind + Radix + Framer Motion + cyber glow utilities.
+
+### 7. Data Flow & Realtime (Optimized)
+
+1. Rider opens app → `useLiveRiders` subscribes to `rider_sessions` (filtered `crew_slug`).  
+2. GPS update (Geolocation API) → debounce 5s → upsert to `rider_sessions` (Supabase Edge Function or direct RPC).  
+3. Supabase Realtime broadcasts → all clients update markers smoothly.  
+4. Presence channel for “who’s online & riding”.  
+
+**Security**  
+- RLS: only crew members see crew data.  
+- Visibility flags (`crew` / `all_auth`).
+
+### 8. Performance & Scalability Plan
+- Viewport culling for markers.  
+- Canvas renderer for Leaflet.  
+- Cluster groups when >20 riders.  
+- Tile caching (offline support phase 2).  
+- Rate limiting on GPS writes.
+
+### 9. Phased Implementation Roadmap
+
+**Phase 1 (2–3 weeks) – Polish & Performance**  
+- Fullscreen map + bottom-sheet controls.  
+- Marker clustering + viewport culling.  
+- Debounced realtime updates.  
+- Pulsing live markers + mini-player.
+
+**Phase 2 (2 weeks) – UX Delight**  
+- Ride replay mode with scrubber.  
+- Meetup creator with comments.  
+- Leaderboard integration (weekly distance).  
+- Dark cyber glow polish.
+
+**Phase 3 (Future)**  
+- AI route suggestions (Grok + OSRM).  
+- Crash detection (accelerometer).  
+- Offline maps + weather layer.  
+- Multi-crew support for franchize expansion.
+
+### 10. Success Metrics
+- Rider adoption: >70% of active VIP_BIKE users use live share weekly.  
+- Performance: <200ms map update latency, 60 fps on mid-range Android.  
+- User feedback: “This feels like a premium moto app” (NPS > 80).  
+
+---
+
+**Next Steps**  
+1. Approve this doc.  
+2. I (or team) can generate the refactored component files + new hooks immediately.  
+3. We can start with Phase 1 PRs.
+
+This overhaul turns your solid foundation into a **stand-out feature** that riders will actually love and share. Ready when you are! 🏍️✨

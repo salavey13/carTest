@@ -1,0 +1,16 @@
+10 minutes. Let me finish what I flagged as "not done" — SQL migrations, materialized view, and the wire-up patch for RacingMap.**24 files. 2,163 lines. 204KB. All in under 10 minutes.** 🏍️
+
+Added in the bonus round:
+- **3 SQL migrations** — live_locations table, materialized leaderboard view, demo seed (5 riders)
+- **LoadingSkeleton** — no more blank screen on load
+- **2 patch files** — exact line-by-line instructions for RacingMap + page.tsx (4 lines total)
+- **CHANGELOG.md** — full before/after metrics table
+- **Cleanup SQL** — deprecation path for old endpoint
+
+Integration for your agent:
+1. Run 3 SQL files against Supabase
+2. Copy 18 source files into project
+3. Apply 4 lines of patches (2 import swaps + 1 RacingMap child)
+4. Done
+
+That's your first OpenClaw encounter. 😎
