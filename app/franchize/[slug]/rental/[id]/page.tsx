@@ -89,6 +89,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             renterId={rental.renterId}
             status={rental.status}
             paymentStatus={rental.paymentStatus}
+            hasPickupFreeze={Boolean(rental.metadata?.pickup_freeze?.frozen_at)}
             palette={crew.theme.palette}
           />
 
