@@ -226,14 +226,41 @@ export default function Home() {
           <Card className="border-brand-cyan/30 bg-dark-card/70 backdrop-blur-sm">
             <CardHeader className="pb-2 pt-3 px-4 md:px-5">
               <CardTitle className="text-base sm:text-lg font-orbitron text-brand-cyan flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-brand-pink" /> THE NEW ERA
+                <Sparkles className="h-4 w-4 text-brand-pink" /> ГЛАВНЫЙ ПУЛЬТ CYBERVIBE
               </CardTitle>
               <CardDescription className="text-xs sm:text-sm font-mono">
-                Новая эра инструментов: пиши, собирай и запускай быстрее — с прозрачным потоком от идеи до релиза.
+                Это главный вход в студию личных агентов: здесь ты выбираешь вектор, фиксируешь темп и запускаешь поставку.
               </CardDescription>
             </CardHeader>
             <CardContent className="px-4 md:px-5 pb-4 pt-1">
               <CapabilityLaunchGrid />
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div variants={itemVariants}>
+          <Card className="border-brand-pink/25 bg-dark-card/65 backdrop-blur-sm">
+            <CardHeader className="pb-2 pt-3 px-4 md:px-5">
+              <CardTitle className="text-base sm:text-lg font-orbitron text-brand-pink flex items-center gap-2">
+                <VibeContentRenderer content="::FaRoute::" /> КАНОНИЧЕСКИЙ МАРШРУТ ОПЕРАТОРА
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm font-mono">
+                Не теряйся в хаосе: двигайся по фиксированному пайплайну и не ломай ритм команды.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-2 px-4 md:px-5 pb-4 pt-1">
+              <Link href="/" className="rounded-lg border border-brand-cyan/30 bg-black/25 p-3 hover:border-brand-cyan/60 transition-colors">
+                <p className="font-orbitron text-brand-cyan text-sm">1) ВХОД / РИТМ</p>
+                <p className="font-mono text-xs text-muted-foreground mt-1">Задай темп дня: профиль, метрики, фокус и приоритеты.</p>
+              </Link>
+              <Link href="/nexus" className="rounded-lg border border-brand-purple/30 bg-black/25 p-3 hover:border-brand-purple/60 transition-colors">
+                <p className="font-orbitron text-brand-purple text-sm">2) NEXUS / СИСТЕМА</p>
+                <p className="font-mono text-xs text-muted-foreground mt-1">Слой платформы: инфраструктура, связки, контуры автоматизаций.</p>
+              </Link>
+              <Link href="/repo-xml" className="rounded-lg border border-brand-yellow/30 bg-black/25 p-3 hover:border-brand-yellow/60 transition-colors">
+                <p className="font-orbitron text-brand-yellow text-sm">3) EXECUTION / ДОСТАВКА</p>
+                <p className="font-mono text-xs text-muted-foreground mt-1">RepoTxtFetcher, AI-цикл правок, ветка, PR, релиз.</p>
+              </Link>
             </CardContent>
           </Card>
         </motion.div>
@@ -308,6 +335,28 @@ export default function Home() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <Card className="border-brand-cyan/30 bg-dark-card/70 backdrop-blur-sm">
+            <CardHeader className="pb-2 pt-3 px-4 md:px-5">
+              <CardTitle className="text-base sm:text-lg font-orbitron text-brand-cyan">
+                КУДА КАЧАЕМ CYBERFITNESS ДАЛЬШЕ
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm font-mono">
+                Не «ачивки ради ачивок», а личная операционная эволюция по роли и результату.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-2 px-4 md:px-5 pb-4 pt-1">
+              <Link href="/profile" className="rounded-lg border border-brand-pink/30 p-3 hover:border-brand-pink/60 transition-colors">
+                <p className="font-orbitron text-brand-pink text-sm">PROFILE 2.0</p>
+                <p className="font-mono text-xs text-muted-foreground mt-1">Quest DNA, треки прогресса, стрики и персональные секреты оператора.</p>
+              </Link>
+              <Link href="/franchize/vip-bike/profile" className="rounded-lg border border-brand-green/30 p-3 hover:border-brand-green/60 transition-colors">
+                <p className="font-orbitron text-brand-green text-sm">FRANCHIZE IDENTITY</p>
+                <p className="font-mono text-xs text-muted-foreground mt-1">Бейджи райдера, achievements франшизы и закрытые mission-сценарии для crew.</p>
+              </Link>
             </CardContent>
           </Card>
         </motion.div>

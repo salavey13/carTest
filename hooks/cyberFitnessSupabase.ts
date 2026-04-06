@@ -1,6 +1,10 @@
 "use client"; 
-import { supabaseAdmin } from './supabase'; 
-import { updateUserMetadata as genericUpdateUserMetadata, fetchUserData as genericFetchUserData } from './supabase'; 
+import {
+  adjustKiloVibesRpcAction,
+  fetchCyberFitnessUserDataAction,
+  updateCyberFitnessUserMetadataAction,
+  updateUserCyberStatsRpcAction,
+} from "./cyberFitnessActions";
 import type { Database } from "@/types/database.types";
 import { logger } from "@/lib/logger";
 import { format } from 'date-fns';
@@ -238,10 +242,10 @@ export const fetchUserCyberFitnessProfile = async (userId: string): Promise<{ su
   }
   
   try {
-    const userData = await genericFetchUserData(userId); 
+    const userData = await fetchCyberFitnessUserDataAction(userId); 
 
     if (!userData) {
-        logger.warn(`[CyberFitness FetchProfile] User ${userId} not found via genericFetchUserData. Returning default profile. Will create metadata on first update.`);
+        logger.warn(`[CyberFitness FetchProfile] User ${userId} not found via fetchCyberFitnessUserDataAction. Returning default profile. Will create metadata on first update.`);
         return { success: false, error: `User ${userId} not found.`, data: getCyberFitnessProfile(userId, null) };
     }
     
@@ -396,9 +400,9 @@ export const updateUserCyberFitnessProfile = async (
   const isTrueMockSession = process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && MOCK_USER_ID_FOR_DB_STR !== null && userId === MOCK_USER_ID_FOR_DB_STR;
 
   try {
-    const userData = await genericFetchUserData(userId); 
+    const userData = await fetchCyberFitnessUserDataAction(userId); 
     if (!userData && !isTrueMockSession) { 
-        logger.error(`[CyberFitness UpdateProfile] User ${userId} not found via genericFetchUserData. Cannot update profile.`);
+        logger.error(`[CyberFitness UpdateProfile] User ${userId} not found via fetchCyberFitnessUserDataAction. Cannot update profile.`);
         return { success: false, error: `User ${userId} not found.` };
     }
    
@@ -620,11 +624,11 @@ export const updateUserCyberFitnessProfile = async (
       [CYBERFIT_METADATA_KEY]: newCyberFitnessProfile, 
     };
         
-    const { success: updateSuccess, data: updatedUser, error: updateError } = await genericUpdateUserMetadata(userId, newOverallMetadata); 
+    const { success: updateSuccess, data: updatedUser, error: updateError } = await updateCyberFitnessUserMetadataAction(userId, newOverallMetadata); 
 
     if (!updateSuccess || !updatedUser) {
-      logger.error(`[CyberFitness UpdateProfile] Error saving updated profile for ${userId} using genericUpdateUserMetadata:`, updateError);
-      throw new Error(updateError || `Failed to update metadata for user ${userId} via genericUpdateUserMetadata`);
+      logger.error(`[CyberFitness UpdateProfile] Error saving updated profile for ${userId} using updateCyberFitnessUserMetadataAction:`, updateError);
+      throw new Error(updateError || `Failed to update metadata for user ${userId} via updateCyberFitnessUserMetadataAction`);
     }
 
     logger.info(`[CyberFitness UpdateProfile EXIT] Successfully updated profile for ${userId}. New KV: ${newCyberFitnessProfile.kiloVibes}, Lvl: ${newCyberFitnessProfile.level}, OS: ${newCyberFitnessProfile.cognitiveOSVersion}`);
@@ -687,16 +691,14 @@ export const logCyberFitnessAction = async (
   }
 
   try {
-    const { data: newMetadata, error: rpcError } = await supabaseAdmin.rpc('update_user_cyber_stats', {
-      p_user_id: userId,
-      p_kv_delta: kiloVibesDelta,
-      p_gv_delta: 0,
-      p_new_achievement: null,
-      p_feature_key: featureKey,
-      p_feature_val: featureVal
+    const { data: newMetadata, error: rpcError } = await updateUserCyberStatsRpcAction({
+      userId,
+      kvDelta: kiloVibesDelta,
+      featureKey,
+      featureVal,
     });
 
-    if (rpcError) throw rpcError;
+    if (rpcError) throw new Error(rpcError);
 
     const profileAfterRpc = getCyberFitnessProfile(userId, newMetadata);
     const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -923,9 +925,9 @@ export async function spendKiloVibes(
   // Use a negative adjustment for spending
   const adjustment = -Math.abs(amount);
 
-  const { data, error } = await supabaseAdmin.rpc('adjust_kilovibes', {
-      p_user_id: userId,
-      p_kv_adjustment: adjustment,
+  const { data, error } = await adjustKiloVibesRpcAction({
+    userId,
+    adjustment,
   });
 
   if (error) {

@@ -493,6 +493,9 @@ For screenshot generation, use this strict fallback chain:
 3. Playwright WebKit
 4. `scripts/page-screenshot-skill.mjs` (thum.io) as last-resort readable capture
 
+Recommended helper command for local/CI visual proof:
+- `node scripts/capture-screenshot.mjs --url http://127.0.0.1:3000 --out artifacts/page.png`
+
 If one engine crashes (e.g. Chromium SIGSEGV), immediately retry next engine and report which engine succeeded.
 
 Important guardrail for step 4:

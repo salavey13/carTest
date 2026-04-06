@@ -106,12 +106,16 @@ git push origin main
 - Telegram deeplink: `https://t.me/oneBikePlsBot/app?startapp=homework/solution/<jobId>`.
 - Screenshot fallback engines: Chromium -> Firefox -> WebKit -> thum.io.
 - thum.io fallback (`scripts/page-screenshot-skill.mjs`) is for public URLs only; do not treat it as local smoke verification and avoid committing generated binary files to PRs.
+- Практичная команда для локального/CI скриншота:  
+  `node scripts/capture-screenshot.mjs --url http://127.0.0.1:3000 --out artifacts/home.png`  
+  Скрипт следует той же цепочке fallback (Chromium -> Firefox -> WebKit -> thum.io для публичных URL), ждёт `networkidle`, отключает анимации и скрывает caret для более стабильных артефактов.
 - ИЗО tasks: include image-generation prompt + manual redraw instructions + materials.
 - If Slack photo upload has `missing_scope`, send public photo links fallback.
 
 
 ## 12) Agent memory
 - Read/update `docs/AGENT_DIARY.md` for practical runtime lessons (bridge errors, screenshot fallbacks, callback edge-cases).
+- Strikeball personalization reference (recommended before new profile systems): `docs/STRIKEBALL_PROFILE_CAPABILITIES.md`.
 
 - Canonical CyberTutor contract: `docs/CYBERTUTOR_RUNTIME_CONTRACT_V1.md`.
 
