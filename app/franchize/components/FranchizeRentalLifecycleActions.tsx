@@ -16,6 +16,7 @@ interface FranchizeRentalLifecycleActionsProps {
   renterId: string;
   status: string;
   paymentStatus: string;
+  hasPickupFreeze: boolean;
   palette: {
     accentMain: string;
     accentMainHover: string;
@@ -32,6 +33,7 @@ export function FranchizeRentalLifecycleActions({
   renterId,
   status,
   paymentStatus,
+  hasPickupFreeze,
   palette,
 }: FranchizeRentalLifecycleActionsProps) {
   const { dbUser } = useAppContext();
@@ -80,6 +82,7 @@ export function FranchizeRentalLifecycleActions({
   };
 
   const canConfirmPickup = role === "owner" && ["pending_confirmation", "confirmed"].includes(status);
+  const pickupActionBlockedByFreeze = canConfirmPickup && !hasPickupFreeze;
   const canConfirmReturn = role === "owner" && status === "active";
   const canUploadStartPhoto = role === "renter" && ["pending_confirmation", "confirmed"].includes(status);
   const canUploadEndPhoto = role === "renter" && status === "active";
@@ -106,11 +109,15 @@ export function FranchizeRentalLifecycleActions({
         {canConfirmPickup && (
           <button
             type="button"
-            disabled={isPending}
+            disabled={isPending || pickupActionBlockedByFreeze}
             onClick={() =>
               withAction("pickup", async () => {
                 if (!dbUser?.user_id) {
                   toast.error("Нужна авторизация в Telegram WebApp.");
+                  return;
+                }
+                if (!hasPickupFreeze) {
+                  toast.error("Сначала заполните Pickup Freeze в Rental Documents.");
                   return;
                 }
                 const result = await confirmVehiclePickup(rentalId, dbUser.user_id);
@@ -121,7 +128,7 @@ export function FranchizeRentalLifecycleActions({
                 toast.success("Получение подтверждено. Обновите карточку для актуального статуса.");
               })
             }
-            className="rounded-xl bg-[var(--lifecycle-accent)] px-3 py-2 text-sm font-semibold text-[#16130A] transition-colors hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lifecycle-accent)]"
+            className="rounded-xl bg-[var(--lifecycle-accent)] px-3 py-2 text-sm font-semibold text-[#16130A] transition-colors hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lifecycle-accent)]"
           >
             {pendingAction === "pickup" ? "Подтверждаем..." : "Подтвердить выдачу"}
           </button>
@@ -201,6 +208,11 @@ export function FranchizeRentalLifecycleActions({
       </div>
 
       {role === "guest" && <p className="mt-3 text-xs text-[var(--lifecycle-muted)]">Действия доступны владельцу или арендатору этой сделки.</p>}
+      {pickupActionBlockedByFreeze && (
+        <p className="mt-3 text-xs text-[var(--lifecycle-muted)]">
+          Подтверждение выдачи будет доступно после сохранения Pickup Freeze в разделе Rental Documents.
+        </p>
+      )}
     </div>
   );
 }
