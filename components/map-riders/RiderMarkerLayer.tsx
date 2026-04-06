@@ -7,10 +7,17 @@
 import { useMemo, useState, useCallback } from "react";
 import { useMap, useMapEvents } from "react-leaflet";
 import { RiderMarker } from "@/components/map-canvas/RiderMarker";
+import { RiderClusterMarker } from "@/components/map-canvas/RiderClusterMarker";
 import { useMapRiders } from "@/hooks/useMapRidersContext";
+import type { LiveRider } from "@/lib/map-riders-reducer";
 import { riderDisplayName } from "@/lib/map-riders";
 
 const CLUSTER_ZOOM_THRESHOLD = 14; // Below this zoom, cluster markers
+const CLUSTER_CELL_PX = 60;
+
+type DisplayItem =
+  | { type: "rider"; rider: LiveRider }
+  | { type: "cluster"; id: string; lat: number; lng: number; count: number };
 
 export function RiderMarkerLayer() {
   const { state, fetchSessionDetail } = useMapRiders();
@@ -50,23 +57,32 @@ export function RiderMarkerLayer() {
   }, [state.liveRiders, bounds]);
 
   // ── Simple grid clustering at low zoom ──
-  const displayRiders = useMemo(() => {
-    if (zoom >= CLUSTER_ZOOM_THRESHOLD || visibleRiders.length <= 20) return visibleRiders;
+  const displayItems = useMemo<DisplayItem[]>(() => {
+    if (zoom >= CLUSTER_ZOOM_THRESHOLD || visibleRiders.length <= 20) {
+      return visibleRiders.map((rider) => ({ type: "rider", rider }));
+    }
 
-    const cellPx = 60;
-    const zoomScale = Math.pow(2, zoom);
-    const grid = new Map<string, typeof visibleRiders>();
+    const grid = new Map<string, LiveRider[]>();
 
     for (const rider of visibleRiders) {
-      const px = map.latLngToContainerPoint([rider.lat, rider.lng]);
-      const cellKey = `${Math.floor(px.x / cellPx)},${Math.floor(px.y / cellPx)}`;
+      const px = map.latLngToContainerPoint([rider.lat, rider.lng]); // stable during current viewport
+      const cellKey = `${Math.floor(px.x / CLUSTER_CELL_PX)},${Math.floor(px.y / CLUSTER_CELL_PX)}`;
       if (!grid.has(cellKey)) grid.set(cellKey, []);
       grid.get(cellKey)!.push(rider);
     }
 
-    // For single-rider cells, return the rider directly
-    // For multi-rider cells, return the first rider (cluster rendering TODO)
-    return Array.from(grid.values()).map((cell) => cell[0]);
+    const next: DisplayItem[] = [];
+    for (const [id, cell] of grid) {
+      if (cell.length === 1) {
+        next.push({ type: "rider", rider: cell[0] });
+        continue;
+      }
+      const avgLat = cell.reduce((sum, rider) => sum + rider.lat, 0) / cell.length;
+      const avgLng = cell.reduce((sum, rider) => sum + rider.lng, 0) / cell.length;
+      next.push({ type: "cluster", id, lat: avgLat, lng: avgLng, count: cell.length });
+    }
+
+    return next;
   }, [visibleRiders, zoom, map]);
 
   const handleRiderClick = useCallback(
@@ -83,7 +99,23 @@ export function RiderMarkerLayer() {
 
   return (
     <>
-      {displayRiders.map((rider) => {
+      {displayItems.map((item) => {
+        if (item.type === "cluster") {
+          return (
+            <RiderClusterMarker
+              key={`cluster:${item.id}`}
+              lat={item.lat}
+              lng={item.lng}
+              count={item.count}
+              onClick={() => {
+                const nextZoom = Math.min(Math.max(map.getZoom(), 13) + 1, 16);
+                map.flyTo([item.lat, item.lng], nextZoom, { duration: 0.45 });
+              }}
+            />
+          );
+        }
+
+        const rider = item.rider;
         const session = state.sessions.find((s) => s.user_id === rider.user_id);
         const name = riderDisplayName(session?.users, rider.user_id);
         return (
