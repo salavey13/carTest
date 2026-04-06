@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { CircleMarker, GeoJSON, MapContainer, Popup, Polyline, TileLayer, useMapEvents } from 'react-leaflet';
 import type { PointOfInterest } from '@/lib/map-utils';
 import type { TileLayerPreset } from '@/lib/maps/map-types';
@@ -67,12 +67,14 @@ export function RacingMap({
   className,
   onMapClick,
   tileLayer = 'cartodb-dark',
+  children,
 }: {
   points: PointOfInterest[];
   bounds: { top: number; bottom: number; left: number; right: number };
   className?: string;
   onMapClick?: (coords: [number, number]) => void;
   tileLayer?: TileLayerPreset;
+  children?: ReactNode;
 }) {
   const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
 
@@ -179,6 +181,7 @@ export function RacingMap({
           );
         })}
 
+        {children}
         <MapClickCapture onMapClick={onMapClick} />
       </MapContainer>
     </div>
