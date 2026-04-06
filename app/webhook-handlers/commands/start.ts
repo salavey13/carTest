@@ -4,6 +4,7 @@ import { notifyAdmin, updateUserSettings } from "@/app/actions";
 import { supabaseAnon, createOrUpdateUser } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
+import { grantFranchizeAchievementAction } from "@/app/franchize/profile-actions";
 // CHANGED IMPORT: Now using warehouse questions
 import { surveyQuestions, answerTexts } from "./content/start_survey_questions_warehouse";
 
@@ -22,6 +23,20 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, userna
   await supabaseAnon.from("user_survey_state").delete().eq('user_id', user_id);
   // Save results to user's metadata
   await updateUserSettings(user_id, { survey_results: answers });
+
+  /**
+   * Franchize capability trigger:
+   * - onboarding_survey_completed
+   * Source of truth lives in app/franchize/profile-actions.ts (slug-filtered achievements).
+   */
+  await grantFranchizeAchievementAction({
+    slug: "vip-bike",
+    userId: user_id,
+    achievementId: "onboarding_survey_completed",
+    source: "telegram:/start",
+    context: { survey: "warehouse", via: "start_command" },
+    incrementCounters: { onboardingCompletions: 1 },
+  });
 
   // Admin Notification (Warehouse Style)
   let adminSummary = `🏭 *Новый Оператор в Системе!*\n- *User:* @${username || user_id} (${user_id})\n`;

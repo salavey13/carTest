@@ -213,6 +213,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
             bgColor={`${crew.theme.palette.bgBase}CC`}
             textColor={crew.theme.palette.textPrimary}
             borderColor={crew.theme.palette.borderSoft}
+            currentSlug={crew.slug}
           />
         </div>
       </div>

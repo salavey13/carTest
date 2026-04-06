@@ -299,6 +299,69 @@ export default function ProfilePage() {
 
   const unlockedCyberMarketsCount = cyberMarketsAchievements.filter((achievement) => userAchievements.includes(achievement.id)).length;
   const unlockedCyberVibeCount = cyberVibeAchievements.filter((achievement) => userAchievements.includes(achievement.id)).length;
+
+  const achievementTracks = [
+    {
+      id: "operator",
+      title: "Operator",
+      color: "border-brand-cyan/40 bg-brand-cyan/10 text-brand-cyan",
+      description: "Извлечение контекста, работа с токенами, инженерная дисциплина.",
+      matcher: (id: string) =>
+        id.includes("data_miner") ||
+        id.includes("token_") ||
+        id.includes("context_") ||
+        id.includes("kwork_") ||
+        id.includes("first_fetch") ||
+        id.includes("first_parse"),
+    },
+    {
+      id: "field",
+      title: "Field",
+      color: "border-brand-green/40 bg-brand-green/10 text-brand-green",
+      description: "Франшиза/поле: экипаж, маршруты, локальные миссии и прикладной прод.",
+      matcher: (id: string) =>
+        id.startsWith("wb_") || id.startsWith("leads_") || id.includes("schematic") || id.includes("tutorial"),
+    },
+    {
+      id: "bridge",
+      title: "Bridge",
+      color: "border-brand-pink/40 bg-brand-pink/10 text-brand-pink",
+      description: "PR-циклы, обновления веток и финальный ритуал доставки.",
+      matcher: (id: string) =>
+        id.includes("pr") ||
+        id.includes("branch") ||
+        id.includes("commit_") ||
+        id.includes("level_up"),
+    },
+  ];
+
+  const trackProgress = achievementTracks.map((track) => {
+    const allIds = allDisplayableAchievements.map((achievement) => achievement.id).filter(track.matcher);
+    const unlocked = allIds.filter((id) => userAchievements.includes(id)).length;
+    return { ...track, total: allIds.length, unlocked };
+  });
+
+  const QUEST_DNA_MAP: Record<string, string> = {
+    first_fetch_completed: "Ты научился вытаскивать контекст без боли и шумов.",
+    first_parse_completed: "Ты прошел цикл «получил ответ → разобрал → применил».",
+    first_pr_created: "Ты закрепил привычку доставлять изменения до PR, а не оставлять в черновике.",
+    architect: "Ты освоил архитектурное мышление через дерево репозитория.",
+    sharpshooter: "Ты научился выделять релевантный контекст, а не тащить всё подряд.",
+    deep_work_logged: "Ты подтверждаешь дисциплину глубоких фокус-сессий.",
+    commit_crafter_1: "Ты зафиксировал стабильный ритм изменений, а не хаотичные рывки.",
+  };
+
+  const questDNAFeed = [...userAchievements]
+    .reverse()
+    .slice(0, 6)
+    .map((achievementId) => {
+      const details = getAchievementDetails(achievementId);
+      return {
+        id: achievementId,
+        title: details?.name || achievementId,
+        dna: QUEST_DNA_MAP[achievementId] || "Этот unlock усилил твою оперативную уверенность и скорость доставки.",
+      };
+    });
   
   const integrationItems = [
     {id: "github" as keyof typeof integrations, label: "GitHub (Токен для PR/веток)", icon: "FaGithub"},
@@ -468,6 +531,45 @@ export default function ProfilePage() {
                     {`Все Достижения (${userAchievements.length}/${allDisplayableAchievements.length})`} <VibeContentRenderer content="::FaChevronRight className='ml-1 w-3 h-3'::" />
                  </Button>
               </div>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-orbitron text-brand-cyan mb-4 flex items-center gap-2">
+                <VibeContentRenderer content="::FaLayerGroup::" />Треки CyberFitness (Operator / Field / Bridge)
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {trackProgress.map((track) => (
+                  <Card key={track.id} className={cn("border", track.color)}>
+                    <CardContent className="p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="font-orbitron">{track.title}</p>
+                        <p className="text-xs font-mono">{track.unlocked}/{track.total}</p>
+                      </div>
+                      <p className="text-xs font-mono text-muted-foreground">{track.description}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-orbitron text-brand-yellow mb-4 flex items-center gap-2">
+                <VibeContentRenderer content="::FaDna::" />Quest DNA — что тебя реально прокачало
+              </h2>
+              <Card className="bg-dark-bg/80 border border-brand-yellow/40">
+                <CardContent className="p-4 space-y-2">
+                  {questDNAFeed.length > 0 ? (
+                    questDNAFeed.map((item) => (
+                      <div key={item.id} className="rounded-md border border-brand-yellow/20 bg-black/20 p-3">
+                        <p className="text-sm font-orbitron text-brand-yellow">{item.title}</p>
+                        <p className="text-xs font-mono text-muted-foreground mt-1">{item.dna}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm font-mono text-muted-foreground">Пока пусто. Сделай первый unlock — и DNA-лента оживёт.</p>
+                  )}
+                </CardContent>
+              </Card>
             </section>
 
             <section>

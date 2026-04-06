@@ -7,7 +7,7 @@ import { debugLogger } from "@/lib/debugLogger";
 import { useAppToast } from "@/hooks/useAppToast";
 import { supabaseAnon } from "@/hooks/supabase";
 import type { Database } from "@/types/database.types";
-import { refreshDbUserAction, fetchUserCrewInfoAction, fetchActiveGameAction } from "./actions";
+import { refreshDbUserAction, fetchActiveGameAction, fetchUserRuntimeSnapshotAction } from "./actions";
 
 export type UserCrewInfo = {
   id: string;
@@ -40,6 +40,11 @@ interface AppRuntimeContextData {
   startParamPayload: string | null;
   clearStartParam: () => void;
   userCrewInfo: UserCrewInfo | null;
+  userMetadataSlices: {
+    cyberFitness: Record<string, unknown> | null;
+    strikeball: Record<string, unknown> | null;
+    franchizeProfiles: Record<string, unknown> | null;
+  };
 }
 
 interface AppCartContextData {
@@ -92,18 +97,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- Runtime boundary ---
   const [startParamPayload, setStartParamPayload] = useState<string | null>(null);
   const [userCrewInfo, setUserCrewInfo] = useState<UserCrewInfo | null>(null);
+  const [userMetadataSlices, setUserMetadataSlices] = useState<AppRuntimeContextData["userMetadataSlices"]>({
+    cyberFitness: null,
+    strikeball: null,
+    franchizeProfiles: null,
+  });
   const processedStartParam = useRef(false);
 
   useEffect(() => {
-    const fetchCrewInfo = async () => {
+    const fetchRuntimeSnapshot = async () => {
       if (!dbUser?.user_id) {
-        if (!hasUserRef.current) setUserCrewInfo(null);
+        if (!hasUserRef.current) {
+          setUserCrewInfo(null);
+          setUserMetadataSlices({ cyberFitness: null, strikeball: null, franchizeProfiles: null });
+        }
         return;
       }
-      const crewInfo = await fetchUserCrewInfoAction(dbUser.user_id);
-      setUserCrewInfo(crewInfo);
+      const snapshot = await fetchUserRuntimeSnapshotAction(dbUser.user_id);
+      setUserCrewInfo(snapshot.crewInfo);
+      setUserMetadataSlices(snapshot.metadataSlices);
     };
-    fetchCrewInfo();
+    fetchRuntimeSnapshot();
   }, [dbUser?.user_id]);
 
   const clearStartParam = useCallback(() => {
@@ -210,7 +224,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     startParamPayload,
     clearStartParam,
     userCrewInfo,
-  }), [startParamPayload, clearStartParam, userCrewInfo]);
+    userMetadataSlices,
+  }), [startParamPayload, clearStartParam, userCrewInfo, userMetadataSlices]);
 
   const cartValue = useMemo<AppCartContextData>(() => ({
     cartScopeVersion: 1,
@@ -274,6 +289,7 @@ export const useAppContext = (): AppContextData => {
       refreshDbUser: defaultRefreshDbUser,
       clearStartParam: defaultClearStartParam,
       userCrewInfo: null,
+      userMetadataSlices: { cyberFitness: null, strikeball: null, franchizeProfiles: null },
       activeLobby: null,
       cartScopeVersion: 1,
     } as unknown as AppContextData;
@@ -294,7 +310,12 @@ export const useAppContext = (): AppContextData => {
 
   return {
     ...safeAuth,
-    ...(runtime ?? { startParamPayload: null, clearStartParam: defaultClearStartParam, userCrewInfo: null }),
+    ...(runtime ?? {
+      startParamPayload: null,
+      clearStartParam: defaultClearStartParam,
+      userCrewInfo: null,
+      userMetadataSlices: { cyberFitness: null, strikeball: null, franchizeProfiles: null },
+    }),
     ...(strikeball ?? { activeLobby: null }),
     ...(cart ?? { cartScopeVersion: 1 }),
   } as AppContextData;
