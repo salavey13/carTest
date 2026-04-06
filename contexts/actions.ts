@@ -114,6 +114,42 @@ export async function fetchActiveGameAction(userId: string): Promise<ActiveLobby
   }
 }
 
+export async function fetchUserRuntimeSnapshotAction(userId: string): Promise<{
+  crewInfo: UserCrewInfo | null;
+  activeLobby: ActiveLobbyInfo | null;
+  metadataSlices: {
+    cyberFitness: Record<string, unknown> | null;
+    strikeball: Record<string, unknown> | null;
+    franchizeProfiles: Record<string, unknown> | null;
+  };
+}> {
+  if (!userId) {
+    return {
+      crewInfo: null,
+      activeLobby: null,
+      metadataSlices: { cyberFitness: null, strikeball: null, franchizeProfiles: null },
+    };
+  }
+
+  const [crewInfo, activeLobby, userRow] = await Promise.all([
+    fetchUserCrewInfoAction(userId),
+    fetchActiveGameAction(userId),
+    supabaseAdmin.from("users").select("metadata").eq("user_id", userId).maybeSingle(),
+  ]);
+
+  const metadata = (userRow.data?.metadata || {}) as Record<string, unknown>;
+
+  return {
+    crewInfo,
+    activeLobby,
+    metadataSlices: {
+      cyberFitness: (metadata.cyberFitness as Record<string, unknown>) || null,
+      strikeball: (metadata.strikeball as Record<string, unknown>) || null,
+      franchizeProfiles: (metadata.franchizeProfiles as Record<string, unknown>) || null,
+    },
+  };
+}
+
 export async function saveUserFranchizeCartAction(
   userId: string,
   slug: string,

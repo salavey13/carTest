@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, Palette, Settings, Shield, User } from "lucide-react";
+import { ChevronDown, Palette, Settings, Shield, User, IdCard } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   DropdownMenu,
@@ -17,6 +17,7 @@ interface FranchizeProfileButtonProps {
   bgColor: string;
   textColor: string;
   borderColor: string;
+  currentSlug?: string;
 }
 
 function getInitials(name: string): string {
@@ -29,13 +30,15 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
-export function FranchizeProfileButton({ bgColor, textColor, borderColor }: FranchizeProfileButtonProps) {
+export function FranchizeProfileButton({ bgColor, textColor, borderColor, currentSlug }: FranchizeProfileButtonProps) {
   const { dbUser, user, userCrewInfo, isAdmin } = useAppContext();
   const effectiveUser = dbUser || user;
   const displayName = effectiveUser?.username || effectiveUser?.full_name || effectiveUser?.first_name || "Operator";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = typeof isAdmin === "function" ? isAdmin() : false;
-  const franchizeAdminHref = `/franchize/${userCrewInfo?.slug || "vip-bike"}/admin`;
+  const scopeSlug = currentSlug || userCrewInfo?.slug || "vip-bike";
+  const franchizeAdminHref = `/franchize/${scopeSlug}/admin`;
+  const franchizeProfileHref = `/franchize/${scopeSlug}/profile`;
 
   return (
     <div style={{ isolation: "isolate" }}>
@@ -89,6 +92,13 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor }: Fran
             <Link href={franchizeAdminHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
               <Shield className="mr-2 h-4 w-4 shrink-0" />
               <span className="truncate">Franchize admin</span>
+            </Link>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem asChild>
+            <Link href={franchizeProfileHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+              <IdCard className="mr-2 h-4 w-4 shrink-0" />
+              <span className="truncate">Franchize profile</span>
             </Link>
           </DropdownMenuItem>
 
