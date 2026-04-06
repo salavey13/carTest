@@ -36,17 +36,30 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 ### I3 — Write-path hardening
 - [x] Add `/api/map-riders/batch-points` endpoint and queue-based client flush.
 - [x] Keep `/api/map-riders/location` as fallback with deprecation header.
-- [ ] Add stale rider eviction policy in client state (fade then remove).
+- [x] Add stale rider eviction policy in client state (fade then remove).
 
 ### I4 — UI porting (slice-by-slice)
 - [x] Introduce provider/reducer from goldmine without breaking current page contract.
 - [x] Port `RiderMarker` + `RiderMarkerLayer` with viewport culling.
 - [x] Port `RidersDrawer`, `RiderFAB`, `StatusOverlay`, `LoadingSkeleton`.
+- [x] Replace cluster TODO fallback (first rider only) with explicit cluster markers + tap-to-zoom drill-down.
 
 ### I5 — QA + rollout
+- [x] Add repeatable smoke-check script for page + split API routes (`npm run qa:map-riders`).
+- [x] Add accessibility polish on map markers (`title/alt/keyboard`) to align with deep-research a11y checklist.
 - [ ] Two-phone live test, stale/offline test, meetup persistence test.
 - [ ] Screenshot evidence for `vip-bike` slug.
 - [ ] Cut final switch: legacy snapshot polling → split APIs + broadcast-first.
+
+## AGI gold port review notes (I1→I5)
+- ✅ Preserved contract-first order from goldmine (`overview`/`leaderboard`/`health` + legacy compatibility).
+- ✅ Preserved write-path hardening (`batch-points`, queue flush, stale/eviction state machine).
+- ✅ Preserved modular UI slices (provider/reducer, drawer/FAB/overlay layers).
+- 🔍 Gap closed in this iteration: low-zoom clustering now shows explicit aggregate markers (instead of rendering only first rider in cell).
+- 🔍 Gap closed in this iteration: marker accessibility metadata (title/alt/keyboard) now provided for screen-reader/keyboard-friendly map interaction.
+
+## Next SupaPlan seed (post-I5)
+- `MapRiders I5 field QA evidence pack` — execute two-phone stale/offline + meetup persistence run and attach `vip-bike` screenshots + short failure matrix. (SupaPlan task: `492d4564-1f97-4b49-b61f-a979bc4019fb`)
 
 ## Risks to watch
 - Race conditions from mixed snapshot + realtime updates.
