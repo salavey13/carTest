@@ -495,6 +495,11 @@ For screenshot generation, use this strict fallback chain:
 
 If one engine crashes (e.g. Chromium SIGSEGV), immediately retry next engine and report which engine succeeded.
 
+Important guardrail for step 4:
+- `scripts/page-screenshot-skill.mjs` uses public thum.io capture and is **not** a valid local/private smoke-test oracle.
+- Treat it as one-off fallback for publicly reachable pages only.
+- Do not commit generated binary screenshots into PRs by default (prefer runtime artifact links/storage upload).
+
 #### 9.4.7) Agent memory diary (resurrectable hints)
 
 Maintain execution diary in `docs/AGENT_DIARY.md`.
