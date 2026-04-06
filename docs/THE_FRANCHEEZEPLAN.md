@@ -1701,11 +1701,11 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T55 — MapRiders goldmine ingestion + phased SupaPlan decomposition
 - status: `in_progress`
-- updated_at: `2026-04-06T01:05:00Z`
+- updated_at: `2026-04-06T02:05:00Z`
 - owner: `codex`
-- notes: Проанализирован `goldmine` пакет (код + deep research + design docx), собран итеративный backlog в `app/franchize/[slug]/map-riders/todo.md`, добавлена контрактная миграция `live_locations + weekly leaderboard` без destructive drop/recreate, зарегистрированы 3 SupaPlan задачи для I2/I3/I4, и закрыт I2 API split (`/overview`, `/leaderboard`, `/health`) c общей server-side data layer и legacy-compatible `/api/map-riders`.
-- next_step: Перейти к I3 write-path hardening: `/batch-points`, deprecation header на `/location`, и client-side flush queue для устойчивости под лагами.
-- risks: текущая `MapRidersClient` всё ещё монолитная; смешанный snapshot+realtime поток пока может дублировать/перезаписывать rider marker состояние под лагами.
+- notes: Закрыт I3/I4 с последовательным портингом goldmine: добавлен `POST /api/map-riders/batch-points`, включён queue-flush + legacy fallback на `/api/map-riders/location` c `X-Deprecated`, перенесены reducer/provider (`lib/map-riders-reducer.ts`, `hooks/useMapRidersContext.tsx`) и UI-срезы (`RiderMarkerLayer`, `RiderMarker`, `RidersDrawer`, `RiderFAB`, `StatusOverlay`, `LoadingSkeleton`), а страница переключена на refactored клиент через совместимый `app/franchize/components/MapRidersClient.tsx`.
+- next_step: Выполнить I5 QA-срез (две мобилки, stale/offline, meetup persistence) и снять evidence-скриншоты для `vip-bike`.
+- risks: после широкого UI-порта возможны регрессии по поведению drawer/FAB и типам в map overlays; требуется целевой smoke + визуальная проверка на Telegram WebApp.
 - dependencies: T53
 - deliverables:
   - `app/franchize/[slug]/map-riders/todo.md`
@@ -1776,6 +1776,8 @@ Append only compact session deltas here as pointers when needed; full narrative 
 
 - 2026-04-06: Выполнен SupaPlan task `c7af132c-3f44-4129-a4d7-e50b2e2e593c` (I2) — добавлены `GET /api/map-riders/overview`, `GET /api/map-riders/leaderboard`, `GET /api/map-riders/health`, вынесен общий data-layer `app/api/map-riders/_lib/shared.ts`, legacy `GET /api/map-riders` оставлен backward-compatible через shared fetch-пайплайн.
 
+- 2026-04-06: Выполнены SupaPlan задачи `a947b563-1fd2-4459-84bc-8978c6f520eb` (I3) и `3da1fba0-84bc-4afb-ada0-42240f625999` (I4) — добавлены batch-write endpoint + fallback/deprecation, внедрены reducer/provider и UI-срезы goldmine, `MapRidersClient` переведён на refactored orchestration без изменения page route-контракта.
+
 ---
 
 ## 8) Skills and tooling note
@@ -1803,4 +1805,3 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 Detailed historical execution notes moved to:
 - `docs/THE_FRANCHEEZEPLAN_HISTORY_ARCHIVE.md`
 - `docs/AGENT_DIARY.md` (compact) and `docs/AGENT_DIARY_ARCHIVE_2026Q1.md` (full)
-

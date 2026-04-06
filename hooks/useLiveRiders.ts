@@ -1,111 +1,204 @@
+// /hooks/useLiveRiders.ts
+// GPS watcher with throttling (3s + 10m) + broadcast + batch queue.
+// Replaces the inline useLiveRiders usage in MapRidersClient.
+
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { useAppContext } from "@/contexts/AppContext";
 
-const THROTTLE_MS = 3000;
-const MIN_DISTANCE_M = 15;
-
-type LiveRiderPoint = {
+interface GPSPoint {
   lat: number;
   lng: number;
   speedKmh: number;
   heading: number | null;
   accuracyMeters: number | null;
   capturedAt: string;
-};
+}
 
-export function useLiveRiders(
-  crewSlug: string,
-  options?: {
-    enabled?: boolean;
-    onPosition?: (point: LiveRiderPoint) => void | Promise<void>;
-  },
-) {
-  const { dbUser } = useAppContext();
-  const enabled = options?.enabled ?? true;
-  const lastSentRef = useRef<{ lat: number; lng: number; ts: number } | null>(null);
-  const onPositionRef = useRef(options?.onPosition);
+interface UseLiveRidersOptions {
+  crewSlug: string;
+  sessionId: string | null;
+  userId: string | null;
+  enabled: boolean;
+  /** Called with each accepted GPS point (for local state + broadcast) */
+  onPosition?: (point: GPSPoint) => void;
+}
 
-  useEffect(() => {
-    onPositionRef.current = options?.onPosition;
-  }, [options?.onPosition]);
+// Haversine for client-side distance threshold
+function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 6371000;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const aa =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+}
 
-  const sendPosition = useCallback(async (position: GeolocationPosition) => {
-    if (!dbUser?.user_id || !crewSlug || !enabled) return;
+const GPS_INTERVAL_MS = 3000; // 3s minimum between accepted updates
+const GPS_DISTANCE_M = 10;    // 10m minimum distance threshold
+const BATCH_FLUSH_MS = 5000;  // Flush batch every 5s
+const BATCH_MAX_SIZE = 10;
 
-    const supabase = getSupabaseBrowserClient();
-    const { latitude: lat, longitude: lng, speed, heading, accuracy } = position.coords;
-    const now = Date.now();
+export function useLiveRiders(options: UseLiveRidersOptions) {
+  const { crewSlug, sessionId, userId, enabled, onPosition } = options;
+  const watchIdRef = useRef<number | null>(null);
+  const lastAcceptedRef = useRef<{ lat: number; lng: number; time: number } | null>(null);
+  const batchQueueRef = useRef<GPSPoint[]>([]);
+  const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isActive, setIsActive] = useState(false);
 
-    const last = lastSentRef.current;
-    if (last) {
-      const distance = Math.hypot(lat - last.lat, lng - last.lng) * 111_000;
-      if (distance < MIN_DISTANCE_M && now - last.ts < THROTTLE_MS) return;
-    }
-
-    const speedKmh = Math.max(0, Number(speed || 0) * 3.6);
-    const payload = {
-      user_id: dbUser.user_id,
-      crew_slug: crewSlug,
-      lat,
-      lng,
-      speed_kmh: speedKmh,
-      heading: heading || null,
-      is_riding: true,
-    };
-
-    supabase.channel(`map:${crewSlug}`).send({
-      type: "broadcast",
-      event: "position",
-      payload,
-    });
-
-    const { error } = await supabase.from("live_locations").upsert(payload, { onConflict: "user_id" });
-    if (error) {
-      console.error("[useLiveRiders] upsert failed", error.message);
-    }
-
-    if (onPositionRef.current) {
-      await onPositionRef.current({
-        lat,
-        lng,
-        speedKmh,
-        heading: heading || null,
-        accuracyMeters: accuracy || null,
-        capturedAt: new Date(position.timestamp).toISOString(),
+  // ── Broadcast position to Supabase Realtime ──
+  const broadcastPosition = useCallback(
+    (point: GPSPoint) => {
+      if (!userId) return;
+      const supabase = getSupabaseBrowserClient();
+      const channel = supabase.channel(`map-riders:${crewSlug}`);
+      channel.send({
+        type: "broadcast",
+        event: "rider:move",
+        payload: {
+          user_id: userId,
+          lat: point.lat,
+          lng: point.lng,
+          speed_kmh: point.speedKmh,
+          heading: point.heading,
+          updated_at: point.capturedAt,
+        },
       });
+    },
+    [crewSlug, userId],
+  );
+
+  // ── Flush batch to server ──
+  const flushBatch = useCallback(async () => {
+    const points = batchQueueRef.current.splice(0, BATCH_MAX_SIZE);
+    if (points.length === 0 || !sessionId || !userId) return;
+
+    try {
+      const batchResponse = await fetch("/api/map-riders/batch-points", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, userId, crewSlug, points }),
+      });
+      if (batchResponse.ok) {
+        return;
+      }
+
+      const lastPoint = points[points.length - 1];
+      await fetch("/api/map-riders/location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          userId,
+          crewSlug,
+          lat: lastPoint.lat,
+          lon: lastPoint.lng,
+          speedKmh: lastPoint.speedKmh,
+          headingDeg: lastPoint.heading,
+          accuracyMeters: lastPoint.accuracyMeters,
+          capturedAt: lastPoint.capturedAt,
+        }),
+      });
+    } catch {
+      // Re-queue failed points at front
+      batchQueueRef.current.unshift(...points);
+    }
+  }, [sessionId, userId, crewSlug]);
+
+  // ── GPS handler ──
+  const handlePosition = useCallback(
+    (position: GeolocationPosition) => {
+      const now = Date.now();
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      const speedKmh = (position.coords.speed || 0) * 3.6;
+      const heading = position.coords.heading ?? null;
+      const accuracyMeters = position.coords.accuracy ?? null;
+      const capturedAt = new Date().toISOString();
+
+      // Throttle: skip if too close in time AND distance
+      const last = lastAcceptedRef.current;
+      if (last) {
+        const elapsed = now - last.time;
+        const dist = haversineMeters({ lat, lng }, { lat: last.lat, lng: last.lng });
+        if (elapsed < GPS_INTERVAL_MS && dist < GPS_DISTANCE_M) return;
+      }
+
+      lastAcceptedRef.current = { lat, lng, time: now };
+      const point: GPSPoint = { lat, lng, speedKmh, heading, accuracyMeters, capturedAt };
+
+      // Broadcast for instant map update
+      broadcastPosition(point);
+
+      // Add to batch queue
+      batchQueueRef.current.push(point);
+
+      // Notify parent hook
+      onPosition?.(point);
+    },
+    [broadcastPosition, onPosition],
+  );
+
+  const handleError = useCallback((err: GeolocationPositionError) => {
+    console.warn("[MapRiders] GPS error:", err.message);
+  }, []);
+
+  // ── Start/stop GPS watcher ──
+  useEffect(() => {
+    if (!enabled || !navigator.geolocation) {
+      setIsActive(false);
+      return;
     }
 
-    lastSentRef.current = { lat, lng, ts: now };
-  }, [crewSlug, dbUser?.user_id, enabled]);
+    // Adjust accuracy based on visibility
+    const highAccuracy = document.visibilityState === "visible";
 
-  useEffect(() => {
-    if (!crewSlug) return;
-    const supabase = getSupabaseBrowserClient();
-    const channel = supabase.channel(`map:${crewSlug}`);
-
-    channel.on("broadcast", { event: "position" }, ({ payload }) => {
-      window.dispatchEvent(new CustomEvent("live-rider-update", { detail: payload }));
-    }).subscribe();
+    watchIdRef.current = navigator.geolocation.watchPosition(handlePosition, handleError, {
+      enableHighAccuracy: highAccuracy,
+      timeout: highAccuracy ? 10000 : 30000,
+      maximumAge: highAccuracy ? 0 : 60000,
+    });
+    setIsActive(true);
 
     return () => {
-      supabase.removeChannel(channel);
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      setIsActive(false);
     };
-  }, [crewSlug]);
+  }, [enabled, handlePosition, handleError]);
 
+  // ── Visibility change → adjust GPS accuracy ──
   useEffect(() => {
-    if (!navigator.geolocation || !dbUser?.user_id || !crewSlug || !enabled) return;
+    const onVisibility = () => {
+      if (!enabled) return;
+      // Restart watcher with new accuracy settings
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        const highAccuracy = !document.hidden;
+        watchIdRef.current = navigator.geolocation.watchPosition(handlePosition, handleError, {
+          enableHighAccuracy: highAccuracy,
+          timeout: highAccuracy ? 10000 : 30000,
+          maximumAge: highAccuracy ? 0 : 60000,
+        });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [enabled, handlePosition, handleError]);
 
-    const watchId = navigator.geolocation.watchPosition(sendPosition, console.error, {
-      enableHighAccuracy: true,
-      maximumAge: 5000,
-      timeout: 10000,
-    });
+  // ── Batch flush timer ──
+  useEffect(() => {
+    if (!enabled) return;
+    flushTimerRef.current = setInterval(flushBatch, BATCH_FLUSH_MS);
+    return () => {
+      if (flushTimerRef.current) clearInterval(flushTimerRef.current);
+    };
+  }, [enabled, flushBatch]);
 
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [crewSlug, dbUser?.user_id, enabled, sendPosition]);
-
-  return { sendPosition };
+  return { isActive };
 }

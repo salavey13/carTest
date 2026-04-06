@@ -34,14 +34,14 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 - [x] Keep legacy `/api/map-riders` endpoint backward-compatible during transition.
 
 ### I3 — Write-path hardening
-- [ ] Add `/api/map-riders/batch-points` endpoint and queue-based client flush.
-- [ ] Keep `/api/map-riders/location` as fallback with deprecation header.
+- [x] Add `/api/map-riders/batch-points` endpoint and queue-based client flush.
+- [x] Keep `/api/map-riders/location` as fallback with deprecation header.
 - [ ] Add stale rider eviction policy in client state (fade then remove).
 
 ### I4 — UI porting (slice-by-slice)
-- [ ] Introduce provider/reducer from goldmine without breaking current page contract.
-- [ ] Port `RiderMarker` + `RiderMarkerLayer` with viewport culling.
-- [ ] Port `RidersDrawer`, `RiderFAB`, `StatusOverlay`, `LoadingSkeleton`.
+- [x] Introduce provider/reducer from goldmine without breaking current page contract.
+- [x] Port `RiderMarker` + `RiderMarkerLayer` with viewport culling.
+- [x] Port `RidersDrawer`, `RiderFAB`, `StatusOverlay`, `LoadingSkeleton`.
 
 ### I5 — QA + rollout
 - [ ] Two-phone live test, stale/offline test, meetup persistence test.
