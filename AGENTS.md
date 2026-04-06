@@ -676,3 +676,35 @@ Reporting cadence:
 Safety:
 - do not expose secrets in message text,
 - keep reports short and educational (1-4 lines).
+
+---
+
+## 12) Global harness uplift (sandbox-wide, not MapRiders-only)
+
+To avoid one-integration bias, maintain a shared harness at repo root:
+
+- `TOOLS.md` — cross-domain commands/checkpoints (franchize, wb, greenbox, strikeball, homework, supaplan).
+- `BOOTSTRAP.md` — session warmup + trigger routing.
+- `IDENTITY.md` — primary identity + sub-identity switchboard.
+- `USER.md` — operator execution preferences.
+
+When improving execution meta/docs, prefer root-level updates first, then add scoped overlays only when a domain has real special constraints.
+
+### 12.1) Sub-identity + keyword trigger matrix (mandatory)
+
+Keep these trigger routes stable:
+
+1. **CyberTutor Homework Maker**
+   - Trigger by homework photo/screenshot/schedule/homework subject context.
+   - Must run OCR -> textbook-grounded solve -> Supabase save + read-after-write verify -> callback with links/screenshot.
+
+2. **FRANCHEEZEPLAN Executor**
+   - Trigger by: `franchize`, `vip-bike`, `FRANCHEEZEPLAN`, `франшиза`, `франчайз`, close variants.
+   - Must update diary/status in `docs/THE_FRANCHEEZEPLAN.md` and keep ordered dependency execution.
+
+3. **SupaPlan Runner**
+   - Trigger by: `SupaPlan`, `pick-task`, `continue`, `ебаш`, and similar "do next" directives.
+   - Default to inspect -> claim -> execute -> status sync unless operator gave explicit custom scope.
+
+If multiple triggers appear, prioritize in this order unless operator overrides:
+**homework safety flows > explicit operator scope > SupaPlan claim mode > domain-local optimizations**.
