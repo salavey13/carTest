@@ -1698,6 +1698,30 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - План отражает alias `viphbike` и канонический slug `vip-bike`.
  
 
+
+### T55 — MapRiders goldmine ingestion + phased SupaPlan decomposition
+- status: `in_progress`
+- updated_at: `2026-04-06T00:35:00Z`
+- owner: `codex`
+- notes: Проанализирован `goldmine` пакет (код + deep research + design docx), собран итеративный backlog в `app/franchize/[slug]/map-riders/todo.md`, добавлена контрактная миграция `live_locations + weekly leaderboard` без destructive drop/recreate, и зарегистрированы 3 SupaPlan задачи для I2/I3/I4.
+- next_step: Выполнить I2 backend split (`/overview`, `/leaderboard`, `/health`) и перевести текущий client snapshot на новые ручки c fallback на legacy endpoint.
+- risks: текущая `MapRidersClient` всё ещё монолитная; смешанный snapshot+realtime поток пока может дублировать/перезаписывать rider marker состояние под лагами.
+- dependencies: T53
+- deliverables:
+  - `app/franchize/[slug]/map-riders/todo.md`
+  - `supabase/migrations/20260406113000_map_riders_live_layer_foundation.sql`
+  - `AGENTS.md`
+- implementation checklist:
+  1. Инвентаризация AGI handoff: выделить code-ready фрагменты и research-only предложения.
+  2. Зафиксировать последовательный план портинга (I1..I5) c чёткими done-criteria.
+  3. Подготовить idempotent SQL migration для live read-model и leaderboard read-model.
+  4. Создать SupaPlan задачи на I2/I3/I4 с ссылками на секции todo.
+- acceptance criteria:
+  - Есть явный поэтапный backlog для map-riders porting.
+  - SQL подготовлен в `supabase/migrations/*` и не ломает существующие таблицы.
+  - SupaPlan содержит task decomposition для следующих итераций.
+
+
 ## 6) Task template for future extension
 
 When adding a new task, copy this block:
@@ -1748,6 +1772,7 @@ Append only compact session deltas here as pointers when needed; full narrative 
 - 2026-03-24: Закрыт FRZ-R3 в практическом виде — добавлены операторские виджеты в `/nexus` и новая витрина `/supaplan/franchize` с легендой, фазами и live-сопоставлением SupaPlan задач к клиентским идеям `vip-bike`/`viphbike`.
 - 2026-03-24: FRZ-R10 improvement pass (rental flow hardening): в `/franchize/[slug]` добавлены бейджи availability + HOT на карточки байков, фикс мультидневного ценообразования в cart lines (поддержка `1/3/7` дней RU/EN), а в `order` встроены дата-диапазон и e-signature поля (ФИО + consent fingerprint). DOCX из markdown-шаблона теперь отправляется не только админу, но и арендатору + owner (когда telegram id доступен через users.metadata).
 - 2026-03-24: FRZ-R11 старт/выполнение — добавлена страница `/doc-verifier` для tamper-check DOCX: регистрация оригинала в Supabase Storage + SHA-256 в таблице `doc_verifier_records` (scope-aware для повторного использования в разных интеграциях), затем верификация загруженного файла через сравнение `uploaded hash` vs `db hash` + контроль целостности storage-копии (`storage hash` vs `db hash`).
+- 2026-04-06: Стартован T55 (MapRiders goldmine ingestion) — собран phased backlog I1..I5, подготовлена migration-заготовка `20260406113000_map_riders_live_layer_foundation.sql`, создано 3 SupaPlan task-а для I2/I3/I4 (IDs: `c7af132c-3f44-4129-a4d7-e50b2e2e593c`, `a947b563-1fd2-4459-84bc-8978c6f520eb`, `3da1fba0-84bc-4afb-ada0-42240f625999`).
 
 ---
 
@@ -1776,3 +1801,4 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 Detailed historical execution notes moved to:
 - `docs/THE_FRANCHEEZEPLAN_HISTORY_ARCHIVE.md`
 - `docs/AGENT_DIARY.md` (compact) and `docs/AGENT_DIARY_ARCHIVE_2026Q1.md` (full)
+
