@@ -1701,11 +1701,11 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T55 — MapRiders goldmine ingestion + phased SupaPlan decomposition
 - status: `in_progress`
-- updated_at: `2026-04-06T02:05:00Z`
+- updated_at: `2026-04-06T10:40:00Z`
 - owner: `codex`
-- notes: Закрыт I3/I4 с последовательным портингом goldmine: добавлен `POST /api/map-riders/batch-points`, включён queue-flush + legacy fallback на `/api/map-riders/location` c `X-Deprecated`, перенесены reducer/provider (`lib/map-riders-reducer.ts`, `hooks/useMapRidersContext.tsx`) и UI-срезы (`RiderMarkerLayer`, `RiderMarker`, `RidersDrawer`, `RiderFAB`, `StatusOverlay`, `LoadingSkeleton`), а страница переключена на refactored клиент через совместимый `app/franchize/components/MapRidersClient.tsx`.
-- next_step: Выполнить I5 QA-срез (две мобилки, stale/offline, meetup persistence) и снять evidence-скриншоты для `vip-bike`.
-- risks: после широкого UI-порта возможны регрессии по поведению drawer/FAB и типам в map overlays; требуется целевой smoke + визуальная проверка на Telegram WebApp.
+- notes: Закрыт I3/I4 с последовательным портингом goldmine: добавлен `POST /api/map-riders/batch-points`, включён queue-flush + legacy fallback на `/api/map-riders/location` c `X-Deprecated`, перенесены reducer/provider (`lib/map-riders-reducer.ts`, `hooks/useMapRidersContext.tsx`) и UI-срезы (`RiderMarkerLayer`, `RiderMarker`, `RidersDrawer`, `RiderFAB`, `StatusOverlay`, `LoadingSkeleton`), а страница переключена на refactored клиент через совместимый `app/franchize/components/MapRidersClient.tsx`. Дополнительно закрыт backlog drift: в `app/franchize/[slug]/map-riders/todo.md` отмечен stale-eviction как завершённый, добавлен автоматический smoke-check `scripts/map-riders-qa-check.mjs` (+ npm alias `qa:map-riders`) для маршрута `vip-bike` и split API (`overview/leaderboard/health` + legacy endpoint), а также закрыт UX gap из deep research: low-zoom grid теперь рендерит явные cluster markers (вместо first-rider fallback) и rider markers получили `title/alt/keyboard` для лучшей a11y-навигации.
+- next_step: Выполнить I5 field QA-срез (две мобилки, stale/offline, meetup persistence) и снять evidence-скриншоты для `vip-bike`; параллельно завести/привязать SupaPlan task для field QA evidence pack и закрыть T55 после проверки.
+- risks: после широкого UI-порта возможны регрессии по поведению drawer/FAB и типам в map overlays; нужен целевой smoke + визуальная проверка на Telegram WebApp.
 - dependencies: T53
 - deliverables:
   - `app/franchize/[slug]/map-riders/todo.md`
@@ -1777,6 +1777,11 @@ Append only compact session deltas here as pointers when needed; full narrative 
 - 2026-04-06: Выполнен SupaPlan task `c7af132c-3f44-4129-a4d7-e50b2e2e593c` (I2) — добавлены `GET /api/map-riders/overview`, `GET /api/map-riders/leaderboard`, `GET /api/map-riders/health`, вынесен общий data-layer `app/api/map-riders/_lib/shared.ts`, legacy `GET /api/map-riders` оставлен backward-compatible через shared fetch-пайплайн.
 
 - 2026-04-06: Выполнены SupaPlan задачи `a947b563-1fd2-4459-84bc-8978c6f520eb` (I3) и `3da1fba0-84bc-4afb-ada0-42240f625999` (I4) — добавлены batch-write endpoint + fallback/deprecation, внедрены reducer/provider и UI-срезы goldmine, `MapRidersClient` переведён на refactored orchestration без изменения page route-контракта.
+
+- 2026-04-06: T55 update — добавлен `scripts/map-riders-qa-check.mjs` и `npm run qa:map-riders` для repeatable smoke (страница `vip-bike/map-riders` + split APIs + legacy), backlog `app/franchize/[slug]/map-riders/todo.md` синхронизирован: stale rider eviction отмечен как выполненный.
+
+- 2026-04-06: T55 polish pass — после reread `goldmine/mr_*` закрыт TODO в clustering UX: `RiderMarkerLayer` теперь показывает cluster count marker + tap-to-zoom drilldown на low zoom, и добавлены `title/alt/keyboard` marker-атрибуты для a11y-совместимости с исследовательским чеклистом.
+- 2026-04-06: Создан следующий SupaPlan task для I5: `492d4564-1f97-4b49-b61f-a979bc4019fb` (`MapRiders I5 field QA evidence pack (vip-bike)`, capability `ui.ux`, `todo_path=app/franchize/[slug]/map-riders/todo.md#Next SupaPlan seed (post-I5)`).
 
 ---
 
