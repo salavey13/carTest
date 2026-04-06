@@ -202,6 +202,17 @@ Hard reminder (learned from regressions): do **not** assume one SupaPlan source 
 Cross-check at least map + mindmap + app docs before changing claim/state/merge automation.
 If any referenced file is missing or moved, explicitly log that mismatch in your final report and PR body.
 
+### 6.4) Goldmine porting protocol (MapRiders AGI handoff)
+
+When operator asks to continue work from `app/franchize/[slug]/map-riders/goldmine/*` artifacts:
+
+1. Treat `goldmine/todo.md` as the scope handshake and create/update a sibling execution tracker in `app/franchize/[slug]/map-riders/todo.md`.
+2. Read at least these handoff artifacts before coding: `PROGRESS.md`, `CHANGELOG.md`, `mr_MEGA.md`, `mr_gpt.md`, `mr_grok.txt`, `mr_qwen.txt`, and the design `.docx` summary.
+3. Port in iterative slices (contracts first, UI second, perf third); avoid one-shot monolith swaps.
+4. If AGI-provided SQL includes table rebuilds, convert it into additive/idempotent migrations under `supabase/migrations/*` (no destructive drop/recreate in default path).
+5. Mirror each porting slice into SupaPlan via `add-task` with explicit `todo_path` pointing to the relevant map-riders tracker section.
+6. Keep `docs/THE_FRANCHEEZEPLAN.md` updated with the active map-riders task block + dated diary note after every meaningful slice.
+
 ### 6.3) Fast-start protocol for parallel-ready task design (new default for broad asks)
 
 When operator asks for "do several tasks" or broad integration pushes, use this startup sequence:
