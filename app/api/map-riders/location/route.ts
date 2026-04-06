@@ -66,5 +66,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: sessionError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, data: { capturedAt } });
+  const response = NextResponse.json({ success: true, data: { capturedAt } });
+  response.headers.set("X-Deprecated", "Use /api/map-riders/batch-points");
+  return response;
 }
