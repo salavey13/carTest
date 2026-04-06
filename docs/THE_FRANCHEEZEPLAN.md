@@ -1696,6 +1696,28 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - На `/supaplan/franchize` видно соответствие «идея ↔ capability ↔ task/status».
   - У оператора есть быстрый переход на страницу из `/supaplan` и `/nexus`.
   - План отражает alias `viphbike` и канонический slug `vip-bike`.
+
+### T55 — VIP BIKE MapRiders demo-mode + visual ultra-polish
+- status: `done`
+- updated_at: `2026-04-01T00:00:00Z`
+- owner: `codex`
+- notes: По явному операторскому запросу прокачан фронт `/franchize/[slug]/map-riders`: добавлен ручной demo toggle + auto-demo fallback при пустом live-снапшоте, анимированные synthetic riders (Alpha/Beta/Gamma), cinematic overlay поверх карты и более жирный статусный UI (LIVE/Demo).
+- next_step: Добавить stress-demo пресеты (20/50/100 synthetic riders) и heat-layer trails как отдельный визуальный режим.
+- risks: Текущий demo-motion работает на клиентском таймере; при очень долгой сессии в фоне Telegram WebApp возможна деградация плавности до ре-активации вкладки.
+- dependencies: T53
+- deliverables:
+  - `app/franchize/components/MapRidersClient.tsx`
+  - `app/franchize/[slug]/map-riders/todo.md`
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Добавить demo режим с явным UI-переключателем.
+  2. Реализовать живые synthetic markers, чтобы карта не выглядела пустой в cold-start.
+  3. Подкрутить визуал карты/карточек под modern map-app стиль без ломки live-флоу.
+  4. Обновить TODO внутри map-riders после реализации (не до).
+- acceptance criteria:
+  - В отсутствие live-данных карта остаётся «живой» и презентабельной.
+  - Оператор может вручную включать/выключать demo режим одним тапом.
+  - Визуальный слой заметно усилен без поломки существующих API-сценариев.
  
 
 ## 6) Task template for future extension
@@ -1748,6 +1770,7 @@ Append only compact session deltas here as pointers when needed; full narrative 
 - 2026-03-24: Закрыт FRZ-R3 в практическом виде — добавлены операторские виджеты в `/nexus` и новая витрина `/supaplan/franchize` с легендой, фазами и live-сопоставлением SupaPlan задач к клиентским идеям `vip-bike`/`viphbike`.
 - 2026-03-24: FRZ-R10 improvement pass (rental flow hardening): в `/franchize/[slug]` добавлены бейджи availability + HOT на карточки байков, фикс мультидневного ценообразования в cart lines (поддержка `1/3/7` дней RU/EN), а в `order` встроены дата-диапазон и e-signature поля (ФИО + consent fingerprint). DOCX из markdown-шаблона теперь отправляется не только админу, но и арендатору + owner (когда telegram id доступен через users.metadata).
 - 2026-03-24: FRZ-R11 старт/выполнение — добавлена страница `/doc-verifier` для tamper-check DOCX: регистрация оригинала в Supabase Storage + SHA-256 в таблице `doc_verifier_records` (scope-aware для повторного использования в разных интеграциях), затем верификация загруженного файла через сравнение `uploaded hash` vs `db hash` + контроль целостности storage-копии (`storage hash` vs `db hash`).
+- 2026-04-01: Закрыт ad-hoc T55 по MapRiders UI: добавлены auto/manual demo mode, 3 анимированных synthetic riders и cinematic overlay, плюс обновлён `app/franchize/[slug]/map-riders/todo.md` после фактической реализации.
 
 ---
 

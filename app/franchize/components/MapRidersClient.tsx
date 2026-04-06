@@ -59,6 +59,8 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
   const [shareStatus, setShareStatus] = useState("Геошеринг выключен");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [liveRiders, setLiveRiders] = useState<any[]>([]);
+  const [demoMode, setDemoMode] = useState(false);
+  const [demoTime, setDemoTime] = useState(0);
   const pendingRoutePointsRef = useRef<Array<{ lat: number; lon: number; speedKmh: number; headingDeg: number | null; accuracyMeters: number | null; capturedAt: string }>>([]);
   const activeOwnSession = useMemo(
     () => snapshot?.activeSessions.find((session) => session.user_id === dbUser?.user_id) || null,
@@ -124,6 +126,18 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
       setShareStatus("Геошеринг выключен");
     }
   }, [activeOwnSession?.id]);
+
+  useEffect(() => {
+    if (snapshot && !snapshot.activeSessions?.length && !snapshot.liveLocations?.length) {
+      setDemoMode(true);
+    }
+  }, [snapshot]);
+
+  useEffect(() => {
+    if (!demoMode) return;
+    const timer = window.setInterval(() => setDemoTime((prev) => prev + 1), 1300);
+    return () => window.clearInterval(timer);
+  }, [demoMode]);
 
 
   useEffect(() => {
@@ -322,26 +336,36 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
         };
       });
 
-    const demoRiderPoints = riderPoints.length
-      ? []
-      : [
+    const orbit = Math.sin(demoTime / 2.8) * 0.004;
+    const orbit2 = Math.cos(demoTime / 3.4) * 0.0035;
+    const demoRiderPoints = demoMode
+      ? [
           {
             id: "demo-rider-alpha",
-            name: "Demo Rider Alpha • 18 км/ч",
+            name: `Demo Rider Alpha • ${18 + Math.round(Math.abs(orbit) * 100)} км/ч`,
             type: "point" as const,
             icon: "image:https://placehold.co/56x56/111827/ffffff?text=DA",
             color: "#60a5fa",
-            coords: [[56.2339, 43.9801]],
+            coords: [[56.2339 + orbit, 43.9801 + orbit2]],
           },
           {
             id: "demo-rider-beta",
-            name: "Demo Rider Beta • 23 км/ч",
+            name: `Demo Rider Beta • ${23 + Math.round(Math.abs(orbit2) * 120)} км/ч`,
             type: "point" as const,
             icon: "image:https://placehold.co/56x56/facc15/111827?text=DB",
             color: "#facc15",
-            coords: [[56.2251, 43.9924]],
+            coords: [[56.2251 - orbit2, 43.9924 + orbit]],
           },
-        ];
+          {
+            id: "demo-rider-gamma",
+            name: `Demo Rider Gamma • ${31 + Math.round(Math.abs(orbit2) * 80)} км/ч`,
+            type: "point" as const,
+            icon: "image:https://placehold.co/56x56/16a34a/ffffff?text=DG",
+            color: "#22c55e",
+            coords: [[56.2186 + orbit2, 43.964 + orbit]],
+          },
+        ]
+      : [];
 
     const meetupPoints = (snapshot?.meetups || []).map((meetup) => ({
       id: `meetup-${meetup.id}`,
@@ -364,7 +388,7 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
       : [];
 
     return [...routePoints, ...riderPoints, ...demoRiderPoints, ...meetupPoints];
-  }, [dbUser?.user_id, liveRiders, sessionDetail, snapshot?.activeSessions, snapshot?.meetups]);
+  }, [dbUser?.user_id, demoMode, demoTime, liveRiders, sessionDetail, snapshot?.activeSessions, snapshot?.meetups]);
 
   const heroStats = [
     { label: "В эфире", value: snapshot?.stats.activeRiders ?? 0, icon: "::FaSatelliteDish::" },
@@ -414,7 +438,14 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
       <section className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
         <Card className="border backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)", boxShadow: "0 30px 80px rgba(15,23,42,0.24)" }}>
           <CardHeader>
-            <Badge className="w-fit border hover:opacity-100" style={{ borderColor: `${crew.theme.palette.accentMain}55`, backgroundColor: `${crew.theme.palette.accentMain}18`, color: crew.theme.palette.accentMain }}>{(crew.header.brandName || crew.name || "VIP BIKE").toUpperCase()} • MAPRIDERS</Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="w-fit border hover:opacity-100" style={{ borderColor: `${crew.theme.palette.accentMain}55`, backgroundColor: `${crew.theme.palette.accentMain}18`, color: crew.theme.palette.accentMain }}>{(crew.header.brandName || crew.name || "VIP BIKE").toUpperCase()} • MAPRIDERS</Badge>
+              {demoMode ? (
+                <Badge className="border border-cyan-400/40 bg-cyan-400/15 text-cyan-100">DEMO FLOW ON</Badge>
+              ) : (
+                <Badge className="border border-emerald-400/40 bg-emerald-400/15 text-emerald-100">LIVE DATA</Badge>
+              )}
+            </div>
             <CardTitle className="mt-3 font-orbitron text-3xl" style={{ color: crew.theme.palette.textPrimary }}>Карта райдеров в реальном времени</CardTitle>
             <CardDescription className="max-w-2xl text-base" style={{ color: crew.theme.palette.textSecondary }}>
               Один тап — и авторизованный байкер делится маршрутом как в Telegram live location: команда видит движение, точки встречи, скорость и недельный прогресс. Deeplink уже несёт franchize slug и корректно возвращает в `/franchize/{slug}/map-riders`.
@@ -474,6 +505,9 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
                 Открыть Telegram-share мост
               </Link>
             </Button>
+            <Button type="button" variant="secondary" className="w-full" onClick={() => setDemoMode((prev) => !prev)}>
+              {demoMode ? "Выключить demo режим" : "Включить demo режим"}
+            </Button>
           </CardContent>
         </Card>
       </section>
@@ -485,7 +519,8 @@ export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: 
             <CardDescription>Тапни по карте, чтобы поставить meetup-поинт. Зелёным — выбранный маршрут, жёлтым/синим — активные райдеры.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[520px] overflow-hidden rounded-3xl border" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
+            <div className="relative h-[520px] overflow-hidden rounded-3xl border" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
+              <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/45 via-transparent to-cyan-500/10" />
               <VibeMap points={mapPoints} bounds={mapBounds ?? DEFAULT_BOUNDS} imageUrl={mapImageUrl} isEditable onMapClick={(coords) => setSelectedMeetupPoint(coords)} />
             </div>
           </CardContent>
