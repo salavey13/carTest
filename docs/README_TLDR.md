@@ -105,6 +105,7 @@ git push origin main
 - Attach screenshot via public `imageUrl` (artifact path alone is not enough).
 - Telegram deeplink: `https://t.me/oneBikePlsBot/app?startapp=homework/solution/<jobId>`.
 - Screenshot fallback engines: Chromium -> Firefox -> WebKit -> thum.io.
+- thum.io fallback (`scripts/page-screenshot-skill.mjs`) is for public URLs only; do not treat it as local smoke verification and avoid committing generated binary files to PRs.
 - ИЗО tasks: include image-generation prompt + manual redraw instructions + materials.
 - If Slack photo upload has `missing_scope`, send public photo links fallback.
 

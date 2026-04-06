@@ -1701,11 +1701,11 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
 
 ### T55 — MapRiders goldmine ingestion + phased SupaPlan decomposition
 - status: `in_progress`
-- updated_at: `2026-04-06T10:40:00Z`
+- updated_at: `2026-04-06T12:55:00Z`
 - owner: `codex`
-- notes: Закрыт I3/I4 с последовательным портингом goldmine: добавлен `POST /api/map-riders/batch-points`, включён queue-flush + legacy fallback на `/api/map-riders/location` c `X-Deprecated`, перенесены reducer/provider (`lib/map-riders-reducer.ts`, `hooks/useMapRidersContext.tsx`) и UI-срезы (`RiderMarkerLayer`, `RiderMarker`, `RidersDrawer`, `RiderFAB`, `StatusOverlay`, `LoadingSkeleton`), а страница переключена на refactored клиент через совместимый `app/franchize/components/MapRidersClient.tsx`. Дополнительно закрыт backlog drift: в `app/franchize/[slug]/map-riders/todo.md` отмечен stale-eviction как завершённый, добавлен автоматический smoke-check `scripts/map-riders-qa-check.mjs` (+ npm alias `qa:map-riders`) для маршрута `vip-bike` и split API (`overview/leaderboard/health` + legacy endpoint), а также закрыт UX gap из deep research: low-zoom grid теперь рендерит явные cluster markers (вместо first-rider fallback) и rider markers получили `title/alt/keyboard` для лучшей a11y-навигации.
-- next_step: Выполнить I5 field QA-срез (две мобилки, stale/offline, meetup persistence) и снять evidence-скриншоты для `vip-bike`; параллельно завести/привязать SupaPlan task для field QA evidence pack и закрыть T55 после проверки.
-- risks: после широкого UI-порта возможны регрессии по поведению drawer/FAB и типам в map overlays; нужен целевой smoke + визуальная проверка на Telegram WebApp.
+- notes: После повторного анализа deep-research и внешних review выполнен ещё один UI-полиш-срез в рамках I5: у rider markers добавлены heading indicators (ориентация по bearing) и плавная интерполяция позиций, чтобы убрать "телепорт" при realtime-обновлениях. Одновременно backlog расширен новой секцией `I6 — Production-hardening` в `app/franchize/[slug]/map-riders/todo.md`: privacy controls, replay scrubber, speed-gradient routes, ordering guardrails и anti-spoof sanity checks; добавлены seed-пункты под SupaPlan task decomposition для I6.
+- next_step: Дожать I5 field QA (две мобилки + stale/offline + meetup persistence), приложить `vip-bike` screenshot evidence и после этого перейти к I6 privacy/replay задачам через SupaPlan.
+- risks: до I5 field QA остаётся интеграционный риск Telegram WebApp (слои карты/FAB/drawer) + риск отсутствия privacy controls до старта production-трафика.
 - dependencies: T53
 - deliverables:
   - `app/franchize/[slug]/map-riders/todo.md`
@@ -1782,6 +1782,9 @@ Append only compact session deltas here as pointers when needed; full narrative 
 
 - 2026-04-06: T55 polish pass — после reread `goldmine/mr_*` закрыт TODO в clustering UX: `RiderMarkerLayer` теперь показывает cluster count marker + tap-to-zoom drilldown на low zoom, и добавлены `title/alt/keyboard` marker-атрибуты для a11y-совместимости с исследовательским чеклистом.
 - 2026-04-06: Создан следующий SupaPlan task для I5: `492d4564-1f97-4b49-b61f-a979bc4019fb` (`MapRiders I5 field QA evidence pack (vip-bike)`, capability `ui.ux`, `todo_path=app/franchize/[slug]/map-riders/todo.md#Next SupaPlan seed (post-I5)`).
+- 2026-04-06: T55 update — в `components/map-canvas/RiderMarker.tsx` добавлены heading arrow + плавная интерполяция marker position (убран резкий jump на realtime packets), а в `app/franchize/[slug]/map-riders/todo.md` добавлены секции `I6 — Production-hardening backlog` и `I6.1 — Screenshot + demo artifacts` для следующего SupaPlan цикла.
+- 2026-04-06: Для `I6` заведены новые SupaPlan задачи: privacy `3edabd9c-6f88-4491-aa31-2f11566e3059`, replay UI `b2fb8b78-dc2d-4913-b379-caf22eb1c4e5`, speed-gradient `92b48f2c-9c24-451e-bd4e-7cc761a7fc68`, ordering/anti-spoof `2d2c9b4a-ca83-4f41-9bf6-75f7bc475830`, field QA + screenshots `e9c8f76f-0863-4f20-a871-6a09dd3bf7f8`.
+- 2026-04-06: По обратной связи оператора закрыт SupaPlan task `2d2c9b4a-ca83-4f41-9bf6-75f7bc475830`: в `lib/map-riders-reducer.ts` добавлены guardrails против out-of-order realtime packets и anti-spoof sanity checks (нереалистичные GPS прыжки/координаты отбрасываются). Дополнительно удалён бинарный screenshot из git и зафиксированы guardrails для `scripts/page-screenshot-skill.mjs` в `AGENTS.md`, `README.MD`, `docs/README_TLDR.md`.
 
 ---
 

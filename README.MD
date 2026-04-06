@@ -328,6 +328,7 @@ curl -X POST "https://v0-car-test.vercel.app/api/codex-bridge/callback" \
 - Completion callback should include production homework URL (`https://v0-car-test.vercel.app/homework/solution/<jobId>`), and screenshot must be uploaded to public storage and sent as `imageUrl`.
 - Include Telegram WebApp deeplink too: `https://t.me/oneBikePlsBot/app?startapp=homework/solution/<jobId>`.
 - Screenshot fallback order: Chromium -> Firefox -> WebKit -> thum.io (`scripts/page-screenshot-skill.mjs`).
+- `scripts/page-screenshot-skill.mjs` is **public URL fallback only** (not local/private smoke testing) and its binary outputs should generally **not be committed in PRs**.
 - For ИЗО tasks, generate a "photo-of-sketchbook" image prompt + manual redraw steps + materials list.
 - If Slack lacks file-upload scopes (`missing_scope`), bridge should send photo links fallback instead of silently dropping images.
 
