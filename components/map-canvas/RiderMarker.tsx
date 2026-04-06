@@ -131,11 +131,16 @@ function createRiderIcon(rider: LiveRider, riderName: string, isSelected: boolea
 
 export const RiderMarker = memo(function RiderMarker({ rider, riderName, isSelected, onClick }: RiderMarkerProps) {
   const icon = useMemo(() => createRiderIcon(rider, riderName, isSelected), [rider, riderName, isSelected]);
+  const staleLabel = rider.status === "stale" ? "нет свежих данных" : "в эфире";
+  const markerLabel = `${riderName}: ${Math.round(rider.speed_kmh)} км/ч, ${staleLabel}`;
 
   return (
     <Marker
       position={[rider.lat, rider.lng]}
       icon={icon}
+      title={markerLabel}
+      alt={markerLabel}
+      keyboard
       eventHandlers={{ click: onClick }}
       zIndexOffset={isSelected ? 1000 : rider.isSelf ? 500 : 0}
     >
