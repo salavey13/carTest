@@ -47,9 +47,22 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 ### I5 — QA + rollout
 - [x] Add repeatable smoke-check script for page + split API routes (`npm run qa:map-riders`).
 - [x] Add accessibility polish on map markers (`title/alt/keyboard`) to align with deep-research a11y checklist.
+- [x] Add heading indicator + smooth marker interpolation to reduce "teleport" jumps on rider updates.
 - [ ] Two-phone live test, stale/offline test, meetup persistence test.
 - [ ] Screenshot evidence for `vip-bike` slug.
 - [ ] Cut final switch: legacy snapshot polling → split APIs + broadcast-first.
+
+### I6 — Production-hardening backlog (new)
+- [ ] Privacy controls: visibility mode (`crew/public`) + home-blur option + auto-expire presets (1/5/15/60).
+- [ ] Route replay full-screen UI with timeline scrubber.
+- [ ] Speed-gradient route polyline rendering (segment color by speed).
+- [ ] Long-press meetup creation mode (keep tap safe for exploration UX).
+- [x] Realtime ordering guardrails (drop stale/out-of-order move packets).
+- [x] Anti-spoof sanity checks for impossible speed/location jumps.
+
+### I6.1 — Screenshot + demo artifacts (new)
+- [x] Add screenshot policy note: for PR evidence use browser-container/playwright artifacts, avoid committing binary screenshots; `scripts/page-screenshot-skill.mjs` is fallback for public one-off capture only.
+- [ ] Capture and attach one "live map with riders" screenshot and one "drawer+leaderboard" screenshot.
 
 ## AGI gold port review notes (I1→I5)
 - ✅ Preserved contract-first order from goldmine (`overview`/`leaderboard`/`health` + legacy compatibility).
@@ -60,6 +73,13 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 
 ## Next SupaPlan seed (post-I5)
 - `MapRiders I5 field QA evidence pack` — execute two-phone stale/offline + meetup persistence run and attach `vip-bike` screenshots + short failure matrix. (SupaPlan task: `492d4564-1f97-4b49-b61f-a979bc4019fb`)
+
+## Next SupaPlan seed (I6 production hardening)
+- `MapRiders I6 privacy controls + auto-expire presets` — add visibility mode + home blur + auto-expire presets and enforce in write APIs. (SupaPlan task: `3edabd9c-6f88-4491-aa31-2f11566e3059`)
+- `MapRiders I6 route replay full-screen scrubber UI` — ship full-screen replay panel + scrubber + play/pause. (SupaPlan task: `b2fb8b78-dc2d-4913-b379-caf22eb1c4e5`)
+- `MapRiders I6 speed-gradient route visualization` — render speed-colored polyline segments on replay/live detail. (SupaPlan task: `92b48f2c-9c24-451e-bd4e-7cc761a7fc68`)
+- `MapRiders I6 realtime ordering + anti-spoof guardrails` — ✅ implemented in reducer: monotonic packet filtering + unrealistic jump reject guard. (SupaPlan task: `2d2c9b4a-ca83-4f41-9bf6-75f7bc475830`)
+- `MapRiders I6 two-phone QA + screenshot evidence pack (vip-bike)` — two-phone pass with stale/offline/meetup persistence matrix + screenshot pack. (SupaPlan task: `e9c8f76f-0863-4f20-a871-6a09dd3bf7f8`)
 
 ## Risks to watch
 - Race conditions from mixed snapshot + realtime updates.

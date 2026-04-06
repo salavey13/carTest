@@ -148,6 +148,25 @@ export const initialMapRidersState: MapRidersState = {
 // --- Eviction constants ---
 const STALE_MS = 30_000;   // 30s → faded
 const EVICT_MS = 120_000;  // 2min → removed
+const MAX_PLAUSIBLE_SPEED_KMH = 280;
+
+function isFiniteCoordinate(lat: number, lng: number): boolean {
+  return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
+
+function haversineDistanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const lat1 = toRad(aLat);
+  const lat2 = toRad(bLat);
+
+  const sinLat = Math.sin(dLat / 2);
+  const sinLng = Math.sin(dLng / 2);
+  const a = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return 6371 * c;
+}
 
 export type MapRidersAction =
   | { type: "snapshot/loaded"; payload: SnapshotData; selfUserId?: string }
@@ -221,8 +240,33 @@ export function mapRidersReducer(state: MapRidersState, action: MapRidersAction)
 
     case "rider/moved": {
       const { user_id, lat, lng, speed_kmh, heading, updated_at } = action.payload;
+      if (!isFiniteCoordinate(lat, lng)) return state;
+
       const nextRiders = new Map(state.liveRiders);
       const existing = nextRiders.get(user_id);
+
+      if (existing) {
+        const incomingTs = new Date(updated_at).getTime();
+        const existingTs = new Date(existing.updated_at).getTime();
+
+        if (Number.isFinite(incomingTs) && Number.isFinite(existingTs) && incomingTs <= existingTs) {
+          // Ignore stale/out-of-order packets.
+          return state;
+        }
+
+        if (Number.isFinite(incomingTs) && Number.isFinite(existingTs)) {
+          const deltaSeconds = Math.max((incomingTs - existingTs) / 1000, 0);
+          if (deltaSeconds > 0) {
+            const distanceKm = haversineDistanceKm(existing.lat, existing.lng, lat, lng);
+            const impliedSpeedKmh = (distanceKm / deltaSeconds) * 3600;
+            if (impliedSpeedKmh > MAX_PLAUSIBLE_SPEED_KMH) {
+              // Drop unrealistic jump packet (possible GPS glitch/spoof).
+              return state;
+            }
+          }
+        }
+      }
+
       nextRiders.set(user_id, {
         ...(existing || { crew_slug: "", isSelf: user_id === action.selfUserId }),
         user_id,
