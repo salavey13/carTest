@@ -476,6 +476,7 @@ export function MapRidersClientRefactored({
 ---
 
 ### CRIT-3: Telegram Hybrid Location System (`useLiveRiders` Rewrite)
+(!) UPDATED: SEE app/franchize/[slug]/map-riders/LOCATION_EXTRACTION_REFERENCES.md AND 'example_*.txt' files nearby for references and exampls of hooks, webhookcs route, components and sql functiond - merge propefly in actual files in repo, create supabase migrstion file with functions after checking it's correctness. marge carefully, do not overwrite whole files (!)
 
 **Проблема:**
 Текущий `useLiveRiders` использует только `navigator.geolocation.watchPosition` — браузерный API, который работает только в foreground и не даёт оптимальной точности в Telegram WebView. Telegram Mini App предоставляет `WebApp.requestLocation()` — более точный и быстрый GPS, особенно на Android/iOS.
