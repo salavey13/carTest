@@ -1,0 +1,377 @@
+"use client";
+
+import { useEffect, useRef, useState, useCallback } from "react";
+
+// Telegram WebApp types
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp?: {
+        initData: string;
+        initDataUnsafe: {
+          user?: {
+            id: number;
+            first_name: string;
+            last_name?: string;
+            username?: string;
+            language_code?: string;
+          };
+          start_param?: string;
+          auth_date?: number;
+          hash?: string;
+        };
+        ready: () => void;
+        expand: () => void;
+        close: () => void;
+        showAlert: (message: string) => void;
+        showConfirm: (message: string, callback: (confirmed: boolean) => void) => void;
+        MainButton: {
+          text: string;
+          color: string;
+          textColor: string;
+          isVisible: boolean;
+          isActive: boolean;
+          setText: (text: string) => void;
+          onClick: (callback: () => void) => void;
+          offClick: (callback: () => void) => void;
+          show: () => void;
+          hide: () => void;
+          enable: () => void;
+          disable: () => void;
+          setParams: (params: { text?: string; color?: string; text_color?: string }) => void;
+        };
+        BackButton: {
+          isVisible: boolean;
+          onClick: (callback: () => void) => void;
+          offClick: (callback: () => void) => void;
+          show: () => void;
+          hide: () => void;
+        };
+        HapticFeedback: {
+          impactOccurred: (style: "light" | "medium" | "heavy" | "rigid" | "soft") => void;
+          notificationOccurred: (type: "error" | "success" | "warning") => void;
+          selectionChanged: () => void;
+        };
+        openLink: (url: string) => void;
+        openTelegramLink: (url: string) => void;
+        platform: string;
+        version: string;
+        colorScheme: "light" | "dark";
+        themeParams: Record<string, string>;
+        isExpanded: boolean;
+        viewportHeight: number;
+        viewportStableHeight: number;
+      };
+    };
+  }
+}
+
+export interface TelegramUser {
+  id: number;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  language_code?: string;
+}
+
+export interface TelegramLocation {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  altitude?: number;
+  heading?: number;
+  speed?: number;
+}
+
+export interface UseTelegramReturn {
+  // WebApp state
+  isReady: boolean;
+  isInTelegram: boolean;
+  user: TelegramUser | null;
+  startParam: string | null;
+  platform: string;
+  version: string;
+  
+  // UI controls
+  mainButton: {
+    show: (text: string, onClick: () => void, options?: { color?: string; textColor?: string }) => void;
+    hide: () => void;
+    setLoading: (loading: boolean) => void;
+    setText: (text: string) => void;
+  };
+  backButton: {
+    show: (onClick: () => void) => void;
+    hide: () => void;
+  };
+  
+  // Haptic feedback
+  haptic: {
+    light: () => void;
+    medium: () => void;
+    heavy: () => void;
+    success: () => void;
+    error: () => void;
+    warning: () => void;
+  };
+  
+  // Location (the vibey way)
+  location: {
+    request: () => Promise<TelegramLocation | null>;
+    watch: (callback: (location: TelegramLocation) => void, options?: PositionOptions) => () => void;
+    isSupported: boolean;
+    lastLocation: TelegramLocation | null;
+  };
+  
+  // Utils
+  expand: () => void;
+  close: () => void;
+  openLink: (url: string) => void;
+  share: (text: string, url?: string) => void;
+  showAlert: (message: string) => void;
+  showConfirm: (message: string) => Promise<boolean>;
+}
+
+export function useTelegram(): UseTelegramReturn {
+  const [isReady, setIsReady] = useState(false);
+  const [lastLocation, setLastLocation] = useState<TelegramLocation | null>(null);
+  const webAppRef = useRef<Window["Telegram"]["WebApp"] | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+
+  const webApp = typeof window !== "undefined" ? window.Telegram?.WebApp : null;
+
+  useEffect(() => {
+    if (webApp) {
+      webAppRef.current = webApp;
+      webApp.ready();
+      setIsReady(true);
+    }
+  }, [webApp]);
+
+  const isInTelegram = Boolean(webApp);
+  const user = webApp?.initDataUnsafe?.user || null;
+  const startParam = webApp?.initDataUnsafe?.start_param || null;
+  const platform = webApp?.platform || "unknown";
+  const version = webApp?.version || "unknown";
+
+  // Main Button controls
+  const mainButton = {
+    show: useCallback((text: string, onClick: () => void, options?: { color?: string; textColor?: string }) => {
+      if (!webApp) return;
+      webApp.MainButton.setText(text);
+      if (options?.color) webApp.MainButton.setParams({ color: options.color });
+      if (options?.textColor) webApp.MainButton.setParams({ text_color: options.textColor });
+      webApp.MainButton.onClick(onClick);
+      webApp.MainButton.show();
+    }, [webApp]),
+
+    hide: useCallback(() => {
+      if (!webApp) return;
+      webApp.MainButton.hide();
+    }, [webApp]),
+
+    setLoading: useCallback((loading: boolean) => {
+      if (!webApp) return;
+      if (loading) {
+        webApp.MainButton.setText("⏳ Загрузка...");
+        webApp.MainButton.disable();
+      } else {
+        webApp.MainButton.enable();
+      }
+    }, [webApp]),
+
+    setText: useCallback((text: string) => {
+      if (!webApp) return;
+      webApp.MainButton.setText(text);
+    }, [webApp]),
+  };
+
+  // Back Button controls
+  const backButton = {
+    show: useCallback((onClick: () => void) => {
+      if (!webApp) return;
+      webApp.BackButton.onClick(onClick);
+      webApp.BackButton.show();
+    }, [webApp]),
+
+    hide: useCallback(() => {
+      if (!webApp) return;
+      webApp.BackButton.hide();
+    }, [webApp]),
+  };
+
+  // Haptic feedback
+  const haptic = {
+    light: useCallback(() => webApp?.HapticFeedback?.impactOccurred("light"), [webApp]),
+    medium: useCallback(() => webApp?.HapticFeedback?.impactOccurred("medium"), [webApp]),
+    heavy: useCallback(() => webApp?.HapticFeedback?.impactOccurred("heavy"), [webApp]),
+    success: useCallback(() => webApp?.HapticFeedback?.notificationOccurred("success"), [webApp]),
+    error: useCallback(() => webApp?.HapticFeedback?.notificationOccurred("error"), [webApp]),
+    warning: useCallback(() => webApp?.HapticFeedback?.notificationOccurred("warning"), [webApp]),
+  };
+
+  // Location - THE VIBEY WAY
+  const location = {
+    // One-time location request
+    request: useCallback(async (): Promise<TelegramLocation | null> => {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          console.error("[useTelegram] Geolocation not supported");
+          resolve(null);
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const loc: TelegramLocation = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              altitude: position.coords.altitude || undefined,
+              heading: position.coords.heading || undefined,
+              speed: position.coords.speed || undefined,
+            };
+            setLastLocation(loc);
+            resolve(loc);
+          },
+          (error) => {
+            console.error("[useTelegram] Location error:", error);
+            resolve(null);
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+        );
+      });
+    }, []),
+
+    // Watch location continuously
+    watch: useCallback((callback: (location: TelegramLocation) => void, options?: PositionOptions): (() => void) => {
+      if (!navigator.geolocation) {
+        console.error("[useTelegram] Geolocation not supported");
+        return () => {};
+      }
+
+      // Clear existing watch
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const loc: TelegramLocation = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            altitude: position.coords.altitude || undefined,
+            heading: position.coords.heading || undefined,
+            speed: position.coords.speed || undefined,
+          };
+          setLastLocation(loc);
+          callback(loc);
+        },
+        (error) => {
+          console.error("[useTelegram] Watch error:", error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: options?.timeout || 10000,
+          maximumAge: options?.maximumAge || 5000,
+        }
+      );
+
+      watchIdRef.current = watchId;
+
+      // Return cleanup function
+      return () => {
+        if (watchIdRef.current !== null) {
+          navigator.geolocation.clearWatch(watchIdRef.current);
+          watchIdRef.current = null;
+        }
+      };
+    }, []),
+
+    isSupported: typeof navigator !== "undefined" && "geolocation" in navigator,
+    lastLocation,
+  };
+
+  // Utils
+  const expand = useCallback(() => webApp?.expand(), [webApp]);
+  const close = useCallback(() => webApp?.close(), [webApp]);
+  const openLink = useCallback((url: string) => webApp?.openLink(url), [webApp]);
+  
+  const share = useCallback((text: string, url?: string) => {
+    const shareText = url ? `${text}\n${url}` : text;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url || "")}&text=${encodeURIComponent(text)}`;
+    webApp?.openTelegramLink(shareUrl);
+  }, [webApp]);
+
+  const showAlert = useCallback((message: string) => {
+    return new Promise<void>((resolve) => {
+      if (webApp) {
+        webApp.showAlert(message);
+        resolve();
+      } else {
+        alert(message);
+        resolve();
+      }
+    });
+  }, [webApp]);
+
+  const showConfirm = useCallback((message: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (webApp) {
+        webApp.showConfirm(message, resolve);
+      } else {
+        resolve(confirm(message));
+      }
+    });
+  }, [webApp]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
+
+  return {
+    isReady,
+    isInTelegram,
+    user,
+    startParam,
+    platform,
+    version,
+    mainButton,
+    backButton,
+    haptic,
+    location,
+    expand,
+    close,
+    openLink,
+    share,
+    showAlert,
+    showConfirm,
+  };
+}
+
+// Hook for checking if running in Telegram
+export function useIsInTelegram(): boolean {
+  const [isInTelegram, setIsInTelegram] = useState(false);
+  
+  useEffect(() => {
+    setIsInTelegram(typeof window !== "undefined" && Boolean(window.Telegram?.WebApp));
+  }, []);
+  
+  return isInTelegram;
+}
+
+// Hook for Telegram theme
+export function useTelegramTheme() {
+  const webApp = typeof window !== "undefined" ? window.Telegram?.WebApp : null;
+  
+  return {
+    colorScheme: webApp?.colorScheme || "dark",
+    themeParams: webApp?.themeParams || {},
+    isDark: webApp?.colorScheme === "dark",
+  };
+}
