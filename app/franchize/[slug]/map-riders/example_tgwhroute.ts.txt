@@ -1,0 +1,443 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
+import { logger } from "@/lib/logger";
+
+/**
+ * Telegram Bot Webhook Handler
+ * Receives updates from Telegram bot including location messages
+ * 
+ * Setup:
+ * 1. Set webhook URL via BotFather or API:
+ *    POST https://api.telegram.org/bot<TOKEN>/setWebhook
+ *    { "url": "https://yourdomain.com/api/telegram/webhook" }
+ * 
+ * 2. Bot will send all updates (messages, locations, inline queries) to this endpoint
+ */
+
+// Telegram Update types
+interface TelegramUpdate {
+  update_id: number;
+  message?: TelegramMessage;
+  edited_message?: TelegramMessage;
+  inline_query?: unknown;
+  callback_query?: TelegramCallbackQuery;
+}
+
+interface TelegramMessage {
+  message_id: number;
+  from?: TelegramUser;
+  date: number;
+  chat: TelegramChat;
+  text?: string;
+  location?: TelegramLocation;
+  venue?: TelegramVenue;
+  reply_to_message?: TelegramMessage;
+}
+
+interface TelegramLocation {
+  latitude: number;
+  longitude: number;
+  horizontal_accuracy?: number;
+  live_period?: number;  // If present, this is a live location
+  heading?: number;
+  proximity_alert_radius?: number;
+}
+
+interface TelegramVenue {
+  location: TelegramLocation;
+  title: string;
+  address: string;
+  foursquare_id?: string;
+  foursquare_type?: string;
+  google_place_id?: string;
+  google_place_type?: string;
+}
+
+interface TelegramUser {
+  id: number;
+  is_bot: boolean;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  language_code?: string;
+}
+
+interface TelegramChat {
+  id: number;
+  type: "private" | "group" | "supergroup" | "channel";
+  title?: string;
+  username?: string;
+}
+
+interface TelegramCallbackQuery {
+  id: string;
+  from: TelegramUser;
+  message?: TelegramMessage;
+  inline_message_id?: string;
+  chat_instance?: string;
+  data?: string;
+}
+
+// Bot token from env
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+
+/**
+ * Send message via Telegram Bot API
+ */
+async function sendTelegramMessage(chatId: number, text: string, options?: {
+  parse_mode?: "HTML" | "Markdown" | "MarkdownV2";
+  reply_markup?: unknown;
+}) {
+  if (!BOT_TOKEN) {
+    logger.error("[telegram/webhook] BOT_TOKEN not configured");
+    return;
+  }
+
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        ...options,
+      }),
+    });
+
+    if (!response.ok) {
+      logger.error("[telegram/webhook] Failed to send message:", await response.text());
+    }
+  } catch (error) {
+    logger.error("[telegram/webhook] Error sending message:", error);
+  }
+}
+
+/**
+ * Send location request button
+ */
+async function requestLocation(chatId: number, text: string = "📍 Поделись локацией для MapRiders") {
+  if (!BOT_TOKEN) return;
+
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        reply_markup: {
+          keyboard: [[
+            { text: "📍 Отправить локацию", request_location: true }
+          ]],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      logger.error("[telegram/webhook] Failed to request location:", await response.text());
+    }
+  } catch (error) {
+    logger.error("[telegram/webhook] Error requesting location:", error);
+  }
+}
+
+/**
+ * Remove custom keyboard
+ */
+async function removeKeyboard(chatId: number, text: string = "✅ Готово!") {
+  if (!BOT_TOKEN) return;
+
+  try {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        reply_markup: { remove_keyboard: true },
+      }),
+    });
+  } catch (error) {
+    logger.error("[telegram/webhook] Error removing keyboard:", error);
+  }
+}
+
+/**
+ * Process location update and save to database
+ */
+async function processLocation(
+  user: TelegramUser,
+  location: TelegramLocation,
+  isLive: boolean = false
+) {
+  const supabase = await createClient();
+
+  // Map Telegram user_id to your user_id format
+  const userId = `tg_${user.id}`;
+  
+  // Default crew slug - you might want to determine this from user context
+  const crewSlug = "vip-bike";
+
+  try {
+    // 1. Upsert to live_locations (for real-time tracking)
+    const { error: liveError } = await supabase.from("live_locations").upsert(
+      {
+        user_id: userId,
+        crew_slug: crewSlug,
+        lat: location.latitude,
+        lng: location.longitude,
+        speed_kmh: 0, // Telegram doesn't provide speed
+        heading: location.heading || null,
+        is_riding: isLive,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" }
+    );
+
+    if (liveError) {
+      logger.error("[telegram/webhook] live_locations upsert error:", liveError);
+    }
+
+    // 2. If this is a live location, also update the session
+    if (isLive) {
+      const { error: sessionError } = await supabase
+        .from("map_rider_sessions")
+        .update({
+          latest_lat: location.latitude,
+          latest_lon: location.longitude,
+          last_ping_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId)
+        .eq("crew_slug", crewSlug)
+        .eq("status", "active");
+
+      if (sessionError) {
+        logger.error("[telegram/webhook] session update error:", sessionError);
+      }
+    }
+
+    // 3. Broadcast to other riders via Supabase Realtime
+    // This triggers the broadcast event for connected clients
+    const channel = supabase.channel(`map:${crewSlug}`);
+    await channel.send({
+      type: "broadcast",
+      event: "position",
+      payload: {
+        user_id: userId,
+        crew_slug: crewSlug,
+        lat: location.latitude,
+        lng: location.longitude,
+        speed_kmh: 0,
+        heading: location.heading || null,
+        is_riding: isLive,
+        source: "telegram_bot",
+      },
+    });
+
+    logger.info(`[telegram/webhook] Location processed for user ${userId}, live=${isLive}`);
+    return true;
+  } catch (error) {
+    logger.error("[telegram/webhook] Error processing location:", error);
+    return false;
+  }
+}
+
+/**
+ * Main webhook handler
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const update: TelegramUpdate = await request.json();
+    
+    logger.info("[telegram/webhook] Received update:", { 
+      update_id: update.update_id,
+      has_message: Boolean(update.message),
+      has_edited_message: Boolean(update.edited_message),
+    });
+
+    const message = update.message || update.edited_message;
+    
+    if (!message) {
+      return NextResponse.json({ ok: true }); // Acknowledge but ignore
+    }
+
+    const chatId = message.chat.id;
+    const user = message.from;
+
+    if (!user) {
+      return NextResponse.json({ ok: true });
+    }
+
+    // Handle location message
+    if (message.location) {
+      const isLive = Boolean(message.location.live_period);
+      const isEdited = Boolean(update.edited_message);
+      
+      logger.info("[telegram/webhook] Location received:", {
+        user_id: user.id,
+        username: user.username,
+        lat: message.location.latitude,
+        lon: message.location.longitude,
+        is_live: isLive,
+        is_edited: isEdited,
+        live_period: message.location.live_period,
+      });
+
+      // Process the location
+      await processLocation(user, message.location, isLive);
+
+      // If this is the first location in a live sharing session, send confirmation
+      if (isLive && !isEdited) {
+        await sendTelegramMessage(
+          chatId,
+          `🏍️ Live location started!\n\nYour position is now visible on MapRiders. Live sharing will expire in ${message.location.live_period} seconds.`,
+          { parse_mode: "HTML" }
+        );
+      }
+
+      return NextResponse.json({ ok: true });
+    }
+
+    // Handle venue message (location with title/address)
+    if (message.venue) {
+      logger.info("[telegram/webhook] Venue received:", {
+        user_id: user.id,
+        title: message.venue.title,
+        address: message.venue.address,
+      });
+
+      await processLocation(user, message.venue.location, false);
+      
+      await sendTelegramMessage(
+        chatId,
+        `📍 Venue "${message.venue.title}" saved!\nAddress: ${message.venue.address}`,
+        { parse_mode: "HTML" }
+      );
+
+      return NextResponse.json({ ok: true });
+    }
+
+    // Handle text commands
+    if (message.text) {
+      const text = message.text.trim();
+      
+      // /start command
+      if (text === "/start" || text.startsWith("/start ")) {
+        const startParam = text.split(" ")[1] || "";
+        
+        await sendTelegramMessage(
+          chatId,
+          `🏍️ <b>Welcome to VIP BIKE MapRiders!</b>\n\n` +
+          `I can help you share your location with your crew.\n\n` +
+          `<b>Commands:</b>\n` +
+          `/location - Share your current location\n` +
+          `/live - Start live location sharing\n` +
+          `/stop - Stop sharing\n` +
+          `/status - Check your status`,
+          { parse_mode: "HTML" }
+        );
+
+        return NextResponse.json({ ok: true });
+      }
+
+      // /location command - request one-time location
+      if (text === "/location") {
+        await requestLocation(chatId, "📍 Tap the button to share your location");
+        return NextResponse.json({ ok: true });
+      }
+
+      // /live command - explain how to start live location
+      if (text === "/live") {
+        await sendTelegramMessage(
+          chatId,
+          `🏍️ <b>Live Location Sharing</b>\n\n` +
+          `To start live sharing:\n` +
+          `1. Tap the 📎 attachment button\n` +
+          `2. Select "Location"\n` +
+          `3. Choose "Share My Live Location"\n\n` +
+          `Your crew will see you moving in real-time!`,
+          { parse_mode: "HTML" }
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      // /stop command
+      if (text === "/stop") {
+        const userId = `tg_${user.id}`;
+        const supabase = await createClient();
+        
+        // Mark session as completed
+        await supabase
+          .from("map_rider_sessions")
+          .update({ status: "completed", sharing_enabled: false })
+          .eq("user_id", userId)
+          .eq("status", "active");
+
+        // Remove from live_locations
+        await supabase.from("live_locations").delete().eq("user_id", userId);
+
+        await sendTelegramMessage(chatId, "✅ Location sharing stopped.");
+        return NextResponse.json({ ok: true });
+      }
+
+      // /status command
+      if (text === "/status") {
+        const userId = `tg_${user.id}`;
+        const supabase = await createClient();
+
+        const { data: session } = await supabase
+          .from("map_rider_sessions")
+          .select("status, started_at, total_distance_km")
+          .eq("user_id", userId)
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (session?.status === "active") {
+          await sendTelegramMessage(
+            chatId,
+            `🏍️ <b>You're currently riding!</b>\n\n` +
+            `Distance: ${session.total_distance_km || 0} km\n` +
+            `Use /stop to end your session.`,
+            { parse_mode: "HTML" }
+          );
+        } else {
+          await sendTelegramMessage(
+            chatId,
+            `😴 <b>You're not riding right now.</b>\n\n` +
+            `Open the MapRiders app to start a new ride!`,
+            { parse_mode: "HTML" }
+          );
+        }
+
+        return NextResponse.json({ ok: true });
+      }
+
+      // Default response for unknown text
+      await sendTelegramMessage(
+        chatId,
+        `🤔 I didn't understand that.\n\nTry: /location, /live, /stop, or /status`,
+        { parse_mode: "HTML" }
+      );
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    logger.error("[telegram/webhook] Webhook error:", error);
+    return NextResponse.json({ ok: false, error: "Internal error" }, { status: 500 });
+  }
+}
+
+/**
+ * Health check endpoint
+ */
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    message: "Telegram webhook is active",
+    bot_configured: Boolean(BOT_TOKEN),
+  });
+}

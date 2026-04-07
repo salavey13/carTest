@@ -1,0 +1,129 @@
+"use client";
+
+import { useEffect, useRef, useCallback } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { useAppContext } from "@/contexts/AppContext";
+
+const THROTTLE_MS = 3000; // 3 seconds
+const MIN_DISTANCE_M = 15;
+
+export interface LiveRiderPosition {
+  user_id: string;
+  crew_slug: string;
+  lat: number;
+  lng: number;
+  speed_kmh: number;
+  heading: number | null;
+  is_riding: boolean;
+  updated_at?: string;
+}
+
+export function useLiveRiders(crewSlug: string, onPositionUpdate?: (payload: LiveRiderPosition) => void) {
+  const { dbUser } = useAppContext();
+  const lastSentRef = useRef<{ lat: number; lng: number; ts: number } | null>(null);
+  const channelRef = useRef<any>(null);
+  const supabase = getSupabaseBrowserClient();
+
+  const sendPosition = useCallback(async (position: GeolocationPosition) => {
+    if (!dbUser?.user_id || !crewSlug) return;
+
+    const { latitude: lat, longitude: lng, speed, heading } = position.coords;
+    const now = Date.now();
+
+    const last = lastSentRef.current;
+    if (last) {
+      // Calculate approximate distance in meters (rough conversion)
+      const distance = Math.hypot(lat - last.lat, lng - last.lng) * 111_000;
+      if (distance < MIN_DISTANCE_M && now - last.ts < THROTTLE_MS) return;
+    }
+
+    const payload: LiveRiderPosition = {
+      user_id: dbUser.user_id,
+      crew_slug: crewSlug,
+      lat,
+      lng,
+      speed_kmh: Math.max(0, (speed || 0) * 3.6),
+      heading: heading || null,
+      is_riding: true,
+    };
+
+    // 1. Fast broadcast (instant for everyone in the crew)
+    supabase.channel(`map:${crewSlug}`).send({
+      type: "broadcast",
+      event: "position",
+      payload,
+    });
+
+    // 2. Upsert to live_locations (ephemeral + spatial RLS)
+    // This is for persistence/reconnection, not for real-time updates
+    await supabase.from("live_locations").upsert(payload, { onConflict: "user_id" });
+
+    lastSentRef.current = { lat, lng, ts: now };
+  }, [dbUser?.user_id, crewSlug, supabase]);
+
+  // Subscribe to live positions from other riders
+  useEffect(() => {
+    if (!crewSlug) return;
+
+    const channel = supabase.channel(`map:${crewSlug}`);
+
+    channel
+      .on("broadcast", { event: "position" }, ({ payload }: { payload: LiveRiderPosition }) => {
+        // Dispatch global event for components to listen to
+        window.dispatchEvent(new CustomEvent("live-rider-update", { detail: payload }));
+        // Also call the callback if provided
+        onPositionUpdate?.(payload);
+      })
+      .subscribe((status: string) => {
+        console.log(`[useLiveRiders] Channel status: ${status}`);
+      });
+
+    channelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [crewSlug, supabase, onPositionUpdate]);
+
+  // Cleanup stale live_locations on mount (optional, runs once)
+  useEffect(() => {
+    if (!crewSlug || !dbUser?.user_id) return;
+
+    // Delete old entries (> 5 minutes) to keep table clean
+    const cleanup = async () => {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      await supabase
+        .from("live_locations")
+        .delete()
+        .lt("updated_at", fiveMinutesAgo);
+    };
+
+    cleanup().catch(console.error);
+  }, [crewSlug, dbUser?.user_id, supabase]);
+
+  return { sendPosition };
+}
+
+// Hook to just listen to live rider updates (for map components)
+export function useLiveRiderListener(crewSlug: string) {
+  const supabase = getSupabaseBrowserClient();
+  const channelRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!crewSlug) return;
+
+    const channel = supabase.channel(`map:${crewSlug}`);
+
+    channel
+      .on("broadcast", { event: "position" }, ({ payload }: { payload: LiveRiderPosition }) => {
+        window.dispatchEvent(new CustomEvent("live-rider-update", { detail: payload }));
+      })
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [crewSlug, supabase]);
+}
