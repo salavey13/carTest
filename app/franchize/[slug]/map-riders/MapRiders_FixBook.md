@@ -11,9 +11,10 @@ The refactoring from the 750-line "monster" component into modular architecture 
 | Category | Status | Count |
 |----------|--------|-------|
 | 🔴 Critical | Broken/Blocking | 5 |
-| 🟠 High Priority | Missing/Incomplete | 8 |
-| 🟡 Medium Priority | Quality/Performance | 6 |
+| 🟠 High Priority | Missing/Incomplete | 7 (1 resolved) |
+| 🟡 Medium Priority | Quality/Performance | 5 |
 | 🟢 Low Priority | Nice to Have | 4 |
+| **Total** | | **21** (1 verified) |
 
 ---
 
@@ -568,66 +569,20 @@ useEffect(() => {
 
 ## 🟠 HIGH PRIORITY ISSUES
 
-### HIGH-1: Missing API Routes
+### HIGH-1: Missing API Routes ✅ VERIFIED EXISTS
 
-The refactored code references API routes that may not exist or need verification:
+The refactored code references API routes:
 
 | Route | Purpose | Status |
 |-------|---------|--------|
-| `/api/map-riders` | Fetch snapshot | Verify exists |
-| `/api/map-riders/session` | Start/stop session | Verify exists |
-| `/api/map-riders/session/[id]` | Get session detail | Verify exists |
-| `/api/map-riders/location` | Update position | Verify exists |
-| `/api/map-riders/meetups` | Create meetup | Verify exists |
-| `/api/map-riders/batch-points` | Batch GPS upload | **MISSING** |
+| `/api/map-riders` | Fetch snapshot | ✅ Exists |
+| `/api/map-riders/session` | Start/stop session | ✅ Exists |
+| `/api/map-riders/session/[id]` | Get session detail | ✅ Exists |
+| `/api/map-riders/location` | Update position | ✅ Exists |
+| `/api/map-riders/meetups` | Create meetup | ✅ Exists |
+| `/api/map-riders/batch-points` | Batch GPS upload | ✅ **VERIFIED EXISTS** |
 
-**Action:** Create missing `/api/map-riders/batch-points/route.ts`:
-
-```tsx
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-server";
-
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { sessionId, userId, crewSlug, points } = body;
-
-    if (!sessionId || !userId || !Array.isArray(points) || points.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    // Insert all points in batch
-    const records = points.map((p) => ({
-      session_id: sessionId,
-      user_id: userId,
-      crew_slug: crewSlug,
-      lat: p.lat,
-      lon: p.lng,
-      speed_kmh: p.speedKmh,
-      heading_deg: p.heading,
-      accuracy_meters: p.accuracyMeters,
-      captured_at: p.capturedAt,
-    }));
-
-    const { error } = await supabaseAdmin
-      .from("map_rider_route_points")
-      .insert(records);
-
-    if (error) throw error;
-
-    return NextResponse.json({ success: true, inserted: records.length });
-  } catch (error) {
-    console.error("[batch-points] Error:", error);
-    return NextResponse.json(
-      { success: false, error: "Failed to save points" },
-      { status: 500 }
-    );
-  }
-}
-```
+**No action needed** - all required API routes are implemented in the codebase.
 
 ---
 
@@ -1098,13 +1053,9 @@ onPosition: (point) => {
 
 ---
 
-### MED-5: Missing Compass/Heading Indicator
+### MED-5: ~~Missing Compass/Heading Indicator~~
 
-**Problem:**
-The rider markers show heading direction, but there's no compass indicator for the user's own heading or map orientation.
-
-**Fix:**
-Add a compass component that shows current heading.
+> **REMOVED**: User confirmed map doesn't rotate, so compass indicator is not needed.
 
 ---
 
@@ -1194,7 +1145,7 @@ Execute fixes in this order for maximum impact:
 5. **CRIT-5**: Fix RiderMarker animation memory leak
 
 ### Phase B: High Priority Fixes
-6. **HIGH-1**: Create `/api/map-riders/batch-points` route
+6. ~~**HIGH-1**: Create `/api/map-riders/batch-points` route~~ ✅ Already exists
 7. **HIGH-3**: Add session form fields (ride name, vehicle, mode)
 8. **HIGH-2**: Implement animated demo mode
 9. **HIGH-4**: Add toggle demo mode button
@@ -1222,7 +1173,6 @@ Execute fixes in this order for maximum impact:
 ### Create New Files:
 1. `/hooks/useMapRidersContext.tsx`
 2. `/components/maps/MapInteractionCapture.tsx`
-3. `/app/api/map-riders/batch-points/route.ts`
 
 ### Modify Existing Files:
 1. `/components/maps/RacingMap.tsx` - Add `onMapLongPress` prop
@@ -1231,6 +1181,9 @@ Execute fixes in this order for maximum impact:
 4. `/components/map-riders/RiderMarker.tsx` - Animation fix
 5. `/lib/map-riders-reducer.ts` - Add UI action types
 6. `/app/globals.css` - Add cluster marker styles
+
+### Verified Existing (No Changes Needed):
+1. `/app/api/map-riders/batch-points/route.ts` - Already implemented
 
 ---
 
