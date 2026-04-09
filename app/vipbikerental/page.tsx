@@ -13,23 +13,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
 
+/* =========================================================
+   SHARED COMPONENTS (ORIGINAL + CLEAN)
+========================================================= */
+
 type ServiceItem = { icon: string; text: string };
 
 const InfoItem = ({ icon, children }: { icon: string; children: React.ReactNode }) => (
   <div className="flex items-start gap-3">
-    <VibeContentRenderer content={icon} className="mt-1 flex-shrink-0 text-xl text-accent-text" />
-    <p className="text-foreground/90">{children}</p>
+    <VibeContentRenderer content={icon} className="mt-1 text-xl text-accent-text" />
+    <p className="text-white/90">{children}</p>
   </div>
 );
 
-const StepItem = ({ num, title, icon, children }: { num: string; title: string; icon: string; children: React.ReactNode }) => (
-  <div className="relative h-full w-full min-w-0 rounded-2xl border border-border/60 bg-card/60 p-6 text-center backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/20">
-    <div className="absolute -top-4 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full bg-primary font-orbitron font-bold text-primary-foreground">
+const StepItem = ({
+  num,
+  title,
+  icon,
+  children,
+}: {
+  num: string;
+  title: string;
+  icon: string;
+  children: React.ReactNode;
+}) => (
+  <div className="relative rounded-2xl border border-border/60 bg-card/60 p-6 text-center backdrop-blur-sm transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/20">
+    <div className="absolute -top-4 left-1/2 -translate-x-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-orbitron">
       {num}
     </div>
-    <VibeContentRenderer content={icon} className="mx-auto my-4 text-4xl text-primary" />
-    <h4 className="mb-2 font-orbitron text-lg">{title}</h4>
-    <p className="text-sm leading-relaxed text-muted-foreground">{children}</p>
+    <VibeContentRenderer content={icon} className="text-4xl text-primary my-4" />
+    <h4 className="font-orbitron mb-2">{title}</h4>
+    <p className="text-sm text-muted-foreground">{children}</p>
   </div>
 );
 
@@ -38,35 +52,28 @@ const ServiceCard = ({
   icon,
   items,
   imageUrl,
-  borderColorClass,
 }: {
   title: string;
   icon: string;
   items: ServiceItem[];
   imageUrl?: string;
-  borderColorClass?: string;
 }) => (
-  <Card className={cn("group relative overflow-hidden border bg-black", borderColorClass || "border-border")}> 
+  <Card className="group relative overflow-hidden border border-border/70 bg-neutral-950/80">
     {imageUrl && (
-      <Image
-        src={imageUrl}
-        alt={title}
-        fill
-        className="absolute inset-0 object-cover opacity-40 transition-opacity duration-300 group-hover:opacity-55"
-      />
+      <Image src={imageUrl} alt={title} fill className="object-cover opacity-60 group-hover:opacity-75 transition" />
     )}
-    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent/10" />
-    <div className="relative flex h-full flex-col p-6">
-      <CardHeader className="mb-4 p-0">
-        <CardTitle className={cn("flex items-center gap-3 text-2xl", borderColorClass?.replace("border-", "text-"))}>
+    <div className="absolute inset-0 bg-black/60" />
+    <div className="relative p-6">
+      <CardHeader className="p-0 mb-4">
+        <CardTitle className="flex items-center gap-2 text-white text-xl">
           <VibeContentRenderer content={icon} />
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-grow space-y-4 p-0">
-        {items.map((item, index) => (
-          <InfoItem key={index} icon={item.icon}>
-            {item.text}
+      <CardContent className="space-y-3 p-0">
+        {items.map((i, idx) => (
+          <InfoItem key={idx} icon={i.icon}>
+            {i.text}
           </InfoItem>
         ))}
       </CardContent>
@@ -74,37 +81,45 @@ const ServiceCard = ({
   </Card>
 );
 
+/* =========================================================
+   DATA
+========================================================= */
+
 const quickActions = [
   {
-    title: "Каталог байков",
+    title: "Купить электромотоцикл",
+    icon: "::FaCartShopping::",
+    text: "Конфигуратор с выбором всего.",
+    href: "/franchize/vip-bike/configurator",
+    cta: "Купить",
+  },
+  {
+    title: "Каталог",
     icon: "::FaMotorcycle::",
-    text: "Подбор модели под стиль езды, бюджет и маршрут.",
+    text: "Подбор под стиль.",
     href: "/franchize/vip-bike",
     cta: "Открыть",
-  },
-  {
-    title: "Контроль сделок",
-    icon: "::FaTicket::",
-    text: "Проверка статусов, подтверждений и активных аренд.",
-    href: "/rentals",
-    cta: "Мои аренды",
-  },
-  {
-    title: "Быстрый вход",
-    icon: "::FaBolt::",
-    text: "Прямой сценарий: выбрать → подтвердить → поехать.",
-    href: "/franchize/vip-bike",
-    cta: "Старт",
   },
 ];
 
 const heroMetrics = [
-  "::FaStopwatch:: Быстрая онлайн-бронь",
-  "::FaShieldHeart:: ОСАГО + экип",
-  "::FaMapLocationDot:: Центр выдачи в городе",
-  "::FaHeadset:: Поддержка на маршруте",
+  "::FaStopwatch:: Быстрая бронь",
+  "::FaShieldHeart:: ОСАГО",
+  "::FaMapLocationDot:: Центр",
+  "::FaHeadset:: Поддержка",
 ];
 
+/* =========================================================
+   INVEST BLOCK (REBUILT CLEAN)
+========================================================= */
+
+const investmentPoints = [
+  "::FaChartLine:: Доходность 20–60% годовых",
+  "::FaCoins:: Вход от 500 000 ₽",
+  "::FaFileSignature:: Договор",
+  "::FaCalendar:: Выплаты ежемесячно",
+  "::FaRightLeft:: Выход за 30 дней",
+];
 
 export default function HomePage() {
   const { dbUser } = useAppContext();
@@ -112,244 +127,140 @@ export default function HomePage() {
   const y = useTransform(scrollYProgress, [0, 1], [0, -90]);
 
   const vibeProfile = useMemo(() => {
-    const surveyResults = (dbUser?.metadata?.survey_results || {}) as Record<string, string>;
-    const bikeStyle = surveyResults.bike_style || surveyResults.style || surveyResults.riding_style;
+    const style = dbUser?.metadata?.survey_results?.bike_style;
 
-    if (!bikeStyle) {
+    if (!style) {
       return {
-        badge: "::FaCompass:: Универсальный подбор",
-        title: "Подберем байк под ваш вайб за 2 минуты",
-        note: "Пройди /start в Telegram, чтобы открыть персональные рекомендации на этой странице.",
-      };
-    }
-
-    if (bikeStyle.toLowerCase().includes("спорт")) {
-      return {
-        badge: "::FaBolt:: Sport Vibe Detected",
-        title: "Твой вайб: скорость и адреналин",
-        note: "Рекомендуем начать с Supersport и быстрых слотов выдачи.",
-      };
-    }
-
-    if (bikeStyle.toLowerCase().includes("ретро") || bikeStyle.toLowerCase().includes("neo")) {
-      return {
-        badge: "::FaWandSparkles:: Neo-Retro Mode",
-        title: "Твой вайб: стиль и харизма",
-        note: "Для тебя выделили neo-retro подборку с фото-ready маршрутами.",
+        badge: "::FaCompass::",
+        title: "Подберем байк под тебя",
+        note: "Пройди /start",
       };
     }
 
     return {
-      badge: "::FaRoute:: Rider Profile Active",
-      title: `Твой вайб: ${bikeStyle}`,
-      note: "Используй персональный фильтр в каталоге, чтобы быстрее выбрать байк.",
+      badge: "::FaBolt::",
+      title: `Твой вайб: ${style}`,
+      note: "Фильтр уже активен",
     };
-  }, [dbUser?.metadata]);
+  }, [dbUser]);
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      <div className="pointer-events-none fixed inset-0 z-[-2] bg-[radial-gradient(circle_at_top,rgba(255,106,0,0.14),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(119,0,255,0.10),transparent_42%)]" />
-      <div className="pointer-events-none fixed inset-0 z-[-3] bg-[linear-gradient(to_bottom,rgba(0,0,0,0.45),transparent_35%)]" />
+    <div className="bg-background text-foreground">
 
-      <section className="relative flex min-h-[760px] items-center justify-center overflow-hidden px-4 pb-14 pt-28 text-white sm:pt-32">
-        <div className="absolute inset-0 z-0">
-          <video autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover brightness-[0.5] saturate-125">
-            <source
-              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/2_5219998213838247718.mp4"
-              type="video/mp4"
-            />
-            Your browser does not support the video tag.
+      {/* HERO */}
+      <section className="relative h-[80vh] flex items-center justify-center text-white">
+        <div className="absolute inset-0">
+          <video autoPlay muted loop className="w-full h-full object-cover brightness-50">
+            <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/2_5219998213838247718.mp4" />
           </video>
-          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-black/55" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_23%,rgba(255,106,0,0.25),transparent_42%)]" />
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7 }}
-          className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center text-center"
-        >
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/45 px-4 py-2 text-sm text-white/90 backdrop-blur-sm">
-            <VibeContentRenderer content="::FaBolt::" className="text-brand-yellow" />
-            <span>VIPBIKE RENTAL ECOSYSTEM</span>
-          </div>
-          <div className="mb-5 w-full max-w-2xl rounded-2xl border border-white/20 bg-black/40 p-4 text-left text-sm text-white/90 backdrop-blur-sm">
-            <div className="mb-1 font-medium text-brand-yellow"><VibeContentRenderer content={vibeProfile.badge} /></div>
-            <p className="font-orbitron text-lg text-white">{vibeProfile.title}</p>
-            <p className="mt-1 text-white/80">{vibeProfile.note}</p>
-          </div>
+        <div className="relative text-center max-w-3xl">
+          <VibeContentRenderer content={vibeProfile.badge} />
+          <h1 className="text-6xl font-orbitron mt-4">{vibeProfile.title}</h1>
+          <p className="mt-4 text-white/80">{vibeProfile.note}</p>
 
-          <h1 className="font-orbitron text-5xl font-black uppercase leading-[0.9] tracking-tight text-white drop-shadow-[0_8px_22px_rgba(0,0,0,0.75)] sm:text-6xl md:text-7xl lg:text-8xl">
-            <span className="block">Скорость. Контроль.</span>
-            <span className="block text-brand-yellow">Твой путь на байке.</span>
-          </h1>
-
-          <p className="mx-auto mt-6 max-w-3xl text-base font-light text-white/90 sm:text-lg md:text-xl">
-            Премиальный прокат в Нижнем Новгороде: от первого выбора модели до возврата — всё организовано в одном
-            потоке с онлайн-навигацией по аренде.
-          </p>
-
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <Button asChild size="lg" variant="accent" className="font-orbitron text-base shadow-lg shadow-accent/35 transition-all hover:scale-105 hover:shadow-accent/70">
-              <Link href="/franchize/vip-bike">
-                <VibeContentRenderer content="::FaMotorcycle className='mr-2':: Выбрать байк" />
-              </Link>
+          <div className="mt-8 flex gap-3 justify-center">
+            <Button asChild>
+              <Link href="/franchize/vip-bike">Выбрать байк</Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="border-white/55 bg-black/25 font-orbitron text-white backdrop-blur-sm hover:bg-white hover:text-black">
-              <Link href="/rentals">
-                <VibeContentRenderer content="::FaTicket className='mr-2':: Мои аренды" />
-              </Link>
+            <Button asChild variant="outline">
+              <Link href="/rentals">Мои аренды</Link>
             </Button>
           </div>
-
-          <div className="mt-8 grid w-full max-w-4xl grid-cols-1 gap-3 text-left sm:grid-cols-2 lg:grid-cols-4">
-            {heroMetrics.map((chip) => (
-              <div key={chip} className="rounded-xl border border-white/20 bg-black/35 px-3 py-2 text-sm text-white/90 backdrop-blur-sm">
-                <VibeContentRenderer content={chip} />
-              </div>
-            ))}
-          </div>
-        </motion.div>
+        </div>
       </section>
 
-      <motion.section style={{ y }} className="relative">
+      <motion.section style={{ y }}>
         <BikeShowcase />
       </motion.section>
 
-      <div className="container mx-auto max-w-7xl space-y-20 px-4 py-16 sm:space-y-24 sm:py-24">
-        <section>
-          <div className="mb-8 text-center">
-            <h2 className="font-orbitron text-3xl sm:text-4xl">Уже внедрённый rental-флоу — в один клик</h2>
-            <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
-              На платформе уже реализованы ключевые инструменты аренды. Ниже — прямые входы в рабочие сценарии, чтобы
-              пользователь сразу попадал в полезные действия.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {quickActions.map((card) => (
-              <Card
-                key={card.title}
-                className="border-border/70 bg-card/60 backdrop-blur-sm transition-all hover:-translate-y-1 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/20"
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-xl">
-                    <VibeContentRenderer content={card.icon} className="text-primary" />
-                    {card.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="mb-5 text-sm text-muted-foreground">{card.text}</p>
-                  <Button asChild variant="outline" className="w-full">
-                    <Link href={card.href}>{card.cta}</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      <div className="max-w-6xl mx-auto py-20 space-y-20 px-4">
+
+        {/* QUICK */}
+        <section className="grid md:grid-cols-2 gap-4">
+          {quickActions.map((a) => (
+            <Card key={a.title}>
+              <CardHeader>
+                <CardTitle>
+                  <VibeContentRenderer content={a.icon} /> {a.title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>{a.text}</p>
+                <Button asChild className="mt-4 w-full">
+                  <Link href={a.href}>{a.cta}</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
         </section>
 
-        <motion.section
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          viewport={{ once: true }}
-          className="grid grid-cols-1 items-stretch gap-8 md:grid-cols-2 lg:grid-cols-3"
-        >
+        {/* SERVICES */}
+        <section className="grid md:grid-cols-3 gap-6">
           <ServiceCard
             title="Требования"
             icon="::FaClipboardList::"
-            borderColorClass="border-secondary text-secondary"
             items={[
-              { icon: "::FaUserClock::", text: "Возраст от 23 лет" },
-              { icon: "::FaIdCard::", text: "Паспорт и В/У категории 'А' (есть скутеры без 'А')" },
-              { icon: "::FaAward::", text: "Залог от 20 000 ₽" },
-              { icon: "::FaCreditCard::", text: "Оплата любым удобным способом" },
+              { icon: "::FaUserClock::", text: "23+" },
+              { icon: "::FaIdCard::", text: "Документы" },
             ]}
           />
           <ServiceCard
-            title="Что вы получаете"
+            title="Что получаешь"
             icon="::FaGift::"
-            borderColorClass="border-accent text-accent"
-            imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/81Dts9uMBXZXTKC7PjIbBRRRHYGQx_2TPEKFWvaUwDzzgSQPjxUf4GjAiRaDWIcWgwmeaZQTKppFn5VBS6yZeK7R-38bfc7fb-0d5a-4b62-b7e6-ca83950cb265.jpg"
             items={[
-              { icon: "::FaCircleCheck::", text: "Полностью обслуженный и чистый мотоцикл" },
-              { icon: "::FaFileSignature::", text: "Открытый полис ОСАГО" },
-              { icon: "::FaUserShield::", text: "Полный комплект защитной экипировки" },
-              { icon: "::FaTag::", text: "Скидка 10% на первую аренду по промокоду 'ЛЕТО2025'" },
+              { icon: "::FaCheck::", text: "Готовый байк" },
+              { icon: "::FaShield::", text: "ОСАГО" },
             ]}
           />
           <ServiceCard
-            title="Наши услуги"
+            title="Сервис"
             icon="::FaWrench::"
-            borderColorClass="border-primary text-primary"
-            imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_bg-cf31dc2b-291b-440b-953b-6e1b4a838e4e.jpg"
             items={[
-              { icon: "::FaTools::", text: "Обслуживание и ремонт вашего мотоцикла" },
-              { icon: "::FaGamepad::", text: "Лаунж-зона с кальяном и игровыми приставками" },
-              { icon: "::FaMapLocationDot::", text: "Новая удобная локация: Стригинский переулок 13Б" },
-              { icon: "::FaBeerMugEmpty::", text: "Место, где можно встретить единомышленников" },
+              { icon: "::FaTools::", text: "Ремонт" },
+              { icon: "::FaUsers::", text: "Комьюнити" },
             ]}
           />
-        </motion.section>
+        </section>
 
-        <section>
-          <h2 className="mb-10 text-center font-orbitron text-4xl">Как это работает</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StepItem num="1" title="Бронь" icon="::FaCalendarCheck::">
-              Выберите модель в нашем{" "}
-              <Link href="/franchize/vip-bike" className="text-accent-text hover:underline">
-                каталоге
-              </Link>{" "}
-              и оформите бронь онлайн.
-            </StepItem>
-            <StepItem num="2" title="Подтверждение" icon="::FaPaperPlane::">
-              Свяжитесь с нами для подтверждения. Возьмите с собой оригиналы документов и залог.
-            </StepItem>
-            <StepItem num="3" title="Получение" icon="::FaKey::">
-              Приезжайте в наш новый дом на Стригинском переулке 13Б, подписываем договор и забираете байк.
-            </StepItem>
-            <StepItem num="4" title="Возврат и отдых" icon="::FaFlagCheckered::">
-              Верните мотоцикл в срок. После поездки можно отдохнуть в нашей лаунж-зоне.
-            </StepItem>
+        {/* INVEST */}
+        <section className="relative rounded-3xl border border-primary/20 overflow-hidden bg-black/70">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent" />
+
+          <div className="relative p-10 text-center">
+            <h2 className="text-4xl font-orbitron mb-6">
+              Инвестиции в мотопарк
+            </h2>
+
+            <div className="grid md:grid-cols-2 gap-4 text-left max-w-3xl mx-auto">
+              {investmentPoints.map((p) => (
+                <div key={p} className="flex gap-3">
+                  <VibeContentRenderer content={p} />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-10">
+              <Button asChild size="lg">
+                <Link href="https://t.me/salavey13" target="_blank">
+                  Обсудить в Telegram
+                </Link>
+              </Button>
+            </div>
           </div>
         </section>
 
-        <motion.section
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          viewport={{ once: true }}
-          className="mx-auto max-w-3xl"
-        >
-          <h2 className="mb-10 text-center font-orbitron text-4xl">Частые вопросы</h2>
-          <Accordion type="single" collapsible className="w-full rounded-2xl border border-border/60 bg-card/40 px-4 text-sm">
-            <AccordionItem value="item-1">
-              <AccordionTrigger className="text-base">Можно ли арендовать мотоцикл без категории «А»?</AccordionTrigger>
-              <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
-                Да! У нас есть парк скутеров, для управления которыми достаточно категории «B» или «M». Для всех остальных мотоциклов категория «А» обязательна.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-2">
-              <AccordionTrigger className="text-base">Что будет, если я попаду в ДТП?</AccordionTrigger>
-              <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
-                Все мотоциклы застрахованы по ОСАГО. Ваша финансовая ответственность ограничена суммой залога, если нет серьезных нарушений с вашей стороны. Главное — немедленно связаться с нами.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-3">
-              <AccordionTrigger className="text-base">Что входит в стоимость аренды?</AccordionTrigger>
-              <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
-                В стоимость входит аренда мотоцикла на 24 часа, полис ОСАГО и полный комплект защитной экипировки. Пробег обычно ограничен (например, 300 км/сутки), превышение оплачивается отдельно.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-4">
-              <AccordionTrigger className="text-base">У вас есть свой сервис?</AccordionTrigger>
-              <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
-                Да, на нашей новой локации работает полноценный сервис. Вы можете пригнать своего верного друга к нам на обслуживание или ремонт.
-              </AccordionContent>
+        {/* FAQ */}
+        <section>
+          <Accordion type="single" collapsible>
+            <AccordionItem value="1">
+              <AccordionTrigger>Без категории А?</AccordionTrigger>
+              <AccordionContent>Да, есть скутеры</AccordionContent>
             </AccordionItem>
           </Accordion>
-        </motion.section>
+        </section>
+
       </div>
     </div>
   );
