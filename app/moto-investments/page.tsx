@@ -345,7 +345,7 @@ export default function MotoInvestmentsPage() {
       <footer className="border-t border-white/10 bg-slate-950 py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-slate-500 text-sm">
           <p>© 2024 Мото Инвестиции. Все права защищены.</p>
-          <Link href="/" className="hover:text-amber-400 transition-colors flex items-center gap-2">
+          <Link href="/vipbikerental" className="hover:text-amber-400 transition-colors flex items-center gap-2">
             <ArrowRight className="h-4 w-4 rotate-180" />
             Вернуться на главную
           </Link>
