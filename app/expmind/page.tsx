@@ -1,13 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useId, useCallback, useRef } from "react";
-import { motion, AnimatePresence, useScroll, useTransform, useSpring } from "framer-motion";
+import React, { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence, useScroll, useSpring } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAppContext } from "@/contexts/AppContext";
-import { debugLogger as logger } from "@/lib/debugLogger";
-import { VibeContentRenderer } from "@/components/VibeContentRenderer";
-import { cn } from "@/lib/utils";
 import { 
   Brain, 
   Route, 
@@ -22,15 +19,14 @@ import {
   Sparkles,
   XCircle,
   HelpCircle,
-  ArrowRight
+  ArrowRight,
+  CheckIcon,
+  XIcon
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 type Language = 'en' | 'ru';
-
-const STORAGE_BASE_URL_EXP = "https://placehold.co"; 
-const PLACEHOLDER_BLUR_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
 const sections = [
   {
@@ -39,23 +35,19 @@ const sections = [
     titleEn: "Understanding Mindsets",
     titleRu: "Понимание Мышления",
     pointsEn: [
-      "A mindset is your <span class='text-cyan-400 font-medium'>default way of seeing the world</span>.",
+      "A mindset is your <span class='text-cyan-400 font-semibold'>default way of seeing the world</span>.",
       "It influences decisions, relationships, thoughts, and feelings.",
-      "Unconscious mindsets act like <span class='text-cyan-400 font-medium'>autopilot</span>, driving life direction.",
+      "Unconscious mindsets act like <span class='text-cyan-400 font-semibold'>autopilot</span>, driving life direction.",
       "Awareness allows for conscious choices aligned with desires.",
-      "Mindsets <span class='text-cyan-400 font-medium'>can change</span>; the first step is making them conscious.",
+      "Mindsets <span class='text-cyan-400 font-semibold'>can change</span>; the first step is making them conscious.",
     ],
     pointsRu: [
-      "Мышление – это ваш <span class='text-cyan-400 font-medium'>стандартный способ видения мира</span>.",
+      "Мышление – это ваш <span class='text-cyan-400 font-semibold'>стандартный способ видения мира</span>.",
       "Оно влияет на решения, отношения, мысли и чувства.",
-      "Неосознанные установки действуют как <span class='text-cyan-400 font-medium'>автопилот</span>, управляя направлением жизни.",
+      "Неосознанные установки действуют как <span class='text-cyan-400 font-semibold'>автопилот</span>, управляя направлением жизни.",
       "Осознанность позволяет делать сознательный выбор в соответствии с желаниями.",
-      "Мышление <span class='text-cyan-400 font-medium'>можно изменить</span>; первый шаг – сделать неосознанное сознательным.",
+      "Мышление <span class='text-cyan-400 font-semibold'>можно изменить</span>; первый шаг – сделать неосознанное сознательным.",
     ],
-    imageUrlEn: `${STORAGE_BASE_URL_EXP}/800x450/0f172a/22d3ee/png?text=Mindset+Lens`,
-    imageUrlRu: `${STORAGE_BASE_URL_EXP}/800x450/0f172a/22d3ee/png?text=Линза+Мышления`,
-    imageAltEn: "Conceptual image: A lens representing a mindset shaping perception",
-    imageAltRu: "Концептуальное изображение: Линза, представляющая мышление, формирующее восприятие",
     question: {
       textRu: "Мышление – это фиксированный набор убеждений, который нельзя изменить.",
       textEn: "A mindset is a fixed set of beliefs that cannot be changed.",
@@ -78,21 +70,17 @@ const sections = [
             textColor: "text-rose-400",
             icon: "⚠️",
             pointsEn: [
-                "Followed <span class='text-rose-400 font-medium'>traditional scripts</span>: good grades → Google → corporate ladder.",
-                "External success masked internal <span class='text-rose-400 font-medium'>emptiness, boredom, and burnout</span>.",
+                "Followed <span class='text-rose-400 font-semibold'>traditional scripts</span>: good grades → Google → corporate ladder.",
+                "External success masked internal <span class='text-rose-400 font-semibold'>emptiness, boredom, and burnout</span>.",
                 "Starting a startup was another script, still unfulfilling.",
                 "Failure forced the question: \"What do *I* actually want?\""
             ],
             pointsRu: [
-                "Следование <span class='text-rose-400 font-medium'>традиционным сценариям</span>: хорошие оценки → Google → карьерная лестница.",
-                "Внешний успех маскировал внутреннюю <span class='text-rose-400 font-medium'>пустоту, скуку и выгорание</span>.",
+                "Следование <span class='text-rose-400 font-semibold'>традиционным сценариям</span>: хорошие оценки → Google → карьерная лестница.",
+                "Внешний успех маскировал внутреннюю <span class='text-rose-400 font-semibold'>пустоту, скуку и выгорание</span>.",
                 "Запуск стартапа был очередным сценарием, все еще не приносящим удовлетворения.",
                 "Неудача заставила задать вопрос: \"Чего *я* на самом деле хочу?\""
             ],
-             imageUrlEn: `${STORAGE_BASE_URL_EXP}/600x338/0f172a/f43f5e/png?text=Linear+Path+Trap`,
-             imageUrlRu: `${STORAGE_BASE_URL_EXP}/600x338/0f172a/f43f5e/png?text=Ловушка+Линейности`,
-             imageAltEn: "Illustration of a straight, rigid path leading to a dead end",
-             imageAltRu: "Иллюстрация прямого, жесткого пути, ведущего в тупик",
         },
         {
             titleEn: "Chapter 2: The Experimental Path",
@@ -102,29 +90,25 @@ const sections = [
             textColor: "text-emerald-400",
             icon: "⚡",
             pointsEn: [
-                "Shifted focus to <span class='text-emerald-400 font-medium'>genuine curiosity</span>, independent of validation.",
+                "Shifted focus to <span class='text-emerald-400 font-semibold'>genuine curiosity</span>, independent of validation.",
                 "Studied neuroscience (PhD) based on fascination with the brain.",
-                "Embraced <span class='text-emerald-400 font-medium'>\"learning in public\"</span> via a newsletter.",
+                "Embraced <span class='text-emerald-400 font-semibold'>\"learning in public\"</span> via a newsletter.",
                 "This \"tiny experiment\" sparked the exploration of the experimental mindset."
             ],
             pointsRu: [
-                "Смещение фокуса на <span class='text-emerald-400 font-medium'>подлинное любопытство</span>, независимое от валидации.",
+                "Смещение фокуса на <span class='text-emerald-400 font-semibold'>подлинное любопытство</span>, независимое от валидации.",
                 "Изучение нейронаук (PhD) из-за увлечения мозгом.",
-                "Принятие <span class='text-emerald-400 font-medium'>\"обучения на публике\"</span> через новостную рассылку.",
+                "Принятие <span class='text-emerald-400 font-semibold'>\"обучения на публике\"</span> через новостную рассылку.",
                 "Этот \"крошечный эксперимент\" положил начало исследованию экспериментального мышления."
             ],
-            imageUrlEn: `${STORAGE_BASE_URL_EXP}/600x338/0f172a/34d399/png?text=Experimental+Path`,
-            imageUrlRu: `${STORAGE_BASE_URL_EXP}/600x338/0f172a/34d399/png?text=Путь+Эксперимента`,
-            imageAltEn: "Illustration of a winding, adaptive path leading upwards",
-            imageAltRu: "Иллюстрация извилистого пути, ведущего вверх с точками открытий",
         }
     ],
     question: {
       textRu: "Линейный путь всегда ведет к успеху и удовлетворению, если следовать традиционным сценариям.",
       textEn: "The linear path always leads to success and satisfaction if traditional scripts are followed.",
       correctAnswer: 'no',
-      tipRu: "Наоборот, линейный путь часто ведет к пустоте и выгоранию. Экспериментальный путь основан на любопытстве и сознательном выборе.",
-      tipEn: "On the contrary, the linear path often leads to emptiness and burnout. The experimental path is based on curiosity and conscious choice.",
+      tipRu: "Наоборот, линейный путь часто ведет к пустоте и выгоранию. Экспериментальный путь основан на любопытстве.",
+      tipEn: "On the contrary, the linear path often leads to emptiness and burnout. The experimental path is based on curiosity.",
     },
   },
   {
@@ -157,8 +141,8 @@ const sections = [
             leadsToEn: "Overworking, burnout", leadsToRu: "Переработки, выгорание"
         }
     ],
-    outroEn: "Crucially, these mindsets are <span class='text-amber-400 font-medium'>fluid</span> and not fixed. Awareness is the first step to change.",
-    outroRu: "Важно: эти установки <span class='text-amber-400 font-medium'>гибки</span> и не являются неизменными. Осознанность – первый шаг к изменению.",
+    outroEn: "Crucially, these mindsets are <span class='text-amber-400 font-semibold'>fluid</span> and not fixed. Awareness is the first step to change.",
+    outroRu: "Важно: эти установки <span class='text-amber-400 font-semibold'>гибки</span> и не являются неизменными. Осознанность – первый шаг к изменению.",
     question: {
       textRu: "Циничное мышление характеризуется высоким любопытством и низкими амбициями.",
       textEn: "A cynical mindset is characterized by high curiosity and low ambition.",
@@ -173,25 +157,21 @@ const sections = [
     titleEn: "The Alternative: Experimental Mindset",
     titleRu: "Альтернатива: Экспериментальное Мышление",
     pointsEn: [
-      "<span class='text-emerald-400 font-medium'>High Curiosity, High Ambition</span>.",
+      "<span class='text-emerald-400 font-semibold'>High Curiosity, High Ambition</span>.",
       "Embraces drive AND openness to learn.",
-      "Sees uncertainty as an <span class='text-emerald-400 font-medium'>opportunity</span> to explore, grow, learn.",
-      "Focuses on the <span class='text-emerald-400 font-medium'>process of discovery</span>, not just outcomes.",
-      "Treats failures/mistakes as valuable <span class='text-emerald-400 font-medium'>data points</span>.",
-      "Moves from rigid plans to iterative <span class='text-emerald-400 font-medium'>experimentation</span>.",
+      "Sees uncertainty as an <span class='text-emerald-400 font-semibold'>opportunity</span> to explore, grow, learn.",
+      "Focuses on the <span class='text-emerald-400 font-semibold'>process of discovery</span>, not just outcomes.",
+      "Treats failures/mistakes as valuable <span class='text-emerald-400 font-semibold'>data points</span>.",
+      "Moves from rigid plans to iterative <span class='text-emerald-400 font-semibold'>experimentation</span>.",
     ],
     pointsRu: [
-      "<span class='text-emerald-400 font-medium'>Высокое Любопытство, Высокие Амбиции</span>.",
+      "<span class='text-emerald-400 font-semibold'>Высокое Любопытство, Высокие Амбиции</span>.",
       "Сочетает стремление к цели И открытость обучению.",
-      "Рассматривает неопределенность как <span class='text-emerald-400 font-medium'>возможность</span> исследовать, расти, учиться.",
-      "Фокусируется на <span class='text-emerald-400 font-medium'>процессе открытия</span>, а не только на результатах.",
-      "Воспринимает неудачи/ошибки как ценные <span class='text-emerald-400 font-medium'>точки данных</span>.",
-      "Переходит от жестких планов к итеративным <span class='text-emerald-400 font-medium'>экспериментам</span>.",
+      "Рассматривает неопределенность как <span class='text-emerald-400 font-semibold'>возможность</span> исследовать, расти, учиться.",
+      "Фокусируется на <span class='text-emerald-400 font-semibold'>процессе открытия</span>, а не только на результатах.",
+      "Воспринимает неудачи/ошибки как ценные <span class='text-emerald-400 font-semibold'>точки данных</span>.",
+      "Переходит от жестких планов к итеративным <span class='text-emerald-400 font-semibold'>экспериментам</span>.",
     ],
-    imageUrlEn: `${STORAGE_BASE_URL_EXP}/800x450/0f172a/34d399/png?text=Experimental+Cycle`,
-    imageUrlRu: `${STORAGE_BASE_URL_EXP}/800x450/0f172a/34d399/png?text=Цикл+Эксперимента`,
-    imageAltEn: "Diagram: Curiosity → Experiment → Data → Adapt → Repeat",
-    imageAltRu: "Диаграмма: Любопытство → Эксперимент → Данные → Адаптация → Повтор",
     question: {
       textRu: "Экспериментальное мышление означает избегание неопределенности и фокусировку только на конечных результатах.",
       textEn: "An experimental mindset means avoiding uncertainty and focusing only on final outcomes.",
@@ -213,8 +193,8 @@ const sections = [
         { letter: "C", titleEn: "Continuous", titleRu: "Непрерывный", descEn: "Commit to a specific, reasonable duration upfront (e.g., 'for 3 weeks').", descRu: "Обязательство на конкретный, разумный срок (напр., 'на 3 недели').", color: "amber", icon: "⏱️" },
         { letter: "T", titleEn: "Trackable", titleRu: "Отслеживаемый", descEn: "Simple tracking: Did you do it? Yes/No. Focus on completion & observation.", descRu: "Простое отслеживание: Сделал(а)? Да/Нет. Фокус на завершении и наблюдении.", color: "emerald", icon: "📊" }
     ],
-    outroEn: "Different from habits & KPIs. PACTs prioritize <span class='text-amber-400 font-medium'>learning and exploration</span> within a defined scope.",
-    outroRu: "Отличается от привычек и KPI. PACTы ставят в приоритет <span class='text-amber-400 font-medium'>обучение и исследование</span> в заданных рамках.",
+    outroEn: "Different from habits & KPIs. PACTs prioritize <span class='text-amber-400 font-semibold'>learning and exploration</span> within a defined scope.",
+    outroRu: "Отличается от привычек и KPI. PACTы ставят в приоритет <span class='text-amber-400 font-semibold'>обучение и исследование</span> в заданных рамках.",
     question: {
       textRu: "Эксперименты PACT не требуют конкретных сроков или отслеживания, главное – начать.",
       textEn: "PACT experiments do not require specific deadlines or tracking; the main thing is to just start.",
@@ -288,21 +268,17 @@ const sections = [
     titleEn: "Why Embrace the Experimental Mindset?",
     titleRu: "Зачем Принимать Экспериментальное Мышление?",
     pointsEn: [
-      "Ensures you live an <span class='text-violet-400 font-medium'>intentional life</span> – *your* life, not dictated by others.",
-      "Keeps you <span class='text-violet-400 font-medium'>adaptable and nimble</span> in a changing world.",
-      "Fosters <span class='text-violet-400 font-medium'>continuous learning</span> and growth.",
-      "Makes the journey genuinely more <span class='text-violet-400 font-medium'>engaging and fun</span>.",
+      "Ensures you live an <span class='text-violet-400 font-semibold'>intentional life</span> – *your* life, not dictated by others.",
+      "Keeps you <span class='text-violet-400 font-semibold'>adaptable and nimble</span> in a changing world.",
+      "Fosters <span class='text-violet-400 font-semibold'>continuous learning</span> and growth.",
+      "Makes the journey genuinely more <span class='text-violet-400 font-semibold'>engaging and fun</span>.",
     ],
     pointsRu: [
-      "Обеспечивает <span class='text-violet-400 font-medium'>осознанную жизнь</span> – *вашу* жизнь, а не продиктованную другими.",
-      "Сохраняет вас <span class='text-violet-400 font-medium'>адаптивными и гибкими</span> в меняющемся мире.",
-      "Способствует <span class='text-violet-400 font-medium'>непрерывному обучению</span> и росту.",
-      "Делает путешествие по-настоящему более <span class='text-violet-400 font-medium'>увлекательным и веселым</span>.",
+      "Обеспечивает <span class='text-violet-400 font-semibold'>осознанную жизнь</span> – *вашу* жизнь, а не продиктованную другими.",
+      "Сохраняет вас <span class='text-violet-400 font-semibold'>адаптивными и гибкими</span> в меняющемся мире.",
+      "Способствует <span class='text-violet-400 font-semibold'>непрерывному обучению</span> и росту.",
+      "Делает путешествие по-настоящему более <span class='text-violet-400 font-semibold'>увлекательным и веселым</span>.",
     ],
-    imageUrlEn: `${STORAGE_BASE_URL_EXP}/800x450/0f172a/a78bfa/png?text=Live+Intentionally`,
-    imageUrlRu: `${STORAGE_BASE_URL_EXP}/800x450/0f172a/a78bfa/png?text=Живи+Осознанно`,
-    imageAltEn: "Abstract image representing growth and intentional living",
-    imageAltRu: "Абстрактное изображение, представляющее рост и осознанную жизнь",
     question: {
       textRu: "Экспериментальное мышление помогает жить более осознанной жизнью и адаптироваться к изменениям.",
       textEn: "An experimental mindset helps live a more intentional life and adapt to changes.",
@@ -322,7 +298,6 @@ export default function ExperimentalMindsetPage() {
   const [answers, setAnswers] = useState<Record<number, { answer: 'yes' | 'no'; correct: boolean }>>({});
   const [showTip, setShowTip] = useState<number | null>(null);
   
-  const containerRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
@@ -342,16 +317,12 @@ export default function ExperimentalMindsetPage() {
       ...section,
       title: selectedLang === 'en' ? section.titleEn : section.titleRu,
       points: section.pointsEn && section.pointsRu ? (selectedLang === 'en' ? section.pointsEn : section.pointsRu) : [],
-      imageUrl: section.imageUrlEn && section.imageUrlRu ? (selectedLang === 'en' ? section.imageUrlEn : section.imageUrlRu) : null,
-      imageAlt: section.imageAltEn && section.imageAltRu ? (selectedLang === 'en' ? section.imageAltEn : section.imageAltRu) : "",
       intro: section.introEn && section.introRu ? (selectedLang === 'en' ? section.introEn : section.introRu) : null,
       outro: section.outroEn && section.outroRu ? (selectedLang === 'en' ? section.outroEn : section.outroRu) : null,
       subSections: section.subSections ? section.subSections.map(sub => ({
         ...sub,
         title: selectedLang === 'en' ? sub.titleEn : sub.titleRu,
         points: selectedLang === 'en' ? sub.pointsEn : sub.pointsRu,
-        imageUrl: selectedLang === 'en' ? sub.imageUrlEn : sub.imageUrlRu,
-        imageAlt: selectedLang === 'en' ? sub.imageAltEn : sub.imageAltRu,
       })) : undefined,
       gridItems: section.gridItems ? section.gridItems.map(item => ({
         ...item,
@@ -417,7 +388,7 @@ export default function ExperimentalMindsetPage() {
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FlaskConical className="w-6 h-6 text-cyan-400" />
-            <span className="font-bold bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">
+            <span className="font-bold bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent hidden sm:inline">
               {selectedLang === 'ru' ? 'Экспериментальное Мышление' : 'Experimental Mindset'}
             </span>
           </div>
@@ -435,7 +406,7 @@ export default function ExperimentalMindsetPage() {
             
             <button
               onClick={() => setSelectedLang(selectedLang === 'ru' ? 'en' : 'ru')}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 transition-colors text-sm"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 transition-colors text-sm text-slate-200"
             >
               <Languages className="w-4 h-4" />
               <span>{selectedLang === 'ru' ? 'EN' : 'RU'}</span>
@@ -461,8 +432,8 @@ export default function ExperimentalMindsetPage() {
             </h1>
             <p className="text-lg text-slate-400 max-w-2xl mx-auto">
               {selectedLang === 'ru' 
-                ? 'Жить осознанно через любопытство и эксперименты. Основано на идеях Anne-Laure Le Cunff.' 
-                : 'Living consciously through curiosity and experimentation. Based on insights from Anne-Laure Le Cunff.'}
+                ? 'Жить осознанно через любопытство и эксперименты' 
+                : 'Living consciously through curiosity and experimentation'}
             </p>
           </motion.div>
 
@@ -563,17 +534,6 @@ export default function ExperimentalMindsetPage() {
                                     </li>
                                   ))}
                                 </ul>
-                                {sub.imageUrl && (
-                                  <div className="mt-4 aspect-video rounded-lg overflow-hidden bg-black/20">
-                                    <Image 
-                                      src={sub.imageUrl} 
-                                      alt={sub.imageAlt} 
-                                      width={400} 
-                                      height={225}
-                                      className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity"
-                                    />
-                                  </div>
-                                )}
                               </div>
                             ))}
                           </div>
@@ -675,24 +635,6 @@ export default function ExperimentalMindsetPage() {
                           </div>
                         )}
 
-                        {/* Main Image */}
-                        {section.imageUrl && !section.subSections && (
-                          <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-800 border border-slate-700/50 group/image">
-                            <Image
-                              src={section.imageUrl}
-                              alt={section.imageAlt}
-                              fill
-                              className="object-cover opacity-80 group-hover/image:opacity-100 transition-opacity duration-500"
-                              placeholder="blur"
-                              blurDataURL={PLACEHOLDER_BLUR_URL}
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent" />
-                            <p className="absolute bottom-4 left-4 text-sm text-slate-300 italic">
-                              {section.imageAlt}
-                            </p>
-                          </div>
-                        )}
-
                         {section.outro && (
                           <p className="text-lg italic text-slate-400 border-l-2 border-amber-500/50 pl-4" dangerouslySetInnerHTML={{ __html: section.outro }} />
                         )}
@@ -719,14 +661,16 @@ export default function ExperimentalMindsetPage() {
                               <div className="flex gap-3">
                                 <Button
                                   onClick={() => handleAnswer(index, 'yes')}
-                                  className="flex-1 bg-slate-800 hover:bg-emerald-600/20 hover:text-emerald-400 hover:border-emerald-500/50 border border-slate-700 transition-all"
+                                  className="flex-1 bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-200 border border-slate-600 hover:border-emerald-500 transition-all font-semibold"
                                 >
+                                  <CheckIcon className="w-4 h-4 mr-2" />
                                   {selectedLang === 'ru' ? 'Да' : 'Yes'}
                                 </Button>
                                 <Button
                                   onClick={() => handleAnswer(index, 'no')}
-                                  className="flex-1 bg-slate-800 hover:bg-rose-600/20 hover:text-rose-400 hover:border-rose-500/50 border border-slate-700 transition-all"
+                                  className="flex-1 bg-slate-800 hover:bg-rose-600 hover:text-white text-slate-200 border border-slate-600 hover:border-rose-500 transition-all font-semibold"
                                 >
+                                  <XIcon className="w-4 h-4 mr-2" />
                                   {selectedLang === 'ru' ? 'Нет' : 'No'}
                                 </Button>
                               </div>
@@ -757,7 +701,7 @@ export default function ExperimentalMindsetPage() {
 
                                 <Button
                                   onClick={handleContinue}
-                                  className="w-full bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white border-0"
+                                  className="w-full bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white border-0 font-semibold"
                                 >
                                   {index === sections.length - 1 
                                     ? (selectedLang === 'ru' ? 'Завершить курс' : 'Complete Course')
