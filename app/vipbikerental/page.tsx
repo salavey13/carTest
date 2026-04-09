@@ -431,26 +431,35 @@ export default function HomePage() {
     </div>
 
     {/* CTA */}
-    <div className="mt-14 text-center">
-      <Button
-        asChild
-        size="lg"
-        className="font-orbitron text-base shadow-lg shadow-primary/40 transition hover:scale-105"
-      >
-        <Link href="https://t.me/I_O_S_NN" target="_blank">
-          <VibeContentRenderer content="::FaTelegram:: Обсудить инвестиции" />
-        </Link>
-      </Button>
-      <Button
-        asChild
-        size="lg"
-        className="font-orbitron text-base shadow-lg shadow-primary/40 transition hover:scale-105"
-      >
-        <Link href="/moto-investments" target="_blank">
-          <VibeContentRenderer content="::FaCircleInfo:: Детальная инфа" />
-        </Link>
-      </Button>
-    </div>
+<div className="mt-14 flex flex-col items-center justify-center gap-3 sm:flex-row">
+
+  {/* PRIMARY — горячий */}
+  <Button
+    asChild
+    size="lg"
+    className="font-orbitron text-base shadow-lg shadow-primary/40 transition hover:scale-105"
+  >
+    <Link href="https://t.me/salavey13" target="_blank">
+      <VibeContentRenderer content="::FaTelegram:: Обсудить инвестиции" />
+    </Link>
+  </Button>
+
+  {/* SECONDARY — прогрев */}
+  <Button
+    asChild
+    size="lg"
+    variant="outline"
+    className="border-white/30 bg-black/20 text-white backdrop-blur-sm hover:bg-white hover:text-black"
+  >
+    <Link href="/moto-investments">
+      <VibeContentRenderer content="::FaCircleInfo:: Подробнее об условиях" />
+    </Link>
+  </Button>
+
+<p className="mt-3 text-xs text-white/50 text-center">
+  Сначала изучи условия или сразу обсуди — как удобнее
+</p>
+</div>
   </div>
 </section>
 
