@@ -4,7 +4,7 @@ import { ArrowRight, BadgePercent, CalendarClock, CircleDollarSign, FileSignatur
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-const contactLink = "https://t.me/salavey13";
+const contactLink = "https://t.me/I_O_S_NN";
 const heroImage = "https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1600&q=80";
 
 const trustPoints = [
