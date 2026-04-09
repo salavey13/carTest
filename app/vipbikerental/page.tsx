@@ -441,6 +441,15 @@ export default function HomePage() {
           <VibeContentRenderer content="::FaTelegram:: Обсудить инвестиции" />
         </Link>
       </Button>
+      <Button
+        asChild
+        size="lg"
+        className="font-orbitron text-base shadow-lg shadow-primary/40 transition hover:scale-105"
+      >
+        <Link href="/moto-investments" target="_blank">
+          <VibeContentRenderer content="::FaCircleInfo:: Детальная инфа" />
+        </Link>
+      </Button>
     </div>
   </div>
 </section>
