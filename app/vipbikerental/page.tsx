@@ -18,7 +18,7 @@ type ServiceItem = { icon: string; text: string };
 const InfoItem = ({ icon, children }: { icon: string; children: React.ReactNode }) => (
   <div className="flex items-start gap-3">
     <VibeContentRenderer content={icon} className="mt-1 flex-shrink-0 text-xl text-accent-text" />
-    <p className="text-foreground/90">{children}</p>
+    <p className="text-white/90">{children}</p>
   </div>
 );
 
@@ -46,19 +46,20 @@ const ServiceCard = ({
   imageUrl?: string;
   borderColorClass?: string;
 }) => (
-  <Card className={cn("group relative overflow-hidden border bg-black", borderColorClass || "border-border")}> 
+  <Card className={cn("group relative overflow-hidden border bg-neutral-950/80 shadow-xl shadow-black/20", borderColorClass || "border-border/70")}>
     {imageUrl && (
       <Image
         src={imageUrl}
         alt={title}
         fill
-        className="absolute inset-0 object-cover opacity-40 transition-opacity duration-300 group-hover:opacity-55"
+        className="absolute inset-0 object-cover opacity-55 transition-opacity duration-300 group-hover:opacity-70"
       />
     )}
-    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent/10" />
+    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/45 to-black/10" />
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,170,90,0.18),transparent_52%)]" />
     <div className="relative flex h-full flex-col p-6">
       <CardHeader className="mb-4 p-0">
-        <CardTitle className={cn("flex items-center gap-3 text-2xl", borderColorClass?.replace("border-", "text-"))}>
+        <CardTitle className={cn("flex items-center gap-3 text-2xl text-white drop-shadow-[0_4px_10px_rgba(0,0,0,0.55)]", borderColorClass?.replace("border-", "text-"))}>
           <VibeContentRenderer content={icon} />
           {title}
         </CardTitle>
@@ -76,6 +77,13 @@ const ServiceCard = ({
 
 const quickActions = [
   {
+    title: "Купить электромотоцикл",
+    icon: "::FaCartShopping::",
+    text: "Открыть конфигуратор с выбором модели, мотора, батареи и допов.",
+    href: "/franchize/vip-bike/configurator",
+    cta: "Купить",
+  },
+  {
     title: "Каталог байков",
     icon: "::FaMotorcycle::",
     text: "Подбор модели под стиль езды, бюджет и маршрут.",
@@ -88,6 +96,13 @@ const quickActions = [
     text: "Проверка статусов, подтверждений и активных аренд.",
     href: "/rentals",
     cta: "Мои аренды",
+  },
+  {
+    title: "MapRiders",
+    icon: "::FaMapLocationDot::",
+    text: "Живая карта райдеров, маршруты, точки встречи и недельный лидерборд.",
+    href: "/franchize/vip-bike/map-riders",
+    cta: "Открыть карту",
   },
   {
     title: "Быстрый вход",
@@ -104,7 +119,6 @@ const heroMetrics = [
   "::FaMapLocationDot:: Центр выдачи в городе",
   "::FaHeadset:: Поддержка на маршруте",
 ];
-
 
 export default function HomePage() {
   const { dbUser } = useAppContext();
@@ -196,7 +210,17 @@ export default function HomePage() {
                 <VibeContentRenderer content="::FaMotorcycle className='mr-2':: Выбрать байк" />
               </Link>
             </Button>
+            <Button asChild size="lg" className="font-orbitron text-base">
+              <Link href="/franchize/vip-bike/configurator">
+                <VibeContentRenderer content="::FaCartShopping className='mr-2':: Купить электромотоцикл" />
+              </Link>
+            </Button>
             <Button asChild size="lg" variant="outline" className="border-white/55 bg-black/25 font-orbitron text-white backdrop-blur-sm hover:bg-white hover:text-black">
+              <Link href="/franchize/vip-bike/map-riders">
+                <VibeContentRenderer content="::FaMapLocationDot className='mr-2':: MapRiders" />
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="border-white/35 bg-black/15 font-orbitron text-white backdrop-blur-sm hover:bg-white hover:text-black">
               <Link href="/rentals">
                 <VibeContentRenderer content="::FaTicket className='mr-2':: Мои аренды" />
               </Link>
@@ -259,7 +283,8 @@ export default function HomePage() {
           <ServiceCard
             title="Требования"
             icon="::FaClipboardList::"
-            borderColorClass="border-secondary text-secondary"
+            borderColorClass="border-secondary text-accent"
+            imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/fon-8f9c72b7-c622-4159-98da-64173322eae4.jpg"
             items={[
               { icon: "::FaUserClock::", text: "Возраст от 23 лет" },
               { icon: "::FaIdCard::", text: "Паспорт и В/У категории 'А' (есть скутеры без 'А')" },
@@ -314,6 +339,111 @@ export default function HomePage() {
             </StepItem>
           </div>
         </section>
+
+   {/* ========================== */}
+{/* VIP INVEST V2 — REAL MONEY */}
+{/* ========================== */}
+
+<section className="relative mt-24 overflow-hidden rounded-3xl border border-primary/30 bg-black/70 backdrop-blur-xl">
+
+  {/* glow */}
+  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,120,0,0.25),transparent_55%)]" />
+
+  <div className="relative z-10 px-6 py-16 md:px-12">
+
+    {/* HERO */}
+    <div className="mx-auto max-w-3xl text-center">
+      <div className="mb-3 text-brand-yellow">
+        <VibeContentRenderer content="::FaChartLine:: INVEST MODE ACTIVATED" />
+      </div>
+
+      <h2 className="font-orbitron text-4xl md:text-5xl font-bold text-white">
+        Зарабатывай на байках,
+        <br />
+        пока другие катаются
+      </h2>
+
+      <p className="mt-4 text-white/80 text-lg">
+        Ты уже внутри экосистемы. Следующий шаг — зарабатывать на спросе.
+      </p>
+    </div>
+
+    {/* ROI BLOCK */}
+    <div className="mt-12 grid gap-6 md:grid-cols-3">
+
+      {[
+        {
+          title: "Инвестиция",
+          value: "500 000 ₽",
+          icon: "::FaCoins::",
+        },
+        {
+          title: "Доход / месяц",
+          value: "60 000 – 90 000 ₽",
+          icon: "::FaMoneyBillTrendUp::",
+        },
+        {
+          title: "Окупаемость",
+          value: "6–10 месяцев",
+          icon: "::FaStopwatch::",
+        },
+      ].map((item) => (
+        <div
+          key={item.title}
+          className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center backdrop-blur-sm transition hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/20"
+        >
+          <VibeContentRenderer content={item.icon} className="text-3xl text-primary mb-3" />
+          <p className="text-sm text-muted-foreground">{item.title}</p>
+          <p className="mt-1 text-xl font-bold text-white">{item.value}</p>
+        </div>
+      ))}
+    </div>
+
+    {/* ECONOMICS */}
+    <div className="mt-14 mx-auto max-w-3xl rounded-2xl border border-border/60 bg-card/40 p-6 backdrop-blur-sm">
+      <h3 className="font-orbitron text-xl mb-4 text-white">
+        Как это работает
+      </h3>
+
+      <div className="space-y-3 text-sm text-white/80">
+        <div><VibeContentRenderer content="::FaMotorcycle:: Байк добавляется в парк" /></div>
+        <div><VibeContentRenderer content="::FaUsers:: Используется райдерами ежедневно" /></div>
+        <div><VibeContentRenderer content="::FaMoneyBillWave:: Генерирует доход с аренды" /></div>
+        <div><VibeContentRenderer content="::FaRepeat:: Ты получаешь выплаты каждый месяц" /></div>
+      </div>
+    </div>
+
+    {/* TRUST */}
+    <div className="mt-12 grid gap-4 md:grid-cols-2">
+
+      {[
+        "::FaFileSignature:: Договор и прозрачные условия",
+        "::FaCalendar:: Выплаты каждый месяц",
+        "::FaRightLeft:: Выход из проекта (30 дней)",
+      ].map((item) => (
+        <div
+          key={item}
+          className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white/90"
+        >
+          <VibeContentRenderer content={item} />
+        </div>
+      ))}
+    </div>
+
+    {/* CTA */}
+    <div className="mt-14 text-center">
+      <Button
+        asChild
+        size="lg"
+        className="font-orbitron text-base shadow-lg shadow-primary/40 transition hover:scale-105"
+      >
+        <Link href="https://t.me/I_O_S_NN" target="_blank">
+          <VibeContentRenderer content="::FaTelegram:: Обсудить инвестиции" />
+        </Link>
+      </Button>
+    </div>
+  </div>
+</section>
 
         <motion.section
           initial={{ opacity: 0, y: 50 }}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { CapabilityLaunchGrid } from "@/components/CapabilityLaunchGrid";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppContext } from "@/contexts/AppContext";
 import { motion } from "framer-motion";
@@ -17,7 +18,7 @@ import type { CyberFitnessProfile } from "@/types/cyberFitness";
 
 import { format, subDays, parseISO, isValid } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ArrowRight, BadgePercent, CircleDollarSign, ExternalLink, FileSignature, GitBranch, MessageCircle, Orbit, ShieldCheck, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 const CHART_COLORS = [
   'hsl(var(--brand-purple))', 'hsl(var(--brand-pink))', 'hsl(var(--brand-cyan))',
@@ -39,22 +40,7 @@ const buildRollingActivityTemplate = (anchorDate: Date): Array<DailyActivityReco
   });
 
 const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png";
-const FEATURED_QUEST_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250510_035401-e6d0b2d8-9f28-4516-a5c7-fe729b31f736.jpg";
-const INVESTMENT_HERO_IMAGE = "https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1600&q=80";
-const ILYA_CONTACT_LINK = "https://t.me/salavey13";
-
-const investmentHighlights = [
-  { icon: BadgePercent, title: "20–60% годовых", description: "Доходность зависит от формата участия, сезона и структуры сделки." },
-  { icon: CircleDollarSign, title: "Вход от 500 т₽", description: "Можно зайти с понятным стартовым чеком и масштабировать участие позже." },
-  { icon: FileSignature, title: "Работаем по договору", description: "Фиксируем условия, формат выплат и сценарии выхода заранее." },
-  { icon: ShieldCheck, title: "Выплаты каждый месяц", description: "Регулярный денежный поток и прозрачная логика взаимодействия." },
-];
-
-const conversionBullets = [
-  "Вход от 500 т₽.",
-  "Выход из проекта возможен в любое время с уведомлением за 1 месяц.",
-  "Формат участия подбирается индивидуально: займ, долевое участие или совместный проект.",
-];
+const FEATURED_QUEST_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250510_035401-e6d0b2d8-9f28-4516-a5c7-fe729b31f736.jpg"; // Consider localizing alt text if needed
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -132,7 +118,7 @@ export default function Home() {
   let currentLevel = 0;
 
   if (!isLoading) { 
-    if (appContextError || cyberProfile?.cognitiveOSVersion?.includes("Аномалия") || cyberProfile?.cognitiveOSVersion?.includes("Ошибка") || cyberProfile?.cognitiveOSVersion?.includes("Exception")) {
+    if (appContextError || cyberProfile?.cognitiveOSVersion?.includes("Аномалия") || cyberProfile?.cognitiveOSVersion?.includes("Ошибка") || cyberProfile?.cognitiveOSVersion?.includes("Exception")) { // Assuming Load Exception is in Russian
       userNameDisplay = 'Агент (Аномалия)';
       osVersionDisplay = cyberProfile?.cognitiveOSVersion || "v0.1 Системная Аномалия";
     } else if (dbUser?.user_id && cyberProfile) {
@@ -240,106 +226,51 @@ export default function Home() {
           <Card className="border-brand-cyan/30 bg-dark-card/70 backdrop-blur-sm">
             <CardHeader className="pb-2 pt-3 px-4 md:px-5">
               <CardTitle className="text-base sm:text-lg font-orbitron text-brand-cyan flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-brand-pink" /> THE NEW ERA
+                <Sparkles className="h-4 w-4 text-brand-pink" /> ГЛАВНЫЙ ПУЛЬТ CYBERVIBE
               </CardTitle>
               <CardDescription className="text-xs sm:text-sm font-mono">
-                Новая эра инструментов: пиши, собирай и запускай быстрее — с прозрачным потоком от идеи до релиза.
+                Это главный вход в студию личных агентов: здесь ты выбираешь вектор, фиксируешь темп и запускаешь поставку.
               </CardDescription>
             </CardHeader>
             <CardContent className="px-4 md:px-5 pb-4 pt-1">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Button asChild variant="outline" className="justify-between border-brand-cyan/40 hover:border-brand-cyan hover:bg-brand-cyan/10">
-                  <a href="https://chatgpt.com/codex" target="_blank" rel="noopener noreferrer">
-                    <span className="inline-flex items-center"><ExternalLink className="mr-2 h-4 w-4" />Codex</span>
-                    <span className="text-[10px] font-mono text-muted-foreground">chatgpt.com</span>
-                  </a>
-                </Button>
-                <Button asChild variant="outline" className="justify-between border-brand-pink/40 hover:border-brand-pink hover:bg-brand-pink/10">
-                  <Link href="/nexus">
-                    <span className="inline-flex items-center"><Orbit className="mr-2 h-4 w-4" />Nexus</span>
-                    <span className="text-[10px] font-mono text-muted-foreground">внутри платформы</span>
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="justify-between border-brand-yellow/40 hover:border-brand-yellow hover:bg-brand-yellow/10">
-                  <Link href="/repo-xml">
-                    <span className="inline-flex items-center"><GitBranch className="mr-2 h-4 w-4" />Repo XML</span>
-                    <span className="text-[10px] font-mono text-muted-foreground">dev flow</span>
-                  </Link>
-                </Button>
-              </div>
+              <CapabilityLaunchGrid />
             </CardContent>
           </Card>
         </motion.div>
 
-        <motion.section variants={itemVariants}>
-          <Card className="overflow-hidden border-white/10 bg-[#050816]/85 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
-            <div className="relative isolate overflow-hidden">
-              <div
-                className="absolute inset-0 bg-cover bg-center scale-105"
-                style={{ backgroundImage: `linear-gradient(115deg, rgba(2,6,23,0.92), rgba(17,24,39,0.78), rgba(120,53,15,0.56)), url(${INVESTMENT_HERO_IMAGE})` }}
-              />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.22),transparent_30%),radial-gradient(circle_at_left,rgba(59,130,246,0.16),transparent_35%)]" />
-              <CardContent className="relative z-10 grid gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[1.2fr_0.8fr] lg:gap-8 lg:px-8 lg:py-8">
-                <div className="space-y-5">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-amber-200">
-                    <BadgePercent className="h-3.5 w-3.5" /> Инвестиции в мотоиндустрию
-                  </div>
-                  <div className="space-y-3">
-                    <h2 className="max-w-3xl text-3xl font-black leading-tight text-white sm:text-4xl lg:text-5xl">
-                      Любишь мотоциклы? Сделай их новым источником дохода.
-                    </h2>
-                    <p className="max-w-2xl text-base text-white/80 sm:text-lg">
-                      Зарабатывай на мотоциклах <span className="font-semibold text-amber-300">20–60% годовых</span>. Вход от 500 т₽, работа по договору, выплата процентов каждый месяц.
-                    </p>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    {investmentHighlights.map(({ icon: Icon, title, description }) => (
-                      <div key={title} className="rounded-2xl border border-white/10 bg-white/8 p-4 backdrop-blur-sm">
-                        <Icon className="mb-3 h-5 w-5 text-amber-300" />
-                        <div className="text-sm font-semibold text-white">{title}</div>
-                        <div className="mt-1 text-sm text-white/70">{description}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <Button asChild size="lg" className="bg-amber-400 text-slate-950 hover:bg-amber-300 font-semibold shadow-[0_12px_40px_rgba(251,191,36,0.28)]">
-                      <Link href="/moto-investments">Открыть страницу инвестора <ArrowRight className="ml-2 h-4 w-4" /></Link>
-                    </Button>
-                    <Button asChild size="lg" variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white">
-                      <a href={ILYA_CONTACT_LINK} target="_blank" rel="noopener noreferrer">Написать Илье Сидорову <MessageCircle className="ml-2 h-4 w-4" /></a>
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-white/10 bg-slate-950/55 p-5 backdrop-blur-md">
-                  <div className="text-sm uppercase tracking-[0.2em] text-amber-200/80">Основные условия</div>
-                  <h3 className="mt-2 text-2xl font-bold text-white">Понятный и деловой формат сотрудничества</h3>
-                  <ul className="mt-5 space-y-3 text-sm text-white/75">
-                    {conversionBullets.map((bullet) => (
-                      <li key={bullet} className="flex gap-3">
-                        <span className="mt-1 h-2 w-2 rounded-full bg-amber-300" />
-                        <span>{bullet}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm text-emerald-50">
-                    <div className="font-semibold">Что важно для принятия решения</div>
-                    <p className="mt-2 text-emerald-50/85">
-                      На странице сразу показаны ключевые условия: доходность, минимальный вход, договор, ежемесячные выплаты и порядок выхода из проекта. Это делает предложение более понятным для потенциального инвестора.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </div>
+        <motion.div variants={itemVariants}>
+          <Card className="border-brand-pink/25 bg-dark-card/65 backdrop-blur-sm">
+            <CardHeader className="pb-2 pt-3 px-4 md:px-5">
+              <CardTitle className="text-base sm:text-lg font-orbitron text-brand-pink flex items-center gap-2">
+                <VibeContentRenderer content="::FaRoute::" /> КАНОНИЧЕСКИЙ МАРШРУТ ОПЕРАТОРА
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm font-mono">
+                Не теряйся в хаосе: двигайся по фиксированному пайплайну и не ломай ритм команды.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-2 px-4 md:px-5 pb-4 pt-1">
+              <Link href="/" className="rounded-lg border border-brand-cyan/30 bg-black/25 p-3 hover:border-brand-cyan/60 transition-colors">
+                <p className="font-orbitron text-brand-cyan text-sm">1) ВХОД / РИТМ</p>
+                <p className="font-mono text-xs text-muted-foreground mt-1">Задай темп дня: профиль, метрики, фокус и приоритеты.</p>
+              </Link>
+              <Link href="/nexus" className="rounded-lg border border-brand-purple/30 bg-black/25 p-3 hover:border-brand-purple/60 transition-colors">
+                <p className="font-orbitron text-brand-purple text-sm">2) NEXUS / СИСТЕМА</p>
+                <p className="font-mono text-xs text-muted-foreground mt-1">Слой платформы: инфраструктура, связки, контуры автоматизаций.</p>
+              </Link>
+              <Link href="/repo-xml" className="rounded-lg border border-brand-yellow/30 bg-black/25 p-3 hover:border-brand-yellow/60 transition-colors">
+                <p className="font-orbitron text-brand-yellow text-sm">3) EXECUTION / ДОСТАВКА</p>
+                <p className="font-mono text-xs text-muted-foreground mt-1">RepoTxtFetcher, AI-цикл правок, ветка, PR, релиз.</p>
+              </Link>
+            </CardContent>
           </Card>
-        </motion.section>
+        </motion.div>
 
         <motion.div variants={itemVariants}>
           <Card className="featured-quest-card group">
             <CardHeader className="flex flex-row items-center justify-between pb-2 pt-3 px-4 md:px-5">
               <div>
                 <CardTitle className="text-lg sm:text-xl font-orbitron text-brand-yellow">Приоритетные Директивы</CardTitle>
-                <CardDescription className="text-muted-foreground font-mono text-xs">Задачи для уровня {currentLevel}+ </CardDescription>
+                <CardDescription className="text-muted-foreground font-mono text-xs">Задачи для уровня {currentLevel}+</CardDescription>
               </div>
               <Button asChild variant="outline" size="xs" className="border-brand-yellow text-brand-yellow hover:bg-brand-yellow/10 hover:text-white font-mono text-xs px-2 py-1 h-auto group-hover:border-brand-pink group-hover:text-brand-pink">
                 <Link href="/selfdev/gamified" className="flex items-center">
@@ -404,6 +335,28 @@ export default function Home() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <Card className="border-brand-cyan/30 bg-dark-card/70 backdrop-blur-sm">
+            <CardHeader className="pb-2 pt-3 px-4 md:px-5">
+              <CardTitle className="text-base sm:text-lg font-orbitron text-brand-cyan">
+                КУДА КАЧАЕМ CYBERFITNESS ДАЛЬШЕ
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm font-mono">
+                Не «ачивки ради ачивок», а личная операционная эволюция по роли и результату.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-2 px-4 md:px-5 pb-4 pt-1">
+              <Link href="/profile" className="rounded-lg border border-brand-pink/30 p-3 hover:border-brand-pink/60 transition-colors">
+                <p className="font-orbitron text-brand-pink text-sm">PROFILE 2.0</p>
+                <p className="font-mono text-xs text-muted-foreground mt-1">Quest DNA, треки прогресса, стрики и персональные секреты оператора.</p>
+              </Link>
+              <Link href="/franchize/vip-bike/profile" className="rounded-lg border border-brand-green/30 p-3 hover:border-brand-green/60 transition-colors">
+                <p className="font-orbitron text-brand-green text-sm">FRANCHIZE IDENTITY</p>
+                <p className="font-mono text-xs text-muted-foreground mt-1">Бейджи райдера, achievements франшизы и закрытые mission-сценарии для crew.</p>
+              </Link>
             </CardContent>
           </Card>
         </motion.div>
