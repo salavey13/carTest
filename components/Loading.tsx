@@ -121,7 +121,8 @@ const ParticleField = () => {
 // ==================== SCANNER LINE ====================
 const ScannerLine = () => (
   <motion.div
-    className="absolute left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500 to-transparent shadow-[0_0_20px_rgba(6,182,212,0.8)] z-30"
+    className="absolute left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500 to-transparent z-30"
+    style={{ boxShadow: "0 0 20px rgba(6,182,212,0.8)" }}
     initial={{ top: "0%" }}
     animate={{ top: "100%" }}
     transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
@@ -201,7 +202,8 @@ const KineticCore = () => {
   return (
     <div
       onMouseMove={handleMouseMove}
-      className="relative w-80 h-80 flex items-center justify-center perspective-1000 cursor-crosshair"
+      className="relative w-80 h-80 flex items-center justify-center cursor-crosshair"
+      style={{ perspective: "1000px" }}
     >
       <motion.div
         style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
@@ -219,19 +221,20 @@ const KineticCore = () => {
 
         {/* Middle Gyroscope Ring */}
         <motion.div
-          className="absolute inset-8 rounded-full border border-purple-500/40 shadow-[0_0_30px_rgba(168,85,247,0.3)]"
-          style={{ transform: "rotateY(85deg)" }}
+          className="absolute inset-8 rounded-full border border-purple-500/40"
+          style={{ transform: "rotateY(85deg)", boxShadow: "0 0 30px rgba(168,85,247,0.3)" }}
           animate={{ rotateZ: -360 }}
           transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
         >
           {[0, 90, 180, 270].map((deg, i) => (
             <motion.div
               key={i}
-              className="absolute w-3 h-3 bg-purple-400 rounded-full shadow-[0_0_10px_rgba(168,85,247,0.8)]"
+              className="absolute w-3 h-3 bg-purple-400 rounded-full"
               style={{
                 top: "50%",
                 left: "50%",
                 transform: `rotate(${deg}deg) translateX(120px) translateY(-50%)`,
+                boxShadow: "0 0 10px rgba(168,85,247,0.8)",
               }}
               animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
               transition={{ duration: 2, repeat: Infinity, delay: i * 0.5 }}
@@ -286,8 +289,11 @@ const KineticCore = () => {
             transition={{ duration: 8 + i, repeat: Infinity, ease: "linear", delay: i * 0.2 }}
           >
             <motion.div
-              className="absolute w-3 h-3 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full shadow-[0_0_15px_rgba(251,191,36,0.8)]"
-              style={{ transform: `rotate(${deg}deg) translateX(140px)` }}
+              className="absolute w-3 h-3 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full"
+              style={{
+                transform: `rotate(${deg}deg) translateX(140px)`,
+                boxShadow: "0 0 15px rgba(251,191,36,0.8)",
+              }}
               animate={{ scale: [1, 1.3, 1] }}
               transition={{ duration: 1, repeat: Infinity, delay: i * 0.1 }}
             />
@@ -330,7 +336,7 @@ const HexGrid = () => {
               fill="none"
               stroke="url(#hexGradient)"
               strokeWidth="1.5"
-              className="drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]"
+              style={{ filter: "drop-shadow(0 0 8px rgba(6,182,212,0.5))" }}
             />
             <defs>
               <linearGradient id="hexGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -359,7 +365,7 @@ const HexGrid = () => {
 // ==================== BIKE SPEEDSTER ====================
 const BikeSpeedster = () => (
   <div className="relative w-full max-w-lg mx-auto h-64 flex items-center justify-center overflow-hidden">
-    <div className="absolute inset-0 perspective-1000">
+    <div className="absolute inset-0" style={{ perspective: "1000px" }}>
       {[...Array(20)].map((_, i) => (
         <motion.div
           key={i}
@@ -384,8 +390,11 @@ const BikeSpeedster = () => (
         {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
           <div
             key={deg}
-            className="absolute w-2 h-2 bg-orange-400 rounded-full shadow-[0_0_10px_rgba(251,191,36,0.8)]"
-            style={{ transform: `rotate(${deg}deg) translateX(60px)` }}
+            className="absolute w-2 h-2 bg-orange-400 rounded-full"
+            style={{
+              transform: `rotate(${deg}deg) translateX(60px)`,
+              boxShadow: "0 0 10px rgba(251,191,36,0.8)",
+            }}
           />
         ))}
       </motion.div>
@@ -398,8 +407,11 @@ const BikeSpeedster = () => (
         {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
           <div
             key={deg}
-            className="absolute w-2 h-2 bg-orange-400 rounded-full shadow-[0_0_10px_rgba(251,191,36,0.8)]"
-            style={{ transform: `rotate(${deg}deg) translateX(60px)` }}
+            className="absolute w-2 h-2 bg-orange-400 rounded-full"
+            style={{
+              transform: `rotate(${deg}deg) translateX(60px)`,
+              boxShadow: "0 0 10px rgba(251,191,36,0.8)",
+            }}
           />
         ))}
       </motion.div>
@@ -415,7 +427,7 @@ const BikeSpeedster = () => (
         }}
         transition={{ duration: 1.5, repeat: Infinity }}
       >
-        <Bike size={80} className="text-orange-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.8)]" strokeWidth={1.5} />
+        <Bike size={80} className="text-orange-400" strokeWidth={1.5} style={{ filter: "drop-shadow(0 0 15px rgba(251,191,36,0.8))" }} />
       </motion.div>
 
       <svg className="absolute -inset-8 w-[calc(100%+4rem)] h-[calc(100%+4rem)] -z-10">
@@ -490,14 +502,14 @@ export function Loading({ variant = "kinetic", text, className }: LoadingProps) 
             <div className="relative h-1 bg-slate-800 rounded-full overflow-hidden">
               <motion.div
                 className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500"
-                animate={{ 
+                animate={{
                   width: ["0%", "100%", "0%"],
-                  x: ["-100%", "0%", "100%"]
+                  x: ["-100%", "0%", "100%"],
                 }}
-                transition={{ 
-                  duration: 3, 
-                  repeat: Infinity, 
-                  ease: "easeInOut" 
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut",
                 }}
               />
             </div>
@@ -557,7 +569,8 @@ export function Loading({ variant = "kinetic", text, className }: LoadingProps) 
               {[0, 1, 2].map((i) => (
                 <motion.div
                   key={i}
-                  className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.8)]"
+                  className="w-2 h-2 rounded-full bg-cyan-400"
+                  style={{ boxShadow: "0 0 10px rgba(6,182,212,0.8)" }}
                   animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }}
                   transition={{ duration: 1, repeat: Infinity, delay: i * 0.3 }}
                 />
@@ -590,20 +603,25 @@ export function Loading({ variant = "kinetic", text, className }: LoadingProps) 
           transition={{ delay: 0.3 }}
           className="mt-12 text-center space-y-4 z-10"
         >
-          <h2 className="font-orbitron font-black text-3xl md:text-5xl uppercase tracking-wider text-orange-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]">
+          <h2
+            className="font-orbitron font-black text-3xl md:text-5xl uppercase tracking-wider text-orange-400"
+            style={{ filter: "drop-shadow(0 0 15px rgba(251,191,36,0.5))" }}
+          >
             TURBO SYNC
           </h2>
           <div className="w-64 h-2 bg-slate-800 rounded-full overflow-hidden mx-auto">
             <motion.div
               className="h-full bg-gradient-to-r from-orange-500 via-amber-400 to-orange-500"
-              animate={{ 
+              animate={{
                 width: ["0%", "100%", "0%"],
-                x: ["-100%", "0%", "100%"]
+                x: ["-100%", "0%", "100%"],
               }}
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
             />
           </div>
-          <p className="font-mono text-sm text-orange-300/70 animate-pulse">{text || "Optimizing performance..."}</p>
+          <p className="font-mono text-sm text-orange-300/70 animate-pulse">
+            {text || "Optimizing performance..."}
+          </p>
           <div className="flex justify-center gap-2 mt-4">
             {["RPM", "TORQUE", "SPEED"].map((label, i) => (
               <div key={label} className="text-center">
@@ -656,7 +674,9 @@ export function Loading({ variant = "kinetic", text, className }: LoadingProps) 
               key={deg}
               className="absolute inset-0 border-2 border-cyan-500/30 rounded-full"
               style={{ transform: `rotate(${deg}deg) scale(${1 - i * 0.15})` }}
-              animate={{ borderColor: ["rgba(6,182,212,0.3)", "rgba(168,85,247,0.5)", "rgba(6,182,212,0.3)"] }}
+              animate={{
+                borderColor: ["rgba(6,182,212,0.3)", "rgba(168,85,247,0.5)", "rgba(6,182,212,0.3)"],
+              }}
               transition={{ duration: 2, repeat: Infinity, delay: i * 0.2 }}
             />
           ))}
