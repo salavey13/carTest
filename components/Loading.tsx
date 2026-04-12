@@ -447,283 +447,254 @@ const BikeSpeedster = () => (
 // ==================== MAIN LOADING COMPONENT ====================
 export function Loading({ variant = "kinetic", text, className }: LoadingProps) {
   const [mounted, setMounted] = useState(false);
-  const [visible, setVisible] = useState(true);
-  const [phase, setPhase] = useState<"booting" | "almost" | "ready">("booting");
 
-  // Монтирование
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Автономные фазы загрузки
-  useEffect(() => {
-    if (!mounted) return;
-
-    const almostTimer = setTimeout(() => setPhase("almost"), 2000);
-    const readyTimer = setTimeout(() => setPhase("ready"), 3000);
-    const fadeTimer = setTimeout(() => setVisible(false), 3500);
-
-    return () => {
-      clearTimeout(almostTimer);
-      clearTimeout(readyTimer);
-      clearTimeout(fadeTimer);
-    };
-  }, [mounted]);
-
   if (!mounted) return null;
-
-  const isAlmost = phase === "almost" || phase === "ready";
-  const displayProgress = phase === "booting" ? 35 : phase === "almost" ? 80 : 100;
 
   // ==================== KINETIC ====================
   if (variant === "kinetic") {
     return (
-      <AnimatePresence>
-        {visible && (
+      <motion.div
+        key="kinetic-loader"
+        initial={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.5, ease: "easeInOut" }}
+        className={cn(
+          "fixed inset-0 z-50 bg-slate-950 text-slate-200 flex flex-col items-center justify-center overflow-hidden",
+          className
+        )}
+      >
+        <MatrixRain />
+        <ParticleField />
+        <ScannerLine />
+
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(2,6,23,0.8)_100%)] z-10" />
+
+        <div className="relative z-20 flex flex-col items-center px-4">
+          <KineticCore />
+
           <motion.div
-            key="kinetic-loader"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5, ease: "easeInOut" }}
-            className={cn(
-              "fixed inset-0 z-50 bg-slate-950 text-slate-200 flex flex-col items-center justify-center overflow-hidden",
-              className
-            )}
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.8 }}
+            className="mt-8 text-center space-y-6 w-full max-w-md"
           >
-            <MatrixRain />
-            <ParticleField />
-            <ScannerLine />
+            <GlitchText
+              text="NEURAL SYNC"
+              className="text-4xl md:text-6xl bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent"
+            />
 
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(2,6,23,0.8)_100%)] z-10" />
-
-            <div className="relative z-20 flex flex-col items-center px-4">
-              <KineticCore />
-
+            <div className="relative h-1 bg-slate-800 rounded-full overflow-hidden">
               <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.8 }}
-                className="mt-8 text-center space-y-6 w-full max-w-md"
-              >
-                <GlitchText
-                  text={phase === "ready" ? "SYSTEM READY" : "NEURAL SYNC"}
-                  className="text-4xl md:text-6xl bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent"
-                />
+                className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500"
+                animate={{ 
+                  width: ["0%", "100%", "0%"],
+                  x: ["-100%", "0%", "100%"]
+                }}
+                transition={{ 
+                  duration: 3, 
+                  repeat: Infinity, 
+                  ease: "easeInOut" 
+                }}
+              />
+            </div>
 
-                <div className="relative h-1 bg-slate-800 rounded-full overflow-hidden">
-                  <motion.div
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500"
-                    initial={{ width: "0%" }}
-                    animate={{ width: `${displayProgress}%` }}
-                    transition={{ duration: 0.5 }}
-                  />
-                </div>
+            <TerminalLogs text={text} />
 
-                <TerminalLogs text={text} />
-
-                <div className="flex items-center justify-center gap-4 text-xs font-mono text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <Wifi className="w-3 h-3 text-emerald-400" />
-                    SECURE
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Shield className="w-3 h-3 text-cyan-400" />
-                    ENCRYPTED
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Radio className="w-3 h-3 text-amber-400 animate-pulse" />
-                    LIVE
-                  </span>
-                </div>
-              </motion.div>
+            <div className="flex items-center justify-center gap-4 text-xs font-mono text-slate-500">
+              <span className="flex items-center gap-1">
+                <Wifi className="w-3 h-3 text-emerald-400" />
+                SECURE
+              </span>
+              <span className="flex items-center gap-1">
+                <Shield className="w-3 h-3 text-cyan-400" />
+                ENCRYPTED
+              </span>
+              <span className="flex items-center gap-1">
+                <Radio className="w-3 h-3 text-amber-400 animate-pulse" />
+                LIVE
+              </span>
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+      </motion.div>
     );
   }
 
   // ==================== GENERIC ====================
   if (variant === "generic") {
     return (
-      <AnimatePresence>
-        {visible && (
-          <motion.div
-            key="generic-loader"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-            className={cn(
-              "fixed inset-0 z-50 bg-slate-950 text-slate-200 flex flex-col items-center justify-center overflow-hidden",
-              className
-            )}
-          >
-            <ParticleField />
-            <div className="relative z-10 flex flex-col items-center">
-              <HexGrid />
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="mt-12 text-center space-y-4"
-              >
-                <motion.h2
-                  className="font-orbitron font-black text-3xl md:text-4xl uppercase tracking-[0.3em] text-slate-300"
-                  animate={{ opacity: [0.5, 1, 0.5] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  SYSTEM BOOT
-                </motion.h2>
-                <div className="flex items-center gap-2 justify-center">
-                  {[0, 1, 2].map((i) => (
-                    <motion.div
-                      key={i}
-                      className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.8)]"
-                      animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }}
-                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.3 }}
-                    />
-                  ))}
-                </div>
-                <p className="font-mono text-sm text-slate-500">{text || "Initializing modules..."}</p>
-              </motion.div>
-            </div>
-          </motion.div>
+      <motion.div
+        key="generic-loader"
+        initial={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.5 }}
+        className={cn(
+          "fixed inset-0 z-50 bg-slate-950 text-slate-200 flex flex-col items-center justify-center overflow-hidden",
+          className
         )}
-      </AnimatePresence>
+      >
+        <ParticleField />
+        <div className="relative z-10 flex flex-col items-center">
+          <HexGrid />
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="mt-12 text-center space-y-4"
+          >
+            <motion.h2
+              className="font-orbitron font-black text-3xl md:text-4xl uppercase tracking-[0.3em] text-slate-300"
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              SYSTEM BOOT
+            </motion.h2>
+            <div className="flex items-center gap-2 justify-center">
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.8)]"
+                  animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }}
+                  transition={{ duration: 1, repeat: Infinity, delay: i * 0.3 }}
+                />
+              ))}
+            </div>
+            <p className="font-mono text-sm text-slate-500">{text || "Initializing modules..."}</p>
+          </motion.div>
+        </div>
+      </motion.div>
     );
   }
 
   // ==================== BIKE ====================
   if (variant === "bike") {
     return (
-      <AnimatePresence>
-        {visible && (
-          <motion.div
-            key="bike-loader"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-            className={cn(
-              "fixed inset-0 z-50 bg-gradient-to-br from-slate-950 via-orange-950/20 to-slate-950 text-slate-200 flex flex-col items-center justify-center overflow-hidden",
-              className
-            )}
-          >
-            <BikeSpeedster />
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="mt-12 text-center space-y-4 z-10"
-            >
-              <h2 className="font-orbitron font-black text-3xl md:text-5xl uppercase tracking-wider text-orange-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]">
-                {phase === "ready" ? "READY TO RIDE" : "TURBO SYNC"}
-              </h2>
-              <div className="w-64 h-2 bg-slate-800 rounded-full overflow-hidden mx-auto">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-orange-500 via-amber-400 to-orange-500"
-                  initial={{ width: "0%" }}
-                  animate={{ width: `${displayProgress}%` }}
-                  transition={{ duration: 0.5 }}
-                />
-              </div>
-              <p className="font-mono text-sm text-orange-300/70 animate-pulse">{text || "Optimizing performance..."}</p>
-              <div className="flex justify-center gap-2 mt-4">
-                {["RPM", "TORQUE", "SPEED"].map((label, i) => (
-                  <div key={label} className="text-center">
-                    <motion.div
-                      className="text-lg font-orbitron font-bold text-amber-400"
-                      animate={{ opacity: [0.3, 1, 0.3] }}
-                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                    >
-                      {Math.floor(Math.random() * 9000 + 1000)}
-                    </motion.div>
-                    <div className="text-[10px] text-slate-500 uppercase">{label}</div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          </motion.div>
+      <motion.div
+        key="bike-loader"
+        initial={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.5 }}
+        className={cn(
+          "fixed inset-0 z-50 bg-gradient-to-br from-slate-950 via-orange-950/20 to-slate-950 text-slate-200 flex flex-col items-center justify-center overflow-hidden",
+          className
         )}
-      </AnimatePresence>
+      >
+        <BikeSpeedster />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mt-12 text-center space-y-4 z-10"
+        >
+          <h2 className="font-orbitron font-black text-3xl md:text-5xl uppercase tracking-wider text-orange-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]">
+            TURBO SYNC
+          </h2>
+          <div className="w-64 h-2 bg-slate-800 rounded-full overflow-hidden mx-auto">
+            <motion.div
+              className="h-full bg-gradient-to-r from-orange-500 via-amber-400 to-orange-500"
+              animate={{ 
+                width: ["0%", "100%", "0%"],
+                x: ["-100%", "0%", "100%"]
+              }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </div>
+          <p className="font-mono text-sm text-orange-300/70 animate-pulse">{text || "Optimizing performance..."}</p>
+          <div className="flex justify-center gap-2 mt-4">
+            {["RPM", "TORQUE", "SPEED"].map((label, i) => (
+              <div key={label} className="text-center">
+                <motion.div
+                  className="text-lg font-orbitron font-bold text-amber-400"
+                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                >
+                  {Math.floor(Math.random() * 9000 + 1000)}
+                </motion.div>
+                <div className="text-[10px] text-slate-500 uppercase">{label}</div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      </motion.div>
     );
   }
 
   // ==================== SYSTEM ====================
   return (
-    <AnimatePresence>
-      {visible && (
+    <motion.div
+      key="system-loader"
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5 }}
+      className={cn(
+        "fixed inset-0 z-50 bg-slate-950 text-slate-200 flex flex-col items-center justify-center overflow-hidden",
+        className
+      )}
+    >
+      <div className="absolute inset-0 opacity-10">
+        <svg className="w-full h-full">
+          <pattern id="circuit" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+            <circle cx="50" cy="50" r="2" fill="currentColor" />
+            <path d="M50 50 L50 0 M50 50 L100 50 M50 50 L50 100 M50 50 L0 50" stroke="currentColor" strokeWidth="0.5" fill="none" />
+          </pattern>
+          <rect width="100%" height="100%" fill="url(#circuit)" />
+        </svg>
+      </div>
+
+      <div className="relative z-10 flex flex-col items-center">
         <motion.div
-          key="system-loader"
-          initial={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.5 }}
-          className={cn(
-            "fixed inset-0 z-50 bg-slate-950 text-slate-200 flex flex-col items-center justify-center overflow-hidden",
-            className
-          )}
+          className="relative w-32 h-32"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
         >
-          <div className="absolute inset-0 opacity-10">
-            <svg className="w-full h-full">
-              <pattern id="circuit" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
-                <circle cx="50" cy="50" r="2" fill="currentColor" />
-                <path d="M50 50 L50 0 M50 50 L100 50 M50 50 L50 100 M50 50 L0 50" stroke="currentColor" strokeWidth="0.5" fill="none" />
-              </pattern>
-              <rect width="100%" height="100%" fill="url(#circuit)" />
-            </svg>
-          </div>
-
-          <div className="relative z-10 flex flex-col items-center">
+          {[0, 45, 90, 135].map((deg, i) => (
             <motion.div
-              className="relative w-32 h-32"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-            >
-              {[0, 45, 90, 135].map((deg, i) => (
-                <motion.div
-                  key={deg}
-                  className="absolute inset-0 border-2 border-cyan-500/30 rounded-full"
-                  style={{ transform: `rotate(${deg}deg) scale(${1 - i * 0.15})` }}
-                  animate={{ borderColor: ["rgba(6,182,212,0.3)", "rgba(168,85,247,0.5)", "rgba(6,182,212,0.3)"] }}
-                  transition={{ duration: 2, repeat: Infinity, delay: i * 0.2 }}
-                />
-              ))}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <motion.div
-                  animate={{
-                    scale: [1, 1.2, 1],
-                    boxShadow: [
-                      "0 0 20px rgba(6,182,212,0.5)",
-                      "0 0 40px rgba(168,85,247,0.8)",
-                      "0 0 20px rgba(6,182,212,0.5)",
-                    ],
-                  }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center"
-                >
-                  <Zap className="w-8 h-8 text-white fill-white" />
-                </motion.div>
-              </div>
-            </motion.div>
-
+              key={deg}
+              className="absolute inset-0 border-2 border-cyan-500/30 rounded-full"
+              style={{ transform: `rotate(${deg}deg) scale(${1 - i * 0.15})` }}
+              animate={{ borderColor: ["rgba(6,182,212,0.3)", "rgba(168,85,247,0.5)", "rgba(6,182,212,0.3)"] }}
+              transition={{ duration: 2, repeat: Infinity, delay: i * 0.2 }}
+            />
+          ))}
+          <div className="absolute inset-0 flex items-center justify-center">
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="mt-8 text-center space-y-3"
+              animate={{
+                scale: [1, 1.2, 1],
+                boxShadow: [
+                  "0 0 20px rgba(6,182,212,0.5)",
+                  "0 0 40px rgba(168,85,247,0.8)",
+                  "0 0 20px rgba(6,182,212,0.5)",
+                ],
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center"
             >
-              <h3 className="font-orbitron font-bold text-2xl text-cyan-400 tracking-widest">
-                {phase === "ready" ? "SYSTEM READY" : text || "SYSTEM ACTIVE"}
-              </h3>
-              <div className="flex items-center gap-2 justify-center text-xs font-mono text-slate-500">
-                <Terminal className="w-3 h-3" />
-                <span>v2.0.1</span>
-                <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-                <span>ONLINE</span>
-              </div>
+              <Zap className="w-8 h-8 text-white fill-white" />
             </motion.div>
           </div>
         </motion.div>
-      )}
-    </AnimatePresence>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="mt-8 text-center space-y-3"
+        >
+          <h3 className="font-orbitron font-bold text-2xl text-cyan-400 tracking-widest">
+            {text || "SYSTEM ACTIVE"}
+          </h3>
+          <div className="flex items-center gap-2 justify-center text-xs font-mono text-slate-500">
+            <Terminal className="w-3 h-3" />
+            <span>v2.0.1</span>
+            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+            <span>ONLINE</span>
+          </div>
+        </motion.div>
+      </div>
+    </motion.div>
   );
 }
