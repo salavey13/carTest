@@ -1,7 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { motion, useMotionValue, useTransform, useSpring } from "framer-motion";
+import React, { useEffect, useState, useMemo } from "react";
+import {
+  motion,
+  useMotionValue,
+  useTransform,
+  useSpring,
+  AnimatePresence,
+} from "framer-motion";
 import { Bike, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,19 +27,40 @@ const SLANG = [
   "main character energy",
 ] as const;
 
-// === KINETIC CORE ===
+// === KINETIC CORE (polished) ===
 const KineticCore = ({ almostReady }: { almostReady: boolean }) => {
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
+  const [dimensions, setDimensions] = useState({ width: 1000, height: 1000 });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setDimensions({ width: window.innerWidth, height: window.innerHeight });
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const rotateX = useSpring(
-    useTransform(mouseY, [0, typeof window !== "undefined" ? window.innerHeight : 1000], [12, -12]),
+    useTransform(mouseY, [0, dimensions.height], [12, -12]),
     { stiffness: almostReady ? 50 : 80, damping: 30 }
   );
 
   const rotateY = useSpring(
-    useTransform(mouseX, [0, typeof window !== "undefined" ? window.innerWidth : 1000], [-12, 12]),
+    useTransform(mouseX, [0, dimensions.width], [-12, 12]),
     { stiffness: almostReady ? 50 : 80, damping: 30 }
+  );
+
+  // Улучшенные частицы с фиксированной позицией
+  const particles = useMemo(
+    () =>
+      Array.from({ length: 6 }).map((_, i) => ({
+        id: `particle-${i}`,
+        rotation: i * 60,
+        delay: i * 0.25,
+      })),
+    []
   );
 
   return (
@@ -81,6 +108,7 @@ const KineticCore = ({ almostReady }: { almostReady: boolean }) => {
           transition={{
             duration: almostReady ? 6 : 4,
             repeat: Infinity,
+            ease: "easeInOut",
           }}
         />
 
@@ -104,17 +132,18 @@ const KineticCore = ({ almostReady }: { almostReady: boolean }) => {
           transition={{
             duration: almostReady ? 2.5 : 2,
             repeat: Infinity,
+            ease: "easeInOut",
           }}
         />
 
         {/* particles */}
-        {Array.from({ length: 6 }).map((_, i) => (
+        {particles.map(({ id, rotation, delay }) => (
           <motion.div
-            key={i}
+            key={id}
             className="absolute top-1/2 left-1/2 w-1.5 h-1.5 rounded-full bg-brand-gold"
             style={{
               transformOrigin: "0 0",
-              transform: `rotate(${i * 60}deg) translateX(120px)`,
+              transform: `rotate(${rotation}deg) translateX(120px)`,
             }}
             animate={{
               opacity: almostReady ? [0, 0.4, 0] : [0, 1, 0],
@@ -123,7 +152,8 @@ const KineticCore = ({ almostReady }: { almostReady: boolean }) => {
             transition={{
               duration: 2,
               repeat: Infinity,
-              delay: i * 0.25,
+              delay,
+              ease: "easeOut",
             }}
           />
         ))}
@@ -134,25 +164,30 @@ const KineticCore = ({ almostReady }: { almostReady: boolean }) => {
 
 // === DATA STREAM ===
 const DataStream = () => {
-  const lines = Array.from({ length: 20 }, (_, i) => ({
-    left: `${(i * 100) / 20}%`,
-    duration: 3 + (i % 4),
-    delay: (i % 5) * 0.2,
-  }));
+  const lines = useMemo(
+    () =>
+      Array.from({ length: 20 }, (_, i) => ({
+        id: `line-${i}`,
+        left: `${(i * 100) / 20}%`,
+        duration: 3 + (i % 4),
+        delay: (i % 5) * 0.2,
+      })),
+    []
+  );
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20 dark:opacity-10">
-      {lines.map((l, i) => (
+      {lines.map(({ id, left, duration, delay }) => (
         <motion.div
-          key={i}
+          key={id}
           className="absolute top-[-10%] h-[20%] w-px bg-foreground"
-          style={{ left: l.left }}
+          style={{ left }}
           animate={{ top: "110%" }}
           transition={{
-            duration: l.duration,
+            duration,
             repeat: Infinity,
             ease: "linear",
-            delay: l.delay,
+            delay,
           }}
         />
       ))}
@@ -160,7 +195,7 @@ const DataStream = () => {
   );
 };
 
-// === TEXT ===
+// === TEXT (с анимацией смены) ===
 const LoadingText = ({
   text,
   almostReady,
@@ -168,29 +203,41 @@ const LoadingText = ({
   text?: string;
   almostReady: boolean;
 }) => {
-  const [i, setI] = useState(0);
+  const [index, setIndex] = useState(0);
 
   useEffect(() => {
     if (almostReady) return;
-
-    const id = setInterval(() => {
-      setI((v) => (v + 1) % SLANG.length);
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % SLANG.length);
     }, 1800);
-
-    return () => clearInterval(id);
+    return () => clearInterval(interval);
   }, [almostReady]);
+
+  const displayText = text || (almostReady ? "almost ready..." : SLANG[index]);
 
   return (
     <div className="flex flex-col items-center text-center mt-10 max-w-sm">
-      <h2 className="font-orbitron font-black text-3xl md:text-5xl tracking-[0.25em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-brand-deep-indigo via-primary to-brand-cyan dark:from-brand-purple dark:via-brand-cyan dark:to-brand-pink">
+      <motion.h2
+        layoutId="loading-title"
+        className="font-orbitron font-black text-3xl md:text-5xl tracking-[0.25em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-brand-deep-indigo via-primary to-brand-cyan dark:from-brand-purple dark:via-brand-cyan dark:to-brand-pink"
+      >
         Init Core
-      </h2>
+      </motion.h2>
 
       <div className="mt-4 h-px w-24 bg-gradient-to-r from-transparent via-foreground/30 to-transparent" />
 
-      <p className="mt-5 font-mono text-sm md:text-base text-muted-foreground tracking-widest uppercase">
-        {text || (almostReady ? "almost ready..." : SLANG[i])}
-      </p>
+      <AnimatePresence mode="wait">
+        <motion.p
+          key={displayText}
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -5 }}
+          transition={{ duration: 0.2 }}
+          className="mt-5 font-mono text-sm md:text-base text-muted-foreground tracking-widest uppercase"
+        >
+          {displayText}
+        </motion.p>
+      </AnimatePresence>
     </div>
   );
 };
@@ -206,17 +253,12 @@ export function Loading({
 
   useEffect(() => {
     setMounted(true);
-
-    const t = setTimeout(() => {
-      setAlmostReady(true);
-    }, 3500);
-
-    return () => clearTimeout(t);
+    const timeout = setTimeout(() => setAlmostReady(true), 3500);
+    return () => clearTimeout(timeout);
   }, []);
 
   if (!mounted) return null;
 
-  // === KINETIC ===
   if (variant === "kinetic") {
     return (
       <div
@@ -227,7 +269,6 @@ export function Loading({
       >
         <div className="absolute inset-0 bg-grid-pattern opacity-40 dark:opacity-15" />
         <DataStream />
-
         <div className="relative z-10 flex flex-col items-center justify-center">
           <KineticCore almostReady={almostReady} />
           <LoadingText text={text} almostReady={almostReady} />
@@ -236,7 +277,6 @@ export function Loading({
     );
   }
 
-  // === GENERIC ===
   if (variant === "generic") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 text-center">
@@ -252,7 +292,6 @@ export function Loading({
     );
   }
 
-  // === BIKE ===
   if (variant === "bike") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6">
@@ -263,7 +302,6 @@ export function Loading({
         >
           <Bike size={56} className="text-brand-red-orange" />
         </motion.div>
-
         <div className="w-56">
           <div className="h-2 bg-muted rounded-full overflow-hidden">
             <motion.div
@@ -277,7 +315,6 @@ export function Loading({
     );
   }
 
-  // === SYSTEM ===
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">
       <motion.div
@@ -286,7 +323,6 @@ export function Loading({
       >
         <Zap className="w-14 h-14 text-primary" />
       </motion.div>
-
       <p className="font-mono text-sm text-muted-foreground tracking-widest uppercase">
         {text || "system..."}
       </p>
