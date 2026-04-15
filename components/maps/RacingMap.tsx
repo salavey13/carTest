@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from 'react';
-import { CircleMarker, GeoJSON, MapContainer, Popup, Polyline, TileLayer, useMapEvents } from 'react-leaflet';
+import { CircleMarker, GeoJSON, MapContainer, Popup, Polyline, TileLayer } from 'react-leaflet';
+import { MapInteractionCapture } from '@/components/maps/MapInteractionCapture';
 import type { PointOfInterest } from '@/lib/map-utils';
 import type { TileLayerPreset } from '@/lib/maps/map-types';
 
@@ -51,21 +52,12 @@ function collectLatLng(points: PointOfInterest[]): Array<[number, number]> {
   return collected;
 }
 
-function MapClickCapture({ onMapClick }: { onMapClick?: (coords: [number, number]) => void }) {
-  useMapEvents({
-    click(event) {
-      onMapClick?.([event.latlng.lat, event.latlng.lng]);
-    },
-  });
-
-  return null;
-}
-
 export function RacingMap({
   points,
   bounds,
   className,
   onMapClick,
+  onMapLongPress,
   tileLayer = 'cartodb-dark',
   children,
 }: {
@@ -73,6 +65,7 @@ export function RacingMap({
   bounds: { top: number; bottom: number; left: number; right: number };
   className?: string;
   onMapClick?: (coords: [number, number]) => void;
+  onMapLongPress?: (coords: [number, number]) => void;
   tileLayer?: TileLayerPreset;
   children?: ReactNode;
 }) {
@@ -182,7 +175,7 @@ export function RacingMap({
         })}
 
         {children}
-        <MapClickCapture onMapClick={onMapClick} />
+        <MapInteractionCapture onMapClick={onMapClick} onMapLongPress={onMapLongPress} />
       </MapContainer>
     </div>
   );

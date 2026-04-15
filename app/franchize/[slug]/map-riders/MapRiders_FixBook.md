@@ -1807,3 +1807,27 @@ Play sound при:
 8. **Constants over magic numbers** — `DEMO_TICK_MS`, `STALE_MS`, `EVICT_MS` как именованные константы.
 9. **Safety bounds in reducer** — privacy values clamped, no invalid state possible.
 10. **Hybrid location** — Telegram `requestLocation` как primary, browser API как fallback. Автоматический переключение без user intervention.
+
+---
+
+## Progress log — 2026-04-09 (Codex iteration)
+
+### Done in this pass (6)
+- [x] CRIT-1: added `MapInteractionCapture` and wired long-press meetup creation (`contextmenu` + `touchstart/touchend`).
+- [x] CRIT-3: rewrote `useLiveRiders` to Telegram-first (`requestLocation`) with browser geolocation fallback.
+- [x] CRIT-3: added `onPosition` optimistic local reducer updates + `isUsingTelegram` runtime flag.
+- [x] CRIT-3/LOW-1: added haptic pulse on accepted position updates.
+- [x] CRIT-5: hardened `RiderMarker` RAF interpolation with cancellation guard on unmount/restart.
+- [x] HIGH-3b: added standalone `SpeedGradientRoute.tsx` and rendered speed-band route segments + legend in overlay.
+
+### Still open from current FixBook scope
+- [ ] HIGH-5 privacy controls (full UI + server enforcement path still incomplete).
+- [ ] HIGH-6 session form fields expansion.
+- [ ] HIGH-7 meetup creation toast/UX flow polish.
+- [ ] HIGH-8/HIGH-9 clustering polish + drawer handle polish.
+- [ ] Remaining medium/low cleanup phases (mapPoints extraction, event bridge cleanup, audio polish, etc.).
+
+### Progress log — 2026-04-12 (follow-up after review comments)
+- [x] HIGH-6: added editable session form controls in rider panel (`rideName`, `vehicleLabel`, `rideMode`) with reducer-driven actions.
+- [x] HIGH-7: meetup creation UX improved (loading label + explicit success toast + form reset).
+- [x] CRIT-1 polish: touch tap no longer triggers meetup creation accidentally; only long-press creates point on touch.
