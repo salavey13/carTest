@@ -181,6 +181,9 @@ export type MapRidersAction =
   | { type: "ui/select-session"; payload: string | null }
   | { type: "ui/select-meetup-point"; payload: [number, number] | null }
   | { type: "ui/toggle-drawer" }
+  | { type: "ui/set-ride-name"; payload: string }
+  | { type: "ui/set-vehicle-label"; payload: string }
+  | { type: "ui/set-ride-mode"; payload: "rental" | "personal" }
   | { type: "loading"; payload: boolean }
   | { type: "error"; payload: string | null };
 
@@ -338,6 +341,18 @@ export function mapRidersReducer(state: MapRidersState, action: MapRidersAction)
 
     case "ui/toggle-drawer": {
       return { ...state, drawerOpen: !state.drawerOpen };
+    }
+
+    case "ui/set-ride-name": {
+      return { ...state, rideName: action.payload };
+    }
+
+    case "ui/set-vehicle-label": {
+      return { ...state, vehicleLabel: action.payload };
+    }
+
+    case "ui/set-ride-mode": {
+      return { ...state, rideMode: action.payload };
     }
 
     case "loading": {
