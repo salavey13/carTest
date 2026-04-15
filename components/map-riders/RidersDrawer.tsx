@@ -46,7 +46,8 @@ export function RidersDrawer() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error);
-      toast.success("Meetup сохранён!");
+      toast.success("Meetup сохранён и опубликован в экипаже");
+      setMeetupTitle("Точка сбора");
       setMeetupComment("");
       dispatch({ type: "ui/select-meetup-point", payload: null });
       await fetchSnapshot();
@@ -118,7 +119,7 @@ export function RidersDrawer() {
                     <Label className="mt-2 text-xs text-amber-200">Комментарий</Label>
                     <Input value={meetupComment} onChange={(e) => setMeetupComment(e.target.value)} placeholder="Ориентир" className="mt-1 bg-transparent text-white" />
                     <Button type="button" size="sm" className="mt-2 w-full" disabled={isSubmitting} onClick={handleCreateMeetup}>
-                      Сохранить meetup
+                      {isSubmitting ? "Сохраняем meetup..." : "Сохранить meetup"}
                     </Button>
                   </div>
                 )}

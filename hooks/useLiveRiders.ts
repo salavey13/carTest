@@ -1,11 +1,22 @@
-// /hooks/useLiveRiders.ts
-// GPS watcher with throttling (3s + 10m) + broadcast + batch queue.
-// Replaces the inline useLiveRiders usage in MapRidersClient.
-
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+
+type TelegramWebApp = {
+  requestLocation?: (callback?: (location: { latitude: number; longitude: number; altitude?: number | null; course?: number | null; horizontal_accuracy?: number | null; speed?: number | null }) => void) => Promise<unknown> | void;
+  HapticFeedback?: {
+    impactOccurred?: (style: "light" | "medium" | "heavy" | "rigid" | "soft") => void;
+  };
+};
+
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp?: TelegramWebApp;
+    };
+  }
+}
 
 interface GPSPoint {
   lat: number;
@@ -21,11 +32,9 @@ interface UseLiveRidersOptions {
   sessionId: string | null;
   userId: string | null;
   enabled: boolean;
-  /** Called with each accepted GPS point (for local state + broadcast) */
   onPosition?: (point: GPSPoint) => void;
 }
 
-// Haversine for client-side distance threshold
 function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371000;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
@@ -36,9 +45,9 @@ function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng:
   return R * 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
 }
 
-const GPS_INTERVAL_MS = 3000; // 3s minimum between accepted updates
-const GPS_DISTANCE_M = 10;    // 10m minimum distance threshold
-const BATCH_FLUSH_MS = 5000;  // Flush batch every 5s
+const GPS_INTERVAL_MS = 3000;
+const GPS_DISTANCE_M = 10;
+const BATCH_FLUSH_MS = 5000;
 const BATCH_MAX_SIZE = 10;
 
 export function useLiveRiders(options: UseLiveRidersOptions) {
@@ -47,15 +56,20 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   const lastAcceptedRef = useRef<{ lat: number; lng: number; time: number } | null>(null);
   const batchQueueRef = useRef<GPSPoint[]>([]);
   const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const telegramTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const channelRef = useRef<ReturnType<ReturnType<typeof getSupabaseBrowserClient>["channel"]> | null>(null);
   const [isActive, setIsActive] = useState(false);
+  const [isUsingTelegram, setIsUsingTelegram] = useState(false);
 
-  // ── Broadcast position to Supabase Realtime ──
+  const hapticPulse = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.("light");
+  }, []);
+
   const broadcastPosition = useCallback(
     (point: GPSPoint) => {
-      if (!userId) return;
-      const supabase = getSupabaseBrowserClient();
-      const channel = supabase.channel(`map-riders:${crewSlug}`);
-      channel.send({
+      if (!userId || !channelRef.current) return;
+      channelRef.current.send({
         type: "broadcast",
         event: "rider:move",
         payload: {
@@ -68,10 +82,9 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
         },
       });
     },
-    [crewSlug, userId],
+    [userId],
   );
 
-  // ── Flush batch to server ──
   const flushBatch = useCallback(async () => {
     const points = batchQueueRef.current.splice(0, BATCH_MAX_SIZE);
     if (points.length === 0 || !sessionId || !userId) return;
@@ -82,9 +95,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId, userId, crewSlug, points }),
       });
-      if (batchResponse.ok) {
-        return;
-      }
+      if (batchResponse.ok) return;
 
       const lastPoint = points[points.length - 1];
       await fetch("/api/map-riders/location", {
@@ -103,102 +114,181 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
         }),
       });
     } catch {
-      // Re-queue failed points at front
       batchQueueRef.current.unshift(...points);
     }
   }, [sessionId, userId, crewSlug]);
 
-  // ── GPS handler ──
-  const handlePosition = useCallback(
-    (position: GeolocationPosition) => {
+  const acceptPoint = useCallback(
+    (point: GPSPoint) => {
       const now = Date.now();
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      const speedKmh = (position.coords.speed || 0) * 3.6;
-      const heading = position.coords.heading ?? null;
-      const accuracyMeters = position.coords.accuracy ?? null;
-      const capturedAt = new Date().toISOString();
-
-      // Throttle: skip if too close in time AND distance
       const last = lastAcceptedRef.current;
       if (last) {
         const elapsed = now - last.time;
-        const dist = haversineMeters({ lat, lng }, { lat: last.lat, lng: last.lng });
+        const dist = haversineMeters({ lat: point.lat, lng: point.lng }, { lat: last.lat, lng: last.lng });
         if (elapsed < GPS_INTERVAL_MS && dist < GPS_DISTANCE_M) return;
       }
 
-      lastAcceptedRef.current = { lat, lng, time: now };
-      const point: GPSPoint = { lat, lng, speedKmh, heading, accuracyMeters, capturedAt };
-
-      // Broadcast for instant map update
+      lastAcceptedRef.current = { lat: point.lat, lng: point.lng, time: now };
       broadcastPosition(point);
-
-      // Add to batch queue
       batchQueueRef.current.push(point);
-
-      // Notify parent hook
       onPosition?.(point);
+      hapticPulse();
     },
-    [broadcastPosition, onPosition],
+    [broadcastPosition, onPosition, hapticPulse],
   );
 
-  const handleError = useCallback((err: GeolocationPositionError) => {
-    console.warn("[MapRiders] GPS error:", err.message);
-  }, []);
+  const handleGeolocationPosition = useCallback(
+    (position: GeolocationPosition) => {
+      const point: GPSPoint = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        speedKmh: (position.coords.speed || 0) * 3.6,
+        heading: position.coords.heading ?? null,
+        accuracyMeters: position.coords.accuracy ?? null,
+        capturedAt: new Date().toISOString(),
+      };
+      acceptPoint(point);
+    },
+    [acceptPoint],
+  );
 
-  // ── Start/stop GPS watcher ──
+  const requestTelegramLocation = useCallback(async () => {
+    if (typeof window === "undefined") return false;
+    const webApp = window.Telegram?.WebApp;
+    if (!webApp?.requestLocation) return false;
+
+    let gotPoint = false;
+    const handleLocation = (location: { latitude: number; longitude: number; speed?: number | null; course?: number | null; horizontal_accuracy?: number | null }) => {
+      gotPoint = true;
+      acceptPoint({
+        lat: Number(location.latitude),
+        lng: Number(location.longitude),
+        speedKmh: Number(location.speed || 0) * 3.6,
+        heading: location.course != null ? Number(location.course) : null,
+        accuracyMeters: location.horizontal_accuracy != null ? Number(location.horizontal_accuracy) : null,
+        capturedAt: new Date().toISOString(),
+      });
+    };
+
+    const maybePromise = webApp.requestLocation(handleLocation);
+    if (maybePromise && typeof (maybePromise as Promise<unknown>).then === "function") {
+      try {
+        const resolved = (await maybePromise) as any;
+        if (!gotPoint && resolved?.latitude && resolved?.longitude) {
+          handleLocation(resolved);
+        }
+      } catch {
+        return false;
+      }
+    }
+
+    setIsUsingTelegram(gotPoint);
+    return gotPoint;
+  }, [acceptPoint]);
+
   useEffect(() => {
-    if (!enabled || !navigator.geolocation) {
+    if (!enabled || !userId) {
       setIsActive(false);
+      setIsUsingTelegram(false);
       return;
     }
 
-    // Adjust accuracy based on visibility
-    const highAccuracy = document.visibilityState === "visible";
-
-    watchIdRef.current = navigator.geolocation.watchPosition(handlePosition, handleError, {
-      enableHighAccuracy: highAccuracy,
-      timeout: highAccuracy ? 10000 : 30000,
-      maximumAge: highAccuracy ? 0 : 60000,
-    });
-    setIsActive(true);
+    const supabase = getSupabaseBrowserClient();
+    const channel = supabase.channel(`map-riders:${crewSlug}`);
+    channel.subscribe();
+    channelRef.current = channel;
 
     return () => {
+      channelRef.current = null;
+      supabase.removeChannel(channel);
+    };
+  }, [crewSlug, enabled, userId]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    let cancelled = false;
+
+    const start = async () => {
+      const telegramSuccess = await requestTelegramLocation();
+      if (cancelled) return;
+
+      if (telegramSuccess) {
+        setIsActive(true);
+        setIsUsingTelegram(true);
+        telegramTimerRef.current = setInterval(() => {
+          requestTelegramLocation();
+        }, GPS_INTERVAL_MS);
+        return;
+      }
+
+      if (!navigator.geolocation) {
+        setIsActive(false);
+        return;
+      }
+
+      const highAccuracy = document.visibilityState === "visible";
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        handleGeolocationPosition,
+        (error) => {
+          console.warn("[useLiveRiders] Geolocation error:", error.message);
+        },
+        {
+          enableHighAccuracy: highAccuracy,
+          timeout: highAccuracy ? 10000 : 30000,
+          maximumAge: highAccuracy ? 0 : 60000,
+        },
+      );
+      setIsActive(true);
+      setIsUsingTelegram(false);
+    };
+
+    start();
+
+    return () => {
+      cancelled = true;
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
       }
+      if (telegramTimerRef.current) {
+        clearInterval(telegramTimerRef.current);
+        telegramTimerRef.current = null;
+      }
       setIsActive(false);
     };
-  }, [enabled, handlePosition, handleError]);
+  }, [enabled, handleGeolocationPosition, requestTelegramLocation]);
 
-  // ── Visibility change → adjust GPS accuracy ──
-  useEffect(() => {
-    const onVisibility = () => {
-      if (!enabled) return;
-      // Restart watcher with new accuracy settings
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        const highAccuracy = !document.hidden;
-        watchIdRef.current = navigator.geolocation.watchPosition(handlePosition, handleError, {
-          enableHighAccuracy: highAccuracy,
-          timeout: highAccuracy ? 10000 : 30000,
-          maximumAge: highAccuracy ? 0 : 60000,
-        });
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [enabled, handlePosition, handleError]);
-
-  // ── Batch flush timer ──
   useEffect(() => {
     if (!enabled) return;
     flushTimerRef.current = setInterval(flushBatch, BATCH_FLUSH_MS);
     return () => {
-      if (flushTimerRef.current) clearInterval(flushTimerRef.current);
+      if (flushTimerRef.current) {
+        clearInterval(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
     };
   }, [enabled, flushBatch]);
 
-  return { isActive };
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!enabled || document.visibilityState !== "visible") return;
+      if (isUsingTelegram) {
+        requestTelegramLocation();
+        return;
+      }
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          handleGeolocationPosition,
+          () => {},
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+        );
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [enabled, handleGeolocationPosition, isUsingTelegram, requestTelegramLocation]);
+
+  return { isActive, isUsingTelegram };
 }

@@ -10,7 +10,9 @@ import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppContext } from "@/contexts/AppContext";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
@@ -22,6 +24,7 @@ import { RiderMarkerLayer } from "@/components/map-riders/RiderMarkerLayer";
 import { RiderFAB } from "@/components/map-riders/RiderFAB";
 import { RidersDrawer } from "@/components/map-riders/RidersDrawer";
 import { StatusOverlay } from "@/components/map-riders/StatusOverlay";
+import { SpeedGradientRoute } from "@/components/map-riders/SpeedGradientRoute";
 import { MapRidersSkeleton } from "@/components/map-riders/LoadingSkeleton";
 
 // Lazy-load map (SSR disabled)
@@ -44,11 +47,26 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   });
 
   // ── GPS tracking hook ──
-  useLiveRiders({
+  const { isUsingTelegram } = useLiveRiders({
     crewSlug,
     sessionId: state.sessionId,
     userId: dbUser?.user_id || null,
     enabled: state.shareEnabled && Boolean(state.sessionId),
+    onPosition: (point) => {
+      if (!dbUser?.user_id) return;
+      dispatch({
+        type: "rider/moved",
+        payload: {
+          user_id: dbUser.user_id,
+          lat: point.lat,
+          lng: point.lng,
+          speed_kmh: point.speedKmh,
+          heading: point.heading,
+          updated_at: point.capturedAt,
+        },
+        selfUserId: dbUser.user_id,
+      });
+    },
   });
 
   // ── Build map points from state ──
@@ -137,7 +155,9 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               className="h-full min-h-[78vh] w-full md:min-h-[84vh]"
               tileLayer={mapData?.meta.tileLayer || "cartodb-dark"}
               onMapClick={(coords) => dispatch({ type: "ui/select-meetup-point", payload: coords })}
+              onMapLongPress={(coords) => dispatch({ type: "ui/select-meetup-point", payload: coords })}
             >
+              {state.sessionDetail?.points?.length ? <SpeedGradientRoute points={state.sessionDetail.points} /> : null}
               <RiderMarkerLayer />
             </RacingMap>
           ) : (
@@ -151,7 +171,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         {/* Floating badges */}
         <div className="pointer-events-none relative z-20 flex min-h-[78vh] flex-col justify-between p-3 md:min-h-[84vh] md:p-6">
           <div className="flex flex-wrap gap-2">
-            <Badge className="border bg-black/55 text-white backdrop-blur-md">{useLeafletMap ? "Leaflet" : "VibeMap"}</Badge>
+            <Badge className="border bg-black/55 text-white backdrop-blur-md">{useLeafletMap ? `Leaflet${isUsingTelegram ? " + Telegram GPS" : " + Browser GPS"}` : "VibeMap"}</Badge>
             {mapData?.routes?.length ? <Badge className="border border-sky-300/50 bg-sky-500/20 text-sky-100">{mapData.routes.length} routes</Badge> : null}
             {state.liveRiders.size === 0 && state.sessions.length === 0 ? (
               <Badge className="border border-emerald-300/40 bg-emerald-500/20 text-emerald-100">Demo mode</Badge>
@@ -161,7 +181,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             <div className="rounded-xl border border-white/30 bg-black/50 px-3 py-1 text-xs text-white">
               {state.selectedMeetupPoint
                 ? `Point: ${state.selectedMeetupPoint[0].toFixed(4)}, ${state.selectedMeetupPoint[1].toFixed(4)}`
-                : "Tap map to place meetup"}
+                : "Long-press map to place meetup"}
             </div>
           </div>
         </div>
@@ -200,6 +220,32 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             {state.shareEnabled ? "Ты сейчас в эфире на карте" : "Геошеринг выключен"}
           </p>
           <div className="mt-4 space-y-3">
+            <div className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-3">
+              <Input
+                value={state.rideName}
+                onChange={(event) => dispatch({ type: "ui/set-ride-name", payload: event.target.value })}
+                placeholder="Название заезда"
+                className="h-9"
+              />
+              <Input
+                value={state.vehicleLabel}
+                onChange={(event) => dispatch({ type: "ui/set-vehicle-label", payload: event.target.value })}
+                placeholder="Мотоцикл"
+                className="h-9"
+              />
+              <Select
+                value={state.rideMode}
+                onValueChange={(value: "rental" | "personal") => dispatch({ type: "ui/set-ride-mode", payload: value })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Режим поездки" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="rental">Rental</SelectItem>
+                  <SelectItem value="personal">Personal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {/* TODO: Wire up session start/stop from useSessionManager */}
             <Button
               type="button"

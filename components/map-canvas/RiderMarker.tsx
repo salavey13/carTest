@@ -176,15 +176,17 @@ export const RiderMarker = memo(function RiderMarker({ rider, riderName, isSelec
 
     const start = performance.now();
     const durationMs = 650;
+    let cancelled = false;
 
     const step = (now: number) => {
+      if (cancelled) return;
       const progress = Math.min(1, (now - start) / durationMs);
       const eased = 1 - Math.pow(1 - progress, 3);
       const next: [number, number] = [from[0] + deltaLat * eased, from[1] + deltaLng * eased];
       positionRef.current = next;
       setPosition(next);
 
-      if (progress < 1) {
+      if (progress < 1 && !cancelled) {
         animationRef.current = requestAnimationFrame(step);
       } else {
         animationRef.current = null;
@@ -194,6 +196,7 @@ export const RiderMarker = memo(function RiderMarker({ rider, riderName, isSelec
     animationRef.current = requestAnimationFrame(step);
 
     return () => {
+      cancelled = true;
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;

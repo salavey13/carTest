@@ -38,9 +38,10 @@ export function StatusOverlay() {
   const session = state.sessions.find((s) => s.id === state.sessionId);
   const distance = Number(session?.total_distance_km || 0).toFixed(1);
   const speed = Math.round(session?.latest_speed_kmh || 0);
+  const showSpeedLegend = Boolean(state.sessionDetail?.points?.length);
 
   return (
-    <div className="pointer-events-none fixed left-1/2 top-4 z-50 -translate-x-1/2 md:top-6">
+    <div className="pointer-events-none fixed left-1/2 top-4 z-50 -translate-x-1/2 space-y-2 md:top-6">
       <div className="flex items-center gap-3 rounded-2xl border border-white/20 bg-black/60 px-4 py-2 text-white backdrop-blur-xl">
         <div className="flex items-center gap-1.5">
           <span className="relative flex h-2.5 w-2.5">
@@ -65,6 +66,17 @@ export function StatusOverlay() {
           <div className="font-mono text-sm font-semibold">{speed} км/ч</div>
         </div>
       </div>
+      {showSpeedLegend ? (
+        <div className="rounded-xl border border-white/20 bg-black/60 px-3 py-2 text-[10px] text-white backdrop-blur-xl">
+          <div className="mb-1 font-medium text-zinc-300">Route speed legend</div>
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-4 rounded bg-sky-400" /> <span>0-10</span>
+            <span className="h-2 w-4 rounded bg-emerald-500" /> <span>10-25</span>
+            <span className="h-2 w-4 rounded bg-amber-500" /> <span>25-40</span>
+            <span className="h-2 w-4 rounded bg-red-500" /> <span>40+</span>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
