@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
@@ -31,12 +31,13 @@ import { MapRidersSkeleton } from "@/components/map-riders/LoadingSkeleton";
 const RacingMap = dynamic(() => import("@/components/maps/RacingMap").then((mod) => mod.RacingMap), { ssr: false });
 
 const DEFAULT_BOUNDS = { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 };
-const HOME_BASE: [number, number] = [56.2041281, 43.7986412];
+const HOME_BASE: [number, number] = [56.204245, 43.798905];
 
 // ── Inner component (uses context) ──
 function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   const { dbUser } = useAppContext();
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
+  const [isQuickMeetupSaving, setIsQuickMeetupSaving] = useState(false);
   const surface = crewPaletteForSurface(crew.theme);
   const mapEngine = process.env.NEXT_PUBLIC_MAP_ENGINE || "leaflet";
   const useLeafletMap = mapEngine !== "vibemap";
@@ -134,6 +135,45 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     { label: "Км за 7 дней", value: state.stats.totalWeeklyDistanceKm, icon: "::FaRoad::" },
   ];
 
+  const handleQuickMeetupCreate = useCallback(async () => {
+    if (!dbUser?.user_id) {
+      toast.error("Авторизуйся в Telegram/VIP BIKE");
+      return;
+    }
+    if (!state.selectedMeetupPoint) {
+      toast.error("Сначала выбери точку на карте");
+      return;
+    }
+
+    setIsQuickMeetupSaving(true);
+    try {
+      const [lat, lon] = state.selectedMeetupPoint;
+      const response = await fetch("/api/map-riders/meetups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          crewSlug,
+          userId: dbUser.user_id,
+          title: "Точка встречи",
+          comment: "Добавлено с карты",
+          lat,
+          lon,
+        }),
+      });
+
+      const json = await response.json();
+      if (!response.ok || !json.success) throw new Error(json.error || "Не удалось создать meetup");
+
+      dispatch({ type: "ui/select-meetup-point", payload: null });
+      await fetchSnapshot();
+      toast.success("Meetup добавлен по выбранной точке");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Ошибка создания meetup");
+    } finally {
+      setIsQuickMeetupSaving(false);
+    }
+  }, [crewSlug, dbUser, dispatch, fetchSnapshot, state.selectedMeetupPoint]);
+
   return (
     <div
       className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-20 md:pt-24"
@@ -180,10 +220,23 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             ) : null}
           </div>
           <div className="flex justify-end">
-            <div className="rounded-xl border border-white/30 bg-black/50 px-3 py-1 text-xs text-white">
-              {state.selectedMeetupPoint
-                ? `Point: ${state.selectedMeetupPoint[0].toFixed(4)}, ${state.selectedMeetupPoint[1].toFixed(4)}`
-                : "Long-press map to place meetup"}
+            <div className="flex items-center gap-2 rounded-xl border border-white/30 bg-black/50 px-3 py-1 text-xs text-white">
+              <span>
+                {state.selectedMeetupPoint
+                  ? `Point: ${state.selectedMeetupPoint[0].toFixed(4)}, ${state.selectedMeetupPoint[1].toFixed(4)}`
+                  : "Tap map to pick meetup point"}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                disabled={!state.selectedMeetupPoint || isQuickMeetupSaving}
+                className="h-6 min-w-6 rounded-full px-2 text-xs leading-none text-black"
+                style={{ backgroundColor: crew.theme.palette.accentMain }}
+                onClick={handleQuickMeetupCreate}
+                aria-label="Создать meetup из выбранной точки"
+              >
+                {isQuickMeetupSaving ? "…" : "+"}
+              </Button>
             </div>
           </div>
         </div>
