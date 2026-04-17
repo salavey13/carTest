@@ -364,25 +364,24 @@ const KineticCore = () => {
 // --- COMPONENT: BIKE SPEEDSTER (Enhanced) ---
 const BikeSpeedster = () => {
   return (
-    <div className="relative w-full max-w-lg mx-auto h-64 flex items-center justify-center overflow-hidden">
+    <div className="relative mx-auto flex h-64 w-full max-w-lg items-center justify-center overflow-hidden">
       {/* Speed Lines Background */}
-      <div className="absolute inset-0 perspective-1000">
-        {[...Array(20)].map((_, i) => (
+      <div className="absolute inset-0">
+        {[...Array(14)].map((_, i) => (
           <motion.div
             key={i}
-            className="absolute h-[2px] bg-gradient-to-r from-transparent via-orange-500 to-transparent"
-            style={{ 
-              top: `${20 + (i * 3)}%`,
-              left: '-100%',
-              right: '-100%'
+            className="absolute h-[2px] w-40 rounded-full bg-gradient-to-r from-transparent via-orange-500/90 to-transparent"
+            style={{
+              top: `${16 + i * 5}%`,
+              left: "8%",
             }}
-            animate={{ 
-              x: ['-100%', '100%'],
+            animate={{
+              x: [0, 300],
               opacity: [0, 1, 0]
             }}
-            transition={{ 
-              duration: 0.6, 
-              repeat: Infinity, 
+            transition={{
+              duration: 0.7,
+              repeat: Infinity,
               delay: i * 0.05,
               ease: "easeIn"
             }}
@@ -390,96 +389,74 @@ const BikeSpeedster = () => {
         ))}
       </div>
 
-      {/* Bike Container */}
-      <motion.div 
-        className="relative z-10"
-        animate={{ 
-          x: [-10, 10, -10],
-          y: [0, -5, 0]
+      <motion.div
+        className="relative z-10 w-[320px]"
+        animate={{
+          x: [-6, 6, -6],
+          y: [0, -3, 0],
         }}
         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
       >
-        {/* Wheel Particles */}
         <motion.div
-          className="absolute -left-16 top-1/2 -translate-y-1/2"
-          animate={{ rotate: -360 }}
-          transition={{ duration: 0.5, repeat: Infinity, ease: "linear" }}
-        >
-          {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
-            <div
-              key={deg}
-              className="absolute w-2 h-2 bg-orange-400 rounded-full shadow-[0_0_10px_rgba(251,191,36,0.8)]"
-              style={{ 
-                transform: `rotate(${deg}deg) translateX(60px)` 
-              }}
-            />
-          ))}
-        </motion.div>
-
-        <motion.div
-          className="absolute -right-16 top-1/2 -translate-y-1/2"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 0.5, repeat: Infinity, ease: "linear" }}
-        >
-          {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
-            <div
-              key={deg}
-              className="absolute w-2 h-2 bg-orange-400 rounded-full shadow-[0_0_10px_rgba(251,191,36,0.8)]"
-              style={{ 
-                transform: `rotate(${deg}deg) translateX(60px)` 
-              }}
-            />
-          ))}
-        </motion.div>
-
-        {/* Main Bike Icon */}
-        <motion.div
-          className="p-8 rounded-3xl bg-gradient-to-br from-orange-500/20 to-red-500/20 border-2 border-orange-500/50 backdrop-blur-sm"
-          animate={{ 
+          className="rounded-3xl border border-orange-300/30 bg-gradient-to-br from-orange-500/10 to-red-500/5 px-6 py-5 backdrop-blur-sm"
+          animate={{
             boxShadow: [
-              "0 0 30px rgba(251,191,36,0.3)",
-              "0 0 60px rgba(251,191,36,0.5)",
-              "0 0 30px rgba(251,191,36,0.3)"
+              "0 0 20px rgba(251,191,36,0.25)",
+              "0 0 36px rgba(251,191,36,0.45)",
+              "0 0 20px rgba(251,191,36,0.25)",
             ]
           }}
-          transition={{ duration: 1.5, repeat: Infinity }}
+          transition={{ duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
         >
-          <Bike size={80} className="text-orange-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.8)]" strokeWidth={1.5} />
-        </motion.div>
+          <div className="relative h-28 w-[260px]">
+            <motion.div
+              className="absolute left-[36px] top-[58px] h-[72px] w-[72px] rounded-full border-4 border-orange-400/90"
+              animate={{ rotate: -360 }}
+              transition={{ duration: 0.45, repeat: Infinity, ease: "linear" }}
+            >
+              {[0, 45, 90, 135].map((deg) => (
+                <div key={deg} className="absolute left-1/2 top-1/2 h-[2px] w-[30px] -translate-x-1/2 -translate-y-1/2 bg-orange-200/90" style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
+              ))}
+            </motion.div>
+            <motion.div
+              className="absolute left-[152px] top-[58px] h-[72px] w-[72px] rounded-full border-4 border-orange-400/90"
+              animate={{ rotate: -360 }}
+              transition={{ duration: 0.45, repeat: Infinity, ease: "linear" }}
+            >
+              {[0, 45, 90, 135].map((deg) => (
+                <div key={deg} className="absolute left-1/2 top-1/2 h-[2px] w-[30px] -translate-x-1/2 -translate-y-1/2 bg-orange-200/90" style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
+              ))}
+            </motion.div>
 
-        {/* Speedometer Ring */}
-        <svg className="absolute -inset-8 w-[calc(100%+4rem)] h-[calc(100%+4rem)] -z-10">
-          <motion.circle
-            cx="50%"
-            cy="50%"
-            r="48%"
-            fill="none"
-            stroke="url(#bikeGradient)"
-            strokeWidth="2"
-            strokeDasharray="10 5"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-          />
-          <defs>
-            <linearGradient id="bikeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="rgba(251,191,36,0)" />
-              <stop offset="50%" stopColor="rgba(251,191,36,0.5)" />
-              <stop offset="100%" stopColor="rgba(251,191,36,0)" />
-            </linearGradient>
-          </defs>
-        </svg>
+            <Bike size={170} className="absolute left-1/2 top-[-10px] -translate-x-1/2 text-orange-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.65)]" strokeWidth={1.5} />
+          </div>
+        </motion.div>
       </motion.div>
 
       {/* Ground Speed Effect */}
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-orange-500 to-transparent opacity-50" />
+      <div className="absolute bottom-6 left-10 right-10 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent opacity-60" />
     </div>
   );
 };
+
+const TelemetryMetric = ({ label, value }: { label: string; value: string }) => (
+  <div className="min-w-[72px] rounded-md border border-orange-300/20 bg-black/30 px-2 py-1.5 text-center">
+    <motion.div
+      className="text-lg font-orbitron font-bold text-amber-300"
+      animate={{ opacity: [0.45, 1, 0.45] }}
+      transition={{ duration: 1.2, repeat: Infinity }}
+    >
+      {value}
+    </motion.div>
+    <div className="text-[10px] uppercase tracking-wide text-slate-400">{label}</div>
+  </div>
+);
 
 // --- MAIN LOADING COMPONENT ---
 export function Loading({ variant = 'kinetic', text, className }: LoadingProps) {
   const [mounted, setMounted] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [bikeTelemetry, setBikeTelemetry] = useState({ rpm: 2100, speed: 18, gear: 1 });
 
   useEffect(() => {
     setMounted(true);
@@ -492,6 +469,18 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
     }, 200);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!mounted || variant !== "bike") return;
+    const interval = setInterval(() => {
+      setBikeTelemetry((prev) => ({
+        rpm: Math.min(9200, Math.max(1400, prev.rpm + (Math.random() * 900 - 420))),
+        speed: Math.min(180, Math.max(0, prev.speed + (Math.random() * 18 - 7))),
+        gear: prev.speed > 120 ? 5 : prev.speed > 90 ? 4 : prev.speed > 55 ? 3 : prev.speed > 25 ? 2 : 1,
+      }));
+    }, 350);
+    return () => clearInterval(interval);
+  }, [mounted, variant]);
 
   if (!mounted) return null;
 
@@ -618,7 +607,7 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
           className="mt-12 text-center space-y-4 z-10"
         >
           <h2 className="font-orbitron font-black text-3xl md:text-5xl uppercase tracking-wider text-orange-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]">
-            TURBO SYNC
+            RIDE LINK
           </h2>
           
           {/* Animated Speed Bar */}
@@ -633,23 +622,14 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
             />
           </div>
           
-          <p className="font-mono text-sm text-orange-300/70 animate-pulse">
-            {text || 'Optimizing performance...'}
+          <p className="font-mono text-sm text-orange-300/80">
+            {text || 'Синхронизируем телеметрию экипажа...'}
           </p>
           
           <div className="flex justify-center gap-2 mt-4">
-            {['RPM', 'TORQUE', 'SPEED'].map((label, i) => (
-              <div key={label} className="text-center">
-                <motion.div
-                  className="text-lg font-orbitron font-bold text-amber-400"
-                  animate={{ opacity: [0.3, 1, 0.3] }}
-                  transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                >
-                  {Math.floor(Math.random() * 9000 + 1000)}
-                </motion.div>
-                <div className="text-[10px] text-slate-500 uppercase">{label}</div>
-              </div>
-            ))}
+            <TelemetryMetric label="RPM" value={`${Math.round(bikeTelemetry.rpm)}`} />
+            <TelemetryMetric label="KM/H" value={`${Math.round(bikeTelemetry.speed)}`} />
+            <TelemetryMetric label="GEAR" value={`${bikeTelemetry.gear}`} />
           </div>
         </motion.div>
       </div>
