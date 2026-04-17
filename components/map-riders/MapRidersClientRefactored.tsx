@@ -38,6 +38,8 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   const { dbUser } = useAppContext();
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
   const [isQuickMeetupSaving, setIsQuickMeetupSaving] = useState(false);
+  const [selectedMeetupId, setSelectedMeetupId] = useState<string | null>(null);
+  const [isMeetupDeleting, setIsMeetupDeleting] = useState(false);
   const surface = crewPaletteForSurface(crew.theme);
   const mapEngine = process.env.NEXT_PUBLIC_MAP_ENGINE || "leaflet";
   const useLeafletMap = mapEngine !== "vibemap";
@@ -126,7 +128,13 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
           ]
         : [];
 
-    return [...(mapData?.points || []), ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints];
+    const sanitizedMapPoints = (mapData?.points || []).filter((point) => {
+      const normalizedId = String(point.id || "").toLowerCase();
+      const normalizedName = String(point.name || "").toLowerCase();
+      return normalizedId !== "demo-rider-beta" && !normalizedName.includes("demo rider beta");
+    });
+
+    return [...sanitizedMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints];
   }, [state.liveRiders, state.sessions, state.meetups, state.sessionDetail, mapData?.points]);
 
   const heroStats = [
@@ -147,6 +155,15 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
 
     setIsQuickMeetupSaving(true);
     try {
+      const titleFromPrompt =
+        typeof window !== "undefined" ? window.prompt("Название точки встречи", "Точка встречи") : "Точка встречи";
+      if (titleFromPrompt === null) return;
+      const title = titleFromPrompt.trim();
+      if (title.length < 2) {
+        toast.error("Название точки должно быть минимум 2 символа");
+        return;
+      }
+
       const [lat, lon] = state.selectedMeetupPoint;
       const response = await fetch("/api/map-riders/meetups", {
         method: "POST",
@@ -154,7 +171,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         body: JSON.stringify({
           crewSlug,
           userId: dbUser.user_id,
-          title: "Точка встречи",
+          title,
           comment: "Добавлено с карты",
           lat,
           lon,
@@ -173,6 +190,47 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       setIsQuickMeetupSaving(false);
     }
   }, [crewSlug, dbUser, dispatch, fetchSnapshot, state.selectedMeetupPoint]);
+
+  const selectedMeetup = useMemo(() => state.meetups.find((meetup) => meetup.id === selectedMeetupId) || null, [state.meetups, selectedMeetupId]);
+
+  const handleMeetupDelete = useCallback(async () => {
+    if (!dbUser?.user_id) {
+      toast.error("Авторизуйся в Telegram/VIP BIKE");
+      return;
+    }
+    if (!selectedMeetup) {
+      toast.error("Сначала выбери meetup-поинт");
+      return;
+    }
+
+    const confirmed =
+      typeof window !== "undefined" ? window.confirm(`Удалить meetup «${selectedMeetup.title}»?`) : false;
+    if (!confirmed) return;
+
+    setIsMeetupDeleting(true);
+    try {
+      const response = await fetch("/api/map-riders/meetups", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          meetupId: selectedMeetup.id,
+          crewSlug,
+          userId: dbUser.user_id,
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) throw new Error(json.error || "Не удалось удалить meetup");
+
+      setSelectedMeetupId(null);
+      dispatch({ type: "ui/select-meetup-point", payload: null });
+      await fetchSnapshot();
+      toast.success("Meetup удалён");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Ошибка удаления meetup");
+    } finally {
+      setIsMeetupDeleting(false);
+    }
+  }, [crewSlug, dbUser, dispatch, fetchSnapshot, selectedMeetup]);
 
   return (
     <div
@@ -195,8 +253,22 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               bounds={mapData?.bounds || mapBounds || DEFAULT_BOUNDS}
               className="h-full min-h-[62vh] w-full md:min-h-[74vh]"
               tileLayer={mapData?.meta.tileLayer || "cartodb-dark"}
-              onMapClick={(coords) => dispatch({ type: "ui/select-meetup-point", payload: coords })}
-              onMapLongPress={(coords) => dispatch({ type: "ui/select-meetup-point", payload: coords })}
+              onMapClick={(coords) => {
+                setSelectedMeetupId(null);
+                dispatch({ type: "ui/select-meetup-point", payload: coords });
+              }}
+              onMapLongPress={(coords) => {
+                setSelectedMeetupId(null);
+                dispatch({ type: "ui/select-meetup-point", payload: coords });
+              }}
+              onPointClick={(point) => {
+                const pointId = String(point.id || "");
+                if (pointId.startsWith("meetup-")) {
+                  const meetupId = pointId.replace(/^meetup-/, "");
+                  setSelectedMeetupId(meetupId);
+                  dispatch({ type: "ui/select-meetup-point", payload: null });
+                }
+              }}
             >
               {state.sessionDetail?.points?.length ? <SpeedGradientRoute points={state.sessionDetail.points} /> : null}
               <RiderMarkerLayer />
@@ -220,22 +292,28 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             ) : null}
           </div>
           <div className="flex justify-end">
-            <div className="flex items-center gap-2 rounded-xl border border-white/30 bg-black/50 px-3 py-1 text-xs text-white">
+            <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-white/30 bg-black/50 px-3 py-1 text-xs text-white">
               <span>
-                {state.selectedMeetupPoint
+                {selectedMeetup
+                  ? `Meetup: ${selectedMeetup.title}`
+                  : state.selectedMeetupPoint
                   ? `Point: ${state.selectedMeetupPoint[0].toFixed(4)}, ${state.selectedMeetupPoint[1].toFixed(4)}`
-                  : "Tap map to pick meetup point"}
+                  : "Tap map to pick or select meetup point"}
               </span>
               <Button
                 type="button"
                 size="sm"
-                disabled={!state.selectedMeetupPoint || isQuickMeetupSaving}
+                disabled={
+                  selectedMeetup
+                    ? isMeetupDeleting
+                    : !state.selectedMeetupPoint || isQuickMeetupSaving
+                }
                 className="h-6 min-w-6 rounded-full px-2 text-xs leading-none text-black"
                 style={{ backgroundColor: crew.theme.palette.accentMain }}
-                onClick={handleQuickMeetupCreate}
-                aria-label="Создать meetup из выбранной точки"
+                onClick={selectedMeetup ? handleMeetupDelete : handleQuickMeetupCreate}
+                aria-label={selectedMeetup ? "Удалить выбранный meetup" : "Создать meetup из выбранной точки"}
               >
-                {isQuickMeetupSaving ? "…" : "+"}
+                {selectedMeetup ? (isMeetupDeleting ? "…" : "−") : isQuickMeetupSaving ? "…" : "+"}
               </Button>
             </div>
           </div>
@@ -275,6 +353,9 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             {state.shareEnabled ? "Ты сейчас в эфире на карте" : "Геошеринг выключен"}
           </p>
           <div className="mt-4 space-y-3">
+            <Button asChild variant="outline" className="w-full justify-center">
+              <Link href="/admin/map-routes">Открыть Map Routes</Link>
+            </Button>
             <div className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-3">
               <Input
                 value={state.rideName}
