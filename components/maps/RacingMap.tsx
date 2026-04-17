@@ -58,6 +58,7 @@ export function RacingMap({
   className,
   onMapClick,
   onMapLongPress,
+  onPointClick,
   tileLayer = 'cartodb-dark',
   children,
 }: {
@@ -66,6 +67,7 @@ export function RacingMap({
   className?: string;
   onMapClick?: (coords: [number, number]) => void;
   onMapLongPress?: (coords: [number, number]) => void;
+  onPointClick?: (poi: PointOfInterest) => void;
   tileLayer?: TileLayerPreset;
   children?: ReactNode;
 }) {
@@ -122,6 +124,9 @@ export function RacingMap({
                 center={center}
                 radius={8}
                 pathOptions={{ color: poi.color, fillColor: poi.color, fillOpacity: 0.9, weight: 2 }}
+                eventHandlers={{
+                  click: () => onPointClick?.(poi),
+                }}
               >
                 <Popup>
                   <div className="font-medium">{poi.name}</div>
