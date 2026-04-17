@@ -268,9 +268,10 @@ export async function POST(request: Request) {
       await handlePhotoMessage(update.message);
     } else if (update.message?.location) {
       await handleLocationMessage(update.message);
-    // --- ЗАКОММЕНТИРОВАНО: Обработка "живых" геоточек отключена для экономии ресурсов Supabase ---
-    // } else if (update.edited_message?.location) {
-    //   await handleLocationMessage(update.edited_message);
+    } else if (update.edited_message?.location) {
+      // Live-location updates from Telegram arrive as edited_message payloads.
+      // We support them to keep MapRiders location feed in sync for Telegram-first flow.
+      await handleLocationMessage(update.edited_message);
     } else if (update.message?.text || update.callback_query) {
       await handleCommand(update);
     } else {

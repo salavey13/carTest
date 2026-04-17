@@ -86,6 +86,21 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 - Live locations policy drift between local SQL and production RLS.
 - Telegram webview tap reliability when introducing new floating layers.
 
+## Investigation notes (2026-04-17)
+- Reviewed Telegram-first location flow end-to-end:
+  - `useLiveRiders` tries `WebApp.requestLocation` first, then falls back to browser geolocation.
+  - Prior implementation could return `false` too early when Telegram only delivers async callback later.
+  - Updated hook to wait briefly for callback-mode `requestLocation` responses before fallback.
+- Confirmed webhook ingestion path:
+  - regular location comes in `update.message.location`,
+  - live location updates come in `update.edited_message.location`.
+  - We now process `edited_message.location` again in `app/api/telegramWebhook/route.ts` so repeated Telegram live-location updates are ingested.
+- Rentals availability warning root cause:
+  - `getFranchizeBySlug` queried non-existent `rentals.end_date`;
+  - switched to `requested_end_date` fallback with `agreed_end_date` priority.
+- Remaining checklist status:
+  - I5/I6 still have open field QA + screenshot evidence tasks; these are still pending and were not auto-closed in this patch.
+
 ## Definition of done (port stream)
 - Live map remains stable with high rider count.
 - Historical/stat flows remain intact (`sessions`, `points`, `meetups`, replay).
