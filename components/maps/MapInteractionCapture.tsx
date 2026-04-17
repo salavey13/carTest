@@ -18,6 +18,9 @@ export function MapInteractionCapture({
   const map = useMap();
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggeredRef = useRef(false);
+  const touchStartRef = useRef<{ timestamp: number; lat: number; lng: number } | null>(null);
+
+  const TOUCH_MOVE_CANCEL_METERS = 18;
 
   const clearLongPress = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -36,18 +39,34 @@ export function MapInteractionCapture({
 
     const handleTouchStart = (event: L.LeafletMouseEvent) => {
       clearLongPress();
+      touchStartRef.current = {
+        timestamp: Date.now(),
+        lat: event.latlng.lat,
+        lng: event.latlng.lng,
+      };
       longPressTimerRef.current = setTimeout(() => {
         onMapLongPress?.([event.latlng.lat, event.latlng.lng]);
         longPressTriggeredRef.current = true;
       }, longPressDelay);
     };
 
-    const handleTouchMove = () => {
-      clearLongPress();
+    const handleTouchMove = (event: L.LeafletMouseEvent) => {
+      const started = touchStartRef.current;
+      if (!started) return;
+      const movedMeters = map.distance([started.lat, started.lng], event.latlng);
+      if (movedMeters >= TOUCH_MOVE_CANCEL_METERS) {
+        clearLongPress();
+        touchStartRef.current = null;
+      }
     };
 
     const handleTouchEnd = () => {
-      // Touch tap should not place meetup accidentally.
+      const started = touchStartRef.current;
+      const holdMs = started ? Date.now() - started.timestamp : 0;
+      if (!longPressTriggeredRef.current && started && holdMs >= longPressDelay) {
+        onMapLongPress?.([started.lat, started.lng]);
+      }
+      touchStartRef.current = null;
       clearLongPress();
     };
 

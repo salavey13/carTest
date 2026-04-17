@@ -149,6 +149,11 @@ export const initialMapRidersState: MapRidersState = {
 const STALE_MS = 30_000;   // 30s → faded
 const EVICT_MS = 120_000;  // 2min → removed
 const MAX_PLAUSIBLE_SPEED_KMH = 280;
+const DEMO_RIDER_PREFIX = "demo-rider-";
+
+function isPinnedDemoRider(userId: string): boolean {
+  return userId.startsWith(DEMO_RIDER_PREFIX);
+}
 
 function isFiniteCoordinate(lat: number, lng: number): boolean {
   return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
@@ -290,6 +295,7 @@ export function mapRidersReducer(state: MapRidersState, action: MapRidersAction)
       const nextRiders = new Map(state.liveRiders);
 
       for (const [userId, rider] of nextRiders) {
+        if (isPinnedDemoRider(userId)) continue;
         const age = now - new Date(rider.updated_at).getTime();
         if (age > EVICT_MS) {
           nextRiders.delete(userId);
