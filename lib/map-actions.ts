@@ -235,6 +235,8 @@ export type AdminMapRouteItem = {
   color: string;
   hasGeojson: boolean;
   coordCount: number;
+  coords: Array<[number, number]>;
+  geojson: unknown | null;
   updatedAt: string | null;
 };
 
@@ -276,6 +278,8 @@ export async function getPublicRoutesForAdmin(): Promise<{ success: boolean; dat
           color: poi.color,
           hasGeojson: Boolean(poi.geojson),
           coordCount: poi.coords.length,
+          coords: poi.coords,
+          geojson: poi.geojson || null,
           updatedAt: map.created_at || null,
         }));
     });
