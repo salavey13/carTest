@@ -275,7 +275,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             </RacingMap>
           ) : (
             <div className="flex h-full min-h-[62vh] items-center justify-center text-muted-foreground md:min-h-[74vh]">
-              VibeMap fallback — set NEXT_PUBLIC_MAP_ENGINE=leaflet
+              Режим VibeMap (резерв) — установи NEXT_PUBLIC_MAP_ENGINE=leaflet
             </div>
           )}
           <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-black/30 via-transparent to-black/30" />
@@ -286,19 +286,19 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         <div className="pointer-events-none relative z-30 flex min-h-[62vh] flex-col justify-between p-3 md:min-h-[74vh] md:p-6">
           <div className="flex flex-wrap gap-2">
             <Badge className="border bg-black/55 text-white backdrop-blur-md">{useLeafletMap ? `Leaflet${isUsingTelegram ? " + Telegram GPS" : " + Browser GPS"}` : "VibeMap"}</Badge>
-            {mapData?.routes?.length ? <Badge className="border border-sky-300/50 bg-sky-500/20 text-sky-100">{mapData.routes.length} routes</Badge> : null}
+            {mapData?.routes?.length ? <Badge className="border border-sky-300/50 bg-sky-500/20 text-sky-100">{mapData.routes.length} маршрутов</Badge> : null}
             {state.liveRiders.size === 0 && state.sessions.length === 0 ? (
-              <Badge className="border border-emerald-300/40 bg-emerald-500/20 text-emerald-100">Demo mode</Badge>
+              <Badge className="border border-emerald-300/40 bg-emerald-500/20 text-emerald-100">Демо-режим</Badge>
             ) : null}
           </div>
           <div className="flex justify-end">
             <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-white/30 bg-black/50 px-3 py-1 text-xs text-white">
               <span>
                 {selectedMeetup
-                  ? `Meetup: ${selectedMeetup.title}`
+                  ? `Точка встречи: ${selectedMeetup.title}`
                   : state.selectedMeetupPoint
-                  ? `Point: ${state.selectedMeetupPoint[0].toFixed(4)}, ${state.selectedMeetupPoint[1].toFixed(4)}`
-                  : "Tap map to pick or select meetup point"}
+                  ? `Точка: ${state.selectedMeetupPoint[0].toFixed(4)}, ${state.selectedMeetupPoint[1].toFixed(4)}`
+                  : "Тапни по карте, чтобы выбрать точку или уже созданный meetup"}
               </span>
               <Button
                 type="button"
@@ -354,7 +354,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
           </p>
           <div className="mt-4 space-y-3">
             <Button asChild variant="outline" className="w-full justify-center">
-              <Link href="/admin/map-routes">Открыть Map Routes</Link>
+              <Link href="/admin/map-routes">Открыть маршруты карты</Link>
             </Button>
             <div className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-3">
               <Input
@@ -377,8 +377,8 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
                   <SelectValue placeholder="Режим поездки" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="rental">Rental</SelectItem>
-                  <SelectItem value="personal">Personal</SelectItem>
+                  <SelectItem value="rental">Аренда</SelectItem>
+                  <SelectItem value="personal">Личный</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -404,7 +404,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               }}
             >
               <VibeContentRenderer content="::FaLocationArrow::" className="mr-2" />
-              Включить live share
+              Включить геошеринг
             </Button>
             <Button
               type="button"
@@ -432,7 +432,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             </Button>
             <Button asChild variant="outline" className="w-full">
               <Link href={`https://t.me/share/url?url=${encodeURIComponent(`https://t.me/oneBikePlsBot/app?startapp=mapriders_${crewSlug}`)}&text=${encodeURIComponent(`${crew.header.brandName || "VIP BIKE"} MapRiders`)}`}>
-                Telegram share
+                Поделиться в Telegram
               </Link>
             </Button>
           </div>
@@ -463,7 +463,7 @@ function LeaderboardSection({ crew, crewSlug }: { crew: FranchizeCrewVM; crewSlu
             <div className="text-center font-orbitron text-xl text-amber-300">#{row.rank}</div>
             <div>
               <div className="font-medium text-white">{row.riderName}</div>
-              <div className="text-xs text-muted-foreground">{row.sessions} заезд(ов) • avg {row.avgSpeedKmh} км/ч</div>
+              <div className="text-xs text-muted-foreground">{row.sessions} заезд(ов) • средняя {row.avgSpeedKmh} км/ч</div>
             </div>
             <div className="text-right text-lg text-white">{row.distanceKm} км</div>
           </div>
