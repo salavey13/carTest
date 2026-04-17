@@ -126,7 +126,12 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
           ]
         : [];
 
-    return [...(mapData?.points || []), ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints];
+    const sanitizedMapPoints = (mapData?.points || []).filter((point) => {
+      const normalizedId = String(point.id || "").toLowerCase();
+      return normalizedId !== "demo-rider-beta";
+    });
+
+    return [...sanitizedMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints];
   }, [state.liveRiders, state.sessions, state.meetups, state.sessionDetail, mapData?.points]);
 
   const heroStats = [
@@ -220,7 +225,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             ) : null}
           </div>
           <div className="flex justify-end">
-            <div className="flex items-center gap-2 rounded-xl border border-white/30 bg-black/50 px-3 py-1 text-xs text-white">
+            <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-white/30 bg-black/50 px-3 py-1 text-xs text-white">
               <span>
                 {state.selectedMeetupPoint
                   ? `Point: ${state.selectedMeetupPoint[0].toFixed(4)}, ${state.selectedMeetupPoint[1].toFixed(4)}`
