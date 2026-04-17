@@ -1,4 +1,3 @@
-"use client"; 
 import {
   adjustKiloVibesRpcAction,
   fetchCyberFitnessUserDataAction,
@@ -180,7 +179,8 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
     },
 ];
 
-const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({
+function getDefaultCyberFitnessProfile(): CyberFitnessProfile {
+  return ({
     level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
     activeQuests: [QUEST_ORDER[0]], 
     completedQuests: [], unlockedPerks: [],
@@ -188,9 +188,10 @@ const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({
     dailyActivityLog: [], achievements: [],
     totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
     totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {},
-});
+  });
+}
 
-const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | null | undefined): CyberFitnessProfile => {
+function getCyberFitnessProfile(userId: string | null, metadata: UserMetadata | null | undefined): CyberFitnessProfile {
   const defaultProfile = getDefaultCyberFitnessProfile();
   let finalProfile = { ...defaultProfile }; 
 
@@ -232,7 +233,7 @@ const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | 
   finalProfile.skillsLeveled = new Set(finalProfile.unlockedPerks || []).size; 
 
   return finalProfile;
-};
+}
 
 export const fetchUserCyberFitnessProfile = async (userId: string): Promise<{ success: boolean; data?: CyberFitnessProfile; error?: string }> => {
   logger.info(`[CyberFitness FetchProfile ENTRY] Attempting to fetch profile for user_id: ${userId}`);
