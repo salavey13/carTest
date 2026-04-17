@@ -188,14 +188,26 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       }
     } else {
       await new Promise<void>((resolve) => {
-        const timeout = setTimeout(resolve, 2200);
+        let settled = false;
+        let pollTimer: ReturnType<typeof setTimeout> | null = null;
+        const timeout = setTimeout(() => {
+          settled = true;
+          if (pollTimer) {
+            clearTimeout(pollTimer);
+            pollTimer = null;
+          }
+          resolve();
+        }, 2200);
+
         const check = () => {
+          if (settled) return;
           if (gotPoint) {
+            settled = true;
             clearTimeout(timeout);
             resolve();
             return;
           }
-          setTimeout(check, 100);
+          pollTimer = setTimeout(check, 100);
         };
         check();
       });

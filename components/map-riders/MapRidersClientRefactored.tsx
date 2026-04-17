@@ -31,6 +31,7 @@ import { MapRidersSkeleton } from "@/components/map-riders/LoadingSkeleton";
 const RacingMap = dynamic(() => import("@/components/maps/RacingMap").then((mod) => mod.RacingMap), { ssr: false });
 
 const DEFAULT_BOUNDS = { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 };
+const HOME_BASE: [number, number] = [56.2041281, 43.7986412];
 
 // ── Inner component (uses context) ──
 function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
@@ -97,7 +98,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               type: "point" as const,
               icon: "image:https://placehold.co/56x56/111827/ffffff?text=SB",
               color: "#60a5fa",
-              coords: [[56.1864, 43.7851]] as [number, number][],
+              coords: [HOME_BASE],
             },
           ];
 
@@ -146,13 +147,13 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       }}
     >
       {/* ── MAP (fullscreen hero) ── */}
-      <section className="relative overflow-hidden rounded-3xl border" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
+      <section className="relative -mx-4 overflow-hidden border md:mx-0 md:rounded-3xl" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
         <div className="absolute inset-0 z-0">
           {useLeafletMap ? (
             <RacingMap
               points={mapPoints}
               bounds={mapData?.bounds || mapBounds || DEFAULT_BOUNDS}
-              className="h-full min-h-[78vh] w-full md:min-h-[84vh]"
+              className="h-full min-h-[62vh] w-full md:min-h-[74vh]"
               tileLayer={mapData?.meta.tileLayer || "cartodb-dark"}
               onMapClick={(coords) => dispatch({ type: "ui/select-meetup-point", payload: coords })}
               onMapLongPress={(coords) => dispatch({ type: "ui/select-meetup-point", payload: coords })}
@@ -161,15 +162,16 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               <RiderMarkerLayer />
             </RacingMap>
           ) : (
-            <div className="flex h-full min-h-[78vh] items-center justify-center text-muted-foreground">
+            <div className="flex h-full min-h-[62vh] items-center justify-center text-muted-foreground md:min-h-[74vh]">
               VibeMap fallback — set NEXT_PUBLIC_MAP_ENGINE=leaflet
             </div>
           )}
           <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-black/30 via-transparent to-black/30" />
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 h-5 bg-[var(--mr-card)]/95 backdrop-blur-sm" />
         </div>
 
         {/* Floating badges */}
-        <div className="pointer-events-none relative z-20 flex min-h-[78vh] flex-col justify-between p-3 md:min-h-[84vh] md:p-6">
+        <div className="pointer-events-none relative z-30 flex min-h-[62vh] flex-col justify-between p-3 md:min-h-[74vh] md:p-6">
           <div className="flex flex-wrap gap-2">
             <Badge className="border bg-black/55 text-white backdrop-blur-md">{useLeafletMap ? `Leaflet${isUsingTelegram ? " + Telegram GPS" : " + Browser GPS"}` : "VibeMap"}</Badge>
             {mapData?.routes?.length ? <Badge className="border border-sky-300/50 bg-sky-500/20 text-sky-100">{mapData.routes.length} routes</Badge> : null}
