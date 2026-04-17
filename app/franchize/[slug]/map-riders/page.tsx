@@ -1,8 +1,13 @@
 import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
-import { MapRidersClient } from "@/app/franchize/components/MapRidersClient";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+import dynamic from "next/dynamic";
+
+const MapRidersClient = dynamic(
+  () => import("@/app/franchize/components/MapRidersClient").then((mod) => mod.MapRidersClient),
+  { ssr: false },
+);
 
 export default async function MapRidersPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
