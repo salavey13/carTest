@@ -440,7 +440,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname === "/blogger" ||
         pathname?.startsWith("/optimapipe") ||
         pathname?.startsWith("/rules") ||
-        pathname === "/"
+        pathname === "/" ||
+        pathname === "/admin/map-routes"
       )
     );
   }, [pathname]);
