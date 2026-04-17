@@ -86,9 +86,11 @@ export function MapInteractionCapture({
 
   useMapEvents({
     click(event) {
-      if (typeof window !== "undefined" && !("ontouchstart" in window)) {
-        onMapClick?.([event.latlng.lat, event.latlng.lng]);
+      if (longPressTriggeredRef.current) {
+        longPressTriggeredRef.current = false;
+        return;
       }
+      onMapClick?.([event.latlng.lat, event.latlng.lng]);
     },
   });
 

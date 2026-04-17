@@ -100,6 +100,8 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
   - switched to `requested_end_date` fallback with `agreed_end_date` priority.
 - Remaining checklist status:
   - I5/I6 still have open field QA + screenshot evidence tasks; these are still pending and were not auto-closed in this patch.
+  - Added tap-first meetup fallback UX: selected map point now has quick `+` publish action, so meetup creation no longer depends only on long-press behavior in Telegram WebApp.
+  - Added migration slice for Supabase `maps.points_of_interest`: replaced river-point defaults, synced VIP base with active demo rider location, and appended `Площадь Комсомольская 2` as third default meetup point.
 
 ## Definition of done (port stream)
 - Live map remains stable with high rider count.
