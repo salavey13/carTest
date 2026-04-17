@@ -1786,6 +1786,8 @@ Append only compact session deltas here as pointers when needed; full narrative 
 - 2026-04-06: Для `I6` заведены новые SupaPlan задачи: privacy `3edabd9c-6f88-4491-aa31-2f11566e3059`, replay UI `b2fb8b78-dc2d-4913-b379-caf22eb1c4e5`, speed-gradient `92b48f2c-9c24-451e-bd4e-7cc761a7fc68`, ordering/anti-spoof `2d2c9b4a-ca83-4f41-9bf6-75f7bc475830`, field QA + screenshots `e9c8f76f-0863-4f20-a871-6a09dd3bf7f8`.
 - 2026-04-06: По обратной связи оператора закрыт SupaPlan task `2d2c9b4a-ca83-4f41-9bf6-75f7bc475830`: в `lib/map-riders-reducer.ts` добавлены guardrails против out-of-order realtime packets и anti-spoof sanity checks (нереалистичные GPS прыжки/координаты отбрасываются). Дополнительно удалён бинарный screenshot из git и зафиксированы guardrails для `scripts/page-screenshot-skill.mjs` в `AGENTS.md`, `README.MD`, `docs/README_TLDR.md`.
 
+- 2026-04-17: T55 hotfix slice — закрыт P1 leak в `hooks/useLiveRiders.ts` (Telegram callback polling теперь гарантированно останавливается по timeout/resolve), усилен mobile long-press захват в `components/maps/MapInteractionCapture.tsx`, карта на `/franchize/vip-bike/map-riders` сделана ниже и full-bleed на mobile + добавлен нижний overlay для перекрытия attribution-зоны; demo rider координаты синхронизированы с базой на Стригинский переулок 13Б (`map_rider_sessions` + `live_locations`), а demo-id исключены из eviction в reducer, чтобы кластер не исчезал через несколько секунд.
+
 ---
 
 ## 8) Skills and tooling note
