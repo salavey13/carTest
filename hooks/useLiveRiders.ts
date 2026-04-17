@@ -158,7 +158,13 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
     if (!webApp?.requestLocation) return false;
 
     let gotPoint = false;
-    const handleLocation = (location: { latitude: number; longitude: number; speed?: number | null; course?: number | null; horizontal_accuracy?: number | null }) => {
+    const handleLocation = (location: {
+      latitude: number;
+      longitude: number;
+      speed?: number | null;
+      course?: number | null;
+      horizontal_accuracy?: number | null;
+    }) => {
       gotPoint = true;
       acceptPoint({
         lat: Number(location.latitude),
@@ -180,6 +186,19 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       } catch {
         return false;
       }
+    } else {
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(resolve, 2200);
+        const check = () => {
+          if (gotPoint) {
+            clearTimeout(timeout);
+            resolve();
+            return;
+          }
+          setTimeout(check, 100);
+        };
+        check();
+      });
     }
 
     setIsUsingTelegram(gotPoint);

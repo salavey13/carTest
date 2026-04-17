@@ -11,6 +11,13 @@ import { getCrewSensitiveData, getUserSensitiveData, saveCrewSensitiveData } fro
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 
 type UnknownRecord = Record<string, unknown>;
+type RentalAvailabilityRow = {
+  vehicle_id: string | null;
+  status: string | null;
+  agreed_start_date: string | null;
+  agreed_end_date: string | null;
+  requested_end_date: string | null;
+};
 
 type ThemePaletteCandidate = Partial<FranchizeTheme["palette"]> & {
   light?: Partial<FranchizeTheme["palette"]>;
@@ -496,7 +503,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const { data: activeRentals, error: rentalsError } = vehicleIds.length
       ? await supabaseAdmin
           .from("rentals")
-          .select("vehicle_id, status, agreed_start_date, agreed_end_date, end_date")
+          .select("vehicle_id, status, agreed_start_date, agreed_end_date, requested_end_date")
           .in("vehicle_id", vehicleIds)
           .in("status", ["pending_confirmation", "confirmed", "active"])
       : { data: [], error: null };
@@ -507,15 +514,15 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
 
     const availabilityByVehicle = new Map<string, { status: "available" | "busy"; label: string }>();
     const nowTs = Date.now();
-    for (const rental of activeRentals ?? []) {
+    for (const rental of (activeRentals ?? []) as RentalAvailabilityRow[]) {
       const vehicleId = typeof rental.vehicle_id === "string" ? rental.vehicle_id : "";
       if (!vehicleId) continue;
 
       const startTs = rental.agreed_start_date ? Date.parse(rental.agreed_start_date) : Number.NaN;
       const endTs = rental.agreed_end_date
         ? Date.parse(rental.agreed_end_date)
-        : rental.end_date
-          ? Date.parse(rental.end_date)
+        : rental.requested_end_date
+          ? Date.parse(rental.requested_end_date)
           : Number.NaN;
       const rentalStatus = typeof rental.status === "string" ? rental.status : "pending_confirmation";
 
