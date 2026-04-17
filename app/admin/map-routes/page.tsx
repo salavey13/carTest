@@ -29,6 +29,7 @@ export default function AdminMapRoutesPage() {
   const [type, setType] = useState<'path' | 'loop'>('path');
   const [geojson, setGeojson] = useState('');
   const [baseWaypoints, setBaseWaypoints] = useState('[[56.29659,43.93606],[56.31974,43.93398],[56.3267,44.0075],[56.3149,43.9475],[56.2475,43.8702],[56.2157,43.8169]]');
+  const [manualWaypoints, setManualWaypoints] = useState<Array<{ lat: string; lon: string }>>([]);
   const [editingRoute, setEditingRoute] = useState<AdminRoute | null>(null);
   const [message, setMessage] = useState('');
   const canMutate = Boolean(dbUser?.user_id);
@@ -46,6 +47,29 @@ export default function AdminMapRoutesPage() {
   }, []);
 
   const routeCountText = useMemo(() => (loading ? 'Loading…' : `${routes.length} routes`), [loading, routes.length]);
+
+  function parseWaypoints(raw: string): Array<{ lat: string; lon: string }> {
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter((entry) => Array.isArray(entry) && entry.length >= 2)
+        .map((entry) => ({ lat: String(entry[0] ?? ""), lon: String(entry[1] ?? "") }));
+    } catch {
+      return [];
+    }
+  }
+
+  function syncTextFromManual(nextWaypoints: Array<{ lat: string; lon: string }>) {
+    const numericWaypoints = nextWaypoints
+      .map((entry) => [Number(entry.lat), Number(entry.lon)] as [number, number])
+      .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon));
+    setBaseWaypoints(JSON.stringify(numericWaypoints));
+  }
+
+  useEffect(() => {
+    setManualWaypoints(parseWaypoints(baseWaypoints));
+  }, [baseWaypoints]);
 
   async function save() {
     if (!dbUser?.user_id) {
@@ -120,6 +144,31 @@ export default function AdminMapRoutesPage() {
     }
   }
 
+  function updateManualWaypoint(index: number, key: 'lat' | 'lon', value: string) {
+    setManualWaypoints((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [key]: value };
+      syncTextFromManual(next);
+      return next;
+    });
+  }
+
+  function addManualWaypoint() {
+    setManualWaypoints((prev) => {
+      const next = [...prev, { lat: "", lon: "" }];
+      syncTextFromManual(next);
+      return next;
+    });
+  }
+
+  function removeManualWaypoint(index: number) {
+    setManualWaypoints((prev) => {
+      const next = prev.filter((_, currentIndex) => currentIndex !== index);
+      syncTextFromManual(next);
+      return next;
+    });
+  }
+
   function loadRouteIntoEditor(route: AdminRoute) {
     setEditingRoute(route);
     setName(route.name);
@@ -148,7 +197,41 @@ export default function AdminMapRoutesPage() {
 
           <div className="grid gap-2">
             <Label>Базовые точки [lat, lon] для road-snap</Label>
-            <Textarea rows={4} value={baseWaypoints} onChange={(event) => setBaseWaypoints(event.target.value)} />
+            <Textarea
+              rows={4}
+              value={baseWaypoints}
+              onChange={(event) => {
+                const value = event.target.value;
+                setBaseWaypoints(value);
+                setManualWaypoints(parseWaypoints(value));
+              }}
+            />
+            <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-medium">Manual points flow</span>
+                <Button type="button" size="sm" variant="outline" onClick={addManualWaypoint}>+ add point</Button>
+              </div>
+              <div className="space-y-2">
+                {manualWaypoints.map((point, index) => (
+                  <div key={`${index}-${point.lat}-${point.lon}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                    <Input
+                      value={point.lat}
+                      placeholder="lat"
+                      onChange={(event) => updateManualWaypoint(index, 'lat', event.target.value)}
+                    />
+                    <Input
+                      value={point.lon}
+                      placeholder="lon"
+                      onChange={(event) => updateManualWaypoint(index, 'lon', event.target.value)}
+                    />
+                    <Button type="button" size="icon" variant="outline" onClick={() => removeManualWaypoint(index)} aria-label={`remove-point-${index}`}>
+                      −
+                    </Button>
+                  </div>
+                ))}
+                {!manualWaypoints.length ? <div className="text-xs text-muted-foreground">Добавь точки через “+ add point” или вставь JSON выше.</div> : null}
+              </div>
+            </div>
             <Button type="button" variant="outline" onClick={generateRoadGeo}>Generate road GeoJSON</Button>
           </div>
 
