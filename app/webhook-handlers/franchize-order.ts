@@ -1,5 +1,7 @@
 import { WebhookHandler } from "./types";
 import { sendComplexMessage } from "./actions/sendComplexMessage";
+import { retryFranchizeOrderNotification } from "@/app/franchize/actions";
+import { ensureFranchizeOrderDocDelivery } from "./franchize-order-doc";
 
 function formatMoney(value: number): string {
   return `${Math.max(0, Math.round(value)).toLocaleString("ru-RU")} ₽`;
@@ -16,6 +18,7 @@ export const franchizeOrderHandler: WebhookHandler = {
     const metadata = (invoice.metadata ?? {}) as Record<string, any>;
     const rentalId = typeof metadata.rental_id === "string" ? metadata.rental_id : undefined;
     const slug = typeof metadata.slug === "string" ? metadata.slug : "vip-bike";
+    const orderId = typeof metadata.orderId === "string" ? metadata.orderId : undefined;
 
     if (!rentalId) {
       throw new Error(`franchize_order metadata missing rental_id for invoice ${invoice.id}`);
@@ -39,6 +42,13 @@ export const franchizeOrderHandler: WebhookHandler = {
     if (!vehicle?.owner_id) {
       throw new Error(`franchize_order owner not found for vehicle ${firstItemId}`);
     }
+
+    await ensureFranchizeOrderDocDelivery({
+      supabase,
+      slug,
+      orderId,
+      retry: retryFranchizeOrderNotification,
+    });
 
     const totalRub = Number(metadata.totalAmount || metadata.subtotal || 0);
     const interestStars = Number(metadata.amountXtr || totalAmount || 0);
