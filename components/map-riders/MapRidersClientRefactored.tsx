@@ -25,6 +25,7 @@ import { RiderFAB } from "@/components/map-riders/RiderFAB";
 import { RidersDrawer } from "@/components/map-riders/RidersDrawer";
 import { StatusOverlay } from "@/components/map-riders/StatusOverlay";
 import { SpeedGradientRoute } from "@/components/map-riders/SpeedGradientRoute";
+import { MapRidersDebugPanel } from "@/components/map-riders/MapRidersDebugPanel";
 import { MapRidersSkeleton } from "@/components/map-riders/LoadingSkeleton";
 
 // Lazy-load map (SSR disabled)
@@ -51,7 +52,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   });
 
   // ── GPS tracking hook ──
-  const { isUsingTelegram } = useLiveRiders({
+  const { isUsingTelegram, lastBroadcastAt, queuedPoints } = useLiveRiders({
     crewSlug,
     sessionId: state.sessionId,
     userId: dbUser?.user_id || null,
@@ -280,6 +281,13 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
           )}
           <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-black/30 via-transparent to-black/30" />
           <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 h-5 bg-[var(--mr-card)]/95 backdrop-blur-sm" />
+          <MapRidersDebugPanel
+            activeRiders={state.liveRiders.size}
+            sessionCount={state.sessions.length}
+            pendingBatchPoints={queuedPoints}
+            isUsingTelegram={isUsingTelegram}
+            lastBroadcastAt={lastBroadcastAt}
+          />
         </div>
 
         {/* Floating badges */}
