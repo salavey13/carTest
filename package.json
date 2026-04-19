@@ -7,10 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "vitest run",
+    "test:ui": "vitest --ui",
+    "test:e2e": "playwright test",
+    "test:franchize": "node scripts/franchize-qa-check.mjs",
     "notify:callback": "node scripts/codex-notify.mjs callback",
     "notify:telegram": "node scripts/codex-notify.mjs telegram",
     "lint:target": "eslint --max-warnings=0 app/franchize scripts/codex-notify.mjs",
-    "qa:franchize": "node scripts/franchize-qa-check.mjs",
+    "qa:franchize": "npm run test:franchize && npm run test:e2e -- --grep franchize",
     "supaplan:skill": "node scripts/supaplan-skill.mjs",
     "qa:map-riders": "node scripts/map-riders-qa-check.mjs"
   },
@@ -115,6 +119,9 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/file-saver": "^2.0.7",
     "@types/node": "^20.14.13",
     "@types/papaparse": "^5.3.14",
@@ -122,11 +129,14 @@
     "@types/react-dom": "18.2.25",
     "@types/three": "0.158.2",
     "@types/uuid": "^10.0.0",
+    "@vitest/ui": "^4.1.4",
     "eslint": "^8.57.0",
     "eslint-config-next": "^14.2.28",
     "file-saver": "^2.0.5",
+    "jsdom": "^29.0.2",
     "postcss": "^8",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.4"
   }
 }

@@ -1602,18 +1602,22 @@ export async function retryFranchizeOrderNotification(input: unknown): Promise<{
   return submitFranchizeOrderNotification(logRow.payload);
 }
 
-export async function createFranchizeOrderInvoice(input: unknown): Promise<{ success: boolean; invoiceId?: string; amountXtr?: number; error?: string }> {
-  const parsed = franchizeOrderInvoiceSchema.safeParse(input);
+type FranchizeOrderInvoicePayload = z.infer<typeof franchizeOrderInvoiceSchema>;
 
-  if (!parsed.success) {
-    return {
-      success: false,
-      error: parsed.error.issues[0]?.message ?? "Некорректный payload для XTR-счёта.",
-    };
-  }
+const franchizeCheckoutRateLimits = new Map<string, number>();
+const FRANCHIZE_CHECKOUT_COOLDOWN_MS = 8_000;
 
-  const payload = parsed.data;
+function buildFranchizeInvoiceId(payload: FranchizeOrderInvoicePayload) {
+  const safeSlug = payload.slug.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+  const safeOrderId = payload.orderId.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+  const safeUserId = payload.telegramUserId.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+  return `franchize_order_${safeSlug}_${safeOrderId}_${safeUserId}`;
+}
 
+async function createFranchizeOrderInvoiceInternal(
+  payload: FranchizeOrderInvoicePayload,
+  options: { skipNotification?: boolean } = {},
+): Promise<{ success: boolean; invoiceId?: string; amountXtr?: number; error?: string }> {
   if (payload.payment !== "telegram_xtr") {
     return {
       success: false,
@@ -1623,7 +1627,17 @@ export async function createFranchizeOrderInvoice(input: unknown): Promise<{ suc
 
   const effectiveTotal = payload.totalAmount > 0 ? payload.totalAmount : payload.subtotal + payload.extrasTotal;
   const amountXtr = Math.max(1, Math.ceil(effectiveTotal * 0.01));
-  const invoiceId = `franchize_order_${payload.slug}_${payload.orderId}_${Date.now()}`;
+  const invoiceId = buildFranchizeInvoiceId(payload);
+
+  const { data: existingInvoice } = await supabaseAdmin
+    .from("invoices")
+    .select("id, amount, status")
+    .eq("id", invoiceId)
+    .maybeSingle();
+  if (existingInvoice?.id) {
+    return { success: true, invoiceId, amountXtr: Number(existingInvoice.amount) || amountXtr };
+  }
+
   const rentalId = randomUUID();
   const startParam = `rental-${rentalId}`;
   const telegramWebappLink = `https://t.me/oneBikePlsBot/app?startapp=${startParam}`;
@@ -1676,7 +1690,9 @@ export async function createFranchizeOrderInvoice(input: unknown): Promise<{ suc
   };
 
   try {
-    await buildFranchizeOrderDocAndNotify({ ...payload, totalAmount: effectiveTotal, subtotal: payload.subtotal, extrasTotal: payload.extrasTotal });
+    if (!options.skipNotification) {
+      await buildFranchizeOrderDocAndNotify({ ...payload, totalAmount: effectiveTotal, subtotal: payload.subtotal, extrasTotal: payload.extrasTotal });
+    }
 
     const invoiceRecord = await createInvoice("franchize_order", invoiceId, payload.telegramUserId, amountXtr, 0, metadata);
     if (!invoiceRecord.success) {
@@ -1702,6 +1718,60 @@ export async function createFranchizeOrderInvoice(input: unknown): Promise<{ suc
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unexpected invoice error",
+    };
+  }
+}
+
+export async function createFranchizeOrderInvoice(input: unknown): Promise<{ success: boolean; invoiceId?: string; amountXtr?: number; error?: string }> {
+  const parsed = franchizeOrderInvoiceSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Некорректный payload для XTR-счёта.",
+    };
+  }
+
+  return createFranchizeOrderInvoiceInternal(parsed.data);
+}
+
+export async function createFranchizeOrderCheckout(
+  input: unknown,
+): Promise<{ success: boolean; invoiceId?: string; amountXtr?: number; error?: string }> {
+  const parsed = franchizeOrderInvoiceSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Некорректный payload заказа." };
+  }
+
+  const payload = parsed.data;
+  const now = Date.now();
+  const throttleKey = `${payload.slug}:${payload.orderId}:${payload.telegramUserId}`;
+  const lastRequestAt = franchizeCheckoutRateLimits.get(throttleKey) ?? 0;
+  if (now - lastRequestAt < FRANCHIZE_CHECKOUT_COOLDOWN_MS) {
+    return { success: false, error: "Слишком частые запросы. Повторите через несколько секунд." };
+  }
+  franchizeCheckoutRateLimits.set(throttleKey, now);
+
+  const effectiveTotal = payload.totalAmount > 0 ? payload.totalAmount : payload.subtotal + payload.extrasTotal;
+
+  try {
+    await buildFranchizeOrderDocAndNotify({
+      ...payload,
+      subtotal: payload.subtotal,
+      extrasTotal: payload.extrasTotal,
+      totalAmount: effectiveTotal,
+    });
+
+    if (payload.payment === "telegram_xtr") {
+      return createFranchizeOrderInvoiceInternal(payload, { skipNotification: true });
+    }
+
+    return { success: true };
+  } catch (error) {
+    logger.error("[franchize] createFranchizeOrderCheckout failed", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unexpected checkout error",
     };
   }
 }

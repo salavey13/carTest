@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { addDays } from "date-fns";
 import { toast } from "sonner";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
-import { createFranchizeOrderInvoice, submitFranchizeOrderNotification } from "../actions";
+import { createFranchizeOrderCheckout } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
 
@@ -63,26 +66,62 @@ type CheckoutPayload = {
   }>;
 };
 
+const orderFormSchema = z.object({
+  recipient: z.string().trim().min(2, "Укажите имя получателя"),
+  phone: z.string().trim().min(6, "Добавьте контактный номер"),
+  time: z.string().trim().min(1, "Выберите удобное время"),
+  comment: z.string().default(""),
+  rentalStartDate: z.string().trim().min(1, "Выберите дату начала аренды"),
+  signatureName: z.string().trim().min(3, "Введите ФИО для подписи"),
+  payment: z.enum(["telegram_xtr", "card", "cash", "sbp"]),
+  deliveryMode: z.enum(["pickup", "delivery"]),
+  selectedExtras: z.array(z.string()).default([]),
+  promo: z.string().default(""),
+  consent: z.boolean().refine((value) => value, "Подтвердите условия аренды"),
+});
+
+type OrderFormValues = z.infer<typeof orderFormSchema>;
+const EMPTY_SELECTED_EXTRAS: string[] = [];
+
 export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientProps) {
   const { user } = useAppContext();
   const { cartLines, subtotal } = useFranchizeCartLines(slug, items);
   const [isSubmitting, startSubmitTransition] = useTransition();
-
-  const [deliveryMode, setDeliveryMode] = useState<"pickup" | "delivery">("pickup");
-  const [payment, setPayment] = useState<PaymentMethod>(payments[0].id);
-  const [recipient, setRecipient] = useState("");
-  const [phone, setPhone] = useState("");
-  const [time, setTime] = useState("");
-  const [comment, setComment] = useState("");
-  const [rentalStartDate, setRentalStartDate] = useState("");
-  const [signatureName, setSignatureName] = useState("");
-  const [promo, setPromo] = useState("");
-  const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
-  const [consent, setConsent] = useState(false);
-  const recipientRef = useRef<HTMLInputElement>(null);
-  const phoneRef = useRef<HTMLInputElement>(null);
-  const timeRef = useRef<HTMLInputElement>(null);
-  const consentRef = useRef<HTMLInputElement>(null);
+  const form = useForm<OrderFormValues>({
+    resolver: zodResolver(orderFormSchema),
+    mode: "onChange",
+    defaultValues: {
+      recipient: "",
+      phone: "",
+      time: "",
+      comment: "",
+      rentalStartDate: "",
+      signatureName: "",
+      promo: "",
+      selectedExtras: [],
+      payment: payments[0].id,
+      deliveryMode: "pickup",
+      consent: false,
+    },
+  });
+  const {
+    register,
+    watch,
+    setValue,
+    setFocus,
+    handleSubmit,
+    formState: { errors, isValid },
+  } = form;
+  const recipient = watch("recipient") ?? "";
+  const phone = watch("phone") ?? "";
+  const time = watch("time") ?? "";
+  const comment = watch("comment") ?? "";
+  const rentalStartDate = watch("rentalStartDate") ?? "";
+  const signatureName = watch("signatureName") ?? "";
+  const payment = watch("payment") as PaymentMethod;
+  const deliveryMode = watch("deliveryMode");
+  const selectedExtras = watch("selectedExtras") ?? EMPTY_SELECTED_EXTRAS;
+  const consent = Boolean(watch("consent"));
   const surface = crewPaletteForSurface(crew.theme);
   const fieldStyle = {
     borderColor: "var(--order-border)",
@@ -107,16 +146,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     if (Number.isNaN(start.getTime())) return "";
     return addDays(start, maxRentalDays - 1).toISOString().slice(0, 10);
   }, [maxRentalDays, rentalStartDate]);
-  const isValidForm =
-    recipient.trim().length > 1 &&
-    phone.trim().length > 5 &&
-    time.trim().length > 0 &&
-    Boolean(rentalStartDate) &&
-    signatureName.trim().length > 2 &&
-    consent;
   const requiresTelegram = payment === "telegram_xtr";
   const hasTelegramUser = Boolean(user?.id);
-  const canSubmit = isValidForm && !isCartEmpty && (!requiresTelegram || hasTelegramUser);
+  const canSubmit = isValid && !isCartEmpty && (!requiresTelegram || hasTelegramUser);
   const checkoutMilestones = useMemo(
     () => [
       { id: "cart", label: "Байк выбран", done: !isCartEmpty },
@@ -191,27 +223,27 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             ? "XTR-счёт будет рассчитан как 1% от полной суммы (с учётом доп. опций)."
             : "Проверьте контакты и способ получения, затем подтверждайте заказ.";
 
-  const handleSubmit = () => {
-    if (!canSubmit || isSubmitting) {
+  const onSubmitValid = (values: OrderFormValues) => {
+    if (isSubmitting || !canSubmit) {
       return;
     }
 
     startSubmitTransition(async () => {
-      const notifyResult = await submitFranchizeOrderNotification({
+      const result = await createFranchizeOrderCheckout({
         slug,
         orderId,
         telegramUserId: String(user?.id ?? "manual-order"),
-        recipient: submitPayload.recipient,
-        phone: submitPayload.phone,
-        time: submitPayload.time,
-        comment: submitPayload.comment,
+        recipient: values.recipient.trim(),
+        phone: values.phone.trim(),
+        time: values.time.trim(),
+        comment: values.comment.trim(),
         rentalStartDate: submitPayload.rentalStartDate,
         rentalEndDate: submitPayload.rentalEndDate,
-        signatureName: submitPayload.signatureName,
-        signatureAccepted: submitPayload.signatureAccepted,
-        signatureFingerprint: submitPayload.signatureFingerprint,
-        payment: submitPayload.payment,
-        delivery: submitPayload.delivery,
+        signatureName: values.signatureName.trim(),
+        signatureAccepted: values.consent,
+        signatureFingerprint: user?.id ? `tg:${user.id}` : "manual-sign",
+        payment: values.payment,
+        delivery: values.deliveryMode,
         subtotal,
         extrasTotal: submitPayload.extrasTotal,
         totalAmount: submitPayload.totalAmount,
@@ -219,44 +251,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         cartLines: submitPayload.cartLines,
       });
 
-      if (!notifyResult.success) {
-        toast.error(notifyResult.error ?? "Не удалось отправить уведомление админу.");
+      if (!result.success) {
+        toast.error(result.error ?? "Не удалось отправить заказ.");
         return;
       }
 
-      if (payment === "telegram_xtr") {
-        if (!user?.id) {
-          toast.error("Для XTR-счёта откройте страницу из Telegram WebApp.");
-          return;
-        }
-
-        const result = await createFranchizeOrderInvoice({
-          slug,
-          orderId,
-          telegramUserId: String(user.id),
-          recipient: submitPayload.recipient,
-          phone: submitPayload.phone,
-          time: submitPayload.time,
-          comment: submitPayload.comment,
-          rentalStartDate: submitPayload.rentalStartDate,
-          rentalEndDate: submitPayload.rentalEndDate,
-          signatureName: submitPayload.signatureName,
-          signatureAccepted: submitPayload.signatureAccepted,
-          signatureFingerprint: submitPayload.signatureFingerprint,
-          payment: submitPayload.payment,
-          delivery: submitPayload.delivery,
-          subtotal,
-          extrasTotal: submitPayload.extrasTotal,
-          totalAmount: submitPayload.totalAmount,
-          extras: submitPayload.extras,
-          cartLines: submitPayload.cartLines,
-        });
-
-        if (!result.success) {
-          toast.error(result.error ?? "Не удалось отправить XTR-счёт.");
-          return;
-        }
-
+      if (values.payment === "telegram_xtr") {
         toast.success("XTR-счёт отправлен в Telegram. После оплаты откроется franchize rental flow ⭐");
         return;
       }
@@ -267,19 +267,19 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
   const focusBlockerControl = (blockerId: string) => {
     if (blockerId === "recipient") {
-      recipientRef.current?.focus();
+      setFocus("recipient");
       return;
     }
     if (blockerId === "phone") {
-      phoneRef.current?.focus();
+      setFocus("phone");
       return;
     }
     if (blockerId === "time") {
-      timeRef.current?.focus();
+      setFocus("time");
       return;
     }
     if (blockerId === "consent") {
-      consentRef.current?.focus();
+      setFocus("consent");
     }
   };
 
@@ -318,7 +318,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         ))}
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-[1fr_300px]">
+      <form className="mt-6 grid gap-4 md:grid-cols-[1fr_300px]" onSubmit={handleSubmit(onSubmitValid)}>
         <div className="space-y-4">
           <div className="rounded-2xl border p-4" style={surface.card}>
             <p className="text-sm font-medium">Способ получения</p>
@@ -330,7 +330,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setDeliveryMode(value as "pickup" | "delivery")}
+                  onClick={() => setValue("deliveryMode", value as "pickup" | "delivery", { shouldValidate: true })}
                   className="rounded-xl border px-3 py-2 text-sm transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
                     borderColor: deliveryMode === value ? "var(--order-accent)" : "var(--order-border)",
@@ -347,9 +347,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <div className="rounded-2xl border p-4" style={surface.card}>
             <p className="text-sm font-medium">Данные получателя</p>
             <div className="mt-3 space-y-3">
-              <input ref={recipientRef} className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Имя и фамилия" value={recipient} onChange={(e) => setRecipient(e.target.value)} />
-              <input ref={phoneRef} className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Телефон" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              <input ref={timeRef} className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Удобное время" value={time} onChange={(e) => setTime(e.target.value)} />
+              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Имя и фамилия" {...register("recipient")} />
+              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Телефон" {...register("phone")} />
+              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Удобное время" {...register("time")} />
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="text-xs" style={surface.mutedText}>
                   Дата старта аренды
@@ -357,8 +357,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                     type="date"
                     className="mt-1 w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                     style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                    value={rentalStartDate}
-                    onChange={(e) => setRentalStartDate(e.target.value)}
+                    {...register("rentalStartDate")}
                   />
                 </label>
                 <label className="text-xs" style={surface.mutedText}>
@@ -376,10 +375,14 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                 style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
                 placeholder="ФИО для электронной подписи"
-                value={signatureName}
-                onChange={(e) => setSignatureName(e.target.value)}
+                {...register("signatureName")}
               />
-              <textarea className="min-h-20 w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Комментарий к заказу" value={comment} onChange={(e) => setComment(e.target.value)} />
+              <textarea className="min-h-20 w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Комментарий к заказу" {...register("comment")} />
+              {errors.recipient || errors.phone || errors.time || errors.rentalStartDate || errors.signatureName ? (
+                <p className="text-xs text-rose-300">
+                  {errors.recipient?.message || errors.phone?.message || errors.time?.message || errors.rentalStartDate?.message || errors.signatureName?.message}
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -390,7 +393,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setPayment(item.id)}
+                  onClick={() => setValue("payment", item.id, { shouldValidate: true })}
                   className="rounded-xl border px-3 py-2 text-left text-sm transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
                     borderColor: payment === item.id ? "var(--order-accent)" : "var(--order-border)",
@@ -407,7 +410,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               <p className="mt-2 text-xs" style={surface.mutedText}>Для оплаты в Stars откройте оформление из Telegram WebApp.</p>
             ) : null}
             <div className="mt-3 flex gap-2">
-              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Промокод" value={promo} onChange={(e) => setPromo(e.target.value)} />
+              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Промокод" {...register("promo")} />
               <button type="button" className="rounded-xl border border-[var(--order-border)] px-3 text-sm transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={focusRingOutlineStyle(crew.theme)}>
                 Применить
               </button>
@@ -425,8 +428,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                     key={extra.id}
                     type="button"
                     onClick={() =>
-                      setSelectedExtras((prev) =>
-                        checked ? prev.filter((id) => id !== extra.id) : [...prev, extra.id],
+                      setValue(
+                        "selectedExtras",
+                        checked ? selectedExtras.filter((id) => id !== extra.id) : [...selectedExtras, extra.id],
+                        { shouldValidate: true },
                       )
                     }
                     className="flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
@@ -445,9 +450,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           </div>
 
           <label className="flex items-start gap-2 rounded-xl border p-3 text-sm" style={surface.card}>
-            <input ref={consentRef} type="checkbox" className="mt-0.5" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <input type="checkbox" className="mt-0.5" {...register("consent")} />
             <span>Согласен с условиями аренды и подтверждаю электронную подпись в Telegram WebApp.</span>
           </label>
+          {errors.consent ? <p className="text-xs text-rose-300">{errors.consent.message}</p> : null}
         </div>
 
         <aside className="h-fit rounded-2xl border p-4" style={surface.card}>
@@ -568,17 +574,16 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           </div>
 
           <button
-            type="button"
+            type="submit"
             disabled={!canSubmit || isSubmitting}
             className="mt-4 w-full rounded-xl bg-[var(--order-accent)] px-4 py-3 text-sm font-semibold text-[var(--order-accent-contrast)] transition hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             style={focusRingOutlineStyle(crew.theme)}
-            onClick={handleSubmit}
           >
             {submitLabel}
           </button>
           <p className="mt-2 text-xs" style={surface.mutedText}>{submitHint}</p>
         </aside>
-      </div>
+      </form>
     </section>
   );
 }
