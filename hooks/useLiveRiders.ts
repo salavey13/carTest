@@ -49,6 +49,8 @@ const GPS_INTERVAL_MS = 3000;
 const GPS_DISTANCE_M = 10;
 const BATCH_FLUSH_MS = 5000;
 const BATCH_MAX_SIZE = 10;
+const TELEGRAM_MIN_INTERVAL_MS = 2500;
+const ACCEPT_DEBOUNCE_MS = 800;
 
 export function useLiveRiders(options: UseLiveRidersOptions) {
   const { crewSlug, sessionId, userId, enabled, onPosition } = options;
@@ -58,8 +60,14 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const telegramTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabaseBrowserClient>["channel"]> | null>(null);
+  const lastTelegramTsRef = useRef<number>(0);
+  const acceptDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingPointRef = useRef<GPSPoint | null>(null);
+  const lastBroadcastAtRef = useRef<string | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [isUsingTelegram, setIsUsingTelegram] = useState(false);
+  const [lastBroadcastAt, setLastBroadcastAt] = useState<string | null>(null);
+  const [queuedPoints, setQueuedPoints] = useState(0);
 
   const hapticPulse = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -81,12 +89,15 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
           updated_at: point.capturedAt,
         },
       });
+      lastBroadcastAtRef.current = point.capturedAt;
+      setLastBroadcastAt(point.capturedAt);
     },
     [userId],
   );
 
   const flushBatch = useCallback(async () => {
     const points = batchQueueRef.current.splice(0, BATCH_MAX_SIZE);
+    setQueuedPoints(batchQueueRef.current.length);
     if (points.length === 0 || !sessionId || !userId) return;
 
     try {
@@ -115,10 +126,11 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       });
     } catch {
       batchQueueRef.current.unshift(...points);
+      setQueuedPoints(batchQueueRef.current.length);
     }
   }, [sessionId, userId, crewSlug]);
 
-  const acceptPoint = useCallback(
+  const acceptPointNow = useCallback(
     (point: GPSPoint) => {
       const now = Date.now();
       const last = lastAcceptedRef.current;
@@ -131,10 +143,32 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       lastAcceptedRef.current = { lat: point.lat, lng: point.lng, time: now };
       broadcastPosition(point);
       batchQueueRef.current.push(point);
+      setQueuedPoints(batchQueueRef.current.length);
       onPosition?.(point);
       hapticPulse();
     },
     [broadcastPosition, onPosition, hapticPulse],
+  );
+
+  const acceptPoint = useCallback(
+    (point: GPSPoint) => {
+      if (!acceptDebounceTimerRef.current) {
+        acceptPointNow(point);
+      }
+      pendingPointRef.current = point;
+      if (acceptDebounceTimerRef.current) {
+        clearTimeout(acceptDebounceTimerRef.current);
+      }
+      acceptDebounceTimerRef.current = setTimeout(() => {
+        acceptDebounceTimerRef.current = null;
+        const pending = pendingPointRef.current;
+        pendingPointRef.current = null;
+        if (pending) {
+          acceptPointNow(pending);
+        }
+      }, ACCEPT_DEBOUNCE_MS);
+    },
+    [acceptPointNow],
   );
 
   const handleGeolocationPosition = useCallback(
@@ -165,6 +199,9 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       course?: number | null;
       horizontal_accuracy?: number | null;
     }) => {
+      const now = Date.now();
+      if (now - lastTelegramTsRef.current < TELEGRAM_MIN_INTERVAL_MS) return;
+      lastTelegramTsRef.current = now;
       gotPoint = true;
       acceptPoint({
         lat: Number(location.latitude),
@@ -179,8 +216,14 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
     const maybePromise = webApp.requestLocation(handleLocation);
     if (maybePromise && typeof (maybePromise as Promise<unknown>).then === "function") {
       try {
-        const resolved = (await maybePromise) as any;
-        if (!gotPoint && resolved?.latitude && resolved?.longitude) {
+        const resolved = (await maybePromise) as {
+          latitude?: number;
+          longitude?: number;
+          speed?: number | null;
+          course?: number | null;
+          horizontal_accuracy?: number | null;
+        };
+        if (!gotPoint && resolved?.latitude != null && resolved?.longitude != null) {
           handleLocation(resolved);
         }
       } catch {
@@ -286,6 +329,10 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
         clearInterval(telegramTimerRef.current);
         telegramTimerRef.current = null;
       }
+      if (acceptDebounceTimerRef.current) {
+        clearTimeout(acceptDebounceTimerRef.current);
+        acceptDebounceTimerRef.current = null;
+      }
       setIsActive(false);
     };
   }, [enabled, handleGeolocationPosition, requestTelegramLocation]);
@@ -321,5 +368,5 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [enabled, handleGeolocationPosition, isUsingTelegram, requestTelegramLocation]);
 
-  return { isActive, isUsingTelegram };
+  return { isActive, isUsingTelegram, lastBroadcastAt, queuedPoints };
 }
