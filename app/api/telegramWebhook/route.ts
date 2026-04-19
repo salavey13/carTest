@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { supabaseAnon } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendComplexMessage, KeyboardButton } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { handleWebhookProxy } from "@/app/webhook-handlers/proxy";
 import { handleCommand } from "@/app/webhook-handlers/commands/command-handler";
 import { addRentalPhoto } from "@/app/rentals/actions";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_LOCATION_DEDUPE_WINDOW_MS = 2000;
+const TELEGRAM_LOCATION_DEDUPE_METERS = 5;
 
 function isCodexCaption(caption: string | undefined) {
     return Boolean(caption?.trim().match(/^\/codex(?:@[\w_]+)?(?:\s|$)/i));
@@ -19,6 +22,10 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c; // Distance in km
+}
+
+function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+    return calculateDistance(lat1, lon1, lat2, lon2) * 1000;
 }
 
 async function handlePhotoMessage(message: any) {
@@ -166,7 +173,7 @@ async function handleLocationMessage(message: any) {
     try {
         const { data: member, error: memberError } = await supabaseAnon
             .from('crew_members')
-            .select('live_status')
+            .select('live_status, crew_id')
             .eq('user_id', userId)
             .eq('membership_status', 'active')
             .single();
@@ -181,6 +188,91 @@ async function handleLocationMessage(message: any) {
                 .eq('user_id', userId);
             
             if (updateError) throw updateError;
+
+            // Mirror Telegram-native live-location updates into live_locations for realtime feed and postgres_changes fallback.
+            let crewSlug = "vip-bike";
+            if (member.crew_id) {
+                const { data: crew } = await supabaseAnon
+                    .from("crews")
+                    .select("slug")
+                    .eq("id", member.crew_id)
+                    .maybeSingle();
+                if (crew?.slug) {
+                    crewSlug = crew.slug;
+                }
+            }
+
+            const capturedAt = new Date().toISOString();
+            const { data: previousLiveLocation } = await supabaseAdmin
+                .from("live_locations")
+                .select("lat,lng,updated_at")
+                .eq("user_id", userId)
+                .maybeSingle();
+
+            if (previousLiveLocation?.updated_at) {
+                const lastUpdatedMs = new Date(previousLiveLocation.updated_at).getTime();
+                const elapsedMs = Date.now() - lastUpdatedMs;
+                const distanceMeters = calculateDistanceMeters(
+                    Number(latitude),
+                    Number(longitude),
+                    Number(previousLiveLocation.lat),
+                    Number(previousLiveLocation.lng),
+                );
+
+                if (elapsedMs < TELEGRAM_LOCATION_DEDUPE_WINDOW_MS && distanceMeters < TELEGRAM_LOCATION_DEDUPE_METERS) {
+                    logger.info(`[Shift Location Update] Skipping duplicate live-location burst for user ${userId}`);
+                    return;
+                }
+            }
+
+            const { error: liveError } = await supabaseAdmin
+                .from("live_locations")
+                .upsert(
+                    {
+                        user_id: userId,
+                        crew_slug: crewSlug,
+                        lat: Number(latitude),
+                        lng: Number(longitude),
+                        speed_kmh: Number(message.location?.speed || 0) * 3.6,
+                        heading: message.location?.heading != null ? Number(message.location.heading) : null,
+                        is_riding: true,
+                        updated_at: capturedAt,
+                    },
+                    { onConflict: "user_id" },
+                );
+
+            if (liveError) {
+                throw liveError;
+            }
+
+            const channel = supabaseAdmin.channel(`map-riders:${crewSlug}`);
+            await new Promise<void>((resolve) => {
+                const timeout = setTimeout(async () => {
+                    await supabaseAdmin.removeChannel(channel);
+                    resolve();
+                }, 1200);
+
+                channel.subscribe(async (status) => {
+                    if (status !== "SUBSCRIBED") return;
+                    await channel.send({
+                        type: "broadcast",
+                        event: "rider:move",
+                        payload: {
+                            user_id: userId,
+                            lat: Number(latitude),
+                            lng: Number(longitude),
+                            speed_kmh: Number(message.location?.speed || 0) * 3.6,
+                            heading: message.location?.heading != null ? Number(message.location.heading) : null,
+                            updated_at: capturedAt,
+                            source: "telegram-webhook",
+                        },
+                    });
+                    clearTimeout(timeout);
+                    await supabaseAdmin.removeChannel(channel);
+                    resolve();
+                });
+            });
+
             logger.info(`[Shift Location Update] Updated location for riding user ${userId}`);
             // Важно: выходим из функции, так как задача выполнена.
             return; 
