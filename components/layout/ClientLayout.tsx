@@ -1,8 +1,8 @@
 "use client";
 
 import type React from "react";
-import { Suspense, useState, useEffect, useRef, useCallback } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 
 // --- Standard Components ---
@@ -46,12 +46,7 @@ import { useAppToast } from "@/hooks/useAppToast";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { Loading } from "@/components/Loading";
 import { cn } from "@/lib/utils";
-
-// Bio30 specific actions
-import { setReferrer } from "@/app/bio30/ref_actions"; 
-
-// WB Syndicate Actions
-import { applyReferralCode } from "@/app/wblanding/actions_view";
+import { useStartParamRouter } from "@/hooks/useStartParamRouter";
 
 // --- THEME ENGINE ---
 const THEME_CONFIG = {
@@ -162,41 +157,6 @@ function AppInitializers() {
     return null;
 }
 
-const START_PARAM_PAGE_MAP: Record<string, string> = {
-  elon: "/elon",
-  musk_market: "/elon",
-  arbitrage_seeker: "/elon",
-  topdf_psycho: "/topdf",
-  settings: "/settings",
-  profile: "/profile",
-  sauna: "/sauna-rent",
-  streamer: "/streamer",
-  demo: "/about_en",
-  wb: "/wblanding", 
-  wb_dashboard: "/wblanding",
-  "audit-tool": "/wblanding",
-  "create_crew": "/wblanding",
-  reports: "/wblanding",
-  crews: "/crews", 
-  "repo-xml": "/repo-xml",
-  "style-guide": "/style-guide",
-  "start-training": "/selfdev/gamified",
-  paddock: "/paddock",
-  leaderboard: "/leaderboard",
-  "rent-bike": "/franchize/vip-bike",
-};
-
-const BIO30_PRODUCT_PATHS: Record<string, string> = {
-  'cordyceps': '/bio30/categories/cordyceps-sinensis',
-  'spirulina': '/bio30/categories/spirulina-chlorella',
-  'lions-mane': '/bio30/categories/lion-s-mane',
-  'lion-s-mane': '/bio30/categories/lion-s-mane',
-  'magnesium': '/bio30/categories/magnesium-pyridoxine',
-  'cordyceps-sinensis': '/bio30/categories/cordyceps-sinensis',
-  'spirulina-chlorella': '/bio30/categories/spirulina-chlorella',
-  'magnesium-pyridoxine': '/bio30/categories/magnesium-pyridoxine'
-};
-
 function useBio30ThemeFix() {
   const pathname = usePathname();
   useEffect(() => {
@@ -243,24 +203,13 @@ function useThemeSync() {
 
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const {
     startParamPayload,
-    dbUser,
-    userCrewInfo, 
-    refreshDbUser,
-    isLoading: isAppLoading,
-    isAuthenticating,
-    clearStartParam,
   } = useAppContext();
   const { activeLobby } = useStrikeballLobbyContext(); // GHOST-VIS: Global Active Combat State
   
   const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
-  const startParamHandledRef = useRef(false);
-  const { success: showToast } = useAppToast();
-
-  const theme = getThemeForPath(pathname);
+  const theme = useMemo(() => getThemeForPath(pathname), [pathname]);
   const CurrentHeader = theme.Header;
   const CurrentFooter = theme.Footer;
   const CurrentBottomNav = theme.BottomNav;
@@ -274,135 +223,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
 
   useBio30ThemeFix();
   useThemeSync(); 
-
-  useEffect(() => {
-    const handleBio30Referral = async (referrerId: string, paramToProcess: string) => {
-      if (dbUser && dbUser.user_id && !dbUser.metadata?.referrer_id) {
-        try {
-          const result = await setReferrer({
-            userId: dbUser.user_id,
-            referrerId,
-            referrerCode: paramToProcess,
-          });
-          if (result.success) {
-            logger.info(`[ClientLayout] Referral set for user ${dbUser.user_id} to referrer ${referrerId}`);
-            await refreshDbUser();
-          } else {
-            logger.error(`[ClientLayout] Failed to set referrer for user ${dbUser.user_id}: ${result.error}`);
-          }
-        } catch (error) {
-          logger.error(`[ClientLayout] Error setting referrer:`, error);
-        }
-      }
-    };
-
-    const handleSyndicateReferral = async (refCode: string) => {
-        if (!dbUser?.user_id) return;
-        if (!dbUser.metadata?.referrer) {
-            logger.info(`[Syndicate] Attempting to link referrer: ${refCode}`);
-            const res = await applyReferralCode(dbUser.user_id, refCode);
-            if (res.success) {
-                await refreshDbUser(); 
-                showToast("🎁 Реферальный код принят! Скидка 1000₽ активирована.");
-            }
-        }
-    };
-
-    const rawStartParam = startParamPayload || searchParams.get("tgWebAppStartParam");
-    const paramToProcess = normalizeStartParamPath(rawStartParam);
-    
-    if (!isAppLoading && !isAuthenticating && paramToProcess && !startParamHandledRef.current) {
-      startParamHandledRef.current = true;
-      let targetPath: string | undefined;
-
-      logger.info(`[ClientLayout] Processing Start Param: ${paramToProcess}`);
-
-      if (paramToProcess === "wb_dashboard") {
-         if (userCrewInfo?.slug) targetPath = `/wb/${userCrewInfo.slug}`;
-         else targetPath = "/wblanding";
-      }
-      else if (START_PARAM_PAGE_MAP[paramToProcess]) {
-        targetPath = START_PARAM_PAGE_MAP[paramToProcess];
-      } 
-      else if (paramToProcess.startsWith("crew_")) {
-        const content = paramToProcess.substring(5); 
-        if (content.endsWith("_join_crew")) {
-             const slug = content.substring(0, content.length - 10); 
-             targetPath = `/wb/${slug}?join_crew=true`;
-        } else {
-             targetPath = `/wb/${content}`;
-        }
-      }
-      else if (paramToProcess.startsWith("viz_")) {
-        const simId = paramToProcess.substring(4);
-        targetPath = `/god-mode-sandbox?simId=${simId}`;
-      }
-      else if (paramToProcess.startsWith("bio30_")) {
-        const parts = paramToProcess.split("_");
-        let productId: string | undefined;
-        let referrerId: string | undefined;
-        if (parts.length > 1 && parts[1] !== 'ref') productId = parts[1];
-        const refIndex = parts.indexOf('ref');
-        if (refIndex !== -1 && refIndex + 1 < parts.length) referrerId = parts[refIndex + 1];
-        
-        if (referrerId) handleBio30Referral(referrerId, paramToProcess);
-        targetPath = (productId && BIO30_PRODUCT_PATHS[productId]) ? BIO30_PRODUCT_PATHS[productId] : '/bio30';
-      }
-      else if (paramToProcess.startsWith("lobby_")) {
-          const lobbyId = paramToProcess.substring(6); 
-          if (lobbyId) targetPath = `/strikeball/lobbies/${lobbyId}`;
-      }
-      else if (paramToProcess.startsWith("rental-") || paramToProcess.startsWith("rentals-")) {
-          const rentalId = paramToProcess.split("-").at(-1);
-          const franchizeSlug = searchParams.get("slug") || "vip-bike";
-          if (rentalId) targetPath = `/franchize/${franchizeSlug}/rental/${rentalId}`;
-      }
-      else if (paramToProcess.startsWith("mapriders_") || paramToProcess.startsWith("mapriders-")) {
-          const separator = paramToProcess.includes("_") ? "_" : "-";
-          const slug = paramToProcess.split(separator).slice(1).join(separator) || searchParams.get("slug") || userCrewInfo?.slug || "vip-bike";
-          targetPath = `/franchize/${slug}/map-riders`;
-      }
-      else if (paramToProcess.startsWith("rental_") || paramToProcess.startsWith("rentals_")) {
-          const parts = paramToProcess.split("_");
-          const rentalId = parts.at(-1);
-          const maybeSlug = parts.length > 2 ? parts[1] : searchParams.get("slug") || "vip-bike";
-          if (rentalId) {
-            if (parts.length > 2 || searchParams.get("slug")) targetPath = `/franchize/${maybeSlug}/rental/${rentalId}`;
-            else targetPath = `/rentals/${rentalId}`;
-          }
-      }
-      else if (paramToProcess.startsWith("ref_")) {
-          const refCode = paramToProcess.substring(4); 
-          handleSyndicateReferral(refCode);
-          if (pathname === '/') targetPath = '/wblanding';
-          else targetPath = pathname; 
-      }
-      else if (paramToProcess.includes("/")) {
-        targetPath = `/${paramToProcess}`;
-      }
-      else {
-        targetPath = `/${paramToProcess}`;
-      }
-
-      if (targetPath && targetPath !== pathname) {
-        logger.info(`[ClientLayout] Redirecting to ${targetPath}`);
-        router.replace(targetPath);
-      }
-      clearStartParam?.();
-    }
-  }, [
-    startParamPayload,
-    searchParams,
-    pathname,
-    router,
-    isAppLoading,
-    isAuthenticating,
-    dbUser,
-    userCrewInfo,
-    refreshDbUser,
-    clearStartParam,
-    showToast
-  ]);
+  useStartParamRouter();
 
   const pathsToShowBottomNavForStartsWith = [
     "/selfdev/gamified",
@@ -513,9 +334,3 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
     </ErrorOverlayProvider>
   );
 }
-const normalizeStartParamPath = (rawParam: string | null) => {
-  if (!rawParam) return null;
-  const decoded = decodeURIComponent(rawParam).trim();
-  if (!decoded) return null;
-  return decoded.replace(/^\/+/, "").replace(/\/+/g, "/");
-};
