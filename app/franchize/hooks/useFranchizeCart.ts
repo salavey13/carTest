@@ -17,6 +17,10 @@ export type FranchizeCartLine = {
 };
 
 export type FranchizeCartState = Record<string, FranchizeCartLine>;
+type CartEnvelope = {
+  updatedAt: number;
+  cart: FranchizeCartState;
+};
 
 const CART_STORAGE_PREFIX = "franchize-cart";
 const CART_SYNC_EVENT = "franchize-cart-sync";
@@ -61,6 +65,39 @@ const sanitizeCartState = (value: unknown): FranchizeCartState => {
   }, {});
 };
 
+const mergeCartStates = (current: FranchizeCartState, incoming: FranchizeCartState): FranchizeCartState => {
+  const merged: FranchizeCartState = { ...incoming };
+  for (const [lineId, line] of Object.entries(current)) {
+    if (!merged[lineId]) {
+      merged[lineId] = line;
+      continue;
+    }
+    merged[lineId] = { ...merged[lineId], qty: Math.max(merged[lineId].qty, line.qty) };
+  }
+  return sanitizeCartState(merged);
+};
+
+const parseEnvelope = (raw: string | null): CartEnvelope => {
+  if (!raw) {
+    return { updatedAt: 0, cart: {} };
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as { updatedAt?: number; cart?: unknown } | unknown;
+    if (parsed && typeof parsed === "object" && "cart" in parsed) {
+      const payload = parsed as { updatedAt?: number; cart?: unknown };
+      return {
+        updatedAt: typeof payload.updatedAt === "number" ? payload.updatedAt : 0,
+        cart: sanitizeCartState(payload.cart ?? {}),
+      };
+    }
+
+    return { updatedAt: 0, cart: sanitizeCartState(parsed) };
+  } catch {
+    return { updatedAt: 0, cart: {} };
+  }
+};
+
 export const getFranchizeCartStorageKey = (slug: string) => `${CART_STORAGE_PREFIX}:${slug}`;
 
 export function useFranchizeCart(slug: string) {
@@ -77,11 +114,7 @@ export function useFranchizeCart(slug: string) {
     let initialState: FranchizeCartState = {};
 
     if (rawLocal) {
-      try {
-        initialState = sanitizeCartState(JSON.parse(rawLocal));
-      } catch {
-        initialState = {};
-      }
+      initialState = parseEnvelope(rawLocal).cart;
     } else if (dbUser?.metadata) {
       // Fallback to DB metadata if local is empty (Read-Only)
       const meta = dbUser.metadata as Record<string, any>;
@@ -91,7 +124,7 @@ export function useFranchizeCart(slug: string) {
       if (remoteCart) {
         initialState = sanitizeCartState(remoteCart);
         // Sync retrieved DB state to local storage immediately
-        const serialized = JSON.stringify(initialState);
+        const serialized = JSON.stringify({ updatedAt: Date.now(), cart: initialState });
         if (window.localStorage.getItem(storageKey) !== serialized) {
             window.localStorage.setItem(storageKey, serialized);
         }
@@ -106,7 +139,7 @@ export function useFranchizeCart(slug: string) {
   useEffect(() => {
     if (!isHydrated || typeof window === "undefined") return;
     
-    const newState = JSON.stringify(cart);
+    const newState = JSON.stringify({ updatedAt: Date.now(), cart });
     const currentState = window.localStorage.getItem(storageKey);
 
     // CRITICAL FIX: Only write/dispatch if value actually changed.
@@ -131,7 +164,7 @@ export function useFranchizeCart(slug: string) {
         const raw = window.localStorage.getItem(storageKey);
         if (!raw) return;
 
-        const newState = sanitizeCartState(JSON.parse(raw));
+        const newState = parseEnvelope(raw).cart;
         
         // Loop Breaker: Don't trigger re-render if state is semantically identical
         setCart(prev => {
@@ -150,43 +183,54 @@ export function useFranchizeCart(slug: string) {
   }, [storageKey]);
 
   // Actions
-  const setLineQty = useCallback((lineId: string, qty: number) => {
+  const updateCart = useCallback((updater: (prev: FranchizeCartState) => FranchizeCartState) => {
     setCart((prev) => {
+      if (typeof window === "undefined") {
+        return updater(prev);
+      }
+      const latest = parseEnvelope(window.localStorage.getItem(storageKey)).cart;
+      const next = updater(mergeCartStates(prev, latest));
+      return sanitizeCartState(next);
+    });
+  }, [storageKey]);
+
+  const setLineQty = useCallback((lineId: string, qty: number) => {
+    updateCart((prev) => {
       if (qty <= 0) { const next = { ...prev }; delete next[lineId]; return next; }
       const current = prev[lineId];
       if (!current) return prev;
       return { ...prev, [lineId]: { ...current, qty }};
     });
-  }, []);
+  }, [updateCart]);
 
   const changeLineQty = useCallback((lineId: string, delta: number) => {
-    setCart((prev) => {
+    updateCart((prev) => {
       const current = prev[lineId];
       if (!current) return prev;
       const nextQty = current.qty + delta;
       if (nextQty <= 0) { const next = { ...prev }; delete next[lineId]; return next; }
       return { ...prev, [lineId]: { ...current, qty: nextQty } };
     });
-  }, []);
+  }, [updateCart]);
 
   const addItem = useCallback((itemId: string, options: FranchizeCartOptions, qty = 1) => {
     const lineId = buildCartLineId(itemId, options);
-    setCart((prev) => {
+    updateCart((prev) => {
       const current = prev[lineId];
       const nextQty = (current?.qty ?? 0) + qty;
       return { ...prev, [lineId]: { itemId, qty: nextQty, options } };
     });
     return lineId;
-  }, []);
+  }, [updateCart]);
 
   const removeLine = useCallback((lineId: string) => {
-    setCart((prev) => {
+    updateCart((prev) => {
       if (!(lineId in prev)) return prev;
       const next = { ...prev };
       delete next[lineId];
       return next;
     });
-  }, []);
+  }, [updateCart]);
 
   const clear = useCallback(() => {
     setCart({});
