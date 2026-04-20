@@ -25,4 +25,18 @@ test.describe('franchize renting flow characterization', () => {
       expect(response.status()).toBeLessThan(300);
     }
   });
+
+  test('doc delivery assertion endpoint reports sent status after checkout flow', async ({ request }) => {
+    const assertUrl = process.env.FRANCHIZE_QA_DOC_ASSERT_URL;
+    if (!assertUrl) {
+      test.skip(true, 'FRANCHIZE_QA_DOC_ASSERT_URL is not configured for doc delivery verification.');
+      return;
+    }
+
+    const response = await request.get(assertUrl);
+    expect(response.ok(), `Expected QA doc assertion endpoint to be reachable: ${assertUrl}`).toBeTruthy();
+
+    const payload = await response.json();
+    expect(payload).toMatchObject({ success: true, sendStatus: 'sent' });
+  });
 });
