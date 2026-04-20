@@ -72,7 +72,7 @@ const CheatItem = ({ href, icon: Icon, title, desc, colorClass, status = "Ready"
 
 export default function VprTestsListPage() {
     const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
-    const [selectedGrade, setSelectedGrade] = useState<number>(8); 
+    const [selectedGrade, setSelectedGrade] = useState<number>(7); 
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
