@@ -188,6 +188,11 @@ export default function VprTestsListPage() {
                                                 colorClass={{ border: 'border-cyan-500/30', bg: 'bg-cyan-500/5', text: 'text-cyan-500', hoverBorder: 'hover:border-cyan-500' }}
                                             />
                                             <CheatItem 
+                                                href="/vpr/russian/7/cheatsheet" icon={MapIcon} title="Русский"
+                                                desc="Правила"
+                                                colorClass={{ border: 'border-red-500/30', bg: 'bg-red-500/5', text: 'text-red-500', hoverBorder: 'hover:border-red-500' }}
+                                            />
+                                            <CheatItem 
                                                 href="/vpr/informatics/7/cheatsheet" icon={Terminal} title="Net Architect 7.0"
                                                 desc="Маршрутизация пакетов. Логические круги Эйлера."
                                                 colorClass={{ border: 'border-brand-green/30', bg: 'bg-brand-green/5', text: 'text-brand-green', hoverBorder: 'hover:border-brand-green' }}
