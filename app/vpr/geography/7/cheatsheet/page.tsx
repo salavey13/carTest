@@ -978,14 +978,14 @@ export default function Geography7Cheatsheet() {
           viewport={{ once: true }}
           className="flex justify-center pb-8"
         >
-          <Link href="/">
+          <Link href="/vpr-tests">
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               className="group flex items-center gap-3 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-4 px-10 rounded-full shadow-[0_0_25px_rgba(16,185,129,0.3)] transition-all"
             >
               <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-              <span>НАЗАД К КАРТЕ</span>
+              <span>НАЗАД</span>
             </motion.div>
           </Link>
         </motion.div>
