@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import Image from 'next/image';
+import Link from 'next/link';
+import { getVprCheatsheetHref } from '@/lib/vprCheatsheet';
 import { Image as ImageIcon, AlertTriangle, BarChart3 } from 'lucide-react';
 
 import { SimpleChart } from './SimpleChart';
@@ -17,6 +19,7 @@ interface VprQuestionContentProps {
     };
     questionNumber: number;
     totalQuestions: number;
+    subjectSlug?: string;
 }
 
 const placeholderRegex = /\[(Диаграмма|Изображение|Рисунок|График|Площадь|Коорд|Таблица).*?\]/gi;
@@ -25,6 +28,7 @@ export function VprQuestionContent({
     questionData,
     questionNumber,
     totalQuestions,
+    subjectSlug = "general",
 }: VprQuestionContentProps) {
 
     const { text: originalText, visual_data } = questionData;
@@ -98,6 +102,10 @@ export function VprQuestionContent({
             </div>
 
             {renderVisualComponent()}
+
+            <Link href={getVprCheatsheetHref(subjectSlug)} className="block mt-6 text-brand-cyan underline text-center">
+                💡 Посмотреть в шпаргалке
+            </Link>
         </div>
     );
 }
