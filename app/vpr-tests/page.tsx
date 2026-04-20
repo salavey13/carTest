@@ -178,6 +178,11 @@ export default function VprTestsListPage() {
                                      {selectedGrade === 7 && (
                                          <>
                                             <CheatItem 
+                                                href="/vpr/geography/7/cheatsheet" icon={MapIcon} title="Geo_Grid: Planet"
+                                                desc="Картография. Масштабирование и координаты."
+                                                colorClass={{ border: 'border-teal-500/30', bg: 'bg-teal-500/5', text: 'text-teal-500', hoverBorder: 'hover:border-teal-500' }}
+                                            />
+                                            <CheatItem 
                                                 href="/vpr/informatics/7/cheatsheet" icon={Terminal} title="Net Architect 7.0"
                                                 desc="Маршрутизация пакетов. Логические круги Эйлера."
                                                 colorClass={{ border: 'border-brand-green/30', bg: 'bg-brand-green/5', text: 'text-brand-green', hoverBorder: 'hover:border-brand-green' }}
