@@ -1,5 +1,9 @@
+"use client";
+
 import { motion } from "framer-motion";
-import { CheckCircle, RotateCcw, BookOpen } from "lucide-react"; // Changed List to BookOpen to match original
+import { CheckCircle, RotateCcw, BookOpen } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { getVprCheatsheetHref } from "@/lib/vprCheatsheet";
 
 interface VprCompletionScreenProps {
   subjectName: string | undefined;
@@ -8,6 +12,7 @@ interface VprCompletionScreenProps {
   totalQuestions: number;
   onReset: () => void;
   onGoToList: () => void;
+  subjectSlug?: string;
 }
 
 export function VprCompletionScreen({
@@ -17,7 +22,9 @@ export function VprCompletionScreen({
   totalQuestions,
   onReset,
   onGoToList,
+  subjectSlug = "general",
 }: VprCompletionScreenProps) {
+  const router = useRouter();
   const percentage = totalQuestions > 0 ? ((finalScore / totalQuestions) * 100).toFixed(0) : '0';
   const scoreInt = parseInt(percentage);
   const resultColor = scoreInt >= 80 ? 'text-brand-green' : scoreInt >= 50 ? 'text-yellow-500' : 'text-brand-pink';
@@ -53,6 +60,13 @@ export function VprCompletionScreen({
           {finalScore} из {totalQuestions} ({percentage}%)
         </p>
         <div className="space-y-4">
+        <button
+          onClick={() => router.push(getVprCheatsheetHref(subjectSlug))}
+          className="w-full bg-brand-cyan text-white py-3 rounded-lg mt-1 font-semibold hover:bg-brand-cyan/80 transition-colors"
+        >
+          📖 Открыть шпаргалку по предмету
+        </button>
+
           <button
             onClick={onReset}
             className="w-full bg-brand-blue text-white px-6 py-3 rounded-lg font-semibold text-lg hover:bg-brand-blue/80 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
