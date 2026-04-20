@@ -9,9 +9,9 @@ import {
   Terminal, Wifi, Search, Circle, MoveDown, Rocket, Zap, ShieldCheck,
   Network, Cpu, HardDrive, Database, Key, Binary, GitBranch,
   Monitor, MousePointerClick, ChevronDown, ChevronUp, Eye,
-  Code2, Shield, Activity, Layers, ArrowRight
+  Code2, Shield, Activity, Layers, ArrowRight,
+  FolderOpen, Palette, Calculator, Gauge, FileArchive, ArrowLeft
 } from "lucide-react";
-
 // ─── Matrix Digital Rain Background ─────────────────────────────────────
 function MatrixRainBg() {
   const columns = useMemo(() => {
@@ -969,6 +969,1457 @@ function AsciiTable() {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  VPR Component 1: InfoVolumeCalculator (Types 7, 8, 9, 10)
+// ═══════════════════════════════════════════════════════════════════════
+function InfoVolumeCalculator() {
+  const [alphabetSize, setAlphabetSize] = useState(256);
+  const [symbolCount, setSymbolCount] = useState(100);
+
+  const bitsPerSymbol = Math.log2(alphabetSize);
+  const isWholeNumber = Number.isInteger(bitsPerSymbol);
+  const totalBits = symbolCount * bitsPerSymbol;
+  const totalBytes = totalBits / 8;
+
+  const specialCases = [
+    { n: 2, bits: 1 },
+    { n: 4, bits: 2 },
+    { n: 8, bits: 3 },
+    { n: 16, bits: 4 },
+    { n: 32, bits: 5 },
+    { n: 64, bits: 6 },
+    { n: 128, bits: 7 },
+    { n: 256, bits: 8 },
+    { n: 512, bits: 9 },
+  ];
+
+  return (
+    <HUDPanel className="p-5 space-y-4" glow>
+      <h3 className="font-mono text-sm text-green-300 mb-2 glow-text-sm flex items-center gap-2">
+        <Calculator className="w-4 h-4" /> {'>'} info_volume.calc()
+      </h3>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="font-mono text-xs text-green-500 mb-1 block">Размер алфавита (N)</label>
+          <input
+            type="number"
+            value={alphabetSize}
+            onChange={(e) => setAlphabetSize(Math.max(2, Number(e.target.value)))}
+            className="w-full bg-[#020c02] border border-green-800/40 rounded-lg px-3 py-2 font-mono text-sm text-[#00ff41] focus:outline-none focus:border-green-400"
+            min={2}
+          />
+        </div>
+        <div>
+          <label className="font-mono text-xs text-green-500 mb-1 block">Количество символов (K)</label>
+          <input
+            type="number"
+            value={symbolCount}
+            onChange={(e) => setSymbolCount(Math.max(1, Number(e.target.value)))}
+            className="w-full bg-[#020c02] border border-green-800/40 rounded-lg px-3 py-2 font-mono text-sm text-[#00ff41] focus:outline-none focus:border-green-400"
+            min={1}
+          />
+        </div>
+      </div>
+
+      {/* Formula */}
+      <div className="bg-[#020c02] rounded-lg border border-green-900/20 p-3 space-y-1">
+        <div className="font-mono text-xs text-green-500">Формула:</div>
+        <div className="font-mono text-sm text-cyan-300">I = K × i, где i = log₂(N)</div>
+        <div className="font-mono text-xs text-green-600 mt-2">Шаги:</div>
+        <div className="font-mono text-xs text-green-400">
+          1. i = log₂({alphabetSize}) = <span className="text-[#00ff41]">{isWholeNumber ? bitsPerSymbol : bitsPerSymbol.toFixed(4)}</span> бит
+        </div>
+        <div className="font-mono text-xs text-green-400">
+          2. I = {symbolCount} × {isWholeNumber ? bitsPerSymbol : bitsPerSymbol.toFixed(4)} = <span className="text-[#00ff41]">{totalBits.toFixed(2)}</span> бит
+        </div>
+        <div className="font-mono text-xs text-green-400">
+          3. I = {totalBits.toFixed(2)} / 8 = <span className="text-[#00ff41]">{totalBytes.toFixed(2)}</span> байт
+        </div>
+      </div>
+
+      {/* 512 Special Callout */}
+      <div className={cn(
+        "rounded-lg border p-3",
+        alphabetSize === 512 ? "bg-amber-500/10 border-amber-500/40" : "bg-green-500/5 border-green-900/20"
+      )}>
+        <div className="font-mono text-xs font-bold mb-1" style={{ color: alphabetSize === 512 ? "#f59e0b" : "#22c55e" }}>
+          {alphabetSize === 512 ? "⚠ ВНИМАНИЕ! Ловушка ВПР!" : "💡 Совет"}
+        </div>
+        <div className="font-mono text-xs text-green-300/80">
+          {alphabetSize === 512
+            ? "512 ≠ 2⁸! 512 = 2⁹, значит 1 символ = 9 бит (не 8!). Многие ошибочно пишут 8."
+            : "N должно быть степенью двойки для целого числа бит на символ."
+          }
+        </div>
+      </div>
+
+      {/* Special Cases Table */}
+      <div>
+        <div className="font-mono text-xs text-green-600 mb-2">Частые значения (N → бит):</div>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-1">
+          {specialCases.map((sc) => (
+            <motion.button
+              key={sc.n}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setAlphabetSize(sc.n)}
+              className={cn(
+                "px-2 py-1 rounded text-center font-mono text-[10px] border cursor-pointer transition-all",
+                alphabetSize === sc.n
+                  ? "bg-green-500/20 border-green-400 text-[#00ff41]"
+                  : "bg-black/40 border-green-900/30 text-green-600 hover:border-green-700"
+              )}
+            >
+              {sc.n} → {sc.bits}
+            </motion.button>
+          ))}
+        </div>
+      </div>
+
+      {/* Flash Drive Example */}
+      <Expandable title="> Пример: флешка 4 ГБ — сколько файлов по 64 МБ?">
+        <div className="space-y-1 font-mono text-xs text-green-400">
+          <p>4 ГБ = 4 × 1024 МБ = <span className="text-[#00ff41]">4096 МБ</span></p>
+          <p>4096 МБ / 64 МБ = <span className="text-[#00ff41]">64 файла</span></p>
+          <p className="text-amber-400 mt-1">⚠ Не забудь: 1 КБ = 1024 байта (не 1000!)</p>
+        </div>
+      </Expandable>
+    </HUDPanel>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VPR Component 2: TransferSpeedCalculator (Type 9)
+// ═══════════════════════════════════════════════════════════════════════
+function TransferSpeedCalculator() {
+  const [mode, setMode] = useState<"speed" | "size">("speed");
+  const [fileSize, setFileSize] = useState(16);
+  const [transferTime, setTransferTime] = useState(512);
+  const [newTime, setNewTime] = useState(128);
+
+  const speed = fileSize / transferTime; // KB/s
+  const newSize = mode === "size" ? speed * newTime : 0;
+
+  return (
+    <HUDPanel className="p-5 space-y-4">
+      <h3 className="font-mono text-sm text-green-300 mb-2 glow-text-sm flex items-center gap-2">
+        <Gauge className="w-4 h-4" /> {'>'} transfer_speed.calc()
+      </h3>
+
+      {/* Mode Toggle */}
+      <div className="flex gap-2">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setMode("speed")}
+          className={cn(
+            "px-3 py-1.5 rounded-lg font-mono text-xs border cursor-pointer",
+            mode === "speed" ? "bg-green-500/20 border-green-400 text-[#00ff41]" : "bg-black/40 border-green-900/30 text-green-600"
+          )}
+        >
+          Скорость → Размер
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setMode("size")}
+          className={cn(
+            "px-3 py-1.5 rounded-lg font-mono text-xs border cursor-pointer",
+            mode === "size" ? "bg-green-500/20 border-green-400 text-[#00ff41]" : "bg-black/40 border-green-900/30 text-green-600"
+          )}
+        >
+          Размер → Скорость
+        </motion.button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="font-mono text-xs text-green-500 mb-1 block">Размер файла (КБ)</label>
+          <input
+            type="number"
+            value={fileSize}
+            onChange={(e) => setFileSize(Number(e.target.value))}
+            className="w-full bg-[#020c02] border border-green-800/40 rounded-lg px-3 py-2 font-mono text-sm text-[#00ff41] focus:outline-none focus:border-green-400"
+          />
+        </div>
+        <div>
+          <label className="font-mono text-xs text-green-500 mb-1 block">Время передачи (сек)</label>
+          <input
+            type="number"
+            value={transferTime}
+            onChange={(e) => setTransferTime(Number(e.target.value))}
+            className="w-full bg-[#020c02] border border-green-800/40 rounded-lg px-3 py-2 font-mono text-sm text-[#00ff41] focus:outline-none focus:border-green-400"
+          />
+        </div>
+      </div>
+
+      {mode === "size" && (
+        <div>
+          <label className="font-mono text-xs text-green-500 mb-1 block">Новое время (сек)</label>
+          <input
+            type="number"
+            value={newTime}
+            onChange={(e) => setNewTime(Number(e.target.value))}
+            className="w-full bg-[#020c02] border border-green-800/40 rounded-lg px-3 py-2 font-mono text-sm text-[#00ff41] focus:outline-none focus:border-green-400"
+          />
+        </div>
+      )}
+
+      {/* Result */}
+      <div className="bg-[#020c02] rounded-lg border border-green-900/20 p-3 space-y-1">
+        <div className="font-mono text-xs text-green-500">Формула: V = S / t</div>
+        <div className="font-mono text-xs text-green-400">
+          V = {fileSize} / {transferTime} = <span className="text-[#00ff41]">{speed} КБ/с</span>
+        </div>
+        {mode === "size" && (
+          <div className="font-mono text-xs text-green-400 mt-2">
+            Новый размер: S = V × t = {speed} × {newTime} = <span className="text-[#00ff41]">{newSize} КБ</span>
+          </div>
+        )}
+      </div>
+
+      {/* Real VPR Example */}
+      <Expandable title="> Реальное задание ВПР" defaultOpen>
+        <div className="space-y-1 font-mono text-xs text-green-400">
+          <p>Файл размером <span className="text-cyan-300">16 КБ</span> передаётся за <span className="text-cyan-300">512 сек</span>.</p>
+          <p>За какое время передастся файл размером <span className="text-cyan-300">4 КБ</span>?</p>
+          <p className="mt-2 text-green-600">Решение:</p>
+          <p>V = 16 / 512 = <span className="text-[#00ff41]">1/32 КБ/с</span></p>
+          <p>t = 4 / (1/32) = 4 × 32 = <span className="text-[#00ff41]">128 сек</span></p>
+          <p className="text-amber-400 mt-1">Ответ: 128</p>
+        </div>
+      </Expandable>
+    </HUDPanel>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VPR Component 3: RGBMixer (Type 11)
+// ═══════════════════════════════════════════════════════════════════════
+function RGBMixer() {
+  const [r, setR] = useState(255);
+  const [g, setG] = useState(0);
+  const [b, setB] = useState(0);
+
+  const getColorName = (rv: number, gv: number, bv: number): string => {
+    if (rv === 0 && gv === 0 && bv === 0) return "Чёрный (Black)";
+    if (rv === 255 && gv === 255 && bv === 255) return "Белый (White)";
+    if (rv === 255 && gv === 0 && bv === 0) return "Красный (Red)";
+    if (rv === 0 && gv === 255 && bv === 0) return "Зелёный (Green)";
+    if (rv === 0 && gv === 0 && bv === 255) return "Синий (Blue)";
+    if (rv === 0 && gv === 255 && bv === 255) return "Голубой (Cyan) ⭐ ВПР";
+    if (rv === 255 && gv === 0 && bv === 255) return "Пурпурный (Magenta)";
+    if (rv === 255 && gv === 255 && bv === 0) return "Жёлтый (Yellow)";
+    return "Другой цвет";
+  };
+
+  const colorName = getColorName(r, g, b);
+  const isVPRClassic = r === 0 && g === 255 && b === 255;
+
+  const presets = [
+    { name: "Красный", r: 255, g: 0, b: 0 },
+    { name: "Зелёный", r: 0, g: 255, b: 0 },
+    { name: "Синий", r: 0, g: 0, b: 255 },
+    { name: "Голубой", r: 0, g: 255, b: 255 },
+    { name: "Пурпурный", r: 255, g: 0, b: 255 },
+    { name: "Жёлтый", r: 255, g: 255, b: 0 },
+    { name: "Чёрный", r: 0, g: 0, b: 0 },
+    { name: "Белый", r: 255, g: 255, b: 255 },
+  ];
+
+  return (
+    <HUDPanel className="p-5 space-y-4" glow={isVPRClassic}>
+      <h3 className="font-mono text-sm text-green-300 mb-2 glow-text-sm flex items-center gap-2">
+        <Palette className="w-4 h-4" /> {'>'} rgb_mixer.visualize()
+      </h3>
+
+      {/* Color Preview */}
+      <div
+        className="w-full h-24 rounded-lg border-2 border-green-800/40 transition-all duration-200"
+        style={{ backgroundColor: `rgb(${r}, ${g}, ${b})` }}
+      />
+
+      {/* Color Info */}
+      <div className="text-center font-mono text-sm">
+        <span className="text-green-300">RGB(</span>
+        <span className="text-red-400">{r}</span>
+        <span className="text-green-300">, </span>
+        <span className="text-green-400">{g}</span>
+        <span className="text-green-300">, </span>
+        <span className="text-blue-400">{b}</span>
+        <span className="text-green-300">)</span>
+        <span className="text-green-600 ml-2">= {colorName}</span>
+      </div>
+
+      {/* Sliders */}
+      {[
+        { label: "R (Красный)", value: r, setter: setR, color: "bg-red-500" },
+        { label: "G (Зелёный)", value: g, setter: setG, color: "bg-green-500" },
+        { label: "B (Синий)", value: b, setter: setB, color: "bg-blue-500" },
+      ].map((ch) => (
+        <div key={ch.label} className="space-y-1">
+          <div className="flex justify-between items-center">
+            <span className="font-mono text-xs text-green-500">{ch.label}</span>
+            <span className="font-mono text-xs text-green-300">{ch.value}</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={255}
+            value={ch.value}
+            onChange={(e) => ch.setter(Number(e.target.value))}
+            className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-green-400"
+            style={{ background: `linear-gradient(to right, #000, ${ch.color.replace("bg-", "")})` }}
+          />
+        </div>
+      ))}
+
+      {/* VPR Callout */}
+      {isVPRClassic && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3"
+        >
+          <div className="font-mono text-xs text-amber-400 font-bold">⭐ Классический вопрос ВПР!</div>
+          <div className="font-mono text-xs text-green-300 mt-1">R=0, G=255, B=255 = Голубой (Cyan)</div>
+          <div className="font-mono text-xs text-green-600 mt-1">Запомни: 0+255+255 = Голубой (не синий!)</div>
+        </motion.div>
+      )}
+
+      {/* Presets */}
+      <div className="grid grid-cols-4 gap-1.5">
+        {presets.map((p) => (
+          <motion.button
+            key={p.name}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => { setR(p.r); setG(p.g); setB(p.b); }}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-black/40 border border-green-900/30 cursor-pointer"
+          >
+            <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: `rgb(${p.r}, ${p.g}, ${p.b})` }} />
+            <span className="font-mono text-[9px] text-green-500 truncate">{p.name}</span>
+          </motion.button>
+        ))}
+      </div>
+    </HUDPanel>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VPR Component 4: DeviceClassifier (Type 1)
+// ═══════════════════════════════════════════════════════════════════════
+const DEVICES_DATA = [
+  { id: "scanner", label: "Сканер", num: 1, category: "input" as const },
+  { id: "printer", label: "Принтер", num: 2, category: "output" as const },
+  { id: "processor", label: "Процессор", num: 3, category: "processing" as const },
+  { id: "hdd", label: "Жёсткий диск", num: 4, category: "storage" as const },
+  { id: "speakers", label: "Колонки", num: 5, category: "output" as const },
+  { id: "mic", label: "Микрофон", num: 6, category: "input" as const },
+  { id: "usb", label: "Флешка", num: 7, category: "storage" as const },
+  { id: "monitor", label: "Монитор", num: 8, category: "output" as const },
+  { id: "keyboard", label: "Клавиатура", num: 9, category: "input" as const },
+  { id: "mouse", label: "Мышь", num: 10, category: "input" as const },
+  { id: "headphones", label: "Наушники", num: 11, category: "output" as const },
+  { id: "webcam", label: "Веб-камера", num: 12, category: "input" as const },
+];
+
+const CATEGORY_LABELS: Record<string, string> = {
+  input: "ВВОД",
+  output: "ВЫВОД",
+  storage: "ХРАНЕНИЕ",
+  processing: "ОБРАБОТКА",
+};
+
+function DeviceClassifier() {
+  const [classifications, setClassifications] = useState<Record<string, string>>({});
+  const [revealed, setRevealed] = useState(false);
+
+  const handleClick = (deviceId: string, category: string) => {
+    if (revealed) return;
+    setClassifications((prev) => ({ ...prev, [deviceId]: category }));
+  };
+
+  const reset = () => { setClassifications({}); setRevealed(false); };
+
+  const getCategoryColor = (cat: string) => {
+    switch (cat) {
+      case "input": return "border-cyan-500/50 bg-cyan-500/10 text-cyan-300";
+      case "output": return "border-green-500/50 bg-green-500/10 text-green-300";
+      case "storage": return "border-amber-500/50 bg-amber-500/10 text-amber-300";
+      case "processing": return "border-purple-500/50 bg-purple-500/10 text-purple-300";
+      default: return "border-green-900/30 text-green-600";
+    }
+  };
+
+  const allClassified = DEVICES_DATA.every((d) => classifications[d.id]);
+
+  return (
+    <HUDPanel className="p-5 space-y-4" glow={revealed}>
+      <div className="flex items-center justify-between">
+        <h3 className="font-mono text-sm text-green-300 glow-text-sm flex items-center gap-2">
+          <Monitor className="w-4 h-4" /> {'>'} device_classifier.run()
+        </h3>
+        <button onClick={reset} className="p-1 rounded hover:bg-green-900/30 text-green-600 hover:text-green-400 transition-colors cursor-pointer">
+          <RotateCcw className="w-4 h-4" />
+        </button>
+      </div>
+
+      <p className="font-mono text-xs text-green-600">
+        Нажми на устройство, затем выбери категорию. Или нажми «Показать ответы».
+      </p>
+
+      {/* Devices Grid */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+        {DEVICES_DATA.map((device) => (
+          <motion.button
+            key={device.id}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => {
+              const cat = classifications[device.id];
+              if (cat) {
+                setClassifications((prev) => {
+                  const next = { ...prev };
+                  delete next[device.id];
+                  return next;
+                });
+              }
+            }}
+            className={cn(
+              "px-2 py-2 rounded-lg border font-mono text-[10px] text-center cursor-pointer transition-all",
+              classifications[device.id]
+                ? getCategoryColor(classifications[device.id])
+                : revealed
+                  ? getCategoryColor(device.category)
+                  : "border-green-800/30 bg-black/40 text-green-400 hover:border-green-500/40"
+            )}
+          >
+            <div className="font-bold">{device.num}.</div>
+            <div className="truncate">{device.label}</div>
+            {(classifications[device.id] || revealed) && (
+              <div className="text-[8px] mt-0.5 opacity-70">
+                {CATEGORY_LABELS[classifications[device.id] || device.category]}
+              </div>
+            )}
+          </motion.button>
+        ))}
+      </div>
+
+      {/* Category Buttons */}
+      {!revealed && (
+        <div className="flex flex-wrap gap-2 justify-center">
+          {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+            <motion.button
+              key={key}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                // classify last unclassified device
+                const unclassified = DEVICES_DATA.find((d) => !classifications[d.id]);
+                if (unclassified) handleClick(unclassified.id, key);
+              }}
+              className={cn("px-3 py-1 rounded-lg border font-mono text-xs cursor-pointer", getCategoryColor(key))}
+            >
+              {label}
+            </motion.button>
+          ))}
+        </div>
+      )}
+
+      {/* Reveal Button */}
+      {!revealed && (
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => setRevealed(true)}
+          className="w-full py-2 rounded-lg bg-green-900/20 border border-green-700/40 font-mono text-xs text-green-400 hover:border-green-400 hover:text-[#00ff41] cursor-pointer"
+        >
+          Показать ответы
+        </motion.button>
+      )}
+
+      {/* Answer Summary */}
+      {revealed && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
+          <div className="font-mono text-xs text-green-400 font-bold">Ответы:</div>
+          <div className="grid grid-cols-2 gap-1 text-[10px] font-mono">
+            <div className="text-cyan-300">ВВОД: 1, 6, 9, 10, 12</div>
+            <div className="text-green-300">ВЫВОД: 2, 5, 8, 11</div>
+            <div className="text-amber-300">ХРАНЕНИЕ: 4, 7</div>
+            <div className="text-purple-300">ОБРАБОТКА: 3</div>
+          </div>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2">
+            <div className="font-mono text-xs text-amber-400 font-bold">⭐ ВПР: Устройства 2, 5, 8 → Ответ: 258</div>
+            <div className="font-mono text-[10px] text-green-600">Принтер, Колонки, Монитор = устройства вывода</div>
+          </div>
+        </motion.div>
+      )}
+    </HUDPanel>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VPR Component 5: FileExtensionMatcher (Type 3)
+// ═══════════════════════════════════════════════════════════════════════
+const EXTENSIONS_DATA = [
+  { ext: "rar", type: "archive", label: "Архив" },
+  { ext: "zip", type: "archive", label: "Архив" },
+  { ext: "ppt", type: "presentation", label: "Презентация" },
+  { ext: "pptx", type: "presentation", label: "Презентация" },
+  { ext: "xls", type: "spreadsheet", label: "Таблица" },
+  { ext: "csv", type: "spreadsheet", label: "Таблица" },
+  { ext: "jpeg", type: "graphics", label: "Графика" },
+  { ext: "png", type: "graphics", label: "Графика" },
+  { ext: "doc", type: "document", label: "Документ" },
+  { ext: "docx", type: "document", label: "Документ" },
+  { ext: "mp3", type: "audio", label: "Аудио" },
+  { ext: "wav", type: "audio", label: "Аудио" },
+  { ext: "mp4", type: "video", label: "Видео" },
+  { ext: "avi", type: "video", label: "Видео" },
+];
+
+const TYPE_LABELS: Record<string, { label: string; color: string }> = {
+  archive: { label: "📁 Архив", color: "border-amber-500/50 bg-amber-500/10 text-amber-300" },
+  presentation: { label: "📊 Презентация", color: "border-orange-500/50 bg-orange-500/10 text-orange-300" },
+  spreadsheet: { label: "📋 Таблица", color: "border-green-500/50 bg-green-500/10 text-green-300" },
+  graphics: { label: "🖼 Графика", color: "border-cyan-500/50 bg-cyan-500/10 text-cyan-300" },
+  document: { label: "📄 Документ", color: "border-blue-500/50 bg-blue-500/10 text-blue-300" },
+  audio: { label: "🎵 Аудио", color: "border-purple-500/50 bg-purple-500/10 text-purple-300" },
+  video: { label: "🎬 Видео", color: "border-red-500/50 bg-red-500/10 text-red-300" },
+};
+
+function FileExtensionMatcher() {
+  const [matched, setMatched] = useState<Record<string, string>>({});
+  const [revealed, setRevealed] = useState(false);
+  const [selectedExt, setSelectedExt] = useState<string | null>(null);
+
+  const remaining = EXTENSIONS_DATA.filter((e) => !matched[e.ext]);
+
+  const handleMatch = (ext: string, type: string) => {
+    if (revealed) return;
+    const correctType = EXTENSIONS_DATA.find((e) => e.ext === ext)?.type;
+    setMatched((prev) => ({
+      ...prev,
+      [ext]: correctType === type ? type : "wrong",
+    }));
+    setSelectedExt(null);
+  };
+
+  const reset = () => { setMatched({}); setRevealed(false); setSelectedExt(null); };
+  const correctCount = Object.values(matched).filter((v) => v !== "wrong").length;
+  const wrongCount = Object.values(matched).filter((v) => v === "wrong").length;
+
+  return (
+    <HUDPanel className="p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-mono text-sm text-green-300 glow-text-sm flex items-center gap-2">
+          <FileArchive className="w-4 h-4" /> {'>'} extension_matcher.run()
+        </h3>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs text-green-600">✓{correctCount} ✗{wrongCount}</span>
+          <button onClick={reset} className="p-1 rounded hover:bg-green-900/30 text-green-600 hover:text-green-400 transition-colors cursor-pointer">
+            <RotateCcw className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <p className="font-mono text-xs text-green-600">
+        Нажми на расширение, затем выбери тип файла.
+      </p>
+
+      {/* Extensions */}
+      <div className="flex flex-wrap gap-1.5">
+        {EXTENSIONS_DATA.map((item) => (
+          <motion.button
+            key={item.ext}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => !matched[item.ext] && !revealed && setSelectedExt(item.ext === selectedExt ? null : item.ext)}
+            className={cn(
+              "px-2.5 py-1 rounded-lg font-mono text-xs border cursor-pointer transition-all",
+              matched[item.ext] === "wrong"
+                ? "border-red-500/50 bg-red-500/10 text-red-400 line-through"
+                : matched[item.ext]
+                  ? TYPE_LABELS[matched[item.ext]].color
+                  : revealed
+                    ? TYPE_LABELS[item.type].color
+                    : selectedExt === item.ext
+                      ? "bg-green-500/20 border-green-400 text-[#00ff41] shadow-[0_0_10px_rgba(0,255,65,0.3)]"
+                      : "border-green-800/30 bg-black/40 text-green-400 hover:border-green-600"
+            )}
+          >
+            .{item.ext}
+          </motion.button>
+        ))}
+      </div>
+
+      {/* Type Selection */}
+      {selectedExt && !revealed && (
+        <div className="flex flex-wrap gap-1.5">
+          {Object.entries(TYPE_LABELS).map(([key, val]) => (
+            <motion.button
+              key={key}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => handleMatch(selectedExt, key)}
+              className={cn("px-2 py-1 rounded-lg font-mono text-[10px] border cursor-pointer", val.color)}
+            >
+              {val.label}
+            </motion.button>
+          ))}
+        </div>
+      )}
+
+      {/* Reference Table */}
+      <Expandable title="> Справочная таблица расширений">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 text-[10px] font-mono">
+          {Object.entries(TYPE_LABELS).map(([key, val]) => {
+            const exts = EXTENSIONS_DATA.filter((e) => e.type === key).map((e) => `.${e.ext}`).join(", ");
+            return (
+              <div key={key} className={cn("p-1.5 rounded", val.color)}>
+                <div className="font-bold">{val.label}</div>
+                <div className="opacity-70">{exts}</div>
+              </div>
+            );
+          })}
+        </div>
+      </Expandable>
+    </HUDPanel>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VPR Component 6: DirectoryNavigator (Type 2)
+// ═══════════════════════════════════════════════════════════════════════
+interface TreeNode {
+  name: string;
+  children?: TreeNode[];
+}
+
+const FILE_TREE: TreeNode = {
+  name: "С:",
+  children: [
+    {
+      name: "учеба",
+      children: [
+        { name: "2013", children: [
+          { name: "Расписание" },
+          { name: "Задания" },
+        ]},
+        { name: "2014", children: [
+          { name: "Расписание" },
+          { name: "Задания" },
+        ]},
+        { name: "математика", children: [
+          { name: "ГИА" },
+          { name: "Контрольные" },
+        ]},
+        { name: "информатика", children: [
+          { name: "Проекты" },
+          { name: "Тесты" },
+        ]},
+      ],
+    },
+    { name: "игры", children: [
+      { name: "minecraft" },
+      { name: "chess" },
+    ]},
+    { name: "фото", children: [
+      { name: "отпуск" },
+      { name: "школа" },
+    ]},
+  ],
+};
+
+function DirectoryNavigator() {
+  const [currentPath, setCurrentPath] = useState<string[]>(["С:"]);
+  const [message, setMessage] = useState("Начни навигацию!");
+
+  const getNode = (path: string[]): TreeNode | null => {
+    let node: TreeNode = FILE_TREE;
+    for (let i = 1; i < path.length; i++) {
+      const child = node.children?.find((c) => c.name === path[i]);
+      if (!child) return null;
+      node = child;
+    }
+    return node;
+  };
+
+  const currentNode = getNode(currentPath);
+  const children = currentNode?.children || [];
+
+  const navigateTo = (name: string) => {
+    const newNode = getNode([...currentPath, name]);
+    if (newNode) {
+      setCurrentPath([...currentPath, name]);
+      setMessage(`Перешёл в: ${[...currentPath, name].join("\\")}`);
+    }
+  };
+
+  const goUp = () => {
+    if (currentPath.length > 1) {
+      const newPath = currentPath.slice(0, -1);
+      setCurrentPath(newPath);
+      setMessage(`Перешёл в: ${newPath.join("\\")}`);
+    }
+  };
+
+  const goHome = () => {
+    setCurrentPath(["С:"]);
+    setMessage("Вернулся в корень");
+  };
+
+  const solveVPR = () => {
+    // Start at С:\учеба\2013\Расписание
+    // Go up 1 → С:\учеба\2013
+    // Then down into 2014 → С:\учеба\2014
+    // Then down into Задания → С:\учеба\2014\Задания
+    setCurrentPath(["С:", "учеба", "2013", "Расписание"]);
+    setMessage("Старт: С:\\учеба\\2013\\Расписание");
+    setTimeout(() => {
+      setCurrentPath(["С:", "учеба", "2013"]);
+      setMessage("↑ На один уровень вверх: С:\\учеба\\2013");
+    }, 800);
+    setTimeout(() => {
+      setCurrentPath(["С:", "учеба", "2014"]);
+      setMessage("↓ В папку «2014»: С:\\учеба\\2014");
+    }, 1600);
+    setTimeout(() => {
+      setCurrentPath(["С:", "учеба", "2014", "Задания"]);
+      setMessage("↓ В папку «Задания»: С:\\учеба\\2014\\Задания — Ответ: вариант 1");
+    }, 2400);
+  };
+
+  const renderTree = (node: TreeNode, path: string[], depth: number = 0) => {
+    const fullPath = [...path, node.name];
+    const isActive = fullPath.join("\\") === currentPath.join("\\");
+    const isAncestor = currentPath.length > fullPath.length && currentPath.slice(0, fullPath.length).join("\\") === fullPath.join("\\");
+
+    return (
+      <div key={fullPath.join("\\")}>
+        <motion.div
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          className={cn(
+            "flex items-center gap-1 py-0.5 px-1 rounded cursor-pointer font-mono text-[10px] transition-all",
+            isActive ? "text-[#00ff41] bg-green-500/10" : isAncestor ? "text-green-400" : "text-green-700 hover:text-green-500"
+          )}
+          style={{ paddingLeft: `${depth * 16}px` }}
+          onClick={() => setCurrentPath(fullPath)}
+        >
+          {node.children ? (
+            <FolderOpen className="w-3 h-3 shrink-0" />
+          ) : (
+            <FileText className="w-3 h-3 shrink-0" />
+          )}
+          <span>{node.name}</span>
+        </motion.div>
+        {node.children?.map((child) => renderTree(child, fullPath, depth + 1))}
+      </div>
+    );
+  };
+
+  return (
+    <HUDPanel className="p-5 space-y-4">
+      <h3 className="font-mono text-sm text-green-300 glow-text-sm flex items-center gap-2">
+        <FolderOpen className="w-4 h-4" /> {'>'} directory.navigate()
+      </h3>
+
+      {/* Current Path */}
+      <div className="bg-[#020c02] rounded-lg border border-green-900/20 p-2">
+        <div className="font-mono text-[10px] text-green-600 mb-1">Текущий путь:</div>
+        <div className="font-mono text-sm text-[#00ff41] break-all">{currentPath.join("\\")}</div>
+        <div className="font-mono text-xs text-green-600 mt-1">{message}</div>
+      </div>
+
+      {/* Navigation */}
+      <div className="flex gap-2">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={goUp}
+          disabled={currentPath.length <= 1}
+          className={cn(
+            "px-3 py-1.5 rounded-lg font-mono text-xs border cursor-pointer",
+            currentPath.length <= 1
+              ? "border-green-900/20 text-green-800 opacity-50"
+              : "border-green-700/40 text-green-300 hover:border-green-400"
+          )}
+        >
+          <ArrowLeft className="w-3 h-3 inline mr-1" /> Вверх
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={goHome}
+          className="px-3 py-1.5 rounded-lg font-mono text-xs border border-green-700/40 text-green-300 hover:border-green-400 cursor-pointer"
+        >
+          В корень
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={solveVPR}
+          className="px-3 py-1.5 rounded-lg font-mono text-xs border border-amber-500/40 text-amber-300 hover:border-amber-400 cursor-pointer"
+        >
+          ▶ Демо ВПР
+        </motion.button>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* File Tree */}
+        <div className="max-h-64 overflow-y-auto bg-[#020c02] rounded-lg border border-green-900/20 p-2">
+          <div className="font-mono text-[10px] text-green-600 mb-1">Дерево папок:</div>
+          {renderTree(FILE_TREE, [])}
+        </div>
+
+        {/* Current Folder Contents */}
+        <div className="bg-[#020c02] rounded-lg border border-green-900/20 p-2">
+          <div className="font-mono text-[10px] text-green-600 mb-1">Содержимое папки:</div>
+          {children.length > 0 ? (
+            <div className="space-y-1">
+              {children.map((child) => (
+                <motion.button
+                  key={child.name}
+                  whileHover={{ x: 4 }}
+                  onClick={() => navigateTo(child.name)}
+                  className="w-full text-left flex items-center gap-2 py-1 px-2 rounded font-mono text-xs text-green-400 hover:bg-green-500/10 cursor-pointer"
+                >
+                  {child.children ? <FolderOpen className="w-3.5 h-3.5 text-amber-400" /> : <FileText className="w-3.5 h-3.5 text-cyan-400" />}
+                  {child.name}
+                </motion.button>
+              ))}
+            </div>
+          ) : (
+            <div className="font-mono text-xs text-green-800">Папка пуста</div>
+          )}
+        </div>
+      </div>
+    </HUDPanel>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VPR Component 7: FormulaReferenceCard
+// ═══════════════════════════════════════════════════════════════════════
+function FormulaReferenceCard() {
+  const formulas = [
+    { formula: "I = K × i", desc: "Информационный объём = количество × вес символа" },
+    { formula: "i = log₂(N)", desc: "Вес символа = log₂ от размера алфавита" },
+    { formula: "N = 2ⁱ", desc: "Размер алфавита = 2 в степени бит" },
+    { formula: "1 байт = 8 бит", desc: "Базовая единица хранения" },
+    { formula: "1 КБ = 1024 байт", desc: "Килобайт" },
+    { formula: "1 МБ = 1024 КБ", desc: "Мегабайт" },
+    { formula: "1 ГБ = 1024 МБ", desc: "Гигабайт" },
+    { formula: "V = S / t", desc: "Скорость = Размер / Время" },
+    { formula: "S = V × t", desc: "Размер = Скорость × Время" },
+  ];
+
+  const specialCases = [
+    { n: "2", bits: "1" },
+    { n: "4", bits: "2" },
+    { n: "8", bits: "3" },
+    { n: "16", bits: "4" },
+    { n: "32", bits: "5" },
+    { n: "64", bits: "6" },
+    { n: "128", bits: "7" },
+    { n: "256", bits: "8" },
+    { n: "512", bits: "9" },
+  ];
+
+  return (
+    <HUDPanel className="p-5 space-y-4" glow>
+      <h3 className="font-mono text-sm text-amber-400 mb-2 glow-text-sm flex items-center gap-2">
+        <Zap className="w-4 h-4" /> {'>'} formula_reference.ALL()
+      </h3>
+
+      <div className="space-y-2">
+        {formulas.map((f, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, x: -10 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.03 }}
+            className="flex items-center gap-3 bg-[#020c02] rounded-lg border border-green-900/20 p-2.5"
+          >
+            <code className="font-mono text-sm text-[#00ff41] font-bold shrink-0 min-w-[120px]">{f.formula}</code>
+            <span className="font-mono text-[10px] text-green-600">{f.desc}</span>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Special Cases */}
+      <div>
+        <div className="font-mono text-xs text-amber-400 font-bold mb-2">⚡ Таблица степеней двойки (выучи наизусть!):</div>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-1">
+          {specialCases.map((sc) => (
+            <div
+              key={sc.n}
+              className={cn(
+                "px-2 py-1 rounded text-center font-mono text-[10px] border",
+                sc.n === "512" ? "border-amber-500/40 bg-amber-500/10" : "border-green-900/20 bg-black/30"
+              )}
+            >
+              <span className="text-green-300">N={sc.n}</span>
+              <span className="text-green-700"> → </span>
+              <span className={sc.n === "512" ? "text-amber-400 font-bold" : "text-[#00ff41]"}>{sc.bits} бит</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Flash Drive Conversion */}
+      <div className="rounded-lg border border-green-800/30 bg-[#020c02] p-3">
+        <div className="font-mono text-xs text-cyan-400 font-bold mb-2">Перевод единиц:</div>
+        <div className="space-y-0.5 font-mono text-[10px] text-green-400">
+          <p>4 ГБ = 4 × 1024 = 4096 МБ</p>
+          <p>4096 МБ = 4096 × 1024 = 4 194 304 КБ</p>
+          <p>4 194 304 КБ = 4 194 304 × 1024 = 4 294 967 296 байт</p>
+          <p className="text-amber-400 mt-1">⚠ 1 КБ = 1024 байта (не 1000!)</p>
+        </div>
+      </div>
+    </HUDPanel>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VPR Component 8: URLAssemblyProblem (Type 4)
+// ═══════════════════════════════════════════════════════════════════════
+function URLAssemblyProblem() {
+  const [step, setStep] = useState(0);
+
+  const fragments = [
+    { letter: "А", text: "tests" },
+    { letter: "Б", text: "http" },
+    { letter: "В", text: "/" },
+    { letter: "Г", text: ".ru" },
+    { letter: "Д", text: "olympiada" },
+    { letter: "Е", text: "://" },
+    { letter: "Ж", text: ".rar" },
+  ];
+
+  const solution = ["Б", "Е", "Д", "Г", "В", "А", "Ж"];
+  const steps = [
+    { text: "http", explain: "Начинаем с протокола — фрагмент Б" },
+    { text: "http://", explain: "Добавляем :// — фрагмент Е" },
+    { text: "http://olympiada", explain: "Добавляем домен — фрагмент Д" },
+    { text: "http://olympiada.ru", explain: "Добавляем зону .ru — фрагмент Г" },
+    { text: "http://olympiada.ru/", explain: "Добавляем / — фрагмент В" },
+    { text: "http://olympiada.ru/tests", explain: "Добавляем имя файла — фрагмент А" },
+    { text: "http://olympiada.ru/tests.rar", explain: "Добавляем расширение — фрагмент Ж" },
+  ];
+
+  return (
+    <HUDPanel className="p-5 space-y-4">
+      <h3 className="font-mono text-sm text-green-300 glow-text-sm flex items-center gap-2">
+        <Globe className="w-4 h-4" /> {'>'} url_assembly.solve() — Задание №4
+      </h3>
+
+      {/* Problem Statement */}
+      <div className="bg-[#020c02] rounded-lg border border-green-900/20 p-3">
+        <div className="font-mono text-xs text-green-500 mb-2">Условие:</div>
+        <div className="font-mono text-xs text-green-300">
+          Требуется собрать URL из фрагментов: http://olympiada.ru/tests.rar
+        </div>
+      </div>
+
+      {/* Fragments */}
+      <div className="flex flex-wrap gap-1.5">
+        {fragments.map((f) => (
+          <div key={f.letter} className="px-2 py-1 rounded-lg bg-black/40 border border-green-900/30 font-mono text-[10px]">
+            <span className="text-amber-400 font-bold">{f.letter}</span>
+            <span className="text-green-600">) </span>
+            <span className="text-green-400">{f.text}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Step-by-step */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-xs text-green-500">Решение по шагам:</span>
+          <span className="font-mono text-[10px] text-green-700">Шаг {step + 1}/{steps.length}</span>
+        </div>
+
+        <div className="bg-[#020c02] rounded-lg border border-green-900/20 p-3 min-h-[60px]">
+          <div className="font-mono text-sm text-[#00ff41] break-all mb-2">{steps[step].text}</div>
+          <div className="font-mono text-[10px] text-green-600">{steps[step].explain}</div>
+          <div className="font-mono text-[10px] text-amber-400 mt-1">
+            Порядок букв: {solution.slice(0, step + 1).join("")}
+          </div>
+        </div>
+
+        {/* Step Navigation */}
+        <div className="flex gap-2">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setStep(Math.max(0, step - 1))}
+            disabled={step === 0}
+            className={cn(
+              "px-3 py-1.5 rounded-lg font-mono text-xs border cursor-pointer",
+              step === 0 ? "border-green-900/20 text-green-800 opacity-50" : "border-green-700/40 text-green-300"
+            )}
+          >
+            ← Назад
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setStep(Math.min(steps.length - 1, step + 1))}
+            disabled={step === steps.length - 1}
+            className={cn(
+              "px-3 py-1.5 rounded-lg font-mono text-xs border cursor-pointer",
+              step === steps.length - 1 ? "border-green-900/20 text-green-800 opacity-50" : "border-green-700/40 text-green-300"
+            )}
+          >
+            Далее →
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setStep(0)}
+            className="px-3 py-1.5 rounded-lg font-mono text-xs border border-green-700/40 text-green-600 cursor-pointer"
+          >
+            Сброс
+          </motion.button>
+        </div>
+      </div>
+
+      {/* Answer */}
+      <div className="rounded-lg border border-green-500/40 bg-green-500/10 p-3">
+        <div className="font-mono text-xs text-[#00ff41] font-bold">Ответ: БЕАДГВЖ</div>
+        <div className="font-mono text-[10px] text-green-600">http + :// + olympiada + .ru + / + tests + .rar</div>
+      </div>
+    </HUDPanel>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VPR Component 9: LogicProblem (Type 5)
+// ═══════════════════════════════════════════════════════════════════════
+function LogicProblem() {
+  const names = ["Андрей", "Борис", "Сергей"];
+  const surnames = ["Данилов", "Иванов", "Петров"];
+  const [table, setTable] = useState<Record<string, Record<string, string>>>({});
+  const [revealed, setRevealed] = useState(false);
+
+  const toggle = (name: string, surname: string) => {
+    if (revealed) return;
+    setTable((prev) => {
+      const row = prev[name] || {};
+      const newVal = row[surname] === "yes" ? "no" : row[surname] === "no" ? "" : "yes";
+      return { ...prev, [name]: { ...row, [surname]: newVal } };
+    });
+  };
+
+  const reset = () => { setTable({}); setRevealed(false); };
+
+  return (
+    <HUDPanel className="p-5 space-y-4">
+      <h3 className="font-mono text-sm text-green-300 glow-text-sm flex items-center gap-2">
+        <GitBranch className="w-4 h-4" /> {'>'} logic_table.solve() — Задание №5
+      </h3>
+
+      {/* Problem */}
+      <div className="bg-[#020c02] rounded-lg border border-green-900/20 p-3 space-y-1">
+        <div className="font-mono text-xs text-green-500">Условие:</div>
+        <div className="font-mono text-xs text-green-300">У three друзей: Андрей, Борис, Сергей — фамилии Данилов, Иванов, Петров.</div>
+        <div className="font-mono text-xs text-green-300">Известно, что ни у одного из них фамилия не совпадает с первой буквой имени.</div>
+        <div className="font-mono text-xs text-green-300">Борис живёт в том же доме, что и Петров.</div>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full font-mono text-xs">
+          <thead>
+            <tr className="border-b border-green-500/30">
+              <th className="p-2 text-left text-green-500">Имя \\ Фамилия</th>
+              {surnames.map((s) => (
+                <th key={s} className="p-2 text-center text-green-400">{s}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {names.map((name) => (
+              <tr key={name} className="border-b border-green-900/20">
+                <td className="p-2 text-green-300 font-bold">{name}</td>
+                {surnames.map((surname) => {
+                  const val = revealed
+                    ? (name === "Андрей" && surname === "Петров" || name === "Борис" && surname === "Данилов" || name === "Сергей" && surname === "Иванов" ? "yes" : "no")
+                    : table[name]?.[surname] || "";
+                  return (
+                    <td key={surname} className="p-1 text-center">
+                      <motion.button
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => toggle(name, surname)}
+                        className={cn(
+                          "w-8 h-8 rounded border font-mono text-xs cursor-pointer transition-all",
+                          val === "yes" && "bg-green-500/20 border-green-400 text-[#00ff41]",
+                          val === "no" && "bg-red-500/10 border-red-500/40 text-red-400",
+                          !val && "border-green-900/20 text-green-800 hover:border-green-700"
+                        )}
+                      >
+                        {val === "yes" ? "✓" : val === "no" ? "✗" : "·"}
+                      </motion.button>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex gap-2">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => setRevealed(true)}
+          className="px-4 py-2 rounded-lg bg-green-900/20 border border-green-700/40 font-mono text-xs text-green-400 hover:border-green-400 cursor-pointer"
+        >
+          Показать ответ
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={reset}
+          className="px-4 py-2 rounded-lg bg-black/40 border border-green-900/30 font-mono text-xs text-green-600 cursor-pointer"
+        >
+          Сброс
+        </motion.button>
+      </div>
+
+      {/* Solution */}
+      {revealed && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-1">
+          <div className="font-mono text-xs text-[#00ff41] font-bold">Решение:</div>
+          <div className="font-mono text-[10px] text-green-400 space-y-0.5">
+            <p>1. Сергей ≠ Данилов (С ≠ Д — первые букки не совпадают)</p>
+            <p>2. Андрей ≠ Иванов (А ≠ И)</p>
+            <p>3. Борис ≠ Петров (Б ≠ П) и Борис живёт с Петровым (разные люди)</p>
+            <p>4. Борис ≠ Данилов (Б ≠ Д)</p>
+            <p>5. ⇒ Борис = Иванов</p>
+            <p>6. Сергей ≠ Данилов и ≠ Иванов ⇒ Сергей = Петров</p>
+            <p>7. Андрей = Данилов</p>
+          </div>
+          <div className="rounded-lg border border-green-500/40 bg-green-500/10 p-2 mt-2">
+            <div className="font-mono text-xs text-[#00ff41]">Ответ: Андрей Данилов, Борис Иванов, Сергей Петров</div>
+          </div>
+        </motion.div>
+      )}
+    </HUDPanel>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VPR Component 10: CipherDecoder (Type 6)
+// ═══════════════════════════════════════════════════════════════════════
+function CipherDecoder() {
+  const codeTable: Record<string, string> = {
+    "А": "..o..",
+    "Б": ".o..o",
+    "В": ".oo.o",
+    "Г": ".oooo",
+    "Д": "...o.",
+    "Е": ".o.oo",
+  };
+
+  const [input, setInput] = useState("...o..o.oo...o..oooo.o.oo");
+  const [decoded, setDecoded] = useState("");
+
+  const decode = () => {
+    const reverseTable: Record<string, string> = {};
+    Object.entries(codeTable).forEach(([k, v]) => { reverseTable[v] = k; });
+
+    let result = "";
+    let remaining = input.replace(/\s/g, "");
+    const chunkSize = 5;
+
+    for (let i = 0; i < remaining.length; i += chunkSize) {
+      const chunk = remaining.slice(i, i + chunkSize);
+      result += reverseTable[chunk] || "?";
+    }
+    setDecoded(result);
+  };
+
+  return (
+    <HUDPanel className="p-5 space-y-4">
+      <h3 className="font-mono text-sm text-green-300 glow-text-sm flex items-center gap-2">
+        <Key className="w-4 h-4" /> {'>'} cipher_decoder.run() — Задание №6
+      </h3>
+
+      {/* Code Table */}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
+        {Object.entries(codeTable).map(([letter, code]) => (
+          <div key={letter} className="px-2 py-1.5 rounded bg-black/40 border border-green-900/30 text-center">
+            <div className="font-mono text-sm text-[#00ff41] font-bold">{letter}</div>
+            <div className="font-mono text-[9px] text-green-600">{code}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Input */}
+      <div>
+        <label className="font-mono text-xs text-green-500 mb-1 block">Закодированное сообщение (точки и o):</label>
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          className="w-full bg-[#020c02] border border-green-800/40 rounded-lg px-3 py-2 font-mono text-sm text-cyan-300 focus:outline-none focus:border-green-400"
+        />
+      </div>
+
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={decode}
+        className="w-full py-2 rounded-lg bg-green-900/20 border border-green-700/40 font-mono text-xs text-green-400 hover:border-green-400 cursor-pointer"
+      >
+        Декодировать
+      </motion.button>
+
+      {decoded && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-[#020c02] rounded-lg border border-green-500/40 p-3">
+          <div className="font-mono text-xs text-green-500">Результат:</div>
+          <div className="font-mono text-lg text-[#00ff41] font-bold">{decoded}</div>
+        </motion.div>
+      )}
+
+      {/* Example Solution */}
+      <Expandable title="> Разбор реального задания">
+        <div className="space-y-1 font-mono text-[10px] text-green-400">
+          <p>Сообщение: ...o..o.oo...o..oooo.o.oo</p>
+          <p>Делим на группы по 5 символов:</p>
+          <p><span className="text-cyan-300">...o.</span> = <span className="text-[#00ff41]">Д</span> (код Д: ...o.)</p>
+          <p><span className="text-cyan-300">.o.oo</span> = <span className="text-[#00ff41]">Е</span> (код Е: .o.oo)</p>
+          <p><span className="text-cyan-300">...o.</span> = <span className="text-[#00ff41]">Д</span> (код Д: ...o.)</p>
+          <p><span className="text-cyan-300">.oooo</span> = <span className="text-[#00ff41]">Г</span> (код Г: .oooo)</p>
+          <p><span className="text-cyan-300">.o.oo</span> = <span className="text-[#00ff41]">Е</span> (код Е: .o.oo)</p>
+          <p className="text-amber-400 mt-1">Ответ: ДЕДГЕ</p>
+        </div>
+      </Expandable>
+    </HUDPanel>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VPR Component 11: TextEditorProps (Type 12)
+// ═══════════════════════════════════════════════════════════════════════
+function TextEditorPropsCard() {
+  const props = [
+    { name: "Отступ первой строки", desc: "Красная строка (абзацный отступ)", icon: "↦", hotkey: "Ctrl+T" },
+    { name: "Выступ первой строки", desc: "Выступ текста за левый край", icon: "⇥", hotkey: "Ctrl+Shift+T" },
+    { name: "Отступ слева", desc: "Сдвиг всего абзаца вправо", icon: "⇒", hotkey: "Ctrl+M" },
+    { name: "Отступ справа", desc: "Правая граница текста", icon: "⇐", hotkey: "" },
+    { name: "Выравнивание по левому краю", desc: "Текст прижат влево", icon: "☰", hotkey: "Ctrl+L" },
+    { name: "Выравнивание по правому краю", desc: "Текст прижат вправо", icon: "☰ ", hotkey: "Ctrl+R" },
+    { name: "Выравнивание по центру", desc: "Текст по центру страницы", icon: "☰", hotkey: "Ctrl+E" },
+    { name: "Выравнивание по ширине", desc: "Текст растянут на всю ширину", icon: "☰", hotkey: "Ctrl+J" },
+  ];
+
+  return (
+    <HUDPanel className="p-5 space-y-4">
+      <h3 className="font-mono text-sm text-green-300 glow-text-sm flex items-center gap-2">
+        <FileText className="w-4 h-4" /> {'>'} text_editor.props() — Задание №12
+      </h3>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {props.map((prop, i) => (
+          <motion.div
+            key={prop.name}
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.05 }}
+            className="bg-[#020c02] rounded-lg border border-green-900/20 p-3"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-mono text-lg text-[#00ff41]">{prop.icon}</span>
+              <span className="font-mono text-xs text-green-300 font-bold">{prop.name}</span>
+            </div>
+            <div className="font-mono text-[10px] text-green-600">{prop.desc}</div>
+            {prop.hotkey && (
+              <div className="font-mono text-[9px] text-amber-400/60 mt-1">{prop.hotkey}</div>
+            )}
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Visual Mock */}
+      <div className="bg-white rounded-lg p-4 relative">
+        <div className="text-[10px] text-gray-400 font-mono mb-2">Визуализация форматирования:</div>
+        {/* Page mock */}
+        <div className="border border-gray-300 rounded p-3 bg-white min-h-[80px]">
+          {/* Left indent */}
+          <div className="ml-8 text-xs text-black leading-relaxed">
+            <div className="indent-8 text-justify">
+              <span className="bg-green-100 border-l-2 border-green-500 pl-1">Это пример абзаца с отступом первой строки (красная строка).</span> Текст выровнен по ширине — каждая строка растянута от левого до правого края.
+            </div>
+          </div>
+          {/* Annotations */}
+          <div className="absolute top-8 left-2 text-[8px] text-red-500 font-mono">↙ отступ</div>
+          <div className="absolute top-10 left-12 text-[8px] text-blue-500 font-mono">↙ красная строка</div>
+        </div>
+      </div>
+    </HUDPanel>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VPR Component 12: SearchInDocument (Type 13)
+// ═══════════════════════════════════════════════════════════════════════
+function SearchInDocumentCard() {
+  const [searchTerm, setSearchTerm] = useState("червонцев");
+  const [showResult, setShowResult] = useState(false);
+
+  const text = `"Дай мне, батько, хотя бы два червонца на дорогу", — просил youngest son. Старый Тарас неохотно достал из кошеля два червонца и протянул сыну. "Вот тебе два червонца, не трать зря", — сказал он. But the youngest had already spent his last червонец on a horse.`;
+
+  const highlightText = (text: string, term: string) => {
+    if (!term) return text;
+    const regex = new RegExp(`(${term})`, "gi");
+    const parts = text.split(regex);
+    return parts.map((part, i) =>
+      regex.test(part) ? (
+        <span key={i} className="bg-green-400 text-black px-0.5 rounded">{part}</span>
+      ) : (
+        <span key={i}>{part}</span>
+      )
+    );
+  };
+
+  const count = searchTerm ? (text.match(new RegExp(searchTerm, "gi")) || []).length : 0;
+
+  return (
+    <HUDPanel className="p-5 space-y-4">
+      <h3 className="font-mono text-sm text-green-300 glow-text-sm flex items-center gap-2">
+        <Search className="w-4 h-4" /> {'>'} search_in_doc.find() — Задание №13
+      </h3>
+
+      {/* Search Input */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => { setSearchTerm(e.target.value); setShowResult(false); }}
+          placeholder="Введите слово для поиска..."
+          className="flex-1 bg-[#020c02] border border-green-800/40 rounded-lg px-3 py-2 font-mono text-sm text-cyan-300 focus:outline-none focus:border-green-400"
+        />
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setShowResult(true)}
+          className="px-4 py-2 rounded-lg bg-green-900/20 border border-green-700/40 font-mono text-xs text-green-400 hover:border-green-400 cursor-pointer"
+        >
+          Найти (Ctrl+F)
+        </motion.button>
+      </div>
+
+      {/* Document */}
+      <div className="bg-[#020c02] rounded-lg border border-green-900/20 p-3 max-h-48 overflow-y-auto">
+        <div className="font-mono text-[10px] text-green-300 leading-relaxed">
+          {showResult ? highlightText(text, searchTerm) : text}
+        </div>
+      </div>
+
+      {showResult && searchTerm && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-green-500/10 rounded-lg border border-green-500/40 p-3">
+          <div className="font-mono text-xs text-[#00ff41]">
+            Найдено совпадений: <span className="font-bold text-lg">{count}</span>
+          </div>
+          <div className="font-mono text-[10px] text-green-600 mt-1">
+            Совет: используй Ctrl+F для быстрого поиска в документе!
+          </div>
+        </motion.div>
+      )}
+
+      <Expandable title="> Пример задания ВПР">
+        <div className="space-y-1 font-mono text-[10px] text-green-400">
+          <p>В тексте «Тарас Бульба» найди слово «червонцев».</p>
+          <p>Сколько раз оно встречается?</p>
+          <p className="mt-1 text-green-600">Используй Ctrl+F → введи «червонцев» → считай</p>
+          <p className="text-amber-400 mt-1">Ответ: 2 (два червонца за полборды)</p>
+        </div>
+      </Expandable>
+    </HUDPanel>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VPR Component 13: PracticalTasks (Types 14-15)
+// ═══════════════════════════════════════════════════════════════════════
+function PracticalTasksCard() {
+  return (
+    <HUDPanel className="p-5 space-y-4">
+      <h3 className="font-mono text-sm text-green-300 glow-text-sm flex items-center gap-2">
+        <FileText className="w-4 h-4" /> {'>'} practical_tasks.reference()
+      </h3>
+
+      {/* Type 14: Formatting */}
+      <Expandable title="> Задание №14: Форматирование документа" defaultOpen>
+        <div className="space-y-2">
+          <div className="font-mono text-xs text-[#00ff41] font-bold">Что нужно знать:</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {[
+              { label: "Шрифт", value: "14 пт (иногда 12 или 16)", tip: "Проверь в задании!" },
+              { label: "Отступ первой строки", value: "1 см (или 1.25 см)", tip: "Красная строка" },
+              { label: "Межстрочный интервал", value: "Одинарный (1.0) или полуторный (1.5)", tip: "Читай задание внимательно" },
+              { label: "Выравнивание", value: "По ширине (обычно)", tip: "Ctrl+J в редакторе" },
+              { label: "Поля", value: "Левое 3 см, остальные 2 см", tip: "Стандарт для рефератов" },
+              { label: "Название шрифта", value: "Times New Roman", tip: "Стандартный шрифт" },
+            ].map((item) => (
+              <div key={item.label} className="bg-black/30 rounded-lg border border-green-900/20 p-2">
+                <div className="font-mono text-[10px] text-green-300 font-bold">{item.label}</div>
+                <div className="font-mono text-[10px] text-cyan-300">{item.value}</div>
+                <div className="font-mono text-[9px] text-amber-400/60">{item.tip}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Expandable>
+
+      {/* Type 15: Drawing */}
+      <Expandable title="> Задание №15: Рисунок в редакторе">
+        <div className="space-y-2">
+          <div className="font-mono text-xs text-[#00ff41] font-bold">Что обычно просят нарисовать:</div>
+          <div className="font-mono text-[10px] text-green-400 space-y-1">
+            <p>• <span className="text-cyan-300">4 прямоугольника</span> (дом, окна, дверь и т.д.)</p>
+            <p>• <span className="text-cyan-300">3 стрелки</span> (направление, связи)</p>
+            <p>• <span className="text-cyan-300">4 текстовых блока</span> (подписи к элементам)</p>
+          </div>
+          <div className="font-mono text-xs text-green-500 mt-2">Полезные инструменты:</div>
+          <div className="grid grid-cols-2 gap-1 text-[10px] font-mono">
+            <div className="bg-black/30 rounded p-1.5 border border-green-900/20">
+              <span className="text-green-300">Прямоугольник</span>
+              <span className="text-green-700 ml-1">— Insert → Shape</span>
+            </div>
+            <div className="bg-black/30 rounded p-1.5 border border-green-900/20">
+              <span className="text-green-300">Стрелка</span>
+              <span className="text-green-700 ml-1">— Insert → Line</span>
+            </div>
+            <div className="bg-black/30 rounded p-1.5 border border-green-900/20">
+              <span className="text-green-300">Текст</span>
+              <span className="text-green-700 ml-1">— Insert → Text Box</span>
+            </div>
+            <div className="bg-black/30 rounded p-1.5 border border-green-900/20">
+              <span className="text-green-300">Заливка</span>
+              <span className="text-green-700 ml-1">— Format → Fill</span>
+            </div>
+          </div>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2 mt-2">
+            <div className="font-mono text-[10px] text-amber-400">⚠ Проверь, что все элементы на месте перед сдачей!</div>
+            <div className="font-mono text-[10px] text-green-600">Считай: прямоугольники, стрелки, текстовые блоки</div>
+          </div>
+        </div>
+      </Expandable>
+    </HUDPanel>
+  );
+}
+
 // ─── Main Component ────────────────────────────────────────────────────
 export default function Informatics7Cheatsheet() {
   const [activeBits, setActiveBits] = useState([0, 0, 0, 0, 0, 0, 0, 0]);
@@ -1173,12 +2624,6 @@ export default function Informatics7Cheatsheet() {
                   <p className="mb-1">Unicode: 149 000+ символов, включая кириллицу</p>
                   <p className="mb-1">UTF-8: переменная длина 1–4 байта</p>
                   <p>Кириллица «А» в Unicode: U+0410 = 1040</p>
-                </Expandable>
-                <Expandable title="> Расширения файлов — что важно знать для ВПР">
-                  <p className="mb-1"><span className="text-cyan-400">Расширение файла</span> — часть имени после точки: <span className="text-green-300">доклад.docx</span>.</p>
-                  <p className="mb-1">Оно помогает ОС выбрать программу: <span className="text-green-300">.jpg</span> открывается как изображение, <span className="text-green-300">.mp3</span> — как аудио.</p>
-                  <p className="mb-1">Типичные форматы: <span className="text-green-300">.txt, .docx, .pdf, .png, .jpg, .mp4, .zip, .exe</span>.</p>
-                  <p>Будь внимателен: похожие имена (<span className="text-green-300">photo.jpg.exe</span>) могут маскировать вредоносный файл.</p>
                 </Expandable>
               </div>
             </div>
@@ -1533,6 +2978,163 @@ INSERT INTO Учащиеся (имя, класс, оценка)
                   <p>Типы связей: один-к-одному, один-ко-многим, многие-ко-многим.</p>
                 </Expandable>
               </div>
+            </div>
+          </motion.section>
+
+
+          {/* ══════ VPR РАЗБОР — РЕАЛЬНЫЕ ЗАДАНИЯ ══════ */}
+          <motion.section
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, margin: "-50px" }}
+            className="mb-20"
+          >
+            <SectionHeader icon={ShieldCheck} title="VPR РАЗБОР — РЕАЛЬНЫЕ ЗАДАНИЯ" subtitle="vpr_exam.scan()" />
+
+            <div className="mb-8">
+              <HUDPanel className="p-5" glow>
+                <h3 className="font-mono text-sm text-amber-400 mb-3 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" /> {'>'} vpr_overview briefing
+                </h3>
+                <div className="font-mono text-xs text-green-300 leading-relaxed space-y-2">
+                  <p>Всероссийская проверочная работа по информатике (7 класс) содержит <span className="text-[#00ff41] font-bold">15 заданий</span>. Здесь — полный разбор каждого типа с интерактивными примерами.</p>
+                  <p className="text-green-600">Нажимай на компоненты, вводи данные, решай прямо на странице!</p>
+                </div>
+                <div className="mt-3 grid grid-cols-5 sm:grid-cols-10 gap-1">
+                  {Array.from({ length: 15 }, (_, i) => (
+                    <div key={i} className="text-center px-1 py-1 rounded bg-green-900/20 border border-green-800/30">
+                      <div className="font-mono text-[10px] text-[#00ff41]">#{i + 1}</div>
+                    </div>
+                  ))}
+                </div>
+              </HUDPanel>
+            </div>
+
+            {/* ═══ VPR Type 1: Device Classification ═══ */}
+            <div className="mb-10">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-green-900/30 border border-green-700/30 text-green-400">№1</span>
+                <span className="font-mono text-sm text-green-300">Классификация устройств</span>
+              </div>
+              <DeviceClassifier />
+            </div>
+
+            {/* ═══ VPR Type 2: Directory Navigation ═══ */}
+            <div className="mb-10">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-green-900/30 border border-green-700/30 text-green-400">№2</span>
+                <span className="font-mono text-sm text-green-300">Файловая система — навигация по папкам</span>
+              </div>
+              <DirectoryNavigator />
+            </div>
+
+            {/* ═══ VPR Type 3: File Extensions ═══ */}
+            <div className="mb-10">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-green-900/30 border border-green-700/30 text-green-400">№3</span>
+                <span className="font-mono text-sm text-green-300">Расширения файлов</span>
+              </div>
+              <FileExtensionMatcher />
+            </div>
+
+            {/* ═══ VPR Type 4: URL Assembly ═══ */}
+            <div className="mb-10">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-green-900/30 border border-green-700/30 text-green-400">№4</span>
+                <span className="font-mono text-sm text-green-300">Сборка URL-адреса</span>
+              </div>
+              <URLAssemblyProblem />
+            </div>
+
+            {/* ═══ VPR Type 5: Logic Problem ═══ */}
+            <div className="mb-10">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-green-900/30 border border-green-700/30 text-green-400">№5</span>
+                <span className="font-mono text-sm text-green-300">Логическая задача — таблица</span>
+              </div>
+              <LogicProblem />
+            </div>
+
+            {/* ═══ VPR Type 6: Cipher Decoder ═══ */}
+            <div className="mb-10">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-green-900/30 border border-green-700/30 text-green-400">№6</span>
+                <span className="font-mono text-sm text-green-300">Декодирование сообщения</span>
+              </div>
+              <CipherDecoder />
+            </div>
+
+            {/* ═══ VPR Types 7, 8, 9, 10: Info Volume ═══ */}
+            <div className="mb-10">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-green-900/30 border border-green-700/30 text-green-400">№7-10</span>
+                <span className="font-mono text-sm text-green-300">Информационный объём данных</span>
+              </div>
+              <div className="grid md:grid-cols-2 gap-6">
+                <InfoVolumeCalculator />
+                <div className="space-y-4">
+                  <TransferSpeedCalculator />
+                  <FormulaReferenceCard />
+                </div>
+              </div>
+            </div>
+
+            {/* ═══ VPR Type 11: RGB Mixer ═══ */}
+            <div className="mb-10">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-green-900/30 border border-green-700/30 text-green-400">№11</span>
+                <span className="font-mono text-sm text-green-300">Цвет в компьютерной графике — RGB</span>
+              </div>
+              <RGBMixer />
+            </div>
+
+            {/* ═══ VPR Type 12: Text Editor Properties ═══ */}
+            <div className="mb-10">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-green-900/30 border border-green-700/30 text-green-400">№12</span>
+                <span className="font-mono text-sm text-green-300">Свойства абзаца текстового редактора</span>
+              </div>
+              <TextEditorPropsCard />
+            </div>
+
+            {/* ═══ VPR Type 13: Search in Document ═══ */}
+            <div className="mb-10">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-green-900/30 border border-green-700/30 text-green-400">№13</span>
+                <span className="font-mono text-sm text-green-300">Поиск в документе</span>
+              </div>
+              <SearchInDocumentCard />
+            </div>
+
+            {/* ═══ VPR Types 14-15: Practical Tasks ═══ */}
+            <div className="mb-10">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-green-900/30 border border-green-700/30 text-green-400">№14-15</span>
+                <span className="font-mono text-sm text-green-300">Практические задания — форматирование и рисунок</span>
+              </div>
+              <PracticalTasksCard />
+            </div>
+
+            {/* ═══ VPR Quick Tips ═══ */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <InfoCard icon={Zap} title="Совет #1">
+                <p className="text-xs text-green-500/70 font-mono">Запомни: <span className="text-[#00ff41]">512 = 2⁹</span>, а не 2⁸! Это самая частая ошибка в заданиях на информационный объём.</p>
+              </InfoCard>
+              <InfoCard icon={Zap} title="Совет #2">
+                <p className="text-xs text-green-500/70 font-mono">В задании на скорость передачи: всегда <span className="text-[#00ff41]">сначала найди скорость V = S/t</span>, потом вычисляй новый размер.</p>
+              </InfoCard>
+              <InfoCard icon={Zap} title="Совет #3">
+                <p className="text-xs text-green-500/70 font-mono">RGB: <span className="text-[#00ff41]">0,255,255 = Голубой</span> (не синий!). Запомни 8 базовых цветов по компонентам.</p>
+              </InfoCard>
+              <InfoCard icon={Zap} title="Совет #4">
+                <p className="text-xs text-green-500/70 font-mono">В логических задачах: <span className="text-[#00ff41]">рисуй таблицу</span> и отмечай невозможные комбинации ✗. Ответ выявится сам.</p>
+              </InfoCard>
+              <InfoCard icon={Zap} title="Совет #5">
+                <p className="text-xs text-green-500/70 font-mono">Ctrl+F — твой лучший друг для задания №13. Считай <span className="text-[#00ff41]">каждое</span> совпадение!</p>
+              </InfoCard>
+              <InfoCard icon={Zap} title="Совет #6">
+                <p className="text-xs text-green-500/70 font-mono">Для задания №14: <span className="text-[#00ff41]">внимательно читай</span> все параметры форматирования в условии (шрифт, отступы, интервалы).</p>
+              </InfoCard>
             </div>
           </motion.section>
 
