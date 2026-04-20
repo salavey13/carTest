@@ -183,6 +183,11 @@ export default function VprTestsListPage() {
                                                 colorClass={{ border: 'border-teal-500/30', bg: 'bg-teal-500/5', text: 'text-teal-500', hoverBorder: 'hover:border-teal-500' }}
                                             />
                                             <CheatItem 
+                                                href="/vpr/english/7/cheatsheet" icon={MapIcon} title="English"
+                                                desc="Do You Speak It?"
+                                                colorClass={{ border: 'border-cyan-500/30', bg: 'bg-cyan-500/5', text: 'text-cyan-500', hoverBorder: 'hover:border-cyan-500' }}
+                                            />
+                                            <CheatItem 
                                                 href="/vpr/informatics/7/cheatsheet" icon={Terminal} title="Net Architect 7.0"
                                                 desc="Маршрутизация пакетов. Логические круги Эйлера."
                                                 colorClass={{ border: 'border-brand-green/30', bg: 'bg-brand-green/5', text: 'text-brand-green', hoverBorder: 'hover:border-brand-green' }}
