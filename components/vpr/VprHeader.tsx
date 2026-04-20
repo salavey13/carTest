@@ -1,6 +1,9 @@
+"use client";
+
 import { Info } from "lucide-react";
-// Ensure TimerDisplay path is correct relative to your project structure
-import { TimerDisplay } from "@/components/TimerDisplay"; // Assuming this is the correct path for TimerDisplay
+import { useRouter } from "next/navigation";
+import { TimerDisplay } from "@/components/TimerDisplay";
+import { getVprCheatsheetHref } from "@/lib/vprCheatsheet";
 
 interface VprHeaderProps {
   subjectName: string | undefined;
@@ -12,6 +15,7 @@ interface VprHeaderProps {
   timeLimit: number;
   onTimeUp: () => void;
   isTimerRunning: boolean;
+  subjectSlug?: string;
 }
 
 export function VprHeader({
@@ -24,7 +28,9 @@ export function VprHeader({
   timeLimit,
   onTimeUp,
   isTimerRunning,
+  subjectSlug = "general",
 }: VprHeaderProps) {
+  const router = useRouter();
   return (
     <div className="flex flex-col sm:flex-row justify-between items-center mb-5 gap-3">
       <div className="text-center sm:text-left flex items-baseline gap-2"> {/* Added flex and gap for alignment */}
@@ -48,7 +54,14 @@ export function VprHeader({
             <Info className="h-5 w-5" />
           </button>
         )}
-        <TimerDisplay // Using TimerDisplay as per your original code
+        <button
+          onClick={() => router.push(getVprCheatsheetHref(subjectSlug))}
+          className="text-brand-cyan hover:text-brand-cyan/80"
+          title="Открыть шпаргалку"
+        >
+          📋
+        </button>
+        <TimerDisplay
           key={timerKey}
           initialTime={timeLimit}
           onTimeUp={onTimeUp}
