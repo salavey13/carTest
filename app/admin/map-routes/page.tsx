@@ -80,7 +80,7 @@ function geojsonToCoords(value: unknown): Array<[number, number]> {
   return result;
 }
 
-function trimSuffixBySegment(
+export function trimSuffixBySegment(
   source: Array<[number, number]>,
   suffix: Array<[number, number]>,
   tolerance = 0.0001,
@@ -97,7 +97,7 @@ function trimSuffixBySegment(
   return source.slice(0, start);
 }
 
-function mergeSegments(...segments: Array<Array<[number, number]>>): Array<[number, number]> {
+export function mergeSegments(...segments: Array<Array<[number, number]>>): Array<[number, number]> {
   const merged: Array<[number, number]> = [];
   for (const segment of segments) {
     for (const point of segment) uniquePush(merged, point);
