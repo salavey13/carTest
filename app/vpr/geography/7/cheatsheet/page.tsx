@@ -26,9 +26,9 @@ import {
   ChevronUp,
 } from "lucide-react";
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   SVG COMPONENTS â€” Rich, animated geographic visualizations
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+/* ═══════════════════════════════════════════════════════════
+   SVG COMPONENTS — Rich, animated geographic visualizations
+   ═══════════════════════════════════════════════════════════ */
 
 const GlobeSVG = () => (
   <svg viewBox="0 0 300 300" className="w-full h-full" style={{ fontFamily: "sans-serif" }}>
@@ -90,11 +90,11 @@ const GlobeSVG = () => (
     <ellipse cx="150" cy="150" rx="120" ry="4" fill="none" stroke="#fbbf24" strokeWidth="1.5" opacity="0.6" filter="url(#glow)" />
 
     {/* Labels */}
-    <text x="155" y="148" fill="#fbbf24" fontSize="8" fontWeight="bold" opacity="0.8">0Â°</text>
-    <text x="248" y="95" fill="#6ee7b7" fontSize="7" opacity="0.6">60Â°N</text>
-    <text x="248" y="210" fill="#6ee7b7" fontSize="7" opacity="0.6">60Â°S</text>
-    <text x="150" y="22" fill="#94a3b8" fontSize="9" textAnchor="middle" fontWeight="bold">Ð¡</text>
-    <text x="150" y="285" fill="#94a3b8" fontSize="9" textAnchor="middle" fontWeight="bold">Ð®</text>
+    <text x="155" y="148" fill="#fbbf24" fontSize="8" fontWeight="bold" opacity="0.8">0°</text>
+    <text x="248" y="95" fill="#6ee7b7" fontSize="7" opacity="0.6">60°N</text>
+    <text x="248" y="210" fill="#6ee7b7" fontSize="7" opacity="0.6">60°S</text>
+    <text x="150" y="22" fill="#94a3b8" fontSize="9" textAnchor="middle" fontWeight="bold">С</text>
+    <text x="150" y="285" fill="#94a3b8" fontSize="9" textAnchor="middle" fontWeight="bold">Ю</text>
 
     {/* Animated pulse on equator */}
     <circle cx="150" cy="150" r="4" fill="#fbbf24" opacity="0.8">
@@ -106,10 +106,10 @@ const GlobeSVG = () => (
 
 const EarthLayersSVG = ({ activeLayer, setActiveLayer }: { activeLayer: number | null; setActiveLayer: (n: number | null) => void }) => {
   const layers = [
-    { r: 120, color: "#92400e", label: "Ð—ÐµÐ¼Ð½Ð°Ñ ÐºÐ¾Ñ€Ð°", depth: "0-70 ÐºÐ¼", temp: "Ð´Ð¾ 800Â°C", idx: 0 },
-    { r: 100, color: "#b45309", label: "ÐœÐ°Ð½Ñ‚Ð¸Ñ", depth: "70-2900 ÐºÐ¼", temp: "Ð´Ð¾ 3700Â°C", idx: 1 },
-    { r: 70, color: "#dc2626", label: "Ð’Ð½ÐµÑˆÐ½ÐµÐµ ÑÐ´Ñ€Ð¾", depth: "2900-5100 ÐºÐ¼", temp: "Ð´Ð¾ 4500Â°C", idx: 2 },
-    { r: 40, color: "#fbbf24", label: "Ð’Ð½ÑƒÑ‚Ñ€ÐµÐ½Ð½ÐµÐµ ÑÐ´Ñ€Ð¾", depth: "5100-6371 ÐºÐ¼", temp: "Ð´Ð¾ 6000Â°C", idx: 3 },
+    { r: 120, color: "#92400e", label: "Земная кора", depth: "0-70 км", temp: "до 800°C", idx: 0 },
+    { r: 100, color: "#b45309", label: "Мантия", depth: "70-2900 км", temp: "до 3700°C", idx: 1 },
+    { r: 70, color: "#dc2626", label: "Внешнее ядро", depth: "2900-5100 км", temp: "до 4500°C", idx: 2 },
+    { r: 40, color: "#fbbf24", label: "Внутреннее ядро", depth: "5100-6371 км", temp: "до 6000°C", idx: 3 },
   ];
 
   return (
@@ -145,7 +145,7 @@ const EarthLayersSVG = ({ activeLayer, setActiveLayer }: { activeLayer: number |
       )}
 
       {activeLayer === null && (
-        <text x="160" y="300" fill="#94a3b8" fontSize="10" textAnchor="middle" opacity="0.6">ÐÐ°Ð²ÐµÐ´Ð¸ Ð½Ð° ÑÐ»Ð¾Ð¹ â€” ÑƒÐ²Ð¸Ð´Ð¸ÑˆÑŒ Ð´ÐµÑ‚Ð°Ð»Ð¸</text>
+        <text x="160" y="300" fill="#94a3b8" fontSize="10" textAnchor="middle" opacity="0.6">Наведи на слой — увидишь детали</text>
       )}
     </svg>
   );
@@ -183,11 +183,11 @@ const ClimateZonesSVG = () => (
 
     {/* Zone blocks - mirror layout for north/south */}
     {[
-      { x: 20, w: 90, label: "ÐÑ€ÐºÑ‚Ð¸Ñ‡ÐµÑÐºÐ¸Ð¹", grad: "url(#arctic)", temp: "Ð´Ð¾ -40Â°C", icon: "â„ï¸" },
-      { x: 115, w: 120, label: "Ð¡ÑƒÐ±Ð°Ñ€ÐºÑ‚Ð¸Ñ‡ÐµÑÐºÐ¸Ð¹", grad: "url(#subarctic)", temp: "Ð´Ð¾ -20Â°C", icon: "ðŸ§Š" },
-      { x: 240, w: 140, label: "Ð£Ð¼ÐµÑ€ÐµÐ½Ð½Ñ‹Ð¹", grad: "url(#temperate)", temp: "0-25Â°C", icon: "ðŸŒ¿" },
-      { x: 385, w: 120, label: "Ð¡ÑƒÐ±Ñ‚Ñ€Ð¾Ð¿Ð¸Ñ‡ÐµÑÐºÐ¸Ð¹", grad: "url(#subtropical)", temp: "15-35Â°C", icon: "â˜€ï¸" },
-      { x: 510, w: 170, label: "Ð¢Ñ€Ð¾Ð¿Ð¸Ñ‡ÐµÑÐºÐ¸Ð¹", grad: "url(#tropical)", temp: "25-35Â°C", icon: "ðŸŒ´" },
+      { x: 20, w: 90, label: "Арктический", grad: "url(#arctic)", temp: "до -40°C", icon: "❄️" },
+      { x: 115, w: 120, label: "Субарктический", grad: "url(#subarctic)", temp: "до -20°C", icon: "🧊" },
+      { x: 240, w: 140, label: "Умеренный", grad: "url(#temperate)", temp: "0-25°C", icon: "🌿" },
+      { x: 385, w: 120, label: "Субтропический", grad: "url(#subtropical)", temp: "15-35°C", icon: "☀️" },
+      { x: 510, w: 170, label: "Тропический", grad: "url(#tropical)", temp: "25-35°C", icon: "🌴" },
     ].map((zone, i) => (
       <g key={i}>
         {/* North */}
@@ -205,10 +205,10 @@ const ClimateZonesSVG = () => (
 
     {/* Equator line */}
     <line x1="20" y1="170" x2="680" y2="170" stroke="#fbbf24" strokeWidth="2" strokeDasharray="6 3" />
-    <text x="350" y="185" fill="#fbbf24" fontSize="10" textAnchor="middle" fontWeight="bold">Ð­ÐšÐ’ÐÐ¢ÐžÐ  (0Â°)</text>
+    <text x="350" y="185" fill="#fbbf24" fontSize="10" textAnchor="middle" fontWeight="bold">ЭКВАТОР (0°)</text>
 
     {/* Labels */}
-    <text x="350" y="12" fill="#94a3b8" fontSize="8" textAnchor="middle">Ð¡Ð•Ð’Ð•Ð ÐÐžÐ• ÐŸÐžÐ›Ð£Ð¨ÐÐ Ð˜Ð•</text>
+    <text x="350" y="12" fill="#94a3b8" fontSize="8" textAnchor="middle">СЕВЕРНОЕ ПОЛУШАРИЕ</text>
   </svg>
 );
 
@@ -278,14 +278,14 @@ const WaterCycleSVG = () => (
     <path d="M 160 220 Q 220 230 280 215" fill="none" stroke="#3b82f6" strokeWidth="2" markerEnd="url(#arrowBlue)" />
 
     {/* Labels */}
-    <text x="395" y="100" fill="#22d3ee" fontSize="9" fontWeight="bold" textAnchor="middle">Ð˜Ð¡ÐŸÐÐ Ð•ÐÐ˜Ð•</text>
-    <text x="195" y="120" fill="#60a5fa" fontSize="9" fontWeight="bold" textAnchor="middle">ÐžÐ¡ÐÐ”ÐšÐ˜</text>
-    <text x="220" y="245" fill="#3b82f6" fontSize="9" fontWeight="bold" textAnchor="middle">Ð¡Ð¢ÐžÐš</text>
-    <text x="530" y="40" fill="#fbbf24" fontSize="9" fontWeight="bold">Ð¡ÐžÐ›ÐÐ¦Ð•</text>
+    <text x="395" y="100" fill="#22d3ee" fontSize="9" fontWeight="bold" textAnchor="middle">ИСПАРЕНИЕ</text>
+    <text x="195" y="120" fill="#60a5fa" fontSize="9" fontWeight="bold" textAnchor="middle">ОСАДКИ</text>
+    <text x="220" y="245" fill="#3b82f6" fontSize="9" fontWeight="bold" textAnchor="middle">СТОК</text>
+    <text x="530" y="40" fill="#fbbf24" fontSize="9" fontWeight="bold">СОЛНЦЕ</text>
 
     {/* Infiltration */}
     <path d="M 130 220 L 130 260" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="3 2" markerEnd="url(#arrowGreen2)" />
-    <text x="115" y="275" fill="#22c55e" fontSize="7">Ð˜Ð½Ñ„Ð¸Ð»ÑŒÑ‚Ñ€Ð°Ñ†Ð¸Ñ</text>
+    <text x="115" y="275" fill="#22c55e" fontSize="7">Инфильтрация</text>
   </svg>
 );
 
@@ -305,19 +305,19 @@ const CoordinateSVG = () => (
 
     {/* Equator */}
     <line x1="10" y1="120" x2="390" y2="120" stroke="#fbbf24" strokeWidth="1.5" opacity="0.6" />
-    <text x="392" y="124" fill="#fbbf24" fontSize="8">0Â°</text>
+    <text x="392" y="124" fill="#fbbf24" fontSize="8">0°</text>
 
     {/* Prime Meridian */}
     <line x1="200" y1="10" x2="200" y2="230" stroke="#f472b6" strokeWidth="1.5" opacity="0.6" />
-    <text x="195" y="8" fill="#f472b6" fontSize="8">0Â°</text>
+    <text x="195" y="8" fill="#f472b6" fontSize="8">0°</text>
 
     {/* Latitude label */}
-    <text x="20" y="20" fill="#6ee7b7" fontSize="9" fontWeight="bold">Ð¨Ð˜Ð ÐžÐ¢Ð</text>
-    <text x="20" y="32" fill="#94a3b8" fontSize="7">(ÑÐµÐ²ÐµÑ€-ÑŽÐ³)</text>
+    <text x="20" y="20" fill="#6ee7b7" fontSize="9" fontWeight="bold">ШИРОТА</text>
+    <text x="20" y="32" fill="#94a3b8" fontSize="7">(север-юг)</text>
 
     {/* Longitude label */}
-    <text x="320" y="225" fill="#f472b6" fontSize="9" fontWeight="bold">Ð”ÐžÐ›Ð“ÐžÐ¢Ð</text>
-    <text x="320" y="237" fill="#94a3b8" fontSize="7">(Ð·Ð°Ð¿Ð°Ð´-Ð²Ð¾ÑÑ‚Ð¾Ðº)</text>
+    <text x="320" y="225" fill="#f472b6" fontSize="9" fontWeight="bold">ДОЛГОТА</text>
+    <text x="320" y="237" fill="#94a3b8" fontSize="7">(запад-восток)</text>
 
     {/* Moscow point */}
     <circle cx="240" cy="75" r="5" fill="#ef4444" stroke="#fff" strokeWidth="1">
@@ -327,56 +327,56 @@ const CoordinateSVG = () => (
     <line x1="240" y1="75" x2="200" y2="75" stroke="#ef4444" strokeWidth="1" strokeDasharray="3 2" opacity="0.5" />
 
     <rect x="248" y="60" width="120" height="30" rx="4" fill="rgba(239,68,68,0.15)" stroke="#ef4444" strokeWidth="1" />
-    <text x="308" y="73" fill="#fff" fontSize="8" fontWeight="bold" textAnchor="middle">ÐœÐ¾ÑÐºÐ²Ð°</text>
-    <text x="308" y="84" fill="#fca5a5" fontSize="7" textAnchor="middle">56Â°N  37Â°E</text>
+    <text x="308" y="73" fill="#fff" fontSize="8" fontWeight="bold" textAnchor="middle">Москва</text>
+    <text x="308" y="84" fill="#fca5a5" fontSize="7" textAnchor="middle">56°N  37°E</text>
 
     {/* Direction labels */}
-    <text x="200" y="18" fill="#94a3b8" fontSize="8" textAnchor="middle">Ð¡Ð•Ð’Ð•Ð  (+)</text>
-    <text x="200" y="238" fill="#94a3b8" fontSize="8" textAnchor="middle">Ð®Ð“ (-)</text>
-    <text x="15" y="124" fill="#94a3b8" fontSize="8">Ð—ÐÐŸÐÐ”</text>
-    <text x="355" y="124" fill="#94a3b8" fontSize="8">Ð’ÐžÐ¡Ð¢ÐžÐš</text>
+    <text x="200" y="18" fill="#94a3b8" fontSize="8" textAnchor="middle">СЕВЕР (+)</text>
+    <text x="200" y="238" fill="#94a3b8" fontSize="8" textAnchor="middle">ЮГ (-)</text>
+    <text x="15" y="124" fill="#94a3b8" fontSize="8">ЗАПАД</text>
+    <text x="355" y="124" fill="#94a3b8" fontSize="8">ВОСТОК</text>
   </svg>
 );
 
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════════════════
    DATA
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ═══════════════════════════════════════════════════════════ */
 
 const continents = [
-  { name: "Ð•Ð²Ñ€Ð°Ð·Ð¸Ñ", area: 54.6, population: "5.3 Ð¼Ð»Ñ€Ð´", highest: "Ð­Ð²ÐµÑ€ÐµÑÑ‚ 8848Ð¼", color: "#22c55e" },
-  { name: "ÐÑ„Ñ€Ð¸ÐºÐ°", area: 30.3, population: "1.4 Ð¼Ð»Ñ€Ð´", highest: "ÐšÐ¸Ð»Ð¸Ð¼Ð°Ð½Ð´Ð¶Ð°Ñ€Ð¾ 5895Ð¼", color: "#f59e0b" },
-  { name: "Ð¡ÐµÐ². ÐÐ¼ÐµÑ€Ð¸ÐºÐ°", area: 24.4, population: "580 Ð¼Ð»Ð½", highest: "ÐœÐ°ÐºÐ¸Ð½Ð»Ð¸ 6190Ð¼", color: "#3b82f6" },
-  { name: "Ð®Ð¶. ÐÐ¼ÐµÑ€Ð¸ÐºÐ°", area: 17.8, population: "430 Ð¼Ð»Ð½", highest: "ÐÐºÐ¾Ð½ÐºÐ°Ð³ÑƒÐ° 6962Ð¼", color: "#ef4444" },
-  { name: "ÐÐ½Ñ‚Ð°Ñ€ÐºÑ‚Ð¸Ð´Ð°", area: 14.1, population: "~1000 (Ð½.-Ð¿.)", highest: "Ð’Ð¸Ð½ÑÐ¾Ð½ 4892Ð¼", color: "#a5b4fc" },
-  { name: "ÐÐ²ÑÑ‚Ñ€Ð°Ð»Ð¸Ñ", area: 7.7, population: "43 Ð¼Ð»Ð½", highest: "ÐšÐ¾ÑÑ†ÑŽÑˆÐºÐ¾ 2228Ð¼", color: "#f472b6" },
+  { name: "Евразия", area: 54.6, population: "5.3 млрд", highest: "Эверест 8848м", color: "#22c55e" },
+  { name: "Африка", area: 30.3, population: "1.4 млрд", highest: "Килиманджаро 5895м", color: "#f59e0b" },
+  { name: "Сев. Америка", area: 24.4, population: "580 млн", highest: "Макинли 6190м", color: "#3b82f6" },
+  { name: "Юж. Америка", area: 17.8, population: "430 млн", highest: "Аконкагуа 6962м", color: "#ef4444" },
+  { name: "Антарктида", area: 14.1, population: "~1000 (н.-п.)", highest: "Винсон 4892м", color: "#a5b4fc" },
+  { name: "Австралия", area: 7.7, population: "43 млн", highest: "Косцюшко 2228м", color: "#f472b6" },
 ];
 
 const mapTypes = [
-  { name: "Ð¤Ð¸Ð·Ð¸Ñ‡ÐµÑÐºÐ°Ñ", desc: "Ð ÐµÐ»ÑŒÐµÑ„, Ñ€ÐµÐºÐ¸, Ð³Ð¾Ñ€Ñ‹, Ð¼Ð¾Ñ€Ñ", icon: Mountain, color: "border-emerald-500", textColor: "text-emerald-400" },
-  { name: "ÐŸÐ¾Ð»Ð¸Ñ‚Ð¸Ñ‡ÐµÑÐºÐ°Ñ", desc: "Ð¡Ñ‚Ñ€Ð°Ð½Ñ‹, Ð³Ñ€Ð°Ð½Ð¸Ñ†Ñ‹, ÑÑ‚Ð¾Ð»Ð¸Ñ†Ñ‹", icon: Globe2, color: "border-amber-500", textColor: "text-amber-400" },
-  { name: "Ð¢ÐµÐ¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ°Ñ", desc: "ÐšÐ»Ð¸Ð¼Ð°Ñ‚, Ð½Ð°ÑÐµÐ»ÐµÐ½Ð¸Ðµ, Ñ€ÐµÑÑƒÑ€ÑÑ‹", icon: Map, color: "border-sky-500", textColor: "text-sky-400" },
+  { name: "Физическая", desc: "Рельеф, реки, горы, моря", icon: Mountain, color: "border-emerald-500", textColor: "text-emerald-400" },
+  { name: "Политическая", desc: "Страны, границы, столицы", icon: Globe2, color: "border-amber-500", textColor: "text-amber-400" },
+  { name: "Тематическая", desc: "Климат, население, ресурсы", icon: Map, color: "border-sky-500", textColor: "text-sky-400" },
 ];
 
 const atmosphereLayers = [
-  { name: "Ð¢Ñ€Ð¾Ð¿Ð¾ÑÑ„ÐµÑ€Ð°", height: "0-12 ÐºÐ¼", fact: "Ð—Ð´ÐµÑÑŒ Ð¼Ñ‹ Ð¶Ð¸Ð²Ñ‘Ð¼! Ð’ÑÑ Ð¿Ð¾Ð³Ð¾Ð´Ð° Ñ‚ÑƒÑ‚.", color: "#22c55e", pct: 100 },
-  { name: "Ð¡Ñ‚Ñ€Ð°Ñ‚Ð¾ÑÑ„ÐµÑ€Ð°", height: "12-50 ÐºÐ¼", fact: "ÐžÐ·Ð¾Ð½Ð¾Ð²Ñ‹Ð¹ ÑÐ»Ð¾Ð¹ â€” Ð½Ð°Ñˆ Ñ‰Ð¸Ñ‚ Ð¾Ñ‚ Ð£Ð¤.", color: "#3b82f6", pct: 75 },
-  { name: "ÐœÐµÐ·Ð¾ÑÑ„ÐµÑ€Ð°", height: "50-80 ÐºÐ¼", fact: "ÐœÐµÑ‚ÐµÐ¾Ñ€Ñ‹ ÑÐ³Ð¾Ñ€Ð°ÑŽÑ‚ Ð·Ð´ÐµÑÑŒ.", color: "#8b5cf6", pct: 50 },
-  { name: "Ð¢ÐµÑ€Ð¼Ð¾ÑÑ„ÐµÑ€Ð°", height: "80-700 ÐºÐ¼", fact: "ÐœÐšÐ¡ Ð»ÐµÑ‚Ð°ÐµÑ‚ Ñ‚ÑƒÑ‚. ÐžÑ‡ÐµÐ½ÑŒ Ð¶Ð°Ñ€ÐºÐ¾!", color: "#f59e0b", pct: 35 },
-  { name: "Ð­ÐºÐ·Ð¾ÑÑ„ÐµÑ€Ð°", height: "700+ ÐºÐ¼", fact: "ÐŸÐµÑ€ÐµÑ…Ð¾Ð´ Ð² ÐºÐ¾ÑÐ¼Ð¾Ñ. ÐŸÐ¾Ñ‡Ñ‚Ð¸ Ð²Ð°ÐºÑƒÑƒÐ¼.", color: "#94a3b8", pct: 20 },
+  { name: "Тропосфера", height: "0-12 км", fact: "Здесь мы живём! Вся погода тут.", color: "#22c55e", pct: 100 },
+  { name: "Стратосфера", height: "12-50 км", fact: "Озоновый слой — наш щит от УФ.", color: "#3b82f6", pct: 75 },
+  { name: "Мезосфера", height: "50-80 км", fact: "Метеоры сгорают здесь.", color: "#8b5cf6", pct: 50 },
+  { name: "Термосфера", height: "80-700 км", fact: "МКС летает тут. Очень жарко!", color: "#f59e0b", pct: 35 },
+  { name: "Экзосфера", height: "700+ км", fact: "Переход в космос. Почти вакуум.", color: "#94a3b8", pct: 20 },
 ];
 
 const oceanFacts = [
-  { name: "Ð¢Ð¸Ñ…Ð¸Ð¹", area: "165.3 Ð¼Ð»Ð½ ÐºÐ¼Â²", depth: "10 994 Ð¼ (ÐœÐ°Ñ€Ð¸Ð°Ð½ÑÐºÐ°Ñ Ð²Ð¿Ð°Ð´Ð¸Ð½Ð°)", color: "#0ea5e9" },
-  { name: "ÐÑ‚Ð»Ð°Ð½Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸Ð¹", area: "91.7 Ð¼Ð»Ð½ ÐºÐ¼Â²", depth: "8 742 Ð¼", color: "#3b82f6" },
-  { name: "Ð˜Ð½Ð´Ð¸Ð¹ÑÐºÐ¸Ð¹", area: "73.6 Ð¼Ð»Ð½ ÐºÐ¼Â²", depth: "7 258 Ð¼", color: "#6366f1" },
-  { name: "Ð¡ÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ Ð›ÐµÐ´Ð¾Ð²Ð¸Ñ‚Ñ‹Ð¹", area: "14.8 Ð¼Ð»Ð½ ÐºÐ¼Â²", depth: "5 527 Ð¼", color: "#a5b4fc" },
+  { name: "Тихий", area: "165.3 млн км²", depth: "10 994 м (Марианская впадина)", color: "#0ea5e9" },
+  { name: "Атлантический", area: "91.7 млн км²", depth: "8 742 м", color: "#3b82f6" },
+  { name: "Индийский", area: "73.6 млн км²", depth: "7 258 м", color: "#6366f1" },
+  { name: "Северный Ледовитый", area: "14.8 млн км²", depth: "5 527 м", color: "#a5b4fc" },
 ];
 
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════════════════
    MAIN PAGE COMPONENT
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   ═══════════════════════════════════════════════════════════ */
 
 export default function Geography7Cheatsheet() {
   const [activeEarthLayer, setActiveEarthLayer] = useState<number | null>(null);
@@ -405,7 +405,7 @@ export default function Geography7Cheatsheet() {
 
       <div className="max-w-6xl mx-auto relative z-10">
 
-        {/* â•â•â•â•â•â•â•â• HEADER â•â•â•â•â•â•â•â• */}
+        {/* ════════ HEADER ════════ */}
         <motion.header
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -427,17 +427,17 @@ export default function Geography7Cheatsheet() {
                 <span className="text-white">EXPLORER</span>
               </h1>
               <p className="text-emerald-400/70 text-lg md:text-xl">
-                7 ÐºÐ»Ð°ÑÑ // Ð›Ð¸Ñ‚Ð¾ÑÑ„ÐµÑ€Ð°, Ð“Ð¸Ð´Ñ€Ð¾ÑÑ„ÐµÑ€Ð°, ÐÑ‚Ð¼Ð¾ÑÑ„ÐµÑ€Ð°, Ð“ÐµÐ¾Ð³Ñ€Ð°Ñ„Ð¸Ñ‡ÐµÑÐºÐ°Ñ ÐºÐ°Ñ€Ñ‚Ð°
+                7 класс // Литосфера, Гидросфера, Атмосфера, Географическая карта
               </p>
               <div className="flex items-center gap-4 mt-4 justify-center md:justify-start text-xs text-emerald-500/60">
-                <span className="flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> Ð˜Ð½Ñ‚ÐµÑ€Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾</span>
-                <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> ÐÐ°Ð²ÐµÐ´Ð¸ Ð¸ ÑƒÐ·Ð½Ð°ÐµÑˆÑŒ</span>
+                <span className="flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> Интерактивно</span>
+                <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> Наведи и узнаешь</span>
               </div>
             </div>
           </div>
         </motion.header>
 
-        {/* â•â•â•â•â•â•â•â• SECTION 1: EARTH STRUCTURE â•â•â•â•â•â•â•â• */}
+        {/* ════════ SECTION 1: EARTH STRUCTURE ════════ */}
         <motion.section
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -450,8 +450,8 @@ export default function Geography7Cheatsheet() {
               <Layers className="text-amber-400 w-7 h-7" />
             </div>
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">Ð¡Ñ‚Ñ€Ð¾ÐµÐ½Ð¸Ðµ Ð—ÐµÐ¼Ð»Ð¸</h2>
-              <p className="text-emerald-500/60 text-sm">Ð§Ñ‚Ð¾ Ñƒ Ð½Ð°Ñ Ð¿Ð¾Ð´ Ð½Ð¾Ð³Ð°Ð¼Ð¸? ÐÐ°Ð²ÐµÐ´Ð¸ Ð½Ð° ÑÐ»Ð¾Ð¸!</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-white">Строение Земли</h2>
+              <p className="text-emerald-500/60 text-sm">Что у нас под ногами? Наведи на слои!</p>
             </div>
           </div>
 
@@ -465,10 +465,10 @@ export default function Geography7Cheatsheet() {
 
             <div className="space-y-3">
               {[
-                { name: "Ð—ÐµÐ¼Ð½Ð°Ñ ÐºÐ¾Ñ€Ð°", detail: "Ð¢Ð¾Ð½ÐºÐ°Ñ Ð¾Ð±Ð¾Ð»Ð¾Ñ‡ÐºÐ°. ÐšÐ¾Ð½Ñ‚Ð¸Ð½ÐµÐ½Ñ‚Ð°Ð»ÑŒÐ½Ð°Ñ (30-70 ÐºÐ¼), Ð¾ÐºÐµÐ°Ð½Ð¸Ñ‡ÐµÑÐºÐ°Ñ (5-10 ÐºÐ¼).", color: "border-l-amber-700", bg: "bg-amber-950/20" },
-                { name: "ÐœÐ°Ð½Ñ‚Ð¸Ñ", detail: "Ð¡Ð°Ð¼Ñ‹Ð¹ Ñ‚Ð¾Ð»ÑÑ‚Ñ‹Ð¹ ÑÐ»Ð¾Ð¹ (~2900 ÐºÐ¼). Ð¢ÐµÐºÑƒÑ‡ÐµÐµ Ð²ÐµÑ‰ÐµÑÑ‚Ð²Ð¾ â€” Ð¼Ð°Ð³Ð¼Ð°.", color: "border-l-orange-600", bg: "bg-orange-950/20" },
-                { name: "Ð’Ð½ÐµÑˆÐ½ÐµÐµ ÑÐ´Ñ€Ð¾", detail: "Ð–Ð¸Ð´ÐºÐ¾Ðµ! Ð˜Ð· Ð¶ÐµÐ»ÐµÐ·Ð° Ð¸ Ð½Ð¸ÐºÐµÐ»Ñ. Ð¡Ð¾Ð·Ð´Ð°Ñ‘Ñ‚ Ð¼Ð°Ð³Ð½Ð¸Ñ‚Ð½Ð¾Ðµ Ð¿Ð¾Ð»Ðµ Ð—ÐµÐ¼Ð»Ð¸.", color: "border-l-red-500", bg: "bg-red-950/20" },
-                { name: "Ð’Ð½ÑƒÑ‚Ñ€ÐµÐ½Ð½ÐµÐµ ÑÐ´Ñ€Ð¾", detail: "Ð¢Ð²Ñ‘Ñ€Ð´Ð¾Ðµ! Ð”Ð°Ð²Ð»ÐµÐ½Ð¸Ðµ Ñ‚Ð°ÐºÐ¾Ðµ Ð¾Ð³Ñ€Ð¾Ð¼Ð½Ð¾Ðµ, Ñ‡Ñ‚Ð¾ Ð¶ÐµÐ»ÐµÐ·Ð¾ Ð½Ðµ Ð¿Ð»Ð°Ð²Ð¸Ñ‚ÑÑ.", color: "border-l-yellow-400", bg: "bg-yellow-950/20" },
+                { name: "Земная кора", detail: "Тонкая оболочка. Континентальная (30-70 км), океаническая (5-10 км).", color: "border-l-amber-700", bg: "bg-amber-950/20" },
+                { name: "Мантия", detail: "Самый толстый слой (~2900 км). Текучее вещество — магма.", color: "border-l-orange-600", bg: "bg-orange-950/20" },
+                { name: "Внешнее ядро", detail: "Жидкое! Из железа и никеля. Создаёт магнитное поле Земли.", color: "border-l-red-500", bg: "bg-red-950/20" },
+                { name: "Внутреннее ядро", detail: "Твёрдое! Давление такое огромное, что железо не плавится.", color: "border-l-yellow-400", bg: "bg-yellow-950/20" },
               ].map((item, i) => (
                 <motion.div
                   key={i}
@@ -485,7 +485,7 @@ export default function Geography7Cheatsheet() {
           </div>
         </motion.section>
 
-        {/* â•â•â•â•â•â•â•â• SECTION 2: CLIMATE ZONES â•â•â•â•â•â•â•â• */}
+        {/* ════════ SECTION 2: CLIMATE ZONES ════════ */}
         <motion.section
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -498,8 +498,8 @@ export default function Geography7Cheatsheet() {
               <Thermometer className="text-red-400 w-7 h-7" />
             </div>
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">ÐšÐ»Ð¸Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸Ðµ ÐŸÐ¾ÑÑÐ°</h2>
-              <p className="text-emerald-500/60 text-sm">ÐžÑ‚ Ð¶Ð°Ñ€Ñ‹ Ð´Ð¾ Ð²ÐµÑ‡Ð½Ð¾Ð¹ Ð¼ÐµÑ€Ð·Ð»Ð¾Ñ‚Ñ‹</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-white">Климатические Пояса</h2>
+              <p className="text-emerald-500/60 text-sm">От жары до вечной мерзлоты</p>
             </div>
           </div>
 
@@ -509,11 +509,11 @@ export default function Geography7Cheatsheet() {
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-6">
             {[
-              { name: "ÐÑ€ÐºÑ‚Ð¸Ñ‡ÐµÑÐºÐ¸Ð¹", desc: "Ð›ÐµÐ´ÑÐ½Ð°Ñ Ð¿ÑƒÑÑ‚Ñ‹Ð½Ñ. ÐŸÐ¾Ð»ÑÑ€Ð½Ð°Ñ Ð½Ð¾Ñ‡ÑŒ.", icon: Snowflake, color: "text-indigo-300", bg: "bg-indigo-950/30", border: "border-indigo-500/30" },
-              { name: "Ð¡ÑƒÐ±Ð°Ñ€ÐºÑ‚Ð¸Ñ‡ÐµÑÐºÐ¸Ð¹", desc: "Ð¢ÑƒÐ½Ð´Ñ€Ð°. ÐœÑ…Ð¸, Ð»Ð¸ÑˆÐ°Ð¹Ð½Ð¸ÐºÐ¸, Ð¾Ð»ÐµÐ½Ð¸.", icon: CloudRain, color: "text-blue-300", bg: "bg-blue-950/30", border: "border-blue-500/30" },
-              { name: "Ð£Ð¼ÐµÑ€ÐµÐ½Ð½Ñ‹Ð¹", desc: "Ð Ð¾ÑÑÐ¸Ñ Ñ‚ÑƒÑ‚! 4 ÑÐµÐ·Ð¾Ð½Ð°, Ð»ÐµÑÐ°, Ð¿Ð¾Ð»Ñ.", icon: TreePine, color: "text-emerald-300", bg: "bg-emerald-950/30", border: "border-emerald-500/30" },
-              { name: "Ð¡ÑƒÐ±Ñ‚Ñ€Ð¾Ð¿Ð¸Ñ‡ÐµÑÐºÐ¸Ð¹", desc: "Ð¡Ñ€ÐµÐ´Ð¸Ð·ÐµÐ¼Ð½Ð¾Ð¼Ð¾Ñ€ÑŒÐµ. ÐžÐ»Ð¸Ð²ÐºÐ¸, Ð²Ð¸Ð½Ð¾.", icon: Sun, color: "text-orange-300", bg: "bg-orange-950/30", border: "border-orange-500/30" },
-              { name: "Ð¢Ñ€Ð¾Ð¿Ð¸Ñ‡ÐµÑÐºÐ¸Ð¹", desc: "Ð’ÐµÑ‡Ð½Ð¾Ðµ Ð»ÐµÑ‚Ð¾. Ð”Ð¶ÑƒÐ½Ð³Ð»Ð¸, ÑÐ°Ð²Ð°Ð½Ð½Ð°.", icon: Sun, color: "text-red-300", bg: "bg-red-950/30", border: "border-red-500/30" },
+              { name: "Арктический", desc: "Ледяная пустыня. Полярная ночь.", icon: Snowflake, color: "text-indigo-300", bg: "bg-indigo-950/30", border: "border-indigo-500/30" },
+              { name: "Субарктический", desc: "Тундра. Мхи, лишайники, олени.", icon: CloudRain, color: "text-blue-300", bg: "bg-blue-950/30", border: "border-blue-500/30" },
+              { name: "Умеренный", desc: "Россия тут! 4 сезона, леса, поля.", icon: TreePine, color: "text-emerald-300", bg: "bg-emerald-950/30", border: "border-emerald-500/30" },
+              { name: "Субтропический", desc: "Средиземноморье. Оливки, вино.", icon: Sun, color: "text-orange-300", bg: "bg-orange-950/30", border: "border-orange-500/30" },
+              { name: "Тропический", desc: "Вечное лето. Джунгли, саванна.", icon: Sun, color: "text-red-300", bg: "bg-red-950/30", border: "border-red-500/30" },
             ].map((zone, i) => {
               const Icon = zone.icon;
               return (
@@ -531,7 +531,7 @@ export default function Geography7Cheatsheet() {
           </div>
         </motion.section>
 
-        {/* â•â•â•â•â•â•â•â• SECTION 3: MAPS & COORDINATES (TABBED) â•â•â•â•â•â•â•â• */}
+        {/* ════════ SECTION 3: MAPS & COORDINATES (TABBED) ════════ */}
         <motion.section
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -544,8 +544,8 @@ export default function Geography7Cheatsheet() {
               <Compass className="text-emerald-400 w-7 h-7" />
             </div>
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">ÐšÐ°Ñ€Ñ‚Ñ‹ Ð¸ ÐšÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ñ‹</h2>
-              <p className="text-emerald-500/60 text-sm">ÐšÐ°Ðº Ð½Ðµ Ð·Ð°Ð±Ð»ÑƒÐ´Ð¸Ñ‚ÑŒÑÑ Ð½Ð° Ð¿Ð»Ð°Ð½ÐµÑ‚Ðµ</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-white">Карты и Координаты</h2>
+              <p className="text-emerald-500/60 text-sm">Как не заблудиться на планете</p>
             </div>
           </div>
 
@@ -555,13 +555,13 @@ export default function Geography7Cheatsheet() {
               onClick={() => setActiveTab("maps")}
               className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === "maps" ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/50" : "bg-emerald-950/30 text-emerald-500 hover:bg-emerald-900/30"}`}
             >
-              <Map className="w-4 h-4 inline mr-1.5" />Ð¢Ð¸Ð¿Ñ‹ ÐšÐ°Ñ€Ñ‚
+              <Map className="w-4 h-4 inline mr-1.5" />Типы Карт
             </button>
             <button
               onClick={() => setActiveTab("coords")}
               className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === "coords" ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/50" : "bg-emerald-950/30 text-emerald-500 hover:bg-emerald-900/30"}`}
             >
-              <Globe2 className="w-4 h-4 inline mr-1.5" />ÐšÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ñ‹
+              <Globe2 className="w-4 h-4 inline mr-1.5" />Координаты
             </button>
           </div>
 
@@ -590,9 +590,9 @@ export default function Geography7Cheatsheet() {
                         <p className="text-sm text-gray-400">{type.desc}</p>
                         <div className="mt-4 pt-3 border-t border-emerald-900/30">
                           <p className="text-xs text-emerald-500/50">
-                            {type.name === "Ð¤Ð¸Ð·Ð¸Ñ‡ÐµÑÐºÐ°Ñ" && "ÐœÐ°ÑÑˆÑ‚Ð°Ð± 1:1000000 â€” Ð² 1 ÑÐ¼ 10 ÐºÐ¼"}
-                            {type.name === "ÐŸÐ¾Ð»Ð¸Ñ‚Ð¸Ñ‡ÐµÑÐºÐ°Ñ" && "Ð¡Ñ‚Ð¾Ð»Ð¸Ñ†Ñ‹ â€” ÐºÑ€Ð°ÑÐ½Ñ‹Ðµ Ñ‚Ð¾Ñ‡ÐºÐ¸ â˜…"}
-                            {type.name === "Ð¢ÐµÐ¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ°Ñ" && "Ð˜Ð·Ð¾Ð»Ð¸Ð½Ð¸Ð¸ Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°ÑŽÑ‚ Ð¾Ð´Ð¸Ð½Ð°ÐºÐ¾Ð²Ñ‹Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ"}
+                            {type.name === "Физическая" && "Масштаб 1:1000000 — в 1 см 10 км"}
+                            {type.name === "Политическая" && "Столицы — красные точки ★"}
+                            {type.name === "Тематическая" && "Изолинии показывают одинаковые значения"}
                           </p>
                         </div>
                       </motion.div>
@@ -603,23 +603,23 @@ export default function Geography7Cheatsheet() {
                 {/* Scale explanation */}
                 <div className="mt-6 bg-[#0a1a14] p-5 rounded-xl border border-emerald-800/30">
                   <h4 className="font-bold text-white mb-3 flex items-center gap-2">
-                    <Info className="w-4 h-4 text-emerald-400" /> ÐœÐ°ÑÑˆÑ‚Ð°Ð±
+                    <Info className="w-4 h-4 text-emerald-400" /> Масштаб
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                     <div className="bg-black/20 p-3 rounded-lg border border-emerald-900/30">
                       <div className="text-emerald-400 font-bold font-mono">1:10000</div>
-                      <div className="text-gray-400 text-xs">ÐšÑ€ÑƒÐ¿Ð½Ñ‹Ð¹. 1 ÑÐ¼ = 100 Ð¼</div>
-                      <div className="text-gray-500 text-[10px] mt-1">Ð”ÐµÑ‚Ð°Ð»Ð¸ Ð·Ð´Ð°Ð½Ð¸Ð¹ Ð²Ð¸Ð´Ð½Ñ‹</div>
+                      <div className="text-gray-400 text-xs">Крупный. 1 см = 100 м</div>
+                      <div className="text-gray-500 text-[10px] mt-1">Детали зданий видны</div>
                     </div>
                     <div className="bg-black/20 p-3 rounded-lg border border-emerald-900/30">
                       <div className="text-emerald-400 font-bold font-mono">1:100000</div>
-                      <div className="text-gray-400 text-xs">Ð¡Ñ€ÐµÐ´Ð½Ð¸Ð¹. 1 ÑÐ¼ = 1 ÐºÐ¼</div>
-                      <div className="text-gray-500 text-[10px] mt-1">Ð“Ð¾Ñ€Ð¾Ð´Ð° Ð¸ Ð´Ð¾Ñ€Ð¾Ð³Ð¸</div>
+                      <div className="text-gray-400 text-xs">Средний. 1 см = 1 км</div>
+                      <div className="text-gray-500 text-[10px] mt-1">Города и дороги</div>
                     </div>
                     <div className="bg-black/20 p-3 rounded-lg border border-emerald-900/30">
                       <div className="text-emerald-400 font-bold font-mono">1:1000000</div>
-                      <div className="text-gray-400 text-xs">ÐœÐµÐ»ÐºÐ¸Ð¹. 1 ÑÐ¼ = 10 ÐºÐ¼</div>
-                      <div className="text-gray-500 text-[10px] mt-1">ÐžÐ±Ð·Ð¾Ñ€ Ð¾Ð±Ð»Ð°ÑÑ‚ÐµÐ¹</div>
+                      <div className="text-gray-400 text-xs">Мелкий. 1 см = 10 км</div>
+                      <div className="text-gray-500 text-[10px] mt-1">Обзор областей</div>
                     </div>
                   </div>
                 </div>
@@ -638,24 +638,24 @@ export default function Geography7Cheatsheet() {
                   </div>
                   <div className="space-y-4">
                     <div className="bg-[#0a1a14] p-5 rounded-xl border border-pink-500/20">
-                      <h4 className="font-bold text-pink-400 mb-2">Ð”Ð¾Ð»Ð³Ð¾Ñ‚Ð° (Î»)</h4>
-                      <p className="text-sm text-gray-300">ÐžÑ‚ Ð“Ñ€Ð¸Ð½Ð²Ð¸Ñ‡Ð° (0Â°) Ð½Ð° Ð·Ð°Ð¿Ð°Ð´ Ð¸Ð»Ð¸ Ð²Ð¾ÑÑ‚Ð¾Ðº (Ð´Ð¾ 180Â°).</p>
+                      <h4 className="font-bold text-pink-400 mb-2">Долгота (λ)</h4>
+                      <p className="text-sm text-gray-300">От Гринвича (0°) на запад или восток (до 180°).</p>
                       <div className="mt-2 flex gap-2 text-xs">
-                        <span className="bg-pink-900/30 text-pink-300 px-2 py-1 rounded">W (Ð·Ð°Ð¿Ð°Ð´)</span>
-                        <span className="bg-pink-900/30 text-pink-300 px-2 py-1 rounded">E (Ð²Ð¾ÑÑ‚Ð¾Ðº)</span>
+                        <span className="bg-pink-900/30 text-pink-300 px-2 py-1 rounded">W (запад)</span>
+                        <span className="bg-pink-900/30 text-pink-300 px-2 py-1 rounded">E (восток)</span>
                       </div>
                     </div>
                     <div className="bg-[#0a1a14] p-5 rounded-xl border border-yellow-500/20">
-                      <h4 className="font-bold text-yellow-400 mb-2">Ð¨Ð¸Ñ€Ð¾Ñ‚Ð° (Ï†)</h4>
-                      <p className="text-sm text-gray-300">ÐžÑ‚ ÑÐºÐ²Ð°Ñ‚Ð¾Ñ€Ð° (0Â°) Ðº Ð¿Ð¾Ð»ÑŽÑÐ°Ð¼ (Ð´Ð¾ 90Â°).</p>
+                      <h4 className="font-bold text-yellow-400 mb-2">Широта (φ)</h4>
+                      <p className="text-sm text-gray-300">От экватора (0°) к полюсам (до 90°).</p>
                       <div className="mt-2 flex gap-2 text-xs">
-                        <span className="bg-yellow-900/30 text-yellow-300 px-2 py-1 rounded">N (ÑÐµÐ²ÐµÑ€)</span>
-                        <span className="bg-yellow-900/30 text-yellow-300 px-2 py-1 rounded">S (ÑŽÐ³)</span>
+                        <span className="bg-yellow-900/30 text-yellow-300 px-2 py-1 rounded">N (север)</span>
+                        <span className="bg-yellow-900/30 text-yellow-300 px-2 py-1 rounded">S (юг)</span>
                       </div>
                     </div>
                     <div className="bg-emerald-950/30 p-4 rounded-lg border border-emerald-700/30">
                       <p className="text-xs text-emerald-300">
-                        <strong>Ð›Ð°Ð¹Ñ„Ñ…Ð°Ðº:</strong> Ð¨Ð¸Ñ€Ð¾Ñ‚Ð° â€” Ð³Ð¾Ñ€Ð¸Ð·Ð¾Ð½Ñ‚Ð°Ð»ÑŒÐ½Ñ‹Ðµ Ð»Ð¸Ð½Ð¸Ð¸ (ÐºÐ°Ðº ÑÑ‚ÑƒÐ¿ÐµÐ½ÑŒÐºÐ¸ Ð»ÐµÑÑ‚Ð½Ð¸Ñ†Ñ‹), Ð´Ð¾Ð»Ð³Ð¾Ñ‚Ð° â€” Ð²ÐµÑ€Ñ‚Ð¸ÐºÐ°Ð»ÑŒÐ½Ñ‹Ðµ (ÐºÐ°Ðº ÑÑ‚Ð¾Ð»Ð±Ñ‹ Ð·Ð°Ð±Ð¾Ñ€Ð°). Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑˆÐ¸Ñ€Ð¾Ñ‚Ð°, Ð¿Ð¾Ñ‚Ð¾Ð¼ Ð´Ð¾Ð»Ð³Ð¾Ñ‚Ð°!
+                        <strong>Лайфхак:</strong> Широта — горизонтальные линии (как ступеньки лестницы), долгота — вертикальные (как столбы забора). Сначала широта, потом долгота!
                       </p>
                     </div>
                   </div>
@@ -665,7 +665,7 @@ export default function Geography7Cheatsheet() {
           </AnimatePresence>
         </motion.section>
 
-        {/* â•â•â•â•â•â•â•â• SECTION 4: CONTINENTS â•â•â•â•â•â•â•â• */}
+        {/* ════════ SECTION 4: CONTINENTS ════════ */}
         <motion.section
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -678,8 +678,8 @@ export default function Geography7Cheatsheet() {
               <Mountain className="text-emerald-300 w-7 h-7" />
             </div>
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">ÐœÐ°Ñ‚ÐµÑ€Ð¸ÐºÐ¸</h2>
-              <p className="text-emerald-500/60 text-sm">6 ÐºÑƒÑÐºÐ¾Ð² ÑÑƒÑˆÐ¸ â€” Ð³Ð»Ð°Ð²Ð½Ñ‹Ðµ Ñ„Ð°ÐºÑ‚Ñ‹</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-white">Материки</h2>
+              <p className="text-emerald-500/60 text-sm">6 кусков суши — главные факты</p>
             </div>
           </div>
 
@@ -698,8 +698,8 @@ export default function Geography7Cheatsheet() {
                 {/* Area bar */}
                 <div className="mb-3">
                   <div className="flex justify-between text-xs text-gray-500 mb-1">
-                    <span>ÐŸÐ»Ð¾Ñ‰Ð°Ð´ÑŒ</span>
-                    <span>{c.area} Ð¼Ð»Ð½ ÐºÐ¼Â²</span>
+                    <span>Площадь</span>
+                    <span>{c.area} млн км²</span>
                   </div>
                   <div className="h-2 bg-emerald-950/50 rounded-full overflow-hidden">
                     <motion.div
@@ -715,11 +715,11 @@ export default function Geography7Cheatsheet() {
 
                 <div className="space-y-1 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">ÐÐ°ÑÐµÐ»ÐµÐ½Ð¸Ðµ</span>
+                    <span className="text-gray-500">Население</span>
                     <span className="text-gray-300">{c.population}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Ð’Ñ‹ÑÑˆÐ°Ñ Ñ‚Ð¾Ñ‡ÐºÐ°</span>
+                    <span className="text-gray-500">Высшая точка</span>
                     <span className="text-gray-300">{c.highest}</span>
                   </div>
                 </div>
@@ -728,7 +728,7 @@ export default function Geography7Cheatsheet() {
           </div>
         </motion.section>
 
-        {/* â•â•â•â•â•â•â•â• SECTION 5: OCEANS â•â•â•â•â•â•â•â• */}
+        {/* ════════ SECTION 5: OCEANS ════════ */}
         <motion.section
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -741,8 +741,8 @@ export default function Geography7Cheatsheet() {
               <Waves className="text-sky-400 w-7 h-7" />
             </div>
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">ÐžÐºÐµÐ°Ð½Ñ‹</h2>
-              <p className="text-emerald-500/60 text-sm">70% Ð¿Ð»Ð°Ð½ÐµÑ‚Ñ‹ â€” Ð²Ð¾Ð´Ð°. ÐšÐ»Ð¸ÐºÐ½Ð¸ Ð´Ð»Ñ Ð´ÐµÑ‚Ð°Ð»ÐµÐ¹!</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-white">Океаны</h2>
+              <p className="text-emerald-500/60 text-sm">70% планеты — вода. Кликни для деталей!</p>
             </div>
           </div>
 
@@ -760,7 +760,7 @@ export default function Geography7Cheatsheet() {
                       <Droplets className="w-5 h-5" style={{ color: ocean.color }} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-white">{ocean.name} Ð¾ÐºÐµÐ°Ð½</h3>
+                      <h3 className="font-bold text-white">{ocean.name} океан</h3>
                       <p className="text-xs text-gray-500">{ocean.area}</p>
                     </div>
                   </div>
@@ -781,16 +781,16 @@ export default function Geography7Cheatsheet() {
                     >
                       <div className="mt-4 pt-3 border-t border-sky-900/30 space-y-2">
                         <div className="flex items-start gap-2">
-                          <span className="text-xs text-sky-400 font-bold min-w-[70px]">Ð“Ð»ÑƒÐ±Ð¸Ð½Ð°:</span>
+                          <span className="text-xs text-sky-400 font-bold min-w-[70px]">Глубина:</span>
                           <span className="text-xs text-gray-300">{ocean.depth}</span>
                         </div>
                         <div className="flex items-start gap-2">
-                          <span className="text-xs text-sky-400 font-bold min-w-[70px]">Ð¤Ð°ÐºÑ‚:</span>
+                          <span className="text-xs text-sky-400 font-bold min-w-[70px]">Факт:</span>
                           <span className="text-xs text-gray-300">
-                            {i === 0 && "Ð¡Ð°Ð¼Ñ‹Ð¹ Ð±Ð¾Ð»ÑŒÑˆÐ¾Ð¹ Ð¸ Ð³Ð»ÑƒÐ±Ð¾ÐºÐ¸Ð¹. Ð’ Ð½Ñ‘Ð¼ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð²Ð¾Ð´Ñ‹, Ñ‡ÐµÐ¼ Ð²Ð¾ Ð²ÑÐµÑ… Ð¾ÑÑ‚Ð°Ð»ÑŒÐ½Ñ‹Ñ… Ð²Ð¼ÐµÑÑ‚Ðµ Ð²Ð·ÑÑ‚Ñ‹Ñ…!"}
-                            {i === 1 && "Ð’Ñ‚Ð¾Ñ€Ð¾Ð¹ Ð¿Ð¾ Ð²ÐµÐ»Ð¸Ñ‡Ð¸Ð½Ðµ. Ð§ÐµÑ€ÐµÐ· Ð½ÐµÐ³Ð¾ Ð¿Ñ€Ð¾Ñ…Ð¾Ð´Ð¸Ð» Ð·Ð½Ð°Ð¼ÐµÐ½Ð¸Ñ‚Ñ‹Ð¹ Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ ÐšÐ¾Ð»ÑƒÐ¼Ð±Ð°."}
-                            {i === 2 && "Ð¡Ð°Ð¼Ñ‹Ð¹ Ñ‚Ñ‘Ð¿Ð»Ñ‹Ð¹ Ð¾ÐºÐµÐ°Ð½. ÐœÑƒÑÑÐ¾Ð½Ð½Ñ‹Ðµ Ð²ÐµÑ‚Ñ€Ð° Ð¼ÐµÐ½ÑÑŽÑ‚ Ð½Ð°Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¸Ðµ Ð¿Ð¾ ÑÐµÐ·Ð¾Ð½Ð°Ð¼."}
-                            {i === 3 && "Ð¡Ð°Ð¼Ñ‹Ð¹ Ð¼Ð°Ð»ÐµÐ½ÑŒÐºÐ¸Ð¹ Ð¸ Ð¼ÐµÐ»ÐºÐ¸Ð¹. ÐŸÐ¾Ñ‡Ñ‚Ð¸ Ð¿Ð¾Ð»Ð½Ð¾ÑÑ‚ÑŒÑŽ Ð¿Ð¾ÐºÑ€Ñ‹Ñ‚ Ð»ÑŒÐ´Ð¾Ð¼."}
+                            {i === 0 && "Самый большой и глубокий. В нём больше воды, чем во всех остальных вместе взятых!"}
+                            {i === 1 && "Второй по величине. Через него проходил знаменитый маршрут Колумба."}
+                            {i === 2 && "Самый тёплый океан. Муссонные ветра меняют направление по сезонам."}
+                            {i === 3 && "Самый маленький и мелкий. Почти полностью покрыт льдом."}
                           </span>
                         </div>
                       </div>
@@ -802,7 +802,7 @@ export default function Geography7Cheatsheet() {
           </div>
         </motion.section>
 
-        {/* â•â•â•â•â•â•â•â• SECTION 6: WATER CYCLE â•â•â•â•â•â•â•â• */}
+        {/* ════════ SECTION 6: WATER CYCLE ════════ */}
         <motion.section
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -815,8 +815,8 @@ export default function Geography7Cheatsheet() {
               <Droplets className="text-sky-300 w-7 h-7" />
             </div>
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">ÐšÑ€ÑƒÐ³Ð¾Ð²Ð¾Ñ€Ð¾Ñ‚ Ð’Ð¾Ð´Ñ‹</h2>
-              <p className="text-emerald-500/60 text-sm">Ð’Ð¾Ð´Ð° Ð½Ð¸ÐºÐ¾Ð³Ð´Ð° Ð½Ðµ Ð¸ÑÑ‡ÐµÐ·Ð°ÐµÑ‚ â€” Ð¾Ð½Ð° Ð¿ÑƒÑ‚ÐµÑˆÐµÑÑ‚Ð²ÑƒÐµÑ‚</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-white">Круговорот Воды</h2>
+              <p className="text-emerald-500/60 text-sm">Вода никогда не исчезает — она путешествует</p>
             </div>
           </div>
 
@@ -826,10 +826,10 @@ export default function Geography7Cheatsheet() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
             {[
-              { name: "Ð˜ÑÐ¿Ð°Ñ€ÐµÐ½Ð¸Ðµ", desc: "Ð¡Ð¾Ð»Ð½Ñ†Ðµ Ð³Ñ€ÐµÐµÑ‚ Ð²Ð¾Ð´Ñƒ â†’ Ð¿Ð°Ñ€ Ð¿Ð¾Ð´Ð½Ð¸Ð¼Ð°ÐµÑ‚ÑÑ", icon: Sun, color: "text-yellow-400", bg: "bg-yellow-950/20" },
-              { name: "ÐšÐ¾Ð½Ð´ÐµÐ½ÑÐ°Ñ†Ð¸Ñ", desc: "ÐŸÐ°Ñ€ Ð¾ÑÑ‚Ñ‹Ð²Ð°ÐµÑ‚ â†’ Ð¾Ð±Ð»Ð°ÐºÐ°", icon: CloudRain, color: "text-gray-300", bg: "bg-gray-900/30" },
-              { name: "ÐžÑÐ°Ð´ÐºÐ¸", desc: "ÐžÐ±Ð»Ð°ÐºÐ° Ñ‚ÑÐ¶ÐµÐ»ÐµÑŽÑ‚ â†’ Ð´Ð¾Ð¶Ð´ÑŒ/ÑÐ½ÐµÐ³", icon: Droplets, color: "text-blue-400", bg: "bg-blue-950/20" },
-              { name: "Ð¡Ñ‚Ð¾Ðº", desc: "Ð’Ð¾Ð´Ð° Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ÑÑ Ð² Ð¾ÐºÐµÐ°Ð½ Ð¿Ð¾ Ñ€ÐµÐºÐ°Ð¼", icon: Waves, color: "text-cyan-400", bg: "bg-cyan-950/20" },
+              { name: "Испарение", desc: "Солнце греет воду → пар поднимается", icon: Sun, color: "text-yellow-400", bg: "bg-yellow-950/20" },
+              { name: "Конденсация", desc: "Пар остывает → облака", icon: CloudRain, color: "text-gray-300", bg: "bg-gray-900/30" },
+              { name: "Осадки", desc: "Облака тяжелеют → дождь/снег", icon: Droplets, color: "text-blue-400", bg: "bg-blue-950/20" },
+              { name: "Сток", desc: "Вода возвращается в океан по рекам", icon: Waves, color: "text-cyan-400", bg: "bg-cyan-950/20" },
             ].map((step, i) => {
               const Icon = step.icon;
               return (
@@ -847,7 +847,7 @@ export default function Geography7Cheatsheet() {
           </div>
         </motion.section>
 
-        {/* â•â•â•â•â•â•â•â• SECTION 7: ATMOSPHERE â•â•â•â•â•â•â•â• */}
+        {/* ════════ SECTION 7: ATMOSPHERE ════════ */}
         <motion.section
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -860,8 +860,8 @@ export default function Geography7Cheatsheet() {
               <Wind className="text-teal-400 w-7 h-7" />
             </div>
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">Ð¡Ð»Ð¾Ð¸ ÐÑ‚Ð¼Ð¾ÑÑ„ÐµÑ€Ñ‹</h2>
-              <p className="text-emerald-500/60 text-sm">Ð’Ð¾Ð·Ð´ÑƒÑ… Ð²Ð¾ÐºÑ€ÑƒÐ³ Ð½Ð°Ñ â€” Ð½Ðµ Ð¿Ñ€Ð¾ÑÑ‚Ð¾ Ð²Ð¾Ð·Ð´ÑƒÑ…</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-white">Слои Атмосферы</h2>
+              <p className="text-emerald-500/60 text-sm">Воздух вокруг нас — не просто воздух</p>
             </div>
           </div>
 
@@ -880,7 +880,7 @@ export default function Geography7Cheatsheet() {
                   <div className="flex items-center gap-4 p-4">
                     {/* Height bar */}
                     <div className="flex flex-col items-center min-w-[70px]">
-                      <span className="text-[10px] text-gray-500">Ð’Ñ‹ÑÐ¾Ñ‚Ð°</span>
+                      <span className="text-[10px] text-gray-500">Высота</span>
                       <span className="text-xs font-mono font-bold text-white">{layer.height}</span>
                     </div>
                     {/* Color bar */}
@@ -898,13 +898,13 @@ export default function Geography7Cheatsheet() {
             {/* Key atmosphere fact */}
             <div className="mt-6 bg-emerald-950/20 p-4 rounded-xl border border-emerald-700/30">
               <p className="text-xs text-emerald-300">
-                <strong>Ð—Ð°Ð¿Ð¾Ð¼Ð½Ð¸:</strong> ÐÑ‚Ð¼Ð¾ÑÑ„ÐµÑ€Ð½Ð¾Ðµ Ð´Ð°Ð²Ð»ÐµÐ½Ð¸Ðµ Ð½Ð° ÑƒÑ€Ð¾Ð²Ð½Ðµ Ð¼Ð¾Ñ€Ñ = 760 Ð¼Ð¼ Ñ€Ñ‚. ÑÑ‚. Ð¡ Ð²Ñ‹ÑÐ¾Ñ‚Ð¾Ð¹ Ð´Ð°Ð²Ð»ÐµÐ½Ð¸Ðµ Ð¿Ð°Ð´Ð°ÐµÑ‚! ÐÐ° Ð²ÐµÑ€ÑˆÐ¸Ð½Ðµ Ð­Ð²ÐµÑ€ÐµÑÑ‚Ð° Ð¾Ð½Ð¾ Ð² 3 Ñ€Ð°Ð·Ð° Ð¼ÐµÐ½ÑŒÑˆÐµ.
+                <strong>Запомни:</strong> Атмосферное давление на уровне моря = 760 мм рт. ст. С высотой давление падает! На вершине Эвереста оно в 3 раза меньше.
               </p>
             </div>
           </div>
         </motion.section>
 
-        {/* â•â•â•â•â•â•â•â• SECTION 8: KEY FORMULAS & FACTS â•â•â•â•â•â•â•â• */}
+        {/* ════════ SECTION 8: KEY FORMULAS & FACTS ════════ */}
         <motion.section
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -917,8 +917,8 @@ export default function Geography7Cheatsheet() {
               <Info className="text-yellow-400 w-7 h-7" />
             </div>
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">Ð¤Ð¾Ñ€Ð¼ÑƒÐ»Ñ‹ Ð¸ Ð¤Ð°ÐºÑ‚Ñ‹</h2>
-              <p className="text-emerald-500/60 text-sm">Ð¨Ð¿Ð°Ñ€Ð³Ð°Ð»ÐºÐ° Ð² ÑˆÐ¿Ð°Ñ€Ð³Ð°Ð»ÐºÐµ â€” Ð¼ÐµÑ‚Ð°-ÑƒÑ€Ð¾Ð²ÐµÐ½ÑŒ</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-white">Формулы и Факты</h2>
+              <p className="text-emerald-500/60 text-sm">Шпаргалка в шпаргалке — мета-уровень</p>
             </div>
           </div>
 
@@ -926,14 +926,14 @@ export default function Geography7Cheatsheet() {
             {/* Formulas */}
             <div className="bg-[#0a1a14] p-6 rounded-2xl border border-emerald-800/30">
               <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-400" />Ð¤Ð¾Ñ€Ð¼ÑƒÐ»Ñ‹
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />Формулы
               </h3>
               <div className="space-y-3">
                 {[
-                  { formula: "L = Î» Ã— t", desc: "Ð”Ð»Ð¸Ð½Ð° Ð´ÑƒÐ³Ð¸ Ð¼ÐµÑ€Ð¸Ð´Ð¸Ð°Ð½Ð°", detail: "Î» â€” Ð´Ð»Ð¸Ð½Ð° 1Â° Ð´ÑƒÐ³Ð¸ (â‰ˆ111 ÐºÐ¼), t â€” Ñ€Ð°Ð·Ð½Ð¾ÑÑ‚ÑŒ ÑˆÐ¸Ñ€Ð¾Ñ‚" },
-                  { formula: "h = t Ã— 6Â°C", desc: "ÐŸÐ°Ð´ÐµÐ½Ð¸Ðµ Ñ‚ÐµÐ¼Ð¿ÐµÑ€Ð°Ñ‚ÑƒÑ€Ñ‹ Ñ Ð²Ñ‹ÑÐ¾Ñ‚Ð¾Ð¹", detail: "ÐÐ° ÐºÐ°Ð¶Ð´Ñ‹Ð¹ 1 ÐºÐ¼ Ð²Ð²ÐµÑ€Ñ… â†’ -6Â°C" },
-                  { formula: "P = Pâ‚€ - Î”h Ã— 1Ð¼Ð¼", desc: "Ð”Ð°Ð²Ð»ÐµÐ½Ð¸Ðµ Ñ Ð²Ñ‹ÑÐ¾Ñ‚Ð¾Ð¹", detail: "ÐÐ° ÐºÐ°Ð¶Ð´Ñ‹Ðµ 10,5 Ð¼ Ð²Ð²ÐµÑ€Ñ… â†’ -1 Ð¼Ð¼ Ñ€Ñ‚. ÑÑ‚." },
-                  { formula: "ÐÐ±Ñ. Ð²Ñ‹ÑÐ¾Ñ‚Ð° = ÐžÑ‚Ð½. Ð²Ñ‹ÑÐ¾Ñ‚Ð° + h Ð¿Ð¾Ð´Ð½Ð¾Ð¶Ð¸Ñ", desc: "ÐÐ±ÑÐ¾Ð»ÑŽÑ‚Ð½Ð°Ñ Ð²Ñ‹ÑÐ¾Ñ‚Ð° Ð²ÐµÑ€ÑˆÐ¸Ð½Ñ‹", detail: "ÐžÑ‚ Ð¿Ð¾Ð´Ð½Ð¾Ð¶Ð¸Ñ Ð´Ð¾ Ð²ÐµÑ€ÑˆÐ¸Ð½Ñ‹ + Ð²Ñ‹ÑÐ¾Ñ‚Ð° Ð¿Ð¾Ð´Ð½Ð¾Ð¶Ð¸Ñ Ð½Ð°Ð´ ÑƒÑ€Ð¾Ð²Ð½ÐµÐ¼ Ð¼Ð¾Ñ€Ñ" },
+                  { formula: "L = λ × t", desc: "Длина дуги меридиана", detail: "λ — длина 1° дуги (≈111 км), t — разность широт" },
+                  { formula: "h = t × 6°C", desc: "Падение температуры с высотой", detail: "На каждый 1 км вверх → -6°C" },
+                  { formula: "P = P₀ - Δh × 1мм", desc: "Давление с высотой", detail: "На каждые 10,5 м вверх → -1 мм рт. ст." },
+                  { formula: "Абс. высота = Отн. высота + h подножия", desc: "Абсолютная высота вершины", detail: "От подножия до вершины + высота подножия над уровнем моря" },
                 ].map((f, i) => (
                   <div key={i} className="bg-black/30 p-3 rounded-lg border border-emerald-900/20">
                     <div className="font-mono text-emerald-400 font-bold text-lg">{f.formula}</div>
@@ -947,19 +947,19 @@ export default function Geography7Cheatsheet() {
             {/* Quick Facts */}
             <div className="bg-[#0a1a14] p-6 rounded-2xl border border-emerald-800/30">
               <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-amber-400" />Ð‘Ñ‹ÑÑ‚Ñ€Ñ‹Ðµ Ð¤Ð°ÐºÑ‚Ñ‹
+                <div className="w-2 h-2 rounded-full bg-amber-400" />Быстрые Факты
               </h3>
               <div className="space-y-3">
                 {[
-                  { label: "Ð Ð°Ð´Ð¸ÑƒÑ Ð—ÐµÐ¼Ð»Ð¸", value: "6 371 ÐºÐ¼" },
-                  { label: "Ð”Ð»Ð¸Ð½Ð° ÑÐºÐ²Ð°Ñ‚Ð¾Ñ€Ð°", value: "40 075 ÐºÐ¼" },
-                  { label: "Ð”Ð»Ð¸Ð½Ð° Ð¼ÐµÑ€Ð¸Ð´Ð¸Ð°Ð½Ð°", value: "20 004 ÐºÐ¼" },
-                  { label: "1Â° Ð¼ÐµÑ€Ð¸Ð´Ð¸Ð°Ð½Ð°", value: "â‰ˆ 111 ÐºÐ¼" },
-                  { label: "1Â° ÑÐºÐ²Ð°Ñ‚Ð¾Ñ€Ð°", value: "â‰ˆ 111,3 ÐºÐ¼" },
-                  { label: "ÐœÐ°ÐºÑ. Ð²Ñ‹ÑÐ¾Ñ‚Ð° ÑÑƒÑˆÐ¸", value: "8 848 Ð¼ (Ð­Ð²ÐµÑ€ÐµÑÑ‚)" },
-                  { label: "ÐœÐ°ÐºÑ. Ð³Ð»ÑƒÐ±Ð¸Ð½Ð° Ð¾ÐºÐµÐ°Ð½Ð°", value: "10 994 Ð¼ (ÐœÐ°Ñ€Ð¸Ð°Ð½ÑÐºÐ°Ñ)" },
-                  { label: "Ð”Ð¾Ð»Ñ Ð²Ð¾Ð´Ñ‹ Ð½Ð° Ð—ÐµÐ¼Ð»Ðµ", value: "71% Ð¿Ð¾Ð²ÐµÑ€Ñ…Ð½Ð¾ÑÑ‚Ð¸" },
-                  { label: "Ð”Ð¾Ð»Ñ Ð¿Ñ€ÐµÑÐ½Ð¾Ð¹ Ð²Ð¾Ð´Ñ‹", value: "~2.5% Ð¾Ñ‚ Ð²ÑÐµÐ¹ Ð²Ð¾Ð´Ñ‹" },
+                  { label: "Радиус Земли", value: "6 371 км" },
+                  { label: "Длина экватора", value: "40 075 км" },
+                  { label: "Длина меридиана", value: "20 004 км" },
+                  { label: "1° меридиана", value: "≈ 111 км" },
+                  { label: "1° экватора", value: "≈ 111,3 км" },
+                  { label: "Макс. высота суши", value: "8 848 м (Эверест)" },
+                  { label: "Макс. глубина океана", value: "10 994 м (Марианская)" },
+                  { label: "Доля воды на Земле", value: "71% поверхности" },
+                  { label: "Доля пресной воды", value: "~2.5% от всей воды" },
                 ].map((fact, i) => (
                   <div key={i} className="flex justify-between items-center py-2 border-b border-emerald-900/20 last:border-0">
                     <span className="text-sm text-gray-400">{fact.label}</span>
@@ -971,7 +971,7 @@ export default function Geography7Cheatsheet() {
           </div>
         </motion.section>
 
-        {/* â•â•â•â•â•â•â•â• FOOTER â•â•â•â•â•â•â•â• */}
+        {/* ════════ FOOTER ════════ */}
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -985,7 +985,7 @@ export default function Geography7Cheatsheet() {
               className="group flex items-center gap-3 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-4 px-10 rounded-full shadow-[0_0_25px_rgba(16,185,129,0.3)] transition-all"
             >
               <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-              <span>ÐÐÐ—ÐÐ” Ðš ÐšÐÐ Ð¢Ð•</span>
+              <span>НАЗАД К КАРТЕ</span>
             </motion.div>
           </Link>
         </motion.div>
