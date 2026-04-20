@@ -27,6 +27,7 @@ import { VprDescription } from "@/components/vpr/VprDescription";
 import { VprQuestionContent } from "@/components/vpr/VprQuestionContent";
 import { VprAnswerList } from "@/components/vpr/VprAnswerList";
 import { VprTimeUpModal } from "@/components/vpr/VprTimeUpModal";
+import { getVprSubjectSlug } from "@/lib/vprCheatsheet";
 
 import { toast } from "sonner";
 // Import Server Actions
@@ -557,7 +558,8 @@ export default function VprTestPage() {
                     finalScore={finalScore}
                     totalQuestions={currentAttempt.total_questions ?? questions.length}
                     onReset={resetTest}
-                    onGoToList={() => router.push('/vpr-tests')} /> );
+                    onGoToList={() => router.push('/vpr-tests')}
+                    subjectSlug={getVprSubjectSlug(subject?.name)} /> );
     }
 
     // Critical Data Check - needs attempt, subject, questions, variant *after* loading/error checks passed
@@ -578,6 +580,7 @@ export default function VprTestPage() {
     }
 
     // Prepare render variables
+    const subjectSlug = getVprSubjectSlug(subject.name);
     const answersForCurrent = currentQuestionData.vpr_answers || [];
     const showSavingOverlay = isSaving;
     const shouldShowExplanation = (isDummyModeActive && !isCurrentQuestionNonAnswerable) || showFeedback;
@@ -615,6 +618,7 @@ export default function VprTestPage() {
                             timeLimit={timeLimit}
                             onTimeUp={handleTimeUp}
                             isTimerRunning={isTimerRunning && !showSavingOverlay && !isTestComplete && !timeUpModal && !isDummyModeActive && !isDummyModeGloballyDisabled}
+                            subjectSlug={subjectSlug}
                         />
                          <div className="flex items-center space-x-3 self-center sm:self-auto">
                              {!isDummyModeGloballyDisabled ? (
@@ -690,6 +694,7 @@ export default function VprTestPage() {
                              questionData={currentQuestionData}
                              questionNumber={currentQuestionIndex + 1}
                              totalQuestions={questions.length}
+                             subjectSlug={subjectSlug}
                          />
                          <VprAnswerList
                             answers={answersForCurrent}
