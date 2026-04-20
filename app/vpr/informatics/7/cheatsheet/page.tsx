@@ -1174,6 +1174,12 @@ export default function Informatics7Cheatsheet() {
                   <p className="mb-1">UTF-8: переменная длина 1–4 байта</p>
                   <p>Кириллица «А» в Unicode: U+0410 = 1040</p>
                 </Expandable>
+                <Expandable title="> Расширения файлов — что важно знать для ВПР">
+                  <p className="mb-1"><span className="text-cyan-400">Расширение файла</span> — часть имени после точки: <span className="text-green-300">доклад.docx</span>.</p>
+                  <p className="mb-1">Оно помогает ОС выбрать программу: <span className="text-green-300">.jpg</span> открывается как изображение, <span className="text-green-300">.mp3</span> — как аудио.</p>
+                  <p className="mb-1">Типичные форматы: <span className="text-green-300">.txt, .docx, .pdf, .png, .jpg, .mp4, .zip, .exe</span>.</p>
+                  <p>Будь внимателен: похожие имена (<span className="text-green-300">photo.jpg.exe</span>) могут маскировать вредоносный файл.</p>
+                </Expandable>
               </div>
             </div>
           </motion.section>
