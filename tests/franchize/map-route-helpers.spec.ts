@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeSegments, trimSuffixBySegment } from '@/app/admin/map-routes/page';
+import { mergeSegments, trimSuffixBySegment } from '@/app/admin/map-routes/helpers';
 
 describe('map route helper utilities', () => {
   it('trimSuffixBySegment removes a matching suffix only', () => {

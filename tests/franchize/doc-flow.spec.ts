@@ -1,53 +1,54 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const createInvoiceMock = vi.fn();
-const notifyAdminMock = vi.fn();
-const sendTelegramDocumentMock = vi.fn();
-const sendTelegramInvoiceMock = vi.fn();
-const loggerErrorMock = vi.fn();
-const buildDocxMock = vi.fn();
-const getUserSensitiveDataMock = vi.fn();
-const getCrewSensitiveDataMock = vi.fn();
-
-const fromMock = vi.fn();
+const mocks = vi.hoisted(() => ({
+  createInvoice: vi.fn(),
+  notifyAdmin: vi.fn(),
+  sendTelegramDocument: vi.fn(),
+  sendTelegramInvoice: vi.fn(),
+  loggerError: vi.fn(),
+  buildDocx: vi.fn(),
+  getUserSensitiveData: vi.fn(),
+  getCrewSensitiveData: vi.fn(),
+  from: vi.fn(),
+}));
 
 vi.mock('@/lib/supabase-server', () => ({
-  createInvoice: createInvoiceMock,
+  createInvoice: mocks.createInvoice,
   supabaseAdmin: {
-    from: fromMock,
+    from: mocks.from,
   },
 }));
 
 vi.mock('@/app/actions', () => ({
-  notifyAdmin: notifyAdminMock,
-  sendTelegramDocument: sendTelegramDocumentMock,
-  sendTelegramInvoice: sendTelegramInvoiceMock,
+  notifyAdmin: mocks.notifyAdmin,
+  sendTelegramDocument: mocks.sendTelegramDocument,
+  sendTelegramInvoice: mocks.sendTelegramInvoice,
 }));
 
 vi.mock('@/lib/logger', () => ({
   logger: {
-    error: loggerErrorMock,
+    error: mocks.loggerError,
     warn: vi.fn(),
     info: vi.fn(),
   },
 }));
 
 vi.mock('@/app/franchize/lib/docx-capability', () => ({
-  buildFranchizeDocxFromTemplate: buildDocxMock,
+  buildFranchizeDocxFromTemplate: mocks.buildDocx,
 }));
 
 vi.mock('@/app/lib/private-secrets', () => ({
-  getUserSensitiveData: getUserSensitiveDataMock,
-  getCrewSensitiveData: getCrewSensitiveDataMock,
+  getUserSensitiveData: mocks.getUserSensitiveData,
+  getCrewSensitiveData: mocks.getCrewSensitiveData,
   saveCrewSensitiveData: vi.fn(),
 }));
 
 import { createFranchizeOrderCheckout } from '@/app/franchize/actions';
 
-function buildPayload(payment: 'telegram_xtr' | 'card' = 'telegram_xtr') {
+function buildPayload(payment: 'telegram_xtr' | 'card' = 'telegram_xtr', orderId = 'order-1') {
   return {
     slug: 'vip-bike',
-    orderId: 'order-1',
+    orderId,
     telegramUserId: '42',
     recipient: 'Ivan Ivanov',
     phone: '+79998887766',
@@ -127,34 +128,34 @@ function buildSupabaseFromMock() {
 describe('franchize checkout doc-flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    fromMock.mockImplementation(buildSupabaseFromMock());
-    getUserSensitiveDataMock.mockResolvedValue({});
-    getCrewSensitiveDataMock.mockResolvedValue({ contractDefaults: {} });
-    sendTelegramDocumentMock.mockResolvedValue({ success: true });
-    notifyAdminMock.mockResolvedValue({ success: true });
-    sendTelegramInvoiceMock.mockResolvedValue({ success: true });
-    createInvoiceMock.mockResolvedValue({ success: true });
-    buildDocxMock.mockResolvedValue({ bytes: new Uint8Array([1, 2, 3]), renderedMarkdown: 'ok' });
+    mocks.from.mockImplementation(buildSupabaseFromMock());
+    mocks.getUserSensitiveData.mockResolvedValue({});
+    mocks.getCrewSensitiveData.mockResolvedValue({ contractDefaults: {} });
+    mocks.sendTelegramDocument.mockResolvedValue({ success: true });
+    mocks.notifyAdmin.mockResolvedValue({ success: true });
+    mocks.sendTelegramInvoice.mockResolvedValue({ success: true });
+    mocks.createInvoice.mockResolvedValue({ success: true });
+    mocks.buildDocx.mockResolvedValue({ bytes: new Uint8Array([1, 2, 3]), renderedMarkdown: 'ok' });
     vi.stubEnv('ADMIN_CHAT_ID', '417553377');
   });
 
   it('does not create invoice when DOCX generation fails', async () => {
-    buildDocxMock.mockRejectedValueOnce(new Error('docx render failed'));
+    mocks.buildDocx.mockRejectedValueOnce(new Error('docx render failed'));
 
-    const result = await createFranchizeOrderCheckout(buildPayload('telegram_xtr'));
+    const result = await createFranchizeOrderCheckout(buildPayload('telegram_xtr', 'order-2'));
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('docx render failed');
-    expect(createInvoiceMock).not.toHaveBeenCalled();
-    expect(sendTelegramInvoiceMock).not.toHaveBeenCalled();
+    expect(mocks.createInvoice).not.toHaveBeenCalled();
+    expect(mocks.sendTelegramInvoice).not.toHaveBeenCalled();
   });
 
   it('creates and sends invoice only after DOCX delivery succeeds', async () => {
     const result = await createFranchizeOrderCheckout(buildPayload('telegram_xtr'));
 
     expect(result.success).toBe(true);
-    expect(createInvoiceMock).toHaveBeenCalledTimes(1);
-    expect(sendTelegramInvoiceMock).toHaveBeenCalledTimes(1);
-    expect(sendTelegramDocumentMock).toHaveBeenCalled();
+    expect(mocks.createInvoice).toHaveBeenCalledTimes(1);
+    expect(mocks.sendTelegramInvoice).toHaveBeenCalledTimes(1);
+    expect(mocks.sendTelegramDocument).toHaveBeenCalled();
   });
 });
