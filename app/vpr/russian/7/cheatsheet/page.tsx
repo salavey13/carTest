@@ -1,1627 +1,1815 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import {
-  BookOpen,
-  PenTool,
-  SpellCheck,
-  Quote,
-  TreePine,
-  GitBranch,
-  Lightbulb,
-  Eye,
-  MousePointerClick,
-  ChevronDown,
-  ChevronUp,
-  Hash,
-  Type,
-  MessageSquare,
-  ScrollText,
-  ArrowLeft,
-} from "lucide-react";
+  BookOpen, PenTool, SpellCheck, ChevronDown, ChevronUp,
+  Lightbulb, Eye, MousePointerClick, Trophy, RotateCcw,
+  Target, ArrowLeft, ArrowRight, CheckCircle2, XCircle,
+  GraduationCap, MessageSquare, ListChecks, ChevronRight,
+} from 'lucide-react';
 
-/* ═══════════════════════════════════════════════════════════════════
-   SVG COMPONENT 1: SpeechTreeSVG — Parts of Speech hierarchy
-   ═══════════════════════════════════════════════════════════════════ */
-const SpeechTreeSVG = ({
-  hovered,
-  setHovered,
-}: {
-  hovered: string | null;
-  setHovered: (v: string | null) => void;
-}) => {
-  const independent = [
-    { id: "suschestvitelnoe", label: "Сущ.", full: "Существительное", color: "#c084fc", x: 40, y: 90 },
-    { id: "prilagatelnoe", label: "Прил.", full: "Прилагательное", color: "#a78bfa", x: 90, y: 90 },
-    { id: "chislitelnoe", label: "Числит.", full: "Числительное", color: "#8b5cf6", x: 145, y: 90 },
-    { id: "mestoimenie", label: "Мест.", full: "Местоимение", color: "#c084fc", x: 40, y: 150 },
-    { id: "glagol", label: "Глагол", full: "Глагол", color: "#a78bfa", x: 90, y: 150 },
-    { id: "narechie", label: "Нареч.", full: "Наречие", color: "#8b5cf6", x: 145, y: 150 },
-    { id: "prichastie", label: "Прич.", full: "Причастие", color: "#c084fc", x: 40, y: 210 },
-    { id: "deechprichastie", label: "Деепр.", full: "Деепричастие", color: "#a78bfa", x: 110, y: 210 },
-  ];
+import {
+  DICTATION_TEXTS, SUPPORT_QUESTIONS, SPELLING_RULES,
+  RULE_TAG_DISPLAY, SUPPORT_TYPE_DISPLAY,
+  type DictationGap, type SupportQuestion, type GapKind, type RuleTag,
+} from './questions-data';
 
-  const auxiliary = [
-    { id: "predlog", label: "Предлог", full: "Предлог", color: "#60a5fa", x: 280, y: 110 },
-    { id: "soyuz", label: "Союз", full: "Союз", color: "#38bdf8", x: 280, y: 165 },
-    { id: "chastitsa", label: "Частица", full: "Частица", color: "#7dd3fc", x: 280, y: 220 },
-  ];
+// ─── Types ──────────────────────────────────────────────────────────────────────
 
+type DictAnswer = string | { ne: string; separate: boolean; nn?: string };
+type Segment = { type: 'text'; content: string } | { type: 'gap'; gapId: number };
+type ModeTab = 'dictation' | 'support';
+type SidebarTab = 'rules' | 'stats';
+
+// ─── Template parser ────────────────────────────────────────────────────────────
+
+function parseTemplate(template: string): Segment[] {
+  const parts = template.split(/\{\{(\d+)\}\}/);
+  const segments: Segment[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 0) {
+      // text segment
+      if (parts[i]) segments.push({ type: 'text', content: parts[i] });
+    } else {
+      // gap segment
+      segments.push({ type: 'gap', gapId: parseInt(parts[i], 10) });
+    }
+  }
+  return segments;
+}
+
+// ─── Gap validation ─────────────────────────────────────────────────────────────
+
+function validateGap(gap: DictationGap, answer: DictAnswer): boolean {
+  if (gap.kind === 'letter' || gap.kind === 'z-s') {
+    const correctStr = gap.correct as string;
+    const answerStr = (typeof answer === 'string' ? answer : '').toLowerCase();
+    return answerStr === correctStr.toLowerCase();
+  }
+  if (gap.kind === 'n-nn') {
+    return typeof answer === 'string' && answer === gap.correct;
+  }
+  if (gap.kind === 'comma') {
+    const answerStr = typeof answer === 'string' ? answer : '';
+    return answerStr === ',';
+  }
+  if (gap.kind === 'ne-simple') {
+    if (typeof answer !== 'object' || typeof gap.correct !== 'object') return false;
+    return answer.ne === gap.correct.ne && answer.separate === gap.correct.separate;
+  }
+  if (gap.kind === 'ne-complex') {
+    if (typeof answer !== 'object' || typeof gap.correct !== 'object') return false;
+    return (
+      answer.ne === gap.correct.ne &&
+      answer.separate === gap.correct.separate &&
+      answer.nn === (gap.correct as { ne: string; separate: boolean; nn?: string }).nn
+    );
+  }
+  return false;
+}
+
+// ─── SVG Components ─────────────────────────────────────────────────────────────
+
+function PenSVG() {
   return (
-    <svg viewBox="0 0 360 270" className="w-full h-full" style={{ fontFamily: "sans-serif" }}>
+    <svg viewBox="0 0 120 120" className="w-20 h-20 sm:w-28 sm:h-28" aria-hidden="true">
       <defs>
-        <filter id="svgGlow">
-          <feGaussianBlur stdDeviation="3" result="blur" />
+        <linearGradient id="penGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#a78bfa" />
+          <stop offset="100%" stopColor="#7c3aed" />
+        </linearGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="2" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
       </defs>
-
-      {/* Root node */}
-      <g>
-        <rect x="100" y="10" width="160" height="36" rx="18" fill="#7c3aed" opacity="0.9" />
-        <text x="180" y="33" fill="#fff" fontSize="13" fontWeight="bold" textAnchor="middle">
-          ЧАСТИ РЕЧИ
+      {/* Quill body */}
+      <path
+        d="M60 15 C60 15, 52 35, 48 55 C45 68, 50 78, 56 85 L60 100 L64 85 C70 78, 75 68, 72 55 C68 35, 60 15, 60 15Z"
+        fill="url(#penGrad)" stroke="#c4b5fd" strokeWidth="0.8" filter="url(#glow)"
+      />
+      {/* Nib line */}
+      <line x1="60" y1="85" x2="60" y2="105" stroke="#e9d5ff" strokeWidth="1.5" strokeLinecap="round" />
+      {/* Ink dot pulsing */}
+      <circle cx="60" cy="108" r="2.5" fill="#a78bfa">
+        <animate attributeName="r" values="2.5;4;2.5" dur="2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />
+      </circle>
+      {/* Orbiting Cyrillic letters */}
+      {[
+        { letter: 'а', delay: 0, radius: 32 },
+        { letter: 'я', delay: 0.6, radius: 38 },
+        { letter: 'з', delay: 1.2, radius: 28 },
+        { letter: 'ы', delay: 1.8, radius: 35 },
+        { letter: 'к', delay: 2.4, radius: 30 },
+      ].map(({ letter, delay, radius }) => (
+        <text
+          key={letter}
+          fontSize="9"
+          fill="#c4b5fd"
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontFamily="serif"
+        >
+          <animateMotion
+            dur="8s"
+            repeatCount="indefinite"
+            begin={`${delay}s`}
+            path={`M60,${60 - radius} A${radius},${radius} 0 1,1 59.99,${60 - radius}`}
+          />
+          {letter}
         </text>
-      </g>
-
-      {/* Branch: Самостоятельные */}
-      <line x1="140" y1="46" x2="95" y2="65" stroke="#a855f7" strokeWidth="2" opacity="0.6" />
-      <rect x="15" y="60" width="160" height="28" rx="14" fill="#7c3aed" opacity="0.5" />
-      <text x="95" y="79" fill="#e9d5ff" fontSize="11" fontWeight="bold" textAnchor="middle">
-        Самостоятельные
-      </text>
-
-      {/* Lines to independent */}
-      {[90, 150, 210].map((y) => (
-        <line key={y} x1="95" y1={y - 5} x2="95" y2={y + 5} stroke="#a855f7" strokeWidth="1.5" opacity="0.4" />
       ))}
-
-      {/* Independent items */}
-      {independent.map((item) => (
-        <g
-          key={item.id}
-          onMouseEnter={() => setHovered(item.id)}
-          onMouseLeave={() => setHovered(null)}
-          className="cursor-pointer"
-        >
-          <rect
-            x={item.x - 2}
-            y={item.y - 16}
-            width={item.id === "deechprichastie" ? 70 : 55}
-            height={32}
-            rx="10"
-            fill={hovered === item.id ? item.color : `${item.color}33`}
-            stroke={hovered === item.id ? "#fff" : item.color}
-            strokeWidth={hovered === item.id ? 2 : 1}
-            style={{ transition: "all 0.2s ease" }}
-          />
-          <text
-            x={item.x + (item.id === "deechprichastie" ? 33 : 25)}
-            y={item.y + 4}
-            fill={hovered === item.id ? "#fff" : "#e9d5ff"}
-            fontSize="10"
-            fontWeight="bold"
-            textAnchor="middle"
-          >
-            {item.label}
-          </text>
-        </g>
-      ))}
-
-      {/* Branch: Служебные */}
-      <line x1="220" y1="46" x2="290" y2="80" stroke="#60a5fa" strokeWidth="2" opacity="0.6" />
-      <rect x="230" y="72" width="120" height="28" rx="14" fill="#3b82f6" opacity="0.5" />
-      <text x="290" y="91" fill="#bfdbfe" fontSize="11" fontWeight="bold" textAnchor="middle">
-        Служебные
-      </text>
-
-      {/* Auxiliary items */}
-      {auxiliary.map((item) => (
-        <g
-          key={item.id}
-          onMouseEnter={() => setHovered(item.id)}
-          onMouseLeave={() => setHovered(null)}
-          className="cursor-pointer"
-        >
-          <rect
-            x={item.x - 2}
-            y={item.y - 16}
-            width={80}
-            height={32}
-            rx="10"
-            fill={hovered === item.id ? item.color : `${item.color}33`}
-            stroke={hovered === item.id ? "#fff" : item.color}
-            strokeWidth={hovered === item.id ? 2 : 1}
-            style={{ transition: "all 0.2s ease" }}
-          />
-          <text
-            x={item.x + 38}
-            y={item.y + 4}
-            fill={hovered === item.id ? "#fff" : "#bfdbfe"}
-            fontSize="10"
-            fontWeight="bold"
-            textAnchor="middle"
-          >
-            {item.label}
-          </text>
-        </g>
-      ))}
-
-      {/* Tooltip on hover */}
-      {hovered && (
-        <g>
-          <rect x="5" y="240" width="350" height="28" rx="6" fill="rgba(0,0,0,0.85)" stroke="#a855f7" strokeWidth="1" />
-          {[...independent, ...auxiliary].find((i) => i.id === hovered) && (
-            <text x="180" y="258" fill="#e9d5ff" fontSize="10" textAnchor="middle" fontWeight="bold">
-              {(() => {
-                const part = [...independent, ...auxiliary].find((i) => i.id === hovered);
-                const defs: Record<string, string> = {
-                  suschestvitelnoe: "Существительное — предмет, живое существо, явление (Кто? Что?)",
-                  prilagatelnoe: "Прилагательное — признак предмета (Какой? Какая? Какие?)",
-                  chislitelnoe: "Числительное — количество, порядок (Сколько? Который?)",
-                  mestoimenie: "Местоимение — указывает на предмет, не называя (Кто? Что?)",
-                  glagol: "Глагол — действие, состояние (Что делать? Что сделать?)",
-                  narechie: "Наречие — признак действия (Как? Где? Когда? Куда?)",
-                  prichastie: "Причастие — признак предмета по действию (Какой?)",
-                  deechprichastie: "Деепричастие — добавочное действие (Что делая? Что сделав?)",
-                  predlog: "Предлог — связь слов в словосочетании (без, в, к, на, о)",
-                  soyuz: "Союз — связь однородных членов и предложений (и, а, но, потому что)",
-                  chastitsa: "Частица — оттенок значения (не, ни, же, ли, ведь, даже)",
-                };
-                return part ? defs[part.id] || part.full : "";
-              })()}
-            </text>
-          )}
-        </g>
-      )}
     </svg>
   );
-};
+}
 
-/* ═══════════════════════════════════════════════════════════════════
-   SVG COMPONENT 2: MorphemeSVG — Word structure breakdown
-   ═══════════════════════════════════════════════════════════════════ */
-const MorphemeSVG = ({
-  activePart,
-  setActivePart,
-  wordParts,
-}: {
-  activePart: string | null;
-  setActivePart: (v: string | null) => void;
-  wordParts: { part: string; label: string; text: string; color: string; width: number }[];
-}) => {
-  const partDefs: Record<string, string> = {
-    Приставка: "Стоит перед корнем. Указывает на направление или завершённость действия. (пере-, за-, на-, под-, от-, при-)",
-    Корень: "Главная значимая часть слова. Общий для родственных слов. (вод- / -вод- / -вожд-)",
-    Суффикс: "Стоит после корня. Образует новое слово или форму. (-ок, -ек, -н-, -тель, -ск-)",
-    Окончание: "Изменяемая часть. Выражает грамм. значение (падеж, число, род). Выделяется!",
-    Основа: "Всё слово без окончания. Несёт основное лексическое значение.",
-  };
-
-  const colors: Record<string, string> = {
-    Приставка: "#f472b6",
-    Корень: "#a855f7",
-    Суффикс: "#38bdf8",
-    Окончание: "#fbbf24",
-    Основа: "#34d399",
-  };
-
+function SentenceTreeSVG() {
   return (
-    <svg viewBox="0 0 600 260" className="w-full h-full" style={{ fontFamily: "sans-serif" }}>
+    <svg viewBox="0 0 200 80" className="w-40 h-16" aria-hidden="true">
       <defs>
-        <marker id="arrPurple" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-          <path d="M0,0 L0,6 L7,3 z" fill="#a855f7" />
-        </marker>
+        <linearGradient id="treeLine" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#a78bfa" />
+          <stop offset="100%" stopColor="#c084fc" />
+        </linearGradient>
       </defs>
+      {/* Nodes */}
+      <rect x="5" y="30" width="55" height="22" rx="6" fill="#1e1035" stroke="#a78bfa" strokeWidth="0.8" />
+      <text x="32" y="45" textAnchor="middle" fontSize="8" fill="#c4b5fd" fontFamily="serif">подлежащее</text>
+      <rect x="75" y="30" width="50" height="22" rx="6" fill="#1e1035" stroke="#c084fc" strokeWidth="0.8" />
+      <text x="100" y="45" textAnchor="middle" fontSize="8" fill="#c4b5fd" fontFamily="serif">сказуемое</text>
+      <rect x="140" y="30" width="55" height="22" rx="6" fill="#1e1035" stroke="#e879f9" strokeWidth="0.8" />
+      <text x="167" y="45" textAnchor="middle" fontSize="8" fill="#e9d5ff" fontFamily="serif">дополнение</text>
+      {/* Connecting lines */}
+      <line x1="60" y1="41" x2="75" y2="41" stroke="url(#treeLine)" strokeWidth="1.2">
+        <animate attributeName="opacity" values="0.4;1;0.4" dur="3s" repeatCount="indefinite" />
+      </line>
+      <line x1="125" y1="41" x2="140" y2="41" stroke="url(#treeLine)" strokeWidth="1.2">
+        <animate attributeName="opacity" values="0.4;1;0.4" dur="3s" repeatCount="indefinite" begin="1.5s" />
+      </line>
+    </svg>
+  );
+}
 
-      {/* Word blocks */}
-      {(() => {
-        let xPos = 60;
-        return wordParts.map((wp, i) => {
-          const w = wp.width;
-          const currentX = xPos;
-          xPos += w + 4;
-          return (
-            <g
-              key={i}
-              onMouseEnter={() => setActivePart(wp.part)}
-              onMouseLeave={() => setActivePart(null)}
-              className="cursor-pointer"
-            >
-              <rect
-                x={currentX}
-                y={40}
-                width={w}
-                height={60}
-                rx="8"
-                fill={activePart === wp.part ? wp.color : `${wp.color}44`}
-                stroke={activePart === wp.part ? "#fff" : wp.color}
-                strokeWidth={activePart === wp.part ? 2 : 1}
-                style={{ transition: "all 0.2s ease" }}
-              />
-              <text
-                x={currentX + w / 2}
-                y={76}
-                fill={activePart === wp.part ? "#fff" : "#e2e8f0"}
-                fontSize="22"
-                fontWeight="bold"
-                textAnchor="middle"
-              >
-                {wp.text}
-              </text>
-              <text
-                x={currentX + w / 2}
-                y={120}
-                fill={wp.color}
-                fontSize="11"
-                fontWeight="bold"
-                textAnchor="middle"
-              >
-                {wp.label}
-              </text>
-              {/* Bracket lines */}
-              <line x1={currentX + w / 2} y1={125} x2={currentX + w / 2} y2={135} stroke={wp.color} strokeWidth="1" />
-            </g>
-          );
-        });
-      })()}
-
-      {/* Основа bracket */}
-      {(() => {
-        let startX = 60;
-        let endX = 60;
-        wordParts.forEach((wp) => {
-          if (wp.part !== "Окончание") {
-            endX = startX + wp.width + 4;
-          }
-          startX += wp.width + 4;
-        });
-        const adjustedEnd = endX - 4;
+function LetterChainSVG() {
+  const morphemes = [
+    { label: 'приставка', color: '#a78bfa', bg: '#2d1854' },
+    { label: 'корень', color: '#c084fc', bg: '#3b1f70' },
+    { label: 'суффикс', color: '#e879f9', bg: '#4a1d7a' },
+    { label: 'окончание', color: '#f0abfc', bg: '#5b2188' },
+  ];
+  return (
+    <svg viewBox="0 0 320 40" className="w-64 h-10" aria-hidden="true">
+      {morphemes.map((m, i) => {
+        const x = i * 82;
         return (
-          <g>
-            <line x1={60} y1={145} x2={adjustedEnd} y2={145} stroke="#34d399" strokeWidth="2" />
-            <line x1={60} y1={140} x2={60} y2={145} stroke="#34d399" strokeWidth="2" />
-            <line x1={adjustedEnd} y1={140} x2={adjustedEnd} y2={145} stroke="#34d399" strokeWidth="2" />
-            <text x={(60 + adjustedEnd) / 2} y={162} fill="#34d399" fontSize="12" fontWeight="bold" textAnchor="middle">
-              основа
+          <g key={m.label}>
+            <rect x={x + 2} y="8" width="72" height="24" rx="4" fill={m.bg} stroke={m.color} strokeWidth="0.7" />
+            <text x={x + 38} y="24" textAnchor="middle" fontSize="8" fill={m.color} fontFamily="sans-serif">
+              {m.label}
             </text>
+            {i < morphemes.length - 1 && (
+              <line x1={x + 74} y1="20" x2={x + 82} y2="20" stroke={m.color} strokeWidth="1" opacity="0.6" />
+            )}
           </g>
         );
-      })()}
-
-      {/* Explanation box */}
-      {activePart && partDefs[activePart] && (
-        <g>
-          <rect x="30" y="180" width="540" height="60" rx="10" fill="rgba(0,0,0,0.85)" stroke={colors[activePart]} strokeWidth="1.5" />
-          <circle cx="55" cy="200" r="8" fill={colors[activePart]} />
-          <text x="70" y="204" fill="#fff" fontSize="12" fontWeight="bold">
-            {activePart}
-          </text>
-          <text x="70" y="224" fill="#cbd5e1" fontSize="10">
-            {partDefs[activePart]}
-          </text>
-        </g>
-      )}
+      })}
     </svg>
   );
-};
+}
 
-/* ═══════════════════════════════════════════════════════════════════
-   SVG COMPONENT 3: SentenceTreeSVG — Syntax tree
-   ═══════════════════════════════════════════════════════════════════ */
-const SentenceTreeSVG = ({
-  hovered,
-  setHovered,
-}: {
-  hovered: string | null;
-  setHovered: (v: string | null) => void;
-}) => {
-  const nodes = [
-    { id: "podlezhaschee", label: "Подлежащее", question: "Кто? Что?", color: "#c084fc", x: 80, y: 30 },
-    { id: "skazuemoe", label: "Сказуемое", question: "Что делает?", color: "#a855f7", x: 240, y: 30 },
-    { id: "dopolnenie", label: "Дополнение", question: "Кого? Что? Кому? Чему?", color: "#60a5fa", x: 400, y: 30 },
-    { id: "opredelenie", label: "Определение", question: "Какой? Чей?", color: "#f472b6", x: 80, y: 120 },
-    { id: "obstoyatelstvo", label: "Обстоятельство", question: "Где? Когда? Как? Куда?", color: "#34d399", x: 260, y: 120 },
-  ];
+// ─── Background Pattern ─────────────────────────────────────────────────────────
 
+function BackgroundPattern() {
   return (
-    <svg viewBox="0 0 520 230" className="w-full h-full" style={{ fontFamily: "sans-serif" }}>
-      <defs>
-        <filter id="nodeGlow">
-          <feGaussianBlur stdDeviation="4" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-
-      {/* Central label */}
-      <text x="260" y="205" fill="#7c3aed" fontSize="12" fontWeight="bold" textAnchor="middle" opacity="0.7">
-        ГЛАВНЫЕ ЧЛЕНЫ + ВТОРОСТЕПЕННЫЕ
-      </text>
-
-      {/* Lines connecting */}
-      <line x1="80" y1="55" x2="80" y2="115" stroke="#a855f7" strokeWidth="1" opacity="0.3" strokeDasharray="4 3" />
-      <line x1="260" y1="55" x2="260" y2="115" stroke="#a855f7" strokeWidth="1" opacity="0.3" strokeDasharray="4 3" />
-      <line x1="80" y1="48" x2="240" y2="48" stroke="#a855f7" strokeWidth="1.5" opacity="0.4" />
-      <line x1="240" y1="48" x2="400" y2="48" stroke="#60a5fa" strokeWidth="1" opacity="0.3" strokeDasharray="4 3" />
-
-      {/* Nodes */}
-      {nodes.map((node) => (
-        <g
-          key={node.id}
-          onMouseEnter={() => setHovered(node.id)}
-          onMouseLeave={() => setHovered(null)}
-          className="cursor-pointer"
-        >
-          <rect
-            x={node.x - 5}
-            y={node.y}
-            width={node.id === "obstoyatelstvo" ? 180 : node.id === "dopolnenie" ? 140 : 130}
-            height={45}
-            rx="12"
-            fill={hovered === node.id ? node.color : `${node.color}22`}
-            stroke={hovered === node.id ? "#fff" : node.color}
-            strokeWidth={hovered === node.id ? 2 : 1}
-            filter={hovered === node.id ? "url(#nodeGlow)" : undefined}
-            style={{ transition: "all 0.25s ease" }}
-          />
-          <text
-            x={node.x + (node.id === "obstoyatelstvo" ? 85 : node.id === "dopolnenie" ? 65 : 60)}
-            y={node.y + 20}
-            fill={hovered === node.id ? "#fff" : node.color}
-            fontSize="13"
-            fontWeight="bold"
-            textAnchor="middle"
-          >
-            {node.label}
-          </text>
-          <text
-            x={node.x + (node.id === "obstoyatelstvo" ? 85 : node.id === "dopolnenie" ? 65 : 60)}
-            y={node.y + 38}
-            fill={hovered === node.id ? "#e2e8f0" : "#94a3b8"}
-            fontSize="10"
-            textAnchor="middle"
-          >
-            {node.question}
-          </text>
-        </g>
-      ))}
-
-      {/* Legend */}
-      <g>
-        <rect x="5" y="170" width="8" height="8" rx="2" fill="#a855f7" />
-        <text x="18" y="178" fill="#94a3b8" fontSize="8">Главные</text>
-        <rect x="70" y="170" width="8" height="8" rx="2" fill="#60a5fa" />
-        <text x="83" y="178" fill="#94a3b8" fontSize="8">Второстепенные</text>
-      </g>
-    </svg>
+    <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+      {/* Gradient blurs */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-900/20 rounded-full blur-3xl" />
+      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-purple-900/15 rounded-full blur-3xl" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-fuchsia-900/10 rounded-full blur-3xl" />
+      {/* Dot grid */}
+      <svg className="absolute inset-0 w-full h-full opacity-[0.07]">
+        <defs>
+          <pattern id="dotGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+            <circle cx="2" cy="2" r="0.8" fill="#a78bfa" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#dotGrid)" />
+      </svg>
+    </div>
   );
-};
+}
 
-/* ═══════════════════════════════════════════════════════════════════
-   SVG COMPONENT 4: PunctuationRuleSVG — Animated sentence with commas
-   ═══════════════════════════════════════════════════════════════════ */
-const PunctuationRuleSVG = ({
-  activeRule,
-  setActiveRule,
-}: {
-  activeRule: string | null;
-  setActiveRule: (v: string | null) => void;
-}) => {
-  const rules = [
-    { id: "odnorodnye", label: "Запятая при однородных", color: "#f472b6" },
-    { id: "prichastnyj", label: "Причастный оборот", color: "#a855f7" },
-    { id: "slozhnoe", label: "Сложное предложение", color: "#38bdf8" },
-    { id: "pryamaya-rech", label: "Прямая речь", color: "#fbbf24" },
-  ];
-
-  return (
-    <svg viewBox="0 0 700 250" className="w-full h-full" style={{ fontFamily: "sans-serif" }}>
-      {/* Rule buttons */}
-      {rules.map((rule, i) => (
-        <g
-          key={rule.id}
-          onMouseEnter={() => setActiveRule(rule.id)}
-          onMouseLeave={() => setActiveRule(null)}
-          className="cursor-pointer"
-        >
-          <rect
-            x={10}
-            y={10 + i * 34}
-            width={220}
-            height={30}
-            rx="8"
-            fill={activeRule === rule.id ? rule.color : `${rule.color}22`}
-            stroke={activeRule === rule.id ? "#fff" : rule.color}
-            strokeWidth={activeRule === rule.id ? 1.5 : 1}
-            style={{ transition: "all 0.2s ease" }}
-          />
-          <text x="120" y={30 + i * 34} fill={activeRule === rule.id ? "#fff" : "#cbd5e1"} fontSize="11" fontWeight="bold" textAnchor="middle">
-            {rule.label}
-          </text>
-        </g>
-      ))}
-
-      {/* Example sentences */}
-      {activeRule === "odnorodnye" && (
-        <g>
-          <rect x="250" y="15" width="440" height="55" rx="10" fill="rgba(244,114,182,0.08)" stroke="#f472b6" strokeWidth="1" />
-          <text x="265" y="38" fill="#e2e8f0" fontSize="13">
-            Ветер{" "}
-            <tspan fill="#f472b6" fontSize="20" fontWeight="bold">,</tspan>{" "}
-            дождь и туман мешали путникам.
-          </text>
-          <text x="265" y="58" fill="#f472b6" fontSize="10" opacity="0.8">
-            → Однородные определения: ветер, дождь, туман (не последнее — запятая!)
-          </text>
-        </g>
-      )}
-
-      {activeRule === "prichastnyj" && (
-        <g>
-          <rect x="250" y="15" width="440" height="55" rx="10" fill="rgba(168,85,247,0.08)" stroke="#a855f7" strokeWidth="1" />
-          <text x="265" y="38" fill="#e2e8f0" fontSize="13">
-            Книга{" "}
-            <tspan fill="#a855f7" fontWeight="bold">, лежащая на столе, </tspan>
-            была старой.
-          </text>
-          <text x="265" y="58" fill="#a855f7" fontSize="10" opacity="0.8">
-            → Причастный оборот после определяемого слова: выделяется запятыми
-          </text>
-        </g>
-      )}
-
-      {activeRule === "slozhnoe" && (
-        <g>
-          <rect x="250" y="15" width="440" height="55" rx="10" fill="rgba(56,189,248,0.08)" stroke="#38bdf8" strokeWidth="1" />
-          <text x="265" y="38" fill="#e2e8f0" fontSize="13">
-            Солнце село{" "}
-            <tspan fill="#38bdf8" fontSize="20" fontWeight="bold">,</tspan>{" "}
-            и на улице стало темно.
-          </text>
-          <text x="265" y="58" fill="#38bdf8" fontSize="10" opacity="0.8">
-            → ССП: две грамматические основы, разделённые запятой (и, а, но)
-          </text>
-        </g>
-      )}
-
-      {activeRule === "pryamaya-rech" && (
-        <g>
-          <rect x="250" y="15" width="440" height="70" rx="10" fill="rgba(251,191,36,0.08)" stroke="#fbbf24" strokeWidth="1" />
-          <text x="265" y="38" fill="#e2e8f0" fontSize="13">
-            <tspan fill="#fbbf24" fontWeight="bold">А: «</tspan>
-            Привет!{" "}
-            <tspan fill="#fbbf24" fontWeight="bold">»</tspan>
-          </text>
-          <text x="265" y="58" fill="#fbbf24" fontSize="10" opacity="0.8">
-            → Слова автора «перед» прямой речью: А: «П» или А: «П!»
-          </text>
-          <text x="265" y="74" fill="#94a3b8" fontSize="10" opacity="0.6">
-            «П», — а. → Прямая речь «перед» словами автора
-          </text>
-        </g>
-      )}
-
-      {!activeRule && (
-        <g>
-          <rect x="250" y="50" width="440" height="40" rx="10" fill="rgba(255,255,255,0.03)" stroke="#334155" strokeWidth="1" strokeDasharray="4 3" />
-          <text x="470" y="75" fill="#64748b" fontSize="12" textAnchor="middle">
-            Наведи на правило слева ←
-          </text>
-        </g>
-      )}
-
-      {/* Comma animation */}
-      <circle cx="233" cy="155" r="4" fill="#f472b6" opacity="0.6">
-        <animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite" />
-      </circle>
-      <text x="210" y="180" fill="#f472b6" fontSize="30" fontWeight="bold" opacity="0.15">
-        ,
-      </text>
-      <text x="280" y="180" fill="#a855f7" fontSize="30" fontWeight="bold" opacity="0.15">
-        ,
-      </text>
-      <text x="350" y="180" fill="#38bdf8" fontSize="30" fontWeight="bold" opacity="0.15">
-        ,
-      </text>
-      <text x="420" y="180" fill="#fbbf24" fontSize="30" fontWeight="bold" opacity="0.15">
-        «»
-      </text>
-
-      {/* Formula bar */}
-      <rect x="250" y="195" width="440" height="40" rx="8" fill="rgba(168,85,247,0.06)" />
-      <text x="470" y="215" fill="#a78bfa" fontSize="10" textAnchor="middle" fontWeight="bold">
-        ПУНКТУАЦИЯ — НАБОР ПРАВИЛ ДЛЯ РАЗДЕЛИТЕЛЬНЫХ ЗНАКОВ
-      </text>
-      <text x="470" y="228" fill="#7c3aed" fontSize="9" textAnchor="middle">
-        Запятая | Точка | Тире | Двоеточие | Точка с запятой
-      </text>
-    </svg>
-  );
-};
-
-/* ═══════════════════════════════════════════════════════════════════
-   SVG COMPONENT 5: NounDeclensionSVG — 6 cases table
-   ═══════════════════════════════════════════════════════════════════ */
-const NounDeclensionSVG = () => (
-  <svg viewBox="0 0 680 310" className="w-full h-full" style={{ fontFamily: "sans-serif" }}>
-    {/* Header row */}
-    <rect x="0" y="0" width="680" height="40" rx="10" fill="#7c3aed" opacity="0.3" />
-    <text x="60" y="26" fill="#e9d5ff" fontSize="12" fontWeight="bold" textAnchor="middle">Падеж</text>
-    <text x="180" y="26" fill="#e9d5ff" fontSize="12" fontWeight="bold" textAnchor="middle">Вопрос</text>
-    <text x="320" y="26" fill="#e9d5ff" fontSize="12" fontWeight="bold" textAnchor="middle">1 скл.</text>
-    <text x="440" y="26" fill="#e9d5ff" fontSize="12" fontWeight="bold" textAnchor="middle">2 скл.</text>
-    <text x="570" y="26" fill="#e9d5ff" fontSize="12" fontWeight="bold" textAnchor="middle">3 скл.</text>
-
-    {/* Case rows */}
-    {[
-      { name: "Именительный", q: "Кто? Что?", e1: "земля, стол", e2: "конь, поле", e3: "ночь", color: "#c084fc" },
-      { name: "Родительный", q: "Кого? Чего?", e1: "земли, стола", e2: "коня, поля", e3: "ночи", color: "#a78bfa" },
-      { name: "Дательный", q: "Кому? Чему?", e1: "земле, столу", e2: "коню, полю", e3: "ночи", color: "#8b5cf6" },
-      { name: "Винительный", q: "Кого? Что?", e1: "землю, стол", e2: "коня, поле", e3: "ночь", color: "#7c3aed" },
-      { name: "Творительный", q: "Кем? Чем?", e1: "землёй, столом", e2: "конём, полем", e3: "ночью", color: "#6d28d9" },
-      { name: "Предложный", q: "О ком? О чём?", e1: "о земле, о столе", e2: "о коне, о поле", e3: "о ночи", color: "#5b21b6" },
-    ].map((row, i) => (
-      <g key={i}>
-        <rect x="0" y={45 + i * 42} width="680" height="40" rx="6" fill={i % 2 === 0 ? "rgba(168,85,247,0.05)" : "rgba(0,0,0,0)"} />
-        <text x="60" y={70 + i * 42} fill={row.color} fontSize="12" fontWeight="bold" textAnchor="middle">{row.name}</text>
-        <text x="180" y={70 + i * 42} fill="#e2e8f0" fontSize="11" textAnchor="middle">{row.q}</text>
-        <text x="320" y={70 + i * 42} fill="#c084fc" fontSize="11" textAnchor="middle">{row.e1}</text>
-        <text x="440" y={70 + i * 42} fill="#60a5fa" fontSize="11" textAnchor="middle">{row.e2}</text>
-        <text x="570" y={70 + i * 42} fill="#34d399" fontSize="11" textAnchor="middle">{row.e3}</text>
-      </g>
-    ))}
-
-    {/* Footer labels */}
-    <text x="320" y="305" fill="#c084fc" fontSize="9" textAnchor="middle" opacity="0.6">ж.р., м.р. + -а/-я</text>
-    <text x="440" y="305" fill="#60a5fa" fontSize="9" textAnchor="middle" opacity="0.6">м.р. с твёрд. осн., ср.р.</text>
-    <text x="570" y="305" fill="#34d399" fontSize="9" textAnchor="middle" opacity="0.6">ж.р. + мягкий знак</text>
-  </svg>
-);
-
-/* ═══════════════════════════════════════════════════════════════════
-   DATA ARRAYS
-   ═══════════════════════════════════════════════════════════════════ */
-
-const spellingRules = [
-  {
-    rule: "жи-ши → И",
-    examples: ["жизнь", "шишка", "живот", "ширина"],
-    note: "Ж и Ш под ударением пишутся с И, несмотря на произношение [ы].",
-    color: "#f472b6",
-  },
-  {
-    rule: "ча-ща → А",
-    examples: ["часы", "щука", "чаща", "площадь"],
-    note: "Ч и Щ под ударением пишутся с А, несмотря на произношение [и].",
-    color: "#a855f7",
-  },
-  {
-    rule: "чу-щу → У",
-    examples: ["чудо", "щука", "чувство", "ищу"],
-    note: "Ч и Щ под ударением пишутся с У, несмотря на произношение [у] — но правило!",
-    color: "#38bdf8",
-  },
-  {
-    rule: "Приставки на -З/-С",
-    examples: ["безвкусный", "бесполезный", "расписать", "расписка"],
-    note: "З перед звонкими, С перед глухими. Исключения: раз-, роз-, без-, бес- (твёрдый/мягкий знак!).",
-    color: "#fbbf24",
-  },
-  {
-    rule: "Корни с чередованием: -раст-/-ращ-/-рост-",
-    examples: ["расти", "выращивать", "росток", "исключение: Ростов"],
-    note: "РАСТ/РАЩ — перед СТ, Щ. РОСТ — без СТ, Щ. Исключение: Ростов, Ростислав.",
-    color: "#34d399",
-  },
-  {
-    rule: "Корни: -лаг-/-лог-",
-    examples: ["полагать", "излагать", "положить", "предложить"],
-    note: "-ЛАГ- перед -А-, -ЛОГ- перед -О-.",
-    color: "#fb923c",
-  },
-  {
-    rule: "Корни: -гор-/-гар-",
-    examples: ["загорелый", "загорать", "исключение: пригарь"],
-    note: "-ГАР- под ударением, -ГОР- без ударения. Исключение: выгарки, пригарь.",
-    color: "#e879f9",
-  },
-  {
-    rule: "НЕ с глаголами",
-    examples: ["не знал", "не мог", "не делал"],
-    note: "НЕ с глаголами пишется РАЗДЕЛЬНО всегда! (не видел, не хочет, не пробовал)",
-    color: "#f43f5e",
-  },
-  {
-    rule: "-тся / -ться",
-    examples: ["он смеётся", "он хочет смеяться"],
-    note: "Отвечай на вопрос: Что делает? (что делаеТ) → -тся. Что делать? (что дела ТЬ) → -ться.",
-    color: "#22d3ee",
-  },
-];
-
-const phraseologisms = [
-  { phrase: "Бить баклуши", meaning: "Бездельничать, ничего не делать", color: "#f472b6" },
-  { phrase: "Водить за нос", meaning: "Обманывать кого-либо", color: "#a855f7" },
-  { phrase: "Зарубить на носу", meaning: "Точно запомнить", color: "#38bdf8" },
-  { phrase: "Капля в море", meaning: "Очень малая часть чего-либо", color: "#fbbf24" },
-  { phrase: "Небо и земля", meaning: "Вполне разные, несхожие вещи", color: "#34d399" },
-  { phrase: "Семь пятниц на неделе", meaning: "Человек часто меняет решения", color: "#fb923c" },
-  { phrase: "Как с гуся вода", meaning: "Всё проходит бесследно, не заботит", color: "#e879f9" },
-  { phrase: "Хлопот полон рот", meaning: "Много забот и дел", color: "#f43f5e" },
-];
-
-const textStyles = [
-  {
-    name: "Разговорный",
-    icon: MessageSquare,
-    features: ["Непринуждённый тон", "Оборот «неужели», «да и»", "Простые предложения", "Разговорная лексика"],
-    example: "Слушай, а ты пойдёшь завтра в кино?",
-    color: "#f472b6",
-    bg: "bg-pink-950/20",
-    border: "border-pink-500/30",
-  },
-  {
-    name: "Художественный",
-    icon: BookOpen,
-    features: ["Образность, метафоры", "Эпитеты, сравнения", "Прямая речь", "Эмоциональность"],
-    example: "Золотая осень укрыла землю ковром из листьев.",
-    color: "#a855f7",
-    bg: "bg-purple-950/20",
-    border: "border-purple-500/30",
-  },
-  {
-    name: "Научный",
-    icon: Type,
-    features: ["Точность, логичность", "Термины, определения", "Сложные предложения", "Объективность"],
-    example: "Фотосинтез — процесс превращения световой энергии в химическую.",
-    color: "#38bdf8",
-    bg: "bg-sky-950/20",
-    border: "border-sky-500/30",
-  },
-  {
-    name: "Официально-деловой",
-    icon: ScrollText,
-    features: ["Стандартные формулировки", "Канцеляризмы", "Прямой порядок слов", "Точность"],
-    example: "Настоящим уведомляем, что в связи с... принято решение.",
-    color: "#fbbf24",
-    bg: "bg-amber-950/20",
-    border: "border-amber-500/30",
-  },
-  {
-    name: "Публицистический",
-    icon: PenTool,
-    features: ["Яркость, эмоциональность", "Риторические вопросы", "Общественная тематика", "Призыв к действию"],
-    example: "Неужели мы останемся равнодушными к судьбе нашей планеты?",
-    color: "#34d399",
-    bg: "bg-emerald-950/20",
-    border: "border-emerald-500/30",
-  },
-];
-
-const wordBreakdowns = [
-  {
-    word: "ПЕРЕХОДИТЬ",
-    parts: [
-      { part: "Приставка", label: "пере-", text: "пере", color: "#f472b6", width: 70 },
-      { part: "Корень", label: "-ход-", text: "ход", color: "#a855f7", width: 60 },
-      { part: "Суффикс", label: "-и-", text: "и", color: "#38bdf8", width: 30 },
-      { part: "Окончание", label: "-ть", text: "ть", color: "#fbbf24", width: 40 },
-    ],
-  },
-  {
-    word: "ПОДОБНЫЙ",
-    parts: [
-      { part: "Приставка", label: "под-", text: "под", color: "#f472b6", width: 55 },
-      { part: "Корень", label: "-обн-", text: "обн", color: "#a855f7", width: 55 },
-      { part: "Суффикс", label: "-ый", text: "ый", color: "#38bdf8", width: 45 },
-    ],
-  },
-  {
-    word: "БЕЗДОМНЫЙ",
-    parts: [
-      { part: "Приставка", label: "без-", text: "без", color: "#f472b6", width: 55 },
-      { part: "Корень", label: "-дом-", text: "дом", color: "#a855f7", width: 60 },
-      { part: "Суффикс", label: "-н-", text: "н", color: "#38bdf8", width: 30 },
-      { part: "Суффикс", label: "-ый", text: "ый", color: "#22d3ee", width: 45 },
-    ],
-  },
-];
-
-const verbConjugations = [
-  { ending: "-ешь, -ет", questions: "Что делаешь? Что делает?", examples: "пишешь, пишет", conj: "I спряжение" },
-  { ending: "-ишь, -ит", questions: "Что делаешь? Что делает?", examples: "слышишь, слышит", conj: "II спряжение" },
-];
-
-const adjDegrees = [
-  { type: "Положительная", example: "высокий — добрый — умный", note: "Исходная форма", color: "#c084fc" },
-  { type: "Сравнительная", example: "выше — добрее — умнее", note: "Сравнение: -ее, -е, -ше или «более + adj»", color: "#a78bfa" },
-  { type: "Превосходная", example: "высочайший — добрейший — умнейший", note: "Наивысшая степень: -ейш-, -айш- или «самый + adj»", color: "#8b5cf6" },
-];
-
-/* ═══════════════════════════════════════════════════════════════════
-   MAIN COMPONENT
-   ═══════════════════════════════════════════════════════════════════ */
+// ─── Main Page Component ────────────────────────────────────────────────────────
 
 export default function Russian7Cheatsheet() {
-  const [hoveredSpeech, setHoveredSpeech] = useState<string | null>(null);
-  const [activeMorpheme, setActiveMorpheme] = useState<string | null>(null);
-  const [selectedWordIdx, setSelectedWordIdx] = useState(0);
-  const [expandedRule, setExpandedRule] = useState<number | null>(null);
-  const [hoveredSyntax, setHoveredSyntax] = useState<string | null>(null);
-  const [activePunctRule, setActivePunctRule] = useState<string | null>(null);
-  const [expandedPhrase, setExpandedPhrase] = useState<number | null>(null);
-  const [morphTab, setMorphTab] = useState<"nouns" | "adjectives" | "verbs">("nouns");
-  const [expandedStyle, setExpandedStyle] = useState<number | null>(null);
+  const dictationText = DICTATION_TEXTS[0];
+  const segments = useMemo(() => parseTemplate(dictationText.template), [dictationText.template]);
+
+  // ── Dictation state ──
+  const [dictAnswers, setDictAnswers] = useState<Record<number, DictAnswer>>({});
+  const [activeGapId, setActiveGapId] = useState<number | null>(null);
+  const [dictSubmitted, setDictSubmitted] = useState(false);
+  const [letterInput, setLetterInput] = useState('');
+  const [neComplexStep, setNeComplexStep] = useState<1 | 2 | 3>(1);
+  const [neComplexTemp, setNeComplexTemp] = useState<{ ne?: string; separate?: boolean; nn?: string }>({});
+  const [showHint, setShowHint] = useState(false);
+  const [expandedGap, setExpandedGap] = useState<number | null>(null);
+
+  // ── Support questions state ──
+  const [supportIdx, setSupportIdx] = useState(0);
+  const [supportAnswers, setSupportAnswers] = useState<Record<number, number[]>>({});
+  const [supportSubmitted, setSupportSubmitted] = useState<Record<number, boolean>>({});
+  const [showSupportHint, setShowSupportHint] = useState(false);
+  const [supportPassageOpen, setSupportPassageOpen] = useState<Record<number, boolean>>({});
+
+  // ── UI state ──
+  const [modeTab, setModeTab] = useState<ModeTab>('dictation');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('rules');
+  const [expandedRule, setExpandedRule] = useState<string | null>(null);
+
+  // ── Refs ──
+  const gapRefs = useRef<Record<number, HTMLSpanElement | null>>({});
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // ── Computed values ──
+  const activeGap = useMemo(
+    () => dictationText.gaps.find((g) => g.id === activeGapId) ?? null,
+    [activeGapId, dictationText.gaps]
+  );
+
+  const answeredCount = useMemo(() => Object.keys(dictAnswers).length, [dictAnswers]);
+  const totalGaps = dictationText.gaps.length;
+  const dictProgress = (answeredCount / totalGaps) * 100;
+
+  // Per-gap correctness after submission
+  const gapResults = useMemo(() => {
+    if (!dictSubmitted) return {};
+    const results: Record<number, boolean> = {};
+    dictationText.gaps.forEach((g) => {
+      const ans = dictAnswers[g.id];
+      results[g.id] = ans !== undefined ? validateGap(g, ans) : false;
+    });
+    return results;
+  }, [dictSubmitted, dictAnswers, dictationText.gaps]);
+
+  // Per-rule accuracy stats
+  const ruleStats = useMemo(() => {
+    const stats: Record<string, { correct: number; total: number }> = {};
+    dictationText.gaps.forEach((g) => {
+      if (!stats[g.rule]) stats[g.rule] = { correct: 0, total: 0 };
+      stats[g.rule].total++;
+      if (dictSubmitted && gapResults[g.id]) {
+        stats[g.rule].correct++;
+      }
+    });
+    return stats;
+  }, [dictationText.gaps, dictSubmitted, gapResults]);
+
+  const dictCorrectCount = useMemo(
+    () => Object.values(gapResults).filter(Boolean).length,
+    [gapResults]
+  );
+
+  // Support question scores
+  const supportCorrectCount = useMemo(() => {
+    let count = 0;
+    SUPPORT_QUESTIONS.forEach((q) => {
+      if (!supportSubmitted[q.id]) return;
+      const userAns = supportAnswers[q.id] ?? [];
+      if (q.multiSelect && q.correctIndices) {
+        const sorted1 = [...userAns].sort();
+        const sorted2 = [...q.correctIndices].sort();
+        if (sorted1.length === sorted2.length && sorted1.every((v, i) => v === sorted2[i])) count++;
+      } else if (q.correctAnswer !== undefined && q.options) {
+        const selectedIdx = userAns[0];
+        if (selectedIdx !== undefined && q.options[selectedIdx] === q.correctAnswer) count++;
+      }
+    });
+    return count;
+  }, [supportAnswers, supportSubmitted]);
+
+  const allSupportDone = useMemo(
+    () => SUPPORT_QUESTIONS.every((q) => supportSubmitted[q.id]),
+    [supportSubmitted]
+  );
+
+  const showResults = dictSubmitted && allSupportDone;
+
+  // ── Handlers ──
+
+  const handleGapClick = useCallback((gapId: number) => {
+    if (dictSubmitted) return;
+    setActiveGapId(gapId);
+    setNeComplexStep(1);
+    setNeComplexTemp({});
+    setShowHint(false);
+    // Focus input for letter type
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, [dictSubmitted]);
+
+  const submitLetterAnswer = useCallback(() => {
+    if (!activeGapId || !letterInput.trim()) return;
+    setDictAnswers((prev) => ({ ...prev, [activeGapId]: letterInput.trim() }));
+    setLetterInput('');
+    // Auto-advance
+    const gapIds = dictationText.gaps.map((g) => g.id);
+    const currentIdx = gapIds.indexOf(activeGapId);
+    if (currentIdx < gapIds.length - 1) {
+      setActiveGapId(gapIds[currentIdx + 1]);
+    } else {
+      setActiveGapId(null);
+    }
+  }, [activeGapId, letterInput, dictationText.gaps]);
+
+  const submitChoiceAnswer = useCallback(
+    (value: DictAnswer) => {
+      if (!activeGapId) return;
+      setDictAnswers((prev) => ({ ...prev, [activeGapId]: value }));
+      // Auto-advance
+      const gapIds = dictationText.gaps.map((g) => g.id);
+      const currentIdx = gapIds.indexOf(activeGapId);
+      if (currentIdx < gapIds.length - 1) {
+        setActiveGapId(gapIds[currentIdx + 1]);
+      } else {
+        setActiveGapId(null);
+      }
+    },
+    [activeGapId, dictationText.gaps]
+  );
+
+  const submitNeComplex = useCallback(() => {
+    if (!activeGapId) return;
+    const answer: { ne: string; separate: boolean; nn?: string } = {
+      ne: neComplexTemp.ne ?? 'не',
+      separate: neComplexTemp.separate ?? false,
+      nn: neComplexTemp.nn,
+    };
+    setDictAnswers((prev) => ({ ...prev, [activeGapId]: answer }));
+    setNeComplexStep(1);
+    setNeComplexTemp({});
+    // Auto-advance
+    const gapIds = dictationText.gaps.map((g) => g.id);
+    const currentIdx = gapIds.indexOf(activeGapId);
+    if (currentIdx < gapIds.length - 1) {
+      setActiveGapId(gapIds[currentIdx + 1]);
+    } else {
+      setActiveGapId(null);
+    }
+  }, [activeGapId, neComplexTemp, dictationText.gaps]);
+
+  const handleCheckDictation = useCallback(() => {
+    setDictSubmitted(true);
+    setActiveGapId(null);
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setDictAnswers({});
+    setActiveGapId(null);
+    setDictSubmitted(false);
+    setLetterInput('');
+    setNeComplexStep(1);
+    setNeComplexTemp({});
+    setShowHint(false);
+    setExpandedGap(null);
+    setSupportAnswers({});
+    setSupportSubmitted({});
+    setShowSupportHint(false);
+    setSupportIdx(0);
+  }, []);
+
+  const toggleSupportOption = useCallback(
+    (qId: number, idx: number) => {
+      if (supportSubmitted[qId]) return;
+      setSupportAnswers((prev) => {
+        const current = prev[qId] ?? [];
+        if (current.includes(idx)) {
+          return { ...prev, [qId]: current.filter((i) => i !== idx) };
+        }
+        return { ...prev, [qId]: [...current, idx] };
+      });
+    },
+    [supportSubmitted]
+  );
+
+  const handleSupportSubmit = useCallback(
+    (qId: number) => {
+      setSupportSubmitted((prev) => ({ ...prev, [qId]: true }));
+    },
+    []
+  );
+
+  // Focus input when active gap changes to letter type
+  useEffect(() => {
+    if (activeGap?.kind === 'letter') {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [activeGap]);
+
+  // ── Helper: get display text for a gap answer ──
+  const formatAnswerDisplay = useCallback((gap: DictationGap, answer: DictAnswer): string => {
+    if (gap.kind === 'letter') return answer as string;
+    if (gap.kind === 'n-nn') return answer as string;
+    if (gap.kind === 'z-s') return answer as string;
+    if (gap.kind === 'comma') {
+      return (answer as string) === ',' ? '✓' : '✗';
+    }
+    if (gap.kind === 'ne-simple') {
+      const a = answer as { ne: string; separate: boolean };
+      return a.separate ? `${a.ne} (раздельно)` : `${a.ne} (слитно)`;
+    }
+    if (gap.kind === 'ne-complex') {
+      const a = answer as { ne: string; separate: boolean; nn?: string };
+      const nePart = a.separate ? `${a.ne} ... (раздельно)` : `${a.ne}... (слитно)`;
+      return a.nn ? `${nePart}, ${a.nn}` : nePart;
+    }
+    return '';
+  }, []);
+
+  // ── Grade calculation ──
+  const totalCorrect = dictCorrectCount + supportCorrectCount;
+  const totalQuestions = totalGaps + SUPPORT_QUESTIONS.length;
+  const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+
+  const grade = useMemo(() => {
+    if (percentage >= 90) return { label: 'Отлично', color: 'text-green-400', emoji: '🏆' };
+    if (percentage >= 70) return { label: 'Хорошо', color: 'text-yellow-400', emoji: '⭐' };
+    if (percentage >= 50) return { label: 'Удовлетворительно', color: 'text-orange-400', emoji: '📖' };
+    return { label: 'Нужно подтянуть', color: 'text-red-400', emoji: '💪' };
+  }, [percentage]);
+
+  // ─── RENDER ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#0a0612] text-purple-50 p-4 md:p-8 font-sans relative overflow-x-hidden selection:bg-purple-500/30">
-      {/* Background pattern — manuscript dots */}
-      <div
-        className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none"
-        style={{
-          backgroundImage: `
-            radial-gradient(circle at 15% 25%, #a855f7 1px, transparent 1px),
-            radial-gradient(circle at 85% 75%, #a855f7 1px, transparent 1px),
-            radial-gradient(circle at 50% 50%, #7c3aed 0.5px, transparent 0.5px),
-            radial-gradient(circle at 30% 80%, #8b5cf6 0.5px, transparent 0.5px)
-          `,
-          backgroundSize: "30px 30px, 50px 50px, 20px 20px, 45px 45px",
-        }}
-      />
+    <div className="min-h-screen bg-[#0a0612] text-gray-100">
+      <BackgroundPattern />
 
-      {/* Glow orbs */}
-      <div className="absolute top-[-250px] left-[-150px] w-[700px] h-[700px] bg-purple-800/8 blur-[200px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[-300px] right-[-200px] w-[600px] h-[600px] bg-violet-900/6 blur-[180px] rounded-full pointer-events-none" />
-      <div className="absolute top-[40%] left-[60%] w-[400px] h-[400px] bg-fuchsia-900/4 blur-[150px] rounded-full pointer-events-none" />
-
-      <div className="max-w-6xl mx-auto relative z-10">
-
-        {/* ════════ BACK LINK ════════ */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4 }}
-          className="mb-8"
-        >
-          <Link
-            href="/vpr-tests"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-900/20 border border-purple-700/30 text-purple-300 text-sm hover:bg-purple-800/30 hover:border-purple-600/50 transition-all group"
-          >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Назад к тестам ВПР
-          </Link>
-        </motion.div>
-
-        {/* ════════ HEADER ════════ */}
-        <motion.header
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7 }}
-          className="mb-16 relative"
-        >
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            {/* Title SVG */}
-            <div className="w-48 h-48 md:w-56 md:h-56 flex-shrink-0">
-              <svg viewBox="0 0 200 200" className="w-full h-full" style={{ fontFamily: "sans-serif" }}>
-                <defs>
-                  <radialGradient id="headerGrad" cx="40%" cy="35%" r="60%">
-                    <stop offset="0%" stopColor="#7c3aed" />
-                    <stop offset="60%" stopColor="#5b21b6" />
-                    <stop offset="100%" stopColor="#3b0764" />
-                  </radialGradient>
-                  <filter id="headerGlow">
-                    <feGaussianBlur stdDeviation="4" result="blur" />
-                    <feMerge>
-                      <feMergeNode in="blur" />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                  </filter>
-                </defs>
-
-                {/* Outer ring */}
-                <circle cx="100" cy="100" r="90" fill="none" stroke="#a855f7" strokeWidth="1" opacity="0.3" strokeDasharray="4 6" />
-                <circle cx="100" cy="100" r="75" fill="url(#headerGrad)" stroke="#a855f7" strokeWidth="2" />
-
-                {/* Letter А */}
-                <text x="100" y="95" fill="#e9d5ff" fontSize="50" fontWeight="900" textAnchor="middle" filter="url(#headerGlow)">А</text>
-                <text x="100" y="120" fill="#c084fc" fontSize="14" textAnchor="middle" fontWeight="bold">Я З Ы К</text>
-
-                {/* Orbiting dots */}
-                {[0, 72, 144, 216, 288].map((deg, i) => (
-                  <circle
-                    key={i}
-                    cx={100 + 60 * Math.cos((deg * Math.PI) / 180)}
-                    cy={100 + 60 * Math.sin((deg * Math.PI) / 180)}
-                    r={2.5}
-                    fill="#c084fc"
-                    opacity="0.6"
-                  >
-                    <animateTransform
-                      attributeName="transform"
-                      type="rotate"
-                      from={`0 100 100`}
-                      to={`${360} 100 100`}
-                      dur={`${8 + i * 2}s`}
-                      repeatCount="indefinite"
-                    />
-                  </circle>
-                ))}
-
-                {/* Corner accents */}
-                <line x1="30" y1="30" x2="50" y2="30" stroke="#a855f7" strokeWidth="2" opacity="0.5" />
-                <line x1="30" y1="30" x2="30" y2="50" stroke="#a855f7" strokeWidth="2" opacity="0.5" />
-                <line x1="170" y1="170" x2="150" y2="170" stroke="#a855f7" strokeWidth="2" opacity="0.5" />
-                <line x1="170" y1="170" x2="170" y2="150" stroke="#a855f7" strokeWidth="2" opacity="0.5" />
-              </svg>
-            </div>
-
-            <div className="text-center md:text-left flex-1">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-900/30 border border-purple-500/40 text-purple-300 text-xs mb-4 uppercase tracking-[0.2em] font-bold">
-                <Hash className="w-3.5 h-3.5" /> Language_Protocol_7.0
-              </div>
-              <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-3">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-violet-200 to-fuchsia-400">
-                  РУССКИЙ
-                </span>{" "}
-                <span className="text-white">КОД</span>
-              </h1>
-              <p className="text-purple-400/70 text-lg md:text-xl">
-                7 класс // Морфология, Орфография, Пунктуация, Синтаксис
-              </p>
-              <div className="flex items-center gap-4 mt-4 justify-center md:justify-start text-xs text-purple-500/60">
-                <span className="flex items-center gap-1"><MousePointerClick className="w-3 h-3" /> Интерактивно</span>
-                <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> Наведи и узнаешь</span>
-                <span className="flex items-center gap-1"><Lightbulb className="w-3 h-3" /> Шпаргалка ВПР</span>
-              </div>
-            </div>
-          </div>
-        </motion.header>
-
-        {/* ════════ SECTION 1: PARTS OF SPEECH ════════ */}
-        <motion.section
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-50px" }}
-          transition={{ duration: 0.6 }}
-          className="mb-20"
-        >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="p-3 bg-purple-900/30 rounded-xl border border-purple-700/40">
-              <GitBranch className="text-purple-400 w-7 h-7" />
-            </div>
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">Части Речи</h2>
-              <p className="text-purple-500/60 text-sm">Самостоятельные и служебные — наведи на ветку!</p>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8 items-start">
+      {/* ═══════ 1. HEADER ═══════ */}
+      <header className="relative overflow-hidden border-b border-violet-900/30">
+        <div className="max-w-5xl mx-auto px-4 py-6 sm:py-8">
+          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+            {/* Logo */}
             <motion.div
-              whileHover={{ scale: 1.01 }}
-              className="bg-[#0f0a1a] rounded-2xl border border-violet-800/40 p-4"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+              className="flex-shrink-0"
             >
-              <SpeechTreeSVG hovered={hoveredSpeech} setHovered={setHoveredSpeech} />
+              <PenSVG />
             </motion.div>
 
-            <div className="space-y-3">
-              {/* Independent card */}
-              <motion.div
-                whileHover={{ x: 4 }}
-                className="bg-purple-950/20 p-4 rounded-xl border border-purple-700/30"
-              >
-                <h4 className="font-bold text-purple-300 text-sm mb-2">Самостоятельные (8 частей)</h4>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {["Существительное", "Прилагательное", "Числительное", "Местоимение", "Глагол", "Наречие", "Причастие", "Деепричастие"].map(
-                    (name, i) => (
-                      <span
-                        key={i}
-                        className="px-2 py-1 rounded bg-purple-900/20 text-purple-200"
-                        onMouseEnter={() => {
-                          const ids = ["suschestvitelnoe", "prilagatelnoe", "chislitelnoe", "mestoimenie", "glagol", "narechie", "prichastie", "deechprichastie"];
-                          setHoveredSpeech(ids[i]);
-                        }}
-                        onMouseLeave={() => setHoveredSpeech(null)}
-                        style={{ cursor: "pointer", transition: "all 0.2s" }}
-                      >
-                        {name}
-                      </span>
-                    )
-                  )}
-                </div>
-              </motion.div>
+            {/* Title */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="text-center sm:text-left flex-1"
+            >
+              <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-violet-400 via-purple-300 to-fuchsia-400 bg-clip-text text-transparent">
+                РУССКИЙ ЯЗЫК
+              </h1>
+              <p className="text-sm sm:text-base text-violet-300/70 mt-1">
+                7 класс — Орфография, Пунктуация, Морфология
+              </p>
+              <p className="text-xs text-violet-400/50 mt-0.5">
+                {dictationText.title} &middot; {dictationText.vprType}
+              </p>
+            </motion.div>
 
-              {/* Auxiliary card */}
-              <motion.div
-                whileHover={{ x: 4 }}
-                className="bg-sky-950/15 p-4 rounded-xl border border-sky-700/30"
+            {/* Score badge + controls */}
+            <motion.div
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="flex items-center gap-3"
+            >
+              <div className="flex items-center gap-2 bg-violet-900/30 border border-violet-500/20 rounded-lg px-3 py-1.5">
+                <Trophy className="w-4 h-4 text-amber-400" />
+                <span className="text-sm font-medium text-amber-300">
+                  {dictCorrectCount}/{totalGaps}
+                </span>
+                {allSupportDone && (
+                  <span className="text-xs text-violet-400">
+                    + {supportCorrectCount}/{SUPPORT_QUESTIONS.length}
+                  </span>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleReset}
+                className="text-violet-400 hover:text-violet-200 hover:bg-violet-900/30"
               >
-                <h4 className="font-bold text-sky-300 text-sm mb-2">Служебные (3 части)</h4>
-                <div className="flex gap-2 text-xs">
-                  {["Предлог", "Союз", "Частица"].map((name, i) => (
-                    <span
-                      key={i}
-                      className="px-3 py-1 rounded bg-sky-900/20 text-sky-200"
-                      onMouseEnter={() => {
-                        const ids = ["predlog", "soyuz", "chastitsa"];
-                        setHoveredSpeech(ids[i]);
-                      }}
-                      onMouseLeave={() => setHoveredSpeech(null)}
-                      style={{ cursor: "pointer", transition: "all 0.2s" }}
-                    >
-                      {name}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-[11px] text-gray-500 mt-2">Служебные части речи не являются членами предложения.</p>
-              </motion.div>
-
-              {/* Special note */}
-              <motion.div
-                whileHover={{ x: 4 }}
-                className="bg-amber-950/15 p-4 rounded-xl border border-amber-700/30"
+                <RotateCcw className="w-4 h-4 mr-1" />
+                Сброс
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="text-violet-400 hover:text-violet-200 hover:bg-violet-900/30"
               >
-                <h4 className="font-bold text-amber-300 text-sm mb-1 flex items-center gap-2">
-                  <Lightbulb className="w-4 h-4" /> Запомни!
-                </h4>
-                <p className="text-xs text-gray-400">Причастие и деепричастие — особые формы глагола. Они сочетают признаки глагола и прилагательного / наречия.</p>
-              </motion.div>
-            </div>
-          </div>
-        </motion.section>
-
-        {/* ════════ SECTION 2: MORPHEMES ════════ */}
-        <motion.section
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-50px" }}
-          transition={{ duration: 0.6 }}
-          className="mb-20"
-        >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="p-3 bg-purple-900/30 rounded-xl border border-purple-700/40">
-              <Type className="text-pink-400 w-7 h-7" />
-            </div>
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">Состав Слова (Морфемы)</h2>
-              <p className="text-purple-500/60 text-sm">Приставка, корень, суффикс, окончание — кликай на части!</p>
-            </div>
+                <BookOpen className="w-4 h-4" />
+              </Button>
+            </motion.div>
           </div>
 
-          {/* Word selector */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {wordBreakdowns.map((wb, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  setSelectedWordIdx(i);
-                  setActiveMorpheme(null);
-                }}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                  selectedWordIdx === i
-                    ? "bg-purple-600 text-white shadow-lg shadow-purple-900/50"
-                    : "bg-purple-950/30 text-purple-400 hover:bg-purple-900/30 border border-purple-800/30"
-                }`}
-              >
-                {wb.word}
-              </button>
-            ))}
-          </div>
-
+          {/* Progress bar */}
           <motion.div
-            key={selectedWordIdx}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="bg-[#0f0a1a] rounded-2xl border border-violet-800/40 p-4"
+            transition={{ duration: 0.4, delay: 0.5 }}
+            className="mt-4"
           >
-            <MorphemeSVG
-              activePart={activeMorpheme}
-              setActivePart={setActiveMorpheme}
-              wordParts={wordBreakdowns[selectedWordIdx].parts}
-            />
+            <div className="flex justify-between text-xs text-violet-400/60 mb-1">
+              <span>Прогресс диктанта</span>
+              <span>{answeredCount} из {totalGaps}</span>
+            </div>
+            <Progress value={dictProgress} className="h-2 bg-violet-950/50" />
           </motion.div>
+        </div>
+      </header>
 
-          {/* Part legend synced */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6">
-            {[
-              { label: "Приставка", color: "#f472b6" },
-              { label: "Корень", color: "#a855f7" },
-              { label: "Суффикс", color: "#38bdf8" },
-              { label: "Окончание", color: "#fbbf24" },
-              { label: "Основа", color: "#34d399" },
-            ].map((item, i) => (
-              <motion.div
-                key={i}
-                whileHover={{ scale: 1.05 }}
-                onMouseEnter={() => setActiveMorpheme(item.label)}
-                onMouseLeave={() => setActiveMorpheme(null)}
-                className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                  activeMorpheme === item.label
-                    ? "bg-purple-900/30 border-purple-500"
-                    : "bg-[#0f0a1a] border-violet-800/30 hover:border-violet-600/40"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-sm font-bold text-gray-300">{item.label}</span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.section>
-
-        {/* ════════ SECTION 3: SPELLING RULES ════════ */}
-        <motion.section
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-50px" }}
-          transition={{ duration: 0.6 }}
-          className="mb-20"
-        >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="p-3 bg-purple-900/30 rounded-xl border border-purple-700/40">
-              <SpellCheck className="text-cyan-400 w-7 h-7" />
-            </div>
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">Орфография</h2>
-              <p className="text-purple-500/60 text-sm">Ключевые правила — раскрой карточку для деталей</p>
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {spellingRules.map((rule, i) => (
-              <motion.div
-                key={i}
-                layout
-                onClick={() => setExpandedRule(expandedRule === i ? null : i)}
-                className="bg-[#0f0a1a] rounded-xl border border-violet-800/40 p-4 cursor-pointer hover:border-violet-600/50 transition-all group"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div
-                    className="w-3 h-3 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: rule.color }}
-                  />
-                  <h4 className="font-bold text-white text-sm ml-2 flex-1">{rule.rule}</h4>
-                  {expandedRule === i ? (
-                    <ChevronUp className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 mb-1">
-                  {rule.examples.map((ex, j) => (
-                    <span key={j} className="text-[11px] px-2 py-0.5 rounded bg-purple-900/20 text-purple-200">
-                      {ex}
-                    </span>
-                  ))}
-                </div>
-
-                <AnimatePresence>
-                  {expandedRule === i && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="mt-3 pt-3 border-t border-violet-800/20">
-                        <p className="text-xs text-gray-400 leading-relaxed">{rule.note}</p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            ))}
-          </div>
-        </motion.section>
-
-        {/* ════════ SECTION 4: PUNCTUATION ════════ */}
-        <motion.section
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-50px" }}
-          transition={{ duration: 0.6 }}
-          className="mb-20"
-        >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="p-3 bg-purple-900/30 rounded-xl border border-purple-700/40">
-              <Quote className="text-amber-400 w-7 h-7" />
-            </div>
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">Пунктуация</h2>
-              <p className="text-purple-500/60 text-sm">Запятые, тире, кавычки — наведи на правило!</p>
-            </div>
-          </div>
-
+      {/* ═══════ SIDEBAR ═══════ */}
+      <AnimatePresence>
+        {sidebarOpen && (
           <motion.div
-            whileHover={{ scale: 1.005 }}
-            className="bg-[#0f0a1a] rounded-2xl border border-violet-800/40 p-4"
+            initial={{ x: '100%', opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed top-0 right-0 h-full w-full sm:w-96 bg-[#0e081a]/95 backdrop-blur-xl border-l border-violet-800/30 z-50 overflow-y-auto"
           >
-            <PunctuationRuleSVG activeRule={activePunctRule} setActiveRule={setActivePunctRule} />
-          </motion.div>
-        </motion.section>
-
-        {/* ════════ SECTION 5: SYNTAX & SENTENCE TYPES ════════ */}
-        <motion.section
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-50px" }}
-          transition={{ duration: 0.6 }}
-          className="mb-20"
-        >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="p-3 bg-purple-900/30 rounded-xl border border-purple-700/40">
-              <TreePine className="text-emerald-400 w-7 h-7" />
-            </div>
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">Синтаксис и Типы Предложений</h2>
-              <p className="text-purple-500/60 text-sm">Структура предложения — наведи на член!</p>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8 items-start">
-            <motion.div
-              whileHover={{ scale: 1.01 }}
-              className="bg-[#0f0a1a] rounded-2xl border border-violet-800/40 p-4"
-            >
-              <SentenceTreeSVG hovered={hoveredSyntax} setHovered={setHoveredSyntax} />
-            </motion.div>
-
-            <div className="space-y-4">
-              {/* Sentence types */}
-              <div className="bg-purple-950/20 p-5 rounded-xl border border-purple-700/30">
-                <h4 className="font-bold text-purple-300 mb-3 text-sm">По количеству грамматических основ</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3 p-2 rounded-lg bg-purple-900/15">
-                    <div className="w-2 h-2 rounded-full bg-purple-400" />
-                    <span className="text-sm text-gray-300"><strong className="text-white">Простое</strong> — одна грамм. основа</span>
-                  </div>
-                  <div className="flex items-center gap-3 p-2 rounded-lg bg-purple-900/15">
-                    <div className="w-2 h-2 rounded-full bg-fuchsia-400" />
-                    <span className="text-sm text-gray-300"><strong className="text-white">Сложное</strong> — две и более основ</span>
-                  </div>
-                </div>
+            <div className="p-4">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold text-violet-200">Справочник</h2>
+                <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)} className="text-violet-400">
+                  ✕
+                </Button>
               </div>
 
-              <div className="bg-purple-950/20 p-5 rounded-xl border border-purple-700/30">
-                <h4 className="font-bold text-purple-300 mb-3 text-sm">По составу грамматической основы</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3 p-2 rounded-lg bg-purple-900/15">
-                    <div className="w-2 h-2 rounded-full bg-cyan-400" />
-                    <span className="text-sm text-gray-300"><strong className="text-white">Двусоставное</strong> — подлежащее + сказуемое</span>
-                  </div>
-                  <div className="flex items-center gap-3 p-2 rounded-lg bg-purple-900/15">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span className="text-sm text-gray-300"><strong className="text-white">Односоставное</strong> — только один главный член</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-purple-950/20 p-5 rounded-xl border border-purple-700/30">
-                <h4 className="font-bold text-purple-300 mb-3 text-sm">Односоставные предложения</h4>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span className="px-2 py-1 rounded bg-violet-900/20 text-violet-200">Определённо-личное</span>
-                  <span className="px-2 py-1 rounded bg-violet-900/20 text-violet-200">Неопределённо-личное</span>
-                  <span className="px-2 py-1 rounded bg-violet-900/20 text-violet-200">Безличное</span>
-                  <span className="px-2 py-1 rounded bg-violet-900/20 text-violet-200">Назывное</span>
-                </div>
-                <p className="text-[11px] text-gray-500 mt-2">Пример: «Мне холодно.» (безличное) — нет и не может быть подлежащего.</p>
-              </div>
-            </div>
-          </div>
-        </motion.section>
-
-        {/* ════════ SECTION 6: PHRASEOLOGISMS ════════ */}
-        <motion.section
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-50px" }}
-          transition={{ duration: 0.6 }}
-          className="mb-20"
-        >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="p-3 bg-purple-900/30 rounded-xl border border-purple-700/40">
-              <Lightbulb className="text-yellow-400 w-7 h-7" />
-            </div>
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">Фразеологизмы</h2>
-              <p className="text-purple-500/60 text-sm">Устойчивые выражения — раскрой, чтобы увидеть смысл!</p>
-            </div>
-          </div>
-
-          {/* Key SVG */}
-          <div className="mb-8 flex justify-center">
-            <svg viewBox="0 0 200 80" className="w-48 h-auto" style={{ fontFamily: "sans-serif" }}>
-              <defs>
-                <filter id="keyGlow">
-                  <feGaussianBlur stdDeviation="2" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-              <circle cx="55" cy="40" r="22" fill="none" stroke="#fbbf24" strokeWidth="3" filter="url(#keyGlow)" />
-              <circle cx="55" cy="40" r="10" fill="#fbbf24" opacity="0.2" />
-              <rect x="75" y="35" width="110" height="10" rx="3" fill="#fbbf24" opacity="0.8" />
-              <rect x="155" y="35" width="8" height="18" rx="2" fill="#fbbf24" opacity="0.6" />
-              <rect x="140" y="35" width="8" height="14" rx="2" fill="#fbbf24" opacity="0.6" />
-              <text x="100" y="20" fill="#fbbf24" fontSize="9" textAnchor="middle" opacity="0.7">КЛЮЧ К СМЫСЛУ</text>
-            </svg>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {phraseologisms.map((phrase, i) => (
-              <motion.div
-                key={i}
-                layout
-                onClick={() => setExpandedPhrase(expandedPhrase === i ? null : i)}
-                whileHover={{ y: -4 }}
-                className="bg-[#0f0a1a] rounded-xl border border-violet-800/40 p-4 cursor-pointer hover:border-violet-600/50 transition-all"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-bold text-white text-sm">{phrase.phrase}</h4>
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: phrase.color }} />
-                </div>
-
-                <AnimatePresence>
-                  {expandedPhrase === i ? (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="pt-2 border-t border-violet-800/20">
-                        <p className="text-xs text-gray-400">{phrase.meaning}</p>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div initial={{ opacity: 0.4 }} className="text-[10px] text-purple-500/50">
-                      Нажми, чтобы раскрыть...
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            ))}
-          </div>
-        </motion.section>
-
-        {/* ════════ SECTION 7: MORPHOLOGY DEEP DIVE (TABBED) ════════ */}
-        <motion.section
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-50px" }}
-          transition={{ duration: 0.6 }}
-          className="mb-20"
-        >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="p-3 bg-purple-900/30 rounded-xl border border-purple-700/40">
-              <BookOpen className="text-violet-400 w-7 h-7" />
-            </div>
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">Морфология: Глубокое Погружение</h2>
-              <p className="text-purple-500/60 text-sm">Существительное, прилагательное, глагол — выбери вкладку!</p>
-            </div>
-          </div>
-
-          {/* Tab switcher */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {[
-              { id: "nouns" as const, label: "Существительное", icon: Type },
-              { id: "adjectives" as const, label: "Прилагательное", icon: GitBranch },
-              { id: "verbs" as const, label: "Глагол", icon: PenTool },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setMorphTab(tab.id)}
-                  className={`px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                    morphTab === tab.id
-                      ? "bg-purple-600 text-white shadow-lg shadow-purple-900/50"
-                      : "bg-purple-950/30 text-purple-400 hover:bg-purple-900/30 border border-purple-800/30"
-                  }`}
+              {/* Sidebar tabs */}
+              <div className="flex gap-2 mb-4">
+                <Button
+                  variant={sidebarTab === 'rules' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSidebarTab('rules')}
+                  className={
+                    sidebarTab === 'rules'
+                      ? 'bg-violet-700/50 text-violet-100'
+                      : 'text-violet-400 hover:text-violet-200'
+                  }
                 >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <AnimatePresence mode="wait">
-            {/* TAB: NOUNS */}
-            {morphTab === "nouns" && (
-              <motion.div
-                key="nouns"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                <div className="bg-[#0f0a1a] rounded-2xl border border-violet-800/40 p-4 overflow-x-auto">
-                  <NounDeclensionSVG />
-                </div>
-
-                <div className="grid sm:grid-cols-3 gap-4">
-                  <div className="bg-purple-950/20 p-4 rounded-xl border border-purple-700/30">
-                    <h4 className="font-bold text-purple-300 text-sm mb-2">1 скл.</h4>
-                    <p className="text-xs text-gray-400">Ж.р., М.р. на -а/-я. (земля, дедушка, мама)</p>
-                  </div>
-                  <div className="bg-sky-950/15 p-4 rounded-xl border border-sky-700/30">
-                    <h4 className="font-bold text-sky-300 text-sm mb-2">2 скл.</h4>
-                    <p className="text-xs text-gray-400">М.р. с твёрд. основой, ср.р. на -о/-е. (стол, конь, поле)</p>
-                  </div>
-                  <div className="bg-emerald-950/15 p-4 rounded-xl border border-emerald-700/30">
-                    <h4 className="font-bold text-emerald-300 text-sm mb-2">3 скл.</h4>
-                    <p className="text-xs text-gray-400">Ж.р. на мягкий знак. (ночь, мышь, рожь)</p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* TAB: ADJECTIVES */}
-            {morphTab === "adjectives" && (
-              <motion.div
-                key="adjectives"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                {/* Degrees of comparison */}
-                <div className="bg-[#0f0a1a] rounded-2xl border border-violet-800/40 p-6">
-                  <h4 className="font-bold text-purple-300 mb-4 text-lg">Степени сравнения прилагательных</h4>
-                  <div className="space-y-4">
-                    {adjDegrees.map((deg, i) => (
-                      <motion.div
-                        key={i}
-                        whileHover={{ x: 6 }}
-                        className="p-4 rounded-xl border transition-all"
-                        style={{ borderColor: `${deg.color}40`, backgroundColor: `${deg.color}08` }}
-                      >
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: deg.color }} />
-                          <h5 className="font-bold text-sm" style={{ color: deg.color }}>{deg.type}</h5>
-                        </div>
-                        <p className="text-sm text-gray-300 mb-1">{deg.example}</p>
-                        <p className="text-xs text-gray-500">{deg.note}</p>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Разряды прилагательных */}
-                <div className="grid sm:grid-cols-3 gap-4">
-                  <div className="bg-purple-950/20 p-4 rounded-xl border border-purple-700/30">
-                    <h4 className="font-bold text-purple-300 text-sm mb-2">Качественные</h4>
-                    <p className="text-xs text-gray-400 mb-2">Можно сравнить, имеют степени. (красивый, добрый, умный)</p>
-                    <div className="flex flex-wrap gap-1">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/30 text-purple-200">+-ее/-ей</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/30 text-purple-200">+-е</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/30 text-purple-200">+-ше</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/30 text-purple-200">более/наиболее</span>
-                    </div>
-                  </div>
-                  <div className="bg-sky-950/15 p-4 rounded-xl border border-sky-700/30">
-                    <h4 className="font-bold text-sky-300 text-sm mb-2">Относительные</h4>
-                    <p className="text-xs text-gray-400">Материал, место, время. (деревянный, городской, утренний)</p>
-                    <p className="text-[10px] text-gray-500 mt-2">Не имеют степеней сравнения!</p>
-                  </div>
-                  <div className="bg-amber-950/15 p-4 rounded-xl border border-amber-700/30">
-                    <h4 className="font-bold text-amber-300 text-sm mb-2">Притяжательные</h4>
-                    <p className="text-xs text-gray-400">Принадлежность кому-то. (мамин, лисий, отцов)</p>
-                    <p className="text-[10px] text-gray-500 mt-2">Отвечают на вопрос «Чей?»</p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* TAB: VERBS */}
-            {morphTab === "verbs" && (
-              <motion.div
-                key="verbs"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                {/* Вид глагола */}
-                <div className="bg-[#0f0a1a] rounded-2xl border border-violet-800/40 p-6">
-                  <h4 className="font-bold text-purple-300 mb-4 text-lg">Виды глагола</h4>
-                  <div className="grid sm:grid-cols-2 gap-6">
-                    <motion.div whileHover={{ x: 4 }} className="p-4 rounded-xl bg-purple-950/20 border border-purple-700/30">
-                      <h5 className="font-bold text-purple-300 text-sm mb-2">Совершенный вид (СВ)</h5>
-                      <p className="text-sm text-gray-300 mb-1">Что <strong>сделать</strong>? Результат.</p>
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {["написать", "прочитать", "построить", "решить"].map((v, i) => (
-                          <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-purple-900/20 text-purple-200">{v}</span>
-                        ))}
-                      </div>
-                      <p className="text-[10px] text-gray-500 mt-2">Ответ на вопрос: Что сделать?</p>
-                    </motion.div>
-                    <motion.div whileHover={{ x: 4 }} className="p-4 rounded-xl bg-sky-950/15 border border-sky-700/30">
-                      <h5 className="font-bold text-sky-300 text-sm mb-2">Несовершенный вид (НСВ)</h5>
-                      <p className="text-sm text-gray-300 mb-1">Что <strong>делать</strong>? Процесс.</p>
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {["писать", "читать", "строить", "решать"].map((v, i) => (
-                          <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-sky-900/20 text-sky-200">{v}</span>
-                        ))}
-                      </div>
-                      <p className="text-[10px] text-gray-500 mt-2">Ответ на вопрос: Что делать?</p>
-                    </motion.div>
-                  </div>
-                </div>
-
-                {/* Спряжения */}
-                <div className="bg-[#0f0a1a] rounded-2xl border border-violet-800/40 p-6">
-                  <h4 className="font-bold text-purple-300 mb-4 text-lg">Спряжения глагола</h4>
-                  <div className="space-y-4">
-                    {verbConjugations.map((conj, i) => (
-                      <motion.div
-                        key={i}
-                        whileHover={{ x: 6 }}
-                        className="p-4 rounded-xl border border-violet-800/30 bg-purple-950/10"
-                      >
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="text-xs font-bold px-2 py-1 rounded bg-purple-600/20 text-purple-300">{conj.conj}</span>
-                          <span className="text-sm text-gray-300">{conj.ending}</span>
-                        </div>
-                        <p className="text-xs text-gray-500">{conj.questions}</p>
-                        <p className="text-sm text-gray-300 mt-1">{conj.examples}</p>
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  <div className="mt-4 p-4 rounded-xl bg-amber-950/15 border border-amber-700/30">
-                    <h5 className="font-bold text-amber-300 text-sm mb-2 flex items-center gap-2">
-                      <Lightbulb className="w-4 h-4" /> Глаголы-исключения
-                    </h5>
-                    <div className="grid sm:grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-purple-300 font-bold">I спр. на -ить:</span>
-                        <span className="text-gray-400 ml-1">брить, стелить, зиждиться, зыбиться</span>
-                      </div>
-                      <div>
-                        <span className="text-sky-300 font-bold">II спр. на -еть/-ать:</span>
-                        <span className="text-gray-400 ml-1">гнать, держать, дышать, смотреть, видеть, слышать, ненавидеть, обидеть, терпеть, зависеть, вертеть</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.section>
-
-        {/* ════════ SECTION 8: TEXT TYPES & STYLES ════════ */}
-        <motion.section
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-50px" }}
-          transition={{ duration: 0.6 }}
-          className="mb-20"
-        >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="p-3 bg-purple-900/30 rounded-xl border border-purple-700/40">
-              <ScrollText className="text-emerald-400 w-7 h-7" />
-            </div>
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">Стили и Типы Текстов</h2>
-              <p className="text-purple-500/60 text-sm">Функциональные стили русского языка</p>
-            </div>
-          </div>
-
-          {/* Text structure SVG */}
-          <div className="mb-8 flex justify-center">
-            <svg viewBox="0 0 500 70" className="w-full max-w-lg h-auto" style={{ fontFamily: "sans-serif" }}>
-              <rect x="10" y="10" width="480" height="50" rx="10" fill="rgba(168,85,247,0.06)" stroke="#7c3aed" strokeWidth="1" />
-              <text x="40" y="30" fill="#7c3aed" fontSize="10" fontWeight="bold">Вступление</text>
-              <text x="40" y="48" fill="#94a3b8" fontSize="8">Тезис, вступление в тему</text>
-              <line x1="160" y1="15" x2="160" y2="55" stroke="#7c3aed" strokeWidth="1" opacity="0.3" strokeDasharray="3 3" />
-              <text x="185" y="30" fill="#a855f7" fontSize="10" fontWeight="bold">Основная часть</text>
-              <text x="185" y="48" fill="#94a3b8" fontSize="8">Аргументы, примеры</text>
-              <line x1="350" y1="15" x2="350" y2="55" stroke="#7c3aed" strokeWidth="1" opacity="0.3" strokeDasharray="3 3" />
-              <text x="370" y="30" fill="#c084fc" fontSize="10" fontWeight="bold">Заключение</text>
-              <text x="370" y="48" fill="#94a3b8" fontSize="8">Вывод, итог</text>
-
-              {/* Animated cursor */}
-              <rect x="14" y="14" width="6" height="42" rx="3" fill="#a855f7" opacity="0.15">
-                <animate attributeName="x" values="14;350;14" dur="6s" repeatCount="indefinite" />
-                <animate attributeName="opacity" values="0.15;0.3;0.15" dur="6s" repeatCount="indefinite" />
-              </rect>
-            </svg>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {textStyles.map((style, i) => {
-              const Icon = style.icon;
-              return (
-                <motion.div
-                  key={i}
-                  layout
-                  onClick={() => setExpandedStyle(expandedStyle === i ? null : i)}
-                  whileHover={{ y: -4 }}
-                  className={`${style.bg} rounded-xl border ${style.border} p-5 cursor-pointer transition-all group`}
+                  <SpellCheck className="w-4 h-4 mr-1" />
+                  Правила
+                </Button>
+                <Button
+                  variant={sidebarTab === 'stats' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSidebarTab('stats')}
+                  className={
+                    sidebarTab === 'stats'
+                      ? 'bg-violet-700/50 text-violet-100'
+                      : 'text-violet-400 hover:text-violet-200'
+                  }
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <Icon className={`w-5 h-5 ${style.color}`} />
-                      <h4 className="font-bold text-white text-sm">{style.name}</h4>
-                    </div>
-                    {expandedStyle === i ? (
-                      <ChevronUp className="w-4 h-4 text-gray-500" />
+                  <Target className="w-4 h-4 mr-1" />
+                  Статистика
+                </Button>
+              </div>
+
+              <AnimatePresence mode="wait">
+                {sidebarTab === 'rules' ? (
+                  <motion.div
+                    key="rules"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="space-y-2"
+                  >
+                    {SPELLING_RULES.map((rule) => (
+                      <div key={rule.id} className="border border-violet-800/20 rounded-lg overflow-hidden">
+                        <button
+                          onClick={() => setExpandedRule(expandedRule === rule.id ? null : rule.id)}
+                          className="w-full flex items-center justify-between p-3 text-left hover:bg-violet-900/20 transition-colors"
+                        >
+                          <span className="text-sm font-medium text-violet-200">{rule.title}</span>
+                          <Badge variant="outline" className="text-[10px] border-violet-700/40 text-violet-400">
+                            {RULE_TAG_DISPLAY[rule.tag]?.label}
+                          </Badge>
+                        </button>
+                        <AnimatePresence>
+                          {expandedRule === rule.id && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="px-3 pb-3 space-y-2">
+                                <p className="text-sm text-violet-300/80">{rule.rule}</p>
+                                <div className="space-y-1">
+                                  {rule.examples.map((ex, i) => (
+                                    <p key={i} className="text-xs text-fuchsia-300/70 font-mono">
+                                      {ex}
+                                    </p>
+                                  ))}
+                                </div>
+                                <div className="flex items-start gap-2 bg-amber-900/10 rounded px-2 py-1.5">
+                                  <Lightbulb className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+                                  <p className="text-xs text-amber-300/70">{rule.tip}</p>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    ))}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="stats"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="space-y-3"
+                  >
+                    {dictSubmitted ? (
+                      <>
+                        <p className="text-sm text-violet-300/70 mb-2">
+                          Результаты по категориям правил:
+                        </p>
+                        {Object.entries(ruleStats).map(([tag, stat]) => {
+                          const display = RULE_TAG_DISPLAY[tag as RuleTag];
+                          const pct = stat.total > 0 ? Math.round((stat.correct / stat.total) * 100) : 0;
+                          return (
+                            <div key={tag} className="space-y-1">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-violet-300">{display?.label ?? tag}</span>
+                                <span className={`${pct >= 70 ? 'text-green-400' : pct >= 40 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                  {stat.correct}/{stat.total}
+                                </span>
+                              </div>
+                              <div className="h-2 bg-violet-950/50 rounded-full overflow-hidden">
+                                <motion.div
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${pct}%` }}
+                                  transition={{ duration: 0.6 }}
+                                  className={`h-full rounded-full ${
+                                    pct >= 70
+                                      ? 'bg-green-500'
+                                      : pct >= 40
+                                        ? 'bg-yellow-500'
+                                        : 'bg-red-500'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Decorative SVGs */}
+                        <div className="mt-6 pt-4 border-t border-violet-800/20 space-y-3">
+                          <SentenceTreeSVG />
+                          <LetterChainSVG />
+                        </div>
+                      </>
                     ) : (
-                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                      <div className="text-center py-8">
+                        <Target className="w-10 h-10 text-violet-600 mx-auto mb-3" />
+                        <p className="text-sm text-violet-400/60">
+                          Статистика появится после проверки диктанта
+                        </p>
+                      </div>
                     )}
-                  </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-                  <AnimatePresence>
-                    {expandedStyle === i ? (
+      {/* Sidebar overlay on mobile */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 bg-black/40 z-40 sm:hidden"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ═══════ 2. MODE TABS ═══════ */}
+      <div className="max-w-5xl mx-auto px-4 mt-6">
+        <div className="flex gap-2 p-1 bg-violet-950/40 rounded-xl border border-violet-800/20 max-w-xs">
+          <button
+            onClick={() => setModeTab('dictation')}
+            className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+              modeTab === 'dictation'
+                ? 'bg-violet-700/50 text-violet-100 shadow-lg shadow-violet-900/30'
+                : 'text-violet-400 hover:text-violet-200'
+            }`}
+          >
+            <PenTool className="w-4 h-4 inline mr-1.5" />
+            Сплошной текст
+          </button>
+          <button
+            onClick={() => setModeTab('support')}
+            className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+              modeTab === 'support'
+                ? 'bg-violet-700/50 text-violet-100 shadow-lg shadow-violet-900/30'
+                : 'text-violet-400 hover:text-violet-200'
+            }`}
+          >
+            <ListChecks className="w-4 h-4 inline mr-1.5" />
+            Типы заданий
+          </button>
+        </div>
+      </div>
+
+      {/* ═══════ MAIN CONTENT ═══════ */}
+      <main className="max-w-5xl mx-auto px-4 py-6">
+        <AnimatePresence mode="wait">
+          {modeTab === 'dictation' ? (
+            <motion.div
+              key="dictation"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              {/* ─── 3. DICTATION ENGINE ─── */}
+
+              {!dictSubmitted ? (
+                <>
+                  {/* Dictation text with interactive gaps */}
+                  <Card className="bg-[#0e081a]/80 border-violet-800/20 backdrop-blur-sm">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-base sm:text-lg text-violet-100 flex items-center gap-2">
+                            <MousePointerClick className="w-4 h-4 text-fuchsia-400" />
+                            Нажимайте на пропуски, чтобы вставить буквы и знаки
+                          </CardTitle>
+                          <p className="text-xs text-violet-400/60 mt-1">
+                            {answeredCount} из {totalGaps} пропусков заполнено
+                          </p>
+                        </div>
+                        {answeredCount === totalGaps && (
+                          <Button
+                            onClick={handleCheckDictation}
+                            className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-lg shadow-violet-900/40"
+                          >
+                            <SpellCheck className="w-4 h-4 mr-1.5" />
+                            Проверить
+                          </Button>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      {/* Flowing text with inline gaps */}
+                      <div className="text-base sm:text-lg leading-relaxed sm:leading-loose text-gray-200 font-serif">
+                        {segments.map((seg, i) => {
+                          if (seg.type === 'text') {
+                            // Handle paragraph breaks
+                            const parts = seg.content.split('\n');
+                            return parts.map((line, li) => (
+                              <span key={`${i}-${li}`}>
+                                {li > 0 && <br />}
+                                <br />
+                                {line}
+                              </span>
+                            ));
+                          }
+                          // Gap
+                          const gap = dictationText.gaps.find((g) => g.id === seg.gapId);
+                          if (!gap) return null;
+                          const isAnswered = dictAnswers[gap.id] !== undefined;
+                          const isActive = activeGapId === gap.id;
+                          const tagDisplay = RULE_TAG_DISPLAY[gap.rule];
+
+                          return (
+                            <span
+                              key={`gap-${gap.id}`}
+                              ref={(el) => { gapRefs.current[gap.id] = el; }}
+                              onClick={() => handleGapClick(gap.id)}
+                              className={`
+                                relative cursor-pointer mx-0.5 rounded px-0.5 transition-all duration-200 select-none
+                                ${isActive
+                                  ? 'bg-fuchsia-600/30 ring-2 ring-fuchsia-400 scale-105'
+                                  : isAnswered
+                                    ? 'bg-green-600/20 ring-1 ring-green-500/40'
+                                    : `bg-violet-800/30 ring-1 ring-violet-600/30 hover:bg-violet-700/40 hover:ring-violet-500/50`
+                                }
+                              `}
+                            >
+                              {/* Display text */}
+                              <span className={`
+                                ${isAnswered ? 'text-green-300' : isActive ? 'text-fuchsia-200' : 'text-violet-300'}
+                                ${gap.kind === 'comma' ? 'font-bold' : ''}
+                              `}>
+                                {isAnswered ? (
+                                  <span className="flex items-center gap-0.5">
+                                    <CheckCircle2 className="w-3 h-3 text-green-400" />
+                                    <span className="text-xs font-mono">
+                                      {formatAnswerDisplay(gap, dictAnswers[gap.id])}
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className="text-xs sm:text-sm font-mono">{gap.display}</span>
+                                )}
+                              </span>
+
+                              {/* Gap number badge */}
+                              <span className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-violet-900 text-[9px] text-violet-300 flex items-center justify-center border border-violet-700/50">
+                                {gap.id}
+                              </span>
+                            </span>
+                          );
+                        })}
+                      </div>
+
+                      {/* Gap interaction widget */}
+                      <AnimatePresence mode="wait">
+                        {activeGap && (
+                          <motion.div
+                            key={activeGap.id}
+                            initial={{ opacity: 0, y: 15, height: 0 }}
+                            animate={{ opacity: 1, y: 0, height: 'auto' }}
+                            exit={{ opacity: 0, y: -10, height: 0 }}
+                            transition={{ duration: 0.25 }}
+                            className="mt-6 pt-4 border-t border-violet-800/20"
+                          >
+                            {/* Gap header */}
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className="border-violet-600/40 text-violet-300 text-xs">
+                                  Пропуск {activeGap.id}
+                                </Badge>
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs ${RULE_TAG_DISPLAY[activeGap.rule]?.color ?? 'border-violet-700/40 text-violet-400'}`}
+                                >
+                                  {RULE_TAG_DISPLAY[activeGap.rule]?.label}
+                                </Badge>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowHint(!showHint)}
+                                className="text-amber-400 hover:text-amber-300 hover:bg-amber-900/20 text-xs"
+                              >
+                                <Lightbulb className="w-3.5 h-3.5 mr-1" />
+                                Подсказка
+                              </Button>
+                            </div>
+
+                            <AnimatePresence>
+                              {showHint && (
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: 'auto' }}
+                                  exit={{ opacity: 0, height: 0 }}
+                                  className="mb-3 p-3 bg-amber-900/10 border border-amber-800/20 rounded-lg"
+                                >
+                                  <p className="text-sm text-amber-300/80">{activeGap.hint}</p>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+
+                            {/* Input by kind */}
+                            {activeGap.kind === 'letter' && (
+                              <div className="flex items-center gap-3">
+                                <div className="text-sm text-violet-300/70 font-mono">{activeGap.display}</div>
+                                <Input
+                                  ref={inputRef}
+                                  value={letterInput}
+                                  onChange={(e) => setLetterInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') submitLetterAnswer();
+                                  }}
+                                  maxLength={2}
+                                  className="w-16 h-10 text-center text-lg font-bold bg-violet-950/50 border-violet-600/30 text-violet-100 focus:border-fuchsia-500"
+                                  placeholder="?"
+                                />
+                                <Button
+                                  onClick={submitLetterAnswer}
+                                  disabled={!letterInput.trim()}
+                                  className="bg-violet-700/50 hover:bg-violet-600/50 text-violet-100"
+                                >
+                                  <ArrowRight className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            )}
+
+                            {activeGap.kind === 'n-nn' && (
+                              <div className="flex gap-3">
+                                {(activeGap.options ?? ['н', 'нн']).map((opt) => (
+                                  <Button
+                                    key={opt}
+                                    onClick={() => submitChoiceAnswer(opt)}
+                                    variant="outline"
+                                    className="flex-1 h-12 text-lg font-bold border-violet-600/30 text-violet-200 hover:bg-violet-700/30 hover:border-violet-500/50 font-mono"
+                                  >
+                                    {opt}
+                                  </Button>
+                                ))}
+                              </div>
+                            )}
+
+                            {activeGap.kind === 'z-s' && (
+                              <div className="flex gap-3">
+                                {(activeGap.options ?? ['с', 'з']).map((opt) => (
+                                  <Button
+                                    key={opt}
+                                    onClick={() => submitChoiceAnswer(opt)}
+                                    variant="outline"
+                                    className="flex-1 h-12 text-lg font-bold border-violet-600/30 text-violet-200 hover:bg-violet-700/30 hover:border-violet-500/50 font-mono"
+                                  >
+                                    {opt}
+                                  </Button>
+                                ))}
+                              </div>
+                            )}
+
+                            {activeGap.kind === 'comma' && (
+                              <div className="flex gap-3">
+                                {(activeGap.options ?? []).map((opt) => (
+                                  <Button
+                                    key={opt}
+                                    onClick={() => submitChoiceAnswer(opt === 'Запятая нужна' ? ',' : '')}
+                                    variant="outline"
+                                    className="flex-1 h-12 text-sm border-violet-600/30 text-violet-200 hover:bg-violet-700/30 hover:border-violet-500/50"
+                                  >
+                                    {opt}
+                                  </Button>
+                                ))}
+                              </div>
+                            )}
+
+                            {activeGap.kind === 'ne-simple' && (
+                              <div className="flex gap-3">
+                                {(activeGap.options ?? []).map((opt) => {
+                                  const isSeparate = opt.includes('раздельно');
+                                  return (
+                                    <Button
+                                      key={opt}
+                                      onClick={() =>
+                                        submitChoiceAnswer({ ne: 'не', separate: isSeparate })
+                                      }
+                                      variant="outline"
+                                      className="flex-1 h-12 text-sm border-violet-600/30 text-violet-200 hover:bg-violet-700/30 hover:border-violet-500/50"
+                                    >
+                                      {opt}
+                                    </Button>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {activeGap.kind === 'ne-complex' && (
+                              <div className="space-y-3">
+                                {/* Step indicators */}
+                                <div className="flex items-center gap-2 text-xs text-violet-400/60">
+                                  <span className={neComplexStep >= 1 ? 'text-fuchsia-300' : ''}>1. не/ни</span>
+                                  <ChevronRight className="w-3 h-3" />
+                                  <span className={neComplexStep >= 2 ? 'text-fuchsia-300' : ''}>2. слитно/раздельно</span>
+                                  <ChevronRight className="w-3 h-3" />
+                                  <span className={neComplexStep >= 3 ? 'text-fuchsia-300' : ''}>3. н/нн</span>
+                                </div>
+
+                                {/* Step 1: не / ни */}
+                                {neComplexStep === 1 && (
+                                  <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
+                                    <p className="text-sm text-violet-300/70 mb-2">Выберите: не или ни?</p>
+                                    <div className="flex gap-3">
+                                      <Button
+                                        onClick={() => {
+                                          setNeComplexTemp((p) => ({ ...p, ne: 'не' }));
+                                          setNeComplexStep(2);
+                                        }}
+                                        variant="outline"
+                                        className="flex-1 h-10 border-violet-600/30 text-violet-200 hover:bg-violet-700/30"
+                                      >
+                                        не
+                                      </Button>
+                                      <Button
+                                        onClick={() => {
+                                          setNeComplexTemp((p) => ({ ...p, ne: 'ни' }));
+                                          setNeComplexStep(2);
+                                        }}
+                                        variant="outline"
+                                        className="flex-1 h-10 border-violet-600/30 text-violet-200 hover:bg-violet-700/30"
+                                      >
+                                        ни
+                                      </Button>
+                                    </div>
+                                  </motion.div>
+                                )}
+
+                                {/* Step 2: слитно / раздельно */}
+                                {neComplexStep === 2 && (
+                                  <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
+                                    <p className="text-sm text-violet-300/70 mb-2">
+                                      «{neComplexTemp.ne}» пишется слитно или раздельно?
+                                    </p>
+                                    <div className="flex gap-3">
+                                      <Button
+                                        onClick={() => {
+                                          setNeComplexTemp((p) => ({ ...p, separate: false }));
+                                          setNeComplexStep(3);
+                                        }}
+                                        variant="outline"
+                                        className="flex-1 h-10 border-violet-600/30 text-violet-200 hover:bg-violet-700/30"
+                                      >
+                                        Слитно
+                                      </Button>
+                                      <Button
+                                        onClick={() => {
+                                          setNeComplexTemp((p) => ({ ...p, separate: true }));
+                                          setNeComplexStep(3);
+                                        }}
+                                        variant="outline"
+                                        className="flex-1 h-10 border-violet-600/30 text-violet-200 hover:bg-violet-700/30"
+                                      >
+                                        Раздельно
+                                      </Button>
+                                    </div>
+                                  </motion.div>
+                                )}
+
+                                {/* Step 3: н / нн */}
+                                {neComplexStep === 3 && (
+                                  <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
+                                    <p className="text-sm text-violet-300/70 mb-2">Сколько «н» в слове?</p>
+                                    <div className="flex gap-3">
+                                      <Button
+                                        onClick={() => {
+                                          setNeComplexTemp((p) => ({ ...p, nn: 'н' }));
+                                          submitNeComplex();
+                                        }}
+                                        variant="outline"
+                                        className="flex-1 h-10 border-violet-600/30 text-violet-200 hover:bg-violet-700/30 font-mono text-lg"
+                                      >
+                                        н
+                                      </Button>
+                                      <Button
+                                        onClick={() => {
+                                          setNeComplexTemp((p) => ({ ...p, nn: 'нн' }));
+                                          submitNeComplex();
+                                        }}
+                                        variant="outline"
+                                        className="flex-1 h-10 border-violet-600/30 text-violet-200 hover:bg-violet-700/30 font-mono text-lg"
+                                      >
+                                        нн
+                                      </Button>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Active gap word info */}
+                            <div className="mt-3 text-xs text-violet-500/50">
+                              Слово: <span className="text-violet-400/60">{activeGap.fullWord}</span>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </CardContent>
+                  </Card>
+
+                  {/* Check button (when all gaps filled) */}
+                  {answeredCount > 0 && answeredCount < totalGaps && (
+                    <div className="mt-4 text-center">
+                      <Button
+                        onClick={handleCheckDictation}
+                        variant="outline"
+                        className="border-violet-700/30 text-violet-300 hover:bg-violet-800/20"
+                      >
+                        <SpellCheck className="w-4 h-4 mr-1.5" />
+                        Проверить ({answeredCount}/{totalGaps})
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* ─── ANALYSIS VIEW (after submission) ─── */
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5 }}
+                  className="space-y-6"
+                >
+                  {/* Score summary */}
+                  <Card className="bg-gradient-to-br from-violet-900/30 to-fuchsia-900/20 border-violet-700/20">
+                    <CardContent className="p-6 text-center">
                       <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: 0.2, type: 'spring' }}
+                      >
+                        <Trophy className="w-12 h-12 text-amber-400 mx-auto mb-2" />
+                        <h2 className="text-2xl font-bold text-violet-100">
+                          {dictCorrectCount} из {totalGaps}
+                        </h2>
+                        <p className="text-sm text-violet-300/60 mt-1">
+                          {dictCorrectCount === totalGaps
+                            ? 'Идеально! Все пропуски заполнены верно!'
+                            : dictCorrectCount >= totalGaps * 0.7
+                              ? 'Отличный результат!'
+                              : 'Есть над чем поработать. Изучите правила ниже.'}
+                        </p>
+                      </motion.div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Correct text with gap highlights */}
+                  <Card className="bg-[#0e081a]/80 border-violet-800/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm text-violet-300 flex items-center gap-2">
+                        <Eye className="w-4 h-4" />
+                        Исправленный текст
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="text-base sm:text-lg leading-relaxed sm:leading-loose text-gray-200 font-serif">
+                        {segments.map((seg, i) => {
+                          if (seg.type === 'text') {
+                            const parts = seg.content.split('\n');
+                            return parts.map((line, li) => (
+                              <span key={`at-${i}-${li}`}>
+                                {li > 0 && <br />}
+                                <br />
+                                {line}
+                              </span>
+                            ));
+                          }
+                          const gap = dictationText.gaps.find((g) => g.id === seg.gapId);
+                          if (!gap) return null;
+                          const isCorrect = gapResults[gap.id] ?? false;
+
+                          return (
+                            <span
+                              key={`ares-${gap.id}`}
+                              onClick={() => setExpandedGap(expandedGap === gap.id ? null : gap.id)}
+                              className={`
+                                cursor-pointer mx-0.5 rounded px-0.5 transition-all
+                                ${isCorrect
+                                  ? 'bg-green-600/20 ring-1 ring-green-500/30'
+                                  : 'bg-red-600/20 ring-1 ring-red-500/30'
+                                }
+                              `}
+                            >
+                              <span className={`text-xs sm:text-sm font-mono ${isCorrect ? 'text-green-300' : 'text-red-300'}`}>
+                                {isCorrect ? (
+                                  <CheckCircle2 className="w-3.5 h-3.5 inline text-green-400 mr-0.5" />
+                                ) : (
+                                  <XCircle className="w-3.5 h-3.5 inline text-red-400 mr-0.5" />
+                                )}
+                                {gap.fullWord}
+                              </span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Per-rule breakdown */}
+                  <Card className="bg-[#0e081a]/80 border-violet-800/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm text-violet-300 flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4" />
+                        Разбивка по правилам
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0 space-y-2">
+                      {Object.entries(ruleStats).map(([tag, stat]) => {
+                        const display = RULE_TAG_DISPLAY[tag as RuleTag];
+                        const pct = stat.total > 0 ? Math.round((stat.correct / stat.total) * 100) : 0;
+                        return (
+                          <div
+                            key={tag}
+                            className="flex items-center gap-3 p-2 rounded-lg hover:bg-violet-900/20 transition-colors"
+                          >
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] flex-shrink-0 ${display?.color ?? ''}`}
+                            >
+                              {display?.label ?? tag}
+                            </Badge>
+                            <div className="flex-1 h-2 bg-violet-950/50 rounded-full overflow-hidden">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${pct}%` }}
+                                transition={{ duration: 0.8, delay: 0.1 }}
+                                className={`h-full rounded-full ${pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                              />
+                            </div>
+                            <span className={`text-xs font-medium ${pct >= 70 ? 'text-green-400' : pct >= 40 ? 'text-yellow-400' : 'text-red-400'}`}>
+                              {stat.correct}/{stat.total}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+
+                  {/* Expandable per-gap explanations */}
+                  <Card className="bg-[#0e081a]/80 border-violet-800/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm text-violet-300 flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4" />
+                        Пояснения к ошибкам
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0 space-y-1">
+                      {dictationText.gaps.map((gap) => {
+                        const isCorrect = gapResults[gap.id] ?? false;
+                        const isExpanded = expandedGap === gap.id;
+                        const tagDisplay = RULE_TAG_DISPLAY[gap.rule];
+
+                        return (
+                          <div key={gap.id} className="border border-violet-800/10 rounded-lg overflow-hidden">
+                            <button
+                              onClick={() => setExpandedGap(isExpanded ? null : gap.id)}
+                              className="w-full flex items-center gap-2 p-3 text-left hover:bg-violet-900/15 transition-colors"
+                            >
+                              {isCorrect ? (
+                                <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
+                              ) : (
+                                <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                              )}
+                              <span className={`text-sm ${isCorrect ? 'text-green-300/80' : 'text-red-300'}`}>
+                                {gap.display} → {gap.fullWord}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={`text-[9px] ml-auto flex-shrink-0 ${tagDisplay?.color ?? ''}`}
+                              >
+                                {tagDisplay?.label}
+                              </Badge>
+                              {isExpanded ? (
+                                <ChevronUp className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
+                              )}
+                            </button>
+                            <AnimatePresence>
+                              {isExpanded && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="px-3 pb-3">
+                                    <p className="text-sm text-violet-300/70 leading-relaxed">
+                                      {gap.explanation}
+                                    </p>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+
+                  {/* Continue to supporting questions */}
+                  {!allSupportDone && (
+                    <div className="text-center py-4">
+                      <Button
+                        onClick={() => setModeTab('support')}
+                        className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-lg shadow-violet-900/40"
+                      >
+                        <ArrowRight className="w-4 h-4 mr-2" />
+                        Перейти к типам заданий
+                      </Button>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </motion.div>
+          ) : (
+            /* ─── 4. SUPPORTING QUESTIONS ─── */
+            <motion.div
+              key="support"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <SupportingQuestionsEngine
+                questions={SUPPORT_QUESTIONS}
+                supportIdx={supportIdx}
+                setSupportIdx={setSupportIdx}
+                supportAnswers={supportAnswers}
+                setSupportAnswers={setSupportAnswers}
+                supportSubmitted={supportSubmitted}
+                handleSupportSubmit={handleSupportSubmit}
+                showSupportHint={showSupportHint}
+                setShowSupportHint={setShowSupportHint}
+                supportPassageOpen={supportPassageOpen}
+                setSupportPassageOpen={setSupportPassageOpen}
+                toggleSupportOption={toggleSupportOption}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ═══════ 6. RESULTS SUMMARY ═══════ */}
+        {showResults && (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="mt-8"
+          >
+            <Card className="bg-gradient-to-br from-violet-900/40 to-fuchsia-900/30 border-violet-600/30 shadow-2xl shadow-violet-900/30">
+              <CardContent className="p-6 sm:p-8 text-center space-y-6">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', delay: 0.2 }}
+                >
+                  <span className="text-5xl">{grade.emoji}</span>
+                </motion.div>
+                <div>
+                  <h2 className={`text-2xl sm:text-3xl font-bold ${grade.color}`}>
+                    {grade.label}
+                  </h2>
+                  <p className="text-sm text-violet-300/60 mt-1">
+                    Общий результат: {totalCorrect} из {totalQuestions} ({percentage}%)
+                  </p>
+                </div>
+
+                {/* Score breakdown */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md mx-auto">
+                  <div className="bg-violet-950/40 rounded-lg p-4 border border-violet-800/20">
+                    <p className="text-xs text-violet-400/60 mb-1">Диктант</p>
+                    <p className="text-2xl font-bold text-violet-200">
+                      {dictCorrectCount}<span className="text-sm text-violet-500">/{totalGaps}</span>
+                    </p>
+                  </div>
+                  <div className="bg-violet-950/40 rounded-lg p-4 border border-violet-800/20">
+                    <p className="text-xs text-violet-400/60 mb-1">Типы заданий</p>
+                    <p className="text-2xl font-bold text-violet-200">
+                      {supportCorrectCount}<span className="text-sm text-violet-500">/{SUPPORT_QUESTIONS.length}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Per-rule chart */}
+                <div className="max-w-sm mx-auto space-y-2 text-left">
+                  <p className="text-xs text-violet-400/60 text-center">Точность по правилам</p>
+                  {Object.entries(ruleStats).map(([tag, stat]) => {
+                    const display = RULE_TAG_DISPLAY[tag as RuleTag];
+                    const pct = stat.total > 0 ? Math.round((stat.correct / stat.total) * 100) : 0;
+                    return (
+                      <div key={tag} className="flex items-center gap-2">
+                        <span className="text-[10px] text-violet-400/60 w-20 truncate">
+                          {display?.label ?? tag}
+                        </span>
+                        <div className="flex-1 h-3 bg-violet-950/50 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${pct}%` }}
+                            transition={{ duration: 0.8, delay: 0.4 }}
+                            className={`h-full rounded-full ${pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                          />
+                        </div>
+                        <span className="text-[10px] text-violet-400/60 w-8 text-right">{pct}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Reset button */}
+                <Button
+                  onClick={handleReset}
+                  variant="outline"
+                  className="border-violet-700/30 text-violet-300 hover:bg-violet-800/20"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Начать заново
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </main>
+
+      {/* ═══════ FOOTER ═══════ */}
+      <footer className="mt-auto border-t border-violet-900/20 py-4">
+        <div className="max-w-5xl mx-auto px-4 flex items-center justify-between text-xs text-violet-500/40">
+          <span>ВПР Русский язык — 7 класс</span>
+          <div className="flex items-center gap-3">
+            <SentenceTreeSVG />
+            <LetterChainSVG />
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// ─── Supporting Questions Engine (sub-component) ────────────────────────────────
+
+interface SupportEngineProps {
+  questions: SupportQuestion[];
+  supportIdx: number;
+  setSupportIdx: (i: number) => void;
+  supportAnswers: Record<number, number[]>;
+  setSupportAnswers: React.Dispatch<React.SetStateAction<Record<number, number[]>>>;
+  supportSubmitted: Record<number, boolean>;
+  handleSupportSubmit: (qId: number) => void;
+  showSupportHint: boolean;
+  setShowSupportHint: (v: boolean) => void;
+  supportPassageOpen: Record<number, boolean>;
+  setSupportPassageOpen: React.Dispatch<React.SetStateAction<Record<number, boolean>>>;
+  toggleSupportOption: (qId: number, idx: number) => void;
+}
+
+function SupportingQuestionsEngine({
+  questions,
+  supportIdx,
+  setSupportIdx,
+  supportAnswers,
+  supportSubmitted,
+  handleSupportSubmit,
+  showSupportHint,
+  setShowSupportHint,
+  supportPassageOpen,
+  setSupportPassageOpen,
+  toggleSupportOption,
+}: SupportEngineProps) {
+  const q = questions[supportIdx];
+
+  const isSubmitted = q ? (supportSubmitted[q.id] ?? false) : false;
+  const userAnswer = q ? (supportAnswers[q.id] ?? []) : [];
+  const typeDisplay = q ? SUPPORT_TYPE_DISPLAY[q.type] : null;
+
+  // Check if answer is correct — must be before early return to satisfy hooks rules
+  const isCorrect = useMemo(() => {
+    if (!q || !isSubmitted) return null;
+    if (q.type === 'polysemous') return true; // all are correct
+    if (q.multiSelect && q.correctIndices) {
+      const sorted1 = [...userAnswer].sort();
+      const sorted2 = [...q.correctIndices].sort();
+      return sorted1.length === sorted2.length && sorted1.every((v, i) => v === sorted2[i]);
+    }
+    if (q.correctAnswer !== undefined && q.options) {
+      const selectedIdx = userAnswer[0];
+      return selectedIdx !== undefined && q.options[selectedIdx] === q.correctAnswer;
+    }
+    return null;
+  }, [q, isSubmitted, userAnswer]);
+
+  if (!q) return null;
+
+  return (
+    <div className="space-y-4">
+      {/* Navigation */}
+      <div className="flex items-center justify-between">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setSupportIdx(Math.max(0, supportIdx - 1))}
+          disabled={supportIdx === 0}
+          className="text-violet-400 hover:text-violet-200 disabled:opacity-30"
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Назад
+        </Button>
+        <span className="text-xs text-violet-400/60">
+          {supportIdx + 1} из {questions.length}
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setSupportIdx(Math.min(questions.length - 1, supportIdx + 1))}
+          disabled={supportIdx === questions.length - 1}
+          className="text-violet-400 hover:text-violet-200 disabled:opacity-30"
+        >
+          Далее
+          <ArrowRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
+      {/* Question card */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={q.id}
+          initial={{ opacity: 0, x: 30 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -30 }}
+          transition={{ duration: 0.25 }}
+        >
+          <Card className="bg-[#0e081a]/80 border-violet-800/20">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="border-violet-600/40 text-violet-300 text-xs">
+                    {q.vprType}
+                  </Badge>
+                  <Badge variant="outline" className={`text-xs ${typeDisplay?.color ?? ''}`}>
+                    {typeDisplay?.label}
+                  </Badge>
+                </div>
+                {!isSubmitted && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowSupportHint(!showSupportHint)}
+                    className="text-amber-400 hover:text-amber-300 hover:bg-amber-900/20 text-xs flex-shrink-0"
+                  >
+                    <Lightbulb className="w-3.5 h-3.5 mr-1" />
+                    Подсказка
+                  </Button>
+                )}
+              </div>
+              <CardTitle className="text-sm sm:text-base text-violet-100 mt-2 leading-relaxed">
+                {q.text}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-4">
+              {/* Hint */}
+              <AnimatePresence>
+                {showSupportHint && q.hint && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="p-3 bg-amber-900/10 border border-amber-800/20 rounded-lg"
+                  >
+                    <p className="text-sm text-amber-300/80">{q.hint}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Passage (collapsible) */}
+              {q.passage && (
+                <div className="border border-violet-800/15 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() =>
+                      setSupportPassageOpen((prev) => ({ ...prev, [q.id]: !prev[q.id] }))
+                    }
+                    className="w-full flex items-center justify-between p-3 text-left hover:bg-violet-900/15 transition-colors"
+                  >
+                    <span className="text-xs text-violet-300/70 flex items-center gap-1.5">
+                      <BookOpen className="w-3.5 h-3.5" />
+                      Текст для чтения
+                    </span>
+                    {supportPassageOpen[q.id] ? (
+                      <ChevronUp className="w-3.5 h-3.5 text-violet-500" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5 text-violet-500" />
+                    )}
+                  </button>
+                  <AnimatePresence>
+                    {supportPassageOpen[q.id] && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
                         className="overflow-hidden"
                       >
-                        <ul className="space-y-1.5 mb-3">
-                          {style.features.map((feat, j) => (
-                            <li key={j} className="text-xs text-gray-400 flex items-start gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: style.color }} />
-                              {feat}
-                            </li>
-                          ))}
-                        </ul>
-                        <div className="pt-3 border-t border-white/5">
-                          <p className="text-xs italic text-gray-500">«{style.example}»</p>
+                        <div className="px-3 pb-3 max-h-64 overflow-y-auto custom-scrollbar">
+                          <p className="text-sm text-violet-300/70 leading-relaxed whitespace-pre-line">
+                            {q.passage}
+                          </p>
                         </div>
-                      </motion.div>
-                    ) : (
-                      <motion.div initial={{ opacity: 0.4 }} className="text-[10px] text-purple-500/40">
-                        Нажми для деталей...
                       </motion.div>
                     )}
                   </AnimatePresence>
-                </motion.div>
-              );
-            })}
-          </div>
-        </motion.section>
+                </div>
+              )}
 
-        {/* ════════ FOOTER ════════ */}
-        <motion.footer
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="mt-auto pt-12 pb-8 border-t border-violet-800/20"
-        >
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-center sm:text-left">
-              <p className="text-purple-400/50 text-sm">РУССКИЙ КОД // Шпаргалка для ВПР 7 класс</p>
-              <p className="text-purple-500/30 text-xs mt-1">Language_Protocol_7.0 — Все разделы охвачены</p>
-            </div>
-            <Link
-              href="/vpr-tests"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-900/20 border border-purple-700/30 text-purple-300 text-sm hover:bg-purple-800/30 hover:border-purple-600/50 transition-all group"
-            >
-              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-              Назад к тестам ВПР
-            </Link>
-          </div>
-        </motion.footer>
+              {/* Options */}
+              {q.options && (
+                <div className="space-y-2">
+                  {q.multiSelect ? (
+                    // Multi-select (checkboxes)
+                    q.options.map((opt, idx) => {
+                      const isSelected = userAnswer.includes(idx);
+                      let showCorrect = false;
+                      let showWrong = false;
+                      if (isSubmitted) {
+                        if (q.correctIndices?.includes(idx)) showCorrect = true;
+                        else if (isSelected) showWrong = true;
+                      }
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => toggleSupportOption(q.id, idx)}
+                          disabled={isSubmitted}
+                          className={`
+                            w-full text-left p-3 rounded-lg border transition-all text-sm
+                            ${isSubmitted && showCorrect
+                              ? 'border-green-500/40 bg-green-900/15 text-green-300'
+                              : isSubmitted && showWrong
+                                ? 'border-red-500/40 bg-red-900/15 text-red-300'
+                                : isSelected
+                                  ? 'border-fuchsia-500/40 bg-fuchsia-900/20 text-fuchsia-200'
+                                  : 'border-violet-800/20 bg-violet-950/30 text-violet-300/80 hover:bg-violet-900/20 hover:border-violet-700/30'
+                            }
+                          `}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className={`
+                              w-4 h-4 mt-0.5 rounded border flex-shrink-0 flex items-center justify-center
+                              ${isSelected ? 'border-fuchsia-500 bg-fuchsia-600/30' : 'border-violet-600/40'}
+                              ${isSubmitted && showCorrect ? 'border-green-500 bg-green-600/30' : ''}
+                              ${isSubmitted && showWrong ? 'border-red-500 bg-red-600/30' : ''}
+                            `}>
+                              {isSelected && !isSubmitted && (
+                                <CheckCircle2 className="w-3 h-3 text-fuchsia-300" />
+                              )}
+                              {isSubmitted && showCorrect && (
+                                <CheckCircle2 className="w-3 h-3 text-green-400" />
+                              )}
+                              {isSubmitted && showWrong && (
+                                <XCircle className="w-3 h-3 text-red-400" />
+                              )}
+                            </div>
+                            <span>{opt}</span>
+                          </div>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    // Single-select (radio / click)
+                    q.options.map((opt, idx) => {
+                      const isSelected = userAnswer[0] === idx;
+                      let showCorrect = false;
+                      let showWrong = false;
+                      if (isSubmitted && q.correctAnswer !== undefined) {
+                        if (opt === q.correctAnswer) showCorrect = true;
+                        else if (isSelected) showWrong = true;
+                      }
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            if (!isSubmitted) {
+                              supportAnswers[q.id] = [idx];
+                            }
+                          }}
+                          disabled={isSubmitted}
+                          className={`
+                            w-full text-left p-3 rounded-lg border transition-all text-sm
+                            ${isSubmitted && showCorrect
+                              ? 'border-green-500/40 bg-green-900/15 text-green-300'
+                              : isSubmitted && showWrong
+                                ? 'border-red-500/40 bg-red-900/15 text-red-300'
+                                : isSelected
+                                  ? 'border-fuchsia-500/40 bg-fuchsia-900/20 text-fuchsia-200'
+                                  : 'border-violet-800/20 bg-violet-950/30 text-violet-300/80 hover:bg-violet-900/20 hover:border-violet-700/30'
+                            }
+                          `}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className={`
+                              w-4 h-4 mt-0.5 rounded-full border flex-shrink-0
+                              ${isSelected ? 'border-fuchsia-500' : 'border-violet-600/40'}
+                              ${isSubmitted && showCorrect ? 'border-green-500' : ''}
+                              ${isSubmitted && showWrong ? 'border-red-500' : ''}
+                            `}>
+                              {(isSelected || (isSubmitted && showCorrect)) && (
+                                <div className={`
+                                  w-full h-full rounded-full scale-50 mt-0.5
+                                  ${isSubmitted && showCorrect ? 'bg-green-400' : 'bg-fuchsia-400'}
+                                  ${isSubmitted && showWrong ? 'bg-red-400' : ''}
+                                `} />
+                              )}
+                            </div>
+                            <span>{opt}</span>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+
+              {/* Submit button */}
+              {!isSubmitted && q.type !== 'polysemous' && (
+                <Button
+                  onClick={() => handleSupportSubmit(q.id)}
+                  disabled={userAnswer.length === 0}
+                  className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white disabled:opacity-40"
+                >
+                  <SpellCheck className="w-4 h-4 mr-1.5" />
+                  Ответить
+                </Button>
+              )}
+
+              {/* Polysemous auto-accept */}
+              {!isSubmitted && q.type === 'polysemous' && (
+                <Button
+                  onClick={() => handleSupportSubmit(q.id)}
+                  className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white"
+                >
+                  Все варианты верны — Продолжить
+                </Button>
+              )}
+
+              {/* Explanation after submission */}
+              <AnimatePresence>
+                {isSubmitted && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    {/* Result badge */}
+                    <div className={`mb-3 p-3 rounded-lg ${
+                      isCorrect === true
+                        ? 'bg-green-900/15 border border-green-800/20'
+                        : isCorrect === false
+                          ? 'bg-red-900/15 border border-red-800/20'
+                          : 'bg-violet-900/15 border border-violet-800/20'
+                    }`}>
+                      <p className={`text-sm font-medium flex items-center gap-1.5 ${
+                        isCorrect === true
+                          ? 'text-green-300'
+                          : isCorrect === false
+                            ? 'text-red-300'
+                            : 'text-violet-300'
+                      }`}>
+                        {isCorrect === true && <CheckCircle2 className="w-4 h-4" />}
+                        {isCorrect === false && <XCircle className="w-4 h-4" />}
+                        {isCorrect === true ? 'Верно!' : isCorrect === false ? 'Неверно' : 'Все верно'}
+                      </p>
+                    </div>
+
+                    {/* Explanation text */}
+                    <div className="p-3 bg-violet-950/40 rounded-lg border border-violet-800/15">
+                      <p className="text-sm text-violet-300/70 leading-relaxed whitespace-pre-line">
+                        {q.explanation}
+                      </p>
+                    </div>
+
+                    {/* Next button */}
+                    {supportIdx < questions.length - 1 && (
+                      <Button
+                        onClick={() => {
+                          setSupportIdx(supportIdx + 1);
+                          setShowSupportHint(false);
+                        }}
+                        variant="outline"
+                        className="w-full mt-3 border-violet-700/30 text-violet-300 hover:bg-violet-800/20"
+                      >
+                        Следующее задание
+                        <ArrowRight className="w-4 h-4 ml-1.5" />
+                      </Button>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Question dots navigation */}
+      <div className="flex justify-center gap-1.5 mt-4">
+        {questions.map((sq, i) => (
+          <button
+            key={sq.id}
+            onClick={() => setSupportIdx(i)}
+            className={`
+              w-2.5 h-2.5 rounded-full transition-all
+              ${i === supportIdx
+                ? 'bg-fuchsia-400 scale-125'
+                : supportSubmitted[sq.id]
+                  ? 'bg-violet-600'
+                  : 'bg-violet-800/40 hover:bg-violet-700/50'
+              }
+            `}
+            title={`${sq.vprType}`}
+          />
+        ))}
       </div>
     </div>
   );
