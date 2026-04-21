@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import {
-  Atom, Zap, ArrowDown, Gauge, Weight, Mountain, Waves,
+  Atom, Zap, ArrowDown, ArrowLeft, Gauge, Weight, Mountain, Waves,
   Cog, Calculator, Eye, MousePointerClick, ChevronDown,
   ChevronUp, Thermometer, BookOpen, Trophy, RotateCcw,
   Target, Ruler, Beaker, Compass, FlaskConical, Lightbulb,
