@@ -118,6 +118,19 @@ const gradeCheats: Record<number, CheatData[]> = {
       tagColor: "text-blue-300 bg-blue-900/40 border-blue-500/20",
     },
     {
+      href: "/vpr/geometry/7/cheatsheet",
+      title: "Geometry_Vector",
+      subtitle: "Function Engine",
+      desc: "Угловые протоколы 7 уровня.",
+      color: "#0bf2f6",
+      glowColor: "rgba(5, 230, 246, 0.3)",
+      borderColor: "border-cyan-500/30",
+      bgAccent: "bg-cyan-500/5",
+      icon: "hash",
+      tag: "Geometry",
+      tagColor: "text-cyan-300 bg-cyan-900/40 border-cyan-500/20",
+    },
+    {
       href: "/vpr/physics/7/cheatsheet",
       title: "Gravity_Lab",
       subtitle: "Physics Engine",
@@ -695,22 +708,6 @@ function CheatCard({ data, index }: { data: CheatData; index: number }) {
               </motion.p>
             )}
           </AnimatePresence>
-
-          {/* Bottom: status indicator */}
-          <div className="flex items-center justify-between mt-4 pt-3 border-t border-zinc-800/50">
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: data.color }} />
-              <span className="text-[9px] text-zinc-600 font-mono uppercase tracking-wider">Online</span>
-            </div>
-            <ArrowRight
-              className="w-4 h-4 transition-all duration-300"
-              style={{
-                color: data.color,
-                opacity: isHovered ? 1 : 0.3,
-                transform: isHovered ? "translateX(4px)" : "translateX(0)",
-              }}
-            />
-          </div>
 
           {/* Scanning line animation on hover */}
           {isHovered && (
