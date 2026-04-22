@@ -287,7 +287,10 @@ export default function Russian7Cheatsheet() {
     SUPPORT_QUESTIONS.forEach((q) => {
       if (!supportSubmitted[q.id]) return;
       const userAns = supportAnswers[q.id] ?? [];
-      if (q.multiSelect && q.correctIndices) {
+      if (q.type === 'polysemous') {
+        // Polysemous questions are auto-accepted — always count as correct
+        count++;
+      } else if (q.multiSelect && q.correctIndices) {
         const sorted1 = [...userAns].sort();
         const sorted2 = [...q.correctIndices].sort();
         if (sorted1.length === sorted2.length && sorted1.every((v, i) => v === sorted2[i])) count++;
@@ -791,7 +794,6 @@ export default function Russian7Cheatsheet() {
                             return parts.map((line, li) => (
                               <span key={`${i}-${li}`}>
                                 {li > 0 && <br />}
-                                <br />
                                 {line}
                               </span>
                             ));
@@ -1454,6 +1456,7 @@ function SupportingQuestionsEngine({
   supportIdx,
   setSupportIdx,
   supportAnswers,
+  setSupportAnswers,
   supportSubmitted,
   handleSupportSubmit,
   showSupportHint,
@@ -1671,7 +1674,7 @@ function SupportingQuestionsEngine({
                           key={idx}
                           onClick={() => {
                             if (!isSubmitted) {
-                              supportAnswers[q.id] = [idx];
+                              setSupportAnswers(prev => ({ ...prev, [q.id]: [idx] }));
                             }
                           }}
                           disabled={isSubmitted}
