@@ -875,6 +875,10 @@ function WelcomeScreen({ onStart }: { onStart: () => void }) {
 /* ═══════════════════════ REFERENCE SIDEBAR ═══════════════════════ */
 
 function ReferenceSidebar({ activeTab, currentType }: { activeTab: string; currentType?: QuestionType }) {
+  const [selectedTab, setSelectedTab] = useState(activeTab);
+  // Sync to the auto-selected tab when question type changes
+  useEffect(() => { setSelectedTab(activeTab); }, [activeTab]);
+
   const refItems: Record<string, React.ReactNode> = {
     formulas: (
       <div className="space-y-3 p-3">
@@ -949,7 +953,7 @@ function ReferenceSidebar({ activeTab, currentType }: { activeTab: string; curre
     percents: ["percent"],
     angles: ["parallel", "triangle", "heights"],
   };
-  const isRelevant = currentType ? (tabToType[activeTab]?.includes(currentType) ?? false) : false;
+  const isRelevant = currentType ? (tabToType[selectedTab]?.includes(currentType) ?? false) : false;
 
   return (
     <Card className="border-slate-700/50 bg-card/80 backdrop-blur h-fit">
@@ -959,7 +963,7 @@ function ReferenceSidebar({ activeTab, currentType }: { activeTab: string; curre
           Справочник
         </CardTitle>
       </CardHeader>
-      <Tabs defaultValue="formulas" value={activeTab} className="w-full">
+      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
         <TabsList className="w-full bg-slate-800/50 h-auto flex-wrap gap-1 p-1 rounded-lg">
           {[
             { val: "formulas", icon: <Sigma size={12} />, label: "Формулы" },
@@ -970,7 +974,7 @@ function ReferenceSidebar({ activeTab, currentType }: { activeTab: string; curre
           ].map(t => (
             <TabsTrigger key={t.val} value={t.val}
               className={cn("text-xs px-2 py-1 data-[state=active]:bg-cyan-600/30 data-[state=active]:text-cyan-400",
-                isRelevant && t.val === activeTab && "ring-1 ring-cyan-400/50")}>
+                isRelevant && t.val === selectedTab && "ring-1 ring-cyan-400/50")}>
               <span className="flex items-center gap-1">{t.icon} {t.label}</span>
             </TabsTrigger>
           ))}
@@ -1050,10 +1054,10 @@ function QuizQuestion({ question, answers, onAnswer, onNavigate, totalQuestions,
 
   return (
     <div className="flex flex-col lg:flex-row gap-4 w-full max-w-6xl mx-auto">
-      {/* Mobile sidebar toggle */}
+      {/* Floating sidebar toggle */}
       <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="lg:hidden fixed top-3 right-3 z-50 bg-slate-800/80 text-slate-300 border border-slate-700/50 backdrop-blur">
-        <Menu size={18} />
+        className="fixed bottom-6 right-6 z-50 bg-cyan-600/80 hover:bg-cyan-500/80 text-white border border-cyan-400/30 backdrop-blur shadow-lg shadow-cyan-500/20 rounded-full w-12 h-12 p-0 cursor-pointer">
+        <BookOpen size={20} />
       </Button>
 
       {/* Main Content */}
@@ -1218,19 +1222,12 @@ function QuizQuestion({ question, answers, onAnswer, onNavigate, totalQuestions,
         </div>
       </div>
 
-      {/* Sidebar */}
-      <div className={cn("hidden lg:block w-72 shrink-0", sidebarOpen && "hidden")}>
-        <div className="sticky top-4">
-          <ReferenceSidebar activeTab={activeRefTab} currentType={question.type} />
-        </div>
-      </div>
-
-      {/* Mobile sidebar overlay */}
+      {/* Sidebar overlay (all screens, toggle via floating button) */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div initial={{ opacity: 0, x: 300 }} animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 300 }} transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-40 lg:hidden">
+            className="fixed inset-0 z-40">
             <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
             <div className="absolute right-0 top-0 bottom-0 w-80 bg-[#0a0a1a] p-4 overflow-y-auto">
               <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)}
@@ -1457,19 +1454,6 @@ function MathPractice() {
           {screen === "quiz" && currentQuestion && (
             <motion.div key="quiz" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, y: 20 }}
               transition={{ duration: 0.3 }} className="px-4 py-6 md:px-8 md:py-8">
-              {/* Top bar */}
-              <div className="max-w-6xl mx-auto flex items-center justify-between mb-4">
-                <Button variant="ghost" size="sm" onClick={() => setScreen("welcome")}
-                  className="text-slate-400 hover:text-slate-200 cursor-pointer">
-                  <Home size={16} className="mr-1" /> Главная
-                </Button>
-                {Object.keys(answers).length === QUESTIONS.length && (
-                  <Button size="sm" onClick={handleFinish}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer">
-                    <Trophy size={14} className="mr-1" /> Результаты
-                  </Button>
-                )}
-              </div>
               <QuizQuestion
                 key={currentQuestion.id}
                 question={currentQuestion}
