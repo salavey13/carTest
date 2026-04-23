@@ -37,7 +37,10 @@ export async function POST(request: NextRequest) {
   }
 
   const { sessionId, userId, crewSlug, points } = parsed.data;
-  const limit = enforceRateLimit(`map-riders:batch-points:${userId}`, 30, 60_000);
+  if (guard.authSource === "app_jwt" && userId !== guard.subject) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+  }
+  const limit = enforceRateLimit(`map-riders:batch-points:${guard.subject}`, 30, 60_000);
   if (!limit.allowed) {
     const response = NextResponse.json({ success: false, error: "Too Many Requests" }, { status: 429 });
     applyRateLimitHeaders(response, limit.retryAfterSeconds, limit.remaining, limit.limit);

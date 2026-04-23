@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
 import { supabaseAdmin } from "@/lib/supabase-server";
 
 const TELEGRAM_ORIGINS = ["https://web.telegram.org", "https://web.telegram.org.a", "https://web.telegram.org.k"];
 
 type GuardResult =
-  | { ok: true; token: string }
+  | { ok: true; token: string; subject: string; authSource: "supabase" | "app_jwt" }
   | { ok: false; response: NextResponse };
 
 function toOrigin(value: string | undefined): string | null {
@@ -58,11 +59,25 @@ export async function guardMapRidersWriteRequest(request: NextRequest): Promise<
 
   const token = authHeader.slice("Bearer ".length).trim();
   const { data, error } = await supabaseAdmin.auth.getUser(token);
-  if (error || !data?.user) {
+  if (!error && data?.user?.id) {
+    return { ok: true, token, subject: data.user.id, authSource: "supabase" };
+  }
+
+  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  if (!jwtSecret) {
     return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
 
-  return { ok: true, token };
+  try {
+    const decoded = jwt.verify(token, jwtSecret) as { sub?: string; chat_id?: string };
+    const subject = String(decoded.chat_id || decoded.sub || "");
+    if (!subject) {
+      return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+    }
+    return { ok: true, token, subject, authSource: "app_jwt" };
+  } catch {
+    return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
 }
 
 export function applyRateLimitHeaders(response: NextResponse, retryAfterSeconds: number, remaining: number, limit: number) {
