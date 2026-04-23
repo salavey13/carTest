@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChevronDown, Palette, Settings, Shield, User, IdCard } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
+import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,11 +32,11 @@ function getInitials(name: string): string {
 }
 
 export function FranchizeProfileButton({ bgColor, textColor, borderColor, currentSlug }: FranchizeProfileButtonProps) {
-  const { dbUser, user, userCrewInfo, isAdmin } = useAppContext();
+  const { dbUser, user, userCrewInfo } = useAppContext();
   const effectiveUser = dbUser || user;
   const displayName = effectiveUser?.username || effectiveUser?.full_name || effectiveUser?.first_name || "Operator";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
-  const userIsAdmin = typeof isAdmin === "function" ? isAdmin() : false;
+  const userIsAdmin = useIsAdmin();
   const scopeSlug = currentSlug || userCrewInfo?.slug || "vip-bike";
   const franchizeAdminHref = `/franchize/${scopeSlug}/admin`;
   const franchizeProfileHref = `/franchize/${scopeSlug}/profile`;
@@ -88,12 +89,14 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             </Link>
           </DropdownMenuItem>
 
-          <DropdownMenuItem asChild>
-            <Link href={franchizeAdminHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-              <Shield className="mr-2 h-4 w-4 shrink-0" />
-              <span className="truncate">Franchize admin</span>
-            </Link>
-          </DropdownMenuItem>
+          {userIsAdmin ? (
+            <DropdownMenuItem asChild>
+              <Link href={franchizeAdminHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                <Shield className="mr-2 h-4 w-4 shrink-0" />
+                <span className="truncate">Franchize admin</span>
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
 
           <DropdownMenuItem asChild>
             <Link href={franchizeProfileHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">

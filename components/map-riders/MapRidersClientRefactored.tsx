@@ -20,6 +20,7 @@ import { useMaps } from "@/lib/maps/useMaps";
 import { MapRidersProvider, useMapRiders } from "@/hooks/useMapRidersContext";
 import { formatRideDuration, initialsFromName, riderDisplayName } from "@/lib/map-riders";
 import { useLiveRiders } from "@/hooks/useLiveRiders";
+import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 import { FranchizeConfirmModal } from "@/app/franchize/components/FranchizeConfirmModal";
 import { FranchizePromptModal } from "@/app/franchize/components/FranchizePromptModal";
@@ -42,6 +43,7 @@ const MEETUP_ACTION_DEBOUNCE_MS = 2000;
 function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   const { dbUser } = useAppContext();
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
+  const isAdmin = useIsAdmin();
   const [isQuickMeetupSaving, setIsQuickMeetupSaving] = useState(false);
   const [selectedMeetupId, setSelectedMeetupId] = useState<string | null>(null);
   const [isMeetupDeleting, setIsMeetupDeleting] = useState(false);
@@ -392,9 +394,11 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             {state.shareEnabled ? "Ты сейчас в эфире на карте" : "Геошеринг выключен"}
           </p>
           <div className="mt-4 space-y-3">
-            <Button asChild variant="outline" className="w-full justify-center">
-              <Link href="/admin/map-routes">Открыть маршруты карты</Link>
-            </Button>
+            {isAdmin ? (
+              <Button asChild variant="outline" className="w-full justify-center">
+                <Link href="/admin/map-routes">Открыть маршруты карты</Link>
+              </Button>
+            ) : null}
             <div className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-3">
               <Input
                 value={state.rideName}
