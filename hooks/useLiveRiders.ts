@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 
 type TelegramWebApp = {
   requestLocation?: (callback?: (location: { latitude: number; longitude: number; altitude?: number | null; course?: number | null; horizontal_accuracy?: number | null; speed?: number | null }) => void) => Promise<unknown> | void;
@@ -51,6 +52,7 @@ const BATCH_FLUSH_MS = 5000;
 const BATCH_MAX_SIZE = 10;
 const TELEGRAM_MIN_INTERVAL_MS = 2500;
 const ACCEPT_DEBOUNCE_MS = 800;
+const SEND_THROTTLE_MS = 3000;
 
 export function useLiveRiders(options: UseLiveRidersOptions) {
   const { crewSlug, sessionId, userId, enabled, onPosition } = options;
@@ -61,6 +63,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   const telegramTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabaseBrowserClient>["channel"]> | null>(null);
   const lastTelegramTsRef = useRef<number>(0);
+  const lastSendTsRef = useRef<number>(0);
   const acceptDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingPointRef = useRef<GPSPoint | null>(null);
   const lastBroadcastAtRef = useRef<string | null>(null);
@@ -101,17 +104,19 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
     if (points.length === 0 || !sessionId || !userId) return;
 
     try {
+      const headers = await getMapRidersWriteHeaders();
       const batchResponse = await fetch("/api/map-riders/batch-points", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ sessionId, userId, crewSlug, points }),
       });
       if (batchResponse.ok) return;
 
       const lastPoint = points[points.length - 1];
+      const fallbackHeaders = await getMapRidersWriteHeaders();
       await fetch("/api/map-riders/location", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: fallbackHeaders,
         body: JSON.stringify({
           sessionId,
           userId,
@@ -133,6 +138,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   const acceptPointNow = useCallback(
     (point: GPSPoint) => {
       const now = Date.now();
+      if (now - lastSendTsRef.current < SEND_THROTTLE_MS) return;
       const last = lastAcceptedRef.current;
       if (last) {
         const elapsed = now - last.time;
@@ -141,6 +147,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       }
 
       lastAcceptedRef.current = { lat: point.lat, lng: point.lng, time: now };
+      lastSendTsRef.current = now;
       broadcastPosition(point);
       batchQueueRef.current.push(point);
       setQueuedPoints(batchQueueRef.current.length);

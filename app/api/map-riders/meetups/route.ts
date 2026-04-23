@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { guardMapRidersWriteRequest, applyRateLimitHeaders } from "@/lib/map-riders-security";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-server";
 
 const meetupSchema = z.object({
@@ -19,10 +21,22 @@ const meetupDeleteSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const guard = await guardMapRidersWriteRequest(request);
+  if (!guard.ok) {
+    return guard.response;
+  }
+
   const body = await request.json();
   const parsed = meetupSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ success: false, error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const limit = enforceRateLimit(`map-riders:meetups:create:${parsed.data.userId}`, 5, 60_000);
+  if (!limit.allowed) {
+    const response = NextResponse.json({ success: false, error: "Too Many Requests" }, { status: 429 });
+    applyRateLimitHeaders(response, limit.retryAfterSeconds, limit.remaining, limit.limit);
+    return response;
   }
 
   const { error, data } = await supabaseAdmin
@@ -47,6 +61,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const guard = await guardMapRidersWriteRequest(request);
+  if (!guard.ok) {
+    return guard.response;
+  }
+
   const body = await request.json();
   const parsed = meetupDeleteSchema.safeParse(body);
   if (!parsed.success) {
@@ -54,6 +73,12 @@ export async function DELETE(request: NextRequest) {
   }
 
   const { meetupId, crewSlug, userId } = parsed.data;
+  const limit = enforceRateLimit(`map-riders:meetups:delete:${userId}`, 5, 60_000);
+  if (!limit.allowed) {
+    const response = NextResponse.json({ success: false, error: "Too Many Requests" }, { status: 429 });
+    applyRateLimitHeaders(response, limit.retryAfterSeconds, limit.remaining, limit.limit);
+    return response;
+  }
 
   const { data: meetup, error: meetupError } = await supabaseAdmin
     .from("map_rider_meetups")

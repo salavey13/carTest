@@ -16,6 +16,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { riderDisplayName, formatRideDuration } from "@/lib/map-riders";
 import { toast } from "sonner";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 
 export function RidersDrawer() {
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
@@ -32,9 +33,10 @@ export function RidersDrawer() {
     }
     setIsSubmitting(true);
     try {
+      const headers = await getMapRidersWriteHeaders();
       const res = await fetch("/api/map-riders/meetups", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           crewSlug,
           userId: dbUser.user_id,
