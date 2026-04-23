@@ -31,8 +31,11 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ success: false, error: parsed.error.flatten() }, { status: 400 });
   }
+  if (guard.authSource === "app_jwt" && parsed.data.userId !== guard.subject) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+  }
 
-  const limit = enforceRateLimit(`map-riders:meetups:create:${parsed.data.userId}`, 5, 60_000);
+  const limit = enforceRateLimit(`map-riders:meetups:create:${guard.subject}`, 5, 60_000);
   if (!limit.allowed) {
     const response = NextResponse.json({ success: false, error: "Too Many Requests" }, { status: 429 });
     applyRateLimitHeaders(response, limit.retryAfterSeconds, limit.remaining, limit.limit);
@@ -73,7 +76,10 @@ export async function DELETE(request: NextRequest) {
   }
 
   const { meetupId, crewSlug, userId } = parsed.data;
-  const limit = enforceRateLimit(`map-riders:meetups:delete:${userId}`, 5, 60_000);
+  if (guard.authSource === "app_jwt" && userId !== guard.subject) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+  }
+  const limit = enforceRateLimit(`map-riders:meetups:delete:${guard.subject}`, 5, 60_000);
   if (!limit.allowed) {
     const response = NextResponse.json({ success: false, error: "Too Many Requests" }, { status: 429 });
     applyRateLimitHeaders(response, limit.retryAfterSeconds, limit.remaining, limit.limit);
