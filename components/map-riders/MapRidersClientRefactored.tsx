@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ import { useMaps } from "@/lib/maps/useMaps";
 import { MapRidersProvider, useMapRiders } from "@/hooks/useMapRidersContext";
 import { formatRideDuration, initialsFromName, riderDisplayName } from "@/lib/map-riders";
 import { useLiveRiders } from "@/hooks/useLiveRiders";
+import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 import { RiderMarkerLayer } from "@/components/map-riders/RiderMarkerLayer";
 import { RiderFAB } from "@/components/map-riders/RiderFAB";
 import { RidersDrawer } from "@/components/map-riders/RidersDrawer";
@@ -33,6 +34,7 @@ const RacingMap = dynamic(() => import("@/components/maps/RacingMap").then((mod)
 
 const DEFAULT_BOUNDS = { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 };
 const HOME_BASE: [number, number] = [56.204245, 43.798905];
+const MEETUP_ACTION_DEBOUNCE_MS = 2000;
 
 // ── Inner component (uses context) ──
 function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
@@ -41,6 +43,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   const [isQuickMeetupSaving, setIsQuickMeetupSaving] = useState(false);
   const [selectedMeetupId, setSelectedMeetupId] = useState<string | null>(null);
   const [isMeetupDeleting, setIsMeetupDeleting] = useState(false);
+  const lastMeetupActionAtRef = useRef(0);
   const surface = crewPaletteForSurface(crew.theme);
   const mapEngine = process.env.NEXT_PUBLIC_MAP_ENGINE || "leaflet";
   const useLeafletMap = mapEngine !== "vibemap";
@@ -153,6 +156,12 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       toast.error("Сначала выбери точку на карте");
       return;
     }
+    const now = Date.now();
+    if (now - lastMeetupActionAtRef.current < MEETUP_ACTION_DEBOUNCE_MS) {
+      toast.info("Подожди пару секунд перед следующим действием");
+      return;
+    }
+    lastMeetupActionAtRef.current = now;
 
     setIsQuickMeetupSaving(true);
     try {
@@ -166,9 +175,10 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       }
 
       const [lat, lon] = state.selectedMeetupPoint;
+      const headers = await getMapRidersWriteHeaders();
       const response = await fetch("/api/map-riders/meetups", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           crewSlug,
           userId: dbUser.user_id,
@@ -203,6 +213,12 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       toast.error("Сначала выбери meetup-поинт");
       return;
     }
+    const now = Date.now();
+    if (now - lastMeetupActionAtRef.current < MEETUP_ACTION_DEBOUNCE_MS) {
+      toast.info("Подожди пару секунд перед следующим действием");
+      return;
+    }
+    lastMeetupActionAtRef.current = now;
 
     const confirmed =
       typeof window !== "undefined" ? window.confirm(`Удалить meetup «${selectedMeetup.title}»?`) : false;
@@ -210,9 +226,10 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
 
     setIsMeetupDeleting(true);
     try {
+      const headers = await getMapRidersWriteHeaders();
       const response = await fetch("/api/map-riders/meetups", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           meetupId: selectedMeetup.id,
           crewSlug,
@@ -399,9 +416,10 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               onClick={async () => {
                 if (!dbUser?.user_id) { toast.error("Авторизуйся"); return; }
                 try {
+                  const headers = await getMapRidersWriteHeaders();
                   const res = await fetch("/api/map-riders/session", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers,
                     body: JSON.stringify({ action: "start", userId: dbUser.user_id, crewSlug, rideName: state.rideName, vehicleLabel: state.vehicleLabel, rideMode: state.rideMode, visibility: "crew" }),
                   });
                   const json = await res.json();
@@ -422,9 +440,10 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               onClick={async () => {
                 if (!dbUser?.user_id || !state.sessionId) return;
                 try {
+                  const headers = await getMapRidersWriteHeaders();
                   const res = await fetch("/api/map-riders/session", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers,
                     body: JSON.stringify({ action: "stop", sessionId: state.sessionId, userId: dbUser.user_id, crewSlug, routePoints: [] }),
                   });
                   const json = await res.json();

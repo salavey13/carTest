@@ -57,12 +57,24 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 - [ ] Route replay full-screen UI with timeline scrubber.
 - [ ] Speed-gradient route polyline rendering (segment color by speed).
 - [ ] Long-press meetup creation mode (keep tap safe for exploration UX).
+- [x] Write API hardening: CSRF-style guards (`Authorization` + `Origin` + `X-Requested-With`) and per-user in-memory rate limits for session/meetups/batch writes.
 - [x] Realtime ordering guardrails (drop stale/out-of-order move packets).
 - [x] Anti-spoof sanity checks for impossible speed/location jumps.
 
 ### I6.1 — Screenshot + demo artifacts (new)
 - [x] Add screenshot policy note: for PR evidence use browser-container/playwright artifacts, avoid committing binary screenshots; `scripts/page-screenshot-skill.mjs` is fallback for public one-off capture only.
 - [ ] Capture and attach one "live map with riders" screenshot and one "drawer+leaderboard" screenshot.
+
+
+
+### I5 field QA evidence run (2026-04-23)
+
+| Проверка | Статус | Доказательство | Комментарий |
+|---|---|---|---|
+| Smoke route + split APIs (`vip-bike`) | ✅ PASS | `npm run qa:map-riders` (все 200) | Проверены `/franchize/vip-bike/map-riders`, `/api/map-riders/overview`, `/leaderboard`, `/health`, legacy `/api/map-riders`. |
+| Скриншот live map (`vip-bike`) | ✅ PASS | `artifacts/map-riders-vip-bike-i5.png` | Получен fallback-движком `thum.io` после падения Playwright из-за системных библиотек в раннере. |
+| Two-phone live + stale/offline + meetup persistence | ⚠️ BLOCKED (env) | N/A | В текущем CI/CLI окружении недоступны две Telegram-мобилки и ручные действия в WebApp; вынесено в отдельный полевой прогон. |
+| Screenshot drawer + leaderboard | ⚠️ BLOCKED (env) | N/A | Для этого нужен интерактивный UI прогон (открыть drawer на мобильном), невозможен через headless smoke без пользовательского взаимодействия. |
 
 ## AGI gold port review notes (I1→I5)
 - ✅ Preserved contract-first order from goldmine (`overview`/`leaderboard`/`health` + legacy compatibility).

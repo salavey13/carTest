@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useMapRiders } from "@/hooks/useMapRidersContext";
 import { useAppContext } from "@/contexts/AppContext";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 
 export function RiderFAB() {
   const { state, dispatch, crewSlug, fetchSnapshot } = useMapRiders();
@@ -25,9 +26,10 @@ export function RiderFAB() {
     try {
       if (!state.shareEnabled) {
         // START
+        const headers = await getMapRidersWriteHeaders();
         const res = await fetch("/api/map-riders/session", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({
             action: "start",
             userId: dbUser.user_id,
@@ -48,9 +50,10 @@ export function RiderFAB() {
         toast.success("MapRiders активирован!");
       } else {
         // STOP
+        const headers = await getMapRidersWriteHeaders();
         const res = await fetch("/api/map-riders/session", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({
             action: "stop",
             sessionId: state.sessionId,
