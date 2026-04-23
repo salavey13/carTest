@@ -58,6 +58,7 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 - [ ] Speed-gradient route polyline rendering (segment color by speed).
 - [ ] Long-press meetup creation mode (keep tap safe for exploration UX).
 - [x] Write API hardening: CSRF-style guards (`Authorization` + `Origin` + `X-Requested-With`) and per-user in-memory rate limits for session/meetups/batch writes.
+- [x] Telegram-safe meetup dialogs: replaced native `window.prompt/window.confirm` in MapRiders flow with custom franchize modals.
 - [x] Realtime ordering guardrails (drop stale/out-of-order move packets).
 - [x] Anti-spoof sanity checks for impossible speed/location jumps.
 
