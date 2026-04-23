@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { guardMapRidersWriteRequest, applyRateLimitHeaders } from "@/lib/map-riders-security";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-server";
 
 const locationSchema = z.object({
@@ -15,6 +17,11 @@ const locationSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const guard = await guardMapRidersWriteRequest(request);
+  if (!guard.ok) {
+    return guard.response;
+  }
+
   const body = await request.json();
   const parsed = locationSchema.safeParse(body);
   if (!parsed.success) {
@@ -22,6 +29,16 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = parsed.data;
+  if (guard.authSource === "app_jwt" && payload.userId !== guard.subject) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+  }
+  const limit = enforceRateLimit(`map-riders:location:${guard.subject}`, 30, 60_000);
+  if (!limit.allowed) {
+    const response = NextResponse.json({ success: false, error: "Too Many Requests" }, { status: 429 });
+    applyRateLimitHeaders(response, limit.retryAfterSeconds, limit.remaining, limit.limit);
+    return response;
+  }
+
   const capturedAt = payload.capturedAt || new Date().toISOString();
 
   const liveLocationUpsert = supabaseAdmin.from("live_locations").upsert(

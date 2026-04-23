@@ -4,6 +4,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { guardMapRidersWriteRequest, applyRateLimitHeaders } from "@/lib/map-riders-security";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-server";
 
 const pointSchema = z.object({
@@ -23,6 +25,11 @@ const batchSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const guard = await guardMapRidersWriteRequest(request);
+  if (!guard.ok) {
+    return guard.response;
+  }
+
   const body = await request.json();
   const parsed = batchSchema.safeParse(body);
   if (!parsed.success) {
@@ -30,6 +37,15 @@ export async function POST(request: NextRequest) {
   }
 
   const { sessionId, userId, crewSlug, points } = parsed.data;
+  if (guard.authSource === "app_jwt" && userId !== guard.subject) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+  }
+  const limit = enforceRateLimit(`map-riders:batch-points:${guard.subject}`, 30, 60_000);
+  if (!limit.allowed) {
+    const response = NextResponse.json({ success: false, error: "Too Many Requests" }, { status: 429 });
+    applyRateLimitHeaders(response, limit.retryAfterSeconds, limit.remaining, limit.limit);
+    return response;
+  }
 
   // 1) Upsert live_locations with the LAST point (most recent position)
   const lastPoint = points[points.length - 1];

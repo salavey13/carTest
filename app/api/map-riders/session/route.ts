@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { haversineKm, safeAverageSpeed } from "@/lib/map-riders";
+import { guardMapRidersWriteRequest, applyRateLimitHeaders } from "@/lib/map-riders-security";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-server";
 
 const routePointSchema = z.object({
@@ -25,6 +27,11 @@ const startSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const guard = await guardMapRidersWriteRequest(request);
+  if (!guard.ok) {
+    return guard.response;
+  }
+
   const body = await request.json();
   const parsed = startSchema.safeParse(body);
   if (!parsed.success) {
@@ -32,6 +39,16 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = parsed.data;
+  if (guard.authSource === "app_jwt" && payload.userId !== guard.subject) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+  }
+
+  const limit = enforceRateLimit(`map-riders:session:${guard.subject}`, 10, 60_000);
+  if (!limit.allowed) {
+    const response = NextResponse.json({ success: false, error: "Too Many Requests" }, { status: 429 });
+    applyRateLimitHeaders(response, limit.retryAfterSeconds, limit.remaining, limit.limit);
+    return response;
+  }
 
   if (payload.action === "start") {
     const now = new Date().toISOString();
