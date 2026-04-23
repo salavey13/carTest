@@ -1821,3 +1821,4 @@ For operator shortcut mode `FRANCHEEZEPLAN_EXECUTIONER`, use:
 Detailed historical execution notes moved to:
 - `docs/THE_FRANCHEEZEPLAN_HISTORY_ARCHIVE.md`
 - `docs/AGENT_DIARY.md` (compact) and `docs/AGENT_DIARY_ARCHIVE_2026Q1.md` (full)
+- 2026-04-23: Выполнен UX-02 (`c55e20dc-f8a8-47a0-9dda-d16a44de3ef9`) — добавлен хук `useIsAdmin` для единой проверки глобальной/crew-admin роли, скрыты admin-only ссылки для non-admin в `MapRidersClientRefactored` (`/admin/map-routes`) и в профайл-меню franchize (`Franchize admin`).
