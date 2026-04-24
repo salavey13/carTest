@@ -33,6 +33,13 @@ interface UseLiveRidersOptions {
   sessionId: string | null;
   userId: string | null;
   enabled: boolean;
+  paused?: boolean;
+  privacy?: {
+    visibilityMode: "crew" | "public";
+    homeBlurEnabled: boolean;
+    autoExpireMinutes: 1 | 5 | 15 | 60;
+    expiresAt: string | null;
+  };
   onPosition?: (point: GPSPoint) => void;
 }
 
@@ -55,7 +62,7 @@ const ACCEPT_DEBOUNCE_MS = 800;
 const SEND_THROTTLE_MS = 3000;
 
 export function useLiveRiders(options: UseLiveRidersOptions) {
-  const { crewSlug, sessionId, userId, enabled, onPosition } = options;
+  const { crewSlug, sessionId, userId, enabled, paused = false, privacy, onPosition } = options;
   const watchIdRef = useRef<number | null>(null);
   const lastAcceptedRef = useRef<{ lat: number; lng: number; time: number } | null>(null);
   const batchQueueRef = useRef<GPSPoint[]>([]);
@@ -101,14 +108,14 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   const flushBatch = useCallback(async () => {
     const points = batchQueueRef.current.splice(0, BATCH_MAX_SIZE);
     setQueuedPoints(batchQueueRef.current.length);
-    if (points.length === 0 || !sessionId || !userId) return;
+    if (points.length === 0 || !sessionId || !userId || paused) return;
 
     try {
       const headers = await getMapRidersWriteHeaders();
       const batchResponse = await fetch("/api/map-riders/batch-points", {
         method: "POST",
         headers,
-        body: JSON.stringify({ sessionId, userId, crewSlug, points }),
+        body: JSON.stringify({ sessionId, userId, crewSlug, points, privacy }),
       });
       if (batchResponse.ok) return;
 
@@ -127,16 +134,19 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
           headingDeg: lastPoint.heading,
           accuracyMeters: lastPoint.accuracyMeters,
           capturedAt: lastPoint.capturedAt,
+          privacy,
         }),
       });
     } catch {
       batchQueueRef.current.unshift(...points);
       setQueuedPoints(batchQueueRef.current.length);
     }
-  }, [sessionId, userId, crewSlug]);
+  }, [sessionId, userId, crewSlug, paused, privacy]);
 
   const acceptPointNow = useCallback(
     (point: GPSPoint) => {
+      if (paused) return;
+      if (privacy?.expiresAt && new Date(privacy.expiresAt).getTime() <= Date.now()) return;
       const now = Date.now();
       if (now - lastSendTsRef.current < SEND_THROTTLE_MS) return;
       const last = lastAcceptedRef.current;
@@ -154,7 +164,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       onPosition?.(point);
       hapticPulse();
     },
-    [broadcastPosition, onPosition, hapticPulse],
+    [broadcastPosition, onPosition, hapticPulse, paused, privacy?.expiresAt],
   );
 
   const acceptPoint = useCallback(

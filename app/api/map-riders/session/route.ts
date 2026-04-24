@@ -23,6 +23,12 @@ const startSchema = z.object({
   vehicleLabel: z.string().trim().max(120).optional(),
   rideMode: z.enum(["rental", "personal"]).default("rental"),
   visibility: z.enum(["crew", "all_auth"]).default("crew"),
+  privacy: z
+    .object({
+      homeBlurEnabled: z.boolean().default(true),
+      autoExpireMinutes: z.union([z.literal(1), z.literal(5), z.literal(15), z.literal(60)]).default(15),
+    })
+    .optional(),
   routePoints: z.array(routePointSchema).max(20000).optional().default([]),
 });
 
@@ -52,6 +58,9 @@ export async function POST(request: NextRequest) {
 
   if (payload.action === "start") {
     const now = new Date().toISOString();
+    const expiresAt = payload.privacy?.autoExpireMinutes
+      ? new Date(Date.now() + payload.privacy.autoExpireMinutes * 60_000).toISOString()
+      : null;
     await supabaseAdmin
       .from("map_rider_sessions")
       .update({ status: "completed", sharing_enabled: false, ended_at: now, updated_at: now })
@@ -72,6 +81,13 @@ export async function POST(request: NextRequest) {
         sharing_enabled: true,
         started_at: now,
         last_ping_at: now,
+        stats: {
+          privacy: {
+            homeBlurEnabled: payload.privacy?.homeBlurEnabled ?? true,
+            autoExpireMinutes: payload.privacy?.autoExpireMinutes ?? 15,
+            expiresAt,
+          },
+        },
       })
       .select("id")
       .single();
