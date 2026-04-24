@@ -67,6 +67,13 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     sessionId: state.sessionId,
     userId: dbUser?.user_id || null,
     enabled: state.shareEnabled && Boolean(state.sessionId),
+    paused: state.sharePaused,
+    privacy: {
+      visibilityMode: state.visibilityMode,
+      homeBlurEnabled: state.homeBlurEnabled,
+      autoExpireMinutes: state.autoExpireMinutes,
+      expiresAt: state.shareExpiresAt,
+    },
     onPosition: (point) => {
       if (!dbUser?.user_id) return;
       dispatch({
@@ -424,6 +431,31 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
                   <SelectItem value="personal">Личный</SelectItem>
                 </SelectContent>
               </Select>
+              <div className="grid grid-cols-2 gap-2">
+                <Select value={state.visibilityMode} onValueChange={(value: "crew" | "public") => dispatch({ type: "privacy/set-visibility", payload: value })}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Видимость" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="crew">Только экипаж</SelectItem>
+                    <SelectItem value="public">Все авторизованные</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={String(state.autoExpireMinutes)} onValueChange={(value: "1" | "5" | "15" | "60") => dispatch({ type: "privacy/set-auto-expire", payload: Number(value) as 1 | 5 | 15 | 60 })}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Авто-стоп" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 мин</SelectItem>
+                    <SelectItem value="5">5 мин</SelectItem>
+                    <SelectItem value="15">15 мин</SelectItem>
+                    <SelectItem value="60">60 мин</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => dispatch({ type: "privacy/toggle-home-blur" })}>
+                {state.homeBlurEnabled ? "Дом размыт: ВКЛ" : "Дом размыт: ВЫКЛ"}
+              </Button>
             </div>
             {/* TODO: Wire up session start/stop from useSessionManager */}
             <Button
@@ -438,7 +470,19 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
                   const res = await fetch("/api/map-riders/session", {
                     method: "POST",
                     headers,
-                    body: JSON.stringify({ action: "start", userId: dbUser.user_id, crewSlug, rideName: state.rideName, vehicleLabel: state.vehicleLabel, rideMode: state.rideMode, visibility: "crew" }),
+                    body: JSON.stringify({
+                      action: "start",
+                      userId: dbUser.user_id,
+                      crewSlug,
+                      rideName: state.rideName,
+                      vehicleLabel: state.vehicleLabel,
+                      rideMode: state.rideMode,
+                      visibility: state.visibilityMode === "public" ? "all_auth" : "crew",
+                      privacy: {
+                        homeBlurEnabled: state.homeBlurEnabled,
+                        autoExpireMinutes: state.autoExpireMinutes,
+                      },
+                    }),
                   });
                   const json = await res.json();
                   if (!res.ok || !json.success) throw new Error(json.error);
@@ -449,6 +493,16 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             >
               <VibeContentRenderer content="::FaLocationArrow::" className="mr-2" />
               Включить геошеринг
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!state.shareEnabled}
+              className="w-full"
+              onClick={() => dispatch({ type: "privacy/toggle-pause" })}
+            >
+              <VibeContentRenderer content={state.sharePaused ? "::FaPlay::" : "::FaPause::"} className="mr-2" />
+              {state.sharePaused ? "Возобновить трансляцию" : "Пауза трансляции"}
             </Button>
             <Button
               type="button"

@@ -14,7 +14,20 @@ const locationSchema = z.object({
   headingDeg: z.number().min(0).max(360).nullable().optional(),
   accuracyMeters: z.number().min(0).max(5000).nullable().optional(),
   capturedAt: z.string().datetime().optional(),
+  privacy: z
+    .object({
+      visibilityMode: z.enum(["crew", "public"]).default("crew"),
+      homeBlurEnabled: z.boolean().default(true),
+      autoExpireMinutes: z.union([z.literal(1), z.literal(5), z.literal(15), z.literal(60)]).default(15),
+      expiresAt: z.string().datetime().nullable().optional(),
+    })
+    .optional(),
 });
+
+function blurCoordinate(value: number, seed: number) {
+  const jitter = ((seed % 7) - 3) * 0.00008;
+  return Number((value + jitter).toFixed(6));
+}
 
 export async function POST(request: NextRequest) {
   const guard = await guardMapRidersWriteRequest(request);
@@ -40,13 +53,40 @@ export async function POST(request: NextRequest) {
   }
 
   const capturedAt = payload.capturedAt || new Date().toISOString();
+  const { data: activeSession } = await supabaseAdmin
+    .from("map_rider_sessions")
+    .select("id, sharing_enabled")
+    .eq("id", payload.sessionId)
+    .eq("user_id", payload.userId)
+    .eq("crew_slug", payload.crewSlug)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!activeSession?.sharing_enabled) {
+    return NextResponse.json({ success: false, error: "Sharing is disabled for this session" }, { status: 409 });
+  }
+
+  const expiresAt = payload.privacy?.expiresAt ? new Date(payload.privacy.expiresAt).getTime() : null;
+  if (expiresAt && Number.isFinite(expiresAt) && Date.now() >= expiresAt) {
+    await supabaseAdmin
+      .from("map_rider_sessions")
+      .update({ sharing_enabled: false, status: "completed", ended_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", payload.sessionId)
+      .eq("user_id", payload.userId);
+    await supabaseAdmin.from("live_locations").delete().eq("user_id", payload.userId).eq("crew_slug", payload.crewSlug);
+    return NextResponse.json({ success: false, error: "Sharing session expired" }, { status: 409 });
+  }
+
+  const seed = Math.floor(Date.now() / 1000);
+  const effectiveLat = payload.privacy?.homeBlurEnabled ? blurCoordinate(payload.lat, seed) : payload.lat;
+  const effectiveLon = payload.privacy?.homeBlurEnabled ? blurCoordinate(payload.lon, seed + 3) : payload.lon;
+  const visibility = payload.privacy?.visibilityMode === "public" ? "all_auth" : "crew";
 
   const liveLocationUpsert = supabaseAdmin.from("live_locations").upsert(
     {
       user_id: payload.userId,
       crew_slug: payload.crewSlug,
-      lat: payload.lat,
-      lng: payload.lon,
+      lat: effectiveLat,
+      lng: effectiveLon,
       speed_kmh: payload.speedKmh,
       heading: payload.headingDeg || null,
       is_riding: true,
@@ -66,7 +106,13 @@ export async function POST(request: NextRequest) {
       stats: {
         lastAccuracyMeters: payload.accuracyMeters || null,
         lastHeadingDeg: payload.headingDeg || null,
+        privacy: {
+          homeBlurEnabled: payload.privacy?.homeBlurEnabled ?? true,
+          autoExpireMinutes: payload.privacy?.autoExpireMinutes ?? 15,
+          expiresAt: payload.privacy?.expiresAt ?? null,
+        },
       },
+      visibility,
     })
     .eq("id", payload.sessionId)
     .eq("user_id", payload.userId)
