@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger"
 import type { WebAppUser } from "@/types/telegram"
 import { supabaseAdmin } from "@/lib/supabase-server" // Safe Server Import
+import { sendMessage } from "@/gateway/telegram/sendMessage"
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL
@@ -60,27 +61,7 @@ export async function validateTelegramWebAppData(initData: string): Promise<bool
 }
 
 export async function sendTelegramMessage(chatId: string, text: string) {
-  if (!TELEGRAM_BOT_TOKEN) {
-    throw new Error("TELEGRAM_BOT_TOKEN is not configured")
-  }
-
-  const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: "HTML",
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to send message: ${response.statusText}`)
-  }
-
-  return response.json()
+  return sendMessage(chatId, text, { parse_mode: "HTML" })
 }
 
 // --- NEW: Server-Side Upsert Logic ---
