@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -504,6 +504,7 @@ export default function Physics7Practice() {
   const [matterState, setMatterState] = useState<'solid' | 'liquid' | 'gas'>('solid');
   const [activeRefTab, setActiveRefTab] = useState('formulas');
   const [inputValue, setInputValue] = useState('');
+  const referencePanelRef = useRef<HTMLDivElement | null>(null);
   const [inputSubmitted, setInputSubmitted] = useState<number | null>(null);
 
   const currentQ = QUESTIONS[currentIndex];
@@ -649,7 +650,24 @@ export default function Physics7Practice() {
             <div className="flex items-center gap-2"><Compass className="text-orange-400 w-5 h-5" /><h2 className="text-lg font-bold text-white">Практика по задачам</h2></div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="bg-black/30 text-orange-300 border-orange-700/50 text-xs">{score}/{QUESTIONS.length}</Badge>
-              <Button variant="ghost" size="sm" onClick={() => setShowReference(!showReference)} className="text-xs gap-1 text-orange-400"><BookOpen className="w-3 h-3" /> Справочник</Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowReference((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      requestAnimationFrame(() => {
+                        referencePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      });
+                    }
+                    return next;
+                  });
+                }}
+                className="text-xs gap-1 text-orange-400"
+              >
+                <BookOpen className="w-3 h-3" /> {showReference ? 'Скрыть справочник' : 'Справочник'} {showReference ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </Button>
             </div>
           </div>
 
@@ -780,7 +798,7 @@ export default function Physics7Practice() {
                 {/* Reference sidebar */}
                 <AnimatePresence>
                   {showReference && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-4 overflow-hidden">
+                    <motion.div ref={referencePanelRef} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-4 overflow-hidden">
                       <ReferenceSidebar activeRefTab={activeRefTab} setActiveRefTab={setActiveRefTab} />
                     </motion.div>
                   )}
