@@ -53,7 +53,7 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 - [ ] Cut final switch: legacy snapshot polling → split APIs + broadcast-first.
 
 ### I6 — Production-hardening backlog (new)
-- [ ] Privacy controls: visibility mode (`crew/public`) + home-blur option + auto-expire presets (1/5/15/60).
+- [x] Privacy controls: visibility mode (`crew/public`) + home-blur option + auto-expire presets (1/5/15/60).
 - [ ] Route replay full-screen UI with timeline scrubber.
 - [ ] Speed-gradient route polyline rendering (segment color by speed).
 - [ ] Long-press meetup creation mode (keep tap safe for exploration UX).
@@ -116,6 +116,13 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
   - I5/I6 still have open field QA + screenshot evidence tasks; these are still pending and were not auto-closed in this patch.
   - Added tap-first meetup fallback UX: selected map point now has quick `+` publish action, so meetup creation no longer depends only on long-press behavior in Telegram WebApp.
   - Added migration slice for Supabase `maps.points_of_interest`: replaced river-point defaults, synced VIP base with active demo rider location, and appended `Площадь Комсомольская 2` as third default meetup point.
+
+## Investigation notes (2026-04-24)
+- Completed privacy hardening slice for SupaPlan `3edabd9c-6f88-4491-aa31-2f11566e3059`:
+  - Added rider privacy controls in UI: visibility mode, auto-expire presets (1/5/15/60), home-blur toggle, pause/resume sharing.
+  - Wired privacy payload from client GPS pipeline into `/api/map-riders/batch-points` and fallback `/api/map-riders/location`.
+  - Added server-side expire enforcement: expired sessions auto-stop and return 409 to client writes.
+  - Added location blur transform when home-blur is enabled and persisted privacy metadata in session stats.
 
 ## Definition of done (port stream)
 - Live map remains stable with high rider count.

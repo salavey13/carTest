@@ -22,7 +22,20 @@ const batchSchema = z.object({
   userId: z.string().min(1),
   crewSlug: z.string().min(1).default("vip-bike"),
   points: z.array(pointSchema).min(1).max(50),
+  privacy: z
+    .object({
+      visibilityMode: z.enum(["crew", "public"]).default("crew"),
+      homeBlurEnabled: z.boolean().default(true),
+      autoExpireMinutes: z.union([z.literal(1), z.literal(5), z.literal(15), z.literal(60)]).default(15),
+      expiresAt: z.string().datetime().nullable().optional(),
+    })
+    .optional(),
 });
+
+function blurCoordinate(value: number, seed: number) {
+  const jitter = ((seed % 7) - 3) * 0.00008;
+  return Number((value + jitter).toFixed(6));
+}
 
 export async function POST(request: NextRequest) {
   const guard = await guardMapRidersWriteRequest(request);
@@ -36,7 +49,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { sessionId, userId, crewSlug, points } = parsed.data;
+  const { sessionId, userId, crewSlug, points, privacy } = parsed.data;
   if (guard.authSource === "app_jwt" && userId !== guard.subject) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
   }
@@ -47,14 +60,41 @@ export async function POST(request: NextRequest) {
     return response;
   }
 
+  const { data: activeSession } = await supabaseAdmin
+    .from("map_rider_sessions")
+    .select("id, sharing_enabled")
+    .eq("id", sessionId)
+    .eq("user_id", userId)
+    .eq("crew_slug", crewSlug)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!activeSession?.sharing_enabled) {
+    return NextResponse.json({ success: false, error: "Sharing is disabled for this session" }, { status: 409 });
+  }
+
+  const expiresAt = privacy?.expiresAt ? new Date(privacy.expiresAt).getTime() : null;
+  if (expiresAt && Number.isFinite(expiresAt) && Date.now() >= expiresAt) {
+    await supabaseAdmin
+      .from("map_rider_sessions")
+      .update({ sharing_enabled: false, status: "completed", ended_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", sessionId)
+      .eq("user_id", userId);
+    await supabaseAdmin.from("live_locations").delete().eq("user_id", userId).eq("crew_slug", crewSlug);
+    return NextResponse.json({ success: false, error: "Sharing session expired" }, { status: 409 });
+  }
+
   // 1) Upsert live_locations with the LAST point (most recent position)
   const lastPoint = points[points.length - 1];
+  const seed = Math.floor(Date.now() / 1000);
+  const effectiveLat = privacy?.homeBlurEnabled ? blurCoordinate(lastPoint.lat, seed) : lastPoint.lat;
+  const effectiveLon = privacy?.homeBlurEnabled ? blurCoordinate(lastPoint.lon, seed + 3) : lastPoint.lon;
+  const visibility = privacy?.visibilityMode === "public" ? "all_auth" : "crew";
   const { error: liveError } = await supabaseAdmin.from("live_locations").upsert(
     {
       user_id: userId,
       crew_slug: crewSlug,
-      lat: lastPoint.lat,
-      lng: lastPoint.lon,
+      lat: effectiveLat,
+      lng: effectiveLon,
       speed_kmh: lastPoint.speedKmh,
       heading: lastPoint.headingDeg || null,
       is_riding: true,
@@ -76,6 +116,14 @@ export async function POST(request: NextRequest) {
       latest_speed_kmh: lastPoint.speedKmh,
       last_ping_at: lastPoint.capturedAt,
       updated_at: new Date().toISOString(),
+      visibility,
+      stats: {
+        privacy: {
+          homeBlurEnabled: privacy?.homeBlurEnabled ?? true,
+          autoExpireMinutes: privacy?.autoExpireMinutes ?? 15,
+          expiresAt: privacy?.expiresAt ?? null,
+        },
+      },
     })
     .eq("id", sessionId)
     .eq("user_id", userId)

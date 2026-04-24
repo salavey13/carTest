@@ -119,6 +119,11 @@ export interface MapRidersState {
   rideName: string;
   vehicleLabel: string;
   rideMode: "rental" | "personal";
+  visibilityMode: "crew" | "public";
+  autoExpireMinutes: 1 | 5 | 15 | 60;
+  homeBlurEnabled: boolean;
+  sharePaused: boolean;
+  shareExpiresAt: string | null;
 
   // Meta
   isLoading: boolean;
@@ -141,6 +146,11 @@ export const initialMapRidersState: MapRidersState = {
   rideName: "Вечерний выезд",
   vehicleLabel: "VIP bike",
   rideMode: "rental",
+  visibilityMode: "crew",
+  autoExpireMinutes: 15,
+  homeBlurEnabled: true,
+  sharePaused: false,
+  shareExpiresAt: null,
   isLoading: true,
   error: null,
 };
@@ -183,6 +193,11 @@ export type MapRidersAction =
   | { type: "session/detail-loaded"; payload: SessionDetail }
   | { type: "share/started"; payload: { sessionId: string; rideName: string; vehicleLabel: string; rideMode: "rental" | "personal" } }
   | { type: "share/stopped" }
+  | { type: "privacy/set-visibility"; payload: "crew" | "public" }
+  | { type: "privacy/set-auto-expire"; payload: 1 | 5 | 15 | 60 }
+  | { type: "privacy/toggle-home-blur" }
+  | { type: "privacy/toggle-pause" }
+  | { type: "privacy/set-expires-at"; payload: string | null }
   | { type: "ui/select-session"; payload: string | null }
   | { type: "ui/select-meetup-point"; payload: [number, number] | null }
   | { type: "ui/toggle-drawer" }
@@ -326,15 +341,17 @@ export function mapRidersReducer(state: MapRidersState, action: MapRidersAction)
       return {
         ...state,
         shareEnabled: true,
+        sharePaused: false,
         sessionId: action.payload.sessionId,
         rideName: action.payload.rideName,
         vehicleLabel: action.payload.vehicleLabel,
         rideMode: action.payload.rideMode,
+        shareExpiresAt: new Date(Date.now() + state.autoExpireMinutes * 60_000).toISOString(),
       };
     }
 
     case "share/stopped": {
-      return { ...state, shareEnabled: false, sessionId: null };
+      return { ...state, shareEnabled: false, sharePaused: false, sessionId: null, shareExpiresAt: null };
     }
 
     case "ui/select-session": {
@@ -359,6 +376,30 @@ export function mapRidersReducer(state: MapRidersState, action: MapRidersAction)
 
     case "ui/set-ride-mode": {
       return { ...state, rideMode: action.payload };
+    }
+
+    case "privacy/set-visibility": {
+      return { ...state, visibilityMode: action.payload };
+    }
+
+    case "privacy/set-auto-expire": {
+      return {
+        ...state,
+        autoExpireMinutes: action.payload,
+        shareExpiresAt: state.shareEnabled ? new Date(Date.now() + action.payload * 60_000).toISOString() : state.shareExpiresAt,
+      };
+    }
+
+    case "privacy/toggle-home-blur": {
+      return { ...state, homeBlurEnabled: !state.homeBlurEnabled };
+    }
+
+    case "privacy/toggle-pause": {
+      return { ...state, sharePaused: !state.sharePaused };
+    }
+
+    case "privacy/set-expires-at": {
+      return { ...state, shareExpiresAt: action.payload };
     }
 
     case "loading": {
