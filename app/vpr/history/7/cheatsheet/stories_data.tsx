@@ -10,7 +10,7 @@ export const STORIES: Story[] = [
     id: "cover",
     content: (
       <div>
-        <h1 className="text-4xl font-bold mb-4">🇷🇺 ИСТОРИЯ РОССИИ</h1>
+        <h1 className="text-4xl font-bold mb-4">🌍 ВСЕОБЩАЯ ИСТОРИЯ</h1>
         <p className="text-lg opacity-80">7 класс за 5 минут</p>
         <p className="mt-6 text-yellow-400">👉 листай</p>
       </div>
@@ -23,158 +23,219 @@ export const STORIES: Story[] = [
       <div>
         <h2 className="text-3xl font-bold mb-4">КАК СДАТЬ ВПР</h2>
         <p>📅 даты</p>
-        <p>👑 правители</p>
+        <p>👑 личности</p>
         <p>⚔️ события</p>
         <p>📚 термины</p>
       </div>
     ),
   },
 
+  // ⚔️ СРЕДНЕВЕКОВЬЕ БАЗА
   {
-    id: "1480",
+    id: "feudalism",
     content: (
       <div>
-        <h2 className="text-4xl font-bold">1480</h2>
-        <p className="mt-2">Стояние на Угре</p>
-        <p className="text-green-400 mt-4">конец ига</p>
+        <h2 className="text-3xl font-bold">ФЕОДАЛИЗМ</h2>
+        <p className="mt-2">земля = власть</p>
+        <p>сеньор → вассал</p>
+        <p className="text-yellow-400 mt-3">главная система Европы</p>
       </div>
     ),
   },
 
   {
-    id: "1552",
+    id: "knights",
     content: (
       <div>
-        <h2 className="text-4xl font-bold">1552</h2>
-        <p>Взятие Казани</p>
-        <p className="text-yellow-400 mt-2">Иван IV</p>
+        <h2 className="text-3xl font-bold">РЫЦАРИ</h2>
+        <p>⚔️ война</p>
+        <p>🏰 служба феодалу</p>
+        <p className="text-green-400 mt-2">кодекс чести</p>
       </div>
     ),
   },
 
   {
-    id: "1572",
+    id: "church",
     content: (
       <div>
-        <h2 className="text-4xl font-bold">1572</h2>
-        <p>Битва при Молодях</p>
-        <p className="text-green-400 mt-2">победа над Крымом</p>
+        <h2 className="text-3xl font-bold">ЦЕРКОВЬ</h2>
+        <p>⛪ огромная власть</p>
+        <p>📖 контроль знаний</p>
+        <p className="text-red-400 mt-2">инквизиция</p>
+      </div>
+    ),
+  },
+
+  // ⚔️ КРЕСТОВЫЕ ПОХОДЫ
+  {
+    id: "crusades",
+    content: (
+      <div>
+        <h2 className="text-3xl font-bold">КРЕСТОВЫЕ ПОХОДЫ</h2>
+        <p>1096–1270</p>
+        <p>⚔️ за Иерусалим</p>
+        <p className="text-yellow-400 mt-2">Европа vs Восток</p>
+      </div>
+    ),
+  },
+
+  // 🏙 ГОРОДА
+  {
+    id: "cities",
+    content: (
+      <div>
+        <h2 className="text-3xl font-bold">ГОРОДА</h2>
+        <p>🏘 ремесло</p>
+        <p>💰 торговля</p>
+        <p className="text-green-400 mt-2">рост экономики</p>
       </div>
     ),
   },
 
   {
-    id: "smuta",
+    id: "guilds",
     content: (
       <div>
-        <h2 className="text-3xl font-bold">СМУТА</h2>
-        <p className="mt-2">1598–1613</p>
-        <p className="mt-4">💀 нет царя</p>
-        <p>⚔️ войны</p>
-        <p>👤 самозванцы</p>
+        <h2 className="text-3xl font-bold">ЦЕХИ</h2>
+        <p>ремесленники</p>
+        <p>контроль качества</p>
+        <p className="text-yellow-400 mt-2">как профсоюзы</p>
+      </div>
+    ),
+  },
+
+  // 💀 ЧУМА
+  {
+    id: "plague",
+    content: (
+      <div>
+        <h2 className="text-3xl font-bold">ЧЁРНАЯ СМЕРТЬ</h2>
+        <p>1347–1351</p>
+        <p>☠️ умерло ~1/3 Европы</p>
+        <p className="text-red-400 mt-2">кризис</p>
+      </div>
+    ),
+  },
+
+  // ⚔️ ВОЙНЫ
+  {
+    id: "hundred",
+    content: (
+      <div>
+        <h2 className="text-3xl font-bold">100-ЛЕТНЯЯ ВОЙНА</h2>
+        <p>1337–1453</p>
+        <p>🇫🇷 vs 🇬🇧</p>
+        <p className="text-green-400 mt-2">Жанна д’Арк</p>
+      </div>
+    ),
+  },
+
+  // 👑 АБСОЛЮТИЗМ
+  {
+    id: "absolutism",
+    content: (
+      <div>
+        <h2 className="text-3xl font-bold">АБСОЛЮТИЗМ</h2>
+        <p>вся власть у короля</p>
+        <p>без ограничений</p>
+        <p className="text-yellow-400 mt-2">Людовик XIV</p>
+      </div>
+    ),
+  },
+
+  // 🎨 ВОЗРОЖДЕНИЕ
+  {
+    id: "renaissance",
+    content: (
+      <div>
+        <h2 className="text-3xl font-bold">ВОЗРОЖДЕНИЕ</h2>
+        <p>🎨 искусство</p>
+        <p>🧠 наука</p>
+        <p className="text-green-400 mt-2">человек в центре</p>
       </div>
     ),
   },
 
   {
-    id: "1613",
+    id: "da_vinci",
     content: (
       <div>
-        <h2 className="text-4xl font-bold">1613</h2>
-        <p>Михаил Романов</p>
-        <p className="text-green-400 mt-2">конец Смуты</p>
+        <h2 className="text-3xl font-bold">ЛЕОНАРДО ДА ВИНЧИ</h2>
+        <p>🎨 Мона Лиза</p>
+        <p>🛠 изобретения</p>
+      </div>
+    ),
+  },
+
+  // ⛪ РЕФОРМАЦИЯ
+  {
+    id: "reformation",
+    content: (
+      <div>
+        <h2 className="text-3xl font-bold">РЕФОРМАЦИЯ</h2>
+        <p>1517</p>
+        <p>📜 Мартин Лютер</p>
+        <p className="text-red-400 mt-2">раскол церкви</p>
+      </div>
+    ),
+  },
+
+  // 🌍 ВЕЛИКИЕ ОТКРЫТИЯ
+  {
+    id: "discoveries",
+    content: (
+      <div>
+        <h2 className="text-3xl font-bold">ГЕОГРАФИЧЕСКИЕ ОТКРЫТИЯ</h2>
+        <p>🌊 новые земли</p>
+        <p>💰 торговля</p>
       </div>
     ),
   },
 
   {
-    id: "1649",
+    id: "columbus",
     content: (
       <div>
-        <h2 className="text-4xl font-bold">1649</h2>
-        <p>Соборное уложение</p>
-        <p className="text-yellow-400 mt-2">главный закон</p>
+        <h2 className="text-3xl font-bold">КОЛУМБ</h2>
+        <p>1492</p>
+        <p className="text-yellow-400 mt-2">открыл Америку</p>
       </div>
     ),
   },
 
   {
-    id: "ivan3",
+    id: "magellan",
     content: (
       <div>
-        <h2 className="text-3xl font-bold">ИВАН III</h2>
-        <p>📍 собрал земли</p>
-        <p>📍 конец ига</p>
+        <h2 className="text-3xl font-bold">МАГЕЛЛАН</h2>
+        <p>первое кругосветное</p>
       </div>
     ),
   },
 
-  {
-    id: "ivan4",
-    content: (
-      <div>
-        <h2 className="text-3xl font-bold">ИВАН IV</h2>
-        <p>🔥 Казань</p>
-        <p>⚔️ Молоди</p>
-        <p className="text-red-400 mt-2">❗ опричнина ≠ внешка</p>
-      </div>
-    ),
-  },
-
-  {
-    id: "terms",
-    content: (
-      <div>
-        <h2 className="text-3xl font-bold">ТЕРМИНЫ</h2>
-        <p>опричнина = террор</p>
-        <p>стрельцы = армия</p>
-        <p>ярмарка = торговля</p>
-      </div>
-    ),
-  },
-
-  {
-    id: "culture",
-    content: (
-      <div>
-        <h2 className="text-3xl font-bold">КУЛЬТУРА</h2>
-        <p>⛪ храм Василия</p>
-        <p>📖 книги</p>
-        <p>🏰 кремли</p>
-      </div>
-    ),
-  },
-
-  {
-    id: "map",
-    content: (
-      <div>
-        <h2 className="text-3xl font-bold">КАРТА</h2>
-        <p>🔥 Разин → Волга</p>
-        <p>🔥 Смута → XVII век</p>
-      </div>
-    ),
-  },
-
+  // ⚠️ ЛОВУШКИ
   {
     id: "traps",
     content: (
       <div>
         <h2 className="text-3xl font-bold">ЛОВУШКИ</h2>
-        <p>1514 → Василий III</p>
-        <p>1613 → 1 половина XVII</p>
+        <p>Колумб ≠ доказал шар</p>
+        <p>Лютер ≠ католик</p>
+        <p>рыцари ≠ крестьяне</p>
       </div>
     ),
   },
 
+  // 🧪 ТЕСТ
   {
     id: "test",
     content: (
       <div>
         <h2 className="text-3xl font-bold">ПРОВЕРЬ СЕБЯ</h2>
-        <p>1. Первый царь?</p>
-        <p>2. 1613?</p>
-        <p>3. Кто спас Москву?</p>
+        <p>1. Кто начал Реформацию?</p>
+        <p>2. Когда Колумб?</p>
+        <p>3. Что такое феодализм?</p>
       </div>
     ),
   },
@@ -184,9 +245,9 @@ export const STORIES: Story[] = [
     content: (
       <div>
         <h2 className="text-3xl font-bold">ОТВЕТЫ</h2>
-        <p>Иван IV</p>
-        <p>Романов</p>
-        <p>Минин и Пожарский</p>
+        <p>Мартин Лютер</p>
+        <p>1492</p>
+        <p>система земли и вассалов</p>
       </div>
     ),
   },
