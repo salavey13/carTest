@@ -1721,6 +1721,42 @@ Primary storage source (phase 1): `crews.metadata` JSONB.
   - SQL подготовлен в `supabase/migrations/*` и не ломает существующие таблицы.
   - SupaPlan содержит task decomposition для следующих итераций.
 
+### T56 — FRZ-R11: Challenges/events/district capture framework
+- status: `ready_for_pr`
+- updated_at: `2026-04-26T15:10:00Z`
+- owner: `codex`
+- notes: Разложен геймификационный контур по трём безопасным срезам: (1) модель событий и сезонных испытаний, (2) слой district-capture с анти-спам ограничениями, (3) Telegram-first витрина прогресса без тяжёлых realtime-перерисовок.
+- next_step: Завести связанные SupaPlan подзадачи на backend-contract, UI-слой и anti-cheat телеметрию.
+- risks: без анти-абьюз счётчиков районов возможны накрутки; без локального кеша у Telegram-пользователей будут заметные лаги при открытии карты.
+- dependencies: T55
+- deliverables:
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Зафиксировать контракт сущностей: challenge, event, district, capture-window, reward-tier.
+  2. Уточнить порядок релиза: backend contract -> leaderboard sync -> mobile UX.
+  3. Добавить критерии против накруток (rate limits, speed sanity, cooldown окна).
+- acceptance criteria:
+  - В плане есть явная архитектурная рамка FRZ-R11 по данным, UX и anti-abuse.
+  - Следующие задачи можно брать параллельно без конфликтов по зонам файлов.
+
+### T57 — FRZ-R12: Pro subscription + multi-city expansion framework
+- status: `ready_for_pr`
+- updated_at: `2026-04-26T15:10:00Z`
+- owner: `codex`
+- notes: Добавлен каркас роста для Pro-подписки и мультигородской модели: baseline-пакеты, платные опции, региональные пресеты, и этапный rollout с контрольными KPI для каждого города.
+- next_step: Создать отдельные SupaPlan задачи на billing-contract, operator dashboard и onboarding-kit для новых городов.
+- risks: без контрактов по биллингу нельзя запускать автосписания; без city-template чеклистов вырастет время запуска новых локаций.
+- dependencies: T55
+- deliverables:
+  - `docs/THE_FRANCHEEZEPLAN.md`
+- implementation checklist:
+  1. Описать линейку Pro-пакетов (single-city, multi-city, enterprise) и минимальные SLA.
+  2. Разделить rollout на волны: pilot-city -> 3-city cohort -> regional scaling.
+  3. Зафиксировать KPI-контур: activation rate, ride retention, CAC payback.
+- acceptance criteria:
+  - В плане зафиксирована конкретная рамка FRZ-R12 по продукту, rollout и KPI.
+  - Есть ясные точки декомпозиции для следующих инженерных задач.
+
 
 ## 6) Task template for future extension
 
@@ -1794,6 +1830,8 @@ Append only compact session deltas here as pointers when needed; full narrative 
 - 2026-04-23: SupaPlan status sync + UX-01 — выставлены `ready_for_pr` для задач `SEC-01` (`bc93d9af-9029-4522-8c85-c0d9de361488`) и `SEC-02` (`fda4e153-d540-478a-8cef-c810ad600a74`) после фактического hardening; дополнительно закрыт `UX-01` (`6b1d27ce-a9b4-4b9c-959d-bc8d7ea49dbc`): в `MapRidersClientRefactored` удалены `window.prompt/window.confirm`, добавлены `FranchizePromptModal` и `FranchizeConfirmModal` с сохранением текущей логики create/delete meetup.
 - 2026-04-23: P1 review-fix по security guard — устранён регресс Telegram-only авторизации: `guardMapRidersWriteRequest` теперь валидирует как Supabase bearer, так и app JWT (`/api/auth/jwt`), а rate-limit ключи переведены на authenticated subject (не `payload.userId`). Дополнительно проведён smoke-run `createFranchizeOrderCheckout` (cash, без XTR): тест дошёл до server action, но упал на `Failed to persist order snapshot: TypeError: fetch failed` (Supabase connectivity/runtime env blocker), поэтому full rent flow + doc generation остаются в статусе blocked-by-env.
 - 2026-04-24: SupaPlan task `3edabd9c-6f88-4491-aa31-2f11566e3059` (MapRiders I6 privacy) переведён в `ready_for_pr`: добавлены privacy-контролы в rider-панель (видимость crew/public, авто-истечение 1/5/15/60, toggle home blur, pause/resume sharing), прокинут privacy payload в live write API, включено server-side истечение с auto-stop (409 на просроченные записи) и запись privacy-метаданных в `map_rider_sessions.stats`.
+- 2026-04-26: SupaPlan task `e9c8f76f-0863-4f20-a871-6a09dd3bf7f8` (MapRiders I6 screenshot pack) — повторно прогнан `npm run qa:map-riders` (PASS по `/franchize/vip-bike/map-riders` + split APIs + legacy), обновлены доказательства `artifacts/map-riders-vip-bike-i6-live-map.png` и `artifacts/map-riders-vip-bike-i6-drawer-leaderboard.png`; Playwright Chromium/Firefox/WebKit в раннере не стартовали из-за отсутствующих системных библиотек, поэтому применён fallback `thum.io`.
+- 2026-04-26: Выполнен пакет «5 задач сразу» по запросу оператора: закрыты инженерные задачи `d8b4e4e7-8234-4b8d-2345-88880008f345` (dedup meetup creation), `da6d6a09-0234-4ade-4567-aaa000aaf567` (GPS source lock), `db7e7b1a-1234-4bef-5678-bbb000bbf678` (a11y drawer), а также оформлены плановые фреймворки `d0521b55-8bd4-4c94-9360-7e93219d57fd` (FRZ-R11) и `fa5eed14-bc10-4c33-800b-3daef27a3148` (FRZ-R12) в текущем плане.
 
 ---
 
