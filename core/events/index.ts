@@ -12,7 +12,9 @@ export function emit(event: CoreEvent) {
   if (!handlers?.size) return;
 
   for (const handler of handlers) {
-    void Promise.resolve(handler(event as any));
+    Promise.resolve(handler(event as any)).catch((err) => {
+      console.error(`[core/events] Unhandled error in handler for "${event.type}":`, err);
+    });
   }
 }
 

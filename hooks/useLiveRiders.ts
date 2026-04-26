@@ -5,7 +5,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 
 type TelegramWebApp = {
-  requestLocation?: (callback?: (location: { latitude: number; longitude: number; altitude?: number | null; course?: number | null; horizontal_accuracy?: number | null; speed?: number | null }) => void) => Promise<unknown> | void;
+  requestLocation?: (callback?: (location: { latitude: number; longitude: number; altitude?: number | null; course?: number | null; horizontal_accuracy?: number | null }) => void) => Promise<unknown> | void;
   HapticFeedback?: {
     impactOccurred?: (style: "light" | "medium" | "heavy" | "rigid" | "soft") => void;
   };
@@ -83,6 +83,10 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   const [lastBroadcastAt, setLastBroadcastAt] = useState<string | null>(null);
   const [queuedPoints, setQueuedPoints] = useState(0);
 
+  // Store latest privacy in a ref to stabilize flushBatch dependency
+  const privacyRef = useRef(privacy);
+  privacyRef.current = privacy;
+
   const hapticPulse = useCallback(() => {
     if (typeof window === "undefined") return;
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.("light");
@@ -110,6 +114,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   );
 
   const flushBatch = useCallback(async () => {
+    const currentPrivacy = privacyRef.current;
     const points = batchQueueRef.current.splice(0, BATCH_MAX_SIZE);
     setQueuedPoints(batchQueueRef.current.length);
     if (points.length === 0 || !sessionId || !userId || paused) return;
@@ -119,7 +124,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       const batchResponse = await fetch("/api/map-riders/batch-points", {
         method: "POST",
         headers,
-        body: JSON.stringify({ sessionId, userId, crewSlug, points, privacy }),
+        body: JSON.stringify({ sessionId, userId, crewSlug, points, privacy: currentPrivacy }),
       });
       if (batchResponse.ok) return;
 
@@ -138,14 +143,15 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
           headingDeg: lastPoint.heading,
           accuracyMeters: lastPoint.accuracyMeters,
           capturedAt: lastPoint.capturedAt,
-          privacy,
+          privacy: currentPrivacy,
         }),
       });
     } catch {
       batchQueueRef.current.unshift(...points);
       setQueuedPoints(batchQueueRef.current.length);
     }
-  }, [sessionId, userId, crewSlug, paused, privacy]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, userId, crewSlug, paused]); // privacy removed; read from ref
 
   const acceptPointNow = useCallback(
     (point: GPSPoint, source: GpsSource) => {
