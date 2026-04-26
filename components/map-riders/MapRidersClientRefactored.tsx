@@ -22,6 +22,7 @@ import { formatRideDuration, initialsFromName, riderDisplayName } from "@/lib/ma
 import { useLiveRiders } from "@/hooks/useLiveRiders";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
+import { useMeetupCreator } from "@/hooks/useMeetupCreator";
 import { FranchizeConfirmModal } from "@/app/franchize/components/FranchizeConfirmModal";
 import { FranchizePromptModal } from "@/app/franchize/components/FranchizePromptModal";
 import { RiderMarkerLayer } from "@/components/map-riders/RiderMarkerLayer";
@@ -60,6 +61,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     crewSlug,
     defaultTileLayer: "cartodb-dark",
   });
+  const { createMeetup } = useMeetupCreator(crewSlug);
 
   // ── GPS tracking hook ──
   const { isUsingTelegram, lastBroadcastAt, queuedPoints } = useLiveRiders({
@@ -205,42 +207,22 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   const handlePromptSubmit = useCallback(
     async (value: string) => {
       if (!dbUser?.user_id || !state.selectedMeetupPoint) return;
-      const title = value.trim();
-      if (title.length < 2) {
-        toast.error("Название точки должно быть минимум 2 символа");
-        return;
-      }
 
       setIsPromptOpen(false);
       setIsQuickMeetupSaving(true);
       try {
-        const [lat, lon] = state.selectedMeetupPoint;
-        const headers = await getMapRidersWriteHeaders();
-        const response = await fetch("/api/map-riders/meetups", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            crewSlug,
-            userId: dbUser.user_id,
-            title,
-            comment: "Добавлено с карты",
-            lat,
-            lon,
-          }),
+        await createMeetup({
+          userId: dbUser.user_id,
+          title: value,
+          comment: "Добавлено с карты",
+          point: state.selectedMeetupPoint,
+          successMessage: "Meetup добавлен по выбранной точке",
         });
-
-        const json = await response.json();
-        if (!response.ok || !json.success) throw new Error(json.error || "Не удалось создать meetup");
-        dispatch({ type: "ui/select-meetup-point", payload: null });
-        await fetchSnapshot();
-        toast.success("Meetup добавлен по выбранной точке");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Ошибка создания meetup");
       } finally {
         setIsQuickMeetupSaving(false);
       }
     },
-    [crewSlug, dbUser, dispatch, fetchSnapshot, state.selectedMeetupPoint],
+    [createMeetup, dbUser?.user_id, state.selectedMeetupPoint],
   );
 
   const handleConfirmDelete = useCallback(async () => {

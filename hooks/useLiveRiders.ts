@@ -60,6 +60,8 @@ const BATCH_MAX_SIZE = 10;
 const TELEGRAM_MIN_INTERVAL_MS = 2500;
 const ACCEPT_DEBOUNCE_MS = 800;
 const SEND_THROTTLE_MS = 3000;
+const SOURCE_SWITCH_DEBOUNCE_MS = 500;
+type GpsSource = "telegram" | "browser";
 
 export function useLiveRiders(options: UseLiveRidersOptions) {
   const { crewSlug, sessionId, userId, enabled, paused = false, privacy, onPosition } = options;
@@ -71,6 +73,8 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabaseBrowserClient>["channel"]> | null>(null);
   const lastTelegramTsRef = useRef<number>(0);
   const lastSendTsRef = useRef<number>(0);
+  const sourceLockRef = useRef<GpsSource | null>(null);
+  const sourceLockAtRef = useRef<number>(0);
   const acceptDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingPointRef = useRef<GPSPoint | null>(null);
   const lastBroadcastAtRef = useRef<string | null>(null);
@@ -144,10 +148,20 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   }, [sessionId, userId, crewSlug, paused, privacy]);
 
   const acceptPointNow = useCallback(
-    (point: GPSPoint) => {
+    (point: GPSPoint, source: GpsSource) => {
       if (paused) return;
       if (privacy?.expiresAt && new Date(privacy.expiresAt).getTime() <= Date.now()) return;
       const now = Date.now();
+      const sourceLock = sourceLockRef.current;
+      if (sourceLock && sourceLock !== source && now - sourceLockAtRef.current < SOURCE_SWITCH_DEBOUNCE_MS) {
+        return;
+      }
+      sourceLockRef.current = source;
+      sourceLockAtRef.current = now;
+      if (source === "telegram" && watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
       if (now - lastSendTsRef.current < SEND_THROTTLE_MS) return;
       const last = lastAcceptedRef.current;
       if (last) {
@@ -168,9 +182,9 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   );
 
   const acceptPoint = useCallback(
-    (point: GPSPoint) => {
+    (point: GPSPoint, source: GpsSource) => {
       if (!acceptDebounceTimerRef.current) {
-        acceptPointNow(point);
+        acceptPointNow(point, source);
       }
       pendingPointRef.current = point;
       if (acceptDebounceTimerRef.current) {
@@ -181,7 +195,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
         const pending = pendingPointRef.current;
         pendingPointRef.current = null;
         if (pending) {
-          acceptPointNow(pending);
+          acceptPointNow(pending, source);
         }
       }, ACCEPT_DEBOUNCE_MS);
     },
@@ -198,7 +212,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
         accuracyMeters: position.coords.accuracy ?? null,
         capturedAt: new Date().toISOString(),
       };
-      acceptPoint(point);
+      acceptPoint(point, "browser");
     },
     [acceptPoint],
   );
@@ -227,7 +241,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
         heading: location.course != null ? Number(location.course) : null,
         accuracyMeters: location.horizontal_accuracy != null ? Number(location.horizontal_accuracy) : null,
         capturedAt: new Date().toISOString(),
-      });
+      }, "telegram");
     };
 
     const maybePromise = webApp.requestLocation(handleLocation);
@@ -338,6 +352,8 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
 
     return () => {
       cancelled = true;
+      sourceLockRef.current = null;
+      sourceLockAtRef.current = 0;
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
