@@ -84,7 +84,7 @@ export type PriorityTask = {
  *   polishing 1.2, ux-fix 1.2, seo 1.1, code-quality 1.0, tech-debt 0.8, post-launch 0.7
  * - Capability base weight (higher = more foundational).
  * - Priority tag (from metadata.priority or body JSON) → critical 2.5, high 2.0, medium 1.5, low 1.0.
- *   Tags like "p0", "p1", "p2" in body also mapped: p0=2.5, p1=2.0, p2=1.5.
+ *   Tags like "p0", "p1", "p2" in body also mapped: p0=2.5, p2=1.5.
  *   The strongest multiplier wins.
  * - Freshness boost: 2.0 if created within last 48h, 1.5 if within last 7d,
  *   0.8 if older than 30d (to slightly demote stale tasks).
@@ -194,11 +194,10 @@ export async function getTopPriorityTasks(): Promise<{
       const maxPriority = Math.max(fromTag, fromText, 1.0);
       if (maxPriority > 1.0) {
         priorityMult = maxPriority;
-        priorityLabel =
-          fromTag >= maxPriority ? ` ${bodyPriorityTag.toUpperCase()}` : ` ${metaPriorityText}`;
+        priorityLabel = fromTag >= maxPriority ? ` ${bodyPriorityTag.toUpperCase()}` : ` ${metaPriorityText}`;
       }
 
-      // Freshness boost – new tasks get bonus, old ones slightly penalised
+      // Freshness boost
       const ageDays = (Date.now() - new Date(task.created_at).getTime()) / (1000 * 60 * 60 * 24);
       let freshnessMult = 1.0;
       let freshnessLabel = "";
