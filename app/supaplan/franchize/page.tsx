@@ -56,15 +56,16 @@ type IdeaRow = {
   decompositionHint: string;
 };
 
+// Все статусы — на русском
 const STATUS_LABEL: Record<TaskStatusProp, { label: string; className: string }> = {
-  open: { label: "Open", className: "bg-sky-500/15 text-sky-300 border-sky-400/30" },
-  claimed: { label: "Claimed", className: "bg-indigo-500/15 text-indigo-300 border-indigo-400/30" },
-  running: { label: "Running", className: "bg-amber-500/15 text-amber-300 border-amber-400/30" },
+  open: { label: "Открыта", className: "bg-sky-500/15 text-sky-300 border-sky-400/30" },
+  claimed: { label: "Назначена", className: "bg-indigo-500/15 text-indigo-300 border-indigo-400/30" },
+  running: { label: "В работе", className: "bg-amber-500/15 text-amber-300 border-amber-400/30" },
   ready_for_pr: {
-    label: "Ready for PR",
+    label: "Готово к PR",
     className: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-400/30",
   },
-  done: { label: "Done", className: "bg-emerald-500/15 text-emerald-300 border-emerald-400/30" },
+  done: { label: "Сделано", className: "bg-emerald-500/15 text-emerald-300 border-emerald-400/30" },
 };
 
 const STATUS_CARD_CONFIG: Record<TaskStatusProp, {
@@ -246,10 +247,10 @@ function formatIso(iso: string): string {
 
 function buildTaskCopyText(task: PriorityTask, fullTask?: FranchizeTask): string {
   const parts = [
-    `Выполни задачу: ${task.title}`,
+    `Задача: ${task.title}`,
     `ID: ${task.id}`,
-    `Статус: ${task.status}`,
-    `Capability: ${task.capability || "—"}`,
+    `Статус: ${STATUS_LABEL[task.status as TaskStatusProp]?.label || task.status}`,
+    `Категория: ${task.capability || "—"}`,
   ];
   if (fullTask?.todo_path) parts.push(`Файл: ${fullTask.todo_path}`);
   if (fullTask?.body) {
@@ -259,9 +260,6 @@ function buildTaskCopyText(task: PriorityTask, fullTask?: FranchizeTask): string
   return parts.join("\n");
 }
 
-/**
- * Custom hook to animate a number from 0 to target over a given duration.
- */
 function useCountUp(target: number, duration = 600) {
   const [display, setDisplay] = useState(0);
   const frameRef = useRef<number>(0);
@@ -272,10 +270,8 @@ function useCountUp(target: number, duration = 600) {
       if (!startTimeRef.current) startTimeRef.current = timestamp;
       const elapsed = timestamp - startTimeRef.current;
       const progress = Math.min(elapsed / duration, 1);
-      // easeOutCubic
       const eased = 1 - Math.pow(1 - progress, 3);
       setDisplay(Math.round(eased * target));
-
       if (progress < 1) {
         frameRef.current = requestAnimationFrame(step);
       }
@@ -365,7 +361,7 @@ export default function FranchizeStatusPage() {
     return totals;
   }, [tasks]);
 
-  // Animated display values for status cards (the surprise!)
+  // Animated counters
   const animatedOpen = useCountUp(statusTotals.open);
   const animatedClaimed = useCountUp(statusTotals.claimed);
   const animatedRunning = useCountUp(statusTotals.running);
@@ -441,11 +437,13 @@ export default function FranchizeStatusPage() {
   }, [tasks]);
 
   const handleCopyAllTop5 = useCallback(async () => {
+    const intro =
+      "Эй, агент! Вот топ‑5 задач для быстрого старта, rock’n’roll! 🤘 (но ты главный – можешь переиграть как угодно)\n\n";
     const texts = priorityTasks.map((pt) => {
       const fullTask = tasks.find((t) => t.id === pt.id);
-      return `--- Задача ${pt.id} ---\n${buildTaskCopyText(pt, fullTask)}`;
+      return `--- ${pt.id} ---\n${buildTaskCopyText(pt, fullTask)}`;
     });
-    const fullText = texts.join("\n\n");
+    const fullText = intro + texts.join("\n\n");
     await navigator.clipboard.writeText(fullText);
     setCopyAllCelebration(true);
     setTimeout(() => setCopyAllCelebration(false), 1500);
@@ -477,24 +475,22 @@ export default function FranchizeStatusPage() {
       {/*  HERO                                                                 */}
       {/* ==================================================================== */}
       <section className="relative rounded-3xl border border-slate-700/80 bg-gradient-to-br from-slate-900 via-indigo-950/90 to-slate-900 p-5 text-white shadow-2xl sm:p-6">
-        {/* Glows */}
         <div className="pointer-events-none absolute -right-8 -top-8 h-52 w-52 rounded-full bg-cyan-500/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-8 -left-8 h-44 w-44 rounded-full bg-purple-500/15 blur-3xl" />
 
         <div className="relative z-10 grid gap-6 md:grid-cols-3">
-          {/* Left column */}
           <div className="md:col-span-2">
             <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-cyan-300">
-              <Badge className="border-cyan-400/40 bg-cyan-400/20 text-cyan-100">FRANCHIZE CONTROL DECK</Badge>
+              <Badge className="border-cyan-400/40 bg-cyan-400/20 text-cyan-100">ПУЛЬТ УПРАВЛЕНИЯ ФРАНШИЗОЙ</Badge>
               <span className="text-slate-400">vip‑bike crew</span>
             </div>
 
             <h1 className="text-3xl font-bold leading-tight sm:text-5xl">
               <span className="bg-gradient-to-r from-cyan-300 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
-                SupaPlan • Franchize
+                SupaPlan • Франшиза
               </span>
               <br />
-              <span className="text-2xl text-slate-100 sm:text-3xl">Live Status Board</span>
+              <span className="text-2xl text-slate-100 sm:text-3xl">Живая панель состояния</span>
             </h1>
 
             <p className="mt-3 max-w-xl text-sm text-slate-300 sm:text-base">
@@ -517,14 +513,14 @@ export default function FranchizeStatusPage() {
                 >
                   <ExternalLink className="h-4 w-4" /> Codex Cloud
                 </a>
-                <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
-                  🚀 Deploy to Codex
+                <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
+                  🚀 Деплой в Codex
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Right column: progress ring */}
+          {/* Progress ring */}
           <div className="flex items-center justify-center">
             <div className="relative flex h-36 w-36 items-center justify-center overflow-visible">
               <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36" overflow="visible" aria-hidden>
@@ -565,7 +561,6 @@ export default function FranchizeStatusPage() {
           const config = STATUS_CARD_CONFIG[status];
           const Icon = config.icon;
           const rawValue = statusTotals[status];
-          // choose animated value based on status
           let animatedValue = rawValue;
           if (status === "open") animatedValue = animatedOpen;
           else if (status === "claimed") animatedValue = animatedClaimed;
@@ -641,17 +636,15 @@ export default function FranchizeStatusPage() {
                 <Flame className="h-5 w-5" />
                 ТОП‑5 критических задач
               </CardTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCopyAllTop5}
-                  className="h-auto px-2 py-1 text-xs text-amber-300 hover:text-amber-100 disabled:opacity-50"
-                >
-                  <Copy className="mr-1 h-3.5 w-3.5" />
-                  {copyAllCelebration ? "🎉 Скопировано!" : "Копировать все 5"}
-                </Button>
-              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCopyAllTop5}
+                className="h-auto px-2 py-1 text-xs text-amber-300 hover:text-amber-100 disabled:opacity-50"
+              >
+                <Copy className="mr-1 h-3.5 w-3.5" />
+                {copyAllCelebration ? "🎉 Скопировано!" : "Копировать все 5"}
+              </Button>
             </div>
             <CardDescription className="text-slate-400">
               Формула: статус × фаза × важность способности × приоритет × свежесть.
@@ -958,7 +951,7 @@ export default function FranchizeStatusPage() {
             </div>
             <div>
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Типы задач (capabilities)
+                Типы задач (категории)
               </h4>
               <div className="flex flex-wrap gap-2">
                 {[...new Set(tasks.map((t) => t.capability))]
@@ -981,10 +974,10 @@ export default function FranchizeStatusPage() {
       <Card className="border-slate-800/70 bg-slate-950 text-slate-100">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Wrench className="h-4 w-4 text-cyan-300" /> Runtime checks
+            <Wrench className="h-4 w-4 text-cyan-300" /> Контроль работы
           </CardTitle>
           <CardDescription className="text-slate-400">
-            {tasks.length} franchize‑задач загружено (greenbox исключены).
+            {tasks.length} задач франшизы загружено (greenbox исключены).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-slate-300">
