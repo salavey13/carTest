@@ -527,7 +527,7 @@ export default function FranchizeStatusPage() {
           {/* Right column: progress ring */}
           <div className="flex items-center justify-center">
             <div className="relative flex h-36 w-36 items-center justify-center overflow-visible">
-              <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36" aria-hidden>
+              <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36" overflow="visible" aria-hidden>
                 <circle
                   className="text-slate-700"
                   fill="none"
