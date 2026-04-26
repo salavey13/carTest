@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -13,6 +13,9 @@ import {
   ExternalLink,
   Flame,
   HelpCircle,
+  Layers3,
+  Megaphone,
+  Rocket,
   Sparkles,
   Wrench,
   Zap,
@@ -64,12 +67,42 @@ const STATUS_LABEL: Record<TaskStatusProp, { label: string; className: string }>
   done: { label: "Done", className: "bg-emerald-500/15 text-emerald-300 border-emerald-400/30" },
 };
 
-const STATUS_GLOW: Record<TaskStatusProp, string> = {
-  open: "shadow-sky-500/10",
-  claimed: "shadow-indigo-500/10",
-  running: "shadow-amber-500/10",
-  ready_for_pr: "shadow-fuchsia-500/10",
-  done: "shadow-emerald-500/10",
+const STATUS_CARD_CONFIG: Record<TaskStatusProp, {
+  icon: React.ElementType;
+  gradient: string;
+  border: string;
+  countColor: string;
+}> = {
+  open: {
+    icon: Layers3,
+    gradient: "from-sky-500/20 to-sky-600/5",
+    border: "border-sky-500/30",
+    countColor: "text-sky-300",
+  },
+  claimed: {
+    icon: Rocket,
+    gradient: "from-indigo-500/20 to-indigo-600/5",
+    border: "border-indigo-500/30",
+    countColor: "text-indigo-300",
+  },
+  running: {
+    icon: Clock3,
+    gradient: "from-amber-500/20 to-amber-600/5",
+    border: "border-amber-500/30",
+    countColor: "text-amber-300",
+  },
+  ready_for_pr: {
+    icon: Megaphone,
+    gradient: "from-fuchsia-500/20 to-fuchsia-600/5",
+    border: "border-fuchsia-500/30",
+    countColor: "text-fuchsia-300",
+  },
+  done: {
+    icon: CheckCircle2,
+    gradient: "from-emerald-500/20 to-emerald-600/5",
+    border: "border-emerald-500/30",
+    countColor: "text-emerald-300",
+  },
 };
 
 const PHASE_ORDER = ["Апрель", "Май", "Июнь", "Лето", "2027"] as const;
@@ -226,6 +259,43 @@ function buildTaskCopyText(task: PriorityTask, fullTask?: FranchizeTask): string
   return parts.join("\n");
 }
 
+/**
+ * Custom hook to animate a number from 0 to target over a given duration.
+ */
+function useCountUp(target: number, duration = 600) {
+  const [display, setDisplay] = useState(0);
+  const frameRef = useRef<number>(0);
+  const startTimeRef = useRef<number | null>(null);
+
+  const step = useCallback(
+    (timestamp: number) => {
+      if (!startTimeRef.current) startTimeRef.current = timestamp;
+      const elapsed = timestamp - startTimeRef.current;
+      const progress = Math.min(elapsed / duration, 1);
+      // easeOutCubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(Math.round(eased * target));
+
+      if (progress < 1) {
+        frameRef.current = requestAnimationFrame(step);
+      }
+    },
+    [target, duration]
+  );
+
+  useEffect(() => {
+    if (target === 0) {
+      setDisplay(0);
+      return;
+    }
+    startTimeRef.current = null;
+    frameRef.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frameRef.current);
+  }, [target, step]);
+
+  return display;
+}
+
 /* ========================================================================== */
 /*  Page Component                                                            */
 /* ========================================================================== */
@@ -246,6 +316,7 @@ export default function FranchizeStatusPage() {
   const [priorityTasks, setPriorityTasks] = useState<PriorityTask[]>([]);
   const [isPriorityLoading, startPriorityTransition] = useTransition();
   const [copied, setCopied] = useState(false);
+  const [copyAllCelebration, setCopyAllCelebration] = useState(false);
 
   // 1. Fetch all franchize tasks on mount
   useEffect(() => {
@@ -294,9 +365,15 @@ export default function FranchizeStatusPage() {
     return totals;
   }, [tasks]);
 
+  // Animated display values for status cards (the surprise!)
+  const animatedOpen = useCountUp(statusTotals.open);
+  const animatedClaimed = useCountUp(statusTotals.claimed);
+  const animatedRunning = useCountUp(statusTotals.running);
+  const animatedReady = useCountUp(statusTotals.ready_for_pr);
+  const animatedDone = useCountUp(statusTotals.done);
+
   const totalPending = tasks.length - statusTotals.done;
   const progressPercent = tasks.length ? Math.round((statusTotals.done / tasks.length) * 100) : 0;
-  const circumference = 2 * Math.PI * 15.9155; // ~100
 
   // ----- Phase grouping -----
   const phaseData = useMemo(() => {
@@ -370,8 +447,8 @@ export default function FranchizeStatusPage() {
     });
     const fullText = texts.join("\n\n");
     await navigator.clipboard.writeText(fullText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopyAllCelebration(true);
+    setTimeout(() => setCopyAllCelebration(false), 1500);
   }, [priorityTasks, tasks]);
 
   // ----- Render states -----
@@ -395,17 +472,17 @@ export default function FranchizeStatusPage() {
   /*  Render                                                                   */
   /* ======================================================================== */
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-3 py-4 pb-20 sm:px-6 sm:py-8 lg:px-8">
+    <div className="mx-auto max-w-7xl space-y-6 px-3 py-4 pb-20 pt-20 sm:px-6 sm:py-8 lg:px-8">
       {/* ==================================================================== */}
-      {/*  HERO – cyber command deck                                           */}
+      {/*  HERO                                                                 */}
       {/* ==================================================================== */}
       <section className="relative rounded-3xl border border-slate-700/80 bg-gradient-to-br from-slate-900 via-indigo-950/90 to-slate-900 p-5 text-white shadow-2xl sm:p-6">
-        {/* Background glows – no overflow‑hidden on the parent so they render fully */}
-        <div className="pointer-events-none absolute -right-10 -top-10 h-56 w-56 rounded-full bg-cyan-500/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-10 -left-10 h-44 w-44 rounded-full bg-purple-500/15 blur-3xl" />
+        {/* Glows */}
+        <div className="pointer-events-none absolute -right-8 -top-8 h-52 w-52 rounded-full bg-cyan-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-8 -left-8 h-44 w-44 rounded-full bg-purple-500/15 blur-3xl" />
 
         <div className="relative z-10 grid gap-6 md:grid-cols-3">
-          {/* Left column: title + meta */}
+          {/* Left column */}
           <div className="md:col-span-2">
             <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-cyan-300">
               <Badge className="border-cyan-400/40 bg-cyan-400/20 text-cyan-100">FRANCHIZE CONTROL DECK</Badge>
@@ -431,20 +508,25 @@ export default function FranchizeStatusPage() {
               >
                 <ArrowLeft className="h-4 w-4" /> Общий SupaPlan
               </Link>
-              <a
-                href="https://chatgpt.com/codex/cloud"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-lg border border-purple-400/30 bg-purple-400/10 px-3 py-2 text-xs text-purple-200 transition hover:bg-purple-400/20"
-              >
-                <ExternalLink className="h-4 w-4" /> Codex Cloud
-              </a>
+              <div className="group relative inline-flex">
+                <a
+                  href="https://chatgpt.com/codex/cloud"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded-lg border border-purple-400/30 bg-purple-400/10 px-3 py-2 text-xs text-purple-200 transition hover:bg-purple-400/20"
+                >
+                  <ExternalLink className="h-4 w-4" /> Codex Cloud
+                </a>
+                <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
+                  🚀 Deploy to Codex
+                </span>
+              </div>
             </div>
           </div>
 
           {/* Right column: progress ring */}
           <div className="flex items-center justify-center">
-            <div className="relative flex h-36 w-36 items-center justify-center">
+            <div className="relative flex h-36 w-36 items-center justify-center overflow-visible">
               <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36" aria-hidden>
                 <circle
                   className="text-slate-700"
@@ -454,7 +536,11 @@ export default function FranchizeStatusPage() {
                   cx="18" cy="18" r="15.9155"
                 />
                 <circle
-                  className="text-cyan-400 drop-shadow-[0_0_6px_#22d3ee] transition-all duration-700"
+                  className={
+                    statusTotals.done === tasks.length && tasks.length > 0
+                      ? "text-emerald-400 drop-shadow-[0_0_8px_#34d399] animate-pulse"
+                      : "text-cyan-400 drop-shadow-[0_0_6px_#22d3ee]"
+                  }
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -472,24 +558,41 @@ export default function FranchizeStatusPage() {
       </section>
 
       {/* ==================================================================== */}
-      {/*  STATUS CARDS – enhanced                                             */}
+      {/*  ANIMATED STATUS CARDS                                               */}
       {/* ==================================================================== */}
       <section className="grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3">
-        {(["open", "claimed", "running", "ready_for_pr", "done"] as TaskStatusProp[]).map((status) => (
-          <Card
-            key={status}
-            className={`border-slate-800/70 bg-slate-950 text-slate-100 transition hover:-translate-y-0.5 hover:shadow-lg ${STATUS_GLOW[status]}`}
-          >
-            <CardHeader className="space-y-1 p-3 pb-1 sm:p-4 sm:pb-1">
-              <CardDescription className="text-[11px] uppercase tracking-wide text-slate-400">
-                {STATUS_LABEL[status].label}
-              </CardDescription>
-              <CardTitle className="text-3xl font-bold tabular-nums tracking-tight">
-                {statusTotals[status]}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        ))}
+        {(["open", "claimed", "running", "ready_for_pr", "done"] as TaskStatusProp[]).map((status) => {
+          const config = STATUS_CARD_CONFIG[status];
+          const Icon = config.icon;
+          const rawValue = statusTotals[status];
+          // choose animated value based on status
+          let animatedValue = rawValue;
+          if (status === "open") animatedValue = animatedOpen;
+          else if (status === "claimed") animatedValue = animatedClaimed;
+          else if (status === "running") animatedValue = animatedRunning;
+          else if (status === "ready_for_pr") animatedValue = animatedReady;
+          else if (status === "done") animatedValue = animatedDone;
+
+          return (
+            <Card
+              key={status}
+              className={`relative overflow-hidden border ${config.border} bg-gradient-to-br ${config.gradient} bg-slate-950 text-white transition hover:-translate-y-1 hover:shadow-lg`}
+            >
+              <Icon className="absolute -right-2 -top-2 h-16 w-16 opacity-10 rotate-12" />
+              <CardHeader className="space-y-1 p-3 pb-1 sm:p-4 sm:pb-1">
+                <CardDescription className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-slate-400">
+                  <Icon className="h-3.5 w-3.5" />
+                  {STATUS_LABEL[status].label}
+                </CardDescription>
+                <CardTitle
+                  className={`text-3xl font-bold tabular-nums tracking-tight transition-colors ${config.countColor}`}
+                >
+                  {animatedValue}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+          );
+        })}
       </section>
 
       {/* ==================================================================== */}
@@ -503,19 +606,25 @@ export default function FranchizeStatusPage() {
               style={{ width: `${progressPercent}%` }}
             />
           </div>
-          <p className="mt-2 text-sm text-slate-300">
-            Выполнено:{" "}
-            <span className="font-semibold text-emerald-300">
-              {statusTotals.done}/{tasks.length}
-            </span>{" "}
-            задач. Осталось критических:{" "}
-            <span className="font-semibold text-rose-400">{totalPending}</span>.
+          <p className="mt-2 flex items-baseline gap-2 text-sm text-slate-300">
+            <span>
+              Выполнено:{" "}
+              <span className="font-semibold text-emerald-300">
+                {statusTotals.done}/{tasks.length}
+              </span>{" "}
+              задач.
+            </span>
+            <span className="text-slate-500">·</span>
+            <span>
+              Осталось критических:{" "}
+              <span className="font-semibold text-rose-400">{totalPending}</span>
+            </span>
           </p>
         </CardContent>
       </Card>
 
       {/* ==================================================================== */}
-      {/*  TOP‑5 PRIORITY – auto‑loaded, no hide button                        */}
+      {/*  TOP‑5 PRIORITY (auto‑loaded)                                        */}
       {/* ==================================================================== */}
       {isPriorityLoading && priorityTasks.length === 0 && (
         <div className="flex items-center gap-2 text-sm text-slate-400">
@@ -540,11 +649,8 @@ export default function FranchizeStatusPage() {
                   className="h-auto px-2 py-1 text-xs text-amber-300 hover:text-amber-100 disabled:opacity-50"
                 >
                   <Copy className="mr-1 h-3.5 w-3.5" />
-                  {copied ? "Скопировано!" : "Копировать все 5"}
+                  {copyAllCelebration ? "🎉 Скопировано!" : "Копировать все 5"}
                 </Button>
-                <span className="rounded-full bg-amber-400/10 px-2 py-0.5 text-[11px] text-amber-400/80">
-                  авто‑обновление
-                </span>
               </div>
             </div>
             <CardDescription className="text-slate-400">
@@ -599,7 +705,7 @@ export default function FranchizeStatusPage() {
       )}
 
       {/* ==================================================================== */}
-      {/*  PHASE → CAPABILITY → TASK TREE                                      */}
+      {/*  PHASE TREE                                                          */}
       {/* ==================================================================== */}
       <div className="space-y-3">
         {phaseData.map(([phase, capMap]) => {
@@ -892,7 +998,7 @@ export default function FranchizeStatusPage() {
       </Card>
 
       {/* ==================================================================== */}
-      {/*  BOTTOM STICKY BAR (mobile only)                                     */}
+      {/*  BOTTOM STICKY BAR (mobile)                                          */}
       {/* ==================================================================== */}
       <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-2 border-t border-slate-200/40 bg-white/90 px-3 py-2 shadow backdrop-blur dark:border-slate-700/80 dark:bg-slate-950/90 sm:hidden">
         <div className="flex items-center gap-2 text-xs">
