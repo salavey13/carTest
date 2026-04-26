@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -11,9 +11,12 @@ import {
   ChevronRight,
   Clock3,
   Flame,
+  HelpCircle,
+  Info,
   Layers3,
   Milestone,
   Rocket,
+  Sparkles,
   Timer,
   Wrench,
   Zap,
@@ -23,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabaseAnon } from "@/hooks/supabase";
+import { getTopPriorityTasks, PriorityTask } from "./actions";
 
 /* -------------------------------------------------------------------------- */
 /*  Types & constants                                                         */
@@ -60,7 +64,13 @@ const STATUS_LABEL: Record<TaskStatus, { label: string; className: string }> = {
   done: { label: "Done", className: "bg-emerald-500/15 text-emerald-300 border-emerald-400/30" },
 };
 
-// Priority weight for sorting: lower = more urgent, higher = more done.
+const TASK_TYPE_DESCRIPTIONS: Record<string, string> = {
+  "R1 Contract": "Блокирующий слой: данные, схемы, совместимость",
+  "R2 Integration": "Telegram/Bridge/API, контур callback",
+  "R3 Ops UX": "Операторская витрина, админ-флоу, CTA",
+  "R4 Growth": "Маркетплейс, комьюнити, геймификация",
+};
+
 function statusUrgency(status: string): number {
   switch (status) {
     case "open": return 0;
@@ -68,7 +78,7 @@ function statusUrgency(status: string): number {
     case "running": return 2;
     case "ready_for_pr": return 3;
     case "done": return 4;
-    default: return 5; // unknown
+    default: return 5;
   }
 }
 
@@ -197,7 +207,7 @@ const IDEA_MAP: IdeaRow[] = [
 ];
 
 /* -------------------------------------------------------------------------- */
-/*  Component                                                                 */
+/*  Page Component                                                            */
 /* -------------------------------------------------------------------------- */
 
 export default function FranchizeStatusPage() {
@@ -209,11 +219,17 @@ export default function FranchizeStatusPage() {
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
   const [expandedCapabilities, setExpandedCapabilities] = useState<Set<string>>(new Set());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-
-  // Global expand/collapse
   const [allExpanded, setAllExpanded] = useState(false);
 
-  // Fetch tasks
+  // Legend visibility
+  const [legendOpen, setLegendOpen] = useState(false);
+
+  // Priority tasks state
+  const [priorityTasks, setPriorityTasks] = useState<PriorityTask[]>([]);
+  const [isPriorityLoading, startPriorityTransition] = useTransition();
+  const [showPriority, setShowPriority] = useState(false);
+
+  // Fetch all franchize tasks on mount
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -263,7 +279,6 @@ export default function FranchizeStatusPage() {
 
   const totalPending = tasks.length - statusTotals.done;
 
-  // Map capability → IdeaRow
   const capabilityIdeaMap = useMemo(() => {
     const map = new Map<string, IdeaRow>();
     IDEA_MAP.forEach((row) => map.set(row.capability, row));
@@ -274,7 +289,7 @@ export default function FranchizeStatusPage() {
     return capabilityIdeaMap.get(cap)?.phase ?? "Uncategorised";
   };
 
-  // ---- Build phase data with intelligent sorting ----
+  // Build phase data with intelligent sorting
   const phaseData = useMemo(() => {
     const phaseMap = new Map<string, { capabilities: string[] }>();
     PHASE_ORDER.forEach((phase) => phaseMap.set(phase, { capabilities: [] }));
@@ -291,8 +306,8 @@ export default function FranchizeStatusPage() {
       phaseMap.get(phase)!.capabilities.push(cap);
     });
 
-    // Sort capabilities within each phase by urgency (worst task status first)
-    phaseMap.forEach((value, phase) => {
+    // Sort capabilities within each phase by urgency (worst status first)
+    phaseMap.forEach((value) => {
       value.capabilities.sort((a, b) => {
         const tasksA = capabilityTaskMap.get(a) || [];
         const tasksB = capabilityTaskMap.get(b) || [];
@@ -303,7 +318,7 @@ export default function FranchizeStatusPage() {
       });
     });
 
-    // Sort phases by total undone tasks (descending), with fully done phases last
+    // Sort phases by total undone tasks (descending), fully done phases last
     const entries = [...phaseMap.entries()].sort(([phaseA, capsA], [phaseB, capsB]) => {
       const undoneA = capsA.capabilities.reduce((sum, cap) => {
         const tasks = capabilityTaskMap.get(cap) || [];
@@ -314,11 +329,10 @@ export default function FranchizeStatusPage() {
         return sum + tasks.filter((t) => t.status !== "done").length;
       }, 0);
 
-      // Phases with 0 undone go to the end
       if (undoneA === 0 && undoneB === 0) return phaseA.localeCompare(phaseB);
       if (undoneA === 0) return 1;
       if (undoneB === 0) return -1;
-      return undoneB - undoneA; // high undone first
+      return undoneB - undoneA;
     });
 
     return entries;
@@ -371,7 +385,6 @@ export default function FranchizeStatusPage() {
     setAllExpanded(false);
   }, []);
 
-  // Jump to first critical phase (first phase with undone tasks)
   const jumpToFirstCritical = useCallback(() => {
     const firstCritical = phaseData.find(([, { capabilities }]) => {
       return capabilities.some((cap) => {
@@ -386,7 +399,20 @@ export default function FranchizeStatusPage() {
     }
   }, [phaseData, capabilityTaskMap]);
 
-  // ---- Rendering ----
+  // Load top priority tasks
+  const handleLoadPriority = useCallback(() => {
+    startPriorityTransition(async () => {
+      const res = await getTopPriorityTasks();
+      if (res.success && res.data) {
+        setPriorityTasks(res.data);
+        setShowPriority(true);
+      } else {
+        alert(res.error || "Ошибка загрузки приоритетных задач");
+      }
+    });
+  }, []);
+
+  // ---- Render ----
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center text-slate-200">
@@ -406,7 +432,7 @@ export default function FranchizeStatusPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
       {/* ---- Mobile sticky status bar ---- */}
-      <div className="sticky top-16 z-30 -mx-3 -mt-4 mb-4 flex items-center justify-between gap-2 rounded-b-2xl border-b border-slate-200/40 bg-white/90 px-3 py-2 shadow backdrop-blur dark:border-slate-700/80 dark:bg-slate-950/90 sm:hidden">
+      <div className="sticky bottom-0 z-30 -mx-3 -mt-4 mb-4 flex items-center justify-between gap-2 rounded-b-2xl border-b border-slate-200/40 bg-white/90 px-3 py-2 shadow backdrop-blur dark:border-slate-700/80 dark:bg-slate-950/90 sm:hidden">
         <div className="flex items-center gap-2 text-xs">
           <Flame className="h-4 w-4 text-rose-400" />
           <span className="font-medium text-slate-700 dark:text-slate-300">
@@ -420,7 +446,7 @@ export default function FranchizeStatusPage() {
         </Button>
       </div>
 
-      {/* ---- Hero Banner (unchanged) ---- */}
+      {/* ---- Hero Banner ---- */}
       <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-[radial-gradient(circle_at_top_right,#0ea5e9_0%,#111827_42%,#020617_100%)] p-5 text-white shadow-lg dark:border-slate-700/80">
         <div className="absolute -right-16 top-0 h-44 w-44 rounded-full bg-cyan-400/25 blur-3xl" aria-hidden />
         <div className="absolute -bottom-16 left-8 h-32 w-32 rounded-full bg-amber-400/20 blur-3xl" aria-hidden />
@@ -431,17 +457,24 @@ export default function FranchizeStatusPage() {
           <span>canonical slug: vip-bike</span>
         </div>
 
-        <h1 className="relative mt-3 text-2xl font-semibold leading-tight sm:text-4xl">SupaPlan • Franchize status board (human-first)</h1>
+        <h1 className="relative mt-3 text-2xl font-semibold leading-tight sm:text-4xl">
+          SupaPlan • Franchize status board (human-first)
+        </h1>
         <p className="relative mt-3 max-w-4xl text-sm text-slate-200 sm:text-base">
-          Сопоставили клиентские идеи и текущий SupaPlan. Здесь видно, какие эпики уже закрыты, какие в работе и где пора декомпозировать
-          в более мелкие задачи во время реализации.
+          Сопоставили клиентские идеи и текущий SupaPlan. Здесь видно, какие эпики уже закрыты, какие в работе и где пора декомпозировать в более мелкие задачи во время реализации.
         </p>
 
         <div className="relative mt-4 flex flex-wrap gap-2 text-xs sm:text-sm">
-          <Link href="/supaplan" className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 hover:bg-white/15">
+          <Link
+            href="/supaplan"
+            className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 hover:bg-white/15"
+          >
             <ArrowLeft className="h-4 w-4" /> Назад в общий SupaPlan
           </Link>
-          <Link href="/nexus" className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 hover:bg-white/15">
+          <Link
+            href="/nexus"
+            className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 hover:bg-white/15"
+          >
             <Rocket className="h-4 w-4" /> Nexus
           </Link>
           <Link
@@ -458,14 +491,16 @@ export default function FranchizeStatusPage() {
         {(["open", "claimed", "running", "ready_for_pr", "done"] as TaskStatus[]).map((status) => (
           <Card key={status} className="border-slate-800/70 bg-slate-950 text-slate-100">
             <CardHeader className="space-y-1 pb-1">
-              <CardDescription className="text-xs text-slate-400">{STATUS_LABEL[status].label}</CardDescription>
+              <CardDescription className="text-xs text-slate-400">
+                {STATUS_LABEL[status].label}
+              </CardDescription>
               <CardTitle className="text-2xl">{statusTotals[status]}</CardTitle>
             </CardHeader>
           </Card>
         ))}
       </section>
 
-      {/* ---- Progress & Legend ---- */}
+      {/* ---- Progress bar ---- */}
       <Card className="border-slate-800/70 bg-slate-950 text-slate-100">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
@@ -477,36 +512,93 @@ export default function FranchizeStatusPage() {
             <div className="h-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-fuchsia-400" style={{ width: `${progressPercent}%` }} />
           </div>
           <p className="mt-2 text-sm text-slate-300">
-            Выполнено: <span className="font-semibold text-emerald-300">{statusTotals.done}/{tasks.length}</span> задач. Осталось критических: <span className="font-semibold text-rose-400">{totalPending}</span>.
+            Выполнено: <span className="font-semibold text-emerald-300">{statusTotals.done}/{tasks.length}</span> задач. Осталось критических:{" "}
+            <span className="font-semibold text-rose-400">{totalPending}</span>.
           </p>
         </CardContent>
       </Card>
 
-      <Card className="border-slate-800/70 bg-slate-950 text-slate-100">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <Milestone className="h-4 w-4 text-cyan-300" /> Legend — типы задач и статусов
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-3">
-            <strong>R1 Contract</strong>
-            <p className="text-slate-300">Блокирующий слой: данные, схемы, совместимость, правила декомпозиции.</p>
-          </div>
-          <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-3">
-            <strong>R2 Integration</strong>
-            <p className="text-slate-300">Интеграции Telegram/Bridge/API, контур callback и внешние связки.</p>
-          </div>
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-            <strong>R3 Ops UX</strong>
-            <p className="text-slate-300">Операторская витрина, админ-флоу, понятные статусы и CTA.</p>
-          </div>
-          <div className="rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/10 p-3">
-            <strong>R4 Growth</strong>
-            <p className="text-slate-300">Маркетплейс, комьюнити, геймификация и ростовые механики.</p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* 🔥 TOP-5 PRIORITY SECTION */}
+      <section>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleLoadPriority}
+          disabled={isPriorityLoading}
+          className="mb-2 gap-2 bg-amber-900/20 text-amber-300 border-amber-500/40 hover:bg-amber-900/30"
+        >
+          {isPriorityLoading ? (
+            <span className="flex items-center gap-1">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
+              Считаю...
+            </span>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4" />
+              Загрузить ТОП-5 приоритетных задач
+            </>
+          )}
+        </Button>
+
+        {showPriority && priorityTasks.length > 0 && (
+          <Card className="border-amber-500/50 bg-gradient-to-br from-amber-950/60 to-slate-950 text-slate-100 shadow shadow-amber-500/10">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-lg text-amber-300">
+                  <Flame className="h-5 w-5" /> ТОП-5 критических задач
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowPriority(false)}
+                  className="text-slate-400 hover:text-slate-200"
+                >
+                  Скрыть
+                </Button>
+              </div>
+              <CardDescription className="text-slate-400">
+                Умная сортировка: статус × фаза × важность способности. Обнови в любой момент.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-2 sm:grid-cols-2">
+              {priorityTasks.map((pt) => {
+                const taskMeta = STATUS_LABEL[pt.status as TaskStatus] || STATUS_LABEL.open;
+                const fullTask = tasks.find((t) => t.id === pt.id);
+                return (
+                  <div key={pt.id} className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-100">{pt.title}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                          <Badge className={taskMeta.className}>{taskMeta.label}</Badge>
+                          <Badge variant="outline" className="border-slate-600 text-slate-400">
+                            {pt.capability}
+                          </Badge>
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs font-mono font-bold text-amber-300">
+                        {pt.score}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-400">{pt.reasoning}</p>
+                    {fullTask?.todo_path && (
+                      <p className="mt-1 text-xs text-slate-500">todo_path: {fullTask.todo_path}</p>
+                    )}
+                    <div className="mt-2">
+                      <Link
+                        href={`/supaplan?task=${pt.id}`}
+                        className="inline-flex items-center gap-1 text-xs text-cyan-300 underline underline-offset-2"
+                      >
+                        Перейти к задаче →
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
+      </section>
 
       {/* ---- Global expand/collapse ---- */}
       <div className="flex flex-wrap items-center gap-2">
@@ -516,21 +608,19 @@ export default function FranchizeStatusPage() {
         <Button variant="outline" size="sm" onClick={handleCollapseAll} className="text-xs">
           Свернуть всё
         </Button>
-        <span className="ml-auto text-xs text-slate-400">
-          Фазы упорядочены по критичности
-        </span>
+        <span className="ml-auto text-xs text-slate-400">Фазы упорядочены по критичности</span>
       </div>
 
       {/* ---- Phase → Capability → Task tree ---- */}
       <div className="space-y-3">
         {phaseData.map(([phase, { capabilities }]) => {
           const phaseExpanded = expandedPhases.has(phase);
-          // Count undone tasks for the phase badge
           const phaseUndone = capabilities.reduce((sum, cap) => {
             const tasks = capabilityTaskMap.get(cap) || [];
             return sum + tasks.filter((t) => t.status !== "done").length;
           }, 0);
           const isPhaseFullyDone = phaseUndone === 0;
+
           return (
             <Card
               key={phase}
@@ -576,7 +666,6 @@ export default function FranchizeStatusPage() {
                       const capTasks = capabilityTaskMap.get(cap) || [];
                       const idea = capabilityIdeaMap.get(cap);
                       const capExpanded = expandedCapabilities.has(cap);
-
                       const doneCount = capTasks.filter((t) => t.status === "done").length;
                       const allDone = capTasks.length > 0 && doneCount === capTasks.length;
                       const worstStatus = capTasks.length
@@ -619,7 +708,10 @@ export default function FranchizeStatusPage() {
                                   <p className="text-slate-300">{idea.note}</p>
                                   <div className="mt-1 flex flex-wrap gap-1">
                                     {idea.routes.map((r) => (
-                                      <code key={r} className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] text-cyan-300">
+                                      <code
+                                        key={r}
+                                        className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] text-cyan-300"
+                                      >
                                         {r}
                                       </code>
                                     ))}
@@ -637,9 +729,13 @@ export default function FranchizeStatusPage() {
                                     .sort((a, b) => statusUrgency(a.status) - statusUrgency(b.status))
                                     .map((task) => {
                                       const taskExpanded = expandedTasks.has(task.id);
-                                      const taskMeta = STATUS_LABEL[task.status as TaskStatus] || STATUS_LABEL.open;
+                                      const taskMeta =
+                                        STATUS_LABEL[task.status as TaskStatus] || STATUS_LABEL.open;
                                       return (
-                                        <li key={task.id} className="rounded border border-slate-700/70 bg-slate-950/70 p-2">
+                                        <li
+                                          key={task.id}
+                                          className="rounded border border-slate-700/70 bg-slate-950/70 p-2"
+                                        >
                                           <button
                                             type="button"
                                             onClick={() => toggleTask(task.id)}
@@ -653,14 +749,20 @@ export default function FranchizeStatusPage() {
                                               )}
                                               <span className="text-sm text-slate-200">{task.title}</span>
                                             </div>
-                                            <Badge className={taskMeta.className}>{taskMeta.label}</Badge>
+                                            <Badge className={taskMeta.className}>
+                                              {taskMeta.label}
+                                            </Badge>
                                           </button>
                                           {taskExpanded && (
                                             <div className="mt-2 space-y-1 pl-5 text-xs text-slate-400">
                                               <p>ID: {task.id}</p>
-                                              {task.todo_path && <p>todo_path: {task.todo_path}</p>}
+                                              {task.todo_path && (
+                                                <p>todo_path: {task.todo_path}</p>
+                                              )}
                                               <p>updated_at (UTC): {formatIso(task.updated_at)}</p>
-                                              {task.body && <p className="text-slate-300">{task.body}</p>}
+                                              {task.body && (
+                                                <p className="text-slate-300">{task.body}</p>
+                                              )}
                                               {task.pr_url && (
                                                 <a
                                                   className="text-cyan-300 underline underline-offset-2"
@@ -691,13 +793,41 @@ export default function FranchizeStatusPage() {
         })}
       </div>
 
+      {/* ---- Compact Collapsible Legend (moved out of the way) ---- */}
+      <div className="mt-8 border-t border-slate-800 pt-4">
+        <button
+          type="button"
+          onClick={() => setLegendOpen(!legendOpen)}
+          className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200"
+        >
+          <HelpCircle className="h-4 w-4" />
+          {legendOpen ? "Скрыть легенду" : "Показать легенду"}
+        </button>
+
+        {legendOpen && (
+          <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            {Object.entries(TASK_TYPE_DESCRIPTIONS).map(([type, desc]) => (
+              <div
+                key={type}
+                className="rounded-xl border border-slate-700/50 bg-slate-900/50 p-3"
+              >
+                <strong className="text-slate-200">{type}</strong>
+                <p className="text-slate-400">{desc}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ---- Runtime checks ---- */}
       <Card className="border-slate-800/70 bg-slate-950 text-slate-100">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Wrench className="h-4 w-4 text-cyan-300" /> Runtime checks
           </CardTitle>
-          <CardDescription className="text-slate-400">Текущая выборка из supaplan_tasks (capability like `franchize.%`).</CardDescription>
+          <CardDescription className="text-slate-400">
+            Текущая выборка из supaplan_tasks (capability like `franchize.%`).
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-slate-300">
           <p className="flex items-center gap-2">
