@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock3,
+  Copy,
   Flame,
   HelpCircle,
   Rocket,
@@ -200,9 +201,21 @@ function formatIso(iso: string): string {
   });
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Page Component                                                            */
-/* -------------------------------------------------------------------------- */
+// Clipboard helpers
+function buildTaskCopyText(task: PriorityTask, fullTask?: FranchizeTask): string {
+  const parts = [
+    `Выполни задачу: ${task.title}`,
+    `ID: ${task.id}`,
+    `Статус: ${task.status}`,
+    `Capability: ${task.capability || "—"}`,
+  ];
+  if (fullTask?.todo_path) parts.push(`Файл: ${fullTask.todo_path}`);
+  if (fullTask?.body) {
+    const bodyPreview = fullTask.body.length > 200 ? `${fullTask.body.slice(0, 200)}...` : fullTask.body;
+    parts.push(`Описание: ${bodyPreview}`);
+  }
+  return parts.join("\n");
+}
 
 export default function FranchizeStatusPage() {
   const [tasks, setTasks] = useState<FranchizeTask[]>([]);
@@ -218,6 +231,8 @@ export default function FranchizeStatusPage() {
   const [priorityTasks, setPriorityTasks] = useState<PriorityTask[]>([]);
   const [isPriorityLoading, startPriorityTransition] = useTransition();
   const [showPriority, setShowPriority] = useState(false);
+
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -257,36 +272,31 @@ export default function FranchizeStatusPage() {
   const totalPending = tasks.length - statusTotals.done;
   const progressPercent = tasks.length ? Math.round((statusTotals.done / tasks.length) * 100) : 0;
 
-  // Group tasks by IDEA_MAP phases, then by capability (using IDEA_MAP for display)
+  // Group tasks by IDEA_MAP phases, then by capability
   const phaseData = useMemo(() => {
     const map = new Map<string, Map<string, FranchizeTask[]>>();
-    // Initialize phases from PHASE_ORDER
     PHASE_ORDER.forEach((p) => map.set(p, new Map()));
 
-    // Add tasks to their IDEA_MAP phase (fallback to metadata.phase if not found)
     const ideaByCap = new Map(IDEA_MAP.map((i) => [i.capability, i]));
     tasks.forEach((task) => {
       const cap = task.capability || "unknown";
       const idea = ideaByCap.get(cap);
-      const phase = idea?.phase ?? "2027"; // default to last phase if unknown
+      const phase = idea?.phase ?? "2027";
       if (!map.has(phase)) map.set(phase, new Map());
       const capMap = map.get(phase)!;
       if (!capMap.has(cap)) capMap.set(cap, []);
       capMap.get(cap)!.push(task);
     });
 
-    // Remove empty phases (with no tasks) for cleanliness, but keep order
     const orderedPhases: [string, Map<string, FranchizeTask[]>][] = [];
     PHASE_ORDER.forEach((p) => {
       if (map.get(p)?.size) orderedPhases.push([p, map.get(p)!]);
     });
-    // Append any extra phases not in PHASE_ORDER (e.g., "2027") at end
     map.forEach((capMap, phase) => {
       if (!PHASE_ORDER.includes(phase as any) && capMap.size) {
         orderedPhases.push([phase, capMap]);
       }
     });
-
     return orderedPhases;
   }, [tasks]);
 
@@ -329,6 +339,25 @@ export default function FranchizeStatusPage() {
     });
   }, []);
 
+  const handleCopyTask = useCallback(async (pt: PriorityTask) => {
+    const fullTask = tasks.find((t) => t.id === pt.id);
+    const text = buildTaskCopyText(pt, fullTask);
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [tasks]);
+
+  const handleCopyAllTop5 = useCallback(async () => {
+    const texts = priorityTasks.map((pt) => {
+      const fullTask = tasks.find((t) => t.id === pt.id);
+      return `--- Задача ${pt.id} ---\n${buildTaskCopyText(pt, fullTask)}`;
+    });
+    const fullText = texts.join("\n\n");
+    await navigator.clipboard.writeText(fullText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [priorityTasks, tasks]);
+
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center text-slate-200">
@@ -346,32 +375,9 @@ export default function FranchizeStatusPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
-      {/* ---- Mobile sticky bar ---- */}
-      <div className="sticky top-16 z-30 -mx-3 -mt-4 mb-4 flex items-center justify-between gap-2 rounded-b-2xl border-b border-slate-200/40 bg-white/90 px-3 py-2 shadow backdrop-blur dark:border-slate-700/80 dark:bg-slate-950/90 sm:hidden">
-        <div className="flex items-center gap-2 text-xs">
-          <Flame className="h-4 w-4 text-rose-400" />
-          <span className="font-medium text-slate-700 dark:text-slate-300">
-            {totalPending} критических
-          </span>
-          <span className="text-slate-400 dark:text-slate-500">|</span>
-          <span className="text-emerald-600 dark:text-emerald-400">{statusTotals.done} сделано</span>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            const first = document.querySelector("[data-phase]");
-            first?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }}
-          className="h-7 text-xs"
-        >
-          <Zap className="mr-1 h-3 w-3" /> К первому
-        </Button>
-      </div>
-
-      {/* ---- Hero ---- */}
-      <section className="relative overflow-hidden rounded-3xl border border-slate-700/80 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-2xl">
+    <div className="mx-auto max-w-7xl space-y-6 px-3 py-4 pb-16 sm:px-6 sm:py-6 lg:px-8">
+      {/* ---- Hero (no overflow-hidden) ---- */}
+      <section className="relative rounded-3xl border border-slate-700/80 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-2xl">
         <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-cyan-500/20 blur-3xl" />
         <div className="absolute -bottom-12 -left-12 h-48 w-48 rounded-full bg-amber-500/20 blur-3xl" />
         <div className="relative z-10 grid gap-6 md:grid-cols-3">
@@ -381,7 +387,7 @@ export default function FranchizeStatusPage() {
               <span>vip-bike crew</span>
             </div>
             <h1 className="text-3xl font-bold leading-tight sm:text-5xl">
-              <span className="bg-gradient-to-r from-cyan-400 via-amber-300 to-fuchsia-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-cyan-300 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
                 SupaPlan • Franchize
               </span>
               <br />
@@ -485,7 +491,20 @@ export default function FranchizeStatusPage() {
                 <CardTitle className="flex items-center gap-2 text-lg text-amber-300">
                   <Flame className="h-5 w-5" /> ТОП-5 критических задач
                 </CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => setShowPriority(false)} className="text-slate-400 hover:text-slate-200">Скрыть</Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopyAllTop5}
+                    className="text-xs text-amber-300 hover:text-amber-100 disabled:opacity-50"
+                  >
+                    <Copy className="mr-1 h-3.5 w-3.5" />
+                    {copied ? "Скопировано!" : "Копировать все 5"}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setShowPriority(false)} className="text-slate-400 hover:text-slate-200">
+                    Скрыть
+                  </Button>
+                </div>
               </div>
               <CardDescription className="text-slate-400">
                 Формула: статус × фаза × важность способности × приоритет × свежесть.
@@ -511,10 +530,16 @@ export default function FranchizeStatusPage() {
                     {fullTask?.todo_path && (
                       <p className="mt-1 text-xs text-slate-500">todo_path: {fullTask.todo_path}</p>
                     )}
-                    <div className="mt-2">
-                      <Link href={`/supaplan?task=${pt.id}`} className="inline-flex items-center gap-1 text-xs text-cyan-300 underline underline-offset-2">
-                        Перейти к задаче →
-                      </Link>
+                    <div className="mt-2 flex items-center justify-between">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCopyTask(pt)}
+                        className="h-auto px-2 py-1 text-xs text-cyan-300 hover:text-cyan-100"
+                      >
+                        <Copy className="mr-1 h-3 w-3" />
+                        Копировать задачу
+                      </Button>
                     </div>
                   </div>
                 );
@@ -532,7 +557,6 @@ export default function FranchizeStatusPage() {
           const undone = phaseTasks.filter((t) => t.status !== "done").length;
           const total = phaseTasks.length;
           const fullyDone = total > 0 && undone === 0;
-          const ideaForPhase = IDEA_MAP.find((i) => i.phase === phase);
           return (
             <Card
               key={phase}
@@ -593,18 +617,23 @@ export default function FranchizeStatusPage() {
                           <button
                             type="button"
                             onClick={() => toggleCapability(cap)}
-                            className="flex w-full items-center justify-between p-3 text-left"
+                            className="flex w-full items-start justify-between p-3 text-left"
                           >
-                            <div className="flex items-center gap-2">
-                              {capExpanded ? (
-                                <ChevronDown className="h-4 w-4 text-amber-300 flex-shrink-0" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4 text-amber-300 flex-shrink-0" />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                {capExpanded ? (
+                                  <ChevronDown className="h-4 w-4 text-amber-300 flex-shrink-0" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 text-amber-300 flex-shrink-0" />
+                                )}
+                                <span className="text-sm font-medium">{idea?.idea || cap}</span>
+                                {allDone && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
+                              </div>
+                              {idea?.note && (
+                                <p className="mt-1 pl-6 text-xs text-slate-400">{idea.note}</p>
                               )}
-                              <span className="text-sm font-medium">{idea?.idea || cap}</span>
-                              {allDone && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="ml-2 flex items-center gap-2">
                               <Badge className={worstMeta.className}>{worstMeta.label}</Badge>
                               <span className="text-xs text-slate-400">{doneCount}/{capTasks.length}</span>
                             </div>
@@ -614,12 +643,9 @@ export default function FranchizeStatusPage() {
                             <div className="border-t border-slate-800 px-3 pb-3 pt-2">
                               {idea && (
                                 <div className="mb-2 text-xs text-slate-400">
-                                  <p className="text-slate-300">{idea.note}</p>
                                   <div className="mt-1 flex flex-wrap gap-1">
                                     {idea.routes.map((r) => (
-                                      <code key={r} className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] text-cyan-300">
-                                        {r}
-                                      </code>
+                                      <code key={r} className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] text-cyan-300">{r}</code>
                                     ))}
                                   </div>
                                 </div>
@@ -740,6 +766,29 @@ export default function FranchizeStatusPage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* ---- Bottom sticky bar ---- */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-between gap-2 border-t border-slate-200/40 bg-white/90 px-3 py-2 shadow backdrop-blur dark:border-slate-700/80 dark:bg-slate-950/90 sm:hidden">
+        <div className="flex items-center gap-2 text-xs">
+          <Flame className="h-4 w-4 text-rose-400" />
+          <span className="font-medium text-slate-700 dark:text-slate-300">
+            {totalPending} критических
+          </span>
+          <span className="text-slate-400 dark:text-slate-500">|</span>
+          <span className="text-emerald-600 dark:text-emerald-400">{statusTotals.done} сделано</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            const first = document.querySelector("[data-phase]");
+            first?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+          className="h-7 text-xs"
+        >
+          <Zap className="mr-1 h-3 w-3" /> К первому
+        </Button>
+      </div>
     </div>
   );
 }
