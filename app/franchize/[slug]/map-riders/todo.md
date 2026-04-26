@@ -65,7 +65,7 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 
 ### I6.1 — Screenshot + demo artifacts (new)
 - [x] Add screenshot policy note: for PR evidence use browser-container/playwright artifacts, avoid committing binary screenshots; `scripts/page-screenshot-skill.mjs` is fallback for public one-off capture only.
-- [ ] Capture and attach one "live map with riders" screenshot and one "drawer+leaderboard" screenshot.
+- [x] Capture and attach one "live map with riders" screenshot and one "drawer+leaderboard" screenshot.
 
 
 
@@ -123,6 +123,17 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
   - Wired privacy payload from client GPS pipeline into `/api/map-riders/batch-points` and fallback `/api/map-riders/location`.
   - Added server-side expire enforcement: expired sessions auto-stop and return 409 to client writes.
   - Added location blur transform when home-blur is enabled and persisted privacy metadata in session stats.
+
+## Investigation notes (2026-04-26)
+- SupaPlan task `e9c8f76f-0863-4f20-a871-6a09dd3bf7f8` (I6.1 evidence pack) progressed with fresh `vip-bike` smoke + screenshot refresh:
+  - Re-ran `npm run qa:map-riders` with PASS for route + split APIs + legacy endpoint.
+  - Captured `artifacts/map-riders-vip-bike-i6-live-map.png`.
+  - Captured `artifacts/map-riders-vip-bike-i6-drawer-leaderboard.png`.
+  - Playwright engines (Chromium/Firefox/WebKit) failed in runner because system browser libs are missing; fallback `thum.io` capture succeeded for both artifacts.
+- SupaPlan task batch (code-quality/perf/a11y):
+  - `d8b4e4e7-8234-4b8d-2345-88880008f345`: meetup creation deduped into shared hook `useMeetupCreator`.
+  - `da6d6a09-0234-4ade-4567-aaa000aaf567`: GPS race mitigated with source lock (`telegram`/`browser`) + source-switch debounce.
+  - `db7e7b1a-1234-4bef-5678-bbb000bbf678`: drawer got dialog semantics, reduced-motion handling, and keyboard focus-trap behavior.
 
 ## Definition of done (port stream)
 - Live map remains stable with high rider count.
