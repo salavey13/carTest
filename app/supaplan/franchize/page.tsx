@@ -108,6 +108,7 @@ const STATUS_CARD_CONFIG: Record<TaskStatusProp, {
 
 const PHASE_ORDER = ["Апрель", "Май", "Июнь", "Лето", "2027"] as const;
 
+// ----- IDEA_MAP (полный, без изменений) -----
 const IDEA_MAP: IdeaRow[] = [
   {
     idea: "Инфо-лендинг + адреса/услуги (VIP Bike)",
@@ -313,6 +314,7 @@ export default function FranchizeStatusPage() {
   const [isPriorityLoading, startPriorityTransition] = useTransition();
   const [copied, setCopied] = useState(false);
   const [copyAllCelebration, setCopyAllCelebration] = useState(false);
+  const [heroCelebrate, setHeroCelebrate] = useState(false);
 
   // 1. Fetch all franchize tasks on mount
   useEffect(() => {
@@ -446,7 +448,15 @@ export default function FranchizeStatusPage() {
     const fullText = intro + texts.join("\n\n");
     await navigator.clipboard.writeText(fullText);
     setCopyAllCelebration(true);
+    setHeroCelebrate(true);
     setTimeout(() => setCopyAllCelebration(false), 1500);
+    // Прокрутка к кнопке Codex Cloud через небольшую задержку
+    setTimeout(() => {
+      document.getElementById("codex-deploy-button")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 200);
   }, [priorityTasks, tasks]);
 
   // ----- Render states -----
@@ -474,14 +484,21 @@ export default function FranchizeStatusPage() {
       {/* ==================================================================== */}
       {/*  HERO                                                                 */}
       {/* ==================================================================== */}
-      <section className="relative rounded-3xl border border-slate-700/80 bg-gradient-to-br from-slate-900 via-indigo-950/90 to-slate-900 p-5 text-white shadow-2xl sm:p-6">
+      <section
+        className={`relative rounded-3xl border border-slate-700/80 bg-gradient-to-br from-slate-900 via-indigo-950/90 to-slate-900 p-5 text-white shadow-2xl transition-all duration-500 sm:p-6 ${
+          heroCelebrate ? "ring-2 ring-amber-400/50" : ""
+        }`}
+      >
+        {/* Glows */}
         <div className="pointer-events-none absolute -right-8 -top-8 h-52 w-52 rounded-full bg-cyan-500/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-8 -left-8 h-44 w-44 rounded-full bg-purple-500/15 blur-3xl" />
 
         <div className="relative z-10 grid gap-6 md:grid-cols-3">
           <div className="md:col-span-2">
             <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-cyan-300">
-              <Badge className="border-cyan-400/40 bg-cyan-400/20 text-cyan-100">ПУЛЬТ УПРАВЛЕНИЯ ФРАНШИЗОЙ</Badge>
+              <Badge className="border-cyan-400/40 bg-cyan-400/20 text-cyan-100">
+                {heroCelebrate ? "🚀 ЗАДАЧИ ОТПРАВЛЕНЫ" : "ПУЛЬТ УПРАВЛЕНИЯ ФРАНШИЗОЙ"}
+              </Badge>
               <span className="text-slate-400">vip‑bike crew</span>
             </div>
 
@@ -490,11 +507,15 @@ export default function FranchizeStatusPage() {
                 SupaPlan • Франшиза
               </span>
               <br />
-              <span className="text-2xl text-slate-100 sm:text-3xl">Живая панель состояния</span>
+              <span className="text-2xl text-slate-100 sm:text-3xl">
+                {heroCelebrate ? "Отправь в Codex!" : "Живая панель состояния"}
+              </span>
             </h1>
 
             <p className="mt-3 max-w-xl text-sm text-slate-300 sm:text-base">
-              Мгновенный срез по всем эпикам. Приоритеты, фазы, критические задачи — всё под рукой.
+              {heroCelebrate
+                ? "Топ‑5 скопированы. Нажми кнопку ниже, чтобы мгновенно деплоить в Codex Cloud."
+                : "Мгновенный срез по всем эпикам. Приоритеты, фазы, критические задачи — всё под рукой."}
             </p>
 
             <div className="mt-4 flex flex-wrap gap-2">
@@ -506,15 +527,21 @@ export default function FranchizeStatusPage() {
               </Link>
               <div className="group relative inline-flex">
                 <a
+                  id="codex-deploy-button"
                   href="https://chatgpt.com/codex/cloud"
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 rounded-lg border border-purple-400/30 bg-purple-400/10 px-3 py-2 text-xs text-purple-200 transition hover:bg-purple-400/20"
+                  className={`inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs transition hover:scale-105 ${
+                    heroCelebrate
+                      ? "animate-pulse border-amber-400/60 bg-amber-400/20 text-amber-200 shadow-[0_0_20px_#f59e0b]"
+                      : "border-purple-400/30 bg-purple-400/10 text-purple-200 hover:bg-purple-400/20"
+                  }`}
                 >
-                  <ExternalLink className="h-4 w-4" /> Codex Cloud
+                  <ExternalLink className="h-4 w-4" />
+                  {heroCelebrate ? "🚀 Деплой в Codex" : "Codex Cloud"}
                 </a>
                 <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
-                  🚀 Деплой в Codex
+                  {heroCelebrate ? "Погнали, агент!" : "Deploy to Codex"}
                 </span>
               </div>
             </div>
