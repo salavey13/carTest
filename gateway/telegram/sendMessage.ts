@@ -45,7 +45,23 @@ export async function sendMessage(chatId: string | number, text: string, opts: S
       }),
     });
 
-    const payload = (await response.json()) as TelegramSendMessageResponse;
+    // Parse body safely so non‑JSON responses don't bypass the retry loop
+    const responseText = await response.text();
+    let payload: TelegramSendMessageResponse;
+    try {
+      payload = JSON.parse(responseText) as TelegramSendMessageResponse;
+    } catch {
+      // Transient error with non‑JSON body → retry if possible
+      if (response.status === 429 || response.status >= 500) {
+        if (attempt < maxRetries) {
+          await sleep(Math.max(250 * (attempt + 1), 500));
+          continue;
+        }
+        throw new Error(`Telegram API returned non‑JSON error (status ${response.status})`);
+      }
+      throw new Error(`Unexpected Telegram response (status ${response.status}): ${responseText.slice(0, 200)}`);
+    }
+
     if (response.ok && payload.ok) {
       return payload;
     }
