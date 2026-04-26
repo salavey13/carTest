@@ -12,7 +12,6 @@ import {
   Clock3,
   Flame,
   HelpCircle,
-  Info,
   Layers3,
   Milestone,
   Rocket,
@@ -615,11 +614,19 @@ export default function FranchizeStatusPage() {
       <div className="space-y-3">
         {phaseData.map(([phase, { capabilities }]) => {
           const phaseExpanded = expandedPhases.has(phase);
-          const phaseUndone = capabilities.reduce((sum, cap) => {
-            const tasks = capabilityTaskMap.get(cap) || [];
-            return sum + tasks.filter((t) => t.status !== "done").length;
-          }, 0);
-          const isPhaseFullyDone = phaseUndone === 0;
+          // Calculate undone tasks and total tasks in this phase
+          const { undone: phaseUndone, total: phaseTotal } = capabilities.reduce(
+            (acc, cap) => {
+              const capTasks = capabilityTaskMap.get(cap) || [];
+              acc.undone += capTasks.filter((t) => t.status !== "done").length;
+              acc.total += capTasks.length;
+              return acc;
+            },
+            { undone: 0, total: 0 }
+          );
+          // Only show fully done badge if there are tasks and none are undone
+          const isPhaseFullyDone = phaseTotal > 0 && phaseUndone === 0;
+          const phaseHasAnyTasks = phaseTotal > 0;
 
           return (
             <Card
@@ -645,7 +652,7 @@ export default function FranchizeStatusPage() {
                     <Badge variant="outline" className="border-slate-600 text-slate-300 text-xs">
                       {capabilities.length} идеи
                     </Badge>
-                    {phaseUndone > 0 && (
+                    {phaseHasAnyTasks && phaseUndone > 0 && (
                       <Badge className="bg-rose-500/20 text-rose-300 text-xs">
                         {phaseUndone} не завершено
                       </Badge>
@@ -657,6 +664,11 @@ export default function FranchizeStatusPage() {
                     )}
                   </div>
                 </div>
+                {phaseHasAnyTasks && (
+                  <span className="text-xs text-slate-400">
+                    {phaseTotal - phaseUndone}/{phaseTotal}
+                  </span>
+                )}
               </button>
 
               {phaseExpanded && (
@@ -793,7 +805,7 @@ export default function FranchizeStatusPage() {
         })}
       </div>
 
-      {/* ---- Compact Collapsible Legend (moved out of the way) ---- */}
+      {/* ---- Collapsible Board Legend ---- */}
       <div className="mt-8 border-t border-slate-800 pt-4">
         <button
           type="button"
@@ -805,16 +817,64 @@ export default function FranchizeStatusPage() {
         </button>
 
         {legendOpen && (
-          <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-            {Object.entries(TASK_TYPE_DESCRIPTIONS).map(([type, desc]) => (
-              <div
-                key={type}
-                className="rounded-xl border border-slate-700/50 bg-slate-900/50 p-3"
-              >
-                <strong className="text-slate-200">{type}</strong>
-                <p className="text-slate-400">{desc}</p>
+          <div className="mt-3 space-y-4 text-sm text-slate-300">
+            {/* Task types */}
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Типы задач
+              </h4>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {Object.entries(TASK_TYPE_DESCRIPTIONS).map(([type, desc]) => (
+                  <div
+                    key={type}
+                    className="rounded-xl border border-slate-700/50 bg-slate-900/50 p-3"
+                  >
+                    <strong className="text-slate-200">{type}</strong>
+                    <p className="text-slate-400">{desc}</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+
+            {/* Statuses */}
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Статусы задач
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(STATUS_LABEL) as TaskStatus[]).map((status) => (
+                  <Badge
+                    key={status}
+                    className={`${STATUS_LABEL[status].className} text-xs`}
+                  >
+                    {STATUS_LABEL[status].label}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {/* Priority formula */}
+            <div>
+              <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Приоритет (ТОП-5)
+              </h4>
+              <p className="text-slate-400">
+                <code className="rounded bg-slate-800 px-1 text-cyan-300">статус (Open=10, …, Ready for PR=3)</code> ×{" "}
+                <code className="rounded bg-slate-800 px-1 text-cyan-300">фаза (Апрель=1.5 … 2027=0.7)</code> ×{" "}
+                <code className="rounded bg-slate-800 px-1 text-cyan-300">важность способности (0.7‑1.4)</code> +{" "}
+                <code className="rounded bg-slate-800 px-1 text-cyan-300">бонус за возраст (+0.5 если старше 7 дней)</code>
+              </p>
+            </div>
+
+            {/* Phases */}
+            <div>
+              <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Фазы (дорожная карта)
+              </h4>
+              <p className="text-slate-400">
+                {PHASE_ORDER.join(" → ")} – фазы упорядочены по количеству незавершённых задач.
+              </p>
+            </div>
           </div>
         )}
       </div>

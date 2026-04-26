@@ -1,6 +1,6 @@
 "use server";
 
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendTelegramMessageCore } from "@/app/core/telegram_actions";
 
 type TaskNotifyInput = {
@@ -93,7 +93,8 @@ export type PriorityTask = {
 };
 
 /**
- * Scores a non‑done franchize task based on status, phase, and capability importance.
+ * Scores a non‑done franchize task based on status, phase, capability importance,
+ * and an optional JSON‑encoded priority (p0/p1/p2) in the `body` field.
  * Returns the 5 tasks with the highest priority score.
  */
 export async function getTopPriorityTasks(): Promise<{
@@ -102,10 +103,10 @@ export async function getTopPriorityTasks(): Promise<{
   error?: string;
 }> {
   try {
-    // 1. Fetch all non‑done franchize tasks
+    // 1. Fetch all non‑done franchize tasks, including the body
     const { data, error } = await supabaseAdmin
       .from("supaplan_tasks")
-      .select("id,title,status,capability,created_at")
+      .select("id,title,status,capability,created_at,body")
       .or("capability.like.franchize.%,capability.eq.greenbox.franchize")
       .neq("status", "done")
       .order("created_at", { ascending: false });
@@ -115,7 +116,7 @@ export async function getTopPriorityTasks(): Promise<{
       return { success: true, data: [] };
     }
 
-    // 2. Scoring weights (all tunable)
+    // 2. Scoring weights
     const statusScore: Record<string, number> = {
       open: 10,
       claimed: 7,
@@ -131,15 +132,15 @@ export async function getTopPriorityTasks(): Promise<{
       "2027": 0.7,
     };
 
-    // Capability priority: higher = more foundational
+    // Capability priority – bumped ui.ux significantly
     const capabilityImportance: Record<string, number> = {
       "franchize.rental": 1.4,
       "franchize.backend.supabase": 1.4,
+      "franchize.ui.ux": 1.8,   // was 1.0 → now top tier
       "franchize.info": 1.2,
       "franchize.telegram": 1.2,
       "franchize.analytics": 1.1,
       "franchize.kpi": 1.1,
-      "franchize.ui.ux": 1.0,
       "franchize.onboarding": 1.0,
       "franchize.integration": 0.9,
       "franchize.sales": 0.9,
@@ -162,6 +163,13 @@ export async function getTopPriorityTasks(): Promise<{
       "franchize.gamification": "Лето",
     };
 
+    // Priority tag multiplier from JSON body (p0, p1, p2)
+    const priorityMultiplier: Record<string, number> = {
+      p0: 2.2,
+      p1: 1.6,
+      p2: 1.25,
+    };
+
     // 3. Calculate priority score for each task
     const scored = (data as any[]).map((task: any) => {
       const baseScore = statusScore[task.status] || 0;
@@ -170,13 +178,32 @@ export async function getTopPriorityTasks(): Promise<{
       const phaseMult = phaseMultiplier[phase] || 1.0;
       const capImportance = capabilityImportance[capability] || 1.0;
 
+      // Parse body JSON for priority tag
+      let priorityMult = 1.0;
+      let priorityLabel = "";
+      if (task.body) {
+        try {
+          const bodyObj = typeof task.body === "string" ? JSON.parse(task.body) : task.body;
+          if (bodyObj && typeof bodyObj === "object" && bodyObj.priority) {
+            const raw = String(bodyObj.priority).toLowerCase();
+            if (priorityMultiplier[raw]) {
+              priorityMult = priorityMultiplier[raw];
+              priorityLabel = ` +${raw.toUpperCase()} (×${priorityMult})`;
+            }
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
+
       // Age boost: tasks created more than 7 days ago get +0.5
       const ageDays = (Date.now() - new Date(task.created_at).getTime()) / (1000 * 60 * 60 * 24);
       const ageBoost = ageDays > 7 ? 0.5 : 0;
 
-      const total = baseScore * phaseMult * capImportance + ageBoost;
+      const total = baseScore * phaseMult * capImportance * priorityMult + ageBoost;
 
       let reasoning = `${baseScore} (статус) × ${phaseMult} (фаза ${phase}) × ${capImportance} (важность)`;
+      if (priorityLabel) reasoning += priorityLabel;
       if (ageBoost > 0) reasoning += ` +0.5 (старше 7 дней)`;
 
       return { ...task, score: Math.round(total * 10) / 10, reasoning };
