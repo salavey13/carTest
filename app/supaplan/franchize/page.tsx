@@ -970,7 +970,7 @@ export default function FranchizeStatusPage() {
                   "tech-debt",
                   "post-launch",
                 ].map((p) => (
-                  <Badge key={p} className="border-l-2 bg-slate-800/50 capitalize">
+                  <Badge key={p} className="border-l-2 bg-cyan-800/50 capitalize">
                     {p.replace("-", " ")}
                   </Badge>
                 ))}
@@ -1004,7 +1004,7 @@ export default function FranchizeStatusPage() {
             <Wrench className="h-4 w-4 text-cyan-300" /> Контроль работы
           </CardTitle>
           <CardDescription className="text-slate-400">
-            {tasks.length} задач франшизы загружено (greenbox исключены).
+            {tasks.length} задач франшизы загружено.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-slate-300">
