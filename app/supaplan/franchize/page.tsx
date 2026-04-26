@@ -26,7 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabaseAnon } from "@/hooks/supabase";
-import { getTopPriorityTasks, PriorityTask } from "./actions";
+import { getTopPriorityTasks, PriorityTask } from "../actions";
 
 /* -------------------------------------------------------------------------- */
 /*  Types & constants                                                         */
