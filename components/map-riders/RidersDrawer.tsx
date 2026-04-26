@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "vaul";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,58 +16,102 @@ import { useAppContext } from "@/contexts/AppContext";
 import { riderDisplayName, formatRideDuration } from "@/lib/map-riders";
 import { toast } from "sonner";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
-import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
+import { useMeetupCreator } from "@/hooks/useMeetupCreator";
 
 export function RidersDrawer() {
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
   const { dbUser } = useAppContext();
+  const contentRef = useRef<HTMLDivElement | null>(null);
 
   const [meetupTitle, setMeetupTitle] = useState("Точка сбора");
   const [meetupComment, setMeetupComment] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const { createMeetup, isSubmitting } = useMeetupCreator(crewSlug);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setPrefersReducedMotion(media.matches);
+    sync();
+    media.addEventListener?.("change", sync);
+    return () => media.removeEventListener?.("change", sync);
+  }, []);
+
+  const drawerSnapPoints = useMemo(() => (prefersReducedMotion ? [1] : [0.64, 380 / 820, 640 / 820]), [prefersReducedMotion]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const node = contentRef.current;
+    if (!node) return;
+
+    const focusable = node.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    first?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+        return;
+      }
+      if (event.key !== "Tab" || !first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    node.addEventListener("keydown", onKeyDown);
+    return () => node.removeEventListener("keydown", onKeyDown);
+  }, [isOpen]);
 
   const handleCreateMeetup = useCallback(async () => {
-    if (!dbUser?.user_id || !state.selectedMeetupPoint) {
+    if (!dbUser?.user_id) {
       toast.error("Ткни по карте и авторизуйся");
       return;
     }
-    setIsSubmitting(true);
-    try {
-      const headers = await getMapRidersWriteHeaders();
-      const res = await fetch("/api/map-riders/meetups", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          crewSlug,
-          userId: dbUser.user_id,
-          title: meetupTitle,
-          comment: meetupComment,
-          lat: state.selectedMeetupPoint[0],
-          lon: state.selectedMeetupPoint[1],
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error);
-      toast.success("Meetup сохранён и опубликован в экипаже");
+    const created = await createMeetup({
+      userId: dbUser.user_id,
+      title: meetupTitle,
+      comment: meetupComment,
+      successMessage: "Meetup сохранён и опубликован в экипаже",
+      clearForm: () => {
+        setMeetupTitle("Точка сбора");
+        setMeetupComment("");
+      },
+    });
+    if (created) {
       setMeetupTitle("Точка сбора");
       setMeetupComment("");
-      dispatch({ type: "ui/select-meetup-point", payload: null });
-      await fetchSnapshot();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Ошибка meetup");
-    } finally {
-      setIsSubmitting(false);
     }
-  }, [dbUser, state.selectedMeetupPoint, crewSlug, meetupTitle, meetupComment, dispatch, fetchSnapshot]);
+  }, [createMeetup, dbUser?.user_id, meetupComment, meetupTitle]);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden">
-      <Drawer.Root snapPoints={[64, 380, 640]}>
+      <Drawer.Root
+        open={isOpen}
+        onOpenChange={(nextOpen) => {
+          setIsOpen(nextOpen);
+          dispatch({ type: "ui/toggle-drawer" });
+        }}
+        snapPoints={drawerSnapPoints}
+      >
         <Drawer.Handle
           className="mx-auto mb-1 h-1.5 w-12 rounded-full bg-white/30"
-          onClick={() => dispatch({ type: "ui/toggle-drawer" })}
+          onClick={() => setIsOpen((prev) => !prev)}
         />
-        <Drawer.Content className="mx-auto flex h-full w-full max-w-lg flex-col rounded-t-2xl bg-black/90 backdrop-blur-xl">
+        <Drawer.Content
+          ref={contentRef}
+          role="dialog"
+          aria-label="Панель райдеров и meetup"
+          className="mx-auto flex h-full w-full max-w-lg flex-col rounded-t-2xl bg-black/90 backdrop-blur-xl"
+        >
           <Tabs defaultValue="riders" className="flex h-full flex-col">
             <div className="border-b border-white/10 px-4 pt-3">
               <TabsList className="grid w-full grid-cols-3 bg-transparent">
