@@ -432,7 +432,7 @@ export default function FranchizeStatusPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
       {/* ---- Mobile sticky status bar ---- */}
-      <div className="sticky bottom-0 z-30 -mx-3 -mt-4 mb-4 flex items-center justify-between gap-2 rounded-b-2xl border-b border-slate-200/40 bg-white/90 px-3 py-2 shadow backdrop-blur dark:border-slate-700/80 dark:bg-slate-950/90 sm:hidden">
+      <div className="sticky top-16 z-30 -mx-3 -mt-4 mb-4 flex items-center justify-between gap-2 rounded-b-2xl border-b border-slate-200/40 bg-white/90 px-3 py-2 shadow backdrop-blur dark:border-slate-700/80 dark:bg-slate-950/90 sm:hidden">
         <div className="flex items-center gap-2 text-xs">
           <Flame className="h-4 w-4 text-rose-400" />
           <span className="font-medium text-slate-700 dark:text-slate-300">
