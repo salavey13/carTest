@@ -16,26 +16,16 @@ export async function claimTask(capability: string, agentId: string) {
     p_capability: capability,
     p_agent: agentId,
   });
-
-  if (error) {
-    throw error;
-  }
-
+  if (error) throw error;
   return data;
 }
 
 export async function updateTaskStatus(taskId: string, status: string) {
   const { error } = await supabaseAdmin
     .from("supaplan_tasks")
-    .update({
-      status,
-      updated_at: new Date().toISOString(),
-    })
+    .update({ status, updated_at: new Date().toISOString() })
     .eq("id", taskId);
-
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 }
 
 export async function logTaskProgressEvent(taskId: string, summary: string) {
@@ -44,11 +34,7 @@ export async function logTaskProgressEvent(taskId: string, summary: string) {
     type: "task_progress",
     payload: { taskId, summary },
   });
-
-  if (error) {
-    throw error;
-  }
-
+  if (error) throw error;
   return { success: true };
 }
 
@@ -74,12 +60,8 @@ export async function notifyTaskPickInTelegram(input: TaskNotifyInput) {
     { text: "Телеграм ВебАпп", url: deepLink },
   ], undefined, input.chatId ?? undefined);
 
-  if (!result.success) {
-    return { success: false, error: result.error };
-  }
-
+  if (!result.success) return { success: false, error: result.error };
   await logTaskProgressEvent(input.taskId, "Задача отправлена в Телеграм из панели");
-
   return { success: true };
 }
 
@@ -93,9 +75,20 @@ export type PriorityTask = {
 };
 
 /**
- * Scores a non‑done franchize task based on status, phase, capability importance,
- * and an optional JSON‑encoded priority (p0/p1/p2) in the `body` field.
- * Returns the 5 tasks with the highest priority score.
+ * Priority scoring engine – franchize tasks only (ignores greenbox.*).
+ *
+ * Factors:
+ * - Status weight: Open=10, Claimed=7, Running=5, Ready for PR=3
+ * - Phase multiplier from metadata.phase:
+ *   launch-blocker 2.0, launch-quality 1.6, security 1.5, performance 1.3,
+ *   polishing 1.2, ux-fix 1.2, seo 1.1, code-quality 1.0, tech-debt 0.8, post-launch 0.7
+ * - Capability base weight (higher = more foundational).
+ * - Priority tag (from metadata.priority or body JSON) → critical 2.5, high 2.0, medium 1.5, low 1.0.
+ *   Tags like "p0", "p1", "p2" in body also mapped: p0=2.5, p1=2.0, p2=1.5.
+ *   The strongest multiplier wins.
+ * - Freshness boost: 2.0 if created within last 48h, 1.5 if within last 7d,
+ *   0.8 if older than 30d (to slightly demote stale tasks).
+ * - Quick win bonus: +1.0 if estimated_hours ≤ 4.
  */
 export async function getTopPriorityTasks(): Promise<{
   success: boolean;
@@ -103,20 +96,16 @@ export async function getTopPriorityTasks(): Promise<{
   error?: string;
 }> {
   try {
-    // 1. Fetch all non‑done franchize tasks, including the body
     const { data, error } = await supabaseAdmin
       .from("supaplan_tasks")
-      .select("id,title,status,capability,created_at,body")
-      .or("capability.like.franchize.%,capability.eq.greenbox.franchize")
+      .select("id,title,status,capability,created_at,body,metadata")
+      .or("capability.like.franchize.%")
       .neq("status", "done")
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    if (!data || data.length === 0) {
-      return { success: true, data: [] };
-    }
+    if (!data || data.length === 0) return { success: true, data: [] };
 
-    // 2. Scoring weights
     const statusScore: Record<string, number> = {
       open: 10,
       claimed: 7,
@@ -125,18 +114,27 @@ export async function getTopPriorityTasks(): Promise<{
     };
 
     const phaseMultiplier: Record<string, number> = {
-      "Апрель": 1.5,
-      "Май": 1.3,
-      "Июнь": 1.1,
-      "Лето": 0.9,
-      "2027": 0.7,
+      "launch-blocker": 2.0,
+      "launch-quality": 1.6,
+      "security": 1.5,
+      "performance": 1.3,
+      "polishing": 1.2,
+      "ux-fix": 1.2,
+      "seo": 1.1,
+      "code-quality": 1.0,
+      "tech-debt": 0.8,
+      "post-launch": 0.7,
     };
 
-    // Capability priority – bumped ui.ux significantly
     const capabilityImportance: Record<string, number> = {
       "franchize.rental": 1.4,
       "franchize.backend.supabase": 1.4,
-      "franchize.ui.ux": 1.8,   // was 1.0 → now top tier
+      "franchize.ui.ux": 1.8,
+      "franchize.finance": 1.3,
+      "franchize.security": 1.5,
+      "franchize.performance": 1.2,
+      "franchize.code-quality": 1.0,
+      "franchize.accessibility": 0.9,
       "franchize.info": 1.2,
       "franchize.telegram": 1.2,
       "franchize.analytics": 1.1,
@@ -148,68 +146,92 @@ export async function getTopPriorityTasks(): Promise<{
       "franchize.gamification": 0.7,
     };
 
-    const phaseMap: Record<string, string> = {
-      "franchize.info": "Апрель",
-      "franchize.rental": "Апрель",
-      "franchize.kpi": "Апрель",
-      "franchize.telegram": "Апрель",
-      "franchize.analytics": "Апрель",
-      "franchize.ui.ux": "Апрель",
-      "franchize.backend.supabase": "Апрель",
-      "franchize.sales": "Май",
-      "franchize.onboarding": "Май",
-      "franchize.growth": "Май",
-      "franchize.integration": "Июнь",
-      "franchize.gamification": "Лето",
+    const priorityTextMultiplier: Record<string, number> = {
+      critical: 2.5,
+      high: 2.0,
+      medium: 1.5,
+      low: 1.0,
     };
 
-    // Priority tag multiplier from JSON body (p0, p1, p2)
-    const priorityMultiplier: Record<string, number> = {
-      p0: 2.2,
-      p1: 1.6,
-      p2: 1.25,
-    };
-
-    // 3. Calculate priority score for each task
-    const scored = (data as any[]).map((task: any) => {
-      const baseScore = statusScore[task.status] || 0;
+    const scored = data.map((task: any) => {
+      const base = statusScore[task.status] || 0;
       const capability = task.capability || "";
-      const phase = phaseMap[capability] || "2027";
-      const phaseMult = phaseMultiplier[phase] || 1.0;
-      const capImportance = capabilityImportance[capability] || 1.0;
+      const capWeight = capabilityImportance[capability] || 1.0;
 
-      // Parse body JSON for priority tag
-      let priorityMult = 1.0;
-      let priorityLabel = "";
+      // metadata parsing
+      let metaPhase = "";
+      let metaPriorityText = "";
+      let estimatedHours = 0;
+      if (task.metadata) {
+        try {
+          const meta = typeof task.metadata === "string" ? JSON.parse(task.metadata) : task.metadata;
+          metaPhase = meta.phase || "";
+          metaPriorityText = (meta.priority || "").toLowerCase();
+          estimatedHours = Number(meta.estimated_hours) || 0;
+        } catch {}
+      }
+
+      // body parsing for p0/p1/p2
+      let bodyPriorityTag = "";
       if (task.body) {
         try {
           const bodyObj = typeof task.body === "string" ? JSON.parse(task.body) : task.body;
           if (bodyObj && typeof bodyObj === "object" && bodyObj.priority) {
-            const raw = String(bodyObj.priority).toLowerCase();
-            if (priorityMultiplier[raw]) {
-              priorityMult = priorityMultiplier[raw];
-              priorityLabel = ` +${raw.toUpperCase()} (×${priorityMult})`;
-            }
+            bodyPriorityTag = String(bodyObj.priority).toLowerCase();
           }
-        } catch {
-          // ignore parse errors
-        }
+        } catch {}
       }
 
-      // Age boost: tasks created more than 7 days ago get +0.5
+      // Phase multiplier
+      const phaseKey = metaPhase || "";
+      const phaseMult = phaseMultiplier[phaseKey] || 1.0;
+
+      // Priority multiplier: take strongest from text or tag
+      let priorityMult = 1.0;
+      let priorityLabel = "";
+      const fromTag = bodyPriorityTag === "p0" ? 2.5 : bodyPriorityTag === "p1" ? 2.0 : bodyPriorityTag === "p2" ? 1.5 : 0;
+      const fromText = priorityTextMultiplier[metaPriorityText] || 0;
+      const maxPriority = Math.max(fromTag, fromText, 1.0);
+      if (maxPriority > 1.0) {
+        priorityMult = maxPriority;
+        priorityLabel =
+          fromTag >= maxPriority ? ` ${bodyPriorityTag.toUpperCase()}` : ` ${metaPriorityText}`;
+      }
+
+      // Freshness boost – new tasks get bonus, old ones slightly penalised
       const ageDays = (Date.now() - new Date(task.created_at).getTime()) / (1000 * 60 * 60 * 24);
-      const ageBoost = ageDays > 7 ? 0.5 : 0;
+      let freshnessMult = 1.0;
+      let freshnessLabel = "";
+      if (ageDays <= 2) {
+        freshnessMult = 2.0;
+        freshnessLabel = "новое (≤2 дн)";
+      } else if (ageDays <= 7) {
+        freshnessMult = 1.5;
+        freshnessLabel = "свежее (≤7 дн)";
+      } else if (ageDays > 30) {
+        freshnessMult = 0.8;
+        freshnessLabel = "старое (>30 дн)";
+      }
 
-      const total = baseScore * phaseMult * capImportance * priorityMult + ageBoost;
+      // Quick win bonus
+      let quickWinBonus = 0;
+      let quickWinLabel = "";
+      if (estimatedHours > 0 && estimatedHours <= 4) {
+        quickWinBonus = 1.0;
+        quickWinLabel = "quick win";
+      }
 
-      let reasoning = `${baseScore} (статус) × ${phaseMult} (фаза ${phase}) × ${capImportance} (важность)`;
-      if (priorityLabel) reasoning += priorityLabel;
-      if (ageBoost > 0) reasoning += ` +0.5 (старше 7 дней)`;
+      const total =
+        base * capWeight * phaseMult * priorityMult * freshnessMult + quickWinBonus;
+
+      let reasoning = `${base} × cap:${capWeight} × phase:"${phaseKey}"${phaseMult}`;
+      if (priorityLabel) reasoning += ` × приоритет:${priorityLabel}(${priorityMult})`;
+      if (freshnessLabel) reasoning += ` × ${freshnessLabel}(${freshnessMult})`;
+      if (quickWinBonus) reasoning += ` + ${quickWinBonus} (${quickWinLabel})`;
 
       return { ...task, score: Math.round(total * 10) / 10, reasoning };
     });
 
-    // 4. Sort descending, pick top 5
     scored.sort((a: any, b: any) => b.score - a.score);
     const top5 = scored.slice(0, 5).map(
       (t: any): PriorityTask => ({

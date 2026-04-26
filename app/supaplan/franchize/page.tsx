@@ -12,8 +12,6 @@ import {
   Clock3,
   Flame,
   HelpCircle,
-  Layers3,
-  Milestone,
   Rocket,
   Sparkles,
   Timer,
@@ -31,43 +29,43 @@ import { getTopPriorityTasks, PriorityTask } from "../actions";
 /*  Types & constants                                                         */
 /* -------------------------------------------------------------------------- */
 
-type TaskStatus = "open" | "claimed" | "running" | "ready_for_pr" | "done";
+type TaskStatusProp = "open" | "claimed" | "running" | "ready_for_pr" | "done";
 
 type FranchizeTask = {
   id: string;
   title: string;
   body: string | null;
   capability: string | null;
-  status: TaskStatus | string;
+  status: TaskStatusProp | string;
   todo_path: string | null;
   created_at: string;
   updated_at: string;
   pr_url: string | null;
+  metadata?: any;
 };
 
-type IdeaRow = {
-  idea: string;
-  capability: string;
-  phase: string;
-  taskType: "R1 Contract" | "R2 Integration" | "R3 Ops UX" | "R4 Growth";
-  routes: string[];
-  note: string;
-  decompositionHint: string;
-};
-
-const STATUS_LABEL: Record<TaskStatus, { label: string; className: string }> = {
+const STATUS_LABEL: Record<TaskStatusProp, { label: string; className: string }> = {
   open: { label: "Open", className: "bg-sky-500/15 text-sky-300 border-sky-400/30" },
   claimed: { label: "Claimed", className: "bg-indigo-500/15 text-indigo-300 border-indigo-400/30" },
   running: { label: "Running", className: "bg-amber-500/15 text-amber-300 border-amber-400/30" },
-  ready_for_pr: { label: "Ready for PR", className: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-400/30" },
+  ready_for_pr: {
+    label: "Ready for PR",
+    className: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-400/30",
+  },
   done: { label: "Done", className: "bg-emerald-500/15 text-emerald-300 border-emerald-400/30" },
 };
 
-const TASK_TYPE_DESCRIPTIONS: Record<string, string> = {
-  "R1 Contract": "Блокирующий слой: данные, схемы, совместимость",
-  "R2 Integration": "Telegram/Bridge/API, контур callback",
-  "R3 Ops UX": "Операторская витрина, админ-флоу, CTA",
-  "R4 Growth": "Маркетплейс, комьюнити, геймификация",
+const PHASE_COLORS: Record<string, string> = {
+  "launch-blocker": "border-l-red-500 text-red-300",
+  "launch-quality": "border-l-amber-500 text-amber-300",
+  "security": "border-l-orange-500 text-orange-300",
+  "performance": "border-l-cyan-500 text-cyan-300",
+  "polishing": "border-l-emerald-500 text-emerald-300",
+  "ux-fix": "border-l-pink-500 text-pink-300",
+  "seo": "border-l-blue-500 text-blue-300",
+  "code-quality": "border-l-slate-500 text-slate-300",
+  "tech-debt": "border-l-gray-500 text-gray-300",
+  "post-launch": "border-l-purple-500 text-purple-300",
 };
 
 function statusUrgency(status: string): number {
@@ -92,118 +90,16 @@ function formatIso(iso: string): string {
   });
 }
 
-const PHASE_ORDER = ["Апрель", "Май", "Июнь", "Лето", "2027"] as const;
-
-const IDEA_MAP: IdeaRow[] = [
-  {
-    idea: "Инфо-лендинг + адреса/услуги (VIP Bike)",
-    capability: "franchize.info",
-    phase: "Апрель",
-    taskType: "R3 Ops UX",
-    routes: ["/vipbikerental", "/franchize/vip-bike/*"],
-    note: "Лендинг + брендинг админка для акций и контента.",
-    decompositionHint: "Разбить на дочерние задачи: контент-блоки, CTA и sync с брендинг-админкой.",
-  },
-  {
-    idea: "Аренда: каталог, доступность, календарь и договор",
-    capability: "franchize.rental",
-    phase: "Апрель",
-    taskType: "R1 Contract",
-    routes: ["/franchize/vip-bike/market", "/rent-bike", "/markdown-doc"],
-    note: "VIN через админку + финализация MD шаблона договора.",
-    decompositionHint: "Спаунить subtasks: availability sync, VIN CRUD, markdown-doc attach к rental flow.",
-  },
-  {
-    idea: "Продажа новых/БУ + трейд-ин (отложенный блок)",
-    capability: "franchize.sales",
-    phase: "Май",
-    taskType: "R4 Growth",
-    routes: ["/franchize/vip-bike/market"],
-    note: "Через specs-флаги “в продаже / трейд-ин”.",
-    decompositionHint: "Отдельные подзадачи на specs flags, фильтры витрины и честные обзоры.",
-  },
-  {
-    idea: "Сервис + эндуро-направление (crew: vip-cross)",
-    capability: "franchize.integration",
-    phase: "Июнь",
-    taskType: "R2 Integration",
-    routes: ["/docs/sql/*.sql", "/franchize/vip-cross/*"],
-    note: "Отдельный crew-слой и SQL-гидрация сервисных потоков.",
-    decompositionHint: "Создать seed по аналогии с vip-bike: docs/sql/vip-cross-franchize-hydration.sql.",
-  },
-  {
-    idea: "Инфоблок для новичков и safety-подсказки",
-    capability: "franchize.onboarding",
-    phase: "Май",
-    taskType: "R3 Ops UX",
-    routes: ["/start (@oneBikePlsBot)", "/franchize/vip-bike/*"],
-    note: "Триггер предупреждений для новых пользователей.",
-    decompositionHint: "Подзадачи на сегментацию новичков, тексты warning и ссылку на FAQ.",
-  },
-  {
-    idea: "Мотомероприятия + партнёры + акции",
-    capability: "franchize.growth",
-    phase: "Май",
-    taskType: "R4 Growth",
-    routes: ["/franchize/vip-bike/*", "брендинг-админка"],
-    note: "Управление через акционные блоки и партнёрские ссылки.",
-    decompositionHint: "Отдельные задачи для партнёров, акций и ивент-ленты.",
-  },
-  {
-    idea: "Map Riders / ивенты / челленджи / захват районов",
-    capability: "franchize.gamification",
-    phase: "Лето",
-    taskType: "R4 Growth",
-    routes: ["/franchize/vip-bike/map-riders", "/admin/map-calibrator"],
-    note: "Геймификация + карты + weekly challenge-ритм.",
-    decompositionHint: "Сначала telemetry contract, потом challenges и achievements.",
-  },
-  {
-    idea: "KPI и воронка статуса франшизы для оператора",
-    capability: "franchize.kpi",
-    phase: "Апрель",
-    taskType: "R3 Ops UX",
-    routes: ["/supaplan", "/nexus", "/supaplan/franchize"],
-    note: "Понятная human-first витрина статуса и прогресса.",
-    decompositionHint: "Детализировать KPI в child tasks: lead->booking, conversion и SLA.",
-  },
-  {
-    idea: "Telegram-first контур и уведомления",
-    capability: "franchize.telegram",
-    phase: "Апрель",
-    taskType: "R2 Integration",
-    routes: ["@oneBikePlsBot", "/api/codex-bridge/callback"],
-    note: "Проверка callback parity + операторские уведомления.",
-    decompositionHint: "Выделить подзадачи на callback schema, retry, fallback telegram post.",
-  },
-  {
-    idea: "Аналитика и разметка SupaPlan-задач по идеям",
-    capability: "franchize.analytics",
-    phase: "Апрель",
-    taskType: "R1 Contract",
-    routes: ["/supaplan/franchize", "/nexus"],
-    note: "Матчинг «идея ↔ capability ↔ task/status».",
-    decompositionHint: "Регулярно спаунить детализацию эпиков при старте реализации.",
-  },
-  {
-    idea: "UI/UX-дизайн для франшизы",
-    capability: "franchize.ui.ux",
-    phase: "Апрель",
-    taskType: "R3 Ops UX",
-    routes: ["/franchize/vip-bike/*"],
-    note: "Система дизайн-компонентов и UX-флоу для мобильных и веб-версий.",
-    decompositionHint: "Создать дизайн-систему и сверстать ключевые экраны.",
-  },
-  {
-    idea: "Бэкенд Supabase-инфраструктура франшизы",
-    capability: "franchize.backend.supabase",
-    phase: "Апрель",
-    taskType: "R1 Contract",
-    routes: ["/supabase", "/sql"],
-    note: "Настройка RLS, миграции, функции и API-роуты.",
-    decompositionHint: "Подготовить миграции схем данных, ролевую модель и хранимые процедуры.",
-  },
-];
+function extractPhase(task: FranchizeTask): string {
+  try {
+    const meta = task.metadata;
+    if (!meta) return "no-phase";
+    const parsed = typeof meta === "string" ? JSON.parse(meta) : meta;
+    return parsed.phase || "no-phase";
+  } catch {
+    return "no-phase";
+  }
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Page Component                                                            */
@@ -214,21 +110,16 @@ export default function FranchizeStatusPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Tree expansion state
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
   const [expandedCapabilities, setExpandedCapabilities] = useState<Set<string>>(new Set());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [allExpanded, setAllExpanded] = useState(false);
 
-  // Legend visibility
   const [legendOpen, setLegendOpen] = useState(false);
 
-  // Priority tasks state
   const [priorityTasks, setPriorityTasks] = useState<PriorityTask[]>([]);
   const [isPriorityLoading, startPriorityTransition] = useTransition();
   const [showPriority, setShowPriority] = useState(false);
 
-  // Fetch all franchize tasks on mount
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -236,12 +127,15 @@ export default function FranchizeStatusPage() {
       try {
         const { data, error } = await supabaseAnon
           .from("supaplan_tasks")
-          .select("id,title,body,capability,status,todo_path,created_at,updated_at,pr_url")
-          .or("capability.like.franchize.%,capability.eq.greenbox.franchize")
+          .select("id,title,body,capability,status,todo_path,created_at,updated_at,pr_url,metadata")
+          .or("capability.like.franchize.%")
           .order("updated_at", { ascending: false });
 
         if (error) throw error;
-        setTasks((data as FranchizeTask[]) || []);
+        const filtered = (data as FranchizeTask[]).filter(
+          (t) => t.capability && !t.capability.startsWith("greenbox.")
+        );
+        setTasks(filtered);
       } catch (err: any) {
         setError(err.message || "Не удалось загрузить задачи");
       } finally {
@@ -251,93 +145,57 @@ export default function FranchizeStatusPage() {
     fetchData();
   }, []);
 
-  // ---- Derived data ----
-  const capabilityTaskMap = useMemo(() => {
-    const map = new Map<string, FranchizeTask[]>();
-    tasks.forEach((task) => {
-      if (!task.capability) return;
-      const prev = map.get(task.capability) || [];
-      prev.push(task);
-      map.set(task.capability, prev);
-    });
-    return map;
-  }, [tasks]);
-
+  // Derived stats
   const statusTotals = useMemo(() => {
-    const totals: Record<TaskStatus, number> = { open: 0, claimed: 0, running: 0, ready_for_pr: 0, done: 0 };
-    tasks.forEach((task) => {
-      const key = task.status as TaskStatus;
+    const totals: Record<TaskStatusProp, number> = { open: 0, claimed: 0, running: 0, ready_for_pr: 0, done: 0 };
+    tasks.forEach((t) => {
+      const key = t.status as TaskStatusProp;
       if (key in totals) totals[key] += 1;
     });
     return totals;
   }, [tasks]);
 
-  const progressPercent = useMemo(() => {
-    return tasks.length ? Math.round((statusTotals.done / tasks.length) * 100) : 0;
-  }, [tasks, statusTotals.done]);
-
   const totalPending = tasks.length - statusTotals.done;
+  const progressPercent = tasks.length ? Math.round((statusTotals.done / tasks.length) * 100) : 0;
 
-  const capabilityIdeaMap = useMemo(() => {
-    const map = new Map<string, IdeaRow>();
-    IDEA_MAP.forEach((row) => map.set(row.capability, row));
-    return map;
-  }, []);
-
-  const getPhaseForCapability = (cap: string): string => {
-    return capabilityIdeaMap.get(cap)?.phase ?? "Uncategorised";
-  };
-
-  // Build phase data with intelligent sorting
+  // Group tasks by phase (from metadata) then by capability
   const phaseData = useMemo(() => {
-    const phaseMap = new Map<string, { capabilities: string[] }>();
-    PHASE_ORDER.forEach((phase) => phaseMap.set(phase, { capabilities: [] }));
-
-    const allCaps = new Set<string>();
-    capabilityTaskMap.forEach((_, cap) => allCaps.add(cap));
-    capabilityIdeaMap.forEach((_, cap) => allCaps.add(cap));
-
-    allCaps.forEach((cap) => {
-      const phase = getPhaseForCapability(cap);
-      if (!phaseMap.has(phase)) {
-        phaseMap.set(phase, { capabilities: [] });
-      }
-      phaseMap.get(phase)!.capabilities.push(cap);
+    const phaseMap = new Map<string, Map<string, FranchizeTask[]>>();
+    tasks.forEach((task) => {
+      const phase = extractPhase(task);
+      const cap = task.capability || "unknown";
+      if (!phaseMap.has(phase)) phaseMap.set(phase, new Map());
+      const capMap = phaseMap.get(phase)!;
+      if (!capMap.has(cap)) capMap.set(cap, []);
+      capMap.get(cap)!.push(task);
     });
 
-    // Sort capabilities within each phase by urgency (worst status first)
-    phaseMap.forEach((value) => {
-      value.capabilities.sort((a, b) => {
-        const tasksA = capabilityTaskMap.get(a) || [];
-        const tasksB = capabilityTaskMap.get(b) || [];
-        const worstA = tasksA.reduce((min, t) => Math.min(min, statusUrgency(t.status)), 4);
-        const worstB = tasksB.reduce((min, t) => Math.min(min, statusUrgency(t.status)), 4);
-        if (worstA !== worstB) return worstA - worstB;
-        return a.localeCompare(b);
-      });
-    });
-
-    // Sort phases by total undone tasks (descending), fully done phases last
-    const entries = [...phaseMap.entries()].sort(([phaseA, capsA], [phaseB, capsB]) => {
-      const undoneA = capsA.capabilities.reduce((sum, cap) => {
-        const tasks = capabilityTaskMap.get(cap) || [];
-        return sum + tasks.filter((t) => t.status !== "done").length;
-      }, 0);
-      const undoneB = capsB.capabilities.reduce((sum, cap) => {
-        const tasks = capabilityTaskMap.get(cap) || [];
-        return sum + tasks.filter((t) => t.status !== "done").length;
-      }, 0);
-
-      if (undoneA === 0 && undoneB === 0) return phaseA.localeCompare(phaseB);
-      if (undoneA === 0) return 1;
-      if (undoneB === 0) return -1;
+    // Sort phases: launch-blocker first, then by total undone tasks
+    const order = [
+      "launch-blocker",
+      "launch-quality",
+      "security",
+      "performance",
+      "polishing",
+      "ux-fix",
+      "seo",
+      "code-quality",
+      "tech-debt",
+      "post-launch",
+      "no-phase",
+    ];
+    const sortedPhases = [...phaseMap.entries()].sort((a, b) => {
+      const idxA = order.indexOf(a[0]) === -1 ? 999 : order.indexOf(a[0]);
+      const idxB = order.indexOf(b[0]) === -1 ? 999 : order.indexOf(b[0]);
+      if (idxA !== idxB) return idxA - idxB;
+      // then by undone task count
+      const undoneA = [...a[1].values()].flat().filter((t) => t.status !== "done").length;
+      const undoneB = [...b[1].values()].flat().filter((t) => t.status !== "done").length;
       return undoneB - undoneA;
     });
+    return sortedPhases;
+  }, [tasks]);
 
-    return entries;
-  }, [capabilityTaskMap, capabilityIdeaMap]);
-
-  // ---- Toggle helpers ----
   const togglePhase = useCallback((phase: string) => {
     setExpandedPhases((prev) => {
       const next = new Set(prev);
@@ -365,40 +223,6 @@ export default function FranchizeStatusPage() {
     });
   }, []);
 
-  const handleExpandAll = useCallback(() => {
-    const allPhases = new Set(phaseData.map(([phase]) => phase));
-    const allCaps = new Set<string>();
-    phaseData.forEach(([, { capabilities }]) => capabilities.forEach((c) => allCaps.add(c)));
-    const allTasks = new Set(tasks.map((t) => t.id));
-
-    setExpandedPhases(allPhases);
-    setExpandedCapabilities(allCaps);
-    setExpandedTasks(allTasks);
-    setAllExpanded(true);
-  }, [phaseData, tasks]);
-
-  const handleCollapseAll = useCallback(() => {
-    setExpandedPhases(new Set());
-    setExpandedCapabilities(new Set());
-    setExpandedTasks(new Set());
-    setAllExpanded(false);
-  }, []);
-
-  const jumpToFirstCritical = useCallback(() => {
-    const firstCritical = phaseData.find(([, { capabilities }]) => {
-      return capabilities.some((cap) => {
-        const tasks = capabilityTaskMap.get(cap) || [];
-        return tasks.some((t) => t.status !== "done");
-      });
-    });
-    if (firstCritical) {
-      const [phase] = firstCritical;
-      setExpandedPhases((prev) => new Set(prev).add(phase));
-      document.getElementById(`phase-${phase}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [phaseData, capabilityTaskMap]);
-
-  // Load top priority tasks
   const handleLoadPriority = useCallback(() => {
     startPriorityTransition(async () => {
       const res = await getTopPriorityTasks();
@@ -411,7 +235,6 @@ export default function FranchizeStatusPage() {
     });
   }, []);
 
-  // ---- Render ----
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center text-slate-200">
@@ -430,7 +253,7 @@ export default function FranchizeStatusPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
-      {/* ---- Mobile sticky status bar ---- */}
+      {/* ---- Mobile sticky bar ---- */}
       <div className="sticky top-16 z-30 -mx-3 -mt-4 mb-4 flex items-center justify-between gap-2 rounded-b-2xl border-b border-slate-200/40 bg-white/90 px-3 py-2 shadow backdrop-blur dark:border-slate-700/80 dark:bg-slate-950/90 sm:hidden">
         <div className="flex items-center gap-2 text-xs">
           <Flame className="h-4 w-4 text-rose-400" />
@@ -440,59 +263,83 @@ export default function FranchizeStatusPage() {
           <span className="text-slate-400 dark:text-slate-500">|</span>
           <span className="text-emerald-600 dark:text-emerald-400">{statusTotals.done} сделано</span>
         </div>
-        <Button variant="ghost" size="sm" onClick={jumpToFirstCritical} className="h-7 text-xs">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            const first = document.querySelector("[data-phase]");
+            first?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+          className="h-7 text-xs"
+        >
           <Zap className="mr-1 h-3 w-3" /> К первому
         </Button>
       </div>
 
-      {/* ---- Hero Banner ---- */}
-      <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-[radial-gradient(circle_at_top_right,#0ea5e9_0%,#111827_42%,#020617_100%)] p-5 text-white shadow-lg dark:border-slate-700/80">
-        <div className="absolute -right-16 top-0 h-44 w-44 rounded-full bg-cyan-400/25 blur-3xl" aria-hidden />
-        <div className="absolute -bottom-16 left-8 h-32 w-32 rounded-full bg-amber-400/20 blur-3xl" aria-hidden />
-
-        <div className="relative flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-cyan-100">
-          <Badge className="border border-cyan-300/40 bg-cyan-300/20 text-cyan-100">FRANCHIZE CONTROL DECK</Badge>
-          <span>crew alias: vip-bike</span>
-          <span>canonical slug: vip-bike</span>
-        </div>
-
-        <h1 className="relative mt-3 text-2xl font-semibold leading-tight sm:text-4xl">
-          SupaPlan • Franchize status board (human-first)
-        </h1>
-        <p className="relative mt-3 max-w-4xl text-sm text-slate-200 sm:text-base">
-          Сопоставили клиентские идеи и текущий SupaPlan. Здесь видно, какие эпики уже закрыты, какие в работе и где пора декомпозировать в более мелкие задачи во время реализации.
-        </p>
-
-        <div className="relative mt-4 flex flex-wrap gap-2 text-xs sm:text-sm">
-          <Link
-            href="/supaplan"
-            className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 hover:bg-white/15"
-          >
-            <ArrowLeft className="h-4 w-4" /> Назад в общий SupaPlan
-          </Link>
-          <Link
-            href="/nexus"
-            className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 hover:bg-white/15"
-          >
-            <Rocket className="h-4 w-4" /> Nexus
-          </Link>
-          <Link
-            href="/franchize/vip-bike/map-riders"
-            className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 hover:bg-white/15"
-          >
-            <Bike className="h-4 w-4" /> VIP Bike Map Riders
-          </Link>
+      {/* ---- Hero Section (overhauled) ---- */}
+      <section className="relative overflow-hidden rounded-3xl border border-slate-700/80 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-2xl">
+        <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-cyan-500/20 blur-3xl" />
+        <div className="absolute -bottom-12 -left-12 h-48 w-48 rounded-full bg-amber-500/20 blur-3xl" />
+        <div className="relative z-10 grid gap-6 md:grid-cols-3">
+          <div className="md:col-span-2">
+            <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-cyan-300">
+              <Badge className="border-cyan-400/40 bg-cyan-400/20 text-cyan-100">FRANCHIZE CONTROL DECK</Badge>
+              <span>vip-bike crew</span>
+            </div>
+            <h1 className="text-3xl font-bold leading-tight sm:text-5xl">
+              <span className="bg-gradient-to-r from-cyan-400 via-amber-300 to-fuchsia-400 bg-clip-text text-transparent">
+                SupaPlan • Franchize
+              </span>
+              <br />
+              <span className="text-2xl sm:text-3xl">Live Status Board</span>
+            </h1>
+            <p className="mt-3 text-sm text-slate-300 sm:text-base">
+              Мгновенный срез по всем эпикам. Приоритеты, фазы, критические задачи — всё под рукой.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link href="/supaplan" className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs hover:bg-white/15">
+                <ArrowLeft className="h-4 w-4" /> Общий SupaPlan
+              </Link>
+              <Link href="/nexus" className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs hover:bg-white/15">
+                <Rocket className="h-4 w-4" /> Nexus
+              </Link>
+              <Link href="/franchize/vip-bike/map-riders" className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs hover:bg-white/15">
+                <Bike className="h-4 w-4" /> Map Riders
+              </Link>
+            </div>
+          </div>
+          <div className="flex items-center justify-center">
+            <div className="relative flex h-40 w-40 items-center justify-center">
+              <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
+                <path
+                  className="text-slate-700"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  className="text-cyan-400 drop-shadow-[0_0_6px_#22d3ee]"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeDasharray={`${progressPercent}, 100`}
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+              </svg>
+              <span className="absolute text-2xl font-bold text-cyan-300">{progressPercent}%</span>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* ---- Status cards ---- */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {(["open", "claimed", "running", "ready_for_pr", "done"] as TaskStatus[]).map((status) => (
+        {(["open", "claimed", "running", "ready_for_pr", "done"] as TaskStatusProp[]).map((status) => (
           <Card key={status} className="border-slate-800/70 bg-slate-950 text-slate-100">
             <CardHeader className="space-y-1 pb-1">
-              <CardDescription className="text-xs text-slate-400">
-                {STATUS_LABEL[status].label}
-              </CardDescription>
+              <CardDescription className="text-xs text-slate-400">{STATUS_LABEL[status].label}</CardDescription>
               <CardTitle className="text-2xl">{statusTotals[status]}</CardTitle>
             </CardHeader>
           </Card>
@@ -501,14 +348,12 @@ export default function FranchizeStatusPage() {
 
       {/* ---- Progress bar ---- */}
       <Card className="border-slate-800/70 bg-slate-950 text-slate-100">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <Timer className="h-4 w-4 text-emerald-300" /> Прогресс ({progressPercent}%)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           <div className="h-2 overflow-hidden rounded-full bg-slate-800">
-            <div className="h-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-fuchsia-400" style={{ width: `${progressPercent}%` }} />
+            <div
+              className="h-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-fuchsia-400"
+              style={{ width: `${progressPercent}%` }}
+            />
           </div>
           <p className="mt-2 text-sm text-slate-300">
             Выполнено: <span className="font-semibold text-emerald-300">{statusTotals.done}/{tasks.length}</span> задач. Осталось критических:{" "}
@@ -517,7 +362,7 @@ export default function FranchizeStatusPage() {
         </CardContent>
       </Card>
 
-      {/* 🔥 TOP-5 PRIORITY SECTION */}
+      {/* 🔥 Top-5 priority */ }
       <section>
         <Button
           variant="outline"
@@ -534,34 +379,29 @@ export default function FranchizeStatusPage() {
           ) : (
             <>
               <Sparkles className="h-4 w-4" />
-              Загрузить ТОП-5 приоритетных задач
+              ТОП-5 приоритетных задач (AI‑ранжирование)
             </>
           )}
         </Button>
 
         {showPriority && priorityTasks.length > 0 && (
-          <Card className="border-amber-500/50 bg-gradient-to-br from-amber-950/60 to-slate-950 text-slate-100 shadow shadow-amber-500/10">
+          <Card className="border-amber-500/50 bg-gradient-to-br from-amber-950/60 to-slate-950 text-slate-100 shadow-lg shadow-amber-500/10">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-lg text-amber-300">
                   <Flame className="h-5 w-5" /> ТОП-5 критических задач
                 </CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowPriority(false)}
-                  className="text-slate-400 hover:text-slate-200"
-                >
+                <Button variant="ghost" size="sm" onClick={() => setShowPriority(false)} className="text-slate-400 hover:text-slate-200">
                   Скрыть
                 </Button>
               </div>
               <CardDescription className="text-slate-400">
-                Умная сортировка: статус × фаза × важность способности. Обнови в любой момент.
+                Формула: статус × фаза × важность способности × приоритет × свежесть + быстрые победы.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-2 sm:grid-cols-2">
               {priorityTasks.map((pt) => {
-                const taskMeta = STATUS_LABEL[pt.status as TaskStatus] || STATUS_LABEL.open;
+                const taskMeta = STATUS_LABEL[pt.status as TaskStatusProp] || STATUS_LABEL.open;
                 const fullTask = tasks.find((t) => t.id === pt.id);
                 return (
                   <div key={pt.id} className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
@@ -599,41 +439,20 @@ export default function FranchizeStatusPage() {
         )}
       </section>
 
-      {/* ---- Global expand/collapse ---- */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" size="sm" onClick={handleExpandAll} className="text-xs">
-          Развернуть всё
-        </Button>
-        <Button variant="outline" size="sm" onClick={handleCollapseAll} className="text-xs">
-          Свернуть всё
-        </Button>
-        <span className="ml-auto text-xs text-slate-400">Фазы упорядочены по критичности</span>
-      </div>
-
       {/* ---- Phase → Capability → Task tree ---- */}
       <div className="space-y-3">
-        {phaseData.map(([phase, { capabilities }]) => {
+        {phaseData.map(([phase, capMap]) => {
           const phaseExpanded = expandedPhases.has(phase);
-          // Calculate undone tasks and total tasks in this phase
-          const { undone: phaseUndone, total: phaseTotal } = capabilities.reduce(
-            (acc, cap) => {
-              const capTasks = capabilityTaskMap.get(cap) || [];
-              acc.undone += capTasks.filter((t) => t.status !== "done").length;
-              acc.total += capTasks.length;
-              return acc;
-            },
-            { undone: 0, total: 0 }
-          );
-          // Only show fully done badge if there are tasks and none are undone
-          const isPhaseFullyDone = phaseTotal > 0 && phaseUndone === 0;
-          const phaseHasAnyTasks = phaseTotal > 0;
-
+          const phaseTasks = [...capMap.values()].flat();
+          const undone = phaseTasks.filter((t) => t.status !== "done").length;
+          const total = phaseTasks.length;
+          const fullyDone = total > 0 && undone === 0;
           return (
             <Card
               key={phase}
-              id={`phase-${phase}`}
-              className={`border-slate-800/70 bg-slate-950 text-slate-100 scroll-mt-28 ${
-                isPhaseFullyDone ? "ring-1 ring-emerald-500/30" : ""
+              data-phase={phase}
+              className={`border-l-4 border-slate-800/70 bg-slate-950 text-slate-100 scroll-mt-28 ${
+                fullyDone ? "ring-1 ring-emerald-500/30" : ""
               }`}
             >
               <button
@@ -647,26 +466,24 @@ export default function FranchizeStatusPage() {
                   ) : (
                     <ChevronRight className="h-5 w-5 text-cyan-300 flex-shrink-0" />
                   )}
-                  <h2 className="text-lg font-semibold uppercase tracking-wide">{phase}</h2>
-                  <div className="flex flex-wrap gap-1">
-                    <Badge variant="outline" className="border-slate-600 text-slate-300 text-xs">
-                      {capabilities.length} идеи
-                    </Badge>
-                    {phaseHasAnyTasks && phaseUndone > 0 && (
-                      <Badge className="bg-rose-500/20 text-rose-300 text-xs">
-                        {phaseUndone} не завершено
+                  <h2 className="text-lg font-semibold capitalize">{phase}</h2>
+                  {total > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant="outline" className="border-slate-600 text-slate-300 text-xs">
+                        {capMap.size} способности
                       </Badge>
-                    )}
-                    {isPhaseFullyDone && (
-                      <Badge className="bg-emerald-500/20 text-emerald-300 text-xs">
-                        Все сделано ✓
-                      </Badge>
-                    )}
-                  </div>
+                      {undone > 0 && (
+                        <Badge className="bg-rose-500/20 text-rose-300 text-xs">{undone} не завершено</Badge>
+                      )}
+                      {fullyDone && (
+                        <Badge className="bg-emerald-500/20 text-emerald-300 text-xs">все сделано ✓</Badge>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {phaseHasAnyTasks && (
+                {total > 0 && (
                   <span className="text-xs text-slate-400">
-                    {phaseTotal - phaseUndone}/{phaseTotal}
+                    {total - undone}/{total}
                   </span>
                 )}
               </button>
@@ -674,9 +491,7 @@ export default function FranchizeStatusPage() {
               {phaseExpanded && (
                 <CardContent className="pt-0">
                   <div className="space-y-3">
-                    {capabilities.map((cap) => {
-                      const capTasks = capabilityTaskMap.get(cap) || [];
-                      const idea = capabilityIdeaMap.get(cap);
+                    {[...capMap.entries()].map(([cap, capTasks]) => {
                       const capExpanded = expandedCapabilities.has(cap);
                       const doneCount = capTasks.filter((t) => t.status === "done").length;
                       const allDone = capTasks.length > 0 && doneCount === capTasks.length;
@@ -685,8 +500,7 @@ export default function FranchizeStatusPage() {
                             statusUrgency(t.status) < statusUrgency(worst) ? t.status : worst
                           , capTasks[0].status)
                         : "open";
-                      const worstMeta = STATUS_LABEL[worstStatus as TaskStatus] || STATUS_LABEL.open;
-
+                      const worstMeta = STATUS_LABEL[worstStatus as TaskStatusProp] || STATUS_LABEL.open;
                       return (
                         <div key={cap} className="rounded-xl border border-slate-800 bg-slate-900/70">
                           <button
@@ -700,10 +514,8 @@ export default function FranchizeStatusPage() {
                               ) : (
                                 <ChevronRight className="h-4 w-4 text-amber-300 flex-shrink-0" />
                               )}
-                              <span className="text-sm font-medium">{idea?.idea || cap}</span>
-                              {allDone && (
-                                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                              )}
+                              <span className="text-sm font-medium">{cap}</span>
+                              {allDone && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
                             </div>
                             <div className="flex items-center gap-2">
                               <Badge className={worstMeta.className}>{worstMeta.label}</Badge>
@@ -715,39 +527,17 @@ export default function FranchizeStatusPage() {
 
                           {capExpanded && (
                             <div className="border-t border-slate-800 px-3 pb-3 pt-2">
-                              {idea && (
-                                <div className="mb-2 text-xs text-slate-400">
-                                  <p className="text-slate-300">{idea.note}</p>
-                                  <div className="mt-1 flex flex-wrap gap-1">
-                                    {idea.routes.map((r) => (
-                                      <code
-                                        key={r}
-                                        className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] text-cyan-300"
-                                      >
-                                        {r}
-                                      </code>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
                               {capTasks.length === 0 ? (
-                                <p className="flex items-center gap-1 text-xs text-amber-300">
-                                  <AlertCircle className="h-3.5 w-3.5" /> Нет задач – нужно создать.
-                                </p>
+                                <p className="text-xs text-amber-300">Нет задач</p>
                               ) : (
                                 <ul className="space-y-2">
                                   {capTasks
                                     .sort((a, b) => statusUrgency(a.status) - statusUrgency(b.status))
                                     .map((task) => {
                                       const taskExpanded = expandedTasks.has(task.id);
-                                      const taskMeta =
-                                        STATUS_LABEL[task.status as TaskStatus] || STATUS_LABEL.open;
+                                      const taskMeta = STATUS_LABEL[task.status as TaskStatusProp] || STATUS_LABEL.open;
                                       return (
-                                        <li
-                                          key={task.id}
-                                          className="rounded border border-slate-700/70 bg-slate-950/70 p-2"
-                                        >
+                                        <li key={task.id} className="rounded border border-slate-700/70 bg-slate-950/70 p-2">
                                           <button
                                             type="button"
                                             onClick={() => toggleTask(task.id)}
@@ -761,27 +551,18 @@ export default function FranchizeStatusPage() {
                                               )}
                                               <span className="text-sm text-slate-200">{task.title}</span>
                                             </div>
-                                            <Badge className={taskMeta.className}>
-                                              {taskMeta.label}
-                                            </Badge>
+                                            <Badge className={taskMeta.className}>{taskMeta.label}</Badge>
                                           </button>
                                           {taskExpanded && (
                                             <div className="mt-2 space-y-1 pl-5 text-xs text-slate-400">
                                               <p>ID: {task.id}</p>
-                                              {task.todo_path && (
-                                                <p>todo_path: {task.todo_path}</p>
-                                              )}
+                                              {task.todo_path && <p>todo_path: {task.todo_path}</p>}
                                               <p>updated_at (UTC): {formatIso(task.updated_at)}</p>
                                               {task.body && (
-                                                <p className="text-slate-300">{task.body}</p>
+                                                <p className="max-w-lg truncate text-slate-300">{task.body}</p>
                                               )}
                                               {task.pr_url && (
-                                                <a
-                                                  className="text-cyan-300 underline underline-offset-2"
-                                                  href={task.pr_url}
-                                                  target="_blank"
-                                                  rel="noreferrer"
-                                                >
+                                                <a className="text-cyan-300 underline underline-offset-2" href={task.pr_url} target="_blank" rel="noreferrer">
                                                   PR: {task.pr_url}
                                                 </a>
                                               )}
@@ -805,7 +586,7 @@ export default function FranchizeStatusPage() {
         })}
       </div>
 
-      {/* ---- Collapsible Board Legend ---- */}
+      {/* ---- Legend (overhauled) ---- */}
       <div className="mt-8 border-t border-slate-800 pt-4">
         <button
           type="button"
@@ -818,62 +599,40 @@ export default function FranchizeStatusPage() {
 
         {legendOpen && (
           <div className="mt-3 space-y-4 text-sm text-slate-300">
-            {/* Task types */}
             <div>
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Типы задач
+                Приоритеты (scoring)
               </h4>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {Object.entries(TASK_TYPE_DESCRIPTIONS).map(([type, desc]) => (
-                  <div
-                    key={type}
-                    className="rounded-xl border border-slate-700/50 bg-slate-900/50 p-3"
-                  >
-                    <strong className="text-slate-200">{type}</strong>
-                    <p className="text-slate-400">{desc}</p>
-                  </div>
-                ))}
-              </div>
+              <p className="text-slate-400">
+                critical ×2.5, high ×2.0, medium ×1.5, low ×1.0. P0/p1/p2 в теле задачи действуют аналогично.
+              </p>
             </div>
-
-            {/* Statuses */}
             <div>
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Статусы задач
+                Фазы и их множители
               </h4>
               <div className="flex flex-wrap gap-2">
-                {(Object.keys(STATUS_LABEL) as TaskStatus[]).map((status) => (
-                  <Badge
-                    key={status}
-                    className={`${STATUS_LABEL[status].className} text-xs`}
-                  >
-                    {STATUS_LABEL[status].label}
+                {Object.entries(PHASE_COLORS).map(([p, cls]) => (
+                  <Badge key={p} className={`border-l-2 bg-slate-800/50 ${cls}`}>
+                    {p}
                   </Badge>
                 ))}
               </div>
             </div>
-
-            {/* Priority formula */}
             <div>
-              <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Приоритет (ТОП-5)
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Типы задач (capabilities)
               </h4>
-              <p className="text-slate-400">
-                <code className="rounded bg-slate-800 px-1 text-cyan-300">статус (Open=10, …, Ready for PR=3)</code> ×{" "}
-                <code className="rounded bg-slate-800 px-1 text-cyan-300">фаза (Апрель=1.5 … 2027=0.7)</code> ×{" "}
-                <code className="rounded bg-slate-800 px-1 text-cyan-300">важность способности (0.7‑1.4)</code> +{" "}
-                <code className="rounded bg-slate-800 px-1 text-cyan-300">бонус за возраст (+0.5 если старше 7 дней)</code>
-              </p>
-            </div>
-
-            {/* Phases */}
-            <div>
-              <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Фазы (дорожная карта)
-              </h4>
-              <p className="text-slate-400">
-                {PHASE_ORDER.join(" → ")} – фазы упорядочены по количеству незавершённых задач.
-              </p>
+              <div className="flex flex-wrap gap-2">
+                {[...new Set(tasks.map((t) => t.capability))]
+                  .filter(Boolean)
+                  .sort()
+                  .map((cap) => (
+                    <Badge key={cap} variant="outline" className="text-xs">
+                      {cap}
+                    </Badge>
+                  ))}
+              </div>
             </div>
           </div>
         )}
@@ -881,20 +640,20 @@ export default function FranchizeStatusPage() {
 
       {/* ---- Runtime checks ---- */}
       <Card className="border-slate-800/70 bg-slate-950 text-slate-100">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
             <Wrench className="h-4 w-4 text-cyan-300" /> Runtime checks
           </CardTitle>
           <CardDescription className="text-slate-400">
-            Текущая выборка из supaplan_tasks (capability like `franchize.%`).
+            {tasks.length} franchize‑задач загружено (greenbox исключены).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-slate-300">
           <p className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-300" /> Задач найдено: {tasks.length}
+            <CheckCircle2 className="h-4 w-4 text-emerald-300" /> Готово: {statusTotals.done}
           </p>
           <p className="flex items-center gap-2">
-            <Clock3 className="h-4 w-4 text-cyan-300" /> Обновлено: {new Date().toISOString()}
+            <Clock3 className="h-4 w-4 text-cyan-300" /> Последнее обновление: {new Date().toISOString()}
           </p>
         </CardContent>
       </Card>
