@@ -1,7 +1,3 @@
-// /app/api/map-riders/batch-points/route.ts
-// Batch write GPS points (flushed every 5s by client hook).
-// Replaces per-tick writes to /api/map-riders/location.
-
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { guardMapRidersWriteRequest, applyRateLimitHeaders } from "@/lib/map-riders-security";
@@ -62,7 +58,7 @@ export async function POST(request: NextRequest) {
 
   const { data: activeSession } = await supabaseAdmin
     .from("map_rider_sessions")
-    .select("id, sharing_enabled")
+    .select("id, sharing_enabled, started_at")
     .eq("id", sessionId)
     .eq("user_id", userId)
     .eq("crew_slug", crewSlug)
@@ -72,8 +68,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Sharing is disabled for this session" }, { status: 409 });
   }
 
-  const expiresAt = privacy?.expiresAt ? new Date(privacy.expiresAt).getTime() : null;
-  if (expiresAt && Number.isFinite(expiresAt) && Date.now() >= expiresAt) {
+  // ---- ENFORCE AUTO-EXPIRE SERVER-SIDE ----
+  const autoExpireMinutes = privacy?.autoExpireMinutes ?? 15;
+  const expiresAt = new Date(new Date(activeSession.started_at).getTime() + autoExpireMinutes * 60 * 1000);
+  if (Date.now() >= expiresAt.getTime()) {
     await supabaseAdmin
       .from("map_rider_sessions")
       .update({ sharing_enabled: false, status: "completed", ended_at: new Date().toISOString(), updated_at: new Date().toISOString() })
@@ -107,7 +105,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: liveError.message }, { status: 500 });
   }
 
-  // 2) Update session with latest position
+  // 2) Update session with latest position and server-computed expires_at
   await supabaseAdmin
     .from("map_rider_sessions")
     .update({
@@ -117,11 +115,12 @@ export async function POST(request: NextRequest) {
       last_ping_at: lastPoint.capturedAt,
       updated_at: new Date().toISOString(),
       visibility,
+      expires_at: expiresAt.toISOString(),
       stats: {
         privacy: {
           homeBlurEnabled: privacy?.homeBlurEnabled ?? true,
-          autoExpireMinutes: privacy?.autoExpireMinutes ?? 15,
-          expiresAt: privacy?.expiresAt ?? null,
+          autoExpireMinutes: autoExpireMinutes,
+          expiresAt: expiresAt.toISOString(),
         },
       },
     })
@@ -142,7 +141,6 @@ export async function POST(request: NextRequest) {
     captured_at: p.capturedAt,
   }));
 
-  // Chunk insert (max 1000 per Supabase)
   for (let i = 0; i < rows.length; i += 1000) {
     const chunk = rows.slice(i, i + 1000);
     const { error: pointsError } = await supabaseAdmin.from("map_rider_points").insert(chunk);
