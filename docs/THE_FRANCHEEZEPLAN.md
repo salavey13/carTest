@@ -1874,3 +1874,4 @@ Detailed historical execution notes moved to:
 
 ### Diary
 - 2026-04-27: Реализован гибридный rental/sale поток во франшизе с отдельным DOC-шаблоном продажи (`docs/SALE_DEAL_TEMPLATE_DEMO.md`) и новым startapp-routing через `/api/startapp/vehicle`.
+- 2026-04-27: VIVOLT refinement pass — заменил прошлый Y-VOLT набор на 2 цвета флагмана (black/white) + аксессуары (мотард-колёса, 2 шлема), добавил многофото-галереи из источника, hourly rent label (будни/выходные) и purchase price в каталог/модалку.

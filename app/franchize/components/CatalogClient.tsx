@@ -455,13 +455,17 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                           <h3 className="mt-1 text-sm font-semibold leading-5">{item.title}</h3>
                           <p className="text-xs" style={surface.mutedText}>{item.description || item.subtitle}</p>
                           <p className="mt-2 text-base font-bold text-[var(--catalog-accent)]">
-                            {item.pricePerDay.toLocaleString("ru-RU")} ₽
-                            <span className="ml-1 text-xs font-normal text-[var(--catalog-muted)]">/ день</span>
+                            {item.rentPriceLabel}
                           </p>
+                          {item.saleAvailable && item.salePrice ? (
+                            <p className="mt-1 text-xs font-semibold text-amber-200">
+                              Покупка: {item.salePrice.toLocaleString("ru-RU")} ₽
+                            </p>
+                          ) : null}
                           <div className="mt-2 flex gap-2">
                             <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95">
                               <ShoppingCart className="h-4 w-4" />
-                              {item.pricePerDay >= 6000 ? "Выбрать" : "Добавить"}
+                              {item.saleAvailable ? "Аренда / Покупка" : item.pricePerDay >= 6000 ? "Выбрать" : "Добавить"}
                             </span>
                           </div>
                         </div>

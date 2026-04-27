@@ -86,11 +86,13 @@ export interface CatalogItemVM {
   imageUrl: string;
   mediaUrls: string[];
   pricePerDay: number;
+  rentPriceLabel: string;
   category: string;
   availabilityStatus: "available" | "busy";
   availabilityLabel: string;
   isHot: boolean;
   saleAvailable: boolean;
+  salePrice: number | null;
   specs: Array<{ label: string; value: string }>;
 }
 
@@ -715,6 +717,10 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         imageUrl: mediaUrls[0] ?? "",
         mediaUrls,
         pricePerDay: car.daily_price ?? 0,
+        rentPriceLabel:
+          (typeof readPath(specs, ["rent_price_label"], "") === "string" && String(readPath(specs, ["rent_price_label"], "")).trim().length > 0)
+            ? String(readPath(specs, ["rent_price_label"], "")).trim()
+            : `${Number(car.daily_price ?? 0).toLocaleString("ru-RU")} ₽ / день`,
         category: subtype,
         availabilityStatus: availabilityByVehicle.get(car.id)?.status ?? fallbackStatus,
         availabilityLabel: availabilityByVehicle.get(car.id)?.label ?? fallbackLabel,
@@ -728,6 +734,12 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
           readPath(specs, ["sale"], false) === true ||
           String(readPath(specs, ["sale"], "")).toLowerCase() === "1" ||
           String(readPath(specs, ["sale"], "")).toLowerCase() === "true",
+        salePrice:
+          Number(readPath(specs, ["sale_price"], 0)) > 0
+            ? Number(readPath(specs, ["sale_price"], 0))
+            : Number(readPath(specs, ["purchase_price"], 0)) > 0
+              ? Number(readPath(specs, ["purchase_price"], 0))
+              : null,
         specs: Object.entries(specs)
           .filter(([, value]) => typeof value === "string" || typeof value === "number")
           .filter(([key]) => !["subtitle", "description", "segment", "subtype", "bike_subtype", "type"].includes(key))

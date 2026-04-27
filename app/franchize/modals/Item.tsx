@@ -153,7 +153,8 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
 
   const fallbackSpecs = [
     { label: "Категория", value: item.category },
-    { label: "Тариф", value: `${item.pricePerDay.toLocaleString("ru-RU")} ₽ / день` },
+    { label: "Тариф аренды", value: item.rentPriceLabel },
+    ...(item.saleAvailable && item.salePrice ? [{ label: "Цена покупки", value: `${item.salePrice.toLocaleString("ru-RU")} ₽` }] : []),
     { label: "Статус", value: "Готов к выдаче" },
   ];
 
@@ -252,7 +253,7 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
               disabled={isAdding}
               className="rounded-xl bg-[var(--item-accent)] px-3 py-2 text-sm font-semibold text-[var(--item-accent-contrast)] transition hover:brightness-105 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
             >
-              {isAdding ? "Добавляем..." : item.saleAvailable ? `Оформить (${item.pricePerDay.toLocaleString("ru-RU")} ₽)` : `Добавить • ${item.pricePerDay.toLocaleString("ru-RU")} ₽`}
+              {isAdding ? "Добавляем..." : item.saleAvailable ? `Оформить • аренда/покупка` : `Добавить • ${item.pricePerDay.toLocaleString("ru-RU")} ₽`}
             </button>
           </div>
         </div>
