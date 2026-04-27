@@ -64,6 +64,7 @@ type CheckoutPayload = {
       auction: string;
     };
   }>;
+  flowType: "rental" | "sale" | "mixed";
 };
 
 const orderFormSchema = z.object({
@@ -130,6 +131,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   };
 
   const isCartEmpty = cartLines.length === 0;
+  const saleLinesCount = useMemo(() => cartLines.filter((line) => line.saleAvailable).length, [cartLines]);
+  const flowType: "rental" | "sale" | "mixed" = saleLinesCount === 0 ? "rental" : saleLinesCount === cartLines.length ? "sale" : "mixed";
   const selectedExtraItems = useMemo(
     () => orderExtras.filter((extra) => selectedExtras.includes(extra.id)),
     [selectedExtras],
@@ -201,8 +204,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         lineTotal: line.lineTotal,
         options: line.options,
       })),
+      flowType,
     }),
-    [cartLines, comment, consent, deliveryMode, extrasTotal, orderId, payment, phone, recipient, rentalEndDate, rentalStartDate, selectedExtraItems, signatureName, time, totalAmount, user?.id],
+    [cartLines, comment, consent, deliveryMode, extrasTotal, flowType, orderId, payment, phone, recipient, rentalEndDate, rentalStartDate, selectedExtraItems, signatureName, time, totalAmount, user?.id],
   );
 
   const submitLabel = isSubmitting
@@ -249,6 +253,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         totalAmount: submitPayload.totalAmount,
         extras: submitPayload.extras,
         cartLines: submitPayload.cartLines,
+        flowType: submitPayload.flowType,
       });
 
       if (!result.success) {
@@ -257,11 +262,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       }
 
       if (values.payment === "telegram_xtr") {
-        toast.success("XTR-счёт отправлен в Telegram. После оплаты откроется franchize rental flow ⭐");
+        toast.success("XTR-счёт отправлен в Telegram. После оплаты откроется franchize flow ⭐");
         return;
       }
 
-      toast.success("Заказ отправлен администратору вместе с DOC-файлом. Скоро с вами свяжутся.");
+      toast.success(submitPayload.flowType === "rental" ? "Заявка на аренду отправлена вместе с DOC-файлом." : "Заявка на покупку отправлена вместе с DOC-файлом.");
     });
   };
 

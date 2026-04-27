@@ -104,24 +104,49 @@ export function useStartParamRouter() {
     [dbUser, refreshDbUser, showToast],
   );
 
+  const resolveFranchizeVehicleLink = useCallback(
+    async (rawParam: string, flow: "rent" | "buy") => {
+      const vehicleId = rawParam.slice(4).trim().toLowerCase();
+      if (!vehicleId) return null;
+      try {
+        const response = await fetch(`/api/startapp/vehicle?vehicle=${encodeURIComponent(vehicleId)}&flow=${flow}`, { cache: "no-store" });
+        if (!response.ok) return null;
+        const data = (await response.json()) as { slug?: string; vehicleId?: string; flow?: string };
+        const slug = (data.slug || "vip-bike").trim() || "vip-bike";
+        const resolvedVehicle = (data.vehicleId || vehicleId).trim().toLowerCase();
+        const resolvedFlow = data.flow === "buy" ? "buy" : "rent";
+        return `/franchize/${slug}?vehicle=${encodeURIComponent(resolvedVehicle)}&flow=${resolvedFlow}`;
+      } catch (error) {
+        logger.warn("[ClientLayout] failed to resolve vehicle deep-link, using vip-bike fallback", { rawParam, error });
+        return `/franchize/vip-bike?vehicle=${encodeURIComponent(vehicleId)}&flow=${flow}`;
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
-    const rawStartParam = startParamPayload || searchParams.get("tgWebAppStartParam");
-    const paramToProcess = normalizeStartParamPath(rawStartParam);
+    const processStartParam = async () => {
+      const rawStartParam = startParamPayload || searchParams.get("tgWebAppStartParam");
+      const paramToProcess = normalizeStartParamPath(rawStartParam);
 
-    if (isAppLoading || isAuthenticating || !paramToProcess || handledRef.current) {
-      return;
-    }
+      if (isAppLoading || isAuthenticating || !paramToProcess || handledRef.current) {
+        return;
+      }
 
-    handledRef.current = true;
-    let targetPath: string | undefined;
+      handledRef.current = true;
+      let targetPath: string | undefined;
 
-    logger.info(`[ClientLayout] Processing Start Param: ${paramToProcess}`);
+      logger.info(`[ClientLayout] Processing Start Param: ${paramToProcess}`);
 
-    if (paramToProcess === "wb_dashboard") {
-      targetPath = userCrewInfo?.slug ? `/wb/${userCrewInfo.slug}` : "/wblanding";
-    } else if (START_PARAM_PAGE_MAP[paramToProcess]) {
-      targetPath = START_PARAM_PAGE_MAP[paramToProcess];
-    } else if (paramToProcess.startsWith("crew_")) {
+      if (paramToProcess === "wb_dashboard") {
+        targetPath = userCrewInfo?.slug ? `/wb/${userCrewInfo.slug}` : "/wblanding";
+      } else if (paramToProcess.startsWith("buy_")) {
+        targetPath = await resolveFranchizeVehicleLink(paramToProcess, "buy") ?? undefined;
+      } else if (paramToProcess.startsWith("rent_")) {
+        targetPath = await resolveFranchizeVehicleLink(paramToProcess, "rent") ?? undefined;
+      } else if (START_PARAM_PAGE_MAP[paramToProcess]) {
+        targetPath = START_PARAM_PAGE_MAP[paramToProcess];
+      } else if (paramToProcess.startsWith("crew_")) {
       const content = paramToProcess.substring(5);
       if (content.endsWith("_join_crew")) {
         const slug = content.substring(0, content.length - 10);
@@ -147,7 +172,7 @@ export function useStartParamRouter() {
       if (lobbyId) {
         targetPath = `/strikeball/lobbies/${lobbyId}`;
       }
-    } else if (paramToProcess.startsWith("rental-") || paramToProcess.startsWith("rentals-")) {
+    } else if (paramToProcess.startsWith("rental-") || paramToProcess.startsWith("rentals-") || paramToProcess.startsWith("sale-")) {
       const rentalId = paramToProcess.split("-").at(-1);
       const franchizeSlug = searchParams.get("slug") || "vip-bike";
       if (rentalId) {
@@ -168,22 +193,25 @@ export function useStartParamRouter() {
           targetPath = `/rentals/${rentalId}`;
         }
       }
-    } else if (paramToProcess.startsWith("ref_")) {
+      } else if (paramToProcess.startsWith("ref_")) {
       const refCode = paramToProcess.substring(4);
       void handleSyndicateReferral(refCode);
       targetPath = pathname === "/" ? "/wblanding" : pathname;
-    } else if (paramToProcess.includes("/")) {
+      } else if (paramToProcess.includes("/")) {
       targetPath = `/${paramToProcess}`;
-    } else {
+      } else {
       targetPath = `/${paramToProcess}`;
-    }
+      }
 
-    if (targetPath && targetPath !== pathname) {
-      logger.info(`[ClientLayout] Redirecting to ${targetPath}`);
-      router.replace(targetPath);
-    }
+      if (targetPath && targetPath !== pathname) {
+        logger.info(`[ClientLayout] Redirecting to ${targetPath}`);
+        router.replace(targetPath);
+      }
 
-    clearStartParam?.();
+      clearStartParam?.();
+    };
+
+    void processStartParam();
   }, [
     startParamPayload,
     searchParams,
@@ -195,6 +223,7 @@ export function useStartParamRouter() {
     clearStartParam,
     handleBio30Referral,
     handleSyndicateReferral,
+    resolveFranchizeVehicleLink,
   ]);
 }
 

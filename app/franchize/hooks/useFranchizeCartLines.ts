@@ -45,6 +45,7 @@ export type FranchizeCartLineVM = {
   pricePerDay: number;
   lineTotal: number;
   rentalDays: number;
+  saleAvailable: boolean;
   options: {
     package: string;
     duration: string;
@@ -80,6 +81,7 @@ export function useFranchizeCartLines(slug: string, items: CatalogItemVM[]) {
           pricePerDay: effectiveUnitPrice,
           lineTotal: discountedLineBase * line.qty,
           rentalDays,
+          saleAvailable: Boolean(item?.saleAvailable),
           options: line.options,
         };
       });
