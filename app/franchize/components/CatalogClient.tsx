@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ShoppingCart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toCategoryId } from "../lib/navigation";
@@ -44,6 +45,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilterKey>("all");
   const [campaignIndex, setCampaignIndex] = useState(0);
+  const searchParams = useSearchParams();
 
   const promoModules = useMemo(() => {
     const now = Date.now();
@@ -226,6 +228,21 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
       auction: auctionTickOptions[0] ?? "Без аукциона",
     });
   };
+
+  useEffect(() => {
+    const focusedVehicle = (searchParams.get("vehicle") || "").trim().toLowerCase();
+    if (!focusedVehicle) return;
+    const target = items.find((item) => item.id.toLowerCase() === focusedVehicle);
+    if (target) {
+      setSelectedItem(target);
+      setSelectedOptions({
+        package: "Базовый",
+        duration: "1 день",
+        perk: "Стандарт",
+        auction: auctionTickOptions[0] ?? "Без аукциона",
+      });
+    }
+  }, [auctionTickOptions, items, searchParams]);
 
   return (
     <>
@@ -429,6 +446,11 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                             >
                               {item.availabilityLabel}
                             </span>
+                            {item.saleAvailable && (
+                              <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-amber-100">
+                                На продажу
+                              </span>
+                            )}
                           </div>
                           <h3 className="mt-1 text-sm font-semibold leading-5">{item.title}</h3>
                           <p className="text-xs" style={surface.mutedText}>{item.description || item.subtitle}</p>

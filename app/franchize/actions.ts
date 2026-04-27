@@ -90,6 +90,7 @@ export interface CatalogItemVM {
   availabilityStatus: "available" | "busy";
   availabilityLabel: string;
   isHot: boolean;
+  saleAvailable: boolean;
   specs: Array<{ label: string; value: string }>;
 }
 
@@ -722,6 +723,11 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
           Boolean(readPath(specs, ["is_hot"], false)) ||
           Boolean(readPath(specs, ["hot"], false)) ||
           /hot|🔥/i.test(String(readPath(specs, ["badge"], ""))),
+        saleAvailable:
+          readPath(specs, ["sale"], 0) === 1 ||
+          readPath(specs, ["sale"], false) === true ||
+          String(readPath(specs, ["sale"], "")).toLowerCase() === "1" ||
+          String(readPath(specs, ["sale"], "")).toLowerCase() === "true",
         specs: Object.entries(specs)
           .filter(([, value]) => typeof value === "string" || typeof value === "number")
           .filter(([key]) => !["subtitle", "description", "segment", "subtype", "bike_subtype", "type"].includes(key))
@@ -1284,15 +1290,23 @@ type FranchizeOrderNotifyPayload = z.infer<typeof franchizeOrderInvoiceSchema> &
   extrasTotal: number;
 };
 
-async function loadFranchizeDealTemplate(slug: string): Promise<string> {
+type FranchizeOrderFlowType = "rental" | "sale" | "mixed";
+
+async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderFlowType): Promise<string> {
   const crewSensitive = await getCrewSensitiveData(slug);
-  const secureTemplate = readPath(crewSensitive.docTemplates ?? {}, ["rentalDealTemplate"], "");
+  const secureTemplateKey = flowType === "rental" ? "rentalDealTemplate" : "saleDealTemplate";
+  const secureTemplate = readPath(crewSensitive.docTemplates ?? {}, [secureTemplateKey], "");
   if (typeof secureTemplate === "string" && secureTemplate.trim().length > 0) {
     return secureTemplate;
   }
 
+  const remoteTemplateUrl = flowType === "rental"
+    ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE_DEMO.md"
+    : "https://raw.githubusercontent.com/salavey13/carTest/main/docs/SALE_DEAL_TEMPLATE_DEMO.md";
+  const localTemplateFile = flowType === "rental" ? "RENTAL_DEAL_TEMPLATE_DEMO.md" : "SALE_DEAL_TEMPLATE_DEMO.md";
+
   try {
-    const response = await fetch("https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE_DEMO.md", { cache: "no-store" });
+    const response = await fetch(remoteTemplateUrl, { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`template fetch failed with ${response.status}`);
     }
@@ -1304,8 +1318,8 @@ async function loadFranchizeDealTemplate(slug: string): Promise<string> {
 
     throw new Error("template fetch returned empty content");
   } catch (error) {
-    logger.warn("[franchize] fallback to local RENTAL_DEAL_TEMPLATE_DEMO.md", error);
-    const localTemplatePath = path.join(process.cwd(), "docs", "RENTAL_DEAL_TEMPLATE_DEMO.md");
+    logger.warn("[franchize] fallback to local template", { flowType, error });
+    const localTemplatePath = path.join(process.cwd(), "docs", localTemplateFile);
     return readFile(localTemplatePath, "utf8");
   }
 }
@@ -1381,11 +1395,13 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const firstCar = firstLine ? byId.get(firstLine.itemId) : null;
     const firstSpecs = (firstCar?.specs as Record<string, unknown> | null) || {};
     const rentDays = Math.max(...payload.cartLines.map((line) => parseDurationDays(line.options.duration)));
+    const flowType: FranchizeOrderFlowType = payload.flowType ?? "rental";
+    const isSaleFlow = flowType === "sale" || flowType === "mixed";
     const rentStartDate = payload.rentalStartDate || payload.time;
     const rentEndDate = payload.rentalEndDate || payload.time;
     const dailyPriceRub = firstLine?.pricePerDay || Math.round(payload.subtotal / Math.max(1, rentDays));
 
-    const template = await loadFranchizeDealTemplate(payload.slug);
+    const template = await loadFranchizeDealTemplate(payload.slug, flowType);
     const userSensitive = await getUserSensitiveData(payload.telegramUserId);
     const crewSensitive = await getCrewSensitiveData(payload.slug);
     const contractDefaults = (crewSensitive.contractDefaults ?? {}) as UnknownRecord;
@@ -1430,7 +1446,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       signature_timestamp: new Date().toLocaleString("ru-RU"),
       signature_fingerprint: payload.signatureFingerprint || "—",
       renter_signature: payload.signatureName || "электронное согласие в Telegram WebApp",
-      document_key: `rental-${payload.slug}-${payload.orderId}`,
+      document_key: `${isSaleFlow ? "sale" : "rental"}-${payload.slug}-${payload.orderId}`,
       verified_at: new Date().toISOString(),
     } as const;
 
@@ -1451,7 +1467,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
     await notifyAdmin(
       [
-        `🧾 Новый franchize-заказ #${payload.orderId}`,
+        `${isSaleFlow ? "🛍️ Новый franchize-заказ на покупку" : "🧾 Новый franchize-заказ на аренду"} #${payload.orderId}`,
         `Crew: ${payload.slug}`,
         `Получатель: ${payload.recipient}`,
         `Телефон: ${payload.phone}`,
@@ -1549,6 +1565,7 @@ const franchizeOrderInvoiceSchema = z.object({
       })
       .default({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона" }),
   })).min(1),
+  flowType: z.enum(["rental", "sale", "mixed"]).default("rental"),
 });
 
 export async function submitFranchizeOrderNotification(input: unknown): Promise<{ success: boolean; error?: string }> {
@@ -1639,7 +1656,9 @@ async function createFranchizeOrderInvoiceInternal(
   }
 
   const rentalId = randomUUID();
-  const startParam = `rental-${rentalId}`;
+  const flowType = payload.flowType ?? "rental";
+  const startParamPrefix = flowType === "rental" ? "rental" : "sale";
+  const startParam = `${startParamPrefix}-${rentalId}`;
   const telegramWebappLink = `https://t.me/oneBikePlsBot/app?startapp=${startParam}`;
   const siteBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
   const franchizeRentalLink = `${siteBaseUrl}/franchize/${payload.slug}/rental/${rentalId}`;
@@ -1662,7 +1681,7 @@ async function createFranchizeOrderInvoiceInternal(
     `Total: ${effectiveTotal.toLocaleString("ru-RU")} ₽`,
     `Proof-of-interest tip: ${amountXtr} XTR (1%)`,
     `WebApp: ${telegramWebappLink}`,
-    `Franchize rental card: ${franchizeRentalLink}`,
+    `Franchize card: ${franchizeRentalLink}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -1687,6 +1706,7 @@ async function createFranchizeOrderInvoiceInternal(
     franchizeRentalLink,
     extras: payload.extras,
     cartLines: payload.cartLines,
+    flowType,
   };
 
   try {
