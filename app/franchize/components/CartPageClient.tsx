@@ -75,7 +75,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
                     </p>
                     {line.item ? (
                       <p className="mt-1 text-sm font-medium text-[var(--cart-accent)]">
-                        {line.item.pricePerDay.toLocaleString("ru-RU")} ₽ / день
+                        {line.item.rentPriceLabel}
                       </p>
                     ) : (
                       <p className="mt-1 text-xs" style={surface.mutedText}>Недоступные позиции не участвуют в расчёте суммы.</p>
