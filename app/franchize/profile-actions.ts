@@ -236,6 +236,7 @@ export async function getFranchizeActivityDigestAction(params: { userId: string;
     .from("franchize_order_notifications")
     .select("order_id,send_status,payload,created_at,doc_file_name")
     .eq("slug", params.slug)
+    .eq("payload->>telegramUserId", params.userId)
     .order("created_at", { ascending: false })
     .limit(20);
   if (ordersError) return { success: false, error: ordersError.message };

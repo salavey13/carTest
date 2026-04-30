@@ -94,6 +94,7 @@ export interface CatalogItemVM {
   saleAvailable: boolean;
   salePrice: number | null;
   specs: Array<{ label: string; value: string }>;
+  rawSpecs?: Record<string, unknown>;
 }
 
 export interface FranchizeCrewVM {
@@ -740,6 +741,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
             : Number(readPath(specs, ["purchase_price"], 0)) > 0
               ? Number(readPath(specs, ["purchase_price"], 0))
               : null,
+        rawSpecs: specs,
         specs: Object.entries(specs)
           .filter(([, value]) => typeof value === "string" || typeof value === "number")
           .filter(([key]) => !["subtitle", "description", "segment", "subtype", "bike_subtype", "type"].includes(key))
