@@ -231,7 +231,7 @@ set
         'contractDefaults', jsonb_build_object(
           'issuerName', 'Рысан Григорий Константинович',
           'issuerRepresentative', 'Сидоров Илья Олегович',
-          'returnAddress', 'г. Нижний Новгород, ул. Стригинский переулок, дом 13б',
+          'returnAddress', 'Н. Н. ул. Комсомольская 2',
           'includedMileage', 200,
           'overageRate', 30,
           'lateReturnPenaltyRub', 5000,
@@ -243,7 +243,7 @@ set
             'bike_value_rub', jsonb_build_object('description', 'Полная стоимость мотоцикла (руб)', 'source', 'bike.estimated_value_rub', 'required', true, 'placeholder', '700000'),
             'bike_value_words', jsonb_build_object('description', 'Сумма прописью', 'source', 'computed_from_bike_value', 'required', true, 'computed', true, 'placeholder', 'Семьсот тысяч'),
             'late_return_penalty_rub', jsonb_build_object('description', 'Неустойка за просрочку (руб/день)', 'source', 'contractDefaults.lateReturnPenaltyRub', 'required', true, 'default', 5000),
-            'return_address', jsonb_build_object('description', 'Адрес возврата мотоцикла', 'source', 'contractDefaults.returnAddress', 'required', true, 'default', 'г. Нижний Новгород, ул. Стригинский переулок, дом 13б'),
+            'return_address', jsonb_build_object('description', 'Адрес возврата мотоцикла', 'source', 'contractDefaults.returnAddress', 'required', true, 'default', 'Н. Н. ул. Комсомольская 2'),
             'issuer_representative', jsonb_build_object('description', 'Представитель арендодателя', 'source', 'contractDefaults.issuerRepresentative', 'required', true, 'default', 'Сидоров Илья Олегович')
           ),
           'defaults', jsonb_build_object(
@@ -254,7 +254,7 @@ set
             'bike_value_rub', 700000,
             'bike_value_words', 'Семьсот тысяч',
             'late_return_penalty_rub', 5000,
-            'return_address', 'г. Нижний Новгород, ул. Стригинский переулок, дом 13б',
+            'return_address', 'Н. Н. ул. Комсомольская 2',
             'issuer_representative', 'Сидоров Илья Олегович'
           )
         )
