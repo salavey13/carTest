@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { useFranchizeCart } from "../hooks/useFranchizeCart"; // Import cart state access
@@ -18,11 +18,35 @@ interface CartPageClientProps {
 
 export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const { cartLines, changeLineQty, removeLine, subtotal, itemCount } = useFranchizeCartLines(slug, items);
-  const { cart } = useFranchizeCart(slug); // Get raw cart state to save
+  const { cart, addItem, itemCount: rawItemCount } = useFranchizeCart(slug); // Get raw cart state to save
   const surface = crewPaletteForSurface(crew.theme);
   const router = useRouter();
   const { dbUser } = useAppContext();
   const [isSaving, setIsSaving] = useState(false);
+  const [buyFlowApplied, setBuyFlowApplied] = useState(false);
+
+  useEffect(() => {
+    if (buyFlowApplied || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("source") !== "buy") return;
+    const bikeId = (params.get("bike") || "").trim();
+    if (!bikeId) return;
+    if (!items.some((item) => item.id === bikeId)) return;
+
+    addItem(
+      bikeId,
+      {
+        package: "Покупка",
+        duration: "Покупка",
+        perk: "Без допов",
+        auction: "Покупка",
+      },
+      1,
+    );
+    setBuyFlowApplied(true);
+    const cleaned = `${window.location.pathname}`;
+    window.history.replaceState({}, "", cleaned);
+  }, [addItem, buyFlowApplied, items]);
 
   const handleProceed = async () => {
     setIsSaving(true);
@@ -31,7 +55,9 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
         await saveUserFranchizeCartAction(dbUser.user_id, slug, cart);
     }
     // Navigate even if save failed (local storage might still be used by next page if hydrated client-side)
-    router.push(`/franchize/${slug}/order/demo-order`);
+    const saleLinesCount = cartLines.filter((line) => line.saleAvailable).length;
+    const flow = saleLinesCount > 0 && saleLinesCount === cartLines.length ? "sale" : saleLinesCount > 0 ? "mixed" : "rental";
+    router.push(`/franchize/${slug}/order/demo-order?flow=${flow}`);
   };
 
   return (
@@ -48,7 +74,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
       <h1 className="mt-2 text-2xl font-semibold">Корзина</h1>
       <p className="mt-2 text-sm" style={surface.mutedText}>Проверьте состав заказа, количество и итог перед оформлением.</p>
 
-      {cartLines.length === 0 ? (
+      {cartLines.length === 0 && rawItemCount === 0 ? (
         <div className="mt-6 rounded-2xl border border-dashed p-6 text-sm" style={surface.subtleCard}>
           Корзина пока пустая. Добавьте байк из каталога, чтобы перейти к оформлению.
           <div className="mt-4">
