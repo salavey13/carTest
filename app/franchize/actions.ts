@@ -310,6 +310,8 @@ const defaultFranchizeConfig: FranchizeConfigInput = {
   socialLinksText: "Telegram|https://t.me/oneBikePlsBot",
   menuLinksText: [
     "Каталог|/franchize/{slug}",
+    "Электроэндуро|/franchize/{slug}/electro-enduro",
+    "Конфигуратор|/franchize/{slug}/configurator",
     "Map Riders|/franchize/{slug}/map-riders",
     "О нас|/franchize/{slug}/about",
     "Контакты|/franchize/{slug}/contacts",
@@ -348,6 +350,8 @@ function readPath<T>(obj: unknown, path: string[], fallback: T): T {
 
 const fallbackMenuLinks = (slug: string) => [
   { label: "Каталог", href: `/franchize/${slug}` },
+  { label: "Электроэндуро", href: `/franchize/${slug}/electro-enduro` },
+  { label: "Конфигуратор", href: `/franchize/${slug}/configurator` },
   { label: "Map Riders", href: `/franchize/${slug}/map-riders` },
   { label: "О нас", href: `/franchize/${slug}/about` },
   { label: "Контакты", href: `/franchize/${slug}/contacts` },
