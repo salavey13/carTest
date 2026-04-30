@@ -26,7 +26,7 @@ export function SaleBikeLanding({ crew, item }: { crew: FranchizeCrewVM; item: C
     { label: "Привод", value: String(specs.drive || "—"), icon: ShoppingBag },
   ];
 
-  const { addItem } = useFranchizeCart(resolvedSlug);
+  const { addItem, isHydrated } = useFranchizeCart(resolvedSlug);
   const [addedOnce, setAddedOnce] = useState(false);
 
   const buyFaq = [
@@ -75,6 +75,7 @@ export function SaleBikeLanding({ crew, item }: { crew: FranchizeCrewVM; item: C
                 <button
                   type="button"
                   onClick={() => {
+                    if (!isHydrated) return;
                     addItem(
                       item.id,
                       {
@@ -87,10 +88,11 @@ export function SaleBikeLanding({ crew, item }: { crew: FranchizeCrewVM; item: C
                     );
                     setAddedOnce(true);
                   }}
-                  className="rounded-xl px-4 py-3 text-center font-semibold transition hover:brightness-105 active:scale-[0.99]"
+                  disabled={!isHydrated}
+                  className="rounded-xl px-4 py-3 text-center font-semibold transition hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                   style={{ ...surface.subtleCard, background: crew.theme.palette.accentMain, color: "#101010" }}
                 >
-                  {addedOnce ? "Добавлено в корзину" : "Добавить в корзину"}
+                  {!isHydrated ? "Подготовка корзины..." : addedOnce ? "Добавлено в корзину" : "Добавить в корзину"}
                 </button>
                 <Link href={`tel:${crew.contacts?.phone || "+79999005588"}`} className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-center font-semibold"><PhoneCall className="h-4 w-4"/>Позвонить</Link>
               </div>
