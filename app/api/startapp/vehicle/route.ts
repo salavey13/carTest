@@ -15,12 +15,12 @@ export async function GET(request: NextRequest) {
 
   const { data: car } = await supabaseAdmin
     .from("cars")
-    .select("id, crew_id, owner_id")
+    .select("id, crew_id, owner_id, specs")
     .eq("id", vehicle)
     .maybeSingle();
 
   if (!car) {
-    return NextResponse.json({ slug: "vip-bike", vehicleId: vehicle, flow });
+    return NextResponse.json({ slug: "vip-bike", vehicleId: vehicle, flow, saleAvailable: false });
   }
 
   let slug = "vip-bike";
@@ -47,5 +47,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ slug, vehicleId: car.id, flow });
+  const rawSale = (car as { specs?: Record<string, unknown> }).specs?.sale;
+  const saleAvailable = rawSale === 1 || rawSale === true || String(rawSale).toLowerCase() === "1" || String(rawSale).toLowerCase() === "true";
+
+  return NextResponse.json({ slug, vehicleId: car.id, flow, saleAvailable });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { Info, X } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
 import { ItemGallery } from "../components/ItemGallery";
@@ -8,6 +9,7 @@ import { crewPaletteForSurface } from "../lib/theme";
 
 interface ItemModalProps {
   item: CatalogItemVM | null;
+  slug: string;
   theme: FranchizeTheme;
   options: {
     package: string;
@@ -71,7 +73,7 @@ function OptionChips({
   );
 }
 
-export function ItemModal({ item, theme, options, auctionOptions, onChangeOption, onClose, onAddToCart }: ItemModalProps) {
+export function ItemModal({ item, slug, theme, options, auctionOptions, onChangeOption, onClose, onAddToCart }: ItemModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
@@ -235,6 +237,15 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
                 ))}
               </div>
             </div>
+            {item.saleAvailable && (
+              <Link
+                href={`/franchize/${slug}/market/${item.id}/buy`}
+                className="inline-flex w-full items-center justify-center rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90"
+                style={surface.subtleCard}
+              >
+                Открыть страницу покупки
+              </Link>
+            )}
 
             <OptionChips title="Пакет" options={packageOptions} selected={options.package} onSelect={(v) => onChangeOption("package", v)} />
             <OptionChips title="Срок" options={durationOptions} selected={options.duration} onSelect={(v) => onChangeOption("duration", v)} />
