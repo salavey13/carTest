@@ -8,7 +8,6 @@ import { useFranchizeCart } from "../hooks/useFranchizeCart"; // Import cart sta
 import { crewPaletteForSurface } from "../lib/theme";
 import { saveUserFranchizeCartAction } from "@/contexts/actions"; // Explicit import
 import { useAppContext } from "@/contexts/AppContext";
-import { Link } from "lucide-react"; // Wait, removing this, using next/link if needed but using router mostly
 
 interface CartPageClientProps {
   crew: FranchizeCrewVM;
@@ -29,7 +28,9 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
     if (buyFlowApplied || typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("source") !== "buy") return;
-    const bikeId = (params.get("bike") || "").trim();
+    const bikeId = (params.get("bike_id") || params.get("bike") || params.get("vehicle") || params.get("item") || "").trim();
+    const shouldAdd = params.get("add");
+    if (shouldAdd === "0" || shouldAdd === "false") return;
     if (!bikeId) return;
     if (!items.some((item) => item.id === bikeId)) return;
 
