@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, Gauge, Battery, Zap, Weight, Timer, ShoppingBag, PhoneCall, Tag } from "lucide-react";
+import { ArrowLeft, Gauge, Battery, Zap, Weight, Timer, ShoppingBag, PhoneCall, Tag, Sparkles, ShieldCheck } from "lucide-react";
 import type { CatalogItemVM, FranchizeCrewVM } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 
@@ -42,14 +42,16 @@ export function SaleBikeLanding({ crew, item }: { crew: FranchizeCrewVM; item: C
               </div>
             </div>
             <div className="flex flex-col gap-3 p-4">
-              <h1 className="text-3xl font-semibold">{item.title}</h1>
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold" style={surface.subtleCard}><Sparkles className="h-3.5 w-3.5" />Premium eMoto</div>
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{item.title}</h1>
               <p className="text-sm opacity-80">{item.description}</p>
               <div className="rounded-2xl border p-4" style={surface.subtleCard}>
-                <p className="text-xs opacity-70">Цена продажи</p>
-                <p className="text-3xl font-bold">{buyPrice > 0 ? `${buyPrice.toLocaleString("ru-RU")} ₽` : "по запросу"}</p>
+                <p className="text-xs uppercase tracking-[0.16em] opacity-70">Цена продажи</p>
+                <p className="text-3xl font-bold sm:text-4xl">{buyPrice > 0 ? `${buyPrice.toLocaleString("ru-RU")} ₽` : "по запросу"}</p>
+                <p className="mt-2 inline-flex items-center gap-2 text-xs opacity-80"><ShieldCheck className="h-3.5 w-3.5" />Официальная сделка + документы</p>
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Link href={`/franchize/${crew.slug}/cart?source=buy&bike=${item.id}`} className="rounded-xl px-4 py-3 text-center font-semibold" style={{ ...surface.subtleCard, background: crew.theme.palette.accentMain, color: "#101010" }}>Написать продавцу</Link>
+                <Link href={`/franchize/${crew.slug}/cart?source=buy&bike=${item.id}`} className="rounded-xl px-4 py-3 text-center font-semibold" style={{ ...surface.subtleCard, background: crew.theme.palette.accentMain, color: "#101010" }}>Оставить заявку на покупку</Link>
                 <Link href={`tel:${crew.contacts?.phone || "+79999005588"}`} className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-center font-semibold"><PhoneCall className="h-4 w-4"/>Позвонить</Link>
               </div>
             </div>
