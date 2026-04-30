@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ShoppingCart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toCategoryId } from "../lib/navigation";
@@ -44,6 +45,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilterKey>("all");
   const [campaignIndex, setCampaignIndex] = useState(0);
+  const searchParams = useSearchParams();
 
   const promoModules = useMemo(() => {
     const now = Date.now();
@@ -226,6 +228,21 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
       auction: auctionTickOptions[0] ?? "Без аукциона",
     });
   };
+
+  useEffect(() => {
+    const focusedVehicle = (searchParams.get("vehicle") || "").trim().toLowerCase();
+    if (!focusedVehicle) return;
+    const target = items.find((item) => item.id.toLowerCase() === focusedVehicle);
+    if (target) {
+      setSelectedItem(target);
+      setSelectedOptions({
+        package: "Базовый",
+        duration: "1 день",
+        perk: "Стандарт",
+        auction: auctionTickOptions[0] ?? "Без аукциона",
+      });
+    }
+  }, [auctionTickOptions, items, searchParams]);
 
   return (
     <>
@@ -429,17 +446,26 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
                             >
                               {item.availabilityLabel}
                             </span>
+                            {item.saleAvailable && (
+                              <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-amber-100">
+                                На продажу
+                              </span>
+                            )}
                           </div>
                           <h3 className="mt-1 text-sm font-semibold leading-5">{item.title}</h3>
                           <p className="text-xs" style={surface.mutedText}>{item.description || item.subtitle}</p>
                           <p className="mt-2 text-base font-bold text-[var(--catalog-accent)]">
-                            {item.pricePerDay.toLocaleString("ru-RU")} ₽
-                            <span className="ml-1 text-xs font-normal text-[var(--catalog-muted)]">/ день</span>
+                            {item.rentPriceLabel}
                           </p>
+                          {item.saleAvailable && item.salePrice ? (
+                            <p className="mt-1 text-xs font-semibold text-amber-200">
+                              Покупка: {item.salePrice.toLocaleString("ru-RU")} ₽
+                            </p>
+                          ) : null}
                           <div className="mt-2 flex gap-2">
                             <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95">
                               <ShoppingCart className="h-4 w-4" />
-                              {item.pricePerDay >= 6000 ? "Выбрать" : "Добавить"}
+                              {item.saleAvailable ? "Аренда / Покупка" : item.pricePerDay >= 6000 ? "Выбрать" : "Добавить"}
                             </span>
                           </div>
                         </div>

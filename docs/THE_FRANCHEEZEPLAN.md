@@ -1861,3 +1861,17 @@ Detailed historical execution notes moved to:
 - `docs/THE_FRANCHEEZEPLAN_HISTORY_ARCHIVE.md`
 - `docs/AGENT_DIARY.md` (compact) and `docs/AGENT_DIARY_ARCHIVE_2026Q1.md` (full)
 - 2026-04-23: Выполнен UX-02 (`c55e20dc-f8a8-47a0-9dda-d16a44de3ef9`) — добавлен хук `useIsAdmin` для единой проверки глобальной/crew-admin роли, скрыты admin-only ссылки для non-admin в `MapRidersClientRefactored` (`/admin/map-routes`) и в профайл-меню franchize (`Franchize admin`).
+
+---
+
+## Ad-hoc task — Y-VOLT sale/rent dual-flow (2026-04-27)
+- status: `done`
+- updated_at: `2026-04-27T00:00:00Z`
+- owner: `codex`
+- notes: Добавлены 4 позиции Y-VOLT в `public.cars` + изображения в `carpix`, внедрён флаг `specs.sale=1`, витрина/модалка/checkout научены обрабатывать покупку параллельно аренде, добавлен startapp deep-link `buy_<bike-id>` с резолвом crew по владельцу/crew_id.
+- next_step: Доработать UI-лейблы checkout для чистого sale-режима (названия полей без “аренда”).
+- risks: Данные Y-VOLT тянутся с внешнего сайта и могут обновляться, нужно периодически освежать контент/фото.
+
+### Diary
+- 2026-04-27: Реализован гибридный rental/sale поток во франшизе с отдельным DOC-шаблоном продажи (`docs/SALE_DEAL_TEMPLATE_DEMO.md`) и новым startapp-routing через `/api/startapp/vehicle`.
+- 2026-04-27: VIVOLT refinement pass — заменил прошлый Y-VOLT набор на 2 цвета флагмана (black/white) + аксессуары (мотард-колёса, 2 шлема), добавил многофото-галереи из источника, hourly rent label (будни/выходные) и purchase price в каталог/модалку.
