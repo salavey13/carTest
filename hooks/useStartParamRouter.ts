@@ -115,6 +115,10 @@ export function useStartParamRouter() {
         const slug = (data.slug || "vip-bike").trim() || "vip-bike";
         const resolvedVehicle = (data.vehicleId || vehicleId).trim().toLowerCase();
         const resolvedFlow = data.flow === "buy" ? "buy" : "rent";
+        const saleAvailable = Boolean((data as { saleAvailable?: boolean }).saleAvailable);
+        if (resolvedFlow === "buy" && saleAvailable) {
+          return `/franchize/${slug}/market/${encodeURIComponent(resolvedVehicle)}/buy`;
+        }
         return `/franchize/${slug}?vehicle=${encodeURIComponent(resolvedVehicle)}&flow=${resolvedFlow}`;
       } catch (error) {
         logger.warn("[ClientLayout] failed to resolve vehicle deep-link, using vip-bike fallback", { rawParam, error });
