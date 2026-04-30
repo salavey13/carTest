@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { addDays } from "date-fns";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,6 +12,7 @@ import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { createFranchizeOrderCheckout } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
+import { getFranchizeFormPrefillAction } from "../profile-actions";
 
 interface OrderPageClientProps {
   crew: FranchizeCrewVM;
@@ -85,7 +86,7 @@ type OrderFormValues = z.infer<typeof orderFormSchema>;
 const EMPTY_SELECTED_EXTRAS: string[] = [];
 
 export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientProps) {
-  const { user } = useAppContext();
+  const { user, dbUser } = useAppContext();
   const { cartLines, subtotal } = useFranchizeCartLines(slug, items);
   const [isSubmitting, startSubmitTransition] = useTransition();
   const form = useForm<OrderFormValues>({
@@ -133,6 +134,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const isCartEmpty = cartLines.length === 0;
   const saleLinesCount = useMemo(() => cartLines.filter((line) => line.saleAvailable).length, [cartLines]);
   const flowType: "rental" | "sale" | "mixed" = saleLinesCount === 0 ? "rental" : saleLinesCount === cartLines.length ? "sale" : "mixed";
+  const flowLabel = flowType === "sale" ? "покупки" : flowType === "mixed" ? "аренды/покупки" : "аренды";
   const selectedExtraItems = useMemo(
     () => orderExtras.filter((extra) => selectedExtras.includes(extra.id)),
     [selectedExtras],
@@ -156,11 +158,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     () => [
       { id: "cart", label: "Байк выбран", done: !isCartEmpty },
       { id: "contact", label: "Контакт заполнен", done: recipient.trim().length > 1 && phone.trim().length > 5 && time.trim().length > 0 },
-      { id: "dates", label: "Период аренды выбран", done: Boolean(rentalStartDate) },
+      { id: "dates", label: `Период ${flowLabel} выбран`, done: Boolean(rentalStartDate) },
       { id: "signature", label: "Электронная подпись задана", done: signatureName.trim().length > 2 },
-      { id: "consent", label: "Условия подтверждены", done: consent },
+      { id: "consent", label: `Условия ${flowLabel} подтверждены`, done: consent },
     ],
-    [consent, isCartEmpty, phone, recipient, rentalStartDate, signatureName, time],
+    [consent, flowLabel, isCartEmpty, phone, recipient, rentalStartDate, signatureName, time],
   );
   const completedMilestones = checkoutMilestones.filter((step) => step.done).length;
   const readinessPercent = Math.round((completedMilestones / checkoutMilestones.length) * 100);
@@ -170,12 +172,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       { id: "recipient", label: "Укажите имя получателя", active: recipient.trim().length <= 1 },
       { id: "phone", label: "Добавьте контактный номер", active: phone.trim().length <= 5 },
       { id: "time", label: "Выберите удобное время", active: time.trim().length === 0 },
-      { id: "dates", label: "Выберите дату начала аренды", active: !rentalStartDate },
+      { id: "dates", label: `Выберите дату начала ${flowLabel}`, active: !rentalStartDate },
       { id: "signature", label: "Введите ФИО для электронной подписи", active: signatureName.trim().length <= 2 },
-      { id: "consent", label: "Подтвердите условия аренды", active: !consent },
+      { id: "consent", label: `Подтвердите условия ${flowLabel}`, active: !consent },
       { id: "telegram", label: "Для Stars откройте страницу через Telegram WebApp", active: requiresTelegram && !hasTelegramUser },
     ].filter((item) => item.active),
-    [consent, hasTelegramUser, isCartEmpty, phone, recipient, rentalStartDate, requiresTelegram, signatureName, time],
+    [consent, flowLabel, hasTelegramUser, isCartEmpty, phone, recipient, rentalStartDate, requiresTelegram, signatureName, time],
   );
   const nextAction = checkoutBlockers[0];
 
@@ -218,14 +220,28 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const submitHint = isSubmitting
     ? "Проверяем данные и отправляем действие оплаты. Обычно это занимает несколько секунд."
     : isCartEmpty
-      ? "Добавьте хотя бы один байк в корзину, чтобы перейти к подтверждению."
+      ? `Добавьте хотя бы один байк в корзину, чтобы перейти к подтверждению ${flowLabel}.`
       : !consent
-        ? "Подтвердите согласие с условиями аренды, чтобы отправить заказ."
+        ? `Подтвердите согласие с условиями ${flowLabel}, чтобы отправить заказ.`
         : requiresTelegram && !hasTelegramUser
           ? "Для оплаты Stars откройте оформление из Telegram WebApp и повторите попытку."
           : payment === "telegram_xtr"
             ? "XTR-счёт будет рассчитан как 1% от полной суммы (с учётом доп. опций)."
             : "Проверьте контакты и способ получения, затем подтверждайте заказ.";
+
+  useEffect(() => {
+    const loadPrefill = async () => {
+      if (!dbUser?.user_id) return;
+      const res = await getFranchizeFormPrefillAction({ userId: dbUser.user_id, slug });
+      if (!res.success || !res.data) return;
+      setValue("recipient", res.data.fullName || "");
+      setValue("phone", res.data.phone || "");
+      setValue("time", res.data.preferredTime || "");
+      setValue("comment", res.data.comment || "");
+      setValue("deliveryMode", res.data.deliveryMode || "pickup");
+    };
+    void loadPrefill();
+  }, [dbUser?.user_id, setValue, slug]);
 
   const onSubmitValid = (values: OrderFormValues) => {
     if (isSubmitting || !canSubmit) {
