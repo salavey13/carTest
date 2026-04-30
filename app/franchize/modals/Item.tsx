@@ -81,7 +81,7 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
     if (!item) return [];
     const urls = item.mediaUrls?.length ? item.mediaUrls : item.imageUrl ? [item.imageUrl] : [];
     return Array.from(new Set(urls.filter(Boolean) as string[]));
-  }, [item?.mediaUrls, item?.imageUrl]);
+  }, [item]);
 
   const descriptionText = useMemo(() => {
     return item?.description || "Этот байк уже подготовлен к аренде: технический чек выполнен, документы готовы, выдача без очереди.";
@@ -153,7 +153,8 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
 
   const fallbackSpecs = [
     { label: "Категория", value: item.category },
-    { label: "Тариф", value: `${item.pricePerDay.toLocaleString("ru-RU")} ₽ / день` },
+    { label: "Тариф аренды", value: item.rentPriceLabel },
+    ...(item.saleAvailable && item.salePrice ? [{ label: "Цена покупки", value: `${item.salePrice.toLocaleString("ru-RU")} ₽` }] : []),
     { label: "Статус", value: "Готов к выдаче" },
   ];
 
@@ -202,6 +203,11 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
             <div>
               <h3 id={`item-modal-title-${item.id}`} className="text-lg font-semibold sm:text-xl">{item.title}</h3>
               <p className="text-sm" style={surface.mutedText}>{item.subtitle}</p>
+              {item.saleAvailable && (
+                <p className="mt-1 inline-flex rounded-full border border-amber-300/60 bg-amber-400/20 px-2 py-0.5 text-xs font-semibold text-amber-100">
+                  Этот мот доступен к покупке (параллельно аренде)
+                </p>
+              )}
               <p className={`mt-2 text-sm leading-6 ${descriptionExpanded ? "" : "line-clamp-4"}`} style={surface.mutedText}>
                 {descriptionText}
               </p>
@@ -247,7 +253,7 @@ export function ItemModal({ item, theme, options, auctionOptions, onChangeOption
               disabled={isAdding}
               className="rounded-xl bg-[var(--item-accent)] px-3 py-2 text-sm font-semibold text-[var(--item-accent-contrast)] transition hover:brightness-105 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
             >
-              {isAdding ? "Добавляем..." : `Добавить • ${item.pricePerDay.toLocaleString("ru-RU")} ₽`}
+              {isAdding ? "Добавляем..." : item.saleAvailable ? `Оформить • аренда/покупка` : `Добавить • ${item.pricePerDay.toLocaleString("ru-RU")} ₽`}
             </button>
           </div>
         </div>
