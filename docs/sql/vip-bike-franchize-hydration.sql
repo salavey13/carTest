@@ -114,7 +114,8 @@ set
             jsonb_build_object('label', 'Контакты', 'href', '/franchize/{slug}/contacts'),
             jsonb_build_object('label', 'Корзина', 'href', '/franchize/{slug}/cart'),
             jsonb_build_object('label', 'Мои аренды', 'href', '/franchize/{slug}/rentals'),
-            jsonb_build_object('label', 'Конфигуратор', 'href', '/franchize/{slug}/configurator')
+            jsonb_build_object('label', 'Конфигуратор', 'href', '/franchize/{slug}/configurator'),
+            jsonb_build_object('label', 'Enduro', 'href', '/franchize/{slug}/electro-enduro')
           ),
           'quickActions', jsonb_build_array(
             jsonb_build_object('label', 'Мотопарк', 'href', '/franchize/{slug}', 'icon', 'FaMotorcycle'),
@@ -152,7 +153,7 @@ set
               'items', jsonb_build_array(
                 jsonb_build_object('type', 'external', 'label', '@I_O_S_NN', 'href', 'https://t.me/I_O_S_NN', 'icon', 'FaTelegram'),
                 jsonb_build_object('type', 'phone', 'label', '+7 9200-789-888', 'href', 'tel:+79200789888', 'icon', 'FaPhone'),
-                jsonb_build_object('type', 'text', 'label', 'Н. Н. Стригинский переулок 13Б', 'icon', 'FaMapLocationDot')
+                jsonb_build_object('type', 'text', 'label', 'Н. Н. ул. Комсомольская 2', 'icon', 'FaMapLocationDot')
               )
             )
           ),
@@ -166,7 +167,7 @@ set
             'Быстрая онлайн-бронь',
             'ОСАГО + комплект экипировки',
             'Поддержка на маршруте',
-            'Новая локация сервиса: Стригинский переулок 13Б'
+            'Новая локация сервиса: ул. Комсомольская 2'
           ),
           'faq', jsonb_build_array(
             jsonb_build_object('q', 'Какой минимальный возраст?', 'a', 'Базовый минимум — 23 года для аренды мотоциклов.'),
@@ -174,7 +175,7 @@ set
           )
         ),
         'contacts', jsonb_build_object(
-          'address', 'Стригинский переулок 13Б, Нижний Новгород',
+          'address', 'ул. Комсомольская 2, Нижний Новгород',
           'phone', '+7 9200-789-888',
           'email', 'hello@vipbike-rental.example',
           'telegram', '@I_O_S_NN',
