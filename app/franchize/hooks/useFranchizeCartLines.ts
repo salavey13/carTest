@@ -41,9 +41,11 @@ function resolveSalePrice(item: CatalogItemVM | null): number {
 }
 
 function isBuyFlow(options: { package: string; duration: string; perk: string; auction: string }): boolean {
-  const values = [options.package, options.duration, options.perk, options.auction]
-    .map((v) => String(v || '').toLowerCase());
-  return values.some((v) => v.includes('покуп') || v.includes('buy'));
+  const normalizedValues = [options.package, options.duration, options.perk, options.auction]
+    .map((value) => String(value ?? "").trim().toLowerCase());
+
+  const buySentinels = new Set(["покупка", "buy", "flow=buy"]);
+  return normalizedValues.some((value) => buySentinels.has(value));
 }
 function parseDurationDays(rawDuration: string): number {
   const normalized = rawDuration.toLowerCase();
