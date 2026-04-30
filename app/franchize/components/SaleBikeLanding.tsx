@@ -7,6 +7,7 @@ import type { CatalogItemVM, FranchizeCrewVM } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 
 export function SaleBikeLanding({ crew, item }: { crew: FranchizeCrewVM; item: CatalogItemVM }) {
+  const resolvedSlug = crew.slug || "vip-bike";
   const surface = crewPaletteForSurface(crew.theme);
   const gallery = item.mediaUrls?.length ? item.mediaUrls : [item.imageUrl].filter(Boolean);
   const specs = item.rawSpecs || {};
@@ -42,7 +43,7 @@ export function SaleBikeLanding({ crew, item }: { crew: FranchizeCrewVM; item: C
     <section className="min-h-screen pb-24 pt-3 sm:pt-6" style={surface.page}>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-3 sm:px-6">
         <div className="flex items-center justify-between gap-2">
-          <Link href={`/franchize/${crew.slug}?vehicle=${item.id}&flow=buy`} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm" style={surface.subtleCard}><ArrowLeft className="h-4 w-4"/>В маркет</Link>
+          <Link href={`/franchize/${resolvedSlug}?vehicle=${item.id}&flow=buy`} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm" style={surface.subtleCard}><ArrowLeft className="h-4 w-4"/>В маркет</Link>
           <span className="rounded-full border px-3 py-1 text-xs font-semibold" style={surface.subtleCard}>На продажу</span>
         </div>
 
@@ -66,7 +67,7 @@ export function SaleBikeLanding({ crew, item }: { crew: FranchizeCrewVM; item: C
                 <p className="mt-2 inline-flex items-center gap-2 text-xs opacity-80"><ShieldCheck className="h-3.5 w-3.5" />Официальная сделка + документы</p>
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Link href={`/franchize/${crew.slug}/cart?source=buy&bike=${item.id}`} className="rounded-xl px-4 py-3 text-center font-semibold" style={{ ...surface.subtleCard, background: crew.theme.palette.accentMain, color: "#101010" }}>Оставить заявку на покупку</Link>
+                <Link href={`/franchize/${resolvedSlug}/cart?source=buy&bike_id=${item.id}&add=1`} className="rounded-xl px-4 py-3 text-center font-semibold" style={{ ...surface.subtleCard, background: crew.theme.palette.accentMain, color: "#101010" }}>Перейти к заказу</Link>
                 <Link href={`tel:${crew.contacts?.phone || "+79999005588"}`} className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-center font-semibold"><PhoneCall className="h-4 w-4"/>Позвонить</Link>
               </div>
             </div>
@@ -89,8 +90,8 @@ export function SaleBikeLanding({ crew, item }: { crew: FranchizeCrewVM; item: C
             <p className="mt-2 text-sm">Офлайн-показ и тест-драйв по предварительной записи. Подскажем маршрут и выдадим базовый инструктаж.</p>
           </div>
           <div className="rounded-2xl border p-4" style={surface.subtleCard}>
-            <p className="text-xs uppercase tracking-[0.16em] opacity-70">Реальный магазин</p>
-            <p className="mt-2 text-sm">Консультация в шоуруме, проверка комплектации, помощь с документами и подготовка к выдаче.</p>
+            <p className="text-xs uppercase tracking-[0.16em] opacity-70">Группа магазина</p>
+            <p className="mt-2 text-sm">Актуальные поставки, наличие и консультации в группе: <a className="underline" href="https://vk.ru/vip_bike_electro" target="_blank" rel="noreferrer">vk.ru/vip_bike_electro</a></p>
           </div>
           <div className="rounded-2xl border p-4" style={surface.subtleCard}>
             <p className="text-xs uppercase tracking-[0.16em] opacity-70">После покупки</p>
