@@ -16,7 +16,7 @@ export default async function BuyBikePage({ params }: BuyBikePageProps) {
   const item = items.find((candidate) => candidate.id === bike_id);
 
   if (!item) notFound();
-  if (!isSaleEnabled(item.rawSpecs?.sale)) {
+  if (!item.saleAvailable && !isSaleEnabled(item.rawSpecs?.sale)) {
     return (
       <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-4 p-6 text-center" style={crewPaletteForSurface(crew.theme).page}>
         <h1 className="text-2xl font-semibold">Этот байк не помечен как продажа</h1>
