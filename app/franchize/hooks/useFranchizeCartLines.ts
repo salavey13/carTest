@@ -28,6 +28,23 @@ const perkSurcharge: Record<string, number> = {
   "full gear": 1800,
 };
 
+
+
+function resolveSalePrice(item: CatalogItemVM | null): number {
+  if (!item) return 0;
+  const specs = item.rawSpecs ?? {};
+  const raw = Number(
+    specs.price_rub ?? specs.sale_price ?? specs.purchase_price ?? specs.total_price ?? specs.price ?? 0,
+  );
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+  return Math.round(raw);
+}
+
+function isBuyFlow(options: { package: string; duration: string; perk: string; auction: string }): boolean {
+  const values = [options.package, options.duration, options.perk, options.auction]
+    .map((v) => String(v || '').toLowerCase());
+  return values.some((v) => v.includes('покуп') || v.includes('buy'));
+}
 function parseDurationDays(rawDuration: string): number {
   const normalized = rawDuration.toLowerCase();
   const numericMatch = normalized.match(/\d+/);
@@ -75,6 +92,23 @@ export function useFranchizeCartLines(
       .filter(([, line]) => line.qty > 0)
       .map(([lineId, line]) => {
         const item = itemById.get(line.itemId) ?? null;
+        const inBuyFlow = isBuyFlow(line.options);
+        const salePrice = resolveSalePrice(item);
+
+        if (inBuyFlow && salePrice > 0) {
+          return {
+            lineId,
+            itemId: line.itemId,
+            qty: line.qty,
+            item,
+            pricePerDay: salePrice,
+            lineTotal: salePrice * line.qty,
+            rentalDays: 1,
+            saleAvailable: Boolean(item?.saleAvailable),
+            options: line.options,
+          };
+        }
+
         const basePricePerDay = item?.pricePerDay ?? 0;
         const rentalDays = parseDurationDays(line.options.duration);
         const packageFactor = packageMultiplier[line.options.package.toLowerCase()] ?? 1;
