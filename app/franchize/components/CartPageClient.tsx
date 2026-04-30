@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { useFranchizeCart } from "../hooks/useFranchizeCart"; // Import cart state access
@@ -16,7 +16,7 @@ interface CartPageClientProps {
 }
 
 export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
-  const { cart, addItem, itemCount: rawItemCount, changeLineQty, removeLine, isHydrated } = useFranchizeCart(slug);
+  const { cart, itemCount: rawItemCount, changeLineQty, removeLine } = useFranchizeCart(slug);
   const { cartLines, subtotal, itemCount } = useFranchizeCartLines(slug, items, {
     cart,
     itemCount: rawItemCount,
@@ -27,32 +27,6 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const router = useRouter();
   const { dbUser } = useAppContext();
   const [isSaving, setIsSaving] = useState(false);
-  const [buyFlowApplied, setBuyFlowApplied] = useState(false);
-
-  useEffect(() => {
-    if (buyFlowApplied || typeof window === "undefined" || !isHydrated) return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("source") !== "buy") return;
-    const bikeId = (params.get("bike_id") || params.get("bike") || params.get("vehicle") || params.get("item") || "").trim();
-    const shouldAdd = params.get("add");
-    if (shouldAdd === "0" || shouldAdd === "false") return;
-    if (!bikeId) return;
-    if (!items.some((item) => item.id === bikeId)) return;
-
-    addItem(
-      bikeId,
-      {
-        package: "Покупка",
-        duration: "Покупка",
-        perk: "Без допов",
-        auction: "Покупка",
-      },
-      1,
-    );
-    setBuyFlowApplied(true);
-    const cleaned = `${window.location.pathname}`;
-    window.history.replaceState({}, "", cleaned);
-  }, [addItem, buyFlowApplied, isHydrated, items]);
 
   const handleProceed = async () => {
     setIsSaving(true);
