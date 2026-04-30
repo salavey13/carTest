@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { ArrowLeft, Gauge, Battery, Zap, Weight, Timer, ShoppingBag, PhoneCall, Tag, Sparkles, ShieldCheck } from "lucide-react";
 import type { CatalogItemVM, FranchizeCrewVM } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+import { useFranchizeCart } from "@/app/franchize/hooks/useFranchizeCart";
 
 export function SaleBikeLanding({ crew, item }: { crew: FranchizeCrewVM; item: CatalogItemVM }) {
   const resolvedSlug = crew.slug || "vip-bike";
@@ -23,6 +25,9 @@ export function SaleBikeLanding({ crew, item }: { crew: FranchizeCrewVM; item: C
     { label: "Зарядка", value: `${specs.charge_time_h || "—"} ч`, icon: Timer },
     { label: "Привод", value: String(specs.drive || "—"), icon: ShoppingBag },
   ];
+
+  const { addItem } = useFranchizeCart(resolvedSlug);
+  const [addedOnce, setAddedOnce] = useState(false);
 
   const buyFaq = [
     {
@@ -67,7 +72,26 @@ export function SaleBikeLanding({ crew, item }: { crew: FranchizeCrewVM; item: C
                 <p className="mt-2 inline-flex items-center gap-2 text-xs opacity-80"><ShieldCheck className="h-3.5 w-3.5" />Официальная сделка + документы</p>
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Link href={`/franchize/${resolvedSlug}/cart?source=buy&bike_id=${item.id}&add=1`} className="rounded-xl px-4 py-3 text-center font-semibold" style={{ ...surface.subtleCard, background: crew.theme.palette.accentMain, color: "#101010" }}>Перейти к заказу</Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    addItem(
+                      item.id,
+                      {
+                        package: "Покупка",
+                        duration: "Покупка",
+                        perk: "Без допов",
+                        auction: "Покупка",
+                      },
+                      1,
+                    );
+                    setAddedOnce(true);
+                  }}
+                  className="rounded-xl px-4 py-3 text-center font-semibold transition hover:brightness-105 active:scale-[0.99]"
+                  style={{ ...surface.subtleCard, background: crew.theme.palette.accentMain, color: "#101010" }}
+                >
+                  {addedOnce ? "Добавлено в корзину" : "Добавить в корзину"}
+                </button>
                 <Link href={`tel:${crew.contacts?.phone || "+79999005588"}`} className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-center font-semibold"><PhoneCall className="h-4 w-4"/>Позвонить</Link>
               </div>
             </div>
