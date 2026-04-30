@@ -16,6 +16,7 @@ interface CatalogClientProps {
   crew: FranchizeCrewVM;
   slug: string;
   items: CatalogItemVM[];
+  mode?: "rental" | "electro";
 }
 
 type QuickFilterKey = "all" | "budget" | "premium" | "newbie";
@@ -33,7 +34,7 @@ const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
   return [...regular, ...wbItems];
 };
 
-export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
+export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogClientProps) {
   const surface = crewPaletteForSurface(crew.theme);
   const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
   const { addItem } = useFranchizeCart(crew.slug || slug);
@@ -155,10 +156,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
     return gradients[index % gradients.length];
   };
 
-  const orderedCategories = useMemo(
-    () => Array.from(new Set([...crew.catalog.categories, ...items.map((item) => item.category).filter(Boolean)])),
-    [crew.catalog.categories, items],
-  );
+  const orderedCategories = useMemo(() => Array.from(new Set(items.map((item) => item.category).filter(Boolean))), [items]);
 
   const matchesQuickFilter = (item: CatalogItemVM, filter: QuickFilterKey) => {
     if (filter === "budget") {
@@ -202,22 +200,13 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
       }))
       .filter((group) => group.items.length > 0);
 
-    const showcaseGroups = crew.catalog.showcaseGroups
-      .map((group) => {
-        const showcaseItems = filteredItems.filter((item) => {
-          if (group.mode === "subtype") {
-            return item.category.toLowerCase().includes((group.subtype ?? "").toLowerCase());
-          }
-          const minPrice = group.minPrice ?? Number.NEGATIVE_INFINITY;
-          const maxPrice = group.maxPrice ?? Number.POSITIVE_INFINITY;
-          return item.pricePerDay >= minPrice && item.pricePerDay <= maxPrice;
-        });
-        return { category: group.label, items: showcaseItems };
-      })
-      .filter((group) => group.items.length > 0);
-
-    return sortWbItemLast([...showcaseGroups, ...grouped]);
-  }, [crew.catalog.showcaseGroups, filteredItems, orderedCategories]);
+    const saleGroup = filteredItems.filter((item) => item.saleAvailable);
+    const saleCategory = mode === "electro" ? "Электроэндуро в продаже" : "Байки на продажу";
+    const baseGroups = grouped.filter((group) => group.category !== saleCategory);
+    const normalized = sortWbItemLast(baseGroups);
+    if (saleGroup.length === 0) return normalized;
+    return [{ category: saleCategory, items: saleGroup }, ...normalized];
+  }, [filteredItems, mode, orderedCategories]);
 
   const openItem = (item: CatalogItemVM) => {
     setSelectedItem(item);
