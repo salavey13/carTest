@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import type { FranchizeCartState } from "./useFranchizeCart";
 import type { CatalogItemVM } from "../actions";
 import { useFranchizeCart } from "./useFranchizeCart";
 
@@ -54,8 +55,18 @@ export type FranchizeCartLineVM = {
   };
 };
 
-export function useFranchizeCartLines(slug: string, items: CatalogItemVM[]) {
-  const { cart, changeLineQty, removeLine, itemCount } = useFranchizeCart(slug);
+export function useFranchizeCartLines(
+  slug: string,
+  items: CatalogItemVM[],
+  externalCart?: {
+    cart: FranchizeCartState;
+    itemCount: number;
+    changeLineQty: (lineId: string, delta: number) => void;
+    removeLine: (lineId: string) => void;
+  },
+) {
+  const internalCart = useFranchizeCart(slug);
+  const { cart, changeLineQty, removeLine, itemCount } = externalCart ?? internalCart;
 
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 
