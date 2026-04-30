@@ -494,6 +494,7 @@ export function CatalogClient({ crew, slug, items }: CatalogClientProps) {
 
       <ItemModal
         item={selectedItem}
+        slug={crew.slug || slug}
         theme={crew.theme}
         options={selectedOptions}
         auctionOptions={auctionTickOptions}

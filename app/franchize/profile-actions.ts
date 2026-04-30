@@ -24,6 +24,19 @@ export type FranchizeProfileState = {
   lastActivityAt: string;
 };
 
+export type FranchizeFormPrefill = {
+  fullName: string;
+  phone: string;
+  preferredTime: string;
+  deliveryMode: "pickup" | "delivery";
+  comment: string;
+};
+
+export type FranchizeActivityDigest = {
+  rentals: Array<{ rentalId: string; status: string; vehicleId: string; vehicleLabel: string; docLink: string }>;
+  buyOrders: Array<{ orderId: string; status: string; vehicleIds: string[]; docLink: string; createdAt: string; docFileName?: string }>;
+};
+
 const FRANCHIZE_ACHIEVEMENT_CAPABILITIES = {
   onboarding: "Tracks onboarding participation (/start survey completion) and marks crew-level readiness.",
   operations: "Tracks recurring crew operations and delivery signals for franchize execution.",
@@ -42,6 +55,14 @@ const DEFAULT_PROFILE = (slug: string): FranchizeProfileState => ({
   counters: {},
   lastActivityAt: new Date(0).toISOString(),
 });
+
+const DEFAULT_PREFILL: FranchizeFormPrefill = {
+  fullName: "",
+  phone: "",
+  preferredTime: "",
+  deliveryMode: "pickup",
+  comment: "",
+};
 
 function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
   const shared: FranchizeAchievementDefinition[] = [
@@ -177,4 +198,68 @@ export async function grantFranchizeAchievementAction(params: {
 
   if (updateError) return { success: false, error: updateError.message };
   return { success: true, alreadyUnlocked };
+}
+
+export async function getFranchizeFormPrefillAction(params: { userId: string; slug: string }): Promise<{ success: boolean; data?: FranchizeFormPrefill; error?: string }> {
+  const { data: user, error } = await supabaseAdmin.from("users").select("metadata").eq("user_id", params.userId).maybeSingle();
+  if (error) return { success: false, error: error.message };
+  const metadata = (user?.metadata || {}) as Record<string, any>;
+  const prefill = metadata.franchizeFormPrefill?.[params.slug] ?? metadata.franchizeFormPrefill?.default ?? DEFAULT_PREFILL;
+  return { success: true, data: { ...DEFAULT_PREFILL, ...(prefill as Record<string, unknown>) } as FranchizeFormPrefill };
+}
+
+export async function saveFranchizeFormPrefillAction(params: { userId: string; slug: string; prefill: FranchizeFormPrefill }): Promise<{ success: boolean; error?: string }> {
+  const { data: user, error } = await supabaseAdmin.from("users").select("metadata").eq("user_id", params.userId).maybeSingle();
+  if (error) return { success: false, error: error.message };
+  const metadata = (user?.metadata || {}) as Record<string, any>;
+  const next = {
+    ...metadata,
+    franchizeFormPrefill: {
+      ...(metadata.franchizeFormPrefill || {}),
+      [params.slug]: params.prefill,
+    },
+  };
+  const { error: updateError } = await supabaseAdmin.from("users").update({ metadata: next, updated_at: new Date().toISOString() }).eq("user_id", params.userId);
+  return updateError ? { success: false, error: updateError.message } : { success: true };
+}
+
+export async function getFranchizeActivityDigestAction(params: { userId: string; slug: string }): Promise<{ success: boolean; data?: FranchizeActivityDigest; error?: string }> {
+  const { data: rentals, error: rentalsError } = await supabaseAdmin
+    .from("rentals")
+    .select("rental_id,status,vehicle_id,vehicle:cars(make,model)")
+    .or(`user_id.eq.${params.userId},owner_id.eq.${params.userId}`)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (rentalsError) return { success: false, error: rentalsError.message };
+
+  const { data: orders, error: ordersError } = await supabaseAdmin
+    .from("franchize_order_notifications")
+    .select("order_id,send_status,payload,created_at,doc_file_name")
+    .eq("slug", params.slug)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (ordersError) return { success: false, error: ordersError.message };
+
+  return {
+    success: true,
+    data: {
+      rentals: (rentals || []).map((r: any) => ({
+        rentalId: r.rental_id,
+        status: r.status || "unknown",
+        vehicleId: r.vehicle_id || "",
+        vehicleLabel: `${r.vehicle?.make || "Bike"} ${r.vehicle?.model || ""}`.trim(),
+        docLink: `/rentals/${r.rental_id}`,
+      })),
+      buyOrders: (orders || [])
+        .filter((o: any) => ["sale", "mixed"].includes(String(o?.payload?.flowType || "")))
+        .map((o: any) => ({
+          orderId: o.order_id,
+          status: o.send_status || "pending",
+          vehicleIds: Array.isArray(o?.payload?.cartLines) ? o.payload.cartLines.map((l: any) => String(l.itemId || "")) : [],
+          docLink: `/franchize/${params.slug}/order/${o.order_id}`,
+          createdAt: o.created_at,
+          docFileName: typeof o.doc_file_name === "string" ? o.doc_file_name : "",
+        })),
+    },
+  };
 }
