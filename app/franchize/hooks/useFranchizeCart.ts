@@ -239,5 +239,15 @@ export function useFranchizeCart(slug: string) {
 
   const itemCount = useMemo(() => Object.values(cart).reduce((sum, line) => sum + line.qty, 0), [cart]);
 
-  return { cart, itemCount, addItem, setLineQty, changeLineQty, removeLine, clear, defaultOptions: DEFAULT_OPTIONS };
+  return {
+    cart,
+    itemCount,
+    addItem,
+    setLineQty,
+    changeLineQty,
+    removeLine,
+    clear,
+    defaultOptions: DEFAULT_OPTIONS,
+    isHydrated,
+  };
 }

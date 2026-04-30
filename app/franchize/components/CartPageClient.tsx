@@ -16,7 +16,7 @@ interface CartPageClientProps {
 }
 
 export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
-  const { cart, addItem, itemCount: rawItemCount, changeLineQty, removeLine } = useFranchizeCart(slug);
+  const { cart, addItem, itemCount: rawItemCount, changeLineQty, removeLine, isHydrated } = useFranchizeCart(slug);
   const { cartLines, subtotal, itemCount } = useFranchizeCartLines(slug, items, {
     cart,
     itemCount: rawItemCount,
@@ -30,7 +30,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const [buyFlowApplied, setBuyFlowApplied] = useState(false);
 
   useEffect(() => {
-    if (buyFlowApplied || typeof window === "undefined") return;
+    if (buyFlowApplied || typeof window === "undefined" || !isHydrated) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("source") !== "buy") return;
     const bikeId = (params.get("bike_id") || params.get("bike") || params.get("vehicle") || params.get("item") || "").trim();
@@ -52,7 +52,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
     setBuyFlowApplied(true);
     const cleaned = `${window.location.pathname}`;
     window.history.replaceState({}, "", cleaned);
-  }, [addItem, buyFlowApplied, items]);
+  }, [addItem, buyFlowApplied, isHydrated, items]);
 
   const handleProceed = async () => {
     setIsSaving(true);
