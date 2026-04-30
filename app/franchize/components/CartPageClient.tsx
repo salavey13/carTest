@@ -16,8 +16,13 @@ interface CartPageClientProps {
 }
 
 export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
-  const { cartLines, changeLineQty, removeLine, subtotal, itemCount } = useFranchizeCartLines(slug, items);
-  const { cart, addItem, itemCount: rawItemCount } = useFranchizeCart(slug); // Get raw cart state to save
+  const { cart, addItem, itemCount: rawItemCount, changeLineQty, removeLine } = useFranchizeCart(slug);
+  const { cartLines, subtotal, itemCount } = useFranchizeCartLines(slug, items, {
+    cart,
+    itemCount: rawItemCount,
+    changeLineQty,
+    removeLine,
+  });
   const surface = crewPaletteForSurface(crew.theme);
   const router = useRouter();
   const { dbUser } = useAppContext();
