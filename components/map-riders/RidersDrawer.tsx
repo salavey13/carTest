@@ -26,6 +26,7 @@ export function RidersDrawer() {
   const [meetupTitle, setMeetupTitle] = useState("Точка сбора");
   const [meetupComment, setMeetupComment] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [isReplayOpen, setIsReplayOpen] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const { createMeetup, isSubmitting } = useMeetupCreator(crewSlug);
 
@@ -187,21 +188,34 @@ export function RidersDrawer() {
             <TabsContent value="history" className="flex-1 overflow-auto p-4">
               <div className="space-y-2">
                 {state.recentCompleted.map((session) => (
-                  <button
-                    key={session.id}
-                    type="button"
-                    onClick={() => fetchSessionDetail(session.id)}
-                    className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-left transition hover:border-emerald-400/50"
-                  >
-                    <div>
-                      <div className="text-sm font-medium text-white">{session.rider_name}</div>
-                      <div className="text-xs text-zinc-400">{session.ride_name || "Без названия"} • {formatRideDuration(session.duration_seconds)}</div>
-                    </div>
-                    <div className="text-right text-sm text-emerald-200">
-                      <div>{Number(session.total_distance_km || 0).toFixed(1)} км</div>
-                      <div className="text-xs">avg {Number(session.avg_speed_kmh || 0).toFixed(1)}</div>
-                    </div>
-                  </button>
+                  <div key={session.id} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => fetchSessionDetail(session.id)}
+                      className="flex w-full items-center justify-between text-left transition hover:text-emerald-100"
+                    >
+                      <div>
+                        <div className="text-sm font-medium text-white">{session.rider_name}</div>
+                        <div className="text-xs text-zinc-400">{session.ride_name || "Без названия"} • {formatRideDuration(session.duration_seconds)}</div>
+                      </div>
+                      <div className="text-right text-sm text-emerald-200">
+                        <div>{Number(session.total_distance_km || 0).toFixed(1)} км</div>
+                        <div className="text-xs">avg {Number(session.avg_speed_kmh || 0).toFixed(1)}</div>
+                      </div>
+                    </button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-2 h-8 w-full border-emerald-300/40 text-emerald-100"
+                      onClick={async () => {
+                        await fetchSessionDetail(session.id);
+                        setIsReplayOpen(true);
+                      }}
+                    >
+                      Открыть replay
+                    </Button>
+                  </div>
                 ))}
                 {!state.recentCompleted.length && (
                   <div className="rounded-xl border border-dashed border-white/25 p-4 text-center text-xs text-muted-foreground">
@@ -213,6 +227,121 @@ export function RidersDrawer() {
           </Tabs>
         </Drawer.Content>
       </Drawer.Root>
+
+      {isReplayOpen ? (
+        <ReplayFullscreen
+          points={state.sessionDetail?.points || []}
+          title={state.sessionDetail?.session?.ride_name || "Маршрут заезда"}
+          onClose={() => setIsReplayOpen(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ReplayFullscreen({
+  points,
+  title,
+  onClose,
+}: {
+  points: Array<{ lat: number; lon: number; speedKmh: number; capturedAt: string }>;
+  title: string;
+  onClose: () => void;
+}) {
+  const total = points.length;
+  const [index, setIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [speedMs, setSpeedMs] = useState<250 | 500 | 1000>(500);
+  const current = points[index];
+
+  useEffect(() => {
+    if (!playing || total < 2) return;
+    const timer = setInterval(() => {
+      setIndex((prev) => {
+        if (prev >= total - 1) {
+          setPlaying(false);
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, speedMs);
+    return () => clearInterval(timer);
+  }, [playing, speedMs, total]);
+
+  useEffect(() => {
+    setIndex(0);
+    setPlaying(false);
+  }, [total]);
+
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (event.key === "ArrowRight") setIndex((prev) => Math.min(prev + 1, Math.max(total - 1, 0)));
+      if (event.key === "ArrowLeft") setIndex((prev) => Math.max(prev - 1, 0));
+      if (event.key === " ") {
+        event.preventDefault();
+        setPlaying((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose, total]);
+
+  const progress = total > 1 ? (index / (total - 1)) * 100 : 0;
+
+  return (
+    <div className="fixed inset-0 z-[90] flex flex-col bg-black/95 p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-xs uppercase tracking-wide text-emerald-200/80">Route replay</div>
+          <h3 className="text-base font-semibold text-white">{title}</h3>
+        </div>
+        <Button type="button" size="sm" variant="outline" onClick={onClose}>Закрыть</Button>
+      </div>
+
+      <div className="mt-4 flex-1 rounded-xl border border-white/10 bg-white/5 p-3">
+        {!total ? (
+          <div className="text-sm text-zinc-400">Нет точек маршрута для воспроизведения.</div>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2 text-xs text-zinc-300">
+              <div>Точка: {index + 1} / {total}</div>
+              <div className="text-right">Скорость: {Number(current?.speedKmh || 0).toFixed(1)} км/ч</div>
+              <div className="col-span-2 break-all text-zinc-400">
+                {current?.capturedAt ? new Date(current.capturedAt).toLocaleString("ru-RU") : "—"}
+              </div>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded bg-white/10">
+              <div className="h-full rounded bg-emerald-400 transition-all" style={{ width: `${progress}%` }} />
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(total - 1, 0)}
+              value={index}
+              onChange={(event) => setIndex(Number(event.target.value))}
+              className="w-full"
+            />
+            <div className="grid grid-cols-3 gap-2">
+              <Button type="button" variant="outline" onClick={() => setIndex((prev) => Math.max(prev - 1, 0))}>← Шаг</Button>
+              <Button type="button" onClick={() => setPlaying((prev) => !prev)} disabled={total < 2}>
+                {playing ? "Пауза" : "Play"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setIndex((prev) => Math.min(prev + 1, Math.max(total - 1, 0)))}>Шаг →</Button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <Button type="button" size="sm" variant={speedMs === 250 ? "default" : "outline"} onClick={() => setSpeedMs(250)}>x2</Button>
+              <Button type="button" size="sm" variant={speedMs === 500 ? "default" : "outline"} onClick={() => setSpeedMs(500)}>x1</Button>
+              <Button type="button" size="sm" variant={speedMs === 1000 ? "default" : "outline"} onClick={() => setSpeedMs(1000)}>x0.5</Button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
