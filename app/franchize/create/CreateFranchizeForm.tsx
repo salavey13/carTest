@@ -342,10 +342,11 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
   const onLoad = useCallback((slugOverride?: string) => {
     startTransition(async () => {
       const slugCandidate = slugOverride ?? form.slug;
-      const slugToLoad = typeof slugCandidate === "string" ? slugCandidate.trim() : "";
-      if (!slugToLoad) {
-        setMessage("Укажите slug перед загрузкой конфигурации.");
-        return;
+      const normalizedCandidate = typeof slugCandidate === "string" ? slugCandidate.trim() : "";
+      const slugToLoad = normalizedCandidate || "vip-bike";
+
+      if (!normalizedCandidate) {
+        setForm((prev) => ({ ...prev, slug: slugToLoad }));
       }
 
       const result = await loadFranchizeConfigBySlug(slugToLoad, actorUserId);
