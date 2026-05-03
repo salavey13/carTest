@@ -353,7 +353,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
       if (!result.ok || !result.data) return setMessage(result.message);
       setForm({
         ...result.data,
-        slug: typeof result.data.slug === "string" ? result.data.slug : slugToLoad,
+        slug: slugToLoad,
       });
       setCanEdit(Boolean(result.canEdit));
       setMessage(result.message);
