@@ -98,13 +98,15 @@ export function useFranchizeCartLines(
         const salePrice = resolveSalePrice(item);
 
         if (inBuyFlow && salePrice > 0) {
+          const buyDelta = Math.max(0, line.options.buyPriceDelta ?? 0);
+          const effectiveSalePrice = salePrice + buyDelta;
           return {
             lineId,
             itemId: line.itemId,
             qty: line.qty,
             item,
-            pricePerDay: salePrice,
-            lineTotal: salePrice * line.qty,
+            pricePerDay: effectiveSalePrice,
+            lineTotal: effectiveSalePrice * line.qty,
             rentalDays: 1,
             saleAvailable: Boolean(item?.saleAvailable),
             options: line.options,
