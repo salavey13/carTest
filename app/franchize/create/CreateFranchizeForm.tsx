@@ -423,7 +423,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
         <label className="text-sm">Slug экипажа
           <input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.slug} onChange={(e) => updateField("slug", e.target.value)} placeholder="vip-bike" />
         </label>
-        <div className="flex items-end gap-2"><button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ backgroundColor: ui.accent, color: ui.accentText }} onClick={onLoad}>Загрузить по slug</button></div>
+        <div className="flex items-end gap-2"><button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ backgroundColor: ui.accent, color: ui.accentText }} onClick={() => onLoad()}>Загрузить по slug</button></div>
       </section>
 
       {stage === "palette" && (
