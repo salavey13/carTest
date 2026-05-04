@@ -1849,6 +1849,38 @@ export async function createFranchizeOrderCheckout(
   }
 }
 
+const checkFranchizeAvailabilitySchema = z.object({
+  carIds: z.array(z.string().trim().min(1)).min(1),
+  rentalStartDate: z.string().trim().min(1),
+  rentalEndDate: z.string().trim().min(1),
+});
+
+export async function checkFranchizeCarsAvailability(input: unknown): Promise<{ success: boolean; unavailableCarIds?: string[]; error?: string }> {
+  const parsed = checkFranchizeAvailabilitySchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Некорректный запрос проверки доступности." };
+  }
+
+  const { carIds, rentalStartDate, rentalEndDate } = parsed.data;
+  const startIso = new Date(`${rentalStartDate}T00:00:00.000Z`).toISOString();
+  const endIso = new Date(`${rentalEndDate}T23:59:59.999Z`).toISOString();
+
+  const { data, error } = await supabaseAdmin
+    .from("rentals")
+    .select("vehicle_id")
+    .in("vehicle_id", carIds)
+    .in("status", ["pending", "confirmed", "active"])
+    .filter("requested_start_date", "lt", endIso)
+    .filter("requested_end_date", "gt", startIso);
+
+  if (error) {
+    return { success: false, error: `Не удалось проверить пересечения аренды: ${error.message}` };
+  }
+
+  const unavailableCarIds = Array.from(new Set((data ?? []).map((row) => row.vehicle_id).filter((id): id is string => typeof id === "string")));
+  return { success: true, unavailableCarIds };
+}
+
 export async function getFranchizeRentalCard(slug: string, rentalId: string): Promise<{
   found: boolean;
   rentalId: string;
