@@ -1,12 +1,23 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getFranchizeBySlug } from "../../actions";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { FranchizeRentalsBridge } from "../../components/FranchizeRentalsBridge";
 import { FranchizeErrorBoundary } from "../../components/ErrorBoundary";
+import { buildFranchizeSectionMetadata } from "../metadata";
 
 interface FranchizeRentalsPageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: FranchizeRentalsPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  return buildFranchizeSectionMetadata(slug, {
+    sectionTitle: "Аренды",
+    sectionDescription: "Раздел управления арендами экипажа: текущие, завершённые и ожидающие заказы.",
+    pathSuffix: "/rentals",
+  });
 }
 
 export default async function FranchizeRentalsPage({ params }: FranchizeRentalsPageProps) {

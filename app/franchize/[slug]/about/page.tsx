@@ -1,11 +1,22 @@
+import type { Metadata } from "next";
 import { getFranchizeBySlug } from "../../actions";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { FranchizeFloatingCart } from "../../components/FranchizeFloatingCart";
 import { crewPaletteForSurface } from "../../lib/theme";
+import { buildFranchizeSectionMetadata } from "../metadata";
 
 interface FranchizeAboutPageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: FranchizeAboutPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  return buildFranchizeSectionMetadata(slug, {
+    sectionTitle: "О нас",
+    sectionDescription: "О франшизе, команде, ценностях и формате работы экипажа.",
+    pathSuffix: "/about",
+  });
 }
 
 export default async function FranchizeAboutPage({ params }: FranchizeAboutPageProps) {
