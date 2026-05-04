@@ -20,32 +20,45 @@ type MinimalRental = {
 
 type RentalLifecycleEvent = "rental_archived" | "pickup_confirmed" | "return_confirmed";
 
+const RENTAL_EVENT_LABELS: Record<RentalLifecycleEvent, string> = {
+  rental_archived: "Бронь отменена и перенесена в архив",
+  pickup_confirmed: "Выдача техники подтверждена",
+  return_confirmed: "Возврат техники подтверждён",
+};
+
 async function notifyRentalLifecycle(rentalId: string, event: RentalLifecycleEvent): Promise<void> {
-    const { data: rental, error } = await supabaseAdmin
-        .from("rentals")
-        .select("rental_id, user_id, owner_id, status, payment_status")
-        .eq("rental_id", rentalId)
-        .maybeSingle();
-    if (error || !rental) return;
+  const { data: rental, error } = await supabaseAdmin
+    .from("rentals")
+    .select("rental_id, user_id, owner_id, status, payment_status")
+    .eq("rental_id", rentalId)
+    .maybeSingle();
+  if (error || !rental) return;
 
-    const userIds = [rental.user_id, rental.owner_id].filter((id): id is string => typeof id === "string" && id.length > 0);
-    if (!userIds.length) return;
+  const userIds = [rental.user_id, rental.owner_id].filter((id): id is string => typeof id === "string" && id.length > 0);
+  if (!userIds.length) return;
 
-    const { data: recipients } = await supabaseAdmin
-        .from("profiles")
-        .select("user_id, telegram_id")
-        .in("user_id", userIds);
+  const { data: recipients } = await supabaseAdmin
+    .from("profiles")
+    .select("user_id, telegram_id")
+    .in("user_id", userIds);
 
-    const text = `🚦 Rental update\n#${rental.rental_id}\nEvent: ${event}\nStatus: ${rental.status}\nPayment: ${rental.payment_status}`;
-    const notifyTargets = (recipients ?? [])
+  const eventLabel = RENTAL_EVENT_LABELS[event] ?? event;
+  const text = [
+    "🚦 Обновление аренды",
+    `#${rental.rental_id}`,
+    `Событие: ${eventLabel}`,
+    `Текущий статус: ${rental.status}`,
+    `Оплата: ${rental.payment_status}`,
+  ].join("\n");
+  const notifyTargets = Array.from(
+    new Set(
+      (recipients ?? [])
         .map((profile) => String(profile.telegram_id || "").trim())
-        .filter(Boolean);
+        .filter(Boolean),
+    ),
+  );
 
-    await Promise.allSettled(
-        notifyTargets.map((chatId) =>
-            sendComplexMessage(chatId, text, [], { parseMode: "Markdown" }),
-        ),
-    );
+  await Promise.allSettled(notifyTargets.map((chatId) => sendComplexMessage(chatId, text)));
 }
 
 /**
