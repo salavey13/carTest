@@ -9,7 +9,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
-import { createFranchizeOrderCheckout } from "../actions";
+import { checkFranchizeCarsAvailability, createFranchizeOrderCheckout } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
 import { getFranchizeFormPrefillAction } from "../profile-actions";
@@ -89,6 +89,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const { user, dbUser } = useAppContext();
   const { cartLines, subtotal } = useFranchizeCartLines(slug, items);
   const [isSubmitting, startSubmitTransition] = useTransition();
+  const [paymentRetryHint, setPaymentRetryHint] = useState<string | null>(null);
   const lastSubmitFingerprintRef = useRef<string | null>(null);
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
@@ -244,7 +245,25 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     void loadPrefill();
   }, [dbUser?.user_id, setValue, slug]);
 
-  const onSubmitValid = (values: OrderFormValues) => {
+  const checkAvailabilityBeforeSubmit = async () => {
+    const carIds = Array.from(new Set(submitPayload.cartLines.map((line) => line.itemId).filter(Boolean)));
+    const startDate = submitPayload.rentalStartDate;
+    const endDate = submitPayload.rentalEndDate || submitPayload.rentalStartDate;
+    if (!carIds.length || !startDate || !endDate) return true;
+
+    const result = await checkFranchizeCarsAvailability({ carIds, rentalStartDate: startDate, rentalEndDate: endDate });
+    if (!result.success) {
+      toast.error(result.error ?? "Не удалось проверить доступность байка.");
+      return false;
+    }
+    if ((result.unavailableCarIds?.length ?? 0) > 0) {
+      toast.error("Часть байков уже занята в выбранный период. Обновите даты или состав заказа.");
+      return false;
+    }
+    return true;
+  };
+
+  const onSubmitValid = async (values: OrderFormValues) => {
     const submitFingerprint = JSON.stringify({
       orderId,
       payment: values.payment,
@@ -268,6 +287,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       toast.message("Похожий checkout уже обрабатывается. Ждём ответ Telegram.");
       return;
     }
+
+    const isAvailable = await checkAvailabilityBeforeSubmit();
+    if (!isAvailable) return;
 
     lastSubmitFingerprintRef.current = submitFingerprint;
 
@@ -297,12 +319,16 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
       if (!result.success) {
         toast.error(result.error ?? "Не удалось отправить заказ.");
+        if (values.payment === "telegram_xtr") {
+          setPaymentRetryHint("XTR-оплата не завершилась. Проверьте Telegram WebApp и повторите отправку или выберите fallback-оплату.");
+        }
         lastSubmitFingerprintRef.current = null;
         return;
       }
 
       if (values.payment === "telegram_xtr") {
         toast.success("XTR-счёт отправлен в Telegram. После оплаты откроется franchize flow ⭐");
+        setPaymentRetryHint(null);
         lastSubmitFingerprintRef.current = null;
         return;
       }
@@ -456,6 +482,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             {requiresTelegram && !hasTelegramUser ? (
               <p className="mt-2 text-xs" style={surface.mutedText}>Для оплаты в Stars откройте оформление из Telegram WebApp.</p>
             ) : null}
+            {paymentRetryHint ? <p className="mt-2 text-xs text-amber-300">{paymentRetryHint}</p> : null}
             <div className="mt-3 flex gap-2">
               <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Промокод" {...register("promo")} />
               <button type="button" className="rounded-xl border border-[var(--order-border)] px-3 text-sm transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={focusRingOutlineStyle(crew.theme)}>
