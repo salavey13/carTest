@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Battery,
@@ -98,6 +98,24 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
   );
 
   const canShowConcretePrice = basePrice > 0;
+
+  const trustStats = useMemo(() => ({
+    soldCount: Number(specs.sold_count || 120),
+    rating: Number(specs.rating || 4.9),
+    recommendPercent: Number(specs.recommend_percent || 98),
+  }), [specs.rating, specs.recommend_percent, specs.sold_count]);
+
+  useEffect(() => {
+    if (!configOptions.find((option) => option.id === selectedOptionId)) {
+      setSelectedOptionId(configOptions[0]?.id ?? "standard");
+    }
+  }, [configOptions, selectedOptionId]);
+
+  useEffect(() => {
+    if (!colorOptions.find((color) => color.id === selectedColorId)) {
+      setSelectedColorId(colorOptions[0]?.id ?? "black");
+    }
+  }, [colorOptions, selectedColorId]);
 
   const cards = [
     { label: "Тип", value: item.category, icon: Tag },
@@ -225,6 +243,7 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
                   onClick={handleAddToCart}
                   disabled={!isHydrated}
                   className="rounded-xl px-4 py-3 text-center font-semibold transition hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                  aria-live="polite"
                   style={{ ...surface.subtleCard, background: crew.theme.palette.accentMain, color: "#101010" }}
                 >
                   {!isHydrated ? "Подготовка корзины..." : cartState === "loading" ? "Добавляем..." : cartState === "success" ? "Добавлено в корзину" : cartState === "error" ? "Повторить" : "Добавить в корзину"}
@@ -288,9 +307,9 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
           <div className="rounded-3xl border p-4 sm:p-5" style={surface.card}>
             <h2 className="text-xl font-semibold">Нам доверяют</h2>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-xl border p-3" style={surface.subtleCard}><p className="text-2xl font-bold">120+</p><p className="text-xs opacity-70">Продано</p></div>
-              <div className="rounded-xl border p-3" style={surface.subtleCard}><p className="text-2xl font-bold">4.9</p><p className="text-xs opacity-70">Рейтинг</p></div>
-              <div className="rounded-xl border p-3" style={surface.subtleCard}><p className="text-2xl font-bold">98%</p><p className="text-xs opacity-70">Рекомендуют</p></div>
+              <div className="rounded-xl border p-3" style={surface.subtleCard}><p className="text-2xl font-bold">{trustStats.soldCount}+</p><p className="text-xs opacity-70">Продано</p></div>
+              <div className="rounded-xl border p-3" style={surface.subtleCard}><p className="text-2xl font-bold">{trustStats.rating.toFixed(1)}</p><p className="text-xs opacity-70">Рейтинг</p></div>
+              <div className="rounded-xl border p-3" style={surface.subtleCard}><p className="text-2xl font-bold">{trustStats.recommendPercent}%</p><p className="text-xs opacity-70">Рекомендуют</p></div>
             </div>
             <div className="mt-3 rounded-2xl border p-3" style={surface.subtleCard}>
               <p className="font-medium">Алексей, Москва</p>
