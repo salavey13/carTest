@@ -78,6 +78,11 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                 record: {rental.docVerifierRecordId.slice(0, 8)}…
               </span>
             ) : null}
+            {rental.contractSourceScope ? (
+              <span className="text-[11px]" style={{ color: crew.theme.palette.textSecondary }}>
+                source: {rental.contractSourceScope}
+              </span>
+            ) : null}
           </div>
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             <p><span style={{ color: crew.theme.palette.textSecondary }}>Rental ID:</span> {rental.rentalId}</p>
@@ -85,6 +90,11 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             <p><span style={{ color: crew.theme.palette.textSecondary }}>Оплата:</span> {rental.paymentStatus}</p>
             <p><span style={{ color: crew.theme.palette.textSecondary }}>Итого:</span> {rental.totalCost.toLocaleString("ru-RU")} ₽</p>
             <p className="sm:col-span-2"><span style={{ color: crew.theme.palette.textSecondary }}>Транспорт:</span> {rental.vehicleTitle}</p>
+            {rental.contractOriginalSha256 ? (
+              <p className="sm:col-span-2 break-all">
+                <span style={{ color: crew.theme.palette.textSecondary }}>Contract SHA256:</span> {rental.contractOriginalSha256}
+              </p>
+            ) : null}
           </div>
 
           <div className="mt-5 grid gap-2 sm:grid-cols-2">
