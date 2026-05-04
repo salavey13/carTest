@@ -1469,8 +1469,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     } as const;
 
     const docFileName = `franchize-order-${payload.slug}-${payload.orderId}.docx`;
-    const { bytes, renderedMarkdown } = await buildFranchizeDocxFromTemplate({
-      integrationScope: "franchize",
+    const verifierScope = `${flowType}:${payload.slug}:${payload.orderId}`;
+    const { bytes, renderedMarkdown, verifierRecordId, sha256 } = await buildFranchizeDocxFromTemplate({
+      integrationScope: verifierScope,
       uploadedBy: "franchize-order-system",
       documentKey: variables.document_key,
       fileName: docFileName,
@@ -1525,6 +1526,40 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       doc_file_name: docFileName,
       last_error: "",
     });
+
+    if (flowType === "rental") {
+      const { data: rentalRow } = await supabaseAdmin
+        .from("rentals")
+        .select("rental_id, metadata")
+        .eq("metadata->>orderId", payload.orderId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (rentalRow?.rental_id) {
+        const existingMetadata =
+          rentalRow.metadata && typeof rentalRow.metadata === "object" ? (rentalRow.metadata as Record<string, unknown>) : {};
+        const rentalScope = `rental:${rentalRow.rental_id}`;
+        await supabaseAdmin
+          .from("rentals")
+          .update({
+            metadata: {
+              ...existingMetadata,
+              contract_verifier: {
+                scope: rentalScope,
+                sourceScope: verifierScope,
+                documentKey: variables.document_key,
+                docVerifierRecordId: verifierRecordId ?? null,
+                originalSha256: sha256,
+                status: "verified",
+                verifiedAt: new Date().toISOString(),
+                expiresAt: null,
+              },
+            },
+          })
+          .eq("rental_id", rentalRow.rental_id);
+      }
+    }
 
     return { renderedMarkdown, docFileName };
   } catch (error) {
@@ -1825,6 +1860,10 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   renterId: string;
   ownerId: string;
   metadata: Record<string, unknown> | null;
+  contractVerificationStatus: "verified" | "not_verified" | "expired";
+  contractVerifierScope: string;
+  contractDocumentKey: string;
+  docVerifierRecordId: string;
   telegramDeepLink: string;
 }> {
   const safeSlug = slug.trim();
@@ -1841,6 +1880,10 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       renterId: "",
       ownerId: "",
       metadata: null,
+      contractVerificationStatus: "not_verified",
+      contractVerifierScope: "",
+      contractDocumentKey: "",
+      docVerifierRecordId: "",
       telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${safeRentalId}`,
     };
   }
@@ -1863,11 +1906,25 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       renterId: "",
       ownerId: "",
       metadata: null,
+      contractVerificationStatus: "not_verified",
+      contractVerifierScope: "",
+      contractDocumentKey: "",
+      docVerifierRecordId: "",
       telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${safeRentalId}`,
     };
   }
 
   const vehicle = data.vehicle as { make?: string; model?: string } | null;
+
+  const metadata = (data.metadata as Record<string, unknown> | null) ?? null;
+  const verifier = metadata && typeof metadata.contract_verifier === "object" ? (metadata.contract_verifier as Record<string, unknown>) : null;
+  const expiresAtValue = typeof verifier?.expiresAt === "string" ? verifier.expiresAt : "";
+  const hasExpired = Boolean(expiresAtValue) && new Date(expiresAtValue).getTime() < Date.now();
+  const contractVerificationStatus = hasExpired
+    ? "expired"
+    : typeof verifier?.status === "string" && verifier.status.toLowerCase() === "verified"
+      ? "verified"
+      : "not_verified";
 
   return {
     found: true,
@@ -1879,7 +1936,11 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     vehicleTitle: `${vehicle?.make ?? "Vehicle"} ${vehicle?.model ?? ""}`.trim(),
     renterId: data.user_id ?? "",
     ownerId: data.owner_id ?? "",
-    metadata: (data.metadata as Record<string, unknown> | null) ?? null,
+    metadata,
+    contractVerificationStatus,
+    contractVerifierScope: typeof verifier?.scope === "string" ? verifier.scope : "",
+    contractDocumentKey: typeof verifier?.documentKey === "string" ? verifier.documentKey : "",
+    docVerifierRecordId: typeof verifier?.docVerifierRecordId === "string" ? verifier.docVerifierRecordId : "",
     telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${data.rental_id}`,
   };
 }

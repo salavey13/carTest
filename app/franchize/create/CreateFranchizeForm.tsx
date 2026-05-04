@@ -182,6 +182,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
   const actorUserId = dbUser?.user_id ?? (user?.id ? String(user.id) : "");
 
   const initialSlugAppliedRef = useRef(false);
+  const loadRequestIdRef = useRef(0);
 
   const isDark = useMemo(() => form.themeMode.toLowerCase().includes("dark"), [form.themeMode]);
 
@@ -341,10 +342,25 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
 
   const onLoad = useCallback((slugOverride?: string) => {
     startTransition(async () => {
-      const slugToLoad = (slugOverride ?? form.slug).trim();
+      const requestId = ++loadRequestIdRef.current;
+      const slugCandidate = slugOverride ?? form.slug;
+      const normalizedCandidate = typeof slugCandidate === "string" ? slugCandidate.trim() : "";
+      const slugToLoad = normalizedCandidate || "vip-bike";
+
+      if (!normalizedCandidate) {
+        setForm((prev) => ({ ...prev, slug: slugToLoad }));
+      }
+
       const result = await loadFranchizeConfigBySlug(slugToLoad, actorUserId);
+      if (requestId !== loadRequestIdRef.current) {
+        return;
+      }
+
       if (!result.ok || !result.data) return setMessage(result.message);
-      setForm(result.data);
+      setForm({
+        ...result.data,
+        slug: slugToLoad,
+      });
       setCanEdit(Boolean(result.canEdit));
       setMessage(result.message);
     });
@@ -413,7 +429,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
         <label className="text-sm">Slug экипажа
           <input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.slug} onChange={(e) => updateField("slug", e.target.value)} placeholder="vip-bike" />
         </label>
-        <div className="flex items-end gap-2"><button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ backgroundColor: ui.accent, color: ui.accentText }} onClick={onLoad}>Загрузить по slug</button></div>
+        <div className="flex items-end gap-2"><button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ backgroundColor: ui.accent, color: ui.accentText }} onClick={() => onLoad()}>Загрузить по slug</button></div>
       </section>
 
       {stage === "palette" && (
