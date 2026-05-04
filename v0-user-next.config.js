@@ -3,10 +3,6 @@ const nextConfig = {
   reactStrictMode: true,
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        "mapbox-gl": "mapbox-gl/dist/mapbox-gl.js",
-      }
 
       // Output the worker file to a known location
       config.output.filename = (pathData) => {
