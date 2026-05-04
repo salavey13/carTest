@@ -1890,14 +1890,21 @@ export async function checkFranchizeCarsAvailability(input: unknown): Promise<{ 
   }
 
   const { carIds, rentalStartDate, rentalEndDate } = parsed.data;
-  const startIso = new Date(`${rentalStartDate}T00:00:00.000Z`).toISOString();
-  const endIso = new Date(`${rentalEndDate}T23:59:59.999Z`).toISOString();
+  const startAt = new Date(`${rentalStartDate}T00:00:00.000Z`);
+  const endAt = new Date(`${rentalEndDate}T23:59:59.999Z`);
+  if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || endAt < startAt) {
+    return { success: false, error: "Проверьте диапазон дат аренды." };
+  }
+  const startIso = startAt.toISOString();
+  const endIso = endAt.toISOString();
+
+  const blockingStatuses = ["pending", "pending_confirmation", "confirmed", "active"] as const;
 
   const { data, error } = await supabaseAdmin
     .from("rentals")
     .select("vehicle_id")
     .in("vehicle_id", carIds)
-    .in("status", ["pending", "confirmed", "active"])
+    .in("status", blockingStatuses)
     .filter("requested_start_date", "lt", endIso)
     .filter("requested_end_date", "gt", startIso);
 
