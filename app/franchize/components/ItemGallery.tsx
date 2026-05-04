@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buildCandidateImageUrls } from "@/app/franchize/lib/media";
 
 export interface ItemGalleryProps {
   images: string[];
@@ -32,6 +33,18 @@ export function ItemGallery({
   className = "",
 }: ItemGalleryProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [failedUrls, setFailedUrls] = useState<Record<string, true>>({});
+
+  const resolvedImages = useMemo(() => {
+    const out: string[] = [];
+    for (const raw of images) {
+      for (const candidate of buildCandidateImageUrls(raw)) {
+        if (!candidate || failedUrls[candidate]) continue;
+        if (!out.includes(candidate)) out.push(candidate);
+      }
+    }
+    return out;
+  }, [images, failedUrls]);
 
   useEffect(() => {
     if (disableKeyboardNav || images.length <= 1) return;
@@ -70,7 +83,7 @@ export function ItemGallery({
     }
   }, [mainAspectRatio]);
 
-  if (images.length === 0) {
+  if (resolvedImages.length === 0) {
     return (
       <div
         className="flex h-64 w-full items-center justify-center px-4 text-center text-sm sm:h-72"
@@ -81,7 +94,7 @@ export function ItemGallery({
     );
   }
 
-  if (images.length === 1) {
+  if (resolvedImages.length === 1) {
     return (
       <div
         ref={containerRef}
@@ -90,13 +103,13 @@ export function ItemGallery({
         style={{ backgroundColor: "var(--item-card-bg, #000)" }}
       >
         <Image
-          src={images[0]}
+          src={resolvedImages[0]}
           alt={`${altText} 1`}
           fill
           sizes="(max-width: 1024px) 100vw, 42vw"
           className="object-cover"
           unoptimized
-          priority
+          loading="lazy"
         />
       </div>
     );
@@ -107,13 +120,18 @@ export function ItemGallery({
       {/* Main Image Container - FIXED: Added explicit aspect ratio class */}
       <div className={`relative w-full bg-black/25 ${getAspectRatioClass()}`}>
         <Image
-          src={images[activeIndex]}
+          src={resolvedImages[activeIndex]}
           alt={`${altText} ${activeIndex + 1}`}
           fill
           sizes="(max-width: 1024px) 100vw, 42vw"
           className="object-cover"
           unoptimized
-          priority={activeIndex === 0}
+          loading={activeIndex === 0 ? "eager" : "lazy"}
+          onError={() => {
+            const failed = resolvedImages[activeIndex];
+            if (!failed) return;
+            setFailedUrls((prev) => ({ ...prev, [failed]: true }));
+          }}
         />
 
         {/* Navigation Arrows */}
@@ -137,7 +155,7 @@ export function ItemGallery({
 
         {/* Image Counter Badge */}
         <div className="absolute bottom-3 left-3 rounded-full bg-black/55 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm select-none pointer-events-none">
-          {activeIndex + 1} / {images.length}
+          {activeIndex + 1} / {resolvedImages.length}
         </div>
       </div>
 
@@ -147,7 +165,7 @@ export function ItemGallery({
         style={{ borderColor, backgroundColor: bgColor }}
       >
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-          {images.map((url, index) => {
+          {resolvedImages.map((url, index) => {
             const isActive = index === activeIndex;
             return (
               <button
@@ -174,6 +192,7 @@ export function ItemGallery({
                   className="object-cover"
                   unoptimized
                   loading={index === 0 ? "eager" : "lazy"}
+                  onError={() => setFailedUrls((prev) => ({ ...prev, [url]: true }))}
                 />
                 {isActive && (
                   <div
