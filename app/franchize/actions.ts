@@ -1531,19 +1531,23 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       const { data: rentalRow } = await supabaseAdmin
         .from("rentals")
         .select("rental_id, metadata")
-        .eq("rental_id", payload.orderId)
+        .eq("metadata->>orderId", payload.orderId)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (rentalRow?.rental_id) {
         const existingMetadata =
           rentalRow.metadata && typeof rentalRow.metadata === "object" ? (rentalRow.metadata as Record<string, unknown>) : {};
+        const rentalScope = `rental:${rentalRow.rental_id}`;
         await supabaseAdmin
           .from("rentals")
           .update({
             metadata: {
               ...existingMetadata,
               contract_verifier: {
-                scope: verifierScope,
+                scope: rentalScope,
+                sourceScope: verifierScope,
                 documentKey: variables.document_key,
                 docVerifierRecordId: verifierRecordId ?? null,
                 originalSha256: sha256,
