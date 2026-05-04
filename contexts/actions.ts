@@ -201,3 +201,97 @@ export async function saveUserFranchizeCartAction(
     return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
   }
 }
+
+export async function upsertTempFranchizeCartAction(input: {
+  cartId: string;
+  cartBySlug: Record<string, unknown>;
+}): Promise<{ ok: boolean; error?: string }> {
+  const cartId = input.cartId?.trim();
+  if (!cartId) return { ok: false, error: "Missing cartId" };
+  if (!input.cartBySlug || typeof input.cartBySlug !== "object" || Array.isArray(input.cartBySlug)) {
+    return { ok: false, error: "cartBySlug must be an object" };
+  }
+
+  try {
+    const { data: existing } = await supabaseAdmin
+      .from("temp_franchize_carts")
+      .select("cart_by_slug")
+      .eq("cart_id", cartId)
+      .maybeSingle();
+
+    const existingBySlug = ((existing?.cart_by_slug as Record<string, unknown> | null) ?? {});
+    const mergedBySlug = { ...existingBySlug, ...input.cartBySlug };
+
+    const { error } = await supabaseAdmin
+      .from("temp_franchize_carts")
+      .upsert({ cart_id: cartId, cart_by_slug: mergedBySlug, updated_at: new Date().toISOString() }, { onConflict: "cart_id" });
+    if (error) throw error;
+    return { ok: true };
+  } catch (error) {
+    logger.error("[upsertTempFranchizeCartAction] Failed:", error);
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+export async function consumeTempFranchizeCartAction(input: {
+  cartId: string;
+  userId: string;
+}): Promise<{ ok: boolean; cartBySlug?: Record<string, unknown>; error?: string }> {
+  const cartId = input.cartId?.trim();
+  const userId = input.userId?.trim();
+  if (!cartId || !userId) return { ok: false, error: "Missing cartId or userId" };
+
+  try {
+    const { data: tempCart, error: tempCartError } = await supabaseAdmin
+      .from("temp_franchize_carts")
+      .select("cart_by_slug, consumed_at")
+      .eq("cart_id", cartId)
+      .maybeSingle();
+    if (tempCartError) throw tempCartError;
+
+    const cartBySlug = ((tempCart?.cart_by_slug as Record<string, unknown> | null) ?? {});
+
+    const { data: user, error: userError } = await supabaseAdmin
+      .from("users")
+      .select("metadata")
+      .eq("user_id", userId)
+      .single();
+    if (userError || !user) return { ok: false, error: "User not found" };
+
+    const currentMeta = (user.metadata as Record<string, any>) || {};
+    const currentSettings = (currentMeta.settings as Record<string, any>) || {};
+    const currentCarts = (currentSettings.franchizeCart as Record<string, any>) || {};
+    const mergedCarts = { ...currentCarts };
+    for (const [slug, incomingCart] of Object.entries(cartBySlug)) {
+      const currentSlugCart = (currentCarts[slug] as Record<string, any> | undefined) ?? {};
+      const incomingSlugCart = (incomingCart as Record<string, any> | undefined) ?? {};
+      mergedCarts[slug] = { ...currentSlugCart, ...incomingSlugCart };
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from("users")
+      .update({
+        metadata: {
+          ...currentMeta,
+          settings: {
+            ...currentSettings,
+            franchizeCart: mergedCarts,
+          },
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+    if (updateError) throw updateError;
+
+    const { error: consumeError } = await supabaseAdmin
+      .from("temp_franchize_carts")
+      .update({ consumed_by_user_id: userId, consumed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("cart_id", cartId);
+    if (consumeError) throw consumeError;
+
+    return { ok: true, cartBySlug };
+  } catch (error) {
+    logger.error("[consumeTempFranchizeCartAction] Failed:", error);
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
