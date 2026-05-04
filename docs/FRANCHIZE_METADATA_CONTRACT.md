@@ -28,6 +28,7 @@ Expected stable blocks:
    - `palette.textSecondary: string`
    - `palette.borderSoft: string`
 3. `header`
+   - `logoHref?: string` (optional; if present, header logo redirects to this path, e.g. `/vipbikerental`)
    - `menuLinks: Array<{ label: string; href: string }>`
 4. `contacts`
    - `phone, email, address, telegram, workingHours: string`
@@ -47,6 +48,7 @@ Expected stable blocks:
 |---|---|---|
 | Theme palette | `theme.palette` or mode bucket (`theme.palette.light/dark`, `theme.palettes.light/dark`) | Pepperolli default palette in `app/franchize/actions.ts` |
 | Header menu | `header.menuLinks` | generated slug-aware defaults (`/franchize/{slug}`, `/about`, `/contacts`, `/cart`) |
+| Header logo click target | `header.logoHref` | `/franchize/{slug}` |
 | Contacts phone/email/address | `contacts.*` | `footer.*` -> crew DB fields (`hq_location`) |
 | Footer social links | `footer.socialLinks` | `footer.columns[].items[]` -> `contacts.telegram` -> `oneBikePlsBot` |
 | Catalog order | `catalog.groupOrder` | derive from catalog item subtype frequency |
