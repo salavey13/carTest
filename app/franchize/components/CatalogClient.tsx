@@ -413,7 +413,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
                       >
                         <div className="relative aspect-[4/3] w-full lg:aspect-square">
                           {item.imageUrl ? (
-                            <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 768px) 50vw, (max-width: 1279px) 33vw, (max-width: 1535px) 24vw, 20vw" className="object-cover" unoptimized />
+                            <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 1279px) 50vw, (max-width: 1535px) 33vw, 25vw" className="object-cover" unoptimized />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Изображение байка скоро загрузим</div>
                           )}
