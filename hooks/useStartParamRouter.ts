@@ -8,6 +8,8 @@ import { useAppToast } from "@/hooks/useAppToast";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { setReferrer } from "@/app/bio30/ref_actions";
 import { applyReferralCode } from "@/app/wblanding/actions_view";
+import { consumeTempFranchizeCartAction } from "@/contexts/actions";
+import { isMockUserModeEnabled } from "@/lib/mockUserMode";
 
 const START_PARAM_PAGE_MAP: Record<string, string> = {
   elon: "/elon",
@@ -60,6 +62,7 @@ export function useStartParamRouter() {
   const { success: showToast } = useAppToast();
 
   const handledRef = useRef(false);
+  const consumedTempCartRef = useRef<string | null>(null);
 
   const handleBio30Referral = useCallback(
     async (referrerId: string, referrerCode: string) => {
@@ -147,6 +150,20 @@ export function useStartParamRouter() {
 
       if (paramToProcess === "wb_dashboard") {
         targetPath = userCrewInfo?.slug ? `/wb/${userCrewInfo.slug}` : "/wblanding";
+      } else if (paramToProcess.startsWith("cart_id_")) {
+        const mockEnabled = isMockUserModeEnabled();
+        const cartId = paramToProcess.slice("cart_id_".length).trim();
+        if (!mockEnabled && dbUser?.user_id && cartId && consumedTempCartRef.current !== cartId) {
+          consumedTempCartRef.current = cartId;
+          const consumed = await consumeTempFranchizeCartAction({ cartId, userId: dbUser.user_id });
+          if (consumed.ok && consumed.cartBySlug && typeof window !== "undefined") {
+            for (const [slug, cartState] of Object.entries(consumed.cartBySlug)) {
+              window.localStorage.setItem(`franchize-cart:${slug}`, JSON.stringify({ updatedAt: Date.now(), cart: cartState }));
+            }
+            window.dispatchEvent(new CustomEvent("franchize-cart-sync", { detail: { storageKey: "*" } }));
+          }
+        }
+        targetPath = pathname;
       } else if (paramToProcess.startsWith("buy_")) {
         targetPath = await resolveFranchizeVehicleLink(paramToProcess, "buy") ?? undefined;
       } else if (paramToProcess.startsWith("rent_")) {
@@ -222,6 +239,7 @@ export function useStartParamRouter() {
   }, [
     startParamPayload,
     searchParams,
+    dbUser?.user_id,
     isAppLoading,
     isAuthenticating,
     userCrewInfo?.slug,
