@@ -300,21 +300,35 @@ export async function sendTelegramInvoice(chatId: string, title: string, descrip
         throw new Error(`Telegram API error: ${data.description || "Failed to send invoice"}`);
     }
     
-    // Attempt to save the invoice to the DB after it's been sent
-    try { 
-      await supabaseAdmin.from("invoices").insert({ 
-        id: payload, 
-        user_id: chatId, 
-        amount: finalAmount, // Save the amount that was actually billed
-        type: payload.split("_")[0], 
-        status: "pending", 
-        metadata: { description, title, original_unrounded_amount: amount }, // Store original amount for reference
-        // ПРОАКТИВНОЕ ИСПРАВЛЕНИЕ: Используем `??` вместо `||` чтобы 0 не превращался в null
-        subscription_id: subscription_id ?? null 
-      }); 
-    } catch (dbError: any) { 
+    // Attempt to save the invoice to the DB after it's been sent.
+    // Some flows (e.g. franchize checkout) persist invoices before sending to Telegram,
+    // so we only insert when no existing row is found to avoid duplicate-key noise.
+    try {
+      const { data: existingInvoice, error: invoiceLookupError } = await supabaseAdmin
+        .from("invoices")
+        .select("id")
+        .eq("id", payload)
+        .maybeSingle();
+
+      if (invoiceLookupError) {
+        logger.warn(`Invoice lookup failed before insert (${payload}): ${invoiceLookupError.message}`);
+      }
+
+      if (!existingInvoice?.id) {
+        await supabaseAdmin.from("invoices").insert({
+          id: payload,
+          user_id: chatId,
+          amount: finalAmount, // Save the amount that was actually billed
+          type: payload.split("_")[0],
+          status: "pending",
+          metadata: { description, title, original_unrounded_amount: amount }, // Store original amount for reference
+          // ПРОАКТИВНОЕ ИСПРАВЛЕНИЕ: Используем `??` вместо `||` чтобы 0 не превращался в null
+          subscription_id: subscription_id ?? null,
+        });
+      }
+    } catch (dbError: any) {
       // This is not a fatal error for the user, but should be logged.
-      logger.error(`Failed to save invoice ${payload} to DB after sending: ${dbError.message}`); 
+      logger.error(`Failed to save invoice ${payload} to DB after sending: ${dbError.message}`);
     }
     
     return { success: true, data: data.result };
