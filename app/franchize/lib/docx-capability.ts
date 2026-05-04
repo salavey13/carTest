@@ -1,7 +1,7 @@
 "use server";
 
 import { createHash } from "crypto";
-import { registerVerifierOriginal } from "@/app/doc-verifier/actions";
+import { registerVerifierOriginalForBuffer } from "@/app/doc-verifier/actions";
 import { generateDocxBytes } from "@/app/markdown-doc/actions";
 import { applyTemplateVariables } from "@/lib/markdownTemplate";
 import { logger } from "@/lib/logger";
@@ -21,6 +21,7 @@ export interface BuildFranchizeDocxOutput {
   bytes: Uint8Array;
   renderedMarkdown: string;
   sha256: string;
+  verifierRecordId?: string;
 }
 
 export async function buildFranchizeDocxFromTemplate(input: BuildFranchizeDocxInput): Promise<BuildFranchizeDocxOutput> {
@@ -28,19 +29,17 @@ export async function buildFranchizeDocxFromTemplate(input: BuildFranchizeDocxIn
   const bytes = await generateDocxBytes(renderedMarkdown);
   const sha256 = createHash("sha256").update(bytes).digest("hex");
 
+  let verifierRecordId: string | undefined;
   if (input.documentKey) {
-    const registerForm = new FormData();
-    registerForm.append("integrationScope", input.integrationScope);
-    registerForm.append("documentKey", input.documentKey);
-    registerForm.append(
-      "file",
-      new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }),
-      input.fileName,
-    );
-    registerForm.append("uploadedBy", input.uploadedBy);
-
     try {
-      await registerVerifierOriginal(registerForm);
+      const registerResult = await registerVerifierOriginalForBuffer({
+        integrationScope: input.integrationScope,
+        documentKey: input.documentKey,
+        sourceFileName: input.fileName,
+        bytes,
+        uploadedBy: input.uploadedBy,
+      });
+      verifierRecordId = registerResult.recordId;
       logger.info(
         `[franchize-docx] registered ${input.integrationScope} doc -> key: ${input.documentKey} | hash: ${sha256}`,
       );
@@ -53,5 +52,6 @@ export async function buildFranchizeDocxFromTemplate(input: BuildFranchizeDocxIn
     bytes,
     renderedMarkdown,
     sha256,
+    verifierRecordId,
   };
 }

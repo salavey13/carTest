@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import { registerVerifierOriginal, verifyDocAgainstStored } from "./actions";
 
 type VerificationState = {
@@ -16,8 +17,9 @@ type VerificationState = {
 } | null;
 
 export default function DocVerifierPage() {
-  const [integrationScope, setIntegrationScope] = useState("core");
-  const [documentKey, setDocumentKey] = useState("");
+  const searchParams = useSearchParams();
+  const [integrationScope, setIntegrationScope] = useState(searchParams.get("integrationScope") || "core");
+  const [documentKey, setDocumentKey] = useState(searchParams.get("documentKey") || "");
   const [registerResult, setRegisterResult] = useState<VerificationState>(null);
   const [verifyResult, setVerifyResult] = useState<VerificationState>(null);
   const [isRegisterPending, startRegister] = useTransition();
