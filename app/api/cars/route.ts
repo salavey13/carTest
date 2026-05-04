@@ -70,3 +70,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: err?.message || String(err) }, { status: 500 });
   }
 }
+
+// Backward-compatible alias for older clients that still send PUT for upsert.
+export async function PUT(request: Request) {
+  return POST(request);
+}
