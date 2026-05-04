@@ -182,6 +182,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
   const actorUserId = dbUser?.user_id ?? (user?.id ? String(user.id) : "");
 
   const initialSlugAppliedRef = useRef(false);
+  const loadRequestIdRef = useRef(0);
 
   const isDark = useMemo(() => form.themeMode.toLowerCase().includes("dark"), [form.themeMode]);
 
@@ -341,6 +342,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
 
   const onLoad = useCallback((slugOverride?: string) => {
     startTransition(async () => {
+      const requestId = ++loadRequestIdRef.current;
       const slugCandidate = slugOverride ?? form.slug;
       const normalizedCandidate = typeof slugCandidate === "string" ? slugCandidate.trim() : "";
       const slugToLoad = normalizedCandidate || "vip-bike";
@@ -350,6 +352,10 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
       }
 
       const result = await loadFranchizeConfigBySlug(slugToLoad, actorUserId);
+      if (requestId !== loadRequestIdRef.current) {
+        return;
+      }
+
       if (!result.ok || !result.data) return setMessage(result.message);
       setForm({
         ...result.data,
