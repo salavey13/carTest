@@ -94,7 +94,7 @@ const quickActions = [
     title: "Контроль сделок",
     icon: "::FaTicket::",
     text: "Проверка статусов, подтверждений и активных аренд.",
-    href: "/rentals",
+    href: "/franchize/vip-bike/rentals",
     cta: "Мои аренды",
   },
   {
@@ -118,6 +118,69 @@ const heroMetrics = [
   "::FaShieldHeart:: ОСАГО + экип",
   "::FaMapLocationDot:: Центр выдачи в городе",
   "::FaHeadset:: Поддержка на маршруте",
+];
+
+
+const partnerLinks = [
+  {
+    name: "Каталог аренды VIP Bike",
+    href: "/franchize/vip-bike",
+    note: "Подбор электроэндуро по уровню, трассе и формату аренды.",
+  },
+  {
+    name: "Конфигуратор электричек и заказ",
+    href: "/franchize/vip-bike/configurator",
+    note: "Актуальная конфигурация: модель → батарея → допы → корзина.",
+  },
+  {
+    name: "MapRiders",
+    href: "/franchize/vip-bike/map-riders",
+    note: "Карта райдеров, маршруты и точки встречи.",
+  },
+  {
+    name: "Личный раздел аренды",
+    href: "/franchize/vip-bike/rentals",
+    note: "Активные заказы, подтверждения, управление поездками.",
+  },
+];
+
+const newbieFlow = [
+  {
+    step: "Шаг 1",
+    title: "Старт с раздела и вводного гида",
+    description: "Открой страницу заказа, прочитай вводный блок про локацию, маршруты и правила безопасности.",
+    href: "/vipbikerental",
+    cta: "Открыть вводный блок",
+  },
+  {
+    step: "Шаг 2",
+    title: "Выбор байка и конфигурации",
+    description: "Перейди в конфигуратор: выбери модель, батарею, режим мощности и нужные допы.",
+    href: "/franchize/vip-bike/electro-enduro",
+    cta: "Подобрать конфиг",
+  },
+  {
+    step: "Шаг 3",
+    title: "Корзина и оформление",
+    description: "Проверь заказ в корзине, добавь экип, подтверди данные и отправь заявку менеджеру.",
+    href: "/franchize/vip-bike/profile",
+    cta: "Проверить оформление",
+  },
+];
+
+const mapRidersJourney = [
+  {
+    title: "Шаг 1: Найди точку старта",
+    text: "Открой карту и выбери ближайшую точку сбора по времени и уровню сложности.",
+  },
+  {
+    title: "Шаг 2: Проверь экип и маршрут",
+    text: "Перед выездом отметь экип и дистанцию — так проще выбрать комфортную сессию.",
+  },
+  {
+    title: "Шаг 3: Поехали с группой",
+    text: "Присоединяйся к активной группе, отслеживай прогресс и отмечай пройденные участки.",
+  },
 ];
 
 export default function HomePage() {
@@ -242,6 +305,199 @@ export default function HomePage() {
       </motion.section>
 
       <div className="container mx-auto max-w-7xl space-y-20 px-4 py-16 sm:space-y-24 sm:py-24">
+        <section className="rounded-2xl border border-border/60 bg-card/40 p-5 sm:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-orbitron text-2xl sm:text-3xl">Актуальность контента / партнёрских ссылок</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Раздел обновлён под новый franchize-поток: Electro-Enduro + Configurator + MapRiders.
+                Последний аудит контента: <span className="font-medium text-foreground">04 мая 2026</span>.
+              </p>
+            </div>
+            <Button asChild variant="outline">
+              <Link href="/franchize/vip-bike/configurator">Начать с конфигуратора</Link>
+            </Button>
+          </div>
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+            {partnerLinks.map((item) => (
+              <Card key={item.name} className="border-border/70 bg-background/40">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">{item.name}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="mb-3 text-sm text-muted-foreground">{item.note}</p>
+                  <Button asChild size="sm" variant="outline" className="w-full">
+                    <Link href={item.href}>Открыть раздел</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="mb-8 text-center">
+            <h2 className="font-orbitron text-3xl sm:text-4xl">Electro-Enduro: аренда + продажа в одном потоке</h2>
+            <p className="mx-auto mt-3 max-w-3xl text-muted-foreground">
+              Мы развиваем отдельное направление по электроэндуро в зоне от метро Моста до Ленинского затона вдоль
+              реки: новичок получает понятный старт, райдер — быстрый доступ к маршрутам, а клиент на покупку —
+              прозрачный путь до кастомного байка.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <Card className="border-primary/40 bg-card/60 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-2xl">
+                  <VibeContentRenderer content="::FaBolt::" className="text-primary" />
+                  Аренда электроэндуро
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  Идеально для теста перед покупкой: берёшь байк на слот, едешь по подготовленным маршрутам вдоль
+                  набережной и получаешь поддержку команды на всём пути.
+                </p>
+                <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-4">
+                  <VibeContentRenderer content="::FaRoute:: Маршруты: Мост — Ленинский затон — речные точки" />
+                  <VibeContentRenderer content="::FaClock:: Формат: часовые и дневные слоты" />
+                  <VibeContentRenderer content="::FaHeadset:: Сопровождение: брифинг + онлайн поддержка" />
+                </div>
+                <Button asChild className="w-full">
+                  <Link href="/franchize/vip-bike">Выбрать байк для аренды</Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-secondary/40 bg-card/60 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-2xl">
+                  <VibeContentRenderer content="::FaCartShopping::" className="text-secondary" />
+                  Продажа электричек
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  Для тех, кто готов брать свой электромотоцикл: сравниваешь модели, собираешь конфиг под бюджет,
+                  дальше переходишь в корзину и оформляешь заказ без лишних шагов.
+                </p>
+                <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-4">
+                  <VibeContentRenderer content="::FaSliders:: Конфигуратор: мотор, батарея, подвеска, допы" />
+                  <VibeContentRenderer content="::FaWallet:: Актуализация прайса: гибкий апдейт по позициям" />
+                  <VibeContentRenderer content="::FaBoxesPacking:: Финал: корзина + оформление + подтверждение" />
+                </div>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/franchize/vip-bike/configurator">Открыть продажу и конфигурацию</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <section>
+          <div className="mb-8 text-center">
+            <h2 className="font-orbitron text-3xl sm:text-4xl">MapRiders — карта, которой реально хочется пользоваться</h2>
+            <p className="mx-auto mt-3 max-w-3xl text-muted-foreground">
+              Здесь не просто метки. Это рабочий инструмент: где кататься сегодня, где встретиться, где безопасно
+              стартовать новичку и где проходят активные сессии комьюнити.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Card className="border-border/70 bg-card/60">
+              <CardHeader>
+                <CardTitle className="text-lg"><VibeContentRenderer content="::FaMapLocationDot:: Живые точки" /></CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Карта показывает точки старта, сервисные зоны и места встреч с райдерами в реальном контексте дня.
+              </CardContent>
+            </Card>
+            <Card className="border-border/70 bg-card/60">
+              <CardHeader>
+                <CardTitle className="text-lg"><VibeContentRenderer content="::FaUserGroup:: Новичкам просто" /></CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Для первого выезда: выбери маршрут по сложности, отметь экип и поехали с комфортной группой.
+              </CardContent>
+            </Card>
+            <Card className="border-border/70 bg-card/60">
+              <CardHeader>
+                <CardTitle className="text-lg"><VibeContentRenderer content="::FaTrophy:: Геймификация" /></CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Лидерборд недели, пройденные участки и прогресс по маршрутам — всё в одном месте без лишних экранов.
+              </CardContent>
+            </Card>
+          </div>
+          <div className="mt-4 flex justify-center">
+            <Button asChild size="lg" variant="outline">
+              <Link href="/franchize/vip-bike/map-riders">Перейти в MapRiders</Link>
+            </Button>
+          </div>
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+            {mapRidersJourney.map((item) => (
+              <Card key={item.title} className="border-border/70 bg-card/60">
+                <CardHeader>
+                  <CardTitle className="text-base">{item.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">{item.text}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="mb-8 text-center">
+            <h2 className="font-orbitron text-3xl sm:text-4xl">Экип и безопасность — отдельный блок перед стартом</h2>
+            <p className="mx-auto mt-3 max-w-3xl text-muted-foreground">
+              Перед арендой или покупкой сразу закрываем вопрос защиты: подбираем комплект под стиль катания и сезон.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              "::FaHelmetSafety:: Шлемы",
+              "::FaHands:: Перчатки",
+              "::FaShirt:: Джерси",
+              "::FaShoePrints:: Ботинки",
+              "::FaShield:: Черепахи",
+              "::FaPersonRunning:: Колени",
+              "::FaRoadBarrier:: Локти и защита корпуса",
+              "::FaKitMedical:: Аптечка и расходники",
+            ].map((item) => (
+              <div key={item} className="rounded-xl border border-border/70 bg-card/60 px-3 py-3 text-sm">
+                <VibeContentRenderer content={item} />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="mb-8 text-center">
+            <h2 className="font-orbitron text-3xl sm:text-4xl">Пошагово для новичка: от информации к заказу</h2>
+            <p className="mx-auto mt-3 max-w-3xl text-muted-foreground">
+              Логика страницы: сначала понятный вводный блок по разделу, дальше выбор мотоциклов и конфигурации,
+              затем корзина и оформление. Никакого хаоса — только последовательный путь.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {newbieFlow.map((item) => (
+              <Card key={item.title} className="border-border/70 bg-card/60">
+                <CardHeader>
+                  <p className="text-xs uppercase tracking-wide text-primary">{item.step}</p>
+                  <CardTitle className="text-lg">{item.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="mb-4 text-sm text-muted-foreground">{item.description}</p>
+                  <Button asChild className="w-full" variant="outline">
+                    <Link href={item.href}>{item.cta}</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
         <section>
           <div className="mb-8 text-center">
             <h2 className="font-orbitron text-3xl sm:text-4xl">Уже внедрённый rental-флоу — в один клик</h2>
