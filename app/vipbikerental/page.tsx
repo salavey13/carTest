@@ -94,7 +94,7 @@ const quickActions = [
     title: "Контроль сделок",
     icon: "::FaTicket::",
     text: "Проверка статусов, подтверждений и активных аренд.",
-    href: "/rentals",
+    href: "/franchize/vip-bike/rentals",
     cta: "Мои аренды",
   },
   {
@@ -128,7 +128,7 @@ const partnerLinks = [
     note: "Подбор электроэндуро по уровню, трассе и формату аренды.",
   },
   {
-    name: "Конфигуратор и заказ",
+    name: "Конфигуратор электричек и заказ",
     href: "/franchize/vip-bike/configurator",
     note: "Актуальная конфигурация: модель → батарея → допы → корзина.",
   },
@@ -139,7 +139,7 @@ const partnerLinks = [
   },
   {
     name: "Личный раздел аренды",
-    href: "/rentals",
+    href: "/franchize/vip-bike/rentals",
     note: "Активные заказы, подтверждения, управление поездками.",
   },
 ];
@@ -156,14 +156,14 @@ const newbieFlow = [
     step: "Шаг 2",
     title: "Выбор байка и конфигурации",
     description: "Перейди в конфигуратор: выбери модель, батарею, режим мощности и нужные допы.",
-    href: "/franchize/vip-bike/configurator",
+    href: "/franchize/vip-bike/electro-enduro",
     cta: "Подобрать конфиг",
   },
   {
     step: "Шаг 3",
     title: "Корзина и оформление",
     description: "Проверь заказ в корзине, добавь экип, подтверди данные и отправь заявку менеджеру.",
-    href: "/rentals",
+    href: "/franchize/vip-bike/profile",
     cta: "Проверить оформление",
   },
 ];
