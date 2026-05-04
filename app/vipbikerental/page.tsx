@@ -120,6 +120,30 @@ const heroMetrics = [
   "::FaHeadset:: Поддержка на маршруте",
 ];
 
+
+const partnerLinks = [
+  {
+    name: "Каталог аренды VIP Bike",
+    href: "/franchize/vip-bike",
+    note: "Подбор электроэндуро по уровню, трассе и формату аренды.",
+  },
+  {
+    name: "Конфигуратор и заказ",
+    href: "/franchize/vip-bike/configurator",
+    note: "Актуальная конфигурация: модель → батарея → допы → корзина.",
+  },
+  {
+    name: "MapRiders",
+    href: "/franchize/vip-bike/map-riders",
+    note: "Карта райдеров, маршруты и точки встречи.",
+  },
+  {
+    name: "Личный раздел аренды",
+    href: "/rentals",
+    note: "Активные заказы, подтверждения, управление поездками.",
+  },
+];
+
 const newbieFlow = [
   {
     step: "Шаг 1",
@@ -266,6 +290,36 @@ export default function HomePage() {
       </motion.section>
 
       <div className="container mx-auto max-w-7xl space-y-20 px-4 py-16 sm:space-y-24 sm:py-24">
+        <section className="rounded-2xl border border-border/60 bg-card/40 p-5 sm:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-orbitron text-2xl sm:text-3xl">Актуальность контента / партнёрских ссылок</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Раздел обновлён под новый franchize-поток: Electro-Enduro + Configurator + MapRiders.
+                Последний аудит контента: <span className="font-medium text-foreground">04 мая 2026</span>.
+              </p>
+            </div>
+            <Button asChild variant="outline">
+              <Link href="/franchize/vip-bike/configurator">Начать с конфигуратора</Link>
+            </Button>
+          </div>
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+            {partnerLinks.map((item) => (
+              <Card key={item.name} className="border-border/70 bg-background/40">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">{item.name}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="mb-3 text-sm text-muted-foreground">{item.note}</p>
+                  <Button asChild size="sm" variant="outline" className="w-full">
+                    <Link href={item.href}>Открыть раздел</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
         <section>
           <div className="mb-8 text-center">
             <h2 className="font-orbitron text-3xl sm:text-4xl">Electro-Enduro: аренда + продажа в одном потоке</h2>
