@@ -68,7 +68,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           >
             <span className="relative block h-8 w-8 overflow-hidden rounded-full border" style={{ borderColor }}>
               {avatarUrl ? (
-                <Image src={avatarUrl} alt={displayName} fill className="object-cover" unoptimized />
+                <Image src={avatarUrl} alt={displayName} fill sizes="32px" className="object-cover" />
               ) : (
                 <span className="flex h-full w-full items-center justify-center text-xs font-semibold">
                   {getInitials(displayName)}

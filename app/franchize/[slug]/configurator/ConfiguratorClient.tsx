@@ -377,7 +377,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                     <article key={bike.id} className={['group relative overflow-hidden rounded-2xl border bg-[#111113] cfg-card-hover', isSelected ? 'cfg-selected-ring border-[#00ffea]' : 'border-[#27272a]'].join(' ')}>
                       <button type="button" className="block w-full text-left" onClick={() => selectBike(bike.id)}>
                         <div className="cfg-img-wrap relative aspect-[4/3] w-full overflow-hidden lg:aspect-square">
-                          <Image src={bike.image_url} alt={`${bike.make} ${bike.model}`} fill className="object-cover transition-transform duration-700 group-hover:scale-105" unoptimized />
+                          <Image src={bike.image_url} alt={`${bike.make} ${bike.model}`} fill sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 25vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
                           <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-transparent to-transparent opacity-60" />
                           <div className="absolute left-3 top-3"><TierBadge tier={bike.specs.tier} /></div>
                           {isSelected && <div className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-[#00ffea] shadow-lg shadow-[#00ffea]/30"><Check className="h-4 w-4 text-black" /></div>}
@@ -410,7 +410,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
             <div className="cfg-fade-in space-y-6">
               <div className="overflow-hidden rounded-2xl border border-[#27272a] bg-[#111113]">
                 <div className="relative aspect-[21/9] w-full overflow-hidden sm:aspect-[3/1]">
-                  <Image src={selectedBike.image_url} alt="" fill className="object-cover" unoptimized />
+                  <Image src={selectedBike.image_url} alt="" fill sizes="(max-width: 1024px) 100vw, 66vw" className="object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-r from-[#09090b] via-[#09090b]/60 to-transparent" />
                   <div className="absolute bottom-0 left-0 p-6 sm:p-8">
                     <TierBadge tier={selectedBike.specs.tier} />
@@ -421,7 +421,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                 {selectedBike.specs.gallery && selectedBike.specs.gallery.length > 0 && (
                   <div className="flex gap-2 overflow-x-auto border-t border-[#27272a] p-3">
                     {[selectedBike.image_url, ...selectedBike.specs.gallery].map((img, i) => (
-                      <div key={img + i} className="relative h-16 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-[#27272a]"><Image src={img} alt="" fill className="object-cover" unoptimized /></div>
+                      <div key={img + i} className="relative h-16 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-[#27272a]"><Image src={img} alt="" fill sizes="96px" className="object-cover" /></div>
                     ))}
                   </div>
                 )}
@@ -535,7 +535,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
               <div className="grid gap-6 lg:grid-cols-5">
                 <div className="lg:col-span-3 space-y-4">
                   <div className="overflow-hidden rounded-2xl border border-[#27272a] bg-[#111113]">
-                    <div className="relative aspect-[16/7] w-full overflow-hidden"><Image src={selectedBike.image_url} alt="" fill className="object-cover" unoptimized /><div className="absolute inset-0 bg-gradient-to-t from-[#111113] via-transparent to-transparent" /></div>
+                    <div className="relative aspect-[16/7] w-full overflow-hidden"><Image src={selectedBike.image_url} alt="" fill sizes="(max-width: 1280px) 100vw, 60vw" className="object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-[#111113] via-transparent to-transparent" /></div>
                     <div className="p-5"><TierBadge tier={selectedBike.specs.tier} /><h2 className="mt-2 text-xl font-black">{selectedBike.make} {selectedBike.model}</h2></div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
