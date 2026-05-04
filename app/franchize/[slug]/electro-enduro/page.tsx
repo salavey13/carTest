@@ -11,13 +11,21 @@ interface ElectroEnduroPageProps {
 
 const isSaleEnabled = (value: unknown) => value === 1 || value === true || String(value).toLowerCase() === "1" || String(value).toLowerCase() === "true";
 const isRentEnabled = (value: unknown) => value === 1 || value === true || String(value).toLowerCase() === "1" || String(value).toLowerCase() === "true";
+const SALE_ID_OVERRIDES = new Set(["sequence-zero", "falcon-gt-2025", "500gt"]);
+const RENT_ID_OVERRIDES = new Set(["sequence-zero", "falcon-gt-2025", "500gt"]);
 
 export default async function ElectroEnduroPage({ params }: ElectroEnduroPageProps) {
   const { slug } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteForSurface(crew.theme);
-  const saleItems = items.filter((item) => item.saleAvailable || isSaleEnabled(item.rawSpecs?.sale));
-  const rentItems = items.filter((item) => item.available !== false || isRentEnabled(item.rawSpecs?.rent));
+  const saleItems = items.filter((item) => {
+    const id = item.id.toLowerCase();
+    return item.saleAvailable || isSaleEnabled(item.rawSpecs?.sale) || SALE_ID_OVERRIDES.has(id);
+  });
+  const rentItems = items.filter((item) => {
+    const id = item.id.toLowerCase();
+    return item.availabilityStatus === "available" || isRentEnabled(item.rawSpecs?.rent) || RENT_ID_OVERRIDES.has(id);
+  });
   const featuredRentItems = rentItems.filter((item) => item.id.toLowerCase().includes("sequence-zero")).slice(0, 3);
   const featuredSaleItems = saleItems.filter((item) => item.id.toLowerCase().includes("falcon-gt-2025")).slice(0, 3);
   const rentPreview = featuredRentItems.length > 0 ? featuredRentItems : rentItems.slice(0, 3);
@@ -96,7 +104,7 @@ export default async function ElectroEnduroPage({ params }: ElectroEnduroPagePro
           </article>
         </div>
       </section>
-      <CatalogClient crew={crew} slug={slug} items={items} mode="electro" />
+      <CatalogClient crew={crew} slug={slug} items={saleItems} mode="electro" />
       <CrewFooter crew={crew} />
     </main>
   );
