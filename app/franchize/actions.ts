@@ -1530,7 +1530,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     });
 
     if (flowType === "rental") {
-      const { data: rentalRow } = await supabaseAdmin
+      const { data: rentalRow, error: rentalLookupError } = await supabaseAdmin
         .from("rentals")
         .select("rental_id, metadata")
         .eq("metadata->>orderId", payload.orderId)
@@ -1538,11 +1538,24 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         .limit(1)
         .maybeSingle();
 
-      if (rentalRow?.rental_id) {
+      if (rentalLookupError) {
+        logger.warn("[franchize] rental lookup for contract attachment failed", {
+          orderId: payload.orderId,
+          slug: payload.slug,
+          error: rentalLookupError.message,
+        });
+      } else if (!rentalRow?.rental_id) {
+        logger.warn("[franchize] rental not found for contract attachment", {
+          orderId: payload.orderId,
+          slug: payload.slug,
+          verifierScope,
+          documentKey: variables.document_key,
+        });
+      } else {
         const existingMetadata =
           rentalRow.metadata && typeof rentalRow.metadata === "object" ? (rentalRow.metadata as Record<string, unknown>) : {};
         const rentalScope = `rental:${rentalRow.rental_id}`;
-        await supabaseAdmin
+        const { error: rentalUpdateError } = await supabaseAdmin
           .from("rentals")
           .update({
             metadata: {
@@ -1560,6 +1573,14 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             },
           })
           .eq("rental_id", rentalRow.rental_id);
+
+        if (rentalUpdateError) {
+          logger.warn("[franchize] rental contract verifier attachment failed", {
+            rentalId: rentalRow.rental_id,
+            orderId: payload.orderId,
+            error: rentalUpdateError.message,
+          });
+        }
       }
     }
 
@@ -1573,6 +1594,87 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
     throw error;
   }
+}
+
+export async function reconcileRentalContractVerifierAttachment(input: {
+  rentalId: string;
+  orderId?: string;
+  flowType?: "rental" | "sale" | "mixed";
+  slug?: string;
+}): Promise<{ success: boolean; error?: string; attached?: boolean; recordId?: string }> {
+  const rentalId = input.rentalId.trim();
+  if (!rentalId) return { success: false, error: "rentalId is required" };
+
+  const { data: rental, error: rentalError } = await supabaseAdmin
+    .from("rentals")
+    .select("rental_id, metadata")
+    .eq("rental_id", rentalId)
+    .maybeSingle();
+
+  if (rentalError || !rental) {
+    return { success: false, error: rentalError?.message || "rental not found" };
+  }
+
+  const metadata = rental.metadata && typeof rental.metadata === "object" ? (rental.metadata as Record<string, unknown>) : {};
+  const verifier = metadata.contract_verifier && typeof metadata.contract_verifier === "object"
+    ? (metadata.contract_verifier as Record<string, unknown>)
+    : null;
+
+  const flowType = input.flowType ?? "rental";
+  const slug = (input.slug || String(metadata.slug || "")).trim();
+  const orderId = (input.orderId || String(metadata.orderId || "")).trim();
+
+  const sourceScope = typeof verifier?.sourceScope === "string" && verifier.sourceScope.trim()
+    ? verifier.sourceScope.trim()
+    : slug && orderId
+      ? `${flowType}:${slug}:${orderId}`
+      : "";
+  const keyPrefix = flowType === "sale" || flowType === "mixed" ? "sale" : "rental";
+  const documentKey = typeof verifier?.documentKey === "string" && verifier.documentKey.trim()
+    ? verifier.documentKey.trim()
+    : slug && orderId
+      ? `${keyPrefix}-${slug}-${orderId}`
+      : "";
+
+  if (!sourceScope || !documentKey) {
+    return { success: false, error: "Cannot derive sourceScope/documentKey for reconciliation" };
+  }
+
+  const { data: record, error: recordError } = await supabaseAdmin
+    .from("doc_verifier_records")
+    .select("id, integration_scope, document_key, original_sha256")
+    .eq("integration_scope", sourceScope)
+    .eq("document_key", documentKey)
+    .maybeSingle();
+
+  if (recordError || !record) {
+    return { success: false, error: recordError?.message || "doc_verifier record not found" };
+  }
+
+  const contractVerifierPatch = {
+    ...(verifier ?? {}),
+    scope: `rental:${rentalId}`,
+    sourceScope: sourceScope,
+    documentKey: documentKey,
+    docVerifierRecordId: record.id,
+    originalSha256: record.original_sha256,
+    status: "verified",
+    verifiedAt: new Date().toISOString(),
+    expiresAt: typeof verifier?.expiresAt === "string" ? verifier.expiresAt : null,
+  };
+
+  const { error: updateError } = await supabaseAdmin
+    .from("rentals")
+    .update({
+      metadata: {
+        ...metadata,
+        contract_verifier: contractVerifierPatch,
+      },
+    })
+    .eq("rental_id", rentalId);
+
+  if (updateError) return { success: false, error: updateError.message };
+  return { success: true, attached: true, recordId: record.id };
 }
 
 
@@ -1933,6 +2035,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   contractVerifierScope: string;
   contractDocumentKey: string;
   docVerifierRecordId: string;
+  contractSourceScope: string;
+  contractOriginalSha256: string;
   telegramDeepLink: string;
 }> {
   const safeSlug = slug.trim();
@@ -1953,6 +2057,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       contractVerifierScope: "",
       contractDocumentKey: "",
       docVerifierRecordId: "",
+      contractSourceScope: "",
+      contractOriginalSha256: "",
       telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${safeRentalId}`,
     };
   }
@@ -1979,6 +2085,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       contractVerifierScope: "",
       contractDocumentKey: "",
       docVerifierRecordId: "",
+      contractSourceScope: "",
+      contractOriginalSha256: "",
       telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${safeRentalId}`,
     };
   }
@@ -1987,12 +2095,15 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
 
   const metadata = (data.metadata as Record<string, unknown> | null) ?? null;
   const verifier = metadata && typeof metadata.contract_verifier === "object" ? (metadata.contract_verifier as Record<string, unknown>) : null;
+  const rawStatus = typeof verifier?.status === "string" ? verifier.status.trim().toLowerCase() : "";
   const expiresAtValue = typeof verifier?.expiresAt === "string" ? verifier.expiresAt : "";
   const hasExpired = Boolean(expiresAtValue) && new Date(expiresAtValue).getTime() < Date.now();
   const contractVerificationStatus = hasExpired
     ? "expired"
-    : typeof verifier?.status === "string" && verifier.status.toLowerCase() === "verified"
+    : rawStatus === "verified" || rawStatus === "ok" || rawStatus === "valid"
       ? "verified"
+      : rawStatus === "expired"
+        ? "expired"
       : "not_verified";
 
   return {
@@ -2010,6 +2121,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     contractVerifierScope: typeof verifier?.scope === "string" ? verifier.scope : "",
     contractDocumentKey: typeof verifier?.documentKey === "string" ? verifier.documentKey : "",
     docVerifierRecordId: typeof verifier?.docVerifierRecordId === "string" ? verifier.docVerifierRecordId : "",
+    contractSourceScope: typeof verifier?.sourceScope === "string" ? verifier.sourceScope : "",
+    contractOriginalSha256: typeof verifier?.originalSha256 === "string" ? verifier.originalSha256 : "",
     telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${data.rental_id}`,
   };
 }
