@@ -356,6 +356,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     }
   };
 
+  const handleSwitchToFallbackPayment = () => {
+    setValue("payment", "card", { shouldDirty: true, shouldValidate: true });
+    setPaymentRetryHint(null);
+    toast.message("Переключили на fallback-оплату картой. Проверьте данные и отправьте заказ снова.");
+  };
+
   return (
     <section
       className="mx-auto w-full max-w-4xl px-4 py-6"
@@ -482,7 +488,18 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             {requiresTelegram && !hasTelegramUser ? (
               <p className="mt-2 text-xs" style={surface.mutedText}>Для оплаты в Stars откройте оформление из Telegram WebApp.</p>
             ) : null}
-            {paymentRetryHint ? <p className="mt-2 text-xs text-amber-300">{paymentRetryHint}</p> : null}
+            {paymentRetryHint ? (
+              <div className="mt-2 rounded-2xl border border-amber-300/40 bg-amber-300/10 p-3">
+                <p className="text-xs text-amber-200">{paymentRetryHint}</p>
+                <button
+                  type="button"
+                  onClick={handleSwitchToFallbackPayment}
+                  className="mt-2 inline-flex items-center rounded-xl border border-amber-200/40 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:bg-amber-200/20"
+                >
+                  Переключиться на оплату картой
+                </button>
+              </div>
+            ) : null}
             <div className="mt-3 flex gap-2">
               <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Промокод" {...register("promo")} />
               <button type="button" className="rounded-xl border border-[var(--order-border)] px-3 text-sm transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={focusRingOutlineStyle(crew.theme)}>
