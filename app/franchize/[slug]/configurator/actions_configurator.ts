@@ -17,6 +17,7 @@ import {
   fallbackParts,
   lithiumBatteries,
 } from "./fallback-catalog";
+import { DEFAULT_FACTORY_COLOR, FACTORY_COLORS, getFactoryColorById } from "./factory-colors";
 
 // ─────────────────────────────────────────────
 // Catalog loader
@@ -101,6 +102,8 @@ const CONFIGURATOR_DOC_TEMPLATE = `# ⚡ Конфигурация электро
 | **Модель** | {{bike_make_model}} |
 | **Мощность мотора** | {{motor_power}} |
 | **Тип батареи** | {{battery_type}} |
+| **Цвет** | {{bike_color_label}} |
+| **Factory ID (цвет)** | {{bike_color_factory_id}} |
 | **Ёмкость батареи** | {{battery_capacity}} |
 | **Запас хода** | {{battery_range}} км |
 
@@ -144,6 +147,14 @@ async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
 
   const fmt = (n: number) => n.toLocaleString("ru-RU");
 
+  const fallbackColor = DEFAULT_FACTORY_COLOR ?? FACTORY_COLORS[0] ?? { id: 'unknown', factoryId: 'UNKNOWN-FACTORY-COLOR', label: 'Не указан' };
+  const resolvedColor =
+    getFactoryColorById(input.selectedColorId) ??
+    FACTORY_COLORS.find((c) => c.factoryId === input.selectedColorFactoryId) ??
+    fallbackColor;
+  const resolvedColorFactoryId =
+    resolvedColor.factoryId?.trim() || input.selectedColorFactoryId?.trim() || 'UNKNOWN-FACTORY-COLOR';
+
   const accessoriesTable =
     input.selectedAccessories.length > 0
       ? input.selectedAccessories
@@ -172,6 +183,8 @@ async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
         ? "Стандартная (Regular)"
         : input.batteryLabel || "—",
     battery_capacity: input.batteryLabel.split(" ")[0] || "—",
+    bike_color_label: resolvedColor.label || 'Не указан',
+    bike_color_factory_id: resolvedColorFactoryId,
     battery_range: "—",
     accessories_table: accessoriesTable,
     accessories_count: String(input.selectedAccessories.length),
@@ -237,6 +250,7 @@ async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
         `Модель: ${input.bikeLabel}`,
         `Мотор: ${input.motorLabel}`,
         `Батарея: ${input.batteryLabel}`,
+        `Цвет: ${resolvedColor.label} (${resolvedColorFactoryId})`,
         `Опции: ${input.selectedAccessories.length} шт.`,
         `Итого: ${fmt(input.total)} ₽`,
       ].join("\n")
