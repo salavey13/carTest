@@ -197,7 +197,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
                   fill
                   sizes="64px"
                   className="object-cover"
-                  unoptimized
                 />
               ) : (
                 <div

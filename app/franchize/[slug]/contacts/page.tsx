@@ -1,12 +1,23 @@
+import type { Metadata } from "next";
 import { getFranchizeBySlug } from "../../actions";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { FranchizeFloatingCart } from "../../components/FranchizeFloatingCart";
 import { FranchizeContactsMap } from "../../components/FranchizeContactsMap";
 import { crewPaletteForSurface } from "../../lib/theme";
+import { buildFranchizeSectionMetadata } from "../metadata";
 
 interface FranchizeContactsPageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: FranchizeContactsPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  return buildFranchizeSectionMetadata(slug, {
+    sectionTitle: "Контакты",
+    sectionDescription: "Контакты экипажа: адрес, телефон, Telegram и карта проезда.",
+    pathSuffix: "/contacts",
+  });
 }
 
 export default async function FranchizeContactsPage({ params }: FranchizeContactsPageProps) {

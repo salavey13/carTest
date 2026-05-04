@@ -108,8 +108,8 @@ export function ItemGallery({
           fill
           sizes="(max-width: 1024px) 100vw, 42vw"
           className="object-cover"
-          unoptimized
-          loading="lazy"
+          loading="eager"
+          priority
         />
       </div>
     );
@@ -125,8 +125,8 @@ export function ItemGallery({
           fill
           sizes="(max-width: 1024px) 100vw, 42vw"
           className="object-cover"
-          unoptimized
-          loading={activeIndex === 0 ? "eager" : "lazy"}
+          loading="eager"
+          priority={activeIndex === 0}
           onError={() => {
             const failed = resolvedImages[activeIndex];
             if (!failed) return;
@@ -190,8 +190,7 @@ export function ItemGallery({
                   fill
                   sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 120px"
                   className="object-cover"
-                  unoptimized
-                  loading={index === 0 ? "eager" : "lazy"}
+                  loading="lazy"
                   onError={() => setFailedUrls((prev) => ({ ...prev, [url]: true }))}
                 />
                 {isActive && (
