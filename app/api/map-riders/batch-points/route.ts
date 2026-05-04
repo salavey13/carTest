@@ -3,6 +3,7 @@ import { z } from "zod";
 import { guardMapRidersWriteRequest, applyRateLimitHeaders } from "@/lib/map-riders-security";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-server";
+import { assertCrewMembership } from "@/app/api/map-riders/_lib/crew-access";
 
 const pointSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -28,10 +29,6 @@ const batchSchema = z.object({
     .optional(),
 });
 
-function blurCoordinate(value: number, seed: number) {
-  const jitter = ((seed % 7) - 3) * 0.00008;
-  return Number((value + jitter).toFixed(6));
-}
 
 export async function POST(request: NextRequest) {
   const guard = await guardMapRidersWriteRequest(request);
@@ -46,8 +43,13 @@ export async function POST(request: NextRequest) {
   }
 
   const { sessionId, userId, crewSlug, points, privacy } = parsed.data;
-  if (guard.authSource === "app_jwt" && userId !== guard.subject) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+  if (userId !== guard.subject) {
+    return NextResponse.json({ success: false, error: "Unauthorized", reason: "subject_mismatch" }, { status: 403 });
+  }
+
+  const isCrewMember = await assertCrewMembership(userId, crewSlug);
+  if (!isCrewMember) {
+    return NextResponse.json({ success: false, error: "Join crew to start sharing", code: "join_required", reason: "membership_required" }, { status: 403 });
   }
   const limit = enforceRateLimit(`map-riders:batch-points:${guard.subject}`, 30, 60_000);
   if (!limit.allowed) {

@@ -5,12 +5,7 @@ import { Polyline } from "react-leaflet";
 
 type RoutePoint = { lat: number; lon: number; speedKmh: number; capturedAt: string };
 
-function segmentColor(speedKmh: number) {
-  if (speedKmh < 10) return "#38bdf8";
-  if (speedKmh < 25) return "#22c55e";
-  if (speedKmh < 40) return "#f59e0b";
-  return "#ef4444";
-}
+import { speedToSegmentColor } from "@/components/map-riders/speedGradient";
 
 export function SpeedGradientRoute({ points }: { points: RoutePoint[] }) {
   const segments = useMemo(() => {
@@ -25,7 +20,7 @@ export function SpeedGradientRoute({ points }: { points: RoutePoint[] }) {
           [prev.lat, prev.lon],
           [current.lat, current.lon],
         ],
-        color: segmentColor(current.speedKmh),
+        color: speedToSegmentColor(current.speedKmh),
       });
     }
     return out;

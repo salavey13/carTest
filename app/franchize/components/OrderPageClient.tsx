@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { addDays } from "date-fns";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -89,6 +89,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const { user, dbUser } = useAppContext();
   const { cartLines, subtotal } = useFranchizeCartLines(slug, items);
   const [isSubmitting, startSubmitTransition] = useTransition();
+  const lastSubmitFingerprintRef = useRef<string | null>(null);
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
     mode: "onChange",
@@ -244,9 +245,31 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   }, [dbUser?.user_id, setValue, slug]);
 
   const onSubmitValid = (values: OrderFormValues) => {
+    const submitFingerprint = JSON.stringify({
+      orderId,
+      payment: values.payment,
+      recipient: values.recipient.trim(),
+      phone: values.phone.trim(),
+      time: values.time.trim(),
+      rentalStartDate: submitPayload.rentalStartDate,
+      rentalEndDate: submitPayload.rentalEndDate,
+      signatureName: values.signatureName.trim(),
+      signatureAccepted: values.consent,
+      totalAmount: submitPayload.totalAmount,
+      extras: submitPayload.extras,
+      cartLines: submitPayload.cartLines,
+    });
+
     if (isSubmitting || !canSubmit) {
       return;
     }
+
+    if (lastSubmitFingerprintRef.current === submitFingerprint) {
+      toast.message("Похожий checkout уже обрабатывается. Ждём ответ Telegram.");
+      return;
+    }
+
+    lastSubmitFingerprintRef.current = submitFingerprint;
 
     startSubmitTransition(async () => {
       const result = await createFranchizeOrderCheckout({
@@ -274,15 +297,18 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
       if (!result.success) {
         toast.error(result.error ?? "Не удалось отправить заказ.");
+        lastSubmitFingerprintRef.current = null;
         return;
       }
 
       if (values.payment === "telegram_xtr") {
         toast.success("XTR-счёт отправлен в Telegram. После оплаты откроется franchize flow ⭐");
+        lastSubmitFingerprintRef.current = null;
         return;
       }
 
       toast.success(submitPayload.flowType === "rental" ? "Заявка на аренду отправлена вместе с DOC-файлом." : "Заявка на покупку отправлена вместе с DOC-файлом.");
+      lastSubmitFingerprintRef.current = null;
     });
   };
 
