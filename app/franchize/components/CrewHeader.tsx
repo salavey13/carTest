@@ -148,7 +148,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
         color: crew.theme.palette.textPrimary,
       }}
     >
-      <div className="mx-auto w-full max-w-4xl overflow-hidden">
+      <div className="mx-auto w-full max-w-7xl overflow-hidden">
         <div
           style={{
             display: "grid",
@@ -224,7 +224,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
           {/* Добавлен класс 'relative' для корректного расчета offsetLeft дочерних элементов */}
           <div
             ref={railRef}
-            className="relative mx-auto flex w-full max-w-4xl gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+            className="relative mx-auto flex w-full max-w-7xl gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
           >
             {visibleRailLinks.map((linkLabel) => {
               const targetId = toCategoryId(linkLabel);

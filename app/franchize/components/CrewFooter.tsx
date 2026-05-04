@@ -31,7 +31,7 @@ export function CrewFooter({ crew }: CrewFooterProps) {
         ["--footer-sub-bg" as string]: "#cd940d",
       }}
     >
-      <div className="mx-auto grid w-full max-w-4xl gap-x-8 gap-y-10 px-4 py-8 md:grid-cols-2">
+      <div className="mx-auto grid w-full max-w-7xl gap-x-8 gap-y-10 px-4 py-8 md:grid-cols-2">
         <section>
           <h3 className="text-3xl font-semibold leading-none text-[var(--footer-text)]">Контакты</h3>
           <ul className="mt-5 space-y-1 text-base">
@@ -86,7 +86,7 @@ export function CrewFooter({ crew }: CrewFooterProps) {
       </div>
 
       <div className="border-t border-[var(--footer-border)] bg-[var(--footer-sub-bg)]">
-        <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-4 py-3 text-xs">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 text-xs">
           <span>{new Date().getFullYear()} © {crew.header.brandName}</span>
           <span>Версия: FR-PEP-02</span>
         </div>
