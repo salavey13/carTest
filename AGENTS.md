@@ -28,6 +28,14 @@ When editing features, preserve this progression:
 
 ---
 
+## 0.1) Fast context files (new)
+
+For quicker agent startup, prefer this compact order before loading large archives:
+1. `SOUL.md`
+2. `AGENTS.md`
+3. domain-local AGENTS (e.g. map-riders scope files)
+4. split plan modules (`docs/THE_FRANCHEEZEPLAN_STATUS.MD`, `docs/THE_FRANCHEEZEPLAN_BLUEPRINT.md`, `docs/THE_FRANCHEEZEPLAN_HISTORY_ARCHIVE.md`) as needed
+
 ## 2) Architecture snapshot
 
 - **Frontend:** Next.js App Router + React + Tailwind + shadcn/ui + Framer Motion
