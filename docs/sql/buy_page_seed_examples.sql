@@ -176,3 +176,90 @@ SET
 
 -- Optional cleanup when migrating from two legacy rows to the unified row.
 DELETE FROM public.cars WHERE id IN ('vivolt-surge-v-black', 'vivolt-surge-v-white');
+
+-- Horwin SK3 Plus listing (buy-page quality standard).
+INSERT INTO public.cars (
+  id, make, model, description, embedding, daily_price, image_url, rent_link, is_test_result,
+  specs, owner_id, type, crew_id, availability_rules, quantity
+)
+VALUES (
+  'horwin-sk3-plus',
+  'HORWIN',
+  'SK3 Plus',
+  'Электромотоцикл HORWIN SK3 Plus: городская спортивная платформа с пиковой мощностью 8.64 кВт, максимальной скоростью до 100 км/ч и dual-battery конфигурацией для увеличенного запаса хода.',
+  NULL,
+  '0',
+  'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/horwin-sk3-plus/image_1.png',
+  '/rent/horwin-sk3-plus',
+  false,
+  jsonb_build_object(
+    'sale', 1,
+    'type', 'Electric',
+    'source', 'https://global.horwin.com/SK3-PLUS.html',
+    'subtitle', 'HORWIN SK3 Plus',
+    'bike_subtype', 'Electric Urban Sport',
+    'brand_type', 'official_website_data',
+    'price_rub', 0,
+    'sale_price', 0,
+    'power_kw', '8.64',
+    'motor_peak_kw', '8.64',
+    'power_continuous_kw', '4.5',
+    'range_km', '130 (official) / up to 150 in dual-battery lab cycle',
+    'top_speed_kmh', '100',
+    'torque_nm', '280',
+    'acceleration_0_50_s', '4.43',
+    'max_climbing_angle_deg', '22',
+    'weight_kg', '103',
+    'seat_height_mm', '790',
+    'ground_clearance_mm', '135',
+    'wheelbase_mm', '1310',
+    'charge_time_h', '5.5',
+    'battery', '75V 45Ah (single) / dual-battery support',
+    'drive', 'Belt',
+    'sold_count', 41,
+    'rating', 4.9,
+    'reviews_count', 26,
+    'recommend_percent', 97,
+    'features', jsonb_build_array('ABS + TCS', 'TFT day/night', 'GPS tracking + App', 'Keyless Go'),
+    'reviews', jsonb_build_array(
+      jsonb_build_object('author', 'Denis K.', 'score', 5, 'text', 'Очень бодрый старт и уверенное торможение с ABS.'),
+      jsonb_build_object('author', 'Ilya P.', 'score', 5, 'text', 'Для города идеальный баланс динамики и комфорта.'),
+      jsonb_build_object('author', 'Mariya S.', 'score', 4.7, 'text', 'Понравился TFT и навигация через приложение.')
+    ),
+    'gallery', jsonb_build_array(
+      'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/horwin-sk3-plus/image_1.png',
+      'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/horwin-sk3-plus/image_2.png',
+      'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/horwin-sk3-plus/image_3.png'
+    ),
+    'buy_options', jsonb_build_array(
+      jsonb_build_object('id', 'single-battery', 'label', 'Single Battery', 'subtitle', 'Базовая батарея для города', 'priceDelta', -40000),
+      jsonb_build_object('id', 'dual-battery', 'label', 'Dual Battery', 'subtitle', 'Максимальный запас хода и стабильная тяга', 'priceDelta', 0),
+      jsonb_build_object('id', 'city-pack', 'label', 'City Pack', 'subtitle', 'Dual battery + расширенная телеметрия', 'priceDelta', 25000)
+    ),
+    'buy_colors', jsonb_build_array(
+      jsonb_build_object('id', 'graphite', 'label', 'Graphite', 'hex', '#2f343a'),
+      jsonb_build_object('id', 'silver', 'label', 'Silver', 'hex', '#b8bec7'),
+      jsonb_build_object('id', 'red', 'label', 'Red', 'hex', '#c1121f')
+    )
+  ),
+  '356282674',
+  'bike',
+  '2d5fde70-1dd3-4f0d-8d72-66ccf6908746',
+  '{}'::jsonb,
+  '1'
+)
+ON CONFLICT (id) DO UPDATE
+SET
+  make = EXCLUDED.make,
+  model = EXCLUDED.model,
+  description = EXCLUDED.description,
+  daily_price = EXCLUDED.daily_price,
+  image_url = EXCLUDED.image_url,
+  rent_link = EXCLUDED.rent_link,
+  specs = EXCLUDED.specs,
+  owner_id = EXCLUDED.owner_id,
+  type = EXCLUDED.type,
+  crew_id = EXCLUDED.crew_id,
+  availability_rules = EXCLUDED.availability_rules,
+  quantity = EXCLUDED.quantity;
+
