@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
+import { upsertTempFranchizeCartAction } from "@/contexts/actions";
+import { isMockUserModeEnabled } from "@/lib/mockUserMode";
 
 export type FranchizeCartOptions = {
   package: string;
@@ -26,6 +28,7 @@ type CartEnvelope = {
 
 const CART_STORAGE_PREFIX = "franchize-cart";
 const CART_SYNC_EVENT = "franchize-cart-sync";
+const TEMP_CART_ID_KEY = "franchize-temp-cart-id";
 
 const DEFAULT_OPTIONS: FranchizeCartOptions = {
   package: "Базовый",
@@ -106,6 +109,7 @@ export const getFranchizeCartStorageKey = (slug: string) => `${CART_STORAGE_PREF
 
 export function useFranchizeCart(slug: string) {
   const { dbUser } = useAppContext();
+  const tempCartFeatureEnabled = !isMockUserModeEnabled();
   const storageKey = useMemo(() => getFranchizeCartStorageKey(slug), [slug]);
   const [cart, setCart] = useState<FranchizeCartState>({});
   const [isHydrated, setIsHydrated] = useState(false);
@@ -153,6 +157,25 @@ export function useFranchizeCart(slug: string) {
         window.dispatchEvent(new CustomEvent(CART_SYNC_EVENT, { detail: { storageKey } }));
     }
   }, [cart, storageKey, isHydrated]);
+
+  useEffect(() => {
+    if (!isHydrated || typeof window === "undefined") return;
+    if (dbUser?.user_id || !tempCartFeatureEnabled) return;
+
+    const existingCartId = window.localStorage.getItem(TEMP_CART_ID_KEY);
+    const cartId = existingCartId || `cart_${crypto.randomUUID()}`;
+    if (!existingCartId) {
+      window.localStorage.setItem(TEMP_CART_ID_KEY, cartId);
+    }
+
+    const syncHash = `franchize-temp-cart-sync:${slug}`;
+    const payloadBySlug = { [slug]: cart };
+    const nextHash = JSON.stringify(payloadBySlug);
+    if (window.sessionStorage.getItem(syncHash) === nextHash) return;
+    window.sessionStorage.setItem(syncHash, nextHash);
+
+    void upsertTempFranchizeCartAction({ cartId, cartBySlug: payloadBySlug });
+  }, [cart, dbUser?.user_id, isHydrated, slug, tempCartFeatureEnabled]);
 
   // 3. Sync Listener
   useEffect(() => {
