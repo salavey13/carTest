@@ -18,6 +18,22 @@ type VerifyResult = {
   storageIntact?: boolean;
 };
 
+export type RegisterVerifierBufferInput = {
+  integrationScope: string;
+  documentKey: string;
+  sourceFileName: string;
+  bytes: Uint8Array;
+  uploadedBy: string;
+};
+
+export type RegisterVerifierBufferResult = {
+  success: boolean;
+  error?: string;
+  recordId?: string;
+  uploadedHash?: string;
+  verifiedAt?: string;
+};
+
 function sanitizeKey(raw: string): string {
   return raw.trim().toLowerCase().replace(/[^a-z0-9-_]+/g, "-").slice(0, 80);
 }
@@ -41,7 +57,7 @@ async function upsertVerifierRecord(input: {
   originalHash: string;
   uploadedBy: string;
 }) {
-  const { error } = await supabaseAdmin.from(DOC_TABLE).upsert(
+  const { data, error } = await supabaseAdmin.from(DOC_TABLE).upsert(
     {
       integration_scope: input.integrationScope,
       document_key: input.documentKey,
@@ -52,10 +68,44 @@ async function upsertVerifierRecord(input: {
       updated_at: new Date().toISOString(),
     },
     { onConflict: "integration_scope,document_key" },
-  );
+  ).select("id").single();
 
   if (error) {
     throw new Error(error.message);
+  }
+  return data?.id as string | undefined;
+}
+
+export async function registerVerifierOriginalForBuffer(input: RegisterVerifierBufferInput): Promise<RegisterVerifierBufferResult> {
+  const integrationScope = sanitizeKey(input.integrationScope || "core");
+  const documentKey = sanitizeKey(input.documentKey || "");
+  if (!documentKey) return { success: false, error: "Введите document key" };
+  if (!input.bytes?.length) return { success: false, error: "Пустой документ" };
+
+  const bytes = Buffer.from(input.bytes);
+  const hash = sha256(bytes);
+  const extension = input.sourceFileName.toLowerCase().endsWith(".docx") ? ".docx" : "";
+  const storagePath = `${documentKey}/original-${Date.now()}-${randomUUID()}${extension}`;
+
+  await ensureBucket();
+  const { error: uploadError } = await supabaseAdmin.storage.from(DOC_BUCKET).upload(storagePath, bytes, {
+    contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    upsert: false,
+  });
+  if (uploadError) return { success: false, error: uploadError.message };
+
+  try {
+    const recordId = await upsertVerifierRecord({
+      documentKey,
+      integrationScope,
+      sourceFileName: input.sourceFileName,
+      originalPath: storagePath,
+      originalHash: hash,
+      uploadedBy: input.uploadedBy || "unknown",
+    });
+    return { success: true, recordId, uploadedHash: hash, verifiedAt: new Date().toISOString() };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "DB upsert failed" };
   }
 }
 
@@ -69,34 +119,14 @@ export async function registerVerifierOriginal(formData: FormData): Promise<Veri
   if (!documentKey) return { success: false, error: "Введите document key" };
   if (!(file instanceof File)) return { success: false, error: "Прикрепите DOCX файл" };
 
-  const bytes = Buffer.from(await file.arrayBuffer());
-  const hash = sha256(bytes);
-  const extension = file.name.toLowerCase().endsWith(".docx") ? ".docx" : "";
-  const storagePath = `${documentKey}/original-${Date.now()}-${randomUUID()}${extension}`;
-
-  await ensureBucket();
-  const { error: uploadError } = await supabaseAdmin.storage.from(DOC_BUCKET).upload(storagePath, bytes, {
-    contentType: file.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    upsert: false,
+  const result = await registerVerifierOriginalForBuffer({
+    integrationScope,
+    documentKey,
+    sourceFileName: file.name,
+    bytes: new Uint8Array(await file.arrayBuffer()),
+    uploadedBy,
   });
-
-  if (uploadError) {
-    return { success: false, error: uploadError.message };
-  }
-
-  try {
-    await upsertVerifierRecord({
-      documentKey,
-      integrationScope,
-      sourceFileName: file.name,
-      originalPath: storagePath,
-      originalHash: hash,
-      uploadedBy,
-    });
-    return { success: true, documentKey, uploadedHash: hash, verifiedAt: new Date().toISOString() };
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "DB upsert failed" };
-  }
+  return { success: result.success, error: result.error, documentKey, uploadedHash: result.uploadedHash, verifiedAt: result.verifiedAt };
 }
 
 export async function verifyDocAgainstStored(formData: FormData): Promise<VerifyResult> {
