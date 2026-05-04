@@ -455,7 +455,7 @@ function maybeNotifyStatusUpdate(taskId, status) {
   }
   const summary = `SupaPlan task ${taskId} -> ${status}`;
   try {
-    spawnSync('node', ['scripts/codex-notify.mjs', 'callback-auto', '--status', 'in_progress', '--summary', summary], {
+    spawnSync('node', ['scripts/codex-notify.mjs', 'callback-auto', '--status', status, '--summary', summary], {
       stdio: 'ignore',
       encoding: 'utf8',
     });
