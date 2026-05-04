@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import { registerVerifierOriginal, verifyDocAgainstStored } from "./actions";
 
 type VerificationState = {
@@ -16,10 +17,12 @@ type VerificationState = {
 } | null;
 
 export default function DocVerifierPage() {
-  const [integrationScope, setIntegrationScope] = useState("core");
-  const [documentKey, setDocumentKey] = useState("");
+  const searchParams = useSearchParams();
+  const [integrationScope, setIntegrationScope] = useState(searchParams.get("integrationScope") || "core");
+  const [documentKey, setDocumentKey] = useState(searchParams.get("documentKey") || "");
   const [registerResult, setRegisterResult] = useState<VerificationState>(null);
   const [verifyResult, setVerifyResult] = useState<VerificationState>(null);
+  const [copied, setCopied] = useState(false);
   const [isRegisterPending, startRegister] = useTransition();
   const [isVerifyPending, startVerify] = useTransition();
 
@@ -41,12 +44,27 @@ export default function DocVerifierPage() {
     });
   };
 
+  const prefilledFromQuery = Boolean(searchParams.get("integrationScope") || searchParams.get("documentKey"));
+  const verifierLink = `/doc-verifier?integrationScope=${encodeURIComponent(integrationScope)}&documentKey=${encodeURIComponent(documentKey)}`;
+
+  const copyVerifierLink = async () => {
+    if (!documentKey.trim()) return;
+    await navigator.clipboard.writeText(verifierLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-3xl px-4 pb-20 pt-24">
       <h1 className="text-3xl font-semibold">Проверка DOCX</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         Универсальная проверка целостности для любых интеграций: сохраняем оригинал, затем сверяем SHA-256.
       </p>
+      {prefilledFromQuery && (
+        <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200">
+          Поля предзаполнены из карточки сделки — можешь сразу загружать DOCX и проверять.
+        </div>
+      )}
 
       <div className="mt-6 grid gap-3 rounded-2xl border p-4 sm:grid-cols-2">
         <label className="text-sm font-medium">
@@ -67,6 +85,17 @@ export default function DocVerifierPage() {
             onChange={(event) => setDocumentKey(event.target.value)}
           />
         </label>
+      </div>
+      <div className="mt-3 flex items-center gap-2 text-xs">
+        <button
+          type="button"
+          onClick={copyVerifierLink}
+          disabled={!documentKey.trim()}
+          className="rounded-lg border px-2.5 py-1.5 disabled:opacity-50"
+        >
+          {copied ? "Ссылка скопирована" : "Скопировать verify-ссылку"}
+        </button>
+        <span className="truncate text-muted-foreground">{verifierLink}</span>
       </div>
 
       <section className="mt-4 grid gap-4 md:grid-cols-2">
