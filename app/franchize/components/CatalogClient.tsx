@@ -236,7 +236,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
   return (
     <>
       <section
-        className="mx-auto w-full max-w-4xl px-4 pb-6 pt-8"
+        className="mx-auto w-full max-w-7xl px-4 pb-6 pt-8 2xl:max-w-[1600px]"
         id="catalog-sections"
         style={{
           ["--catalog-accent" as string]: crew.theme.palette.accentMain,
@@ -395,7 +395,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
                     {group.items.length} шт.
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
                   {group.items.map((item) => (
                     <article
                       key={item.id}
@@ -411,9 +411,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
                         style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
                       >
-                        <div className="relative h-28 w-full">
+                        <div className="relative aspect-[4/3] w-full lg:aspect-square">
                           {item.imageUrl ? (
-                            <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 768px) 50vw, 280px" className="object-cover" unoptimized />
+                            <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 1279px) 50vw, (max-width: 1535px) 33vw, 25vw" className="object-cover" unoptimized />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Изображение байка скоро загрузим</div>
                           )}
