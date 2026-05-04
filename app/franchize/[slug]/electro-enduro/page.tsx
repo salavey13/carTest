@@ -10,12 +10,18 @@ interface ElectroEnduroPageProps {
 }
 
 const isSaleEnabled = (value: unknown) => value === 1 || value === true || String(value).toLowerCase() === "1" || String(value).toLowerCase() === "true";
+const isRentEnabled = (value: unknown) => value === 1 || value === true || String(value).toLowerCase() === "1" || String(value).toLowerCase() === "true";
 
 export default async function ElectroEnduroPage({ params }: ElectroEnduroPageProps) {
   const { slug } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteForSurface(crew.theme);
   const saleItems = items.filter((item) => item.saleAvailable || isSaleEnabled(item.rawSpecs?.sale));
+  const rentItems = items.filter((item) => item.available !== false || isRentEnabled(item.rawSpecs?.rent));
+  const featuredRentItems = rentItems.filter((item) => item.id.toLowerCase().includes("sequence-zero")).slice(0, 3);
+  const featuredSaleItems = saleItems.filter((item) => item.id.toLowerCase().includes("falcon-gt-2025")).slice(0, 3);
+  const rentPreview = featuredRentItems.length > 0 ? featuredRentItems : rentItems.slice(0, 3);
+  const salePreview = featuredSaleItems.length > 0 ? featuredSaleItems : saleItems.slice(0, 3);
 
   return (
     <main className="min-h-screen" style={surface.page}>
@@ -23,10 +29,10 @@ export default async function ElectroEnduroPage({ params }: ElectroEnduroPagePro
       <section className="mx-auto w-full max-w-7xl px-4 pt-6 2xl:max-w-[1600px]">
         <div className="rounded-3xl border border-white/15 bg-black/30 p-5 backdrop-blur-sm sm:p-8">
           <p className="text-xs uppercase tracking-[0.18em] text-white/60">Electro-Enduro flow</p>
-          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Сначала выбираем сценарий: тест-драйв аренда или покупка</h1>
+          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Electro-enduro: два сценария в одном каталоге</h1>
           <p className="mt-3 max-w-3xl text-sm text-white/75 sm:text-base">
-            Эта страница посвящена электроэндуро. Для новичков: можно начать с аренды как тест-драйва. Для покупки:
-            переходи в конфигуратор и собирай байк под себя, затем корзина и оформление.
+            Для быстрого старта удобно взять байк в аренду и оценить поведение на маршруте. Для заказа в собственность
+            используйте конфигуратор: параметры, комплектация и оформление идут отдельным потоком.
           </p>
           <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
             <article className="rounded-2xl border border-emerald-300/30 bg-emerald-500/10 p-4 text-white">
@@ -54,7 +60,43 @@ export default async function ElectroEnduroPage({ params }: ElectroEnduroPagePro
           </div>
         </div>
       </section>
-      <CatalogClient crew={crew} slug={slug} items={saleItems} mode="electro" />
+      <section className="mx-auto w-full max-w-7xl px-4 pt-6 2xl:max-w-[1600px]">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <article className="rounded-3xl border border-emerald-300/30 bg-emerald-500/10 p-5 text-white">
+            <h3 className="text-xl font-semibold">Группа аренды (test-ride friendly)</h3>
+            <p className="mt-2 text-sm text-white/75">Включает модели для первого знакомства и коротких прокатных сессий.</p>
+            <div className="mt-4 space-y-2">
+              {rentPreview.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/franchize/${crew.slug || slug}/electro-enduro?vehicle=${item.id}`}
+                  className="flex items-center justify-between rounded-xl border border-white/20 px-3 py-2 text-sm hover:bg-white hover:text-black"
+                >
+                  <span>{item.title}</span>
+                  <span className="text-xs opacity-80">{item.pricePerDay} ₽/день</span>
+                </Link>
+              ))}
+            </div>
+          </article>
+          <article className="rounded-3xl border border-amber-300/30 bg-amber-500/10 p-5 text-white">
+            <h3 className="text-xl font-semibold">Группа продажи (build-to-order)</h3>
+            <p className="mt-2 text-sm text-white/75">Фокус на кастомизации и заказе модели в конфигураторе.</p>
+            <div className="mt-4 space-y-2">
+              {salePreview.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/franchize/${crew.slug || slug}/configurator?vehicle=${item.id}`}
+                  className="flex items-center justify-between rounded-xl border border-white/20 px-3 py-2 text-sm hover:bg-white hover:text-black"
+                >
+                  <span>{item.title}</span>
+                  <span className="text-xs opacity-80">{item.pricePerDay} ₽/день</span>
+                </Link>
+              ))}
+            </div>
+          </article>
+        </div>
+      </section>
+      <CatalogClient crew={crew} slug={slug} items={items} mode="electro" />
       <CrewFooter crew={crew} />
     </main>
   );
