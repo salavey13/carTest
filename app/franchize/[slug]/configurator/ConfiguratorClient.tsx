@@ -336,7 +336,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
         {/* ── HERO ── */}
         <div className="relative overflow-hidden border-b border-[#27272a]">
           <div className="absolute -top-40 left-1/2 h-[500px] w-[800px] -translate-x-1/2 rounded-full opacity-20" style={{ background: 'radial-gradient(ellipse, #00ffea 0%, transparent 70%)' }} />
-          <div className="relative mx-auto max-w-6xl px-4 pb-8 pt-10 sm:pt-14">
+          <div className="relative mx-auto max-w-7xl px-4 pb-8 pt-10 sm:pt-14 2xl:max-w-[1600px]">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="cfg-mono mb-2 text-[11px] font-medium uppercase tracking-[0.25em] text-[#00ffea]">Конфигуратор</p>
@@ -354,7 +354,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
         </div>
 
         {/* ── CONTENT ── */}
-        <div className="mx-auto max-w-6xl px-4 py-6 pb-20 sm:pb-8">
+        <div className="mx-auto max-w-7xl px-4 py-6 pb-20 sm:pb-8 2xl:max-w-[1600px]">
           <StepBar current={tab} goTo={(s) => setTab(s as ConfigStep)} disabled={tabDisabled} />
 
           {/* ═══ STEP 1: MODEL ═══ */}
@@ -370,13 +370,13 @@ export function ConfiguratorClient({ crew, slug }: Props) {
               </div>
               <p className="cfg-mono text-xs text-[#71717a]">Найдено: <span className="font-bold text-white">{filteredBikes.length}</span> моделей</p>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 cfg-stagger">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 cfg-stagger">
                 {filteredBikes.map((bike) => {
                   const isSelected = selectedBikeId === bike.id
                   return (
                     <article key={bike.id} className={['group relative overflow-hidden rounded-2xl border bg-[#111113] cfg-card-hover', isSelected ? 'cfg-selected-ring border-[#00ffea]' : 'border-[#27272a]'].join(' ')}>
                       <button type="button" className="block w-full text-left" onClick={() => selectBike(bike.id)}>
-                        <div className="cfg-img-wrap relative aspect-[4/3] w-full overflow-hidden">
+                        <div className="cfg-img-wrap relative aspect-[4/3] w-full overflow-hidden lg:aspect-square">
                           <Image src={bike.image_url} alt={`${bike.make} ${bike.model}`} fill className="object-cover transition-transform duration-700 group-hover:scale-105" unoptimized />
                           <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-transparent to-transparent opacity-60" />
                           <div className="absolute left-3 top-3"><TierBadge tier={bike.specs.tier} /></div>
