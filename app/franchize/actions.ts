@@ -1643,6 +1643,7 @@ export async function submitFranchizeOrderNotification(input: unknown): Promise<
 const retryFranchizeNotificationSchema = z.object({
   slug: z.string().trim().min(1),
   orderId: z.string().trim().min(1),
+  actorUserId: z.string().trim().min(1),
 });
 
 export async function retryFranchizeOrderNotification(input: unknown): Promise<{ success: boolean; error?: string }> {
@@ -1651,7 +1652,11 @@ export async function retryFranchizeOrderNotification(input: unknown): Promise<{
     return { success: false, error: parsed.error.issues[0]?.message ?? "Некорректный payload для retry." };
   }
 
-  const { slug, orderId } = parsed.data;
+  const { slug, orderId, actorUserId } = parsed.data;
+  const { data: crew } = await supabaseAdmin.from("crews").select("id, owner_id").eq("slug", slug).maybeSingle();
+  if (!crew) return { success: false, error: "Экипаж не найден." };
+  const canRetry = await resolveFranchizeEditorAccess(actorUserId, crew);
+  if (!canRetry) return { success: false, error: "Недостаточно прав для retry уведомления." };
   const { data: logRow, error } = await supabaseAdmin
     .from("franchize_order_notifications")
     .select("payload")
@@ -1670,6 +1675,29 @@ export async function retryFranchizeOrderNotification(input: unknown): Promise<{
   }
 
   return submitFranchizeOrderNotification(logRow.payload);
+}
+
+export async function getFranchizeOrderNotificationFailures(input: unknown): Promise<{ success: boolean; items?: Array<{ orderId: string; sendTo: string; lastError: string; createdAt: string }>; error?: string }> {
+  const parsed = z.object({ slug: z.string().trim().min(1), actorUserId: z.string().trim().min(1) }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректный запрос." };
+  const { slug, actorUserId } = parsed.data;
+  const { data: crew } = await supabaseAdmin.from("crews").select("id, owner_id").eq("slug", slug).maybeSingle();
+  if (!crew) return { success: false, error: "Экипаж не найден." };
+  const canRead = await resolveFranchizeEditorAccess(actorUserId, crew);
+  if (!canRead) return { success: false, error: "Недостаточно прав для просмотра логов." };
+
+  const { data, error } = await supabaseAdmin
+    .from("franchize_order_notifications")
+    .select("order_id, send_to, last_error, created_at")
+    .eq("slug", slug)
+    .eq("send_status", "failed")
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error) return { success: false, error: error.message };
+  return {
+    success: true,
+    items: (data ?? []).map((row) => ({ orderId: row.order_id, sendTo: row.send_to ?? "", lastError: row.last_error ?? "", createdAt: row.created_at ?? "" })),
+  };
 }
 
 type FranchizeOrderInvoicePayload = z.infer<typeof franchizeOrderInvoiceSchema>;
