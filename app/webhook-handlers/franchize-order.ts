@@ -115,8 +115,13 @@ export const franchizeOrderHandler: WebhookHandler = {
       })
       .eq("rental_id", rentalId);
 
-    const tgDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rental-${rentalId}`;
-    const appLink = `https://v0-car-test.vercel.app/franchize/${slug}/rental/${rentalId}`;
+    const startParam = typeof metadata.startParam === "string" && metadata.startParam.trim().length > 0
+      ? metadata.startParam.trim()
+      : `${metadata.flowType === "sale" || metadata.flowType === "mixed" ? "sale" : "rental"}-${rentalId}`;
+    const tgDeepLink = `https://t.me/oneBikePlsBot/app?startapp=${startParam}`;
+    const appLink = typeof metadata.franchizeRentalLink === "string" && metadata.franchizeRentalLink.trim().length > 0
+      ? metadata.franchizeRentalLink.trim()
+      : `https://v0-car-test.vercel.app/franchize/${slug}/rental/${rentalId}`;
     const catalogLink = `https://v0-car-test.vercel.app/franchize/${slug}`;
 
     const cartLines = Array.isArray(metadata.cartLines) ? metadata.cartLines : [];
@@ -143,7 +148,7 @@ export const franchizeOrderHandler: WebhookHandler = {
       : "• базовый пакет";
 
     const extrasText = extras.length
-      ? extras.map((extra: any) => `• ${safeText(extra?.label)} (+${formatMoney(Number(extra?.price || 0))})`).join("\n")
+      ? extras.map((extra: any) => `• ${safeText(extra?.label)} (+${formatMoney(Number(extra?.amount ?? extra?.price ?? 0))})`).join("\n")
       : "• без допов";
 
     const userMessage = [
