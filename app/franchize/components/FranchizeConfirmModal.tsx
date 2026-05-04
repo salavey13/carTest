@@ -19,6 +19,7 @@ type FranchizeConfirmModalProps = {
   confirmText?: string;
   cancelText?: string;
   variant?: "danger" | "default";
+  confirmDisabled?: boolean;
 };
 
 export function FranchizeConfirmModal({
@@ -30,6 +31,7 @@ export function FranchizeConfirmModal({
   confirmText = "Подтвердить",
   cancelText = "Отмена",
   variant = "default",
+  confirmDisabled = false,
 }: FranchizeConfirmModalProps) {
   const confirmClass =
     variant === "danger"
@@ -41,13 +43,13 @@ export function FranchizeConfirmModal({
       <DialogContent className="border-white/20 bg-zinc-950/95 text-white backdrop-blur-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription className="text-zinc-300">{message}</DialogDescription>
+          <DialogDescription className="whitespace-pre-line text-zinc-300">{message}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose}>
             {cancelText}
           </Button>
-          <Button type="button" className={confirmClass} onClick={onConfirm}>
+          <Button type="button" className={confirmClass} onClick={onConfirm} disabled={confirmDisabled}>
             {confirmText}
           </Button>
         </DialogFooter>
