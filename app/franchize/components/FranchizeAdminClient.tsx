@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Loading } from "@/components/Loading";
 import { useAppContext } from "@/contexts/AppContext";
 import { getEditableVehiclesForUser } from "@/app/rentals/actions";
-import { getFranchizeBySlug, type FranchizeCrewVM } from "@/app/franchize/actions";
+import { getFranchizeBySlug, getFranchizeOrderNotificationFailures, retryFranchizeOrderNotification, type FranchizeCrewVM } from "@/app/franchize/actions";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "@/app/franchize/lib/theme";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -66,6 +66,8 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [filterType, setFilterType] = useState<"all" | "bike" | "car">("all");
   const [loadingFleet, setLoadingFleet] = useState(false);
+  const [failedNotifications, setFailedNotifications] = useState<Array<{ orderId: string; sendTo: string; lastError: string; createdAt: string }>>([]);
+  const [retryingOrderId, setRetryingOrderId] = useState<string | null>(null);
 
   const slug = initialSlug?.trim() || "vip-bike";
 
@@ -109,6 +111,33 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
   useEffect(() => {
     loadFleet();
   }, [loadFleet]);
+
+  const loadFailedNotifications = useCallback(async () => {
+    if (!dbUser?.user_id) return;
+    const result = await getFranchizeOrderNotificationFailures({ slug, actorUserId: dbUser.user_id });
+    if (!result.success) return;
+    setFailedNotifications(result.items || []);
+  }, [dbUser?.user_id, slug]);
+
+  const handleRetryNotification = useCallback(async (orderId: string) => {
+    if (!dbUser?.user_id) return;
+    setRetryingOrderId(orderId);
+    const result = await retryFranchizeOrderNotification({ slug, orderId, actorUserId: dbUser.user_id });
+    setRetryingOrderId(null);
+    if (!result.success) {
+      toast.error(result.error || "Retry не выполнен");
+      return;
+    }
+    toast.success(`Retry отправлен для заказа #${orderId}`);
+    void loadFailedNotifications();
+  }, [dbUser?.user_id, loadFailedNotifications, slug]);
+
+
+
+
+  useEffect(() => {
+    void loadFailedNotifications();
+  }, [loadFailedNotifications]);
 
   const visible = useMemo(
     () => fleet.filter((item) => (filterType === "all" ? true : item.type === filterType)),
@@ -230,6 +259,25 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
             ))}
           </div>
           <CarSubmissionForm ownerId={dbUser?.user_id} vehicleToEdit={selectedVehicle} onSuccess={() => loadFleet()} />
+        </div>
+
+        <div className="mt-4 rounded-2xl border p-3" style={{ ...surface.subtleCard, borderColor: "var(--fr-admin-border)" }}>
+          <p className="text-sm font-semibold text-[var(--fr-admin-text)]">Failed doc notifications</p>
+          {!failedNotifications.length ? (
+            <p className="mt-2 text-xs text-[var(--fr-admin-muted)]">Сбоев отправки не найдено.</p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {failedNotifications.map((item) => (
+                <div key={`${item.orderId}-${item.sendTo}-${item.createdAt}`} className="rounded-xl border p-2" style={{ borderColor: "var(--fr-admin-border)" }}>
+                  <p className="text-xs text-[var(--fr-admin-text)]">Заказ #{item.orderId} → {item.sendTo || "unknown"}</p>
+                  <p className="mt-1 text-xs text-rose-300">{item.lastError || "unknown error"}</p>
+                  <Button type="button" className="mt-2 h-8 text-xs" onClick={() => handleRetryNotification(item.orderId)} disabled={retryingOrderId === item.orderId}>
+                    {retryingOrderId === item.orderId ? "Retry..." : "Retry send"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mt-4 flex flex-wrap gap-3 text-sm">

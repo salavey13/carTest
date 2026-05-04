@@ -18,6 +18,36 @@ type MinimalRental = {
   status: string;
 };
 
+type RentalLifecycleEvent = "rental_archived" | "pickup_confirmed" | "return_confirmed";
+
+async function notifyRentalLifecycle(rentalId: string, event: RentalLifecycleEvent): Promise<void> {
+    const { data: rental, error } = await supabaseAdmin
+        .from("rentals")
+        .select("rental_id, user_id, owner_id, status, payment_status")
+        .eq("rental_id", rentalId)
+        .maybeSingle();
+    if (error || !rental) return;
+
+    const userIds = [rental.user_id, rental.owner_id].filter((id): id is string => typeof id === "string" && id.length > 0);
+    if (!userIds.length) return;
+
+    const { data: recipients } = await supabaseAdmin
+        .from("profiles")
+        .select("user_id, telegram_id")
+        .in("user_id", userIds);
+
+    const text = `🚦 Rental update\n#${rental.rental_id}\nEvent: ${event}\nStatus: ${rental.status}\nPayment: ${rental.payment_status}`;
+    const notifyTargets = (recipients ?? [])
+        .map((profile) => String(profile.telegram_id || "").trim())
+        .filter(Boolean);
+
+    await Promise.allSettled(
+        notifyTargets.map((chatId) =>
+            sendComplexMessage(chatId, text, [], { parseMode: "Markdown" }),
+        ),
+    );
+}
+
 /**
  * БЕЗОПАСНО и ЭФФЕКТИВНО получает минимальный список аренд для UI индикаторов.
  * Использует существующую RPC функцию с флагом p_minimal: true.
@@ -687,6 +717,8 @@ export async function archivePendingRental(
             logger.error('[archivePendingRental] Rental updated but failed to create archival event:', eventError);
         }
 
+        await notifyRentalLifecycle(rentalId, 'rental_archived');
+
         return { success: true };
     } catch (e: any) {
         logger.error('[archivePendingRental] Error:', e);
@@ -761,6 +793,8 @@ export async function confirmVehiclePickup(rentalId: string, userId: string) {
             rental_id: rentalId, type: 'pickup_confirmed', created_by: userId 
         });
         if(eventError) logger.error(`[confirmVehiclePickup] Rental updated but failed to create event for ${rentalId}:`, eventError);
+
+        await notifyRentalLifecycle(rentalId, 'pickup_confirmed');
 
         return { success: true, data: 'OK' };
     } catch (e: any) {
@@ -949,6 +983,7 @@ export async function confirmVehicleReturn(rentalId: string, userId: string) {
             rental_id: rentalId, type: 'return_confirmed', created_by: userId 
         });
         if(eventError) logger.error(`[confirmVehicleReturn] Rental updated but failed to create event for ${rentalId}:`, eventError);
+        await notifyRentalLifecycle(rentalId, 'return_confirmed');
         
         return { success: true, data: 'OK' };
     } catch (e: any) {
