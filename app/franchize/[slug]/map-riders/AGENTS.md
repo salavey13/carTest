@@ -13,7 +13,7 @@ Keep `/franchize/[slug]/map-riders` stable for real riders in Telegram WebApp wh
 Before coding in this scope:
 
 1. Read `app/franchize/[slug]/map-riders/todo.md` (source of truth for current port stage).
-2. Read latest context from `goldmine/PROGRESS.md` and `goldmine/CHANGELOG.md` only for extraction, not blind copy.
+2. Read latest context from `todo.md` + `MapRiders_FixBook.md` for active extraction notes (goldmine dump files were retired).
 3. Open `app/franchize/[slug]/map-riders/IDENTITY.md` and `USER.md` (operator intent + UX tone).
 4. Cross-check active SupaPlan seeds listed in `todo.md` and avoid inventing duplicate work.
 
@@ -64,4 +64,4 @@ A change is done only when:
 
 - Never paste secrets into markdown/docs.
 - Never remove backward compatibility without explicit operator approval.
-- Never treat `goldmine/*` as production-ready truth; it's a knowledge mine, not runtime contract.
+- Never treat archival notes as production-ready truth; use runtime contracts (`page.tsx`, API routes, migrations) as source of truth.
