@@ -63,7 +63,7 @@ const sanitizeCartState = (value: unknown): FranchizeCartState => {
       perk: typeof rawOptions.perk === "string" ? rawOptions.perk : DEFAULT_OPTIONS.perk,
       auction: typeof rawOptions.auction === "string" ? rawOptions.auction : DEFAULT_OPTIONS.auction,
       buyConfigId: typeof rawOptions.buyConfigId === "string" ? rawOptions.buyConfigId : undefined,
-      buyPriceDelta: typeof rawOptions.buyPriceDelta === "number" ? rawOptions.buyPriceDelta : undefined,
+      buyPriceDelta: typeof rawOptions.buyPriceDelta === "number" && Number.isFinite(rawOptions.buyPriceDelta) ? rawOptions.buyPriceDelta : undefined,
     };
     const normalizedLineId = buildCartLineId(itemId, options);
     const prev = acc[normalizedLineId];
@@ -82,6 +82,34 @@ const mergeCartStates = (current: FranchizeCartState, incoming: FranchizeCartSta
     merged[lineId] = { ...merged[lineId], qty: Math.max(merged[lineId].qty, line.qty) };
   }
   return sanitizeCartState(merged);
+};
+
+const areLineOptionsEqual = (left: FranchizeCartOptions, right: FranchizeCartOptions): boolean => {
+  return (
+    left.package === right.package &&
+    left.duration === right.duration &&
+    left.perk === right.perk &&
+    left.auction === right.auction &&
+    (left.buyConfigId ?? null) === (right.buyConfigId ?? null) &&
+    (left.buyPriceDelta ?? null) === (right.buyPriceDelta ?? null)
+  );
+};
+
+const areCartStatesEqual = (a: FranchizeCartState, b: FranchizeCartState): boolean => {
+  const aEntries = Object.entries(a);
+  const bEntries = Object.entries(b);
+  if (aEntries.length !== bEntries.length) return false;
+
+  for (const [lineId, left] of aEntries) {
+    const right = b[lineId];
+    if (!right) return false;
+    if (left.itemId !== right.itemId || left.qty !== right.qty) return false;
+    if (!areLineOptionsEqual(left.options, right.options)) {
+      return false;
+    }
+  }
+
+  return true;
 };
 
 const parseEnvelope = (raw: string | null): CartEnvelope => {
@@ -131,10 +159,11 @@ export function useFranchizeCart(slug: string) {
       
       if (remoteCart) {
         initialState = sanitizeCartState(remoteCart);
-        // Sync retrieved DB state to local storage immediately
-        const serialized = JSON.stringify({ updatedAt: Date.now(), cart: initialState });
-        if (window.localStorage.getItem(storageKey) !== serialized) {
-            window.localStorage.setItem(storageKey, serialized);
+        // Sync retrieved DB state to local storage only if cart content differs.
+        const localEnvelope = parseEnvelope(window.localStorage.getItem(storageKey));
+        if (!areCartStatesEqual(localEnvelope.cart, initialState)) {
+          const serialized = JSON.stringify({ updatedAt: Date.now(), cart: initialState });
+          window.localStorage.setItem(storageKey, serialized);
         }
       }
     }
@@ -146,16 +175,17 @@ export function useFranchizeCart(slug: string) {
   // 2. Persistence Logic (Loop Safe)
   useEffect(() => {
     if (!isHydrated || typeof window === "undefined") return;
-    
-    const newState = JSON.stringify({ updatedAt: Date.now(), cart });
-    const currentState = window.localStorage.getItem(storageKey);
 
-    // CRITICAL FIX: Only write/dispatch if value actually changed.
-    // This stops the infinite Ping-Pong loop between tabs/components.
-    if (currentState !== newState) {
-        window.localStorage.setItem(storageKey, newState);
-        window.dispatchEvent(new CustomEvent(CART_SYNC_EVENT, { detail: { storageKey } }));
+    const currentEnvelope = parseEnvelope(window.localStorage.getItem(storageKey));
+
+    // CRITICAL FIX: compare semantically and skip writes when cart content is identical.
+    if (areCartStatesEqual(currentEnvelope.cart, cart)) {
+      return;
     }
+
+    const nextState = JSON.stringify({ updatedAt: Date.now(), cart });
+    window.localStorage.setItem(storageKey, nextState);
+    window.dispatchEvent(new CustomEvent(CART_SYNC_EVENT, { detail: { storageKey } }));
   }, [cart, storageKey, isHydrated]);
 
   useEffect(() => {
@@ -195,7 +225,7 @@ export function useFranchizeCart(slug: string) {
         
         // Loop Breaker: Don't trigger re-render if state is semantically identical
         setCart(prev => {
-            if (JSON.stringify(prev) === JSON.stringify(newState)) return prev;
+            if (areCartStatesEqual(prev, newState)) return prev;
             return newState;
         });
     };
