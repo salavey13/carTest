@@ -562,3 +562,30 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
+
+-- Horwin SK3 Plus (official website data)
+INSERT INTO public.cars (id, make, model, description, daily_price, image_url, rent_link, is_test_result, specs, type, quantity)
+VALUES (
+    'horwin-sk3-plus',
+    'HORWIN',
+    'SK3 Plus',
+    'Электромотоцикл HORWIN SK3 Plus: городская спортивная платформа с пиковой мощностью 8.64 кВт, максимальной скоростью до 100 км/ч и dual-battery конфигурацией для увеличенного запаса хода.',
+    0,
+    'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/horwin-sk3-plus/image_1.png',
+    '/rent/horwin-sk3-plus',
+    false,
+    '{"type": "Electric", "engine": "Электро", "subtitle": "HORWIN SK3 Plus", "bike_subtype": "Electric Urban Sport", "power_kw": 8.64, "power_continuous_kw": 4.5, "top_speed_kmh": 100, "range_km": "150 (45 км/ч, dual-battery)", "battery": "72V 45Ah x2", "charging_time": "≈5.5h x2 (8A)", "weight_kg": 103, "seat_height_mm": 790, "ground_clearance_mm": 135, "wheelbase_mm": 1310, "features": ["ABS + TCS", "TFT", "GPS + App"], "source": "https://global.horwin.com/SK3-PLUS.html", "gallery": ["https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/horwin-sk3-plus/image_1.png", "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/horwin-sk3-plus/image_2.png", "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/horwin-sk3-plus/image_3.png"], "sale": true}'::jsonb,
+    'bike',
+    1
+)
+ON CONFLICT (id) DO UPDATE SET
+    make = EXCLUDED.make,
+    model = EXCLUDED.model,
+    description = EXCLUDED.description,
+    daily_price = EXCLUDED.daily_price,
+    image_url = EXCLUDED.image_url,
+    rent_link = EXCLUDED.rent_link,
+    is_test_result = EXCLUDED.is_test_result,
+    specs = EXCLUDED.specs,
+    type = EXCLUDED.type,
+    quantity = EXCLUDED.quantity;
