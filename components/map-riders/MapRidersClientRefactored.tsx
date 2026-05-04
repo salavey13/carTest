@@ -184,6 +184,18 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   }, [dbUser?.user_id, state.selectedMeetupPoint]);
 
   const selectedMeetup = useMemo(() => state.meetups.find((meetup) => meetup.id === selectedMeetupId) || null, [state.meetups, selectedMeetupId]);
+  const selectedMeetupOwnerLabel = useMemo(() => {
+    if (!selectedMeetup) return null;
+    const fullName = selectedMeetup.users?.full_name?.trim();
+    const username = selectedMeetup.users?.username?.trim();
+    if (fullName) return fullName;
+    if (username) return `@${username}`;
+    return selectedMeetup.created_by_user_id;
+  }, [selectedMeetup]);
+  const isSelectedMeetupOwnedByCurrentUser = useMemo(() => {
+    if (!selectedMeetup || !dbUser?.user_id) return false;
+    return selectedMeetup.created_by_user_id === dbUser.user_id;
+  }, [dbUser?.user_id, selectedMeetup]);
 
   const handleMeetupDelete = useCallback(async () => {
     if (!dbUser?.user_id) {
@@ -539,8 +551,15 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleConfirmDelete}
         title="Удалить meetup?"
-        message={selectedMeetup ? `Удалить meetup «${selectedMeetup.title}»?` : "Удалить выбранную точку встречи?"}
-        confirmText="Удалить"
+        confirmDisabled={isMeetupDeleting}
+        message={
+          selectedMeetup
+            ? `Удалить meetup «${selectedMeetup.title}»?\n\nВладелец: ${selectedMeetupOwnerLabel || "неизвестно"}${
+                isSelectedMeetupOwnedByCurrentUser ? " (вы)" : ""
+              }.\nУдаление доступно автору, owner экипажа или admin.`
+            : "Удалить выбранную точку встречи?"
+        }
+        confirmText={isMeetupDeleting ? "Удаляем…" : "Удалить"}
         cancelText="Отмена"
         variant="danger"
       />
