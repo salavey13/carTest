@@ -1,6 +1,7 @@
 import { CrewFooter } from "../components/CrewFooter";
 import { CrewHeader } from "../components/CrewHeader";
 import { CatalogClient } from "../components/CatalogClient";
+import { FranchizeErrorBoundary } from "../components/ErrorBoundary";
 import { getFranchizeBySlug } from "../actions";
 import { crewPaletteForSurface } from "../lib/theme";
 
@@ -16,7 +17,14 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
   return (
     <main className="min-h-screen" style={surface.page}>
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}`} groupLinks={items.map((item) => item.category)} />
-      <CatalogClient crew={crew} slug={slug} items={items} />
+      <FranchizeErrorBoundary
+        resetKey={slug}
+        fallbackTitle="Каталог недоступен"
+        fallbackHref={`/franchize/${crew.slug || slug}`}
+        fallbackLinkLabel="Обновить каталог экипажа"
+      >
+        <CatalogClient crew={crew} slug={slug} items={items} />
+      </FranchizeErrorBoundary>
       <CrewFooter crew={crew} />
     </main>
   );

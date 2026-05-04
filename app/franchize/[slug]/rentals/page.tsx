@@ -3,6 +3,7 @@ import { getFranchizeBySlug } from "../../actions";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { FranchizeRentalsBridge } from "../../components/FranchizeRentalsBridge";
+import { FranchizeErrorBoundary } from "../../components/ErrorBoundary";
 
 interface FranchizeRentalsPageProps {
   params: Promise<{ slug: string }>;
@@ -32,7 +33,14 @@ export default async function FranchizeRentalsPage({ params }: FranchizeRentalsP
           </Link>
         </div>
 
-        <FranchizeRentalsBridge />
+        <FranchizeErrorBoundary
+          resetKey={slug}
+          fallbackTitle="Раздел аренд временно недоступен"
+          fallbackHref={`/franchize/${crew.slug || slug}/rentals`}
+          fallbackLinkLabel="Остаться в арендном разделе"
+        >
+          <FranchizeRentalsBridge />
+        </FranchizeErrorBoundary>
       </section>
       <CrewFooter crew={crew} />
     </>
