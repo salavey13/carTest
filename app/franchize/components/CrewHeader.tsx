@@ -24,6 +24,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   const [isCompact, setIsCompact] = useState(false);
   const pathname = usePathname();
   const mainCatalogPath = `/franchize/${crew.slug}`;
+  const headerLogoHref = crew.header.logoHref || mainCatalogPath;
   const railRef = useRef<HTMLDivElement | null>(null);
   const prevPathnameRef = useRef<string | null>(null);
 
@@ -179,7 +180,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
 
           {/* HEADER LOGO — PURE SPA LINK */}
           <Link
-            href={mainCatalogPath}
+            href={headerLogoHref}
             className="relative z-10 mx-auto flex flex-col items-center text-center cursor-pointer hover:opacity-90 transition-opacity pointer-events-auto"
           >
             <div

@@ -42,3 +42,9 @@ For every task below, keep these fields updated:
 - Visual system + implementation blueprint: `docs/THE_FRANCHEEZEPLAN_BLUEPRINT.md`
 
 This root file stays intentionally compact so operators and agents can load it quickly in high-frequency loops.
+
+---
+
+## 2) Mini execution diary
+
+- 2026-05-04 — Added support for metadata-driven franchize header logo routing via `header.logoHref` with default fallback to `/franchize/{slug}`; seeded `vip-bike` to land on `/vipbikerental` instead of catalog. Next step: expose `header.logoHref` in admin configurator UI for non-SQL operators.

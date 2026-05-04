@@ -108,6 +108,7 @@ set
           'showBackButton', false,
           'title', 'VIP BIKE RENTAL',
           'subtitle', 'Нижний Новгород',
+          'logoHref', '/vipbikerental',
           'menuLinks', jsonb_build_array(
             jsonb_build_object('label', 'Каталог', 'href', '/franchize/{slug}'),
             jsonb_build_object('label', 'О нас', 'href', '/franchize/{slug}/about'),
