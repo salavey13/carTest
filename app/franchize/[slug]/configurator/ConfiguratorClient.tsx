@@ -22,6 +22,7 @@ import {
   fallbackParts,
   lithiumBatteries,
 } from './fallback-catalog'
+import { DEFAULT_FACTORY_COLOR, FACTORY_COLORS, getFactoryColorById } from './factory-colors'
 import {
   type ConfiguratorBike,
   type ConfiguratorPart,
@@ -29,7 +30,6 @@ import {
   formatPrice,
   TIER_META,
   CATEGORY_LABELS,
-  PART_CATEGORY_ICONS,
   STEPS,
   type ConfigStep,
 } from './configurator-types'
@@ -142,6 +142,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
   const [batteryMode, setBatteryMode] = useState<'regular' | 'lithium'>('regular')
   const [batteryCapacity, setBatteryCapacity] = useState('')
   const [selectedAccessories, setSelectedAccessories] = useState<string[]>([])
+  const [selectedColorId, setSelectedColorId] = useState(DEFAULT_FACTORY_COLOR?.id ?? '')
   const [deliveryApplied, setDeliveryApplied] = useState(false)
 
   useEffect(() => {
@@ -217,6 +218,8 @@ export function ConfiguratorClient({ crew, slug }: Props) {
     [batteryCapacity, batteryMode, regularBatteries],
   )
 
+  const selectedColor = useMemo(() => getFactoryColorById(selectedColorId) ?? DEFAULT_FACTORY_COLOR, [selectedColorId])
+
   const filteredBikes = useMemo(() => bikes.filter((b) => b.daily_price >= priceRange[0] && b.daily_price <= priceRange[1]), [bikes, priceRange])
   const accessoriesTotal = useMemo(() => selectedAccessories.reduce((sum, id) => sum + (parts.find((p) => p.id === id)?.daily_price ?? 0), 0), [selectedAccessories, parts])
 
@@ -240,6 +243,8 @@ export function ConfiguratorClient({ crew, slug }: Props) {
         bikeLabel: `${selectedBike.make} ${selectedBike.model}`,
         motorLabel: selectedMotor?.label ?? '—',
         batteryLabel: activeBattery ? `${activeBattery.capacity} (${batteryMode})` : 'без батареи',
+        selectedColorId: selectedColor?.id ?? DEFAULT_FACTORY_COLOR?.id ?? 'unknown',
+        selectedColorFactoryId: selectedColor?.factoryId ?? DEFAULT_FACTORY_COLOR?.factoryId ?? 'UNKNOWN-FACTORY-COLOR',
         selectedAccessories: selectedAccessories.map((id) => {
           const part = parts.find((p) => p.id === id)
           return { name: part?.model ?? id, price: part?.daily_price ?? 0 }
@@ -481,6 +486,38 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                 </div>
               )}
 
+              <div className="rounded-2xl border border-[#27272a] bg-[#111113] p-5 sm:p-6">
+                <div className="mb-4 flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#00ffea]/10"><Sparkles className="h-4 w-4 text-[#00ffea]" /></div>
+                  <div><h3 className="text-sm font-bold">Цвет</h3><p className="text-[11px] text-[#71717a]">Цвет попадёт в заказ и DOCX с factory ID</p></div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {FACTORY_COLORS.map((color) => {
+                    const active = selectedColorId === color.id
+                    return (
+                      <button
+                        key={color.id}
+                        type="button"
+                        onClick={() => setSelectedColorId(color.id)}
+                        className={[
+                          'cfg-option flex items-center justify-between rounded-xl border p-4 text-left',
+                          active ? 'cfg-option-active' : 'border-[#27272a]',
+                        ].join(' ')}
+                      >
+                        <span className="flex items-center gap-3">
+                          <span className="h-5 w-5 rounded-full border border-white/20" style={{ backgroundColor: color.hex ?? '#6b7280' }} />
+                          <span>
+                            <span className="block text-sm font-semibold">{color.label}</span>
+                            <span className="block text-[11px] text-[#71717a]">Factory ID: {color.factoryId}</span>
+                          </span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+
               <div className="flex gap-3">
                 <Button variant="ghost" onClick={() => setTab('model')} className="text-[#71717a] hover:text-white">← Назад</Button>
                 <Button onClick={() => setTab('addons')} className="cfg-glow-btn flex-1 bg-[#00ffea] font-bold text-black hover:bg-[#33ffed] sm:flex-none">Дальше: опции<ChevronRight className="ml-1 h-4 w-4" /></Button>
@@ -543,6 +580,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                       { icon: Zap, label: 'Мотор', value: `${selectedMotor?.value ?? '3000'}W` },
                       { icon: Battery, label: 'Батарея', value: activeBattery ? activeBattery.capacity : '—' },
                       { icon: Gauge, label: 'Скорость', value: `${selectedBike.specs.max_speed_kmh} км/ч` },
+                      { icon: Sparkles, label: 'Цвет', value: selectedColor?.label ?? '—' },
                       { icon: Shield, label: 'Запас хода', value: activeBattery ? `${activeBattery.range_km} км` : '—' },
                     ].map(({ icon: Icon, label, value }) => (
                       <div key={label} className="rounded-xl border border-[#27272a] bg-[#111113] p-3"><Icon className="mb-1.5 h-4 w-4 text-[#71717a]" /><p className="cfg-mono text-lg font-bold">{value}</p><p className="text-[10px] uppercase tracking-widest text-[#71717a]">{label}</p></div>
@@ -568,6 +606,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                       <h3 className="mb-4 text-sm font-bold uppercase tracking-widest text-[#71717a]">Расчёт стоимости</h3>
                       <div className="space-y-3 text-sm">
                         <div className="flex justify-between"><span className="text-[#a1a1aa]">{selectedBike.make} {selectedBike.model}</span><span className="cfg-mono font-medium">{formatPrice(basePrice)}</span></div>
+                        <div className="flex justify-between"><span className="text-[#a1a1aa]">Цвет (Factory ID)</span><span className="cfg-mono text-xs font-medium">{selectedColor?.factoryId ?? 'UNKNOWN-FACTORY-COLOR'}</span></div>
                         {motorExtra > 0 && <div className="flex justify-between"><span className="text-[#a1a1aa]">Мотор {selectedMotor?.value}W</span><span className="cfg-mono font-medium">+{formatPrice(motorExtra)}</span></div>}
                         {batteryPrice > 0 && <div className="flex justify-between"><span className="text-[#a1a1aa]">Батарея {activeBattery?.capacity}</span><span className="cfg-mono font-medium">+{formatPrice(batteryPrice)}</span></div>}
                         {accessoriesTotal > 0 && <div className="flex justify-between"><span className="text-[#a1a1aa]">Опции ({selectedAccessories.length})</span><span className="cfg-mono font-medium">+{formatPrice(accessoriesTotal)}</span></div>}

@@ -63,6 +63,16 @@ export interface ConfiguratorPart {
 
 // ── UI constants ──
 
+
+export interface ConfiguratorColorOption {
+  id: string
+  factoryId: string
+  label: string
+  hex?: string
+  availability?: 'in_stock' | 'made_to_order' | 'out_of_stock'
+  isDefault?: boolean
+}
+
 export const TIER_META: Record<string, { label: string; color: string }> = {
   budget: { label: 'Бюджет', color: '#6ee7b7' },
   standard: { label: 'Стандарт', color: '#60a5fa' },
@@ -99,6 +109,8 @@ export interface ConfiguratorLeadInput {
   bikeLabel: string
   motorLabel: string
   batteryLabel: string
+  selectedColorId: string
+  selectedColorFactoryId: string
   selectedAccessories: Array<{ name: string; price: number }>
   withDelivery: boolean
   deliveryPrice: number
