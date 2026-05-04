@@ -22,6 +22,18 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
   const { slug, id } = await params;
   const [{ crew, items }, rental] = await Promise.all([getFranchizeBySlug(slug), getFranchizeRentalCard(slug, id)]);
   const dealStarted = rental.found || rental.paymentStatus === "interest_paid";
+  const verificationText =
+    rental.contractVerificationStatus === "verified"
+      ? "Верифицирован"
+      : rental.contractVerificationStatus === "expired"
+        ? "Истёк"
+        : "Не верифицирован";
+  const verificationColor =
+    rental.contractVerificationStatus === "verified"
+      ? "#22c55e"
+      : rental.contractVerificationStatus === "expired"
+        ? "#f59e0b"
+        : crew.theme.palette.textSecondary;
 
   return (
     <main className="min-h-screen" style={{ backgroundColor: crew.theme.palette.bgBase, color: crew.theme.palette.textPrimary }}>
@@ -51,8 +63,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
         <section className="mt-6 rounded-3xl border p-4 shadow-[0_18px_30px_rgba(0,0,0,0.35)]" style={{ borderColor: crew.theme.palette.borderSoft, backgroundColor: crew.theme.palette.bgCard }}>
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <span className="text-xs" style={{ color: crew.theme.palette.textSecondary }}>Проверка контракта:</span>
-            <span className="rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: crew.theme.palette.borderSoft }}>
-              {rental.contractVerificationStatus === "verified" ? "verified" : rental.contractVerificationStatus === "expired" ? "expired" : "not verified"}
+            <span className="rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: verificationColor, color: verificationColor }}>
+              {verificationText}
             </span>
             <Link
               href={`/doc-verifier?integrationScope=${encodeURIComponent(rental.contractVerifierScope || `rental:${rental.rentalId}`)}&documentKey=${encodeURIComponent(rental.contractDocumentKey || `rental-${slug}-${rental.rentalId}`)}`}
@@ -61,6 +73,11 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             >
               Verify contract
             </Link>
+            {rental.docVerifierRecordId ? (
+              <span className="text-[11px]" style={{ color: crew.theme.palette.textSecondary }}>
+                record: {rental.docVerifierRecordId.slice(0, 8)}…
+              </span>
+            ) : null}
           </div>
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             <p><span style={{ color: crew.theme.palette.textSecondary }}>Rental ID:</span> {rental.rentalId}</p>
