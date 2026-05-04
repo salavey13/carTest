@@ -407,7 +407,17 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
                 <div key={s.id} className="flex flex-col gap-2 lg:flex-row">
                   <Input value={s.key} onChange={(e) => updateSpec(s.id, "key", e.target.value)} placeholder="ключ (например engine_cc)" className="input-cyber" />
                   <Input value={s.value} onChange={(e) => updateSpec(s.id, "value", e.target.value)} placeholder="значение" className="input-cyber" />
-                  <Button type="button" variant="destructive" className="sm:w-auto" onClick={() => removeSpec(s.id)}>Удалить</Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="h-9 sm:h-10 sm:w-auto sm:px-3 px-2"
+                    onClick={() => removeSpec(s.id)}
+                    aria-label="Удалить характеристику"
+                  >
+                    <VibeContentRenderer content="::FaTrashCan::" className="h-3.5 w-3.5 sm:mr-1" />
+                    <span className="hidden sm:inline">Удалить</span>
+                  </Button>
                 </div>
               ))}
               <Button type="button" onClick={addSpec} variant="outline">Добавить характеристику</Button>

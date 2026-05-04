@@ -15,6 +15,24 @@ import type { Database } from "@/types/database.types";
 
 type Vehicle = Database["public"]["Tables"]["cars"]["Row"];
 
+const normalizeVin = (value: unknown) => (typeof value === "string" ? value.trim().toUpperCase() : "");
+
+const VIN_ALLOWED = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789";
+
+const buildSyntheticVin = (vehicle: Vehicle) => {
+  const raw = `${vehicle.make ?? ""}${vehicle.model ?? ""}${vehicle.year ?? ""}${vehicle.id ?? ""}`.toUpperCase();
+  const mapped = raw
+    .replace(/I/g, "1")
+    .replace(/O/g, "0")
+    .replace(/Q/g, "0")
+    .replace(/[^A-Z0-9]/g, "");
+  const normalized = mapped
+    .split("")
+    .map((char) => (VIN_ALLOWED.includes(char) ? char : "X"))
+    .join("");
+  return (normalized + "CARTESTVIN00000000").slice(0, 17);
+};
+
 const fallbackCrew: FranchizeCrewVM = {
   id: "",
   slug: "vip-bike",
@@ -68,6 +86,7 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
   const [loadingFleet, setLoadingFleet] = useState(false);
   const [failedNotifications, setFailedNotifications] = useState<Array<{ orderId: string; sendTo: string; lastError: string; createdAt: string }>>([]);
   const [retryingOrderId, setRetryingOrderId] = useState<string | null>(null);
+  const [isBulkFillingVin, setIsBulkFillingVin] = useState(false);
 
   const slug = initialSlug?.trim() || "vip-bike";
 
@@ -143,6 +162,40 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
     () => fleet.filter((item) => (filterType === "all" ? true : item.type === filterType)),
     [fleet, filterType],
   );
+
+
+  const vinAudit = useMemo(() => {
+    const target = fleet.filter((item) => item.type === "bike" || item.type === "car");
+    const missing = target.filter((item) => !normalizeVin(item.specs?.vin));
+    return { total: target.length, withVin: target.length - missing.length, missing };
+  }, [fleet]);
+
+  const handleBulkFillVin = useCallback(async () => {
+    if (!vinAudit.missing.length) return;
+    setIsBulkFillingVin(true);
+    try {
+      for (const vehicle of vinAudit.missing) {
+        const response = await fetch('/api/cars', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...vehicle,
+            specs: {
+              ...(vehicle.specs || {}),
+              vin: buildSyntheticVin(vehicle),
+            },
+          }),
+        });
+        if (!response.ok) throw new Error(`VIN bulk-fill failed for ${vehicle.make} ${vehicle.model}`);
+      }
+      toast.success(`VIN заполнен для ${vinAudit.missing.length} карточек`);
+      await loadFleet();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Не удалось выполнить bulk-fill VIN');
+    } finally {
+      setIsBulkFillingVin(false);
+    }
+  }, [vinAudit.missing, loadFleet]);
 
   const surface = crewPaletteForSurface(crew.theme);
   const buttonFocus = focusRingOutlineStyle(crew.theme);
@@ -222,6 +275,15 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
             Доступно записей по фильтру: <span className="font-semibold text-[var(--fr-admin-accent)]">{visible.length}</span>.
             {loadingFleet ? " Обновляем список..." : ""}
           </p>
+          <div className="mt-2 rounded-xl border px-3 py-2" style={{ borderColor: "var(--fr-admin-border)", backgroundColor: "rgba(217,154,0,0.08)" }}>
+            <p className="text-xs text-[var(--fr-admin-text)]">VIN аудит: <span className="font-semibold">{vinAudit.withVin}</span> / {vinAudit.total} заполнено</p>
+            {vinAudit.missing.length > 0 && <p className="mt-1 text-xs text-amber-300">Пустых VIN: {vinAudit.missing.length}</p>}
+            {vinAudit.missing.length > 0 && (
+              <Button type="button" variant="outline" className="mt-2 h-8 text-xs" onClick={() => void handleBulkFillVin()} disabled={isBulkFillingVin}>
+                {isBulkFillingVin ? "Заполняю VIN…" : "Bulk-fill VIN"}
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 rounded-2xl border p-3" style={{ ...surface.subtleCard, borderColor: "var(--fr-admin-border)" }}>
