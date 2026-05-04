@@ -28,6 +28,24 @@ import { cn } from "@/lib/utils";
 
 type Vehicle = Database['public']['Tables']['cars']['Row'];
 
+const normalizeVin = (value: unknown) => (typeof value === "string" ? value.trim().toUpperCase() : "");
+
+const VIN_ALLOWED = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789";
+
+const buildSyntheticVin = (vehicle: Vehicle) => {
+  const raw = `${vehicle.make ?? ""}${vehicle.model ?? ""}${vehicle.year ?? ""}${vehicle.id ?? ""}`.toUpperCase();
+  const mapped = raw
+    .replace(/I/g, "1")
+    .replace(/O/g, "0")
+    .replace(/Q/g, "0")
+    .replace(/[^A-Z0-9]/g, "");
+  const normalized = mapped
+    .split("")
+    .map((char) => (VIN_ALLOWED.includes(char) ? char : "X"))
+    .join("");
+  return (normalized + "CARTESTVIN00000000").slice(0, 17);
+};
+
 // === QUICK STATS COMPONENT ===
 function AdminQuickStats({ vehicles, isAdmin }: { vehicles: Vehicle[]; isAdmin: boolean }) {
   const stats = useMemo(() => {
@@ -231,6 +249,7 @@ function AdminPageContent() {
   const [typeFilter, setTypeFilter] = useState<"all" | "bike" | "car">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [isBulkFillingVin, setIsBulkFillingVin] = useState(false);
 
   const fetchUserVehicles = useCallback(async (userId: string) => {
     setIsFetchingVehicles(true);
@@ -308,6 +327,47 @@ function AdminPageContent() {
       });
   }, [userVehicles, typeFilter, searchQuery]);
 
+
+
+  const vinAudit = useMemo(() => {
+    const target = userVehicles.filter(v => v.type === "bike" || v.type === "car");
+    const missing = target.filter(v => !normalizeVin(v.specs?.vin));
+    return {
+      total: target.length,
+      withVin: target.length - missing.length,
+      missing,
+    };
+  }, [userVehicles]);
+
+  const handleBulkFillVin = useCallback(async () => {
+    if (!dbUser?.user_id || !vinAudit.missing.length) return;
+    setIsBulkFillingVin(true);
+    try {
+      for (const vehicle of vinAudit.missing) {
+        const syntheticVin = buildSyntheticVin(vehicle);
+        const res = await fetch('/api/cars', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...vehicle,
+            specs: {
+              ...(vehicle.specs || {}),
+              vin: syntheticVin,
+            },
+          }),
+        });
+        if (!res.ok) {
+          throw new Error(`VIN bulk-fill failed for ${vehicle.make} ${vehicle.model}`);
+        }
+      }
+      toast.success(`VIN заполнен для ${vinAudit.missing.length} карточек`);
+      await fetchUserVehicles(dbUser.user_id);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Не удалось выполнить bulk-fill VIN');
+    } finally {
+      setIsBulkFillingVin(false);
+    }
+  }, [dbUser?.user_id, vinAudit.missing, fetchUserVehicles]);
   const handleVehicleSelect = (vehicle: Vehicle | null) => {
     setSelectedVehicle(vehicle);
     if (vehicle) {
@@ -482,7 +542,20 @@ function AdminPageContent() {
                   </AnimatePresence>
                 </div>
 
-                {/* VIN Hint */}
+                {/* VIN Audit */}
+                <div className="rounded border border-brand-lime/20 bg-brand-lime/5 px-3 py-2 space-y-2">
+                  <p className="text-[10px] sm:text-[11px] text-zinc-300 font-mono">
+                    VIN аудит: <span className="text-brand-lime">{vinAudit.withVin}</span> / {vinAudit.total} заполнено
+                  </p>
+                  {vinAudit.missing.length > 0 && (
+                    <p className="text-[10px] text-amber-300 font-mono">Пустых VIN: {vinAudit.missing.length}</p>
+                  )}
+                  {isTrulyAdmin && vinAudit.missing.length > 0 && (
+                    <Button size="sm" variant="outline" onClick={handleBulkFillVin} disabled={isBulkFillingVin} className="h-7 text-[11px]">
+                      {isBulkFillingVin ? 'Заполняю VIN…' : 'Bulk-fill VIN'}
+                    </Button>
+                  )}
+                </div>
                 <p className="text-[10px] sm:text-[11px] text-zinc-500 font-mono bg-black/30 px-3 py-2 rounded">
                   💡 Для генерации договоров добавляй <code className="text-brand-lime">vin</code> в specs карточки
                 </p>
