@@ -78,6 +78,43 @@ export const franchizeOrderHandler: WebhookHandler = {
       throw new Error(`franchize_order rental upsert failed: ${upsertError.message}`);
     }
 
+    const documentKey = `${metadata.flowType === "sale" || metadata.flowType === "mixed" ? "sale" : "rental"}-${slug}-${orderId || ""}`;
+    const sourceScope = `${metadata.flowType || "rental"}:${slug}:${orderId || ""}`;
+    const { data: verifierRow } = await supabase
+      .from("doc_verifier_records")
+      .select("id, original_sha256")
+      .eq("document_key", documentKey)
+      .eq("integration_scope", sourceScope)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { data: persistedRental } = await supabase
+      .from("rentals")
+      .select("metadata")
+      .eq("rental_id", rentalId)
+      .maybeSingle();
+
+    const rentalMetadata = (persistedRental?.metadata ?? {}) as Record<string, any>;
+    await supabase
+      .from("rentals")
+      .update({
+        metadata: {
+          ...rentalMetadata,
+          contract_verifier: {
+            scope: `rental:${rentalId}`,
+            sourceScope,
+            documentKey,
+            docVerifierRecordId: verifierRow?.id ?? null,
+            originalSha256: verifierRow?.original_sha256 ?? null,
+            status: verifierRow?.id ? "verified" : "not_verified",
+            verifiedAt: verifierRow?.id ? new Date().toISOString() : null,
+            expiresAt: null,
+          },
+        },
+      })
+      .eq("rental_id", rentalId);
+
     const tgDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rental-${rentalId}`;
     const appLink = `https://v0-car-test.vercel.app/franchize/${slug}/rental/${rentalId}`;
     const catalogLink = `https://v0-car-test.vercel.app/franchize/${slug}`;
