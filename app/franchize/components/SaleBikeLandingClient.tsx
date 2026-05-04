@@ -22,6 +22,7 @@ import {
 
 import type { CatalogItemVM, FranchizeCrewVM } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+import { buildCandidateImageUrls } from "@/app/franchize/lib/media";
 import { useFranchizeCart } from "@/app/franchize/hooks/useFranchizeCart";
 
 type ConfigOption = { id: string; label: string; priceDelta: number; subtitle: string };
@@ -49,7 +50,11 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
   const resolvedSlug = crew.slug || "vip-bike";
   const surface = crewPaletteForSurface(crew.theme);
   const gallery = useMemo(
-    () => (item.mediaUrls?.filter(Boolean)?.length ? item.mediaUrls.filter(Boolean) : [item.imageUrl].filter(Boolean)),
+    () => {
+      const raw = item.mediaUrls?.filter(Boolean)?.length ? item.mediaUrls.filter(Boolean) : [item.imageUrl].filter(Boolean);
+      const normalized = raw.flatMap((url) => buildCandidateImageUrls(url));
+      return Array.from(new Set(normalized));
+    },
     [item.imageUrl, item.mediaUrls],
   );
   const heroImage = gallery[0] ?? "https://placehold.co/1200x900/0b0f13/e6edf3?text=No+image";
@@ -84,6 +89,7 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
   }, [specs.buy_colors]);
 
   const [selectedImage, setSelectedImage] = useState(0);
+  const [brokenGalleryUrls, setBrokenGalleryUrls] = useState<Record<string, true>>({});
   const [selectedOptionId, setSelectedOptionId] = useState<string>(configOptions[0]?.id ?? "standard");
   const [selectedColorId, setSelectedColorId] = useState<string>(colorOptions[0]?.id ?? "black");
 
@@ -196,16 +202,21 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
             <div className="space-y-2 p-2 sm:p-3">
               <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-black/30 sm:aspect-[4/3]">
                 <Image
-                  src={gallery[selectedImage] ?? heroImage}
+                  src={safeGallery[selectedImage] ?? heroImage}
                   alt={item.title}
                   fill
                   sizes="(max-width: 1024px) 100vw, 66vw"
-                  priority
+                  loading="lazy"
                   className="object-cover"
+                  onError={() => {
+                    const broken = safeGallery[selectedImage];
+                    if (!broken) return;
+                    setBrokenGalleryUrls((prev) => ({ ...prev, [broken]: true }));
+                  }}
                 />
               </div>
               <div className="grid grid-cols-5 gap-2">
-                {gallery.slice(0, 5).map((img, i) => (
+                {safeGallery.slice(0, 5).map((img, i) => (
                   <button
                     key={`${img}-${i}`}
                     type="button"
@@ -215,7 +226,7 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
                       ...(i === selectedImage ? { borderColor: crew.theme.palette.accentMain, boxShadow: `0 0 0 1px ${crew.theme.palette.accentMain}` } : {}),
                     }}
                   >
-                    <span className="relative block aspect-[4/3] w-full"><Image src={img} alt={`${item.title}-${i}`} fill sizes="120px" className="object-cover" /></span>
+                    <span className="relative block aspect-[4/3] w-full"><Image src={img} alt={`${item.title}-${i}`} fill sizes="120px" className="object-cover" loading="lazy" onError={() => setBrokenGalleryUrls((prev) => ({ ...prev, [img]: true }))} /></span>
                   </button>
                 ))}
               </div>
@@ -367,3 +378,8 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
     </div>
   );
 }
+  const safeGallery = useMemo(() => gallery.filter((url) => !brokenGalleryUrls[url]), [gallery, brokenGalleryUrls]);
+
+  useEffect(() => {
+    if (selectedImage >= safeGallery.length) setSelectedImage(0);
+  }, [selectedImage, safeGallery.length]);
