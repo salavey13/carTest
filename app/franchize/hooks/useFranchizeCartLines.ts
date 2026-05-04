@@ -40,12 +40,13 @@ function resolveSalePrice(item: CatalogItemVM | null): number {
   return Math.round(raw);
 }
 
-function isBuyFlow(options: { package: string; duration: string; perk: string; auction: string }): boolean {
-  const normalizedValues = [options.package, options.duration, options.perk, options.auction]
-    .map((value) => String(value ?? "").trim().toLowerCase());
+function isBuyFlow(options: { package: string; duration: string; perk: string; auction: string; buyConfigId?: string; buyPriceDelta?: number }): boolean {
+  if (typeof options.buyConfigId === "string" && options.buyConfigId.trim().length > 0) return true;
+  if (typeof options.buyPriceDelta === "number" && options.buyPriceDelta > 0) return true;
 
-  const buySentinels = new Set(["покупка", "buy", "flow=buy"]);
-  return normalizedValues.some((value) => buySentinels.has(value));
+  const duration = String(options.duration ?? "").trim().toLowerCase();
+  const auction = String(options.auction ?? "").trim().toLowerCase();
+  return duration === "покупка" || duration === "buy" || auction === "покупка" || auction === "buy";
 }
 function parseDurationDays(rawDuration: string): number {
   const normalized = rawDuration.toLowerCase();
@@ -98,13 +99,15 @@ export function useFranchizeCartLines(
         const salePrice = resolveSalePrice(item);
 
         if (inBuyFlow && salePrice > 0) {
+          const buyDelta = Math.max(0, line.options.buyPriceDelta ?? 0);
+          const effectiveSalePrice = salePrice + buyDelta;
           return {
             lineId,
             itemId: line.itemId,
             qty: line.qty,
             item,
-            pricePerDay: salePrice,
-            lineTotal: salePrice * line.qty,
+            pricePerDay: effectiveSalePrice,
+            lineTotal: effectiveSalePrice * line.qty,
             rentalDays: 1,
             saleAvailable: Boolean(item?.saleAvailable),
             options: line.options,

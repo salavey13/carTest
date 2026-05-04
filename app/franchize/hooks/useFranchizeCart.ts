@@ -8,6 +8,8 @@ export type FranchizeCartOptions = {
   duration: string;
   perk: string;
   auction: string;
+  buyConfigId?: string;
+  buyPriceDelta?: number;
 };
 
 export type FranchizeCartLine = {
@@ -33,7 +35,7 @@ const DEFAULT_OPTIONS: FranchizeCartOptions = {
 };
 
 export function buildCartLineId(itemId: string, options: FranchizeCartOptions) {
-  const normalized = `${options.package}|${options.duration}|${options.perk}|${options.auction}`.toLowerCase().replace(/\s+/g, "-");
+  const normalized = `${options.package}|${options.duration}|${options.perk}|${options.auction}|${options.buyConfigId ?? "base"}|${options.buyPriceDelta ?? 0}`.toLowerCase().replace(/\s+/g, "-");
   return `${itemId}::${normalized}`;
 }
 
@@ -57,6 +59,8 @@ const sanitizeCartState = (value: unknown): FranchizeCartState => {
       duration: typeof rawOptions.duration === "string" ? rawOptions.duration : DEFAULT_OPTIONS.duration,
       perk: typeof rawOptions.perk === "string" ? rawOptions.perk : DEFAULT_OPTIONS.perk,
       auction: typeof rawOptions.auction === "string" ? rawOptions.auction : DEFAULT_OPTIONS.auction,
+      buyConfigId: typeof rawOptions.buyConfigId === "string" ? rawOptions.buyConfigId : undefined,
+      buyPriceDelta: typeof rawOptions.buyPriceDelta === "number" ? rawOptions.buyPriceDelta : undefined,
     };
     const normalizedLineId = buildCartLineId(itemId, options);
     const prev = acc[normalizedLineId];
