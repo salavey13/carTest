@@ -4,6 +4,7 @@ import { haversineKm, safeAverageSpeed } from "@/lib/map-riders";
 import { guardMapRidersWriteRequest, applyRateLimitHeaders } from "@/lib/map-riders-security";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-server";
+import { assertCrewMembership } from "@/app/api/map-riders/_lib/crew-access";
 
 const routePointSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -32,6 +33,7 @@ const startSchema = z.object({
   routePoints: z.array(routePointSchema).max(20000).optional().default([]),
 });
 
+
 export async function POST(request: NextRequest) {
   const guard = await guardMapRidersWriteRequest(request);
   if (!guard.ok) {
@@ -45,8 +47,13 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = parsed.data;
-  if (guard.authSource === "app_jwt" && payload.userId !== guard.subject) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+  if (payload.userId !== guard.subject) {
+    return NextResponse.json({ success: false, error: "Unauthorized", reason: "subject_mismatch" }, { status: 403 });
+  }
+
+  const isCrewMember = await assertCrewMembership(payload.userId, payload.crewSlug);
+  if (!isCrewMember) {
+    return NextResponse.json({ success: false, error: "Join crew to start sharing", code: "join_required", reason: "membership_required" }, { status: 403 });
   }
 
   const limit = enforceRateLimit(`map-riders:session:${guard.subject}`, 10, 60_000);

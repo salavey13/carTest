@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { useMapRiders } from "@/hooks/useMapRidersContext";
+import { SPEED_BANDS } from "@/components/map-riders/speedGradient";
 
 export function StatusOverlay() {
   const { state } = useMapRiders();
@@ -70,10 +71,11 @@ export function StatusOverlay() {
         <div className="rounded-xl border border-white/20 bg-black/60 px-3 py-2 text-[10px] text-white backdrop-blur-xl">
           <div className="mb-1 font-medium text-zinc-300">Route speed legend</div>
           <div className="flex items-center gap-2">
-            <span className="h-2 w-4 rounded bg-sky-400" /> <span>0-10</span>
-            <span className="h-2 w-4 rounded bg-emerald-500" /> <span>10-25</span>
-            <span className="h-2 w-4 rounded bg-amber-500" /> <span>25-40</span>
-            <span className="h-2 w-4 rounded bg-red-500" /> <span>40+</span>
+            {SPEED_BANDS.map((band) => (
+              <div key={band.label} className="flex items-center gap-1">
+                <span className={`h-2 w-4 rounded ${band.colorClass}`} /> <span>{band.label}</span>
+              </div>
+            ))}
           </div>
         </div>
       ) : null}
