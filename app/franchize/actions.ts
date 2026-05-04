@@ -75,6 +75,7 @@ export interface FranchizeHeaderVM {
   brandName: string;
   tagline: string;
   logoUrl: string;
+  logoHref: string;
   menuLinks: Array<{ label: string; href: string }>;
 }
 
@@ -594,6 +595,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         brandName: readPath(franchize, ["branding", "name"], crew.name ?? "Franchize"),
         tagline: readPath(franchize, ["branding", "tagline"], "Ride the vibe"),
         logoUrl: readPath(franchize, ["branding", "logoUrl"], crew.logo_url ?? ""),
+        logoHref: readPath(franchize, ["header", "logoHref"], `/franchize/${crew.slug ?? safeSlug}`),
         menuLinks,
       },
       contacts: {
