@@ -35,7 +35,7 @@ const fallbackCrew: FranchizeCrewVM = {
       borderSoft: "#24262E",
     },
   },
-  header: { brandName: "VIP BIKE", tagline: "Ride the vibe", logoUrl: "", menuLinks: [] },
+  header: { brandName: "VIP BIKE", tagline: "Ride the vibe", logoUrl: "", logoHref: "", menuLinks: [] },
   contacts: {
     phone: "",
     email: "",
