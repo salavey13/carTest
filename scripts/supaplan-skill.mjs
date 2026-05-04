@@ -447,6 +447,23 @@ async function pickTask() {
   }
 }
 
+
+function maybeNotifyStatusUpdate(taskId, status) {
+  if (process.env.SUPAPLAN_NOTIFY_STATUS_UPDATES !== '1') {
+    console.warn('maybeNotifyStatusUpdate skipped: set SUPAPLAN_NOTIFY_STATUS_UPDATES=1 to enable callback notifications');
+    return;
+  }
+  const summary = `SupaPlan task ${taskId} -> ${status}`;
+  try {
+    spawnSync('node', ['scripts/codex-notify.mjs', 'callback-auto', '--status', status, '--summary', summary], {
+      stdio: 'ignore',
+      encoding: 'utf8',
+    });
+  } catch {
+    console.warn(`maybeNotifyStatusUpdate failed for ${taskId} -> ${status}`)
+  }
+}
+
 async function updateStatus() {
   const taskId = required(getArg('taskId'), 'Missing --taskId');
   const status = required(getArg('status'), 'Missing --status');
@@ -477,6 +494,7 @@ async function updateStatus() {
     );
   }
 
+  maybeNotifyStatusUpdate(taskId, status);
   console.log(JSON.stringify({ ok: true, taskId, status }, null, 2));
 }
 

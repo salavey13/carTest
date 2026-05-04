@@ -3,6 +3,7 @@ import { z } from "zod";
 import { guardMapRidersWriteRequest, applyRateLimitHeaders } from "@/lib/map-riders-security";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-server";
+import { assertCrewMembership } from "@/app/api/map-riders/_lib/crew-access";
 
 const meetupSchema = z.object({
   crewSlug: z.string().min(1).default("vip-bike"),
@@ -20,6 +21,7 @@ const meetupDeleteSchema = z.object({
   userId: z.string().trim().min(1),
 });
 
+
 export async function POST(request: NextRequest) {
   const guard = await guardMapRidersWriteRequest(request);
   if (!guard.ok) {
@@ -31,8 +33,8 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ success: false, error: parsed.error.flatten() }, { status: 400 });
   }
-  if (guard.authSource === "app_jwt" && parsed.data.userId !== guard.subject) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+  if (parsed.data.userId !== guard.subject) {
+    return NextResponse.json({ success: false, error: "Unauthorized", reason: "subject_mismatch" }, { status: 403 });
   }
 
   const limit = enforceRateLimit(`map-riders:meetups:create:${guard.subject}`, 5, 60_000);
@@ -76,8 +78,13 @@ export async function DELETE(request: NextRequest) {
   }
 
   const { meetupId, crewSlug, userId } = parsed.data;
-  if (guard.authSource === "app_jwt" && userId !== guard.subject) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+  if (userId !== guard.subject) {
+    return NextResponse.json({ success: false, error: "Unauthorized", reason: "subject_mismatch" }, { status: 403 });
+  }
+
+  const isCrewMember = await assertCrewMembership(userId, crewSlug);
+  if (!isCrewMember) {
+    return NextResponse.json({ success: false, error: "Join crew to start sharing", code: "join_required", reason: "membership_required" }, { status: 403 });
   }
   const limit = enforceRateLimit(`map-riders:meetups:delete:${guard.subject}`, 5, 60_000);
   if (!limit.allowed) {
