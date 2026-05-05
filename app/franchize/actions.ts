@@ -564,7 +564,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
 
     const metadataShowcaseGroups = readPath(franchize, ["catalog", "showcaseGroups"], []) as Array<UnknownRecord>;
     const defaultShowcaseGroups: FranchizeCrewVM["catalog"]["showcaseGroups"] = [
-      { id: "edition-23", label: "23rd feb edition", mode: "subtype", subtype: "bobber" },
+      //{ id: "edition-23", label: "23rd feb edition", mode: "subtype", subtype: "bobber" },
       { id: "sweetspot-6000", label: "Все по 6000", mode: "price", minPrice: 5600, maxPrice: 6400 },
     ];
     const showcaseGroups = (metadataShowcaseGroups.length > 0
