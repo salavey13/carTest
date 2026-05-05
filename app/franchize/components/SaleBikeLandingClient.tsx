@@ -57,6 +57,7 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
     },
     [item.imageUrl, item.mediaUrls],
   );
+  
   const heroImage = gallery[0] ?? "https://placehold.co/1200x900/0b0f13/e6edf3?text=No+image";
   const specs = item.rawSpecs || {};
   const basePrice = Number(specs.price_rub || specs.sale_price || 0);
@@ -92,6 +93,11 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
   const [brokenGalleryUrls, setBrokenGalleryUrls] = useState<Record<string, true>>({});
   const [selectedOptionId, setSelectedOptionId] = useState<string>(configOptions[0]?.id ?? "standard");
   const [selectedColorId, setSelectedColorId] = useState<string>(colorOptions[0]?.id ?? "black");
+  const safeGallery = useMemo(() => gallery.filter((url) => !brokenGalleryUrls[url]), [gallery, brokenGalleryUrls]);
+
+  useEffect(() => {
+    if (selectedImage >= safeGallery.length) setSelectedImage(0);
+  }, [selectedImage, safeGallery.length]);
 
   const selectedOption = useMemo(
     () => configOptions.find((option) => option.id === selectedOptionId) || configOptions[0],
@@ -378,8 +384,3 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
     </div>
   );
 }
-  const safeGallery = useMemo(() => gallery.filter((url) => !brokenGalleryUrls[url]), [gallery, brokenGalleryUrls]);
-
-  useEffect(() => {
-    if (selectedImage >= safeGallery.length) setSelectedImage(0);
-  }, [selectedImage, safeGallery.length]);
