@@ -58,6 +58,16 @@ This root file stays intentionally compact so operators and agents can load it q
 - next_step: `Create PR. Remaining TODO entries are future backlog and should not auto-trigger unless operator explicitly asks.`
 - risks: `Local runtime can render fallback data when Supabase is unavailable; production QA should verify real vip-bike catalog/map records.`
 
+
+### 2026-05-06 — SupaPlan franchize maintenance pair
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T22:30:00Z
+- `owner`: codex-frz-couple-01
+- `notes`: Implemented `FIX-STARTPARAM` stale-ref reset for repeated Telegram deep links and started `RENT-P3.2` with Vitest coverage for franchize navigation/theme helpers; self-review tightened duplicate-processing/stale-result guards and category anchor normalization.
+- `next_step`: Add mocked Supabase coverage for server action validators after this PR lands.
+- `risks`: Server-action integration tests remain future work because this slice intentionally focused on low-conflict pure helper coverage.
+
 ## 4) Mini execution diary addendum
 
 - 2026-05-06 — Started `/vipbikerental` interactive enhancement stream from `app/vipbikerental/todo.md`; shipped the first Hero tabs slice with animated mode preview and MapRiders overview metrics. Next step: replace fallback rent/buy preview cards with real catalog item data.
@@ -84,3 +94,6 @@ This root file stays intentionally compact so operators and agents can load it q
 - `notes`: Aligned sale reservation CTA copy with the same 100-500 XTR formula used by backend invoices, centralized VS spec aliases, and split reservation/cart CTA state so secondary cart actions do not display invoice success.
 - `next_step`: Verify production `vip-bike` sale bike with real catalog specs and Telegram WebApp invoice delivery.
 - `risks`: Visual/live invoice verification still depends on reachable Supabase and Telegram bot credentials.
+- 2026-05-06 — SupaPlan franchize maintenance pair: fixed repeated `startapp` handling in `useStartParamRouter` and added a test-coverage foundation for franchize helper libraries. Next step: mocked Supabase action validation tests.
+- 2026-05-06 — Self-reviewed SupaPlan franchize maintenance pair: replaced the boolean start-param guard with active/last-handled param refs to prevent duplicate processing during pathname/clear races, removed dead sale metadata, and normalized category anchors before tests codify the behavior.
+- 2026-05-06 — Final code review polish for SupaPlan franchize maintenance: added a run-id freshness guard so slow async start-param resolutions cannot navigate after a newer deep link wins.
