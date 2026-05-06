@@ -299,8 +299,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
             type="button"
             aria-label="Перейти к первому найденному байку"
             onClick={() => {
-              const firstResult = document.querySelector("[data-catalog-item='true']") as HTMLElement | null;
+              const firstResult = document.querySelector("[data-catalog-item-button='true']") as HTMLButtonElement | null;
               firstResult?.scrollIntoView({ behavior: "smooth", block: "center" });
+              firstResult?.focus({ preventScroll: true });
             }}
             className="absolute bottom-1 right-1 top-1 rounded-full px-5 text-sm font-semibold transition active:scale-95"
             onFocus={() => setSearchCtaFocused(true)}
@@ -420,6 +421,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
                       <button
                         type="button"
                         aria-label={`Открыть карточку ${item.title}: ${item.rentPriceLabel}`}
+                        data-catalog-item-button="true"
                         className="block w-full text-left"
                         onClick={() => openItem(item)}
                         onFocus={() => setFocusedItemId(item.id)}
