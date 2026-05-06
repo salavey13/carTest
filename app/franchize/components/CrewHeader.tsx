@@ -166,9 +166,11 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
         >
           <button
             type="button"
-            aria-label="Open menu"
+            aria-label="Открыть меню экипажа"
+            aria-expanded={menuOpen}
+            aria-controls="franchize-header-menu"
             onClick={() => setMenuOpen(true)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl transition"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             style={{
               backgroundColor: `${crew.theme.palette.bgBase}CC`,
               color: crew.theme.palette.textPrimary,
@@ -181,7 +183,8 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
           {/* HEADER LOGO — PURE SPA LINK */}
           <Link
             href={headerLogoHref}
-            className="relative z-10 mx-auto flex flex-col items-center text-center cursor-pointer hover:opacity-90 transition-opacity pointer-events-auto"
+            aria-label={`На главную страницу ${crew.header.brandName}`}
+            className="relative z-10 mx-auto flex flex-col items-center text-center cursor-pointer hover:opacity-90 transition-opacity pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             <div
               className="relative h-16 w-16 overflow-hidden rounded-full border shadow-lg"
@@ -234,7 +237,9 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
                   key={linkLabel}
                   href={href}
                   data-category-pill={linkLabel}
-                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-4 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] transition-colors pointer-events-auto"
+                  aria-current={isActive ? "location" : undefined}
+                  aria-label={`Перейти к разделу ${linkLabel}`}
+                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-4 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] transition-colors pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
                     ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
                     ["--pill-text" as string]: isActive ? "#000000" : crew.theme.palette.textPrimary,

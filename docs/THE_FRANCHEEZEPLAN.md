@@ -52,10 +52,10 @@ This root file stays intentionally compact so operators and agents can load it q
 ## 3) Active ad-hoc task — `/vipbikerental` interactive landing
 
 - status: `ready_for_pr`
-- updated_at: `2026-05-06T00:00:00Z`
+- updated_at: `2026-05-06T23:45:00Z`
 - owner: `codex`
-- notes: `Quick action follow-up plus sale-config cleanup complete: Hero, Electro-Enduro, MapRiders preview, StepsProgress, RentalQuickActionHub, and shared sale config parsing are synced with safe catalog/map fallbacks.`
-- next_step: `Create PR. Remaining TODO entries are OSRM/route loading cleanup and production QA with real data.`
+- notes: `Self-reviewed and polished ConversionPilot into a more customer-facing route cockpit: score is now a compact operator signal, while the main surface recommends the next bike and three clear rent/buy/group-ride paths with better copy and accessibility labels.`
+- next_step: `Create PR and production-smoke /vipbikerental with real vip-bike catalog/map data.`
 - risks: `Local runtime can render fallback data when Supabase is unavailable; production QA should verify real vip-bike catalog/map records and active rental states.`
 
 
@@ -77,6 +77,9 @@ This root file stays intentionally compact so operators and agents can load it q
 - 2026-05-06 — Final polish iteration: implemented `StepsProgress` for the newbie flow and reworded `/app/vipbikerental/todo.md` so completed scope is clearly closed while remaining quick-action/technical items are future backlog, not an automatic trigger.
 - 2026-05-06 — Continued explicit `/vipbikerental` TODO work: replaced static quick-action link cards with `RentalQuickActionHub`, including latest rental readiness, live rider counters and a quick bike chooser modal hydrated from catalog/fallback items. Next step: technical cleanup backlog or production QA with real Supabase rental/map data.
 - 2026-05-06 — Continued cleanup after quick actions: extracted shared sale config/color parsing into `app/franchize/lib/sale-config.ts` and reused it in both the sale buy page and `/vipbikerental` Electro-Enduro quick preview, removing duplicated package/color constants. Next step: OSRM/route loading cleanup or production QA.
+
+- 2026-05-06 — Responded to operator rating request for `/vipbikerental`: added a visible ConversionPilot scorecard/decision dock after the hero showcase, deriving score/next action from catalog and MapRiders data, plus replaced the stale 2025 promo code with evergreen `VIPSTART`. Next step: visual smoke in local/preview runtime.
+- 2026-05-06 — Self-reviewed the ConversionPilot slice: reduced the audit feeling, made the score compact, rewrote the section as a customer-facing route cockpit, added route aria labels, fixed rider pluralization, and kept the recommended bike CTA data-driven. Next step: preview QA with production catalog/map data.
 ## 3) Active implementation slices
 
 
@@ -150,3 +153,31 @@ This root file stays intentionally compact so operators and agents can load it q
 - `notes`: Fixed automated review findings: review submission now verifies Telegram initData server-side instead of trusting caller-provided userId, and hidden reviews cannot be restored by renter upsert/edit.
 - `next_step`: Production smoke with a real Telegram WebApp review link after migration apply.
 - `risks`: TEMP_BYPASS_TG_AUTH_VALIDATION must remain disabled in production for the server-side initData check to be authoritative.
+### 2026-05-06 — FRZ-R5 pilot KPI scoreboard
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T22:55:00Z
+- `owner`: codex-cli
+- `notes`: Added a compact `/nexus` KPI scoreboard for the VIP Bike franchise funnel with pilot conversion/SLA/partner signals and lead-to-paid-booking stages. SupaPlan task `913e8a73-46f6-4c22-8278-c1b5aabe661e`.
+- `next_step`: Wire the same KPI cards to real order/lead events after event analytics storage is finalized.
+- `risks`: Current numbers are explicitly pilot targets, not live production analytics.
+
+### 2026-05-06 — CQ franchize config/theme hardening
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:15:00Z
+- `owner`: codex
+- `notes`: Executed SupaPlan CQ-03 (`9513da34-2e8b-445e-a43a-09a22c8e5bc3`) and CQ-04 (`43499f79-1513-47b3-9b2c-3a85fdb30653`): extracted franchise defaults into shared config constants and moved crew theme resolution behind null-safe metadata guards.
+- `next_step`: Merge PR, then use the shared config constants for future create-form cleanup slices.
+- `risks`: Full repository typecheck is still blocked by pre-existing syntax errors outside this slice (`data/questions.ts`, `supabase/functions/arbitrage-scan-instance/index.ts`).
+
+- 2026-05-06 — CQ franchize config/theme hardening: centralized hardcoded default palette/map/menu/promo/contract values and added malformed theme metadata coverage so bad crew records fall back to defaults instead of crashing.
+- 2026-05-06 — Self-review polish for CQ config/theme hardening: removed the type-only cycle between shared config and server actions, kept `FranchizeTheme` exported through the old action module contract, and made array-shaped crew metadata reads defensive for menu/footer/catalog/order buckets.
+### 2026-05-06 — Storefront a11y + XTR orphan invoice cleanup
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:20:00Z
+- `owner`: codex
+- `notes`: Completed SupaPlan `RENT-P3.1` and `FIX-ORPHAN-INVOICE`: public storefront controls now expose stronger labels/current/pressed states, overlay focus containment/return was tightened in self-review, and failed Telegram XTR sends clean up newly-created pending franchize invoices.
+- `next_step`: Merge PR, then run browser accessibility smoke on `/franchize/vip-bike` and a Telegram invoice failure-path smoke with test credentials.
+- `risks`: Visual a11y smoke depends on a bootable local/prod runtime; invoice delivery/failure verification depends on Telegram bot credentials.
