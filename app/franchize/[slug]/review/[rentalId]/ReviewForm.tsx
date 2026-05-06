@@ -18,7 +18,7 @@ interface ReviewFormProps {
 }
 
 export function ReviewForm({ slug, rentalId, bikeTitle, status, renterUserId, theme, existingReview }: ReviewFormProps) {
-  const { dbUser, isLoading } = useAppContext();
+  const { dbUser, initData, isLoading } = useAppContext();
   const [rating, setRating] = useState(existingReview?.rating ?? 5);
   const [text, setText] = useState(existingReview?.text ?? "");
   const [saved, setSaved] = useState(false);
@@ -33,8 +33,12 @@ export function ReviewForm({ slug, rentalId, bikeTitle, status, renterUserId, th
       toast.error("Откройте ссылку из Telegram WebApp, чтобы сохранить отзыв.");
       return;
     }
+    if (!initData) {
+      toast.error("Не удалось подтвердить Telegram WebApp-сессию. Откройте отзыв из Telegram.");
+      return;
+    }
     startTransition(async () => {
-      const result = await submitRentalReview({ slug, rentalId, userId: dbUser.user_id, rating, text });
+      const result = await submitRentalReview({ slug, rentalId, initData, rating, text });
       if (!result.success) {
         toast.error(result.error || "Не удалось сохранить отзыв");
         return;
