@@ -6,6 +6,27 @@
 > **Решение:** заменить статику на микро‑интерактивы прямо внутри секций.  
 > Так лендинг станет не навигатором, а эмоциональным полигоном.
 
+## ✅ Current interactive landing scope complete — 2026-05-06
+
+### Finished in this `/vipbikerental` slice
+- [x] Server/client boundary review: `page.tsx` is a server wrapper, `VipBikeRentalClient.tsx` owns interactive UI; no service-role/admin Supabase code is imported by the client runtime.
+- [x] Existing landing structure review: core blocks stayed present after refactor — Hero, BikeShowcase, partner links, Electro-Enduro, MapRiders, safety/equipment, newbie flow, quick actions, service cards, classic “Как это работает”, VIP Invest, FAQ.
+- [x] Hero tabs: `rent | buy | map | rentals`, animated preview, catalog-aware rent/buy cards, MapRiders live metrics.
+- [x] Electro-Enduro slider: real/fallback catalog cards, rental + purchase prices, quick preview modal with color/package mini-config and CTAs.
+- [x] MapRiders preview: lightweight static mini-map, live rider dots, meetup labels, weekly stats, latest ride summary, SVG speed sparkline, click-through to full MapRiders.
+- [x] Interactive newbie stepper: `StepsProgress` replaces static newbie cards with tabs, animated content, bike preview carousel and mini-cart visualization.
+- [x] Documentation sync: this TODO and `docs/THE_FRANCHEEZEPLAN.md` now reflect completed slices and explicitly separated future backlog.
+
+### Future backlog — not an active trigger unless operator explicitly asks
+- [ ] Quick action cards with in-place micro-actions: latest rental status, live rider counter, quick bike chooser modal.
+- [ ] Technical cleanup backlog: duplicated sale configurator constants, protected OSRM/fallback routing layer, lighter route/POI loading strategy.
+- [ ] Deeper production QA with real Supabase data available in runtime; local runner currently falls back safely when Supabase fetch fails.
+
+### Final code-review notes
+- No important visible section was intentionally removed during the server/client split; the main content sequence is preserved.
+- The MapRiders landing preview deliberately avoids loading Leaflet or heavy GeoJSON on first paint; it uses overview data first and safe fallbacks second.
+- Current interactive landing scope is complete and PR-ready; future backlog above should not auto-trigger new work unless explicitly requested.
+
 ## 📐 0. Принцип: «кликай, не покидая секцию»
 
 - Любая секция должна давать пользователю возможность **совершить действие прямо здесь**: переключить вкладку, перетащить слайдер, посмотреть модалку, ткнуть на карту.
@@ -19,13 +40,18 @@
 
 ### Что сделать
 - [x] Добавить состояние `heroMode: 'rent' | 'buy' | 'map' | 'rentals'`.
-- [ ] Вместо статичного заголовка показать **динамический превью‑блок**:
+- [x] Вместо статичного заголовка показать **динамический превью‑блок**:
   - При `rent`: фото лучшего байка для аренды, цена, кнопка «Выбрать байк».
   - При `buy`: фото байка из конфигуратора, цена, кнопка «Конфигуратор».
   - При `map`: мини‑статистика (сколько райдеров онлайн, маршрутов), кнопка «Открыть карту».
   - При `rentals`: последняя аренда или CTA «Мои аренды».
-- [ ] Использовать **существующие данные**: `items` (из пропсов или хука), MapRiders `/api/map-riders/overview`.
-- [ ] Добавить плавный transition между режимами (`AnimatePresence`).
+- [x] Использовать **существующие данные**: MapRiders `/api/map-riders/overview` для live-метрик + `items` через серверный `getFranchizeBySlug("vip-bike")` wrapper.
+- [x] Добавить плавный transition между режимами (`AnimatePresence`).
+
+
+### Implementation note — 2026-05-06
+- Первый срез Hero tabs внедрён в `app/vipbikerental/page.tsx`: `heroMode`, табы аренда/покупка/карта/мои аренды, `AnimatePresence`-превью и live-метрики MapRiders через `/api/map-riders/overview?slug=vip-bike`.
+- Следующий срез выполнен 2026-05-06: `items` подтянуты через серверный wrapper `app/vipbikerental/page.tsx`, rent/buy hero preview теперь берёт реальные карточки каталога.
 
 ## 2. 🔋 Electro-Enduro – слайдер с реальными байками и быстрым просмотром
 
@@ -33,11 +59,16 @@
 **Нужно:** горизонтальный слайдер, где каждый слайд – **реальный байк** из каталога.
 
 ### Что сделать
-- [  ] Заменить сетку из двух `Card` на `<HorizontalSlider />`.
-- [ ] Слайды: изображение байка + название + цена аренды/покупки + кнопка «Быстрый просмотр».
-- [ ] Кнопка «Быстрый просмотр» открывает **модалку** с мини‑конфигуратором (цвета, опции) без перехода на другую страницу.
+- [x] Заменить сетку из двух `Card` на `<HorizontalSlider />`.
+- [x] Слайды: изображение байка + название + цена аренды/покупки + кнопка «Быстрый просмотр».
+- [x] Кнопка «Быстрый просмотр» открывает **модалку** с мини‑конфигуратором (цвета, опции) без перехода на другую страницу.
   - *Можно переиспользовать `ItemModal` или сделать упрощённый `PreviewModal`.*
-- [ ] Данные брать из `items` (уже есть на странице).
+- [x] Данные брать из `items` (уже есть на странице).
+
+
+### Implementation note — 2026-05-06
+- Второй срез Electro-Enduro внедрён: `/vipbikerental` теперь серверно гидратит каталог `vip-bike`, передаёт `items` в client runtime, показывает горизонтальный slider реальных electro/sale карточек и modal quick preview с цветом, пакетом и итоговой конфигурацией.
+- Следующий срез: заменить MapRiders текстовые карточки на mini-map/social proof preview из `/api/map-riders/overview`.
 
 ## 3. 🗺️ MapRiders – живая мини‑карта и социальные пруфы
 
@@ -45,14 +76,20 @@
 **Нужно:** мини‑карта Leaflet с реальными точками (недраггируемая, без зума) + блок с последней завершённой поездкой.
 
 ### Что сделать
-- [ ] Вставить статичную карту (размер ~400×300) с:
+- [x] Вставить статичную карту (размер ~400×300) с:
   - 2‑3 активными райдерами (из `/api/map-riders/overview`),
   - 2‑3 маршрутами (из `getPublicRacingRoutes()` или `mapData.routes`),
   - 1 meetup точкой.
-- [ ] Карта **не скроллится, не зумится**; при клике – переход в полноценный MapRiders.
-- [ ] Ниже карты – блок «Последняя поездка»:
+- [x] Карта **не скроллится, не зумится**; при клике – переход в полноценный MapRiders.
+- [x] Ниже карты – блок «Последняя поездка»:
   - Имя райдера, дистанция, время, маленький график скорости (SVG path из точек сессии).
   - Данные из `latestCompleted` (есть в API).
+
+
+### Implementation note — 2026-05-06
+- Саморевью refactor: сверены ключевые заголовки/секции старого `page.tsx` с новым `VipBikeRentalClient.tsx`; landing flow сохранён, серверный wrapper убрал риск client-import server action.
+- MapRiders срез внедрён как лёгкое static-map preview: live rider dots + meetup labels из `/api/map-riders/overview`, glowing route lines без тяжёлого GeoJSON/Leaflet на первом экране, click-through в полный MapRiders и карточка последней поездки с SVG speed sparkline.
+- Следующий срез выполнен 2026-05-06: интерактивный степпер для новичка добавлен, static newbie cards заменены на `StepsProgress`.
 
 ## 4. 📖 Пошаговая секция – интерактивный степпер
 
@@ -60,11 +97,16 @@
 **Нужно:** горизонтальный степпер с анимированной сменой контента.
 
 ### Что сделать
-- [ ] Заменить сетку карточек на компонент `StepsProgress`.
-- [ ] Под активным шагом показывать **конкретную визуализацию**: например, на шаге «Выбор байка» – карусель из 3‑х популярных байков, на шаге «Корзина» – мини‑превью корзины.
-- [ ] Использовать `AnimatePresence` для плавного перехода между шагами.
+- [x] Заменить сетку карточек на компонент `StepsProgress`.
+- [x] Под активным шагом показывать **конкретную визуализацию**: на шаге «Выбор байка» – карусель популярных байков, на шаге «Корзина» – мини‑превью корзины.
+- [x] Использовать `AnimatePresence` для плавного перехода между шагами.
 
-## 5. 🔧 Быстрые действия – замена на карточки с быстрым экшеном внутри
+
+### Implementation note — 2026-05-06
+- Финальная полировка: `StepsProgress` внедрён в `VipBikeRentalClient.tsx`, статичные карточки новичка заменены на табы с прогресс-баром, `AnimatePresence`, визуализацией локации/экипа/правил, каруселью популярных байков и мини-корзиной.
+- Текущий interactive landing scope закрыт; разделы ниже — future backlog, не активный триггер для автоматического продолжения без явной команды оператора.
+
+## 5. 🔧 Future backlog — быстрые действия с микро-экшеном (not active trigger)
 
 **Сейчас:** сетка карточек «Контроль сделок», «MapRiders» и т.д. с кнопками‑ссылками.  
 **Нужно:** оставить сетку, но каждая карточка должна выполнять **микро‑действие** на месте (например, показать последнюю аренду, количество активных райдеров, открыть модалку с контактом).
@@ -74,7 +116,7 @@
 - [ ] Для «MapRiders»: показать живой счётчик райдеров.
 - [ ] Для «Быстрый вход»: сразу открыть модалку выбора байка.
 
-## 🧪 6. Мелкие, но важные фиксы
+## 🧪 6. Future backlog — мелкие, но важные фиксы (not active trigger)
 
 - [ ] Удалить дублирующиеся константы `CONFIG_OPTIONS` / `COLOR_OPTIONS` из серверного `SaleBikeLanding.tsx`.
 - [ ] Заменить OSRM public server на любой защищённый слой (хотя бы продублировать local fallback).
