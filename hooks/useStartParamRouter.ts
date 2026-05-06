@@ -62,7 +62,28 @@ export function useStartParamRouter() {
   const { success: showToast } = useAppToast();
 
   const handledRef = useRef(false);
+  const mountedRef = useRef(false);
+  const lastStartParamPayloadRef = useRef<string | null>(null);
   const consumedTempCartRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (startParamPayload && startParamPayload !== lastStartParamPayloadRef.current) {
+      handledRef.current = false;
+      lastStartParamPayloadRef.current = startParamPayload;
+    }
+
+    if (!startParamPayload) {
+      lastStartParamPayloadRef.current = null;
+    }
+  }, [startParamPayload]);
 
   const handleBio30Referral = useCallback(
     async (referrerId: string, referrerCode: string) => {
@@ -144,6 +165,7 @@ export function useStartParamRouter() {
       }
 
       handledRef.current = true;
+      const shouldResetHandledAfterClear = Boolean(startParamPayload);
       let targetPath: string | undefined;
 
       logger.info(`[ClientLayout] Processing Start Param: ${paramToProcess}`);
@@ -228,11 +250,21 @@ export function useStartParamRouter() {
       }
 
       if (targetPath && targetPath !== pathname) {
+        if (!mountedRef.current) {
+          return;
+        }
         logger.info(`[ClientLayout] Redirecting to ${targetPath}`);
         router.replace(targetPath);
       }
 
+      if (!mountedRef.current) {
+        return;
+      }
+
       clearStartParam?.();
+      if (shouldResetHandledAfterClear) {
+        handledRef.current = false;
+      }
     };
 
     void processStartParam();
