@@ -54,9 +54,9 @@ This root file stays intentionally compact so operators and agents can load it q
 - status: `ready_for_pr`
 - updated_at: `2026-05-06T00:00:00Z`
 - owner: `codex`
-- notes: `Final polish complete: Hero, Electro-Enduro, MapRiders preview, StepsProgress newbie flow, original downstream content blocks, docs, and safe fallbacks are preserved/synced.`
-- next_step: `Create PR. Remaining TODO entries are future backlog and should not auto-trigger unless operator explicitly asks.`
-- risks: `Local runtime can render fallback data when Supabase is unavailable; production QA should verify real vip-bike catalog/map records.`
+- notes: `Quick action follow-up plus sale-config cleanup complete: Hero, Electro-Enduro, MapRiders preview, StepsProgress, RentalQuickActionHub, and shared sale config parsing are synced with safe catalog/map fallbacks.`
+- next_step: `Create PR. Remaining TODO entries are OSRM/route loading cleanup and production QA with real data.`
+- risks: `Local runtime can render fallback data when Supabase is unavailable; production QA should verify real vip-bike catalog/map records and active rental states.`
 
 ## 4) Mini execution diary addendum
 
@@ -65,6 +65,8 @@ This root file stays intentionally compact so operators and agents can load it q
 - 2026-05-06 — Self-reviewed `/vipbikerental` refactor by comparing old/new section headings, then shipped lightweight MapRiders preview: static glowing route map, live rider dots, meetup labels, latest ride stats and SVG speed sparkline. Next step: interactive newbie stepper.
 - 2026-05-06 — Finalized `/vipbikerental` PR readiness review: updated TODO with finished/not-finished checklist, confirmed no important visible sections were intentionally removed, and moved active status to `ready_for_pr`. Next PR should begin with the interactive newbie stepper.
 - 2026-05-06 — Final polish iteration: implemented `StepsProgress` for the newbie flow and reworded `/app/vipbikerental/todo.md` so completed scope is clearly closed while remaining quick-action/technical items are future backlog, not an automatic trigger.
+- 2026-05-06 — Continued explicit `/vipbikerental` TODO work: replaced static quick-action link cards with `RentalQuickActionHub`, including latest rental readiness, live rider counters and a quick bike chooser modal hydrated from catalog/fallback items. Next step: technical cleanup backlog or production QA with real Supabase rental/map data.
+- 2026-05-06 — Continued cleanup after quick actions: extracted shared sale config/color parsing into `app/franchize/lib/sale-config.ts` and reused it in both the sale buy page and `/vipbikerental` Electro-Enduro quick preview, removing duplicated package/color constants. Next step: OSRM/route loading cleanup or production QA.
 ## 3) Active implementation slices
 
 
