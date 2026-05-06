@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Loading } from "@/components/Loading";
 import { useAppContext } from "@/contexts/AppContext";
 import { getEditableVehiclesForUser } from "@/app/rentals/actions";
-import { getFranchizeBySlug, getFranchizeOrderNotificationFailures, retryFranchizeOrderNotification, type FranchizeCrewVM } from "@/app/franchize/actions";
+import { getFranchizeBySlug, getFranchizeOrderNotificationFailures, getFranchizeRentalReviewsForModeration, moderateRentalReview, retryFranchizeOrderNotification, type FranchizeCrewVM, type RentalReviewVM } from "@/app/franchize/actions";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "@/app/franchize/lib/theme";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -68,7 +68,8 @@ const fallbackCrew: FranchizeCrewVM = {
       bounds: { top: 0, bottom: 0, left: 0, right: 0 },
     },
   },
-  catalog: { categories: [], quickLinks: [], tickerItems: [], showcaseGroups: [] },
+  catalog: { categories: [], quickLinks: [], tickerItems: [], promoBanners: [], adCards: [], showcaseGroups: [] },
+  ratingSummary: { average: 0, count: 0 },
   footer: { socialLinks: [], textColor: "#16130A" },
 };
 
@@ -85,8 +86,10 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
   const [filterType, setFilterType] = useState<"all" | "bike" | "car">("all");
   const [loadingFleet, setLoadingFleet] = useState(false);
   const [failedNotifications, setFailedNotifications] = useState<Array<{ orderId: string; sendTo: string; lastError: string; createdAt: string }>>([]);
+  const [reviews, setReviews] = useState<RentalReviewVM[]>([]);
   const [retryingOrderId, setRetryingOrderId] = useState<string | null>(null);
   const [isBulkFillingVin, setIsBulkFillingVin] = useState(false);
+  const [moderatingReviewId, setModeratingReviewId] = useState<string | null>(null);
 
   const slug = initialSlug?.trim() || "vip-bike";
 
@@ -150,13 +153,34 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
     toast.success(`Retry отправлен для заказа #${orderId}`);
     void loadFailedNotifications();
   }, [dbUser?.user_id, loadFailedNotifications, slug]);
+  const loadReviews = useCallback(async () => {
+    if (!dbUser?.user_id) return;
+    const result = await getFranchizeRentalReviewsForModeration({ slug, actorUserId: dbUser.user_id });
+    if (!result.success) return;
+    setReviews(result.items || []);
+  }, [dbUser?.user_id, slug]);
 
-
+  const handleModerateReview = useCallback(async (reviewId: string, hidden: boolean) => {
+    if (!dbUser?.user_id) return;
+    setModeratingReviewId(reviewId);
+    const result = await moderateRentalReview({ slug, actorUserId: dbUser.user_id, reviewId, hidden });
+    setModeratingReviewId(null);
+    if (!result.success) {
+      toast.error(result.error || "Не удалось обновить отзыв");
+      return;
+    }
+    toast.success(hidden ? "Отзыв скрыт" : "Отзыв возвращён");
+    void loadReviews();
+  }, [dbUser?.user_id, loadReviews, slug]);
 
 
   useEffect(() => {
     void loadFailedNotifications();
   }, [loadFailedNotifications]);
+
+  useEffect(() => {
+    void loadReviews();
+  }, [loadReviews]);
 
   const visible = useMemo(
     () => fleet.filter((item) => (filterType === "all" ? true : item.type === filterType)),
@@ -322,6 +346,32 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
           </div>
           <CarSubmissionForm ownerId={dbUser?.user_id} vehicleToEdit={selectedVehicle} onSuccess={() => loadFleet()} />
         </div>
+
+        <div className="mt-4 rounded-2xl border p-3" style={{ ...surface.subtleCard, borderColor: "var(--fr-admin-border)" }}>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-[var(--fr-admin-text)]">Rental reviews moderation</p>
+            <span className="rounded-full border px-2 py-1 text-xs text-[var(--fr-admin-muted)]" style={{ borderColor: "var(--fr-admin-border)" }}>{reviews.length}</span>
+          </div>
+          {!reviews.length ? (
+            <p className="mt-2 text-xs text-[var(--fr-admin-muted)]">Отзывов пока нет.</p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {reviews.slice(0, 8).map((review) => (
+                <div key={review.id} className="rounded-xl border p-2" style={{ borderColor: "var(--fr-admin-border)", opacity: review.hiddenAt ? 0.62 : 1 }}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-[var(--fr-admin-accent)]">★ {review.rating} / 5</p>
+                    <Button type="button" className="h-8 text-xs" variant="outline" onClick={() => handleModerateReview(review.id, !review.hiddenAt)} disabled={moderatingReviewId === review.id}>
+                      {review.hiddenAt ? "Показать" : "Скрыть"}
+                    </Button>
+                  </div>
+                  <p className="mt-1 text-xs text-[var(--fr-admin-muted)]">bike: {review.bikeId} · user: {review.userId}</p>
+                  {review.text && <p className="mt-2 text-sm text-[var(--fr-admin-text)]">{review.text}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
 
         <div className="mt-4 rounded-2xl border p-3" style={{ ...surface.subtleCard, borderColor: "var(--fr-admin-border)" }}>
           <p className="text-sm font-semibold text-[var(--fr-admin-text)]">Failed doc notifications</p>

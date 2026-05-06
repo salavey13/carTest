@@ -124,6 +124,35 @@ This root file stays intentionally compact so operators and agents can load it q
 - `risks`: Runtime Telegram validation still depends on configured bot/API env and a real WebApp launch context.
 
 
+### 2026-05-06 — SupaPlan RENT-P2.2 rental reviews
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:20:00Z
+- `owner`: codex-franchize-1778108121
+- `supaplan_task`: 88d44bfc-1f3b-4004-b5e2-d123479d7d39
+- `notes`: Added rental review schema, completed-rental review form route, catalog card/modal review display, Top rated filter, crew rating blocks, Telegram review deep link, and admin soft-hide moderation panel.
+- `next_step`: Apply migration in Supabase, complete a real return_confirmed rental, submit a review through Telegram WebApp, and verify public catalog/admin moderation with live data.
+- `risks`: Review table must be migrated before runtime review queries can hydrate; local smoke is limited by unavailable production Supabase data.
+
+### 2026-05-06 — RENT-P2.2 self-review polish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:18:00Z
+- `owner`: codex-franchize-1778108121
+- `supaplan_task`: 88d44bfc-1f3b-4004-b5e2-d123479d7d39
+- `notes`: Self-review tightened the review flow: notification slug lookup no longer depends on nested PostgREST embeds, review form disables submission for non-renter Telegram profiles before server call, and RLS insert checks now verify the bike belongs to the submitted crew.
+- `next_step`: Merge after applying the migration in the target Supabase project and smoke-test one completed rental review from the renter account.
+- `risks`: Existing runtime still relies on Telegram WebApp identity hydration; production smoke should verify the renter user id matches stored rental user_id.
+
+### 2026-05-06 — RENT-P2.2 Codex review fixes
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:32:00Z
+- `owner`: codex
+- `supaplan_task`: 88d44bfc-1f3b-4004-b5e2-d123479d7d39
+- `notes`: Fixed automated review findings: review submission now verifies Telegram initData server-side instead of trusting caller-provided userId, and hidden reviews cannot be restored by renter upsert/edit.
+- `next_step`: Production smoke with a real Telegram WebApp review link after migration apply.
+- `risks`: TEMP_BYPASS_TG_AUTH_VALIDATION must remain disabled in production for the server-side initData check to be authoritative.
 ### 2026-05-06 — FRZ-R5 pilot KPI scoreboard
 
 - `status`: ready_for_pr
