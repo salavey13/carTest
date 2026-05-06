@@ -120,3 +120,13 @@ This root file stays intentionally compact so operators and agents can load it q
 - `next_step`: Merge PR, then verify Telegram WebApp auth/navigation on `vip-bike` under slow network throttling.
 - `risks`: Runtime Telegram validation still depends on configured bot/API env and a real WebApp launch context.
 
+
+### 2026-05-06 — SupaPlan RENT-P2.2 rental reviews
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:20:00Z
+- `owner`: codex-franchize-1778108121
+- `supaplan_task`: 88d44bfc-1f3b-4004-b5e2-d123479d7d39
+- `notes`: Added rental review schema, completed-rental review form route, catalog card/modal review display, Top rated filter, crew rating blocks, Telegram review deep link, and admin soft-hide moderation panel.
+- `next_step`: Apply migration in Supabase, complete a real return_confirmed rental, submit a review through Telegram WebApp, and verify public catalog/admin moderation with live data.
+- `risks`: Review table must be migrated before runtime review queries can hydrate; local smoke is limited by unavailable production Supabase data.
