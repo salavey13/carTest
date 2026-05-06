@@ -14,9 +14,19 @@ interface HeaderMenuProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const focusableSelector = [
+  "a[href]",
+  "button:not([disabled])",
+  "textarea:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
+
 export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuProps) {
   const [mounted, setMounted] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const surface = crewPaletteForSurface(crew.theme);
 
   useEffect(() => {
@@ -26,16 +36,47 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
   useEffect(() => {
     if (!open) return;
 
+    const originalOverflow = document.body.style.overflow;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    document.body.style.overflow = "hidden";
+
+    const focusFirstControl = window.requestAnimationFrame(() => {
+      closeButtonRef.current?.focus();
+    });
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
         onOpenChange(false);
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusable = Array.from(menuRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? [])
+        .filter((element) => element.offsetParent !== null || element === document.activeElement);
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    closeButtonRef.current?.focus();
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFirstControl);
+      document.body.style.overflow = originalOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      if (previouslyFocused && document.contains(previouslyFocused)) {
+        previouslyFocused.focus();
+      }
+    };
   }, [onOpenChange, open]);
 
   if (!open || !mounted) return null;
@@ -43,6 +84,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
   return createPortal(
     <div className="fixed inset-0 z-[70] flex items-start justify-center bg-black/75 p-4" onClick={() => onOpenChange(false)}>
       <div
+        ref={menuRef}
         id="franchize-header-menu"
         role="dialog"
         aria-modal="true"

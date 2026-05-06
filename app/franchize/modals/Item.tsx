@@ -35,6 +35,14 @@ interface ItemModalProps {
 const packageOptions = ["Базовый", "Комфорт", "Максимум"];
 const durationOptions = ["1 день", "3 дня", "7 дней"];
 const perkOptions = ["Стандарт", "Шлем + GoPro", "Полный комплект"];
+const modalFocusableSelector = [
+  "a[href]",
+  "button:not([disabled])",
+  "textarea:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
 
 const getModalThemeVars = (theme: FranchizeTheme) =>
   ({
@@ -141,16 +149,40 @@ export function ItemModal({
         e.preventDefault();
         e.stopPropagation();
         onClose();
+        return;
+      }
+
+      if (e.key !== "Tab") return;
+
+      const focusable = Array.from(modalRef.current?.querySelectorAll<HTMLElement>(modalFocusableSelector) ?? [])
+        .filter((element) => element.offsetParent !== null || element === document.activeElement);
+      if (focusable.length === 0) {
+        e.preventDefault();
+        modalRef.current?.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    modalRef.current?.focus();
+    const focusDialog = window.requestAnimationFrame(() => modalRef.current?.focus());
 
     return () => {
+      window.cancelAnimationFrame(focusDialog);
       document.body.style.overflow = originalOverflow;
       document.removeEventListener("keydown", handleKeyDown);
-      previouslyFocused?.focus();
+      if (previouslyFocused && document.contains(previouslyFocused)) {
+        previouslyFocused.focus();
+      }
     };
   }, [item, onClose]);
 
