@@ -254,11 +254,16 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
           </p>
         )}
 
-        <div id="catalog-search" className="relative mb-5">
+        <div id="catalog-search" className="relative mb-5" role="search" aria-label="Поиск по каталогу байков">
+          <label htmlFor="catalog-search-input" className="sr-only">
+            Поиск по каталогу байков
+          </label>
           <input
             id="catalog-search-input"
             type="text"
             placeholder="Введите название байка"
+            autoComplete="off"
+            aria-describedby="catalog-results-status"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             className="w-full rounded-full border py-3 pl-5 pr-36 text-sm outline-none transition focus:border-transparent focus:ring-2"
@@ -275,6 +280,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
           {searchQuery.trim().length > 0 && (
             <button
               type="button"
+              aria-label="Очистить поиск по каталогу"
               onClick={() => setSearchQuery("")}
               className="absolute bottom-2 right-24 top-2 rounded-full px-3 text-xs font-medium transition active:scale-95"
               onFocus={() => setClearFocused(true)}
@@ -291,9 +297,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
           )}
           <button
             type="button"
+            aria-label="Перейти к первому найденному байку"
             onClick={() => {
-              const firstResult = document.querySelector("[data-catalog-item='true']") as HTMLElement | null;
+              const firstResult = document.querySelector("[data-catalog-item-button='true']") as HTMLButtonElement | null;
               firstResult?.scrollIntoView({ behavior: "smooth", block: "center" });
+              firstResult?.focus({ preventScroll: true });
             }}
             className="absolute bottom-1 right-1 top-1 rounded-full px-5 text-sm font-semibold transition active:scale-95"
             onFocus={() => setSearchCtaFocused(true)}
@@ -317,7 +325,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
                   key={module.id}
                   title={module.title}
                   href={module.href}
-                  className="w-[85vw] shrink-0 rounded-2xl border p-3 transition hover:opacity-95 sm:w-auto"
+                  aria-label={`${module.ctaLabel}: ${module.title}`}
+                  className="w-[85vw] shrink-0 rounded-2xl border p-3 transition hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)] sm:w-auto"
                   style={{
                     borderColor: crew.theme.palette.borderSoft,
                     background: promoGradientByIndex(index),
@@ -342,7 +351,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
           </div>
         )}
 
-        <div className="mb-5 flex gap-2 overflow-x-auto pb-1 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <p id="catalog-results-status" className="sr-only" aria-live="polite">
+          Найдено позиций: {filteredItems.length}
+        </p>
+
+        <div className="mb-5 flex gap-2 overflow-x-auto pb-1 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Быстрые фильтры каталога">
           {QUICK_FILTERS.map((filter) => {
             const active = quickFilter === filter.key;
             return (
@@ -350,7 +363,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
                 key={filter.key}
                 type="button"
                 onClick={() => setQuickFilter(filter.key)}
-                className="shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)]"
+                aria-pressed={active}
+                className="shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
                 style={{
                   ["--quick-pill-bg" as string]: active ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
                   ["--quick-pill-text" as string]: active ? "#000000" : crew.theme.palette.textPrimary,
@@ -367,7 +381,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
                 setQuickFilter("all");
                 setSearchQuery("");
               }}
-              className="shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)]"
+              aria-label="Сбросить поиск и все быстрые фильтры"
+              className="shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
               style={{ ["--quick-pill-bg" as string]: crew.theme.palette.bgCard, ["--quick-pill-text" as string]: crew.theme.palette.textPrimary }}
             >
               Сбросить всё
@@ -405,6 +420,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
                     >
                       <button
                         type="button"
+                        aria-label={`Открыть карточку ${item.title}: ${item.rentPriceLabel}`}
+                        data-catalog-item-button="true"
                         className="block w-full text-left"
                         onClick={() => openItem(item)}
                         onFocus={() => setFocusedItemId(item.id)}
