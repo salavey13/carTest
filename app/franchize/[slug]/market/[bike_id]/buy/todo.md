@@ -4,6 +4,35 @@
 We are building a premium e-moto franchise SaaS (`/app/franchize/`). Dark-themed (`crew.theme.palette`), `surface.subtleCard`, `font-orbitron`. 
 **CRITICAL:** All React hooks and useMemo/useEffect calls MUST remain inside the component function body. Do NOT append hooks at the module scope.
 
+## Agent execution status — 2026-05-06
+
+- `status`: completed-archived
+- `owner`: codex
+- `automation`: no-action / do-not-claim / do-not-trigger
+- `completed_at`: 2026-05-06T00:00:00Z
+- `final_review`: passed agent self-review; remaining items below are external live-environment verification only.
+
+### Finished
+- Task 1.1: added reusable `VsSpecRow` primitive with numeric parsing, winner/loser styling, shared catalog spec aliases, and safe fallback values.
+- Task 1.2: sale buy page reads `vs` from `searchParams`, resolves `vsItem` from loaded sale bikes, and passes comparison props into the landing.
+- Task 1.3: sale landing renders VS picker, appends/clears `?vs=`, and shows inline side-by-side comparison under the specs grid.
+- Task 1.4: rent modal receives the full `items` list, keeps local `vsBike` state, and renders compact in-modal comparison before cart actions.
+- Task 1.5: VS UI uses compact grid rows, `surface.subtleCard`, `border-white/10`, and winning-value emphasis.
+- Task 2.1: backend invoice logic now uses sale-specific 100-500 XTR reservation amount, title, description prefix, proof label, and metadata.
+- Task 2.2: sale landing primary CTA sends a `flowType: "sale"` Telegram XTR reservation invoice; secondary purchase action remains non-XTR and goes through cart checkout.
+- Task 2.3: mobile sticky bar uses the same test-drive reservation action and amount estimate.
+- Final self-review polish: split reservation vs cart button states so adding to cart cannot falsely display invoice success.
+
+### Not finished / needs live verification
+- Live Telegram invoice delivery was not verified in this runner; requires production/staging Telegram bot credentials and a real Telegram WebApp user.
+- Visual screenshot smoke for `vip-bike` sale buy page was not captured here because local Supabase fetch for `vip-bike` failed in this environment.
+- Global TypeScript check remains blocked by pre-existing syntax errors outside this scope (`data/questions.ts`, `supabase/functions/arbitrage-scan-instance/index.ts`).
+
+### Closed-task guard
+- This todo is intentionally kept as an archive for traceability, not as an open task queue.
+- Future bots/agents should not claim this file as pending work unless the operator explicitly asks to reopen the sale buy flow.
+- Code review pass is complete from the agent side; ready for PR after operator review of the live Telegram/Supabase environment constraints.
+
 ---
 
 ## Task 1: Inline "VS" Comparison (No Separate Page)
