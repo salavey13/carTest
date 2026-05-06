@@ -1828,7 +1828,21 @@ async function createFranchizeOrderInvoiceInternal(
   }
 
   const effectiveTotal = payload.totalAmount > 0 ? payload.totalAmount : payload.subtotal + payload.extrasTotal;
-  const amountXtr = Math.max(1, Math.ceil(effectiveTotal * 0.01));
+  const flowType = payload.flowType ?? "rental";
+  let amountXtr: number;
+  let invoiceTitle = "Franchize: подтверждение намерения";
+  let invoiceDescriptionPrefix = "Подтверждение аренды";
+  let invoiceProofLabel = "Proof-of-interest tip";
+
+  if (flowType === "sale") {
+    amountXtr = Math.min(500, Math.max(100, Math.ceil(effectiveTotal * 0.001)));
+    invoiceTitle = "Franchize: Бронь тест-драйва";
+    invoiceDescriptionPrefix = "Резерв на тест-драйв и получение спеццены на";
+    invoiceProofLabel = "Бронь тест-драйва";
+  } else {
+    amountXtr = Math.max(1, Math.ceil(effectiveTotal * 0.01));
+  }
+
   const invoiceId = buildFranchizeInvoiceId(payload);
 
   const { data: existingInvoice } = await supabaseAdmin
@@ -1841,7 +1855,6 @@ async function createFranchizeOrderInvoiceInternal(
   }
 
   const rentalId = randomUUID();
-  const flowType = payload.flowType ?? "rental";
   const startParamPrefix = flowType === "rental" ? "rental" : "sale";
   const startParam = `${startParamPrefix}-${rentalId}`;
   const telegramWebappLink = `https://t.me/oneBikePlsBot/app?startapp=${startParam}`;
@@ -1853,7 +1866,7 @@ async function createFranchizeOrderInvoiceInternal(
     .join("\n");
 
   const description = [
-    `Экипаж: ${payload.slug}`,
+    `${invoiceDescriptionPrefix}: ${payload.slug}`,
     `Заказ: #${payload.orderId}`,
     `Получатель: ${payload.recipient}`,
     `Телефон: ${payload.phone}`,
@@ -1864,7 +1877,7 @@ async function createFranchizeOrderInvoiceInternal(
     `Subtotal: ${payload.subtotal.toLocaleString("ru-RU")} ₽`,
     `Extras: ${payload.extrasTotal.toLocaleString("ru-RU")} ₽`,
     `Total: ${effectiveTotal.toLocaleString("ru-RU")} ₽`,
-    `Proof-of-interest tip: ${amountXtr} XTR (1%)`,
+    `${invoiceProofLabel}: ${amountXtr} XTR${flowType === "sale" ? "" : " (1%)"}`,
     `WebApp: ${telegramWebappLink}`,
     `Franchize card: ${franchizeRentalLink}`,
   ]
@@ -1883,7 +1896,7 @@ async function createFranchizeOrderInvoiceInternal(
     subtotal: payload.subtotal,
     extrasTotal: payload.extrasTotal,
     totalAmount: effectiveTotal,
-    tipPercent: 1,
+    tipPercent: flowType === "sale" ? 0.1 : 1,
     amountXtr,
     rental_id: rentalId,
     startParam,
@@ -1906,7 +1919,7 @@ async function createFranchizeOrderInvoiceInternal(
 
     const invoiceSent = await sendTelegramInvoice(
       payload.telegramUserId,
-      "Franchize: подтверждение намерения",
+      invoiceTitle,
       description,
       invoiceId,
       amountXtr,
