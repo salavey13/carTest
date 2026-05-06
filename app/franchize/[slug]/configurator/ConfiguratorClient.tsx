@@ -444,7 +444,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                     return (
                       <label key={motor.value} className={['cfg-option flex items-center justify-between rounded-xl border p-4', active ? 'cfg-option-active' : 'border-[#27272a]'].join(' ')}>
                         <span className="flex items-center gap-3">
-                          <input type="radio" name="motor" className="cfg-radio-dot" value={motor.value} checked={active} onChange={() => setMotorPower(motor.value)} />
+                          <input type="radio" name="motor" className="cfg-radio-dot" value={motor.value} checked={active} onChange={() => setMotorPower(motor.value)} aria-label={`Мощность мотора ${motor.value}W`} />
                           <span><span className="block text-sm font-semibold">{motor.value}W</span><span className="block text-[11px] text-[#71717a]">{motor.extra === 0 ? 'Базовая комплектация' : `+${formatPrice(motor.extra)}`}</span></span>
                         </span>
                         {motor.extra > 0 && <span className="cfg-mono text-xs font-medium text-[#a1a1aa]">+{formatPrice(motor.extra)}</span>}
@@ -464,6 +464,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                   <div className="mb-4 inline-flex rounded-xl border border-[#27272a] bg-[#09090b] p-1">
                     {(['regular', 'lithium'] as const).map((mode) => (
                       <button key={mode} onClick={() => { setBatteryMode(mode); setBatteryCapacity((mode === 'regular' ? regularBatteries[0] : lithiumBatteries[0])?.capacity ?? '') }}
+                        aria-label={`Тип аккумулятора ${mode === 'regular' ? 'Regular' : 'Lithium'}`}
                         className={['rounded-lg px-4 py-2 text-xs font-semibold transition-all', batteryMode === mode ? 'bg-[#00ffea] text-black shadow-md' : 'text-[#71717a] hover:text-white'].join(' ')}>
                         {mode === 'regular' ? 'Regular' : 'Lithium'}
                       </button>
@@ -475,7 +476,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                       return (
                         <label key={`${batteryMode}-${battery.capacity}`} className={['cfg-option flex items-center justify-between rounded-xl border p-4', active ? 'cfg-option-active' : 'border-[#27272a]'].join(' ')}>
                           <span className="flex items-center gap-3">
-                            <input type="radio" name="battery" className="cfg-radio-dot" value={battery.capacity} checked={active} onChange={() => setBatteryCapacity(battery.capacity)} />
+                            <input type="radio" name="battery" className="cfg-radio-dot" value={battery.capacity} checked={active} onChange={() => setBatteryCapacity(battery.capacity)} aria-label={`Аккумулятор ${battery.capacity}`} />
                             <span><span className="block text-sm font-semibold">{battery.capacity}</span><span className="block text-[11px] text-[#71717a]">Запас хода: {battery.range_km} км</span></span>
                           </span>
                           <span className="cfg-mono text-xs font-medium text-[#a1a1aa]">{battery.battery_price === 0 ? 'Вкл.' : `+${formatPrice(battery.battery_price)}`}</span>
@@ -499,6 +500,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                         key={color.id}
                         type="button"
                         onClick={() => setSelectedColorId(color.id)}
+                        aria-label={`Цвет рамы ${color.label}`}
                         className={[
                           'cfg-option flex items-center justify-between rounded-xl border p-4 text-left',
                           active ? 'cfg-option-active' : 'border-[#27272a]',
@@ -542,7 +544,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                         return (
                           <label key={part.id} className={['cfg-option flex items-start justify-between gap-3 rounded-xl border p-4', checked ? 'cfg-option-active' : 'border-[#27272a]'].join(' ')}>
                             <span className="flex items-start gap-3">
-                              <input type="checkbox" className="cfg-check mt-0.5" checked={checked} onChange={() => setSelectedAccessories((prev) => prev.includes(part.id) ? prev.filter((id) => id !== part.id) : [...prev, part.id])} />
+                              <input type="checkbox" className="cfg-check mt-0.5" checked={checked} onChange={() => setSelectedAccessories((prev) => prev.includes(part.id) ? prev.filter((id) => id !== part.id) : [...prev, part.id])} aria-label={`Аксессуар ${part.model}`} />
                               <span><span className="block text-sm font-semibold">{part.model}</span><span className="mt-0.5 block text-[11px] leading-relaxed text-[#71717a]">{part.description}</span></span>
                             </span>
                             <span className="cfg-mono whitespace-nowrap text-xs font-medium text-[#a1a1aa]">+{formatPrice(part.daily_price)}</span>
