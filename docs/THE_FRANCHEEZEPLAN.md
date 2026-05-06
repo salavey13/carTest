@@ -130,3 +130,13 @@ This root file stays intentionally compact so operators and agents can load it q
 - `notes`: Added rental review schema, completed-rental review form route, catalog card/modal review display, Top rated filter, crew rating blocks, Telegram review deep link, and admin soft-hide moderation panel.
 - `next_step`: Apply migration in Supabase, complete a real return_confirmed rental, submit a review through Telegram WebApp, and verify public catalog/admin moderation with live data.
 - `risks`: Review table must be migrated before runtime review queries can hydrate; local smoke is limited by unavailable production Supabase data.
+
+### 2026-05-06 — RENT-P2.2 self-review polish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:18:00Z
+- `owner`: codex-franchize-1778108121
+- `supaplan_task`: 88d44bfc-1f3b-4004-b5e2-d123479d7d39
+- `notes`: Self-review tightened the review flow: notification slug lookup no longer depends on nested PostgREST embeds, review form disables submission for non-renter Telegram profiles before server call, and RLS insert checks now verify the bike belongs to the submitted crew.
+- `next_step`: Merge after applying the migration in the target Supabase project and smoke-test one completed rental review from the renter account.
+- `risks`: Existing runtime still relies on Telegram WebApp identity hydration; production smoke should verify the renter user id matches stored rental user_id.

@@ -42,6 +42,12 @@ WITH CHECK (
       AND r.vehicle_id = rental_reviews.bike_id
       AND r.status = 'completed'
   )
+  AND EXISTS (
+    SELECT 1
+    FROM public.cars c
+    WHERE c.id = rental_reviews.bike_id
+      AND c.crew_id = rental_reviews.crew_id
+  )
 );
 
 CREATE POLICY "Renters can update own visible rental review"
