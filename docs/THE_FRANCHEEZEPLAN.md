@@ -129,3 +129,14 @@ This root file stays intentionally compact so operators and agents can load it q
 - `notes`: Added a compact `/nexus` KPI scoreboard for the VIP Bike franchise funnel with pilot conversion/SLA/partner signals and lead-to-paid-booking stages. SupaPlan task `913e8a73-46f6-4c22-8278-c1b5aabe661e`.
 - `next_step`: Wire the same KPI cards to real order/lead events after event analytics storage is finalized.
 - `risks`: Current numbers are explicitly pilot targets, not live production analytics.
+
+### 2026-05-06 — CQ franchize config/theme hardening
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:15:00Z
+- `owner`: codex
+- `notes`: Executed SupaPlan CQ-03 (`9513da34-2e8b-445e-a43a-09a22c8e5bc3`) and CQ-04 (`43499f79-1513-47b3-9b2c-3a85fdb30653`): extracted franchise defaults into shared config constants and moved crew theme resolution behind null-safe metadata guards.
+- `next_step`: Merge PR, then use the shared config constants for future create-form cleanup slices.
+- `risks`: Full repository typecheck is still blocked by pre-existing syntax errors outside this slice (`data/questions.ts`, `supabase/functions/arbitrage-scan-instance/index.ts`).
+
+- 2026-05-06 — CQ franchize config/theme hardening: centralized hardcoded default palette/map/menu/promo/contract values and added malformed theme metadata coverage so bad crew records fall back to defaults instead of crashing.

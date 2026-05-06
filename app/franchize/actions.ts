@@ -9,6 +9,26 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { getCrewSensitiveData, getUserSensitiveData, saveCrewSensitiveData } from "@/app/lib/private-secrets";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
+import { resolveFranchizeTheme, resolvePaletteByMode } from "@/app/franchize/lib/theme-resolver";
+import {
+  DEFAULT_AD_CARDS_TEXT,
+  DEFAULT_CATEGORY_ORDER,
+  DEFAULT_CONTRACT_PREFILL,
+  DEFAULT_DELIVERY_MODES_TEXT,
+  DEFAULT_FOOTER_TEXT_COLOR,
+  DEFAULT_FRANCHIZE_BRAND,
+  DEFAULT_FRANCHIZE_THEME,
+  DEFAULT_LIGHT_THEME_PALETTE,
+  DEFAULT_MAP_BOUNDS,
+  DEFAULT_MAP_GPS,
+  DEFAULT_MAP_IMAGE_URL,
+  DEFAULT_MENU_LINK_TEMPLATES,
+  DEFAULT_PAYMENT_OPTIONS_TEXT,
+  DEFAULT_PROMO_BANNERS_TEXT,
+  DEFAULT_SHOWCASE_GROUPS,
+  DEFAULT_SOCIAL_LINKS_TEXT,
+  DEFAULT_TELEGRAM_BOT_URL,
+} from "@/lib/franchize-config";
 
 type UnknownRecord = Record<string, unknown>;
 type RentalAvailabilityRow = {
@@ -18,45 +38,6 @@ type RentalAvailabilityRow = {
   agreed_end_date: string | null;
   requested_end_date: string | null;
 };
-
-type ThemePaletteCandidate = Partial<FranchizeTheme["palette"]> & {
-  light?: Partial<FranchizeTheme["palette"]>;
-  dark?: Partial<FranchizeTheme["palette"]>;
-};
-
-function resolvePaletteByMode(franchize: UnknownRecord): FranchizeTheme["palette"] {
-  const mode = readPath(franchize, ["theme", "mode"], defaultTheme.mode).toLowerCase();
-  const paletteCandidate = readPath(franchize, ["theme", "palette"], {}) as ThemePaletteCandidate;
-  const palettesCandidate = readPath(franchize, ["theme", "palettes"], {}) as ThemePaletteCandidate;
-
-  const explicitFlatPalette = (
-    typeof paletteCandidate.bgBase === "string" &&
-    typeof paletteCandidate.bgCard === "string" &&
-    typeof paletteCandidate.accentMain === "string"
-  )
-    ? paletteCandidate
-    : undefined;
-
-  const modeBucket = mode.includes("light") ? "light" : "dark";
-  const nestedByMode = readPath(paletteCandidate, [modeBucket], {}) as Partial<FranchizeTheme["palette"]>;
-  const nestedFromPalettes = readPath(palettesCandidate, [modeBucket], {}) as Partial<FranchizeTheme["palette"]>;
-
-  const source = {
-    ...explicitFlatPalette,
-    ...nestedFromPalettes,
-    ...nestedByMode,
-  } as Partial<FranchizeTheme["palette"]>;
-
-  return {
-    bgBase: readPath(source, ["bgBase"], defaultTheme.palette.bgBase),
-    bgCard: readPath(source, ["bgCard"], defaultTheme.palette.bgCard),
-    accentMain: readPath(source, ["accentMain"], defaultTheme.palette.accentMain),
-    accentMainHover: readPath(source, ["accentMainHover"], defaultTheme.palette.accentMainHover),
-    textPrimary: readPath(source, ["textPrimary"], defaultTheme.palette.textPrimary),
-    textSecondary: readPath(source, ["textSecondary"], defaultTheme.palette.textSecondary),
-    borderSoft: readPath(source, ["borderSoft"], defaultTheme.palette.borderSoft),
-  };
-}
 
 export interface FranchizeTheme {
   mode: string;
@@ -213,18 +194,7 @@ export interface FranchizeConfigState {
   canEdit?: boolean;
 }
 
-const defaultTheme: FranchizeTheme = {
-  mode: "pepperolli_dark",
-  palette: {
-    bgBase: "#0B0C10",
-    bgCard: "#111217",
-    accentMain: "#D99A00",
-    accentMainHover: "#E2A812",
-    textPrimary: "#F2F2F3",
-    textSecondary: "#A7ABB4",
-    borderSoft: "#24262E",
-  },
-};
+const defaultTheme = DEFAULT_FRANCHIZE_THEME;
 
 const franchizeConfigSchema = z.object({
   slug: z.string().trim().min(2, "Slug is required"),
@@ -252,11 +222,11 @@ const franchizeConfigSchema = z.object({
   telegram: z.string().trim().default(""),
   mapGps: z.string().trim().default(""),
   mapImageUrl: z.string().trim().default(""),
-  mapBoundsTop: z.string().trim().default("56.42"),
-  mapBoundsBottom: z.string().trim().default("56.08"),
-  mapBoundsLeft: z.string().trim().default("43.66"),
-  mapBoundsRight: z.string().trim().default("44.12"),
-  socialLinksText: z.string().default("Telegram|https://t.me/oneBikePlsBot"),
+  mapBoundsTop: z.string().trim().default(String(DEFAULT_MAP_BOUNDS.top)),
+  mapBoundsBottom: z.string().trim().default(String(DEFAULT_MAP_BOUNDS.bottom)),
+  mapBoundsLeft: z.string().trim().default(String(DEFAULT_MAP_BOUNDS.left)),
+  mapBoundsRight: z.string().trim().default(String(DEFAULT_MAP_BOUNDS.right)),
+  socialLinksText: z.string().default(DEFAULT_SOCIAL_LINKS_TEXT),
   menuLinksText: z.string().default(""),
   categoryOrderText: z.string().default(""),
   promoBannersText: z.string().default(""),
@@ -280,8 +250,8 @@ const franchizeConfigSchema = z.object({
 
 const defaultFranchizeConfig: FranchizeConfigInput = {
   slug: "",
-  brandName: "VIP BIKE",
-  tagline: "Ride the vibe",
+  brandName: DEFAULT_FRANCHIZE_BRAND.brandName,
+  tagline: DEFAULT_FRANCHIZE_BRAND.tagline,
   logoUrl: "",
   themeMode: defaultTheme.mode,
   bgBase: defaultTheme.palette.bgBase,
@@ -291,48 +261,40 @@ const defaultFranchizeConfig: FranchizeConfigInput = {
   textPrimary: defaultTheme.palette.textPrimary,
   textSecondary: defaultTheme.palette.textSecondary,
   borderSoft: defaultTheme.palette.borderSoft,
-  lightBgBase: "#F6F6F7",
-  lightBgCard: "#FFFFFF",
-  lightAccentMain: "#C78900",
-  lightAccentMainHover: "#D99A00",
-  lightTextPrimary: "#1A1B1F",
-  lightTextSecondary: "#4B5160",
-  lightBorderSoft: "#D4D8E1",
+  lightBgBase: DEFAULT_LIGHT_THEME_PALETTE.bgBase,
+  lightBgCard: DEFAULT_LIGHT_THEME_PALETTE.bgCard,
+  lightAccentMain: DEFAULT_LIGHT_THEME_PALETTE.accentMain,
+  lightAccentMainHover: DEFAULT_LIGHT_THEME_PALETTE.accentMainHover,
+  lightTextPrimary: DEFAULT_LIGHT_THEME_PALETTE.textPrimary,
+  lightTextSecondary: DEFAULT_LIGHT_THEME_PALETTE.textSecondary,
+  lightBorderSoft: DEFAULT_LIGHT_THEME_PALETTE.borderSoft,
   phone: "",
   email: "",
   address: "",
   telegram: "",
-  mapGps: "56.20420451632873, 43.798582127051695",
-  mapImageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg",
-  mapBoundsTop: "56.42",
-  mapBoundsBottom: "56.08",
-  mapBoundsLeft: "43.66",
-  mapBoundsRight: "44.12",
-  socialLinksText: "Telegram|https://t.me/oneBikePlsBot",
-  menuLinksText: [
-    "Каталог|/franchize/{slug}",
-    "Электроэндуро|/franchize/{slug}/electro-enduro",
-    "Конфигуратор|/franchize/{slug}/configurator",
-    "Map Riders|/franchize/{slug}/map-riders",
-    "О нас|/franchize/{slug}/about",
-    "Контакты|/franchize/{slug}/contacts",
-    "Корзина|/franchize/{slug}/cart",
-  ].join("\n"),
-  categoryOrderText: "Naked, Supersport, Touring, Neo-retro",
-  promoBannersText: "weekend-boost|Weekend boost|Скидка 10% на выходные|WEEKEND10|/franchize/{slug}#catalog-sections||2026-02-01|2026-12-31|90|Забрать скидку",
-  adCardsText: "safety-kit|Экипировка PRO|Подбор шлема и защиты перед выдачей|/franchize/{slug}/about||Safety|2026-02-01|2026-12-31|70|Смотреть детали",
+  mapGps: DEFAULT_MAP_GPS,
+  mapImageUrl: DEFAULT_MAP_IMAGE_URL,
+  mapBoundsTop: String(DEFAULT_MAP_BOUNDS.top),
+  mapBoundsBottom: String(DEFAULT_MAP_BOUNDS.bottom),
+  mapBoundsLeft: String(DEFAULT_MAP_BOUNDS.left),
+  mapBoundsRight: String(DEFAULT_MAP_BOUNDS.right),
+  socialLinksText: DEFAULT_SOCIAL_LINKS_TEXT,
+  menuLinksText: DEFAULT_MENU_LINK_TEMPLATES.map((link) => `${link.label}|${link.href}`).join("\n"),
+  categoryOrderText: DEFAULT_CATEGORY_ORDER,
+  promoBannersText: DEFAULT_PROMO_BANNERS_TEXT,
+  adCardsText: DEFAULT_AD_CARDS_TEXT,
   allowPromo: true,
-  deliveryModesText: "pickup, delivery",
-  paymentOptionsText: "telegram_xtr, card, sbp, cash",
+  deliveryModesText: DEFAULT_DELIVERY_MODES_TEXT,
+  paymentOptionsText: DEFAULT_PAYMENT_OPTIONS_TEXT,
   defaultMode: "pickup",
   issuerName: "",
   issuerRepresentative: "",
-  includedMileage: "200",
-  overageRateRub: "30",
-  bikeValueRub: "700000",
-  bikeValueWords: "Семьсот тысяч",
-  lateReturnPenaltyRub: "5000",
-  returnAddress: "г. Нижний Новгород, ул. Стригинский переулок, дом 13б",
+  includedMileage: DEFAULT_CONTRACT_PREFILL.includedMileage,
+  overageRateRub: DEFAULT_CONTRACT_PREFILL.overageRateRub,
+  bikeValueRub: DEFAULT_CONTRACT_PREFILL.bikeValueRub,
+  bikeValueWords: DEFAULT_CONTRACT_PREFILL.bikeValueWords,
+  lateReturnPenaltyRub: DEFAULT_CONTRACT_PREFILL.lateReturnPenaltyRub,
+  returnAddress: DEFAULT_CONTRACT_PREFILL.returnAddress,
   contractDefaultsJson: "",
   docTemplatesJson: "",
   advancedJson: "",
@@ -349,15 +311,10 @@ function readPath<T>(obj: unknown, path: string[], fallback: T): T {
   return (current as T) ?? fallback;
 }
 
-const fallbackMenuLinks = (slug: string) => [
-  { label: "Каталог", href: `/franchize/${slug}` },
-  { label: "Электроэндуро", href: `/franchize/${slug}/electro-enduro` },
-  { label: "Конфигуратор", href: `/franchize/${slug}/configurator` },
-  { label: "Map Riders", href: `/franchize/${slug}/map-riders` },
-  { label: "О нас", href: `/franchize/${slug}/about` },
-  { label: "Контакты", href: `/franchize/${slug}/contacts` },
-  { label: "Корзина", href: `/franchize/${slug}/cart` },
-];
+const fallbackMenuLinks = (slug: string) => DEFAULT_MENU_LINK_TEMPLATES.map((link) => ({
+  label: link.label,
+  href: withSlug(link.href, slug),
+}));
 
 function normalizeCrewSlug(value: string): string {
   return String(value || "")
@@ -399,7 +356,7 @@ function parseSocialLinks(lines: string): Array<{ label: string; href: string }>
     .filter(Boolean)
     .map((line) => {
       const [label, href] = line.split("|").map((value) => value.trim());
-      return { label: label || "Social", href: href || "https://t.me/oneBikePlsBot" };
+      return { label: label || "Social", href: href || DEFAULT_TELEGRAM_BOT_URL };
     });
 }
 
@@ -428,7 +385,7 @@ function extractFooterSocialLinks(franchize: UnknownRecord, fallbackTelegram: st
     return [{ label: fallbackTelegram, href: `https://t.me/${fallbackTelegram.replace("@", "")}` }];
   }
 
-  return [{ label: "Telegram", href: "https://t.me/oneBikePlsBot" }];
+  return [{ label: "Telegram", href: DEFAULT_TELEGRAM_BOT_URL }];
 }
 
 const emptyCrew = (slug: string): FranchizeCrewVM => ({
@@ -458,10 +415,10 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
       carDirections: "",
       imageUrl: "",
       bounds: {
-        top: 56.42,
-        bottom: 56.08,
-        left: 43.66,
-        right: 44.12,
+        top: DEFAULT_MAP_BOUNDS.top,
+        bottom: DEFAULT_MAP_BOUNDS.bottom,
+        left: DEFAULT_MAP_BOUNDS.left,
+        right: DEFAULT_MAP_BOUNDS.right,
       },
     },
   },
@@ -549,7 +506,8 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const metadata = ((crew as UnknownRecord).metadata ?? {}) as UnknownRecord;
     const franchize = (metadata.franchize ?? metadata) as UnknownRecord;
 
-    const themePalette = resolvePaletteByMode(franchize);
+    const resolvedTheme = resolveFranchizeTheme(franchize);
+    const themePalette = resolvedTheme.palette;
     const menuLinksRaw = readPath(franchize, ["header", "menuLinks"], fallbackMenuLinks(safeSlug)).map((link) => ({
       ...link,
       href: withSlug(link.href, crew.slug ?? safeSlug),
@@ -563,10 +521,6 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         ];
 
     const metadataShowcaseGroups = readPath(franchize, ["catalog", "showcaseGroups"], []) as Array<UnknownRecord>;
-    const defaultShowcaseGroups: FranchizeCrewVM["catalog"]["showcaseGroups"] = [
-      //{ id: "edition-23", label: "23rd feb edition", mode: "subtype", subtype: "bobber" },
-      { id: "sweetspot-6000", label: "Все по 6000", mode: "price", minPrice: 5600, maxPrice: 6400 },
-    ];
     const showcaseGroups = (metadataShowcaseGroups.length > 0
       ? metadataShowcaseGroups.map((group, index) => ({
           id: readPath(group, ["id"], `showcase-${index + 1}`),
@@ -576,7 +530,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
           minPrice: Number(readPath(group, ["minPrice"], 0)),
           maxPrice: Number(readPath(group, ["maxPrice"], 0)),
         }))
-      : defaultShowcaseGroups)
+      : DEFAULT_SHOWCASE_GROUPS)
       .filter((group) => group.label.trim().length > 0);
 
     const hydratedCrew: FranchizeCrewVM = {
@@ -587,10 +541,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       logoUrl: crew.logo_url ?? "",
       hqLocation: crew.hq_location ?? "",
       isFound: true,
-      theme: {
-        mode: readPath(franchize, ["theme", "mode"], defaultTheme.mode),
-        palette: themePalette,
-      },
+      theme: resolvedTheme,
       header: {
         brandName: readPath(franchize, ["branding", "name"], crew.name ?? "Franchize"),
         tagline: readPath(franchize, ["branding", "tagline"], "Ride the vibe"),
@@ -614,10 +565,10 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
           carDirections: readPath(franchize, ["contacts", "map", "carDirections"], ""),
           imageUrl: readPath(franchize, ["contacts", "map", "imageUrl"], ""),
           bounds: {
-            top: Number(readPath(franchize, ["contacts", "map", "bounds", "top"], 56.42)),
-            bottom: Number(readPath(franchize, ["contacts", "map", "bounds", "bottom"], 56.08)),
-            left: Number(readPath(franchize, ["contacts", "map", "bounds", "left"], 43.66)),
-            right: Number(readPath(franchize, ["contacts", "map", "bounds", "right"], 44.12)),
+            top: Number(readPath(franchize, ["contacts", "map", "bounds", "top"], DEFAULT_MAP_BOUNDS.top)),
+            bottom: Number(readPath(franchize, ["contacts", "map", "bounds", "bottom"], DEFAULT_MAP_BOUNDS.bottom)),
+            left: Number(readPath(franchize, ["contacts", "map", "bounds", "left"], DEFAULT_MAP_BOUNDS.left)),
+            right: Number(readPath(franchize, ["contacts", "map", "bounds", "right"], DEFAULT_MAP_BOUNDS.right)),
           },
         },
       },
@@ -668,7 +619,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       },
       footer: {
         socialLinks: extractFooterSocialLinks(franchize, readPath(franchize, ["contacts", "telegram"], "")),
-        textColor: readPath(franchize, ["footer", "textColor"], "#16130A"),
+        textColor: readPath(franchize, ["footer", "textColor"], DEFAULT_FOOTER_TEXT_COLOR),
       },
     };
 
@@ -1002,10 +953,10 @@ async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promis
     telegram: readPath(franchize, ["contacts", "telegram"], ""),
     mapGps: readPath(franchize, ["contacts", "map", "gps"], ""),
     mapImageUrl: readPath(franchize, ["contacts", "map", "imageUrl"], ""),
-    mapBoundsTop: String(readPath(franchize, ["contacts", "map", "bounds", "top"], 56.42)),
-    mapBoundsBottom: String(readPath(franchize, ["contacts", "map", "bounds", "bottom"], 56.08)),
-    mapBoundsLeft: String(readPath(franchize, ["contacts", "map", "bounds", "left"], 43.66)),
-    mapBoundsRight: String(readPath(franchize, ["contacts", "map", "bounds", "right"], 44.12)),
+    mapBoundsTop: String(readPath(franchize, ["contacts", "map", "bounds", "top"], DEFAULT_MAP_BOUNDS.top)),
+    mapBoundsBottom: String(readPath(franchize, ["contacts", "map", "bounds", "bottom"], DEFAULT_MAP_BOUNDS.bottom)),
+    mapBoundsLeft: String(readPath(franchize, ["contacts", "map", "bounds", "left"], DEFAULT_MAP_BOUNDS.left)),
+    mapBoundsRight: String(readPath(franchize, ["contacts", "map", "bounds", "right"], DEFAULT_MAP_BOUNDS.right)),
     socialLinksText: extractFooterSocialLinks(franchize, readPath(franchize, ["contacts", "telegram"], ""))
       .map((entry) => `${entry.label}|${entry.href}`)
       .join("\n"),
@@ -1048,8 +999,8 @@ async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promis
       })
       .join("\n"),
     allowPromo: readPath(franchize, ["order", "allowPromo"], true),
-    deliveryModesText: readPath(franchize, ["order", "deliveryModes"], ["pickup", "delivery"]).join(", "),
-    paymentOptionsText: readPath(franchize, ["order", "paymentOptions"], ["telegram_xtr", "card", "sbp", "cash"]).join(", "),
+    deliveryModesText: readPath(franchize, ["order", "deliveryModes"], DEFAULT_DELIVERY_MODES_TEXT.split(", ")).join(", "),
+    paymentOptionsText: readPath(franchize, ["order", "paymentOptions"], DEFAULT_PAYMENT_OPTIONS_TEXT.split(", ")).join(", "),
     defaultMode: readPath(franchize, ["order", "defaultMode"], "pickup"),
     issuerName: readPath(defaults, ["issuerName"], ""),
     issuerRepresentative: readPath(defaults, ["issuer_representative"], ""),
