@@ -4,7 +4,7 @@ import { createInvoice, supabaseAdmin } from "@/lib/supabase-server";
 import { notifyAdmin, sendTelegramDocument, sendTelegramInvoice } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
-import { randomUUID } from "crypto";
+import { randomUUID, webcrypto } from "crypto";
 import { readFile } from "fs/promises";
 import path from "path";
 import { getCrewSensitiveData, getUserSensitiveData, saveCrewSensitiveData } from "@/app/lib/private-secrets";
@@ -1905,10 +1905,63 @@ export async function getFranchizeOrderNotificationFailures(input: unknown): Pro
 const rentalReviewInputSchema = z.object({
   slug: z.string().trim().min(1),
   rentalId: z.string().uuid(),
-  userId: z.string().trim().min(1),
+  initData: z.string().trim().min(1),
   rating: z.coerce.number().int().min(1).max(5),
   text: z.string().trim().max(1200).default(""),
 });
+
+async function resolveVerifiedTelegramUserId(initDataString: string): Promise<{ success: boolean; userId?: string; error?: string }> {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) return { success: false, error: "Telegram bot token is not configured." };
+
+  const params = new URLSearchParams(initDataString);
+  const hashFromClient = params.get("hash");
+  if (!hashFromClient) return { success: false, error: "Telegram init data hash is missing." };
+
+  const keys = Array.from(params.keys()).filter((key) => key !== "hash" && key !== "signature").sort();
+  const dataCheckString = keys.map((key) => `${key}=${params.get(key)}`).join("\n");
+
+  const botTokenKey = await webcrypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(botToken),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const derivedKeyBuffer = await webcrypto.subtle.sign("HMAC", botTokenKey, new TextEncoder().encode("WebAppData"));
+  const telegramWebAppKey = await webcrypto.subtle.importKey(
+    "raw",
+    derivedKeyBuffer,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signatureBuffer = await webcrypto.subtle.sign("HMAC", telegramWebAppKey, new TextEncoder().encode(dataCheckString));
+  const signatureHex = Array.from(new Uint8Array(signatureBuffer)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const bypassValidation = process.env.TEMP_BYPASS_TG_AUTH_VALIDATION === "true";
+
+  if (signatureHex !== hashFromClient && !bypassValidation) {
+    return { success: false, error: "Telegram init data hash mismatch." };
+  }
+
+  const userParam = params.get("user");
+  if (!userParam) return { success: false, error: "Telegram init data user is missing." };
+
+  const authDate = Number(params.get("auth_date") ?? 0);
+  const maxInitDataAgeSeconds = 24 * 60 * 60;
+  if (!bypassValidation && (!Number.isFinite(authDate) || authDate <= 0 || Date.now() / 1000 - authDate > maxInitDataAgeSeconds)) {
+    return { success: false, error: "Telegram init data is expired." };
+  }
+
+  try {
+    const user = JSON.parse(userParam) as { id?: unknown };
+    const userId = typeof user.id === "number" || typeof user.id === "string" ? String(user.id) : "";
+    if (!userId) return { success: false, error: "Telegram init data user id is missing." };
+    return { success: true, userId };
+  } catch {
+    return { success: false, error: "Telegram init data user payload is invalid." };
+  }
+}
 
 export async function getRentalReviewContext(input: unknown): Promise<{ success: boolean; error?: string; rental?: { rentalId: string; status: string; userId: string; bikeId: string; bikeTitle: string; crewId: string; existingReview?: RentalReviewVM } }> {
   const parsed = z.object({ slug: z.string().trim().min(1), rentalId: z.string().uuid() }).safeParse(input);
@@ -1944,7 +1997,7 @@ export async function getRentalReviewContext(input: unknown): Promise<{ success:
       bikeId: String(rental.vehicle_id ?? ""),
       bikeTitle: `${vehicle?.make ?? ""} ${vehicle?.model ?? ""}`.trim() || "байк",
       crewId: String(crew.id),
-      existingReview: existing ? toRentalReviewVM(existing as UnknownRecord) : undefined,
+      existingReview: existing && !(existing as UnknownRecord).hidden_at ? toRentalReviewVM(existing as UnknownRecord) : undefined,
     },
   };
 }
@@ -1952,22 +2005,36 @@ export async function getRentalReviewContext(input: unknown): Promise<{ success:
 export async function submitRentalReview(input: unknown): Promise<{ success: boolean; error?: string }> {
   const parsed = rentalReviewInputSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Некорректный отзыв." };
-  const { slug, rentalId, userId, rating, text } = parsed.data;
+  const { slug, rentalId, initData, rating, text } = parsed.data;
+
+  const verifiedTelegramUser = await resolveVerifiedTelegramUserId(initData);
+  if (!verifiedTelegramUser.success || !verifiedTelegramUser.userId) {
+    return { success: false, error: verifiedTelegramUser.error ?? "Не удалось подтвердить Telegram-пользователя." };
+  }
 
   const context = await getRentalReviewContext({ slug, rentalId });
   if (!context.success || !context.rental) return { success: false, error: context.error ?? "Аренда не найдена." };
   if (context.rental.status !== "completed") return { success: false, error: "Отзыв можно оставить после завершения аренды." };
-  if (context.rental.userId !== userId) return { success: false, error: "Отзыв может оставить только арендатор." };
+  if (context.rental.userId !== verifiedTelegramUser.userId) return { success: false, error: "Отзыв может оставить только арендатор." };
+
+  const { data: existingReview, error: existingReviewError } = await supabaseAdmin
+    .from("rental_reviews")
+    .select("hidden_at")
+    .eq("rental_id", rentalId)
+    .maybeSingle();
+  if (existingReviewError) return { success: false, error: existingReviewError.message };
+  if (existingReview?.hidden_at) {
+    return { success: false, error: "Отзыв скрыт модератором. Обновление возможно только после восстановления владельцем экипажа." };
+  }
 
   const { error } = await supabaseAdmin.from("rental_reviews").upsert(
     {
       rental_id: rentalId,
-      user_id: userId,
+      user_id: verifiedTelegramUser.userId,
       bike_id: context.rental.bikeId,
       crew_id: context.rental.crewId,
       rating,
       text,
-      hidden_at: null,
     },
     { onConflict: "rental_id" },
   );

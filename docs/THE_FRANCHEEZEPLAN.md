@@ -140,3 +140,13 @@ This root file stays intentionally compact so operators and agents can load it q
 - `notes`: Self-review tightened the review flow: notification slug lookup no longer depends on nested PostgREST embeds, review form disables submission for non-renter Telegram profiles before server call, and RLS insert checks now verify the bike belongs to the submitted crew.
 - `next_step`: Merge after applying the migration in the target Supabase project and smoke-test one completed rental review from the renter account.
 - `risks`: Existing runtime still relies on Telegram WebApp identity hydration; production smoke should verify the renter user id matches stored rental user_id.
+
+### 2026-05-06 — RENT-P2.2 Codex review fixes
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:32:00Z
+- `owner`: codex
+- `supaplan_task`: 88d44bfc-1f3b-4004-b5e2-d123479d7d39
+- `notes`: Fixed automated review findings: review submission now verifies Telegram initData server-side instead of trusting caller-provided userId, and hidden reviews cannot be restored by renter upsert/edit.
+- `next_step`: Production smoke with a real Telegram WebApp review link after migration apply.
+- `risks`: TEMP_BYPASS_TG_AUTH_VALIDATION must remain disabled in production for the server-side initData check to be authoritative.
