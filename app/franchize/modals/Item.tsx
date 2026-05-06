@@ -1,14 +1,20 @@
 "use client";
 
-import { Info, X } from "lucide-react";
+import { Info, Swords, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
+import {
+  CATALOG_VS_SPECS,
+  VsSpecRow,
+  getCatalogVsSpecValue,
+} from "@/components/franchize/VsSpecRow";
 import { ItemGallery } from "../components/ItemGallery";
 import { crewPaletteForSurface } from "../lib/theme";
 
 interface ItemModalProps {
   item: CatalogItemVM | null;
+  items: CatalogItemVM[];
   slug: string;
   theme: FranchizeTheme;
   options: {
@@ -18,7 +24,10 @@ interface ItemModalProps {
     auction: string;
   };
   auctionOptions: string[];
-  onChangeOption: (key: "package" | "duration" | "perk" | "auction", value: string) => void;
+  onChangeOption: (
+    key: "package" | "duration" | "perk" | "auction",
+    value: string,
+  ) => void;
   onClose: () => void;
   onAddToCart: () => void;
 }
@@ -49,7 +58,9 @@ function OptionChips({
 }) {
   return (
     <div>
-      <p className="mb-2 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">{title}</p>
+      <p className="mb-2 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+        {title}
+      </p>
       <div className="flex flex-wrap gap-2">
         {options.map((option) => {
           const isActive = option === selected;
@@ -73,20 +84,38 @@ function OptionChips({
   );
 }
 
-export function ItemModal({ item, slug, theme, options, auctionOptions, onChangeOption, onClose, onAddToCart }: ItemModalProps) {
+export function ItemModal({
+  item,
+  items,
+  slug,
+  theme,
+  options,
+  auctionOptions,
+  onChangeOption,
+  onClose,
+  onAddToCart,
+}: ItemModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [isAdding, setIsAdding] = useState(false);
+  const [vsBike, setVsBike] = useState<CatalogItemVM | null>(null);
 
   const gallery = useMemo(() => {
     if (!item) return [];
-    const urls = item.mediaUrls?.length ? item.mediaUrls : item.imageUrl ? [item.imageUrl] : [];
+    const urls = item.mediaUrls?.length
+      ? item.mediaUrls
+      : item.imageUrl
+        ? [item.imageUrl]
+        : [];
     return Array.from(new Set(urls.filter(Boolean) as string[]));
   }, [item]);
 
   const descriptionText = useMemo(() => {
-    return item?.description || "Этот байк уже подготовлен к аренде: технический чек выполнен, документы готовы, выдача без очереди.";
+    return (
+      item?.description ||
+      "Этот байк уже подготовлен к аренде: технический чек выполнен, документы готовы, выдача без очереди."
+    );
   }, [item?.description]);
 
   const surface = useMemo(() => crewPaletteForSurface(theme), [theme]);
@@ -95,6 +124,7 @@ export function ItemModal({ item, slug, theme, options, auctionOptions, onChange
   useEffect(() => {
     setDescriptionExpanded(false);
     setActiveMediaIndex(0);
+    setVsBike(null);
   }, [item?.id]);
 
   useEffect(() => {
@@ -141,22 +171,42 @@ export function ItemModal({ item, slug, theme, options, auctionOptions, onChange
         setIsAdding(false);
       }
     },
-    [isAdding, onAddToCart]
+    [isAdding, onAddToCart],
   );
 
   const changeMedia = useCallback(
     (direction: -1 | 1) => {
-      setActiveMediaIndex((prev) => (prev + direction + gallery.length) % gallery.length);
+      setActiveMediaIndex(
+        (prev) => (prev + direction + gallery.length) % gallery.length,
+      );
     },
-    [gallery.length]
+    [gallery.length],
   );
+
+  const comparableBikes = useMemo(() => {
+    if (!item) return [];
+    return items
+      .filter(
+        (candidate) =>
+          candidate.id !== item.id &&
+          candidate.availabilityStatus === "available",
+      )
+      .slice(0, 6);
+  }, [item, items]);
 
   if (!item) return null;
 
   const fallbackSpecs = [
     { label: "Категория", value: item.category },
     { label: "Тариф аренды", value: item.rentPriceLabel },
-    ...(item.saleAvailable && item.salePrice ? [{ label: "Цена покупки", value: `${item.salePrice.toLocaleString("ru-RU")} ₽` }] : []),
+    ...(item.saleAvailable && item.salePrice
+      ? [
+          {
+            label: "Цена покупки",
+            value: `${item.salePrice.toLocaleString("ru-RU")} ₽`,
+          },
+        ]
+      : []),
     { label: "Статус", value: "Готов к выдаче" },
   ];
 
@@ -172,10 +222,11 @@ export function ItemModal({ item, slug, theme, options, auctionOptions, onChange
       tabIndex={-1}
       style={themeVars}
     >
-      <div className="flex w-full max-w-4xl flex-col overflow-hidden rounded-[1.75rem] border shadow-[0_30px_80px_rgba(0,0,0,0.35)] sm:my-auto sm:rounded-3xl max-h-[calc(100dvh-1.5rem)]" style={surface.card}>
-        
+      <div
+        className="flex w-full max-w-4xl flex-col overflow-hidden rounded-[1.75rem] border shadow-[0_30px_80px_rgba(0,0,0,0.35)] sm:my-auto sm:rounded-3xl max-h-[calc(100dvh-1.5rem)]"
+        style={surface.card}
+      >
         <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
-          
           {/* Gallery Component */}
           <ItemGallery
             images={gallery}
@@ -203,14 +254,24 @@ export function ItemModal({ item, slug, theme, options, auctionOptions, onChange
           {/* Content */}
           <div className="space-y-4 p-4 sm:p-5">
             <div>
-              <h3 id={`item-modal-title-${item.id}`} className="text-lg font-semibold sm:text-xl">{item.title}</h3>
-              <p className="text-sm" style={surface.mutedText}>{item.subtitle}</p>
+              <h3
+                id={`item-modal-title-${item.id}`}
+                className="text-lg font-semibold sm:text-xl"
+              >
+                {item.title}
+              </h3>
+              <p className="text-sm" style={surface.mutedText}>
+                {item.subtitle}
+              </p>
               {item.saleAvailable && (
                 <p className="mt-1 inline-flex rounded-full border border-amber-300/60 bg-amber-400/20 px-2 py-0.5 text-xs font-semibold text-amber-100">
                   Этот мот доступен к покупке (параллельно аренде)
                 </p>
               )}
-              <p className={`mt-2 text-sm leading-6 ${descriptionExpanded ? "" : "line-clamp-4"}`} style={surface.mutedText}>
+              <p
+                className={`mt-2 text-sm leading-6 ${descriptionExpanded ? "" : "line-clamp-4"}`}
+                style={surface.mutedText}
+              >
                 {descriptionText}
               </p>
               {descriptionText.length > 200 && (
@@ -224,15 +285,29 @@ export function ItemModal({ item, slug, theme, options, auctionOptions, onChange
               )}
             </div>
 
-            <div className="rounded-2xl border p-3 text-xs" style={surface.subtleCard}>
+            <div
+              className="rounded-2xl border p-3 text-xs"
+              style={surface.subtleCard}
+            >
               <p className="inline-flex items-center gap-1 font-medium text-[var(--item-accent)]">
                 <Info className="h-3.5 w-3.5" /> Характеристики и условия
               </p>
-              <div className="mt-2 grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-2" style={surface.mutedText}>
+              <div
+                className="mt-2 grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-2"
+                style={surface.mutedText}
+              >
                 {normalizedSpecs.map((spec) => (
-                  <div key={`${spec.label}-${spec.value}`} className="min-w-0 rounded-lg border px-2.5 py-2" style={surface.subtleCard}>
-                    <p className="text-[10px] uppercase tracking-[0.08em]">{spec.label}</p>
-                    <p className="mt-1 break-words text-sm text-[var(--item-text)]">{spec.value}</p>
+                  <div
+                    key={`${spec.label}-${spec.value}`}
+                    className="min-w-0 rounded-lg border px-2.5 py-2"
+                    style={surface.subtleCard}
+                  >
+                    <p className="text-[10px] uppercase tracking-[0.08em]">
+                      {spec.label}
+                    </p>
+                    <p className="mt-1 break-words text-sm text-[var(--item-text)]">
+                      {spec.value}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -247,15 +322,100 @@ export function ItemModal({ item, slug, theme, options, auctionOptions, onChange
               </Link>
             )}
 
-            <OptionChips title="Пакет" options={packageOptions} selected={options.package} onSelect={(v) => onChangeOption("package", v)} />
-            <OptionChips title="Срок" options={durationOptions} selected={options.duration} onSelect={(v) => onChangeOption("duration", v)} />
-            <OptionChips title="Комплект" options={perkOptions} selected={options.perk} onSelect={(v) => onChangeOption("perk", v)} />
-            <OptionChips title="Аукцион / тик" options={auctionOptions} selected={options.auction} onSelect={(v) => onChangeOption("auction", v)} />
+            <OptionChips
+              title="Пакет"
+              options={packageOptions}
+              selected={options.package}
+              onSelect={(v) => onChangeOption("package", v)}
+            />
+            <OptionChips
+              title="Срок"
+              options={durationOptions}
+              selected={options.duration}
+              onSelect={(v) => onChangeOption("duration", v)}
+            />
+            <OptionChips
+              title="Комплект"
+              options={perkOptions}
+              selected={options.perk}
+              onSelect={(v) => onChangeOption("perk", v)}
+            />
+            <OptionChips
+              title="Аукцион / тик"
+              options={auctionOptions}
+              selected={options.auction}
+              onSelect={(v) => onChangeOption("auction", v)}
+            />
+
+            {comparableBikes.length ? (
+              <details
+                className="rounded-2xl border p-3"
+                style={surface.subtleCard}
+              >
+                <summary className="cursor-pointer list-none text-sm font-semibold">
+                  Сравнить с другой моделью
+                </summary>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {comparableBikes.map((bike) => (
+                    <button
+                      key={bike.id}
+                      type="button"
+                      onClick={() => setVsBike(bike)}
+                      className="rounded-xl border p-2 text-left text-xs transition hover:bg-white/5"
+                      style={surface.subtleCard}
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="line-clamp-2">{bike.title}</span>
+                        <Swords className="h-3.5 w-3.5 shrink-0" />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {vsBike ? (
+                  <div
+                    className="mt-3 rounded-2xl border border-white/10 p-3"
+                    style={surface.subtleCard}
+                  >
+                    <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center text-xs font-semibold">
+                      <span>{item.title}</span>
+                      <Swords className="h-5 w-5 text-[var(--item-accent)]" />
+                      <span>{vsBike.title}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {CATALOG_VS_SPECS.map((spec) => (
+                        <VsSpecRow
+                          key={spec.label}
+                          label={spec.label}
+                          valueA={getCatalogVsSpecValue(
+                            item.rawSpecs,
+                            spec.keys,
+                          )}
+                          valueB={getCatalogVsSpecValue(
+                            vsBike.rawSpecs,
+                            spec.keys,
+                          )}
+                          unit={spec.unit}
+                          lowerIsBetter={spec.lowerIsBetter}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </details>
+            ) : null}
           </div>
 
           {/* Footer Buttons */}
-          <div className="grid shrink-0 grid-cols-1 gap-2 border-t p-3 sm:grid-cols-2" style={{ ...surface.card, borderColor: theme.palette.borderSoft }}>
-            <button type="button" onClick={onClose} className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]" style={surface.subtleCard}>
+          <div
+            className="grid shrink-0 grid-cols-1 gap-2 border-t p-3 sm:grid-cols-2"
+            style={{ ...surface.card, borderColor: theme.palette.borderSoft }}
+          >
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+              style={surface.subtleCard}
+            >
               Закрыть
             </button>
             <button
@@ -264,7 +424,11 @@ export function ItemModal({ item, slug, theme, options, auctionOptions, onChange
               disabled={isAdding}
               className="rounded-xl bg-[var(--item-accent)] px-3 py-2 text-sm font-semibold text-[var(--item-accent-contrast)] transition hover:brightness-105 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
             >
-              {isAdding ? "Добавляем..." : item.saleAvailable ? `Оформить • аренда/покупка` : `Добавить • ${item.pricePerDay.toLocaleString("ru-RU")} ₽`}
+              {isAdding
+                ? "Добавляем..."
+                : item.saleAvailable
+                  ? `Оформить • аренда/покупка`
+                  : `Добавить • ${item.pricePerDay.toLocaleString("ru-RU")} ₽`}
             </button>
           </div>
         </div>
