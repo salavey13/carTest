@@ -52,10 +52,10 @@ This root file stays intentionally compact so operators and agents can load it q
 ## 3) Active ad-hoc task — `/vipbikerental` interactive landing
 
 - status: `ready_for_pr`
-- updated_at: `2026-05-06T00:00:00Z`
+- updated_at: `2026-05-06T23:45:00Z`
 - owner: `codex`
-- notes: `Quick action follow-up plus sale-config cleanup complete: Hero, Electro-Enduro, MapRiders preview, StepsProgress, RentalQuickActionHub, and shared sale config parsing are synced with safe catalog/map fallbacks.`
-- next_step: `Create PR. Remaining TODO entries are OSRM/route loading cleanup and production QA with real data.`
+- notes: `Self-reviewed and polished ConversionPilot into a more customer-facing route cockpit: score is now a compact operator signal, while the main surface recommends the next bike and three clear rent/buy/group-ride paths with better copy and accessibility labels.`
+- next_step: `Create PR and production-smoke /vipbikerental with real vip-bike catalog/map data.`
 - risks: `Local runtime can render fallback data when Supabase is unavailable; production QA should verify real vip-bike catalog/map records and active rental states.`
 
 
@@ -77,6 +77,9 @@ This root file stays intentionally compact so operators and agents can load it q
 - 2026-05-06 — Final polish iteration: implemented `StepsProgress` for the newbie flow and reworded `/app/vipbikerental/todo.md` so completed scope is clearly closed while remaining quick-action/technical items are future backlog, not an automatic trigger.
 - 2026-05-06 — Continued explicit `/vipbikerental` TODO work: replaced static quick-action link cards with `RentalQuickActionHub`, including latest rental readiness, live rider counters and a quick bike chooser modal hydrated from catalog/fallback items. Next step: technical cleanup backlog or production QA with real Supabase rental/map data.
 - 2026-05-06 — Continued cleanup after quick actions: extracted shared sale config/color parsing into `app/franchize/lib/sale-config.ts` and reused it in both the sale buy page and `/vipbikerental` Electro-Enduro quick preview, removing duplicated package/color constants. Next step: OSRM/route loading cleanup or production QA.
+
+- 2026-05-06 — Responded to operator rating request for `/vipbikerental`: added a visible ConversionPilot scorecard/decision dock after the hero showcase, deriving score/next action from catalog and MapRiders data, plus replaced the stale 2025 promo code with evergreen `VIPSTART`. Next step: visual smoke in local/preview runtime.
+- 2026-05-06 — Self-reviewed the ConversionPilot slice: reduced the audit feeling, made the score compact, rewrote the section as a customer-facing route cockpit, added route aria labels, fixed rider pluralization, and kept the recommended bike CTA data-driven. Next step: preview QA with production catalog/map data.
 ## 3) Active implementation slices
 
 
