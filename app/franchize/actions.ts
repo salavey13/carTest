@@ -10,6 +10,7 @@ import path from "path";
 import { getCrewSensitiveData, getUserSensitiveData, saveCrewSensitiveData } from "@/app/lib/private-secrets";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 import { resolveFranchizeTheme, resolvePaletteByMode } from "@/app/franchize/lib/theme-resolver";
+import type { FranchizeTheme } from "@/lib/franchize-config";
 import {
   DEFAULT_AD_CARDS_TEXT,
   DEFAULT_CATEGORY_ORDER,
@@ -39,18 +40,7 @@ type RentalAvailabilityRow = {
   requested_end_date: string | null;
 };
 
-export interface FranchizeTheme {
-  mode: string;
-  palette: {
-    bgBase: string;
-    bgCard: string;
-    accentMain: string;
-    accentMainHover: string;
-    textPrimary: string;
-    textSecondary: string;
-    borderSoft: string;
-  };
-}
+export type { FranchizeTheme } from "@/lib/franchize-config";
 
 export interface FranchizeHeaderVM {
   brandName: string;
@@ -232,8 +222,8 @@ const franchizeConfigSchema = z.object({
   promoBannersText: z.string().default(""),
   adCardsText: z.string().default(""),
   allowPromo: z.coerce.boolean().default(true),
-  deliveryModesText: z.string().default("pickup,delivery"),
-  paymentOptionsText: z.string().default("telegram_xtr,card,sbp,cash"),
+  deliveryModesText: z.string().default(DEFAULT_DELIVERY_MODES_TEXT),
+  paymentOptionsText: z.string().default(DEFAULT_PAYMENT_OPTIONS_TEXT),
   defaultMode: z.string().trim().default("pickup"),
   issuerName: z.string().trim().default(""),
   issuerRepresentative: z.string().trim().default(""),
@@ -311,6 +301,11 @@ function readPath<T>(obj: unknown, path: string[], fallback: T): T {
   return (current as T) ?? fallback;
 }
 
+function readArrayPath<T>(obj: unknown, path: string[], fallback: T[] = []): T[] {
+  const value = readPath<unknown>(obj, path, fallback);
+  return Array.isArray(value) ? (value as T[]) : fallback;
+}
+
 const fallbackMenuLinks = (slug: string) => DEFAULT_MENU_LINK_TEMPLATES.map((link) => ({
   label: link.label,
   href: withSlug(link.href, slug),
@@ -361,16 +356,16 @@ function parseSocialLinks(lines: string): Array<{ label: string; href: string }>
 }
 
 function extractFooterSocialLinks(franchize: UnknownRecord, fallbackTelegram: string) {
-  const explicit = readPath(franchize, ["footer", "socialLinks"], []) as Array<UnknownRecord>;
+  const explicit = readArrayPath<UnknownRecord>(franchize, ["footer", "socialLinks"]);
   const fromExplicit = explicit
     .map((item) => ({ label: readPath(item, ["label"], ""), href: readPath(item, ["href"], "") }))
     .filter((item) => item.label && item.href);
 
   if (fromExplicit.length > 0) return fromExplicit;
 
-  const columns = readPath(franchize, ["footer", "columns"], []) as Array<UnknownRecord>;
+  const columns = readArrayPath<UnknownRecord>(franchize, ["footer", "columns"]);
   const fromColumns = columns.flatMap((column) => {
-    const items = readPath(column, ["items"], []) as Array<UnknownRecord>;
+    const items = readArrayPath<UnknownRecord>(column, ["items"]);
     return items
       .map((item) => ({
         label: readPath(item, ["label"], readPath(item, ["value"], "")),
@@ -507,10 +502,9 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const franchize = (metadata.franchize ?? metadata) as UnknownRecord;
 
     const resolvedTheme = resolveFranchizeTheme(franchize);
-    const themePalette = resolvedTheme.palette;
-    const menuLinksRaw = readPath(franchize, ["header", "menuLinks"], fallbackMenuLinks(safeSlug)).map((link) => ({
-      ...link,
-      href: withSlug(link.href, crew.slug ?? safeSlug),
+    const menuLinksRaw = readArrayPath<UnknownRecord>(franchize, ["header", "menuLinks"], fallbackMenuLinks(safeSlug)).map((link) => ({
+      label: readPath(link, ["label"], "Link"),
+      href: withSlug(readPath(link, ["href"], `/franchize/${crew.slug ?? safeSlug}`), crew.slug ?? safeSlug),
     }));
     const menuLinks = menuLinksRaw.some((link) => link.href === `/franchize/${crew.slug ?? safeSlug}/map-riders`)
       ? menuLinksRaw
@@ -520,7 +514,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
           ...menuLinksRaw.slice(1),
         ];
 
-    const metadataShowcaseGroups = readPath(franchize, ["catalog", "showcaseGroups"], []) as Array<UnknownRecord>;
+    const metadataShowcaseGroups = readArrayPath<UnknownRecord>(franchize, ["catalog", "showcaseGroups"]);
     const showcaseGroups = (metadataShowcaseGroups.length > 0
       ? metadataShowcaseGroups.map((group, index) => ({
           id: readPath(group, ["id"], `showcase-${index + 1}`),
@@ -573,9 +567,9 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         },
       },
       catalog: {
-        categories: readPath(franchize, ["catalog", "groupOrder"], []),
-        quickLinks: readPath(franchize, ["catalog", "quickLinks"], []),
-        tickerItems: readPath(franchize, ["catalog", "tickerItems"], []).map((item: unknown, index: number) => {
+        categories: readArrayPath<string>(franchize, ["catalog", "groupOrder"]),
+        quickLinks: readArrayPath<string>(franchize, ["catalog", "quickLinks"]),
+        tickerItems: readArrayPath<unknown>(franchize, ["catalog", "tickerItems"]).map((item: unknown, index: number) => {
           const tickerItem = (item ?? {}) as UnknownRecord;
           const text = readPath(tickerItem, ["text"], readPath(tickerItem, ["title"], ""));
 
@@ -585,7 +579,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
             href: readPath(tickerItem, ["href"], `/franchize/${crew.slug ?? safeSlug}`),
           };
         }),
-        promoBanners: readPath(franchize, ["catalog", "promoBanners"], []).map((item: unknown, index: number) => {
+        promoBanners: readArrayPath<unknown>(franchize, ["catalog", "promoBanners"]).map((item: unknown, index: number) => {
           const banner = (item ?? {}) as UnknownRecord;
           return {
             id: readPath(banner, ["id"], `promo-${index + 1}`),
@@ -600,7 +594,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
             ctaLabel: readPath(banner, ["ctaLabel"], "Открыть"),
           };
         }),
-        adCards: readPath(franchize, ["catalog", "adCards"], []).map((item: unknown, index: number) => {
+        adCards: readArrayPath<unknown>(franchize, ["catalog", "adCards"]).map((item: unknown, index: number) => {
           const ad = (item ?? {}) as UnknownRecord;
           return {
             id: readPath(ad, ["id"], `ad-${index + 1}`),
@@ -919,7 +913,7 @@ async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promis
     textSecondary: readPath(franchize, ["theme", "palettes", "light", "textSecondary"], readPath(franchize, ["theme", "palette", "light", "textSecondary"], defaultFranchizeConfig.lightTextSecondary)),
     borderSoft: readPath(franchize, ["theme", "palettes", "light", "borderSoft"], readPath(franchize, ["theme", "palette", "light", "borderSoft"], defaultFranchizeConfig.lightBorderSoft)),
   };
-  const menuLinks = readPath(franchize, ["header", "menuLinks"], fallbackMenuLinks(slug));
+  const menuLinks = readArrayPath<UnknownRecord>(franchize, ["header", "menuLinks"], fallbackMenuLinks(slug));
 
   const crewSecrets = await getCrewSensitiveData(slug);
   const contractDefaults = (crewSecrets.contractDefaults ?? {}) as UnknownRecord;
@@ -963,8 +957,8 @@ async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promis
     menuLinksText: menuLinks
       .map((entry) => `${readPath(entry, ["label"], "Link")}|${readPath(entry, ["href"], `/franchize/${slug}`)}`)
       .join("\n"),
-    categoryOrderText: readPath(franchize, ["catalog", "groupOrder"], []).join(", "),
-    promoBannersText: readPath(franchize, ["catalog", "promoBanners"], [])
+    categoryOrderText: readArrayPath<string>(franchize, ["catalog", "groupOrder"]).join(", "),
+    promoBannersText: readArrayPath<unknown>(franchize, ["catalog", "promoBanners"])
       .map((entry: unknown, index: number) => {
         const row = (entry ?? {}) as UnknownRecord;
         return [
@@ -981,7 +975,7 @@ async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promis
         ].join("|");
       })
       .join("\n"),
-    adCardsText: readPath(franchize, ["catalog", "adCards"], [])
+    adCardsText: readArrayPath<unknown>(franchize, ["catalog", "adCards"])
       .map((entry: unknown, index: number) => {
         const row = (entry ?? {}) as UnknownRecord;
         return [
@@ -999,8 +993,8 @@ async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promis
       })
       .join("\n"),
     allowPromo: readPath(franchize, ["order", "allowPromo"], true),
-    deliveryModesText: readPath(franchize, ["order", "deliveryModes"], DEFAULT_DELIVERY_MODES_TEXT.split(", ")).join(", "),
-    paymentOptionsText: readPath(franchize, ["order", "paymentOptions"], DEFAULT_PAYMENT_OPTIONS_TEXT.split(", ")).join(", "),
+    deliveryModesText: readArrayPath<string>(franchize, ["order", "deliveryModes"], DEFAULT_DELIVERY_MODES_TEXT.split(", ")).join(", "),
+    paymentOptionsText: readArrayPath<string>(franchize, ["order", "paymentOptions"], DEFAULT_PAYMENT_OPTIONS_TEXT.split(", ")).join(", "),
     defaultMode: readPath(franchize, ["order", "defaultMode"], "pickup"),
     issuerName: readPath(defaults, ["issuerName"], ""),
     issuerRepresentative: readPath(defaults, ["issuer_representative"], ""),

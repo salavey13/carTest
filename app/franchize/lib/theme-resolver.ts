@@ -1,5 +1,5 @@
 import { DEFAULT_FRANCHIZE_THEME } from "@/lib/franchize-config";
-import type { FranchizeTheme } from "../actions";
+import type { FranchizeTheme } from "@/lib/franchize-config";
 
 type UnknownRecord = Record<string, unknown>;
 type Palette = FranchizeTheme["palette"];

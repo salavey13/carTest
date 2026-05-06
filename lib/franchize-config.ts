@@ -1,4 +1,24 @@
-import type { FranchizeCrewVM, FranchizeTheme } from "@/app/franchize/actions";
+export interface FranchizeTheme {
+  mode: string;
+  palette: {
+    bgBase: string;
+    bgCard: string;
+    accentMain: string;
+    accentMainHover: string;
+    textPrimary: string;
+    textSecondary: string;
+    borderSoft: string;
+  };
+}
+
+export type FranchizeShowcaseGroup = {
+  id: string;
+  label: string;
+  mode: "subtype" | "price";
+  subtype?: string;
+  minPrice?: number;
+  maxPrice?: number;
+};
 
 export const DEFAULT_FRANCHIZE_THEME: FranchizeTheme = {
   mode: "pepperolli_dark",
@@ -64,7 +84,7 @@ export const DEFAULT_CONTRACT_PREFILL = {
   returnAddress: "г. Нижний Новгород, ул. Стригинский переулок, дом 13б",
 } as const;
 
-export const DEFAULT_SHOWCASE_GROUPS: FranchizeCrewVM["catalog"]["showcaseGroups"] = [
+export const DEFAULT_SHOWCASE_GROUPS: FranchizeShowcaseGroup[] = [
   { id: "sweetspot-6000", label: "Все по 6000", mode: "price", minPrice: 5600, maxPrice: 6400 },
 ];
 

@@ -140,3 +140,4 @@ This root file stays intentionally compact so operators and agents can load it q
 - `risks`: Full repository typecheck is still blocked by pre-existing syntax errors outside this slice (`data/questions.ts`, `supabase/functions/arbitrage-scan-instance/index.ts`).
 
 - 2026-05-06 — CQ franchize config/theme hardening: centralized hardcoded default palette/map/menu/promo/contract values and added malformed theme metadata coverage so bad crew records fall back to defaults instead of crashing.
+- 2026-05-06 — Self-review polish for CQ config/theme hardening: removed the type-only cycle between shared config and server actions, kept `FranchizeTheme` exported through the old action module contract, and made array-shaped crew metadata reads defensive for menu/footer/catalog/order buckets.
