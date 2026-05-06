@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -13,6 +14,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
+  Swords,
   Star,
   Tag,
   Timer,
@@ -21,18 +23,51 @@ import {
 } from "lucide-react";
 
 import type { CatalogItemVM, FranchizeCrewVM } from "@/app/franchize/actions";
+import { createFranchizeOrderInvoice } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { buildCandidateImageUrls } from "@/app/franchize/lib/media";
 import { useFranchizeCart } from "@/app/franchize/hooks/useFranchizeCart";
+import { useAppContext } from "@/contexts/AppContext";
+import {
+  CATALOG_VS_SPECS,
+  VsSpecRow,
+  getCatalogVsSpecValue,
+} from "@/components/franchize/VsSpecRow";
 
-type ConfigOption = { id: string; label: string; priceDelta: number; subtitle: string };
+type ConfigOption = {
+  id: string;
+  label: string;
+  priceDelta: number;
+  subtitle: string;
+};
 type ColorOption = { id: string; label: string; hex: string };
-type AddToCartState = "idle" | "loading" | "success" | "error";
+type SaleActionState = "idle" | "loading" | "success" | "error";
+type SaleBikeLandingClientProps = {
+  crew: FranchizeCrewVM;
+  item: CatalogItemVM;
+  vsItem?: CatalogItemVM | null;
+  otherSaleBikes?: CatalogItemVM[];
+};
 
 const DEFAULT_CONFIG_OPTIONS: ConfigOption[] = [
-  { id: "standard", label: "Стандарт", subtitle: "Базовая комплектация", priceDelta: 0 },
-  { id: "long-range", label: "Long Range", subtitle: "Увеличенный запас хода", priceDelta: 40000 },
-  { id: "comfort", label: "Comfort", subtitle: "Комфорт и защита", priceDelta: 25000 },
+  {
+    id: "standard",
+    label: "Стандарт",
+    subtitle: "Базовая комплектация",
+    priceDelta: 0,
+  },
+  {
+    id: "long-range",
+    label: "Long Range",
+    subtitle: "Увеличенный запас хода",
+    priceDelta: 40000,
+  },
+  {
+    id: "comfort",
+    label: "Comfort",
+    subtitle: "Комфорт и защита",
+    priceDelta: 25000,
+  },
 ];
 
 const DEFAULT_COLOR_OPTIONS: ColorOption[] = [
@@ -46,24 +81,33 @@ function formatPrice(value: number): string {
   return value > 0 ? `${value.toLocaleString("ru-RU")} ₽` : "по запросу";
 }
 
-export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; item: CatalogItemVM }) {
+export function SaleBikeLandingClient({
+  crew,
+  item,
+  vsItem = null,
+  otherSaleBikes = [],
+}: SaleBikeLandingClientProps) {
+  const router = useRouter();
+  const { user, dbUser } = useAppContext();
   const resolvedSlug = crew.slug || "vip-bike";
   const surface = crewPaletteForSurface(crew.theme);
-  const gallery = useMemo(
-    () => {
-      const raw = item.mediaUrls?.filter(Boolean)?.length ? item.mediaUrls.filter(Boolean) : [item.imageUrl].filter(Boolean);
-      const normalized = raw.flatMap((url) => buildCandidateImageUrls(url));
-      return Array.from(new Set(normalized));
-    },
-    [item.imageUrl, item.mediaUrls],
-  );
-  
-  const heroImage = gallery[0] ?? "https://placehold.co/1200x900/0b0f13/e6edf3?text=No+image";
+  const gallery = useMemo(() => {
+    const raw = item.mediaUrls?.filter(Boolean)?.length
+      ? item.mediaUrls.filter(Boolean)
+      : [item.imageUrl].filter(Boolean);
+    const normalized = raw.flatMap((url) => buildCandidateImageUrls(url));
+    return Array.from(new Set(normalized));
+  }, [item.imageUrl, item.mediaUrls]);
+
+  const heroImage =
+    gallery[0] ?? "https://placehold.co/1200x900/0b0f13/e6edf3?text=No+image";
   const specs = item.rawSpecs || {};
   const basePrice = Number(specs.price_rub || specs.sale_price || 0);
 
   const configOptions = useMemo(() => {
-    const custom = Array.isArray(specs.buy_options) ? specs.buy_options as Array<Record<string, unknown>> : [];
+    const custom = Array.isArray(specs.buy_options)
+      ? (specs.buy_options as Array<Record<string, unknown>>)
+      : [];
     if (!custom.length) return DEFAULT_CONFIG_OPTIONS;
     const mapped = custom
       .map((option, idx) => ({
@@ -77,7 +121,9 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
   }, [specs.buy_options]);
 
   const colorOptions = useMemo(() => {
-    const custom = Array.isArray(specs.buy_colors) ? specs.buy_colors as Array<Record<string, unknown>> : [];
+    const custom = Array.isArray(specs.buy_colors)
+      ? (specs.buy_colors as Array<Record<string, unknown>>)
+      : [];
     if (!custom.length) return DEFAULT_COLOR_OPTIONS;
     const mapped = custom
       .map((color, idx) => ({
@@ -90,17 +136,28 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
   }, [specs.buy_colors]);
 
   const [selectedImage, setSelectedImage] = useState(0);
-  const [brokenGalleryUrls, setBrokenGalleryUrls] = useState<Record<string, true>>({});
-  const [selectedOptionId, setSelectedOptionId] = useState<string>(configOptions[0]?.id ?? "standard");
-  const [selectedColorId, setSelectedColorId] = useState<string>(colorOptions[0]?.id ?? "black");
-  const safeGallery = useMemo(() => gallery.filter((url) => !brokenGalleryUrls[url]), [gallery, brokenGalleryUrls]);
+  const [brokenGalleryUrls, setBrokenGalleryUrls] = useState<
+    Record<string, true>
+  >({});
+  const [selectedOptionId, setSelectedOptionId] = useState<string>(
+    configOptions[0]?.id ?? "standard",
+  );
+  const [selectedColorId, setSelectedColorId] = useState<string>(
+    colorOptions[0]?.id ?? "black",
+  );
+  const safeGallery = useMemo(
+    () => gallery.filter((url) => !brokenGalleryUrls[url]),
+    [gallery, brokenGalleryUrls],
+  );
 
   useEffect(() => {
     if (selectedImage >= safeGallery.length) setSelectedImage(0);
   }, [selectedImage, safeGallery.length]);
 
   const selectedOption = useMemo(
-    () => configOptions.find((option) => option.id === selectedOptionId) || configOptions[0],
+    () =>
+      configOptions.find((option) => option.id === selectedOptionId) ||
+      configOptions[0],
     [configOptions, selectedOptionId],
   );
 
@@ -111,11 +168,14 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
 
   const canShowConcretePrice = basePrice > 0;
 
-  const trustStats = useMemo(() => ({
-    soldCount: Number(specs.sold_count || 120),
-    rating: Number(specs.rating || 4.9),
-    recommendPercent: Number(specs.recommend_percent || 98),
-  }), [specs.rating, specs.recommend_percent, specs.sold_count]);
+  const trustStats = useMemo(
+    () => ({
+      soldCount: Number(specs.sold_count || 120),
+      rating: Number(specs.rating || 4.9),
+      recommendPercent: Number(specs.recommend_percent || 98),
+    }),
+    [specs.rating, specs.recommend_percent, specs.sold_count],
+  );
 
   useEffect(() => {
     if (!configOptions.find((option) => option.id === selectedOptionId)) {
@@ -131,10 +191,18 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
 
   const cards = [
     { label: "Тип", value: item.category, icon: Tag },
-    { label: "Мощность", value: String(specs.power_kw || specs.motor_peak_kw || "—"), icon: Zap },
+    {
+      label: "Мощность",
+      value: String(specs.power_kw || specs.motor_peak_kw || "—"),
+      icon: Zap,
+    },
     { label: "Батарея", value: String(specs.battery || "—"), icon: Battery },
     { label: "Запас хода", value: `${specs.range_km || "—"} км`, icon: Gauge },
-    { label: "Макс. скорость", value: `${specs.top_speed_kmh || "—"} км/ч`, icon: Gauge },
+    {
+      label: "Макс. скорость",
+      value: `${specs.top_speed_kmh || "—"} км/ч`,
+      icon: Gauge,
+    },
     { label: "Вес", value: `${specs.weight_kg || "—"} кг`, icon: Weight },
     { label: "Зарядка", value: `${specs.charge_time_h || "—"} ч`, icon: Timer },
     { label: "Привод", value: String(specs.drive || "—"), icon: ShoppingBag },
@@ -156,29 +224,126 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
   ];
 
   const { addItem, isHydrated } = useFranchizeCart(resolvedSlug);
-  const [cartState, setCartState] = useState<AddToCartState>("idle");
+  const [reservationState, setReservationState] =
+    useState<SaleActionState>("idle");
+  const [purchaseState, setPurchaseState] = useState<SaleActionState>("idle");
+  const [cartMessage, setCartMessage] = useState("");
+  const reservationAmountXtr = useMemo(
+    () =>
+      Math.min(
+        500,
+        Math.max(
+          100,
+          Math.ceil((finalPrice > 0 ? finalPrice : basePrice) * 0.001),
+        ),
+      ),
+    [basePrice, finalPrice],
+  );
+
+  const selectVsBike = (bikeId: string) => {
+    router.push(
+      `${window.location.pathname}?vs=${encodeURIComponent(bikeId)}`,
+      { scroll: false },
+    );
+  };
+
+  const clearVsBike = () => {
+    router.push(window.location.pathname, { scroll: false });
+  };
+
+  const buildBuyOptions = () => ({
+    package: selectedOption.label,
+    duration: "Покупка",
+    perk: `Цвет: ${colorOptions.find((color) => color.id === selectedColorId)?.label ?? "—"}`,
+    auction: "Покупка",
+  });
 
   const handleAddToCart = () => {
     if (!isHydrated) return;
-    setCartState("loading");
+    setPurchaseState("loading");
+    setCartMessage("");
     try {
       addItem(
         item.id,
         {
-          package: selectedOption.label,
-          duration: "Покупка",
-          perk: `Цвет: ${colorOptions.find((color) => color.id === selectedColorId)?.label ?? "—"}`,
-          auction: "Покупка",
+          ...buildBuyOptions(),
           buyConfigId: selectedOption.id,
           buyPriceDelta: selectedOption.priceDelta,
           buyColorId: selectedColorId,
         },
         1,
       );
-      setCartState("success");
+      setPurchaseState("success");
+      setCartMessage(
+        "Конфигурация добавлена в корзину. Открываем оформление покупки.",
+      );
+      router.push(`/franchize/${resolvedSlug}/cart`);
     } catch (error) {
       console.error("buy/add-to-cart failed", error);
-      setCartState("error");
+      setPurchaseState("error");
+      setCartMessage("Не удалось добавить конфигурацию. Попробуйте ещё раз.");
+    }
+  };
+
+  const handleReserveTestDrive = async () => {
+    if (!isHydrated) return;
+    const telegramUserId = user?.id ? String(user.id) : "";
+    if (!telegramUserId) {
+      setReservationState("error");
+      setCartMessage(
+        "Откройте страницу в Telegram WebApp, чтобы получить счёт на бронь тест-драйва.",
+      );
+      return;
+    }
+
+    const options = buildBuyOptions();
+    setReservationState("loading");
+    setCartMessage("");
+    try {
+      const result = await createFranchizeOrderInvoice({
+        slug: resolvedSlug,
+        orderId: `testdrive-${item.id}-${Date.now()}`,
+        telegramUserId,
+        recipient: String(
+          dbUser?.full_name || user?.first_name || "Гость Telegram",
+        ),
+        phone: crew.contacts?.phone || "+79999005588",
+        time: "Тест-драйв: ближайший свободный слот",
+        comment: `Бронь тест-драйва для покупки ${item.title}`,
+        payment: "telegram_xtr",
+        delivery: "pickup",
+        subtotal: finalPrice,
+        extrasTotal: 0,
+        totalAmount: finalPrice,
+        extras: [],
+        cartLines: [
+          {
+            itemId: item.id,
+            qty: 1,
+            pricePerDay: finalPrice,
+            lineTotal: finalPrice,
+            options,
+          },
+        ],
+        flowType: "sale",
+      });
+
+      if (!result.success) {
+        setReservationState("error");
+        setCartMessage(result.error ?? "Не удалось отправить счёт в Telegram.");
+        return;
+      }
+
+      setReservationState("success");
+      setCartMessage(
+        `Счёт на бронь тест-драйва отправлен в Telegram: ${result.amountXtr ?? reservationAmountXtr} XTR.`,
+      );
+    } catch (error) {
+      console.error("buy/reserve-test-drive failed", error);
+      setReservationState("error");
+      setCartMessage(
+        "Не удалось забронировать тест-драйв. Попробуйте ещё раз.",
+      );
     }
   };
 
@@ -193,7 +358,10 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
           >
             <ArrowLeft className="h-4 w-4" />В маркет
           </Link>
-          <span className="rounded-full border px-3 py-1 text-xs font-semibold" style={surface.subtleCard}>
+          <span
+            className="rounded-full border px-3 py-1 text-xs font-semibold"
+            style={surface.subtleCard}
+          >
             На продажу
           </span>
         </div>
@@ -217,7 +385,10 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
                   onError={() => {
                     const broken = safeGallery[selectedImage];
                     if (!broken) return;
-                    setBrokenGalleryUrls((prev) => ({ ...prev, [broken]: true }));
+                    setBrokenGalleryUrls((prev) => ({
+                      ...prev,
+                      [broken]: true,
+                    }));
                   }}
                 />
               </div>
@@ -229,67 +400,219 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
                     onClick={() => setSelectedImage(i)}
                     className="overflow-hidden rounded-xl border transition hover:brightness-110"
                     style={{
-                      ...(i === selectedImage ? { borderColor: crew.theme.palette.accentMain, boxShadow: `0 0 0 1px ${crew.theme.palette.accentMain}` } : {}),
+                      ...(i === selectedImage
+                        ? {
+                            borderColor: crew.theme.palette.accentMain,
+                            boxShadow: `0 0 0 1px ${crew.theme.palette.accentMain}`,
+                          }
+                        : {}),
                     }}
                   >
-                    <span className="relative block aspect-[4/3] w-full"><Image src={img} alt={`${item.title}-${i}`} fill sizes="120px" className="object-cover" loading="lazy" onError={() => setBrokenGalleryUrls((prev) => ({ ...prev, [img]: true }))} /></span>
+                    <span className="relative block aspect-[4/3] w-full">
+                      <Image
+                        src={img}
+                        alt={`${item.title}-${i}`}
+                        fill
+                        sizes="120px"
+                        className="object-cover"
+                        loading="lazy"
+                        onError={() =>
+                          setBrokenGalleryUrls((prev) => ({
+                            ...prev,
+                            [img]: true,
+                          }))
+                        }
+                      />
+                    </span>
                   </button>
                 ))}
               </div>
             </div>
 
             <div className="flex flex-col gap-3 p-4">
-              <div className="inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold" style={surface.subtleCard}>
-                <Sparkles className="h-3.5 w-3.5" />Premium eMoto
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div
+                  className="inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
+                  style={surface.subtleCard}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Premium eMoto
+                </div>
+                {!vsItem && otherSaleBikes.length ? (
+                  <div className="group relative">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
+                      style={surface.subtleCard}
+                    >
+                      <Swords className="h-3.5 w-3.5" />
+                      Сравнить
+                    </button>
+                    <div
+                      className="pointer-events-none absolute right-0 top-full z-20 mt-2 w-64 rounded-2xl border p-2 opacity-0 shadow-2xl transition group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+                      style={surface.card}
+                    >
+                      <p className="px-2 pb-2 text-xs opacity-70">
+                        Выберите байк для VS
+                      </p>
+                      {otherSaleBikes.slice(0, 5).map((bike) => (
+                        <button
+                          key={bike.id}
+                          type="button"
+                          onClick={() => selectVsBike(bike.id)}
+                          className="flex w-full items-center justify-between gap-2 rounded-xl px-2 py-2 text-left text-xs transition hover:bg-white/5"
+                        >
+                          <span className="min-w-0 truncate">{bike.title}</span>
+                          <Swords className="h-3.5 w-3.5 shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{item.title}</h1>
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                {item.title}
+              </h1>
               <p className="text-sm opacity-80">{item.description}</p>
 
-              <div className="rounded-2xl border p-4" style={surface.subtleCard}>
-                <p className="text-xs uppercase tracking-[0.16em] opacity-70">Цена продажи</p>
-                <p className="text-3xl font-bold sm:text-4xl">{formatPrice(finalPrice)}</p>
-                {!canShowConcretePrice ? <p className="mt-1 text-xs opacity-70">Точная стоимость зависит от комплектации и наличия.</p> : null}
+              <div
+                className="rounded-2xl border p-4"
+                style={surface.subtleCard}
+              >
+                <p className="text-xs uppercase tracking-[0.16em] opacity-70">
+                  Цена продажи
+                </p>
+                <p className="text-3xl font-bold sm:text-4xl">
+                  {formatPrice(finalPrice)}
+                </p>
+                {!canShowConcretePrice ? (
+                  <p className="mt-1 text-xs opacity-70">
+                    Точная стоимость зависит от комплектации и наличия.
+                  </p>
+                ) : null}
                 <p className="mt-2 inline-flex items-center gap-2 text-xs opacity-80">
-                  <ShieldCheck className="h-3.5 w-3.5" />Официальная сделка + документы
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Официальная сделка + документы
                 </p>
               </div>
 
               <div className="grid gap-2">
+                <p className="text-xs opacity-70">
+                  Оплата {reservationAmountXtr.toLocaleString("ru-RU")} ₽ через
+                  Telegram — гарантия вашей брони на тест-драйв. Остаток суммы
+                  при покупке на базе.
+                </p>
                 <button
                   type="button"
-                  onClick={handleAddToCart}
-                  disabled={!isHydrated}
+                  onClick={handleReserveTestDrive}
+                  disabled={!isHydrated || reservationState === "loading"}
                   className="rounded-xl px-4 py-3 text-center font-semibold transition hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                   aria-live="polite"
-                  style={{ ...surface.subtleCard, background: crew.theme.palette.accentMain, color: "#101010" }}
+                  style={{
+                    ...surface.subtleCard,
+                    background: crew.theme.palette.accentMain,
+                    color: "#101010",
+                  }}
                 >
-                  {!isHydrated ? "Подготовка корзины..." : cartState === "loading" ? "Добавляем..." : cartState === "success" ? "Добавлено в корзину" : cartState === "error" ? "Повторить" : "Добавить в корзину"}
+                  {!isHydrated
+                    ? "Подготовка Telegram..."
+                    : reservationState === "loading"
+                      ? "Отправляем счёт..."
+                      : reservationState === "success"
+                        ? "Счёт отправлен"
+                        : reservationState === "error"
+                          ? "Повторить бронь"
+                          : `Забронировать тест-драйв (${reservationAmountXtr.toLocaleString("ru-RU")} ₽)`}
                 </button>
-                <Link
-                  href={`tel:${crew.contacts?.phone || "+79999005588"}`}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-center font-semibold"
-                >
-                  <PhoneCall className="h-4 w-4" />Позвонить
-                </Link>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={handleAddToCart}
+                    disabled={!isHydrated || purchaseState === "loading"}
+                    className="inline-flex items-center justify-center rounded-xl border px-4 py-3 text-center font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    style={surface.subtleCard}
+                  >
+                    {purchaseState === "loading"
+                      ? "Добавляем..."
+                      : purchaseState === "success"
+                        ? "Добавлено в корзину"
+                        : purchaseState === "error"
+                          ? "Повторить покупку"
+                          : "Оформить покупку"}
+                  </button>
+                  <Link
+                    href={`tel:${crew.contacts?.phone || "+79999005588"}`}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-center font-semibold"
+                  >
+                    <PhoneCall className="h-4 w-4" />
+                    Позвонить
+                  </Link>
+                </div>
+                {cartMessage ? (
+                  <p className="text-xs opacity-75">{cartMessage}</p>
+                ) : null}
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4">
             {cards.map((card) => (
-              <div key={card.label} className="rounded-2xl border p-3" style={surface.subtleCard}>
+              <div
+                key={card.label}
+                className="rounded-2xl border p-3"
+                style={surface.subtleCard}
+              >
                 <card.icon className="mb-2 h-4 w-4 opacity-80" />
                 <p className="text-xs opacity-70">{card.label}</p>
                 <p className="text-sm font-semibold">{card.value}</p>
               </div>
             ))}
           </div>
+
+          {vsItem ? (
+            <div
+              className="mx-3 mb-3 rounded-3xl border border-white/10 p-3"
+              style={surface.subtleCard}
+            >
+              <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
+                <p className="text-sm font-semibold">{item.title}</p>
+                <Swords
+                  className="h-7 w-7"
+                  style={{ color: crew.theme.palette.accentMain }}
+                />
+                <div className="flex items-center justify-end gap-2 text-sm font-semibold">
+                  <span className="min-w-0 truncate">{vsItem.title}</span>
+                  <button
+                    type="button"
+                    onClick={clearVsBike}
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {CATALOG_VS_SPECS.map((spec) => (
+                  <VsSpecRow
+                    key={spec.label}
+                    label={spec.label}
+                    valueA={getCatalogVsSpecValue(item.rawSpecs, spec.keys)}
+                    valueB={getCatalogVsSpecValue(vsItem.rawSpecs, spec.keys)}
+                    unit={spec.unit}
+                    lowerIsBetter={spec.lowerIsBetter}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
         </motion.div>
 
         <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr]">
           <div className="rounded-3xl border p-4 sm:p-5" style={surface.card}>
             <h2 className="text-xl font-semibold sm:text-2xl">Конфигуратор</h2>
-            <p className="mt-1 text-sm opacity-80">Соберите конфигурацию под себя и сразу видьте итоговую цену.</p>
+            <p className="mt-1 text-sm opacity-80">
+              Соберите конфигурацию под себя и сразу видьте итоговую цену.
+            </p>
             <div className="mt-4 space-y-2">
               {configOptions.map((option) => (
                 <button
@@ -297,13 +620,24 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
                   type="button"
                   onClick={() => setSelectedOptionId(option.id)}
                   className="flex w-full items-center justify-between rounded-2xl border p-3 text-left transition hover:brightness-110"
-                  style={selectedOptionId === option.id ? { ...surface.subtleCard, borderColor: crew.theme.palette.accentMain } : surface.subtleCard}
+                  style={
+                    selectedOptionId === option.id
+                      ? {
+                          ...surface.subtleCard,
+                          borderColor: crew.theme.palette.accentMain,
+                        }
+                      : surface.subtleCard
+                  }
                 >
                   <div>
                     <p className="font-semibold">{option.label}</p>
                     <p className="text-xs opacity-70">{option.subtitle}</p>
                   </div>
-                  <p className="font-semibold">{option.priceDelta === 0 ? "Включено" : `+ ${option.priceDelta.toLocaleString("ru-RU")} ₽`}</p>
+                  <p className="font-semibold">
+                    {option.priceDelta === 0
+                      ? "Включено"
+                      : `+ ${option.priceDelta.toLocaleString("ru-RU")} ₽`}
+                  </p>
                 </button>
               ))}
             </div>
@@ -315,7 +649,13 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
                   onClick={() => setSelectedColorId(color.id)}
                   aria-label={color.label}
                   className="h-8 w-8 rounded-full border-2"
-                  style={{ background: color.hex, borderColor: selectedColorId === color.id ? crew.theme.palette.accentMain : "rgba(255,255,255,0.3)" }}
+                  style={{
+                    background: color.hex,
+                    borderColor:
+                      selectedColorId === color.id
+                        ? crew.theme.palette.accentMain
+                        : "rgba(255,255,255,0.3)",
+                  }}
                 />
               ))}
             </div>
@@ -324,30 +664,73 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
           <div className="rounded-3xl border p-4 sm:p-5" style={surface.card}>
             <h2 className="text-xl font-semibold">Нам доверяют</h2>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-xl border p-3" style={surface.subtleCard}><p className="text-2xl font-bold">{trustStats.soldCount}+</p><p className="text-xs opacity-70">Продано</p></div>
-              <div className="rounded-xl border p-3" style={surface.subtleCard}><p className="text-2xl font-bold">{trustStats.rating.toFixed(1)}</p><p className="text-xs opacity-70">Рейтинг</p></div>
-              <div className="rounded-xl border p-3" style={surface.subtleCard}><p className="text-2xl font-bold">{trustStats.recommendPercent}%</p><p className="text-xs opacity-70">Рекомендуют</p></div>
+              <div className="rounded-xl border p-3" style={surface.subtleCard}>
+                <p className="text-2xl font-bold">{trustStats.soldCount}+</p>
+                <p className="text-xs opacity-70">Продано</p>
+              </div>
+              <div className="rounded-xl border p-3" style={surface.subtleCard}>
+                <p className="text-2xl font-bold">
+                  {trustStats.rating.toFixed(1)}
+                </p>
+                <p className="text-xs opacity-70">Рейтинг</p>
+              </div>
+              <div className="rounded-xl border p-3" style={surface.subtleCard}>
+                <p className="text-2xl font-bold">
+                  {trustStats.recommendPercent}%
+                </p>
+                <p className="text-xs opacity-70">Рекомендуют</p>
+              </div>
             </div>
-            <div className="mt-3 rounded-2xl border p-3" style={surface.subtleCard}>
+            <div
+              className="mt-3 rounded-2xl border p-3"
+              style={surface.subtleCard}
+            >
               <p className="font-medium">Алексей, Москва</p>
-              <p className="mt-1 inline-flex items-center gap-1 text-yellow-300">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className="h-3.5 w-3.5 fill-current" />)}</p>
-              <p className="mt-1 text-sm opacity-80">"Отличный байк и сервис, быстро оформили и объяснили всё по обслуживанию."</p>
+              <p className="mt-1 inline-flex items-center gap-1 text-yellow-300">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star key={i} className="h-3.5 w-3.5 fill-current" />
+                ))}
+              </p>
+              <p className="mt-1 text-sm opacity-80">
+                "Отличный байк и сервис, быстро оформили и объяснили всё по
+                обслуживанию."
+              </p>
             </div>
           </div>
         </div>
 
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-2xl border p-4" style={surface.subtleCard}>
-            <p className="text-xs uppercase tracking-[0.16em] opacity-70">Тест-драйв</p>
-            <p className="mt-2 text-sm">Офлайн-показ и тест-драйв по предварительной записи.</p>
+            <p className="text-xs uppercase tracking-[0.16em] opacity-70">
+              Тест-драйв
+            </p>
+            <p className="mt-2 text-sm">
+              Офлайн-показ и тест-драйв по предварительной записи.
+            </p>
           </div>
           <div className="rounded-2xl border p-4" style={surface.subtleCard}>
-            <p className="text-xs uppercase tracking-[0.16em] opacity-70">Группа магазина</p>
-            <p className="mt-2 text-sm">Актуальные поставки и консультации: <a className="underline" href="https://vk.ru/vip_bike_electro" target="_blank" rel="noreferrer">vk.ru/vip_bike_electro</a></p>
+            <p className="text-xs uppercase tracking-[0.16em] opacity-70">
+              Группа магазина
+            </p>
+            <p className="mt-2 text-sm">
+              Актуальные поставки и консультации:{" "}
+              <a
+                className="underline"
+                href="https://vk.ru/vip_bike_electro"
+                target="_blank"
+                rel="noreferrer"
+              >
+                vk.ru/vip_bike_electro
+              </a>
+            </p>
           </div>
           <div className="rounded-2xl border p-4" style={surface.subtleCard}>
-            <p className="text-xs uppercase tracking-[0.16em] opacity-70">После покупки</p>
-            <p className="mt-2 text-sm">Сервисное сопровождение и рекомендации по обслуживанию.</p>
+            <p className="text-xs uppercase tracking-[0.16em] opacity-70">
+              После покупки
+            </p>
+            <p className="mt-2 text-sm">
+              Сервисное сопровождение и рекомендации по обслуживанию.
+            </p>
           </div>
         </div>
 
@@ -355,8 +738,14 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
           <h2 className="text-xl font-semibold sm:text-2xl">FAQ по покупке</h2>
           <div className="mt-3 space-y-3">
             {buyFaq.map((faq) => (
-              <details key={faq.q} className="rounded-2xl border p-4 open:shadow-sm" style={surface.subtleCard}>
-                <summary className="cursor-pointer list-none font-medium">{faq.q}</summary>
+              <details
+                key={faq.q}
+                className="rounded-2xl border p-4 open:shadow-sm"
+                style={surface.subtleCard}
+              >
+                <summary className="cursor-pointer list-none font-medium">
+                  {faq.q}
+                </summary>
                 <p className="mt-2 text-sm opacity-80">{faq.a}</p>
               </details>
             ))}
@@ -364,20 +753,34 @@ export function SaleBikeLandingClient({ crew, item }: { crew: FranchizeCrewVM; i
         </div>
       </div>
 
-      <div className="fixed inset-x-2 bottom-2 z-40 rounded-2xl border p-2 backdrop-blur md:hidden" style={surface.card}>
+      <div
+        className="fixed inset-x-2 bottom-2 z-40 rounded-2xl border p-2 backdrop-blur md:hidden"
+        style={surface.card}
+      >
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{item.title}</p>
-            <p className="text-base font-bold" style={{ color: crew.theme.palette.accentMain }}>{formatPrice(finalPrice)}</p>
+            <p
+              className="text-base font-bold"
+              style={{ color: crew.theme.palette.accentMain }}
+            >
+              {formatPrice(finalPrice)}
+            </p>
           </div>
           <button
             type="button"
-            onClick={handleAddToCart}
-            disabled={!isHydrated}
+            onClick={handleReserveTestDrive}
+            disabled={!isHydrated || reservationState === "loading"}
             className="rounded-xl px-4 py-3 text-sm font-semibold"
             style={{ background: crew.theme.palette.accentMain, color: "#111" }}
           >
-            {cartState === "success" ? <Check className="h-4 w-4" /> : cartState === "loading" ? "..." : "В корзину"}
+            {reservationState === "success" ? (
+              <Check className="h-4 w-4" />
+            ) : reservationState === "loading" ? (
+              "..."
+            ) : (
+              `Тест-драйв ${reservationAmountXtr.toLocaleString("ru-RU")} ₽`
+            )}
           </button>
         </div>
       </div>

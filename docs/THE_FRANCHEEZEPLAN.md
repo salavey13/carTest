@@ -48,3 +48,23 @@ This root file stays intentionally compact so operators and agents can load it q
 ## 2) Mini execution diary
 
 - 2026-05-04 — Added support for metadata-driven franchize header logo routing via `header.logoHref` with default fallback to `/franchize/{slug}`; seeded `vip-bike` to land on `/vipbikerental` instead of catalog. Next step: expose `header.logoHref` in admin configurator UI for non-SQL operators.
+
+## 3) Active implementation slices
+
+### 2026-05-06 — Sale buy page VS + test-drive reservation
+
+- `status`: done
+- `updated_at`: 2026-05-06T00:00:00Z
+- `owner`: codex
+- `notes`: Implemented `/franchize/[slug]/market/[bike_id]/buy` inline VS comparison and switched sale XTR primary CTA to a small Telegram test-drive reservation invoice.
+- `next_step`: Smoke-test `vip-bike` buy page in Telegram WebApp with a real Telegram user id and confirm invoice delivery UX.
+- `risks`: Local build may still surface unrelated repository warnings; invoice delivery requires configured Telegram Bot/API secrets.
+
+### 2026-05-06 — Sale buy polish follow-up
+
+- `status`: done
+- `updated_at`: 2026-05-06T00:00:00Z
+- `owner`: codex
+- `notes`: Aligned sale reservation CTA copy with the same 100-500 XTR formula used by backend invoices, centralized VS spec aliases, and split reservation/cart CTA state so secondary cart actions do not display invoice success.
+- `next_step`: Verify production `vip-bike` sale bike with real catalog specs and Telegram WebApp invoice delivery.
+- `risks`: Visual/live invoice verification still depends on reachable Supabase and Telegram bot credentials.
