@@ -161,10 +161,25 @@ export function RidersDrawer() {
               <div className="space-y-3">
                 {state.selectedMeetupPoint && (
                   <div className="rounded-xl border border-amber-300/30 bg-amber-500/10 p-3">
-                    <Label className="text-xs text-amber-200">Название</Label>
-                    <Input value={meetupTitle} onChange={(e) => setMeetupTitle(e.target.value)} className="mt-1 bg-transparent text-white" />
-                    <Label className="mt-2 text-xs text-amber-200">Комментарий</Label>
-                    <Input value={meetupComment} onChange={(e) => setMeetupComment(e.target.value)} placeholder="Ориентир" className="mt-1 bg-transparent text-white" />
+                    <Label htmlFor="map-riders-meetup-title" className="text-xs text-amber-200">
+                      Название
+                    </Label>
+                    <Input
+                      id="map-riders-meetup-title"
+                      value={meetupTitle}
+                      onChange={(e) => setMeetupTitle(e.target.value)}
+                      className="mt-1 bg-transparent text-white"
+                    />
+                    <Label htmlFor="map-riders-meetup-comment" className="mt-2 text-xs text-amber-200">
+                      Комментарий
+                    </Label>
+                    <Input
+                      id="map-riders-meetup-comment"
+                      value={meetupComment}
+                      onChange={(e) => setMeetupComment(e.target.value)}
+                      placeholder="Ориентир"
+                      className="mt-1 bg-transparent text-white"
+                    />
                     <Button type="button" size="sm" className="mt-2 w-full" disabled={isSubmitting} onClick={handleCreateMeetup}>
                       {isSubmitting ? "Сохраняем meetup..." : "Сохранить meetup"}
                     </Button>
@@ -319,7 +334,11 @@ function ReplayFullscreen({
             <div className="h-2 w-full overflow-hidden rounded bg-white/10">
               <div className="h-full rounded bg-emerald-400 transition-all" style={{ width: `${progress}%` }} />
             </div>
+            <Label htmlFor="map-riders-replay-position" className="sr-only">
+              Позиция воспроизведения маршрута
+            </Label>
             <input
+              id="map-riders-replay-position"
               type="range"
               min={0}
               max={Math.max(total - 1, 0)}
