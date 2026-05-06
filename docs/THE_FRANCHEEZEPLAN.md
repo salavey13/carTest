@@ -84,3 +84,13 @@ This root file stays intentionally compact so operators and agents can load it q
 - `notes`: Aligned sale reservation CTA copy with the same 100-500 XTR formula used by backend invoices, centralized VS spec aliases, and split reservation/cart CTA state so secondary cart actions do not display invoice success.
 - `next_step`: Verify production `vip-bike` sale bike with real catalog specs and Telegram WebApp invoice delivery.
 - `risks`: Visual/live invoice verification still depends on reachable Supabase and Telegram bot credentials.
+
+### 2026-05-06 — Telegram auth unmount guard
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T22:25:00Z
+- `owner`: codex
+- `notes`: Claimed SupaPlan `CQ-TELEGRAM-GUARD` and moved `useTelegram` async initialization from a local boolean to a lifecycle ref guard so delayed auth results do not update state after unmount.
+- `next_step`: Merge PR, then verify Telegram WebApp auth/navigation on `vip-bike` under slow network throttling.
+- `risks`: Runtime Telegram validation still depends on configured bot/API env and a real WebApp launch context.
+
