@@ -54,12 +54,12 @@ export function CrewFooter({ crew }: CrewFooterProps) {
               return (
                 <li key={`${link.href}-${link.label}`} className="border-b border-[var(--footer-border)]">
                   {isExternal ? (
-                    <a href={link.href} className="flex items-center gap-2 py-3" target="_blank" rel="noreferrer">
+                    <a href={link.href} className="flex items-center gap-2 py-3 transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" target="_blank" rel="noreferrer" aria-label={`${link.label} (откроется в новой вкладке)`}>
                       <ChevronRight className="h-4 w-4" />
                       <span>{link.label}</span>
                     </a>
                   ) : (
-                    <Link href={link.href} className="flex items-center gap-2 py-3 hover:opacity-90 transition">
+                    <Link href={link.href} className="flex items-center gap-2 py-3 hover:opacity-90 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
                       <ChevronRight className="h-4 w-4" />
                       <span>{link.label}</span>
                     </Link>
@@ -75,7 +75,7 @@ export function CrewFooter({ crew }: CrewFooterProps) {
           <ul className="mt-5 grid gap-1 text-base md:grid-cols-2">
             {socialLinks.map((item) => (
               <li key={`${item.label}-${item.href}`} className="border-b border-[var(--footer-border)]">
-                <a href={item.href} className="flex items-center gap-2 py-3" target="_blank" rel="noreferrer">
+                <a href={item.href} className="flex items-center gap-2 py-3 transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" target="_blank" rel="noreferrer" aria-label={`${item.label} (откроется в новой вкладке)`}>
                   <Send className="h-4 w-4" />
                   <span>{item.label}</span>
                 </a>

@@ -98,8 +98,9 @@ export function ItemGallery({
     return (
       <div
         ref={containerRef}
-        tabIndex={disableKeyboardNav ? -1 : 0}
-        className={`relative w-full outline-none ${getAspectRatioClass()}`}
+        tabIndex={-1}
+        aria-label={`Галерея ${altText}`}
+        className={`relative w-full outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${getAspectRatioClass()}`}
         style={{ backgroundColor: "var(--item-card-bg, #000)" }}
       >
         <Image
@@ -116,7 +117,13 @@ export function ItemGallery({
   }
 
   return (
-    <div ref={containerRef} tabIndex={disableKeyboardNav ? -1 : 0} className={`relative w-full outline-none ${className}`}>
+    <div
+      ref={containerRef}
+      tabIndex={disableKeyboardNav ? -1 : 0}
+      role="region"
+      aria-label={`Галерея ${altText}`}
+      className={`relative w-full outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${className}`}
+    >
       {/* Main Image Container - FIXED: Added explicit aspect ratio class */}
       <div className={`relative w-full bg-black/25 ${getAspectRatioClass()}`}>
         <Image
@@ -154,7 +161,7 @@ export function ItemGallery({
         </button>
 
         {/* Image Counter Badge */}
-        <div className="absolute bottom-3 left-3 rounded-full bg-black/55 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm select-none pointer-events-none">
+        <div className="absolute bottom-3 left-3 rounded-full bg-black/55 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm select-none pointer-events-none" aria-live="polite">
           {activeIndex + 1} / {resolvedImages.length}
         </div>
       </div>
@@ -164,7 +171,7 @@ export function ItemGallery({
         className="border-t px-3 pb-3 pt-3 sm:px-4"
         style={{ borderColor, backgroundColor: bgColor }}
       >
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6" role="group" aria-label="Миниатюры фотографий">
           {resolvedImages.map((url, index) => {
             const isActive = index === activeIndex;
             return (
@@ -174,7 +181,7 @@ export function ItemGallery({
                 onClick={() => onSelect(index)}
                 aria-pressed={isActive}
                 aria-label={`Показать фото ${index + 1}`}
-                className={`relative aspect-[5/4] w-full overflow-hidden rounded-2xl border transition-all duration-200 ${
+                className={`relative aspect-[5/4] w-full overflow-hidden rounded-2xl border transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
                   isActive ? "scale-[0.98] opacity-100" : "opacity-85 hover:opacity-100 active:scale-[0.97]"
                 }`}
                 style={{
