@@ -12,18 +12,21 @@ interface ReviewFormProps {
   rentalId: string;
   bikeTitle: string;
   status: string;
+  renterUserId: string;
   theme: FranchizeTheme;
   existingReview?: RentalReviewVM;
 }
 
-export function ReviewForm({ slug, rentalId, bikeTitle, status, theme, existingReview }: ReviewFormProps) {
+export function ReviewForm({ slug, rentalId, bikeTitle, status, renterUserId, theme, existingReview }: ReviewFormProps) {
   const { dbUser, isLoading } = useAppContext();
   const [rating, setRating] = useState(existingReview?.rating ?? 5);
   const [text, setText] = useState(existingReview?.text ?? "");
   const [saved, setSaved] = useState(false);
   const [isPending, startTransition] = useTransition();
   const surface = crewPaletteForSurface(theme);
-  const canSubmit = Boolean(dbUser?.user_id) && status === "completed";
+  const isCompleted = status === "completed";
+  const isRenter = Boolean(dbUser?.user_id) && dbUser?.user_id === renterUserId;
+  const canSubmit = isCompleted && isRenter;
 
   const onSubmit = () => {
     if (!dbUser?.user_id) {
@@ -47,9 +50,15 @@ export function ReviewForm({ slug, rentalId, bikeTitle, status, theme, existingR
       <h1 className="mt-2 text-2xl font-semibold">Как прошла аренда?</h1>
       <p className="mt-2 text-sm" style={surface.mutedText}>{bikeTitle}</p>
 
-      {status !== "completed" ? (
+      {!isCompleted ? (
         <div className="mt-4 rounded-2xl border p-3 text-sm" style={surface.subtleCard}>
           Отзыв откроется после статуса <b>completed</b>. Сейчас: <b>{status || "unknown"}</b>.
+        </div>
+      ) : null}
+
+      {isCompleted && dbUser?.user_id && !isRenter ? (
+        <div className="mt-4 rounded-2xl border p-3 text-sm" style={surface.subtleCard}>
+          Этот отзыв привязан к Telegram-профилю арендатора. Откройте ссылку из аккаунта, который оформлял аренду.
         </div>
       ) : null}
 

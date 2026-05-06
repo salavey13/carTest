@@ -27,6 +27,7 @@ export default async function RentalReviewPage({ params }: RentalReviewPageProps
             rentalId={rental.rentalId}
             bikeTitle={rental.bikeTitle}
             status={rental.status}
+            renterUserId={rental.userId}
             theme={crew.theme}
             existingReview={rental.existingReview}
           />
