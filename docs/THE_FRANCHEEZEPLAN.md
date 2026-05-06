@@ -64,7 +64,7 @@ This root file stays intentionally compact so operators and agents can load it q
 - `status`: ready_for_pr
 - `updated_at`: 2026-05-06T22:30:00Z
 - `owner`: codex-frz-couple-01
-- `notes`: Implemented `FIX-STARTPARAM` stale-ref reset for repeated Telegram deep links and started `RENT-P3.2` with Vitest coverage for franchize navigation/theme helpers.
+- `notes`: Implemented `FIX-STARTPARAM` stale-ref reset for repeated Telegram deep links and started `RENT-P3.2` with Vitest coverage for franchize navigation/theme helpers; self-review tightened duplicate-processing guards and category anchor normalization.
 - `next_step`: Add mocked Supabase coverage for server action validators after this PR lands.
 - `risks`: Server-action integration tests remain future work because this slice intentionally focused on low-conflict pure helper coverage.
 
@@ -95,3 +95,4 @@ This root file stays intentionally compact so operators and agents can load it q
 - `next_step`: Verify production `vip-bike` sale bike with real catalog specs and Telegram WebApp invoice delivery.
 - `risks`: Visual/live invoice verification still depends on reachable Supabase and Telegram bot credentials.
 - 2026-05-06 — SupaPlan franchize maintenance pair: fixed repeated `startapp` handling in `useStartParamRouter` and added a test-coverage foundation for franchize helper libraries. Next step: mocked Supabase action validation tests.
+- 2026-05-06 — Self-reviewed SupaPlan franchize maintenance pair: replaced the boolean start-param guard with active/last-handled param refs to prevent duplicate processing during pathname/clear races, removed dead sale metadata, and normalized category anchors before tests codify the behavior.

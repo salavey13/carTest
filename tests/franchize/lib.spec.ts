@@ -21,7 +21,7 @@ const theme: FranchizeTheme = {
 describe('franchize navigation helpers', () => {
   it('normalizes catalog category names into stable DOM ids', () => {
     expect(toCategoryId('Big Adventure Bikes')).toBe('category-big-adventure-bikes');
-    expect(toCategoryId('  City   Rental  ')).toBe('category--city-rental-');
+    expect(toCategoryId('  City   Rental  ')).toBe('category-city-rental');
   });
 
   it('detects only HTTP(S) links as external navigation targets', () => {
