@@ -67,6 +67,16 @@ This root file stays intentionally compact so operators and agents can load it q
 - 2026-05-06 — Final polish iteration: implemented `StepsProgress` for the newbie flow and reworded `/app/vipbikerental/todo.md` so completed scope is clearly closed while remaining quick-action/technical items are future backlog, not an automatic trigger.
 ## 3) Active implementation slices
 
+
+### 2026-05-06 — Franchize accessibility labels for MapRiders/configurator
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T22:25:00Z
+- `owner`: codex
+- `notes`: Added screen-reader labels/aria names for MapRiders ride controls, privacy dropdowns, meetup drawer inputs, replay scrubber, and configurator option controls. SupaPlan task `dc8f8c2b-2234-4c0a-6789-ccc000ccf789`.
+- `next_step`: Verify `vip-bike` configurator and `/franchize/vip-bike/map-riders` with a browser accessibility audit when a local runtime is available.
+- `risks`: Visual layout should be unchanged because labels are hidden where needed; runtime audit still depends on app boot and route data.
+
 ### 2026-05-06 — Sale buy page VS + test-drive reservation
 
 - `status`: done
@@ -85,6 +95,7 @@ This root file stays intentionally compact so operators and agents can load it q
 - `next_step`: Verify production `vip-bike` sale bike with real catalog specs and Telegram WebApp invoice delivery.
 - `risks`: Visual/live invoice verification still depends on reachable Supabase and Telegram bot credentials.
 
+- 2026-05-06 — Claimed SupaPlan franchize accessibility task `dc8f8c2b-2234-4c0a-6789-ccc000ccf789`; labeled MapRiders dropdown/input controls and configurator option controls for screen readers. Next step: PR review + runtime accessibility smoke on `vip-bike`.
 ### 2026-05-06 — Telegram auth unmount guard
 
 - `status`: ready_for_pr
