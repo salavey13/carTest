@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
             .select(`
                 user_id,
                 owner_id,
-                vehicle:cars (make, model, crew_id),
+                vehicle:cars (make, model, crew_id, crew:crews(slug)),
                 renter:rentals_user_id_fkey (username),
                 owner:rentals_owner_id_fkey (username)
             `)
@@ -112,7 +112,12 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ ok: true, message: "No handler for event type" });
         }
         
-        const deep_link_url = `${TELEGRAM_BOT_LINK}?startapp=rental_${action_link_slug}_${rental_id}`;
+        const vehicleCrew = Array.isArray(vehicle?.crew) ? vehicle?.crew?.[0] : vehicle?.crew;
+        const crewSlug = typeof vehicleCrew?.slug === "string" && vehicleCrew.slug.trim().length > 0 ? vehicleCrew.slug.trim() : "vip-bike";
+        const reviewPath = `/franchize/${crewSlug}/review/${rental_id}`;
+        const deep_link_url = action_link_slug === 'review'
+            ? `${TELEGRAM_BOT_LINK}?startapp=${reviewPath.replace(/^\//, '')}`
+            : `${TELEGRAM_BOT_LINK}?startapp=rental_${action_link_slug}_${rental_id}`;
 
         for (const recipientId of Array.from(recipient_ids)) {
              if (doNotNotifyCreator && recipientId === created_by) continue; 

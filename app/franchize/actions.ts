@@ -79,6 +79,25 @@ export interface FranchizeHeaderVM {
   menuLinks: Array<{ label: string; href: string }>;
 }
 
+export interface RentalReviewVM {
+  id: string;
+  rentalId: string;
+  userId: string;
+  bikeId: string;
+  crewId: string;
+  rating: number;
+  text: string;
+  createdAt: string;
+  hiddenAt?: string | null;
+}
+
+export interface RentalReviewSummaryVM {
+  average: number;
+  count: number;
+  latest?: RentalReviewVM;
+  reviews: RentalReviewVM[];
+}
+
 export interface CatalogItemVM {
   id: string;
   title: string;
@@ -96,6 +115,7 @@ export interface CatalogItemVM {
   salePrice: number | null;
   specs: Array<{ label: string; value: string }>;
   rawSpecs?: Record<string, unknown>;
+  reviewSummary: RentalReviewSummaryVM;
 }
 
 export interface FranchizeCrewVM {
@@ -141,6 +161,10 @@ export interface FranchizeCrewVM {
       minPrice?: number;
       maxPrice?: number;
     }>;
+  };
+  ratingSummary: {
+    average: number;
+    count: number;
   };
   footer: {
     socialLinks: Array<{ label: string; href: string }>;
@@ -349,6 +373,58 @@ function readPath<T>(obj: unknown, path: string[], fallback: T): T {
   return (current as T) ?? fallback;
 }
 
+
+function toRentalReviewVM(row: UnknownRecord): RentalReviewVM {
+  return {
+    id: String(row.id ?? ""),
+    rentalId: String(row.rental_id ?? ""),
+    userId: String(row.user_id ?? ""),
+    bikeId: String(row.bike_id ?? ""),
+    crewId: String(row.crew_id ?? ""),
+    rating: Math.min(5, Math.max(1, Number(row.rating ?? 0) || 1)),
+    text: String(row.text ?? "").trim(),
+    createdAt: String(row.created_at ?? ""),
+    hiddenAt: typeof row.hidden_at === "string" ? row.hidden_at : null,
+  };
+}
+
+function buildReviewSummary(reviews: RentalReviewVM[]): RentalReviewSummaryVM {
+  const visible = reviews.filter((review) => !review.hiddenAt);
+  const count = visible.length;
+  const average = count > 0
+    ? Math.round((visible.reduce((sum, review) => sum + review.rating, 0) / count) * 10) / 10
+    : 0;
+  return {
+    average,
+    count,
+    latest: visible[0],
+    reviews: visible,
+  };
+}
+
+
+function groupReviewsByBike(rows: UnknownRecord[]): Map<string, RentalReviewVM[]> {
+  const grouped = new Map<string, RentalReviewVM[]>();
+  rows
+    .map(toRentalReviewVM)
+    .filter((review) => review.bikeId && !review.hiddenAt)
+    .forEach((review) => {
+      const list = grouped.get(review.bikeId) ?? [];
+      list.push(review);
+      grouped.set(review.bikeId, list);
+    });
+
+  grouped.forEach((list) => {
+    list.sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""));
+  });
+
+  return grouped;
+}
+
+function buildCrewRatingSummary(rows: UnknownRecord[]) {
+  return buildReviewSummary(rows.map(toRentalReviewVM).filter((review) => !review.hiddenAt));
+}
+
 const fallbackMenuLinks = (slug: string) => [
   { label: "Каталог", href: `/franchize/${slug}` },
   { label: "Электроэндуро", href: `/franchize/${slug}/electro-enduro` },
@@ -469,8 +545,11 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     categories: [],
     quickLinks: [],
     tickerItems: [],
+    promoBanners: [],
+    adCards: [],
     showcaseGroups: [],
   },
+  ratingSummary: { average: 0, count: 0 },
   footer: {
     socialLinks: [],
     textColor: "#16130A",
@@ -545,6 +624,23 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         : (Number.isNaN(startTs) ? "Забронирован" : `Забронирован с ${new Date(startTs).toLocaleDateString("ru-RU")}`);
       availabilityByVehicle.set(vehicleId, { status: "busy", label });
     }
+
+    const { data: reviewRows, error: reviewsError } = vehicleIds.length
+      ? await supabaseAdmin
+          .from("rental_reviews")
+          .select("id, rental_id, user_id, bike_id, crew_id, rating, text, created_at, hidden_at")
+          .in("bike_id", vehicleIds)
+          .is("hidden_at", null)
+          .order("created_at", { ascending: false })
+      : { data: [], error: null };
+
+    if (reviewsError) {
+      logger.warn("[franchize] failed to load rental reviews", { safeSlug, reviewsError: reviewsError.message });
+    }
+
+    const reviewRowsRaw = ((reviewRows ?? []) as UnknownRecord[]);
+    const reviewsByBike = groupReviewsByBike(reviewRowsRaw);
+    const crewRatingSummary = buildCrewRatingSummary(reviewRowsRaw);
 
     const metadata = ((crew as UnknownRecord).metadata ?? {}) as UnknownRecord;
     const franchize = (metadata.franchize ?? metadata) as UnknownRecord;
@@ -666,6 +762,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         }),
         showcaseGroups,
       },
+      ratingSummary: { average: crewRatingSummary.average, count: crewRatingSummary.count },
       footer: {
         socialLinks: extractFooterSocialLinks(franchize, readPath(franchize, ["contacts", "telegram"], "")),
         textColor: readPath(franchize, ["footer", "textColor"], "#16130A"),
@@ -748,6 +845,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
               ? Number(readPath(specs, ["purchase_price"], 0))
               : null,
         rawSpecs: specs,
+        reviewSummary: buildReviewSummary(reviewsByBike.get(car.id) ?? []),
         specs: Object.entries(specs)
           .filter(([, value]) => typeof value === "string" || typeof value === "number")
           .filter(([key]) => !["subtitle", "description", "segment", "subtype", "bike_subtype", "type"].includes(key))
@@ -1802,6 +1900,117 @@ export async function getFranchizeOrderNotificationFailures(input: unknown): Pro
     success: true,
     items: (data ?? []).map((row) => ({ orderId: row.order_id, sendTo: row.send_to ?? "", lastError: row.last_error ?? "", createdAt: row.created_at ?? "" })),
   };
+}
+
+const rentalReviewInputSchema = z.object({
+  slug: z.string().trim().min(1),
+  rentalId: z.string().uuid(),
+  userId: z.string().trim().min(1),
+  rating: z.coerce.number().int().min(1).max(5),
+  text: z.string().trim().max(1200).default(""),
+});
+
+export async function getRentalReviewContext(input: unknown): Promise<{ success: boolean; error?: string; rental?: { rentalId: string; status: string; userId: string; bikeId: string; bikeTitle: string; crewId: string; existingReview?: RentalReviewVM } }> {
+  const parsed = z.object({ slug: z.string().trim().min(1), rentalId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректная ссылка отзыва." };
+  const { slug, rentalId } = parsed.data;
+
+  const { data: crew } = await supabaseAdmin.from("crews").select("id").eq("slug", normalizeCrewSlug(slug)).maybeSingle();
+  if (!crew) return { success: false, error: "Экипаж не найден." };
+
+  const { data: rental, error } = await supabaseAdmin
+    .from("rentals")
+    .select("rental_id, user_id, vehicle_id, status, vehicle:cars(id, make, model, crew_id)")
+    .eq("rental_id", rentalId)
+    .maybeSingle();
+  if (error) return { success: false, error: error.message };
+  if (!rental) return { success: false, error: "Аренда не найдена." };
+
+  const vehicle = Array.isArray(rental.vehicle) ? rental.vehicle[0] : rental.vehicle;
+  if (vehicle?.crew_id !== crew.id) return { success: false, error: "Аренда относится к другому экипажу." };
+
+  const { data: existing } = await supabaseAdmin
+    .from("rental_reviews")
+    .select("id, rental_id, user_id, bike_id, crew_id, rating, text, created_at, hidden_at")
+    .eq("rental_id", rentalId)
+    .maybeSingle();
+
+  return {
+    success: true,
+    rental: {
+      rentalId: String(rental.rental_id),
+      status: String(rental.status ?? ""),
+      userId: String(rental.user_id ?? ""),
+      bikeId: String(rental.vehicle_id ?? ""),
+      bikeTitle: `${vehicle?.make ?? ""} ${vehicle?.model ?? ""}`.trim() || "байк",
+      crewId: String(crew.id),
+      existingReview: existing ? toRentalReviewVM(existing as UnknownRecord) : undefined,
+    },
+  };
+}
+
+export async function submitRentalReview(input: unknown): Promise<{ success: boolean; error?: string }> {
+  const parsed = rentalReviewInputSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Некорректный отзыв." };
+  const { slug, rentalId, userId, rating, text } = parsed.data;
+
+  const context = await getRentalReviewContext({ slug, rentalId });
+  if (!context.success || !context.rental) return { success: false, error: context.error ?? "Аренда не найдена." };
+  if (context.rental.status !== "completed") return { success: false, error: "Отзыв можно оставить после завершения аренды." };
+  if (context.rental.userId !== userId) return { success: false, error: "Отзыв может оставить только арендатор." };
+
+  const { error } = await supabaseAdmin.from("rental_reviews").upsert(
+    {
+      rental_id: rentalId,
+      user_id: userId,
+      bike_id: context.rental.bikeId,
+      crew_id: context.rental.crewId,
+      rating,
+      text,
+      hidden_at: null,
+    },
+    { onConflict: "rental_id" },
+  );
+
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+export async function getFranchizeRentalReviewsForModeration(input: unknown): Promise<{ success: boolean; error?: string; items?: RentalReviewVM[] }> {
+  const parsed = z.object({ slug: z.string().trim().min(1), actorUserId: z.string().trim().min(1) }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректный запрос." };
+  const { slug, actorUserId } = parsed.data;
+  const { data: crew } = await supabaseAdmin.from("crews").select("id, owner_id").eq("slug", normalizeCrewSlug(slug)).maybeSingle();
+  if (!crew) return { success: false, error: "Экипаж не найден." };
+  const canRead = await resolveFranchizeEditorAccess(actorUserId, crew);
+  if (!canRead) return { success: false, error: "Недостаточно прав для модерации отзывов." };
+
+  const { data, error } = await supabaseAdmin
+    .from("rental_reviews")
+    .select("id, rental_id, user_id, bike_id, crew_id, rating, text, created_at, hidden_at")
+    .eq("crew_id", crew.id)
+    .order("created_at", { ascending: false })
+    .limit(40);
+  if (error) return { success: false, error: error.message };
+  return { success: true, items: ((data ?? []) as UnknownRecord[]).map(toRentalReviewVM) };
+}
+
+export async function moderateRentalReview(input: unknown): Promise<{ success: boolean; error?: string }> {
+  const parsed = z.object({ slug: z.string().trim().min(1), actorUserId: z.string().trim().min(1), reviewId: z.string().uuid(), hidden: z.boolean() }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректный запрос модерации." };
+  const { slug, actorUserId, reviewId, hidden } = parsed.data;
+  const { data: crew } = await supabaseAdmin.from("crews").select("id, owner_id").eq("slug", normalizeCrewSlug(slug)).maybeSingle();
+  if (!crew) return { success: false, error: "Экипаж не найден." };
+  const canModerate = await resolveFranchizeEditorAccess(actorUserId, crew);
+  if (!canModerate) return { success: false, error: "Недостаточно прав для модерации отзывов." };
+
+  const { error } = await supabaseAdmin
+    .from("rental_reviews")
+    .update({ hidden_at: hidden ? new Date().toISOString() : null, moderated_by: actorUserId })
+    .eq("id", reviewId)
+    .eq("crew_id", crew.id);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
 }
 
 type FranchizeOrderInvoicePayload = z.infer<typeof franchizeOrderInvoiceSchema>;

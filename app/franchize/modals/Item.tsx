@@ -312,6 +312,29 @@ export function ItemModal({
                 ))}
               </div>
             </div>
+            {item.reviewSummary.count > 0 && (
+              <section
+                className="rounded-2xl border p-3"
+                style={surface.subtleCard}
+                aria-label="Отзывы арендаторов"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-[var(--item-text)]">Отзывы друзей</p>
+                  <span className="rounded-full bg-[var(--item-accent)] px-2.5 py-1 text-xs font-bold text-[var(--item-accent-contrast)]">
+                    ★ {item.reviewSummary.average.toFixed(1)} · {item.reviewSummary.count}
+                  </span>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {item.reviewSummary.reviews.slice(0, 6).map((review) => (
+                    <article key={review.id} className="rounded-xl border px-3 py-2" style={surface.subtleCard}>
+                      <p className="text-xs font-semibold text-[var(--item-accent)]">{`★`.repeat(review.rating)}<span className="text-[var(--item-muted-text)]"> / 5</span></p>
+                      {review.text && <p className="mt-1 text-sm leading-5" style={surface.mutedText}>{review.text}</p>}
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {item.saleAvailable && (
               <Link
                 href={`/franchize/${slug}/market/${item.id}/buy`}

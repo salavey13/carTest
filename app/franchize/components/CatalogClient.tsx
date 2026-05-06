@@ -19,13 +19,14 @@ interface CatalogClientProps {
   mode?: "rental" | "electro";
 }
 
-type QuickFilterKey = "all" | "budget" | "premium" | "newbie";
+type QuickFilterKey = "all" | "budget" | "premium" | "newbie" | "topRated";
 
 const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string }> = [
   { key: "all", label: "Все" },
   { key: "budget", label: "До 5000" },
   { key: "premium", label: "Премиум 7000+" },
   { key: "newbie", label: "Для новичка" },
+  { key: "topRated", label: "Top rated" },
 ];
 
 const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
@@ -168,6 +169,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
     if (filter === "newbie") {
       return /naked|neo|scooter|300|400/i.test(`${item.category} ${item.title}`);
     }
+    if (filter === "topRated") {
+      return item.reviewSummary.count > 0 && item.reviewSummary.average >= 4.5;
+    }
     return true;
   };
 
@@ -188,25 +192,29 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
         acc[filter.key] = searchFiltered.filter((item) => matchesQuickFilter(item, filter.key)).length;
         return acc;
       },
-      { all: 0, budget: 0, premium: 0, newbie: 0 },
+      { all: 0, budget: 0, premium: 0, newbie: 0, topRated: 0 },
     );
   }, [items, searchQuery]);
 
   const itemsByCategory = useMemo(() => {
+    const sortedFilteredItems = quickFilter === "topRated"
+      ? [...filteredItems].sort((a, b) => (b.reviewSummary.average - a.reviewSummary.average) || (b.reviewSummary.count - a.reviewSummary.count))
+      : filteredItems;
+
     const grouped = orderedCategories
       .map((category) => ({
         category,
-        items: filteredItems.filter((item) => item.category === category),
+        items: sortedFilteredItems.filter((item) => item.category === category),
       }))
       .filter((group) => group.items.length > 0);
 
-    const saleGroup = filteredItems.filter((item) => item.saleAvailable);
+    const saleGroup = sortedFilteredItems.filter((item) => item.saleAvailable);
     const saleCategory = mode === "electro" ? "Электроэндуро в продаже" : "Байки на продажу";
     const baseGroups = grouped.filter((group) => group.category !== saleCategory);
     const normalized = sortWbItemLast(baseGroups);
     if (saleGroup.length === 0) return normalized;
     return [{ category: saleCategory, items: saleGroup }, ...normalized];
-  }, [filteredItems, mode, orderedCategories]);
+  }, [filteredItems, mode, orderedCategories, quickFilter]);
 
   const openItem = (item: CatalogItemVM) => {
     setSelectedItem(item);
@@ -441,8 +449,18 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
                               </span>
                             )}
                           </div>
+                          {item.reviewSummary.count > 0 && (
+                            <span className="inline-flex rounded-full border border-yellow-300/60 bg-yellow-400/20 px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-yellow-100">
+                              ★ {item.reviewSummary.average.toFixed(1)} · {item.reviewSummary.count}
+                            </span>
+                          )}
                           <h3 className="mt-1 text-sm font-semibold leading-5">{item.title}</h3>
                           <p className="text-xs" style={surface.mutedText}>{item.description || item.subtitle}</p>
+                          {item.reviewSummary.latest?.text && (
+                            <p className="mt-2 rounded-xl border border-white/10 px-2 py-1.5 text-[11px] leading-4" style={surface.mutedText}>
+                              “{item.reviewSummary.latest.text}”
+                            </p>
+                          )}
                           <p className="mt-2 text-base font-bold text-[var(--catalog-accent)]">
                             {item.rentPriceLabel}
                           </p>
