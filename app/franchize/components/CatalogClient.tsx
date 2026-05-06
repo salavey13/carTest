@@ -483,6 +483,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
 
       <ItemModal
         item={selectedItem}
+        items={items}
         slug={crew.slug || slug}
         theme={crew.theme}
         options={selectedOptions}
