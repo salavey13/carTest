@@ -35,6 +35,14 @@ interface ItemModalProps {
 const packageOptions = ["Базовый", "Комфорт", "Максимум"];
 const durationOptions = ["1 день", "3 дня", "7 дней"];
 const perkOptions = ["Стандарт", "Шлем + GoPro", "Полный комплект"];
+const modalFocusableSelector = [
+  "a[href]",
+  "button:not([disabled])",
+  "textarea:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
 
 const getModalThemeVars = (theme: FranchizeTheme) =>
   ({
@@ -61,13 +69,14 @@ function OptionChips({
       <p className="mb-2 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
         {title}
       </p>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2" role="group" aria-label={title}>
         {options.map((option) => {
           const isActive = option === selected;
           return (
             <button
               key={option}
               type="button"
+              aria-pressed={isActive}
               onClick={() => onSelect(option)}
               className={`rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] ${
                 isActive
@@ -140,16 +149,40 @@ export function ItemModal({
         e.preventDefault();
         e.stopPropagation();
         onClose();
+        return;
+      }
+
+      if (e.key !== "Tab") return;
+
+      const focusable = Array.from(modalRef.current?.querySelectorAll<HTMLElement>(modalFocusableSelector) ?? [])
+        .filter((element) => element.offsetParent !== null || element === document.activeElement);
+      if (focusable.length === 0) {
+        e.preventDefault();
+        modalRef.current?.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    modalRef.current?.focus();
+    const focusDialog = window.requestAnimationFrame(() => modalRef.current?.focus());
 
     return () => {
+      window.cancelAnimationFrame(focusDialog);
       document.body.style.overflow = originalOverflow;
       document.removeEventListener("keydown", handleKeyDown);
-      previouslyFocused?.focus();
+      if (previouslyFocused && document.contains(previouslyFocused)) {
+        previouslyFocused.focus();
+      }
     };
   }, [item, onClose]);
 
@@ -219,6 +252,7 @@ export function ItemModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby={`item-modal-title-${item.id}`}
+      aria-describedby={`item-modal-description-${item.id}`}
       tabIndex={-1}
       style={themeVars}
     >
@@ -269,6 +303,7 @@ export function ItemModal({
                 </p>
               )}
               <p
+                id={`item-modal-description-${item.id}`}
                 className={`mt-2 text-sm leading-6 ${descriptionExpanded ? "" : "line-clamp-4"}`}
                 style={surface.mutedText}
               >
@@ -278,6 +313,8 @@ export function ItemModal({
                 <button
                   type="button"
                   className="mt-1 text-sm font-medium text-[var(--item-accent)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                  aria-expanded={descriptionExpanded}
+                  aria-controls={`item-modal-description-${item.id}`}
                   onClick={() => setDescriptionExpanded((prev) => !prev)}
                 >
                   {descriptionExpanded ? "Скрыть" : "Показать ещё..."}
@@ -315,7 +352,8 @@ export function ItemModal({
             {item.saleAvailable && (
               <Link
                 href={`/franchize/${slug}/market/${item.id}/buy`}
-                className="inline-flex w-full items-center justify-center rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90"
+                className="inline-flex w-full items-center justify-center rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                aria-label={`Открыть страницу покупки ${item.title}`}
                 style={surface.subtleCard}
               >
                 Открыть страницу покупки
@@ -361,7 +399,8 @@ export function ItemModal({
                       key={bike.id}
                       type="button"
                       onClick={() => setVsBike(bike)}
-                      className="rounded-xl border p-2 text-left text-xs transition hover:bg-white/5"
+                      aria-pressed={vsBike?.id === bike.id}
+                      className="rounded-xl border p-2 text-left text-xs transition hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
                       style={surface.subtleCard}
                     >
                       <span className="flex items-center justify-between gap-2">
@@ -413,6 +452,7 @@ export function ItemModal({
             <button
               type="button"
               onClick={onClose}
+              aria-label="Закрыть карточку товара"
               className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
               style={surface.subtleCard}
             >
@@ -422,6 +462,7 @@ export function ItemModal({
               type="button"
               onClick={handleAddToCart}
               disabled={isAdding}
+              aria-busy={isAdding}
               className="rounded-xl bg-[var(--item-accent)] px-3 py-2 text-sm font-semibold text-[var(--item-accent-contrast)] transition hover:brightness-105 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
             >
               {isAdding
