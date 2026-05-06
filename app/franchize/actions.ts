@@ -1761,6 +1761,30 @@ function buildFranchizeInvoiceId(payload: FranchizeOrderInvoicePayload) {
   return `franchize_order_${safeSlug}_${safeOrderId}_${safeUserId}`;
 }
 
+async function cleanupPendingFranchizeInvoiceAfterSendFailure(invoiceId: string, rentalId: string) {
+  const { error } = await supabaseAdmin
+    .from("invoices")
+    .delete()
+    .eq("id", invoiceId)
+    .eq("status", "pending")
+    .contains("metadata", { rental_id: rentalId });
+
+  if (error) {
+    logger.error("[franchize] failed to cleanup unsent invoice", {
+      invoiceId,
+      rentalId,
+      error: error.message,
+    });
+    return false;
+  }
+
+  logger.warn("[franchize] cleaned up unsent pending invoice after Telegram XTR send failure", {
+    invoiceId,
+    rentalId,
+  });
+  return true;
+}
+
 async function createFranchizeOrderInvoiceInternal(
   payload: FranchizeOrderInvoicePayload,
   options: { skipNotification?: boolean } = {},
@@ -1852,6 +1876,8 @@ async function createFranchizeOrderInvoiceInternal(
     flowType,
   };
 
+  let createdPendingInvoiceForThisAttempt = false;
+
   try {
     if (!options.skipNotification) {
       await buildFranchizeOrderDocAndNotify({ ...payload, totalAmount: effectiveTotal, subtotal: payload.subtotal, extrasTotal: payload.extrasTotal });
@@ -1861,6 +1887,7 @@ async function createFranchizeOrderInvoiceInternal(
     if (!invoiceRecord.success) {
       return { success: false, error: invoiceRecord.error ?? "Не удалось создать запись счёта." };
     }
+    createdPendingInvoiceForThisAttempt = invoiceRecord.data?.status === "pending";
 
     const invoiceSent = await sendTelegramInvoice(
       payload.telegramUserId,
@@ -1872,11 +1899,17 @@ async function createFranchizeOrderInvoiceInternal(
     );
 
     if (!invoiceSent.success) {
+      if (createdPendingInvoiceForThisAttempt) {
+        await cleanupPendingFranchizeInvoiceAfterSendFailure(invoiceId, rentalId);
+      }
       return { success: false, error: invoiceSent.error ?? "Не удалось отправить XTR-счёт в Telegram." };
     }
 
     return { success: true, invoiceId, amountXtr };
   } catch (error) {
+    if (createdPendingInvoiceForThisAttempt) {
+      await cleanupPendingFranchizeInvoiceAfterSendFailure(invoiceId, rentalId);
+    }
     logger.error("[franchize] createFranchizeOrderInvoice failed", error);
     return {
       success: false,
