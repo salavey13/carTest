@@ -30,9 +30,9 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
     >
       <button
         type="button"
-        aria-label="Scroll to top"
+        aria-label="Прокрутить страницу вверх"
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--floating-cart-bg)] text-[var(--floating-cart-text)] shadow-lg transition active:scale-95 cursor-pointer"
+        className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--floating-cart-bg)] text-[var(--floating-cart-text)] shadow-lg transition active:scale-95 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--floating-cart-accent)]"
       >
         <ArrowUp className="h-5 w-5" />
       </button>
@@ -40,7 +40,8 @@ export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor,
       {/* RESTORED TO SPA LINK */}
       <Link
         href={href}
-        className="relative inline-flex items-center justify-center gap-2 rounded-full bg-[var(--floating-cart-accent)] px-5 py-3 text-black shadow-xl transition-transform active:scale-95 cursor-pointer no-underline"
+        aria-label={`Открыть корзину: ${itemCount} позиций, ${isCartEmpty ? "0 ₽" : `${totalPrice.toLocaleString("ru-RU")} ₽`}`}
+        className="relative inline-flex items-center justify-center gap-2 rounded-full bg-[var(--floating-cart-accent)] px-5 py-3 text-black shadow-xl transition-transform active:scale-95 cursor-pointer no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--floating-cart-accent)]"
       >
         <ShoppingCart className="h-5 w-5" />
         <span className="text-sm font-bold">{isCartEmpty ? "0 ₽" : `${totalPrice.toLocaleString("ru-RU")} ₽`}</span>
