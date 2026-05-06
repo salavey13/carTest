@@ -2,7 +2,27 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Cpu, ShieldCheck, Rocket, Network, WandSparkles, FlaskConical, Target, Bot, Crosshair, Store, Brain, Bike, KanbanSquare } from "lucide-react";
+import {
+  ArrowRight,
+  BarChart3,
+  Bike,
+  Bot,
+  Brain,
+  ClipboardCheck,
+  Cpu,
+  Crosshair,
+  FlaskConical,
+  KanbanSquare,
+  Network,
+  Rocket,
+  ShieldCheck,
+  Store,
+  Target,
+  TimerReset,
+  TrendingUp,
+  Users,
+  WandSparkles,
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CapabilityLaunchGrid } from "@/components/CapabilityLaunchGrid";
@@ -31,6 +51,59 @@ const pillars = [
   },
 ];
 
+const pilotKpiFunnel = [
+  {
+    stage: "Лиды",
+    value: "100",
+    detail: "Telegram, лендинг, рекомендации",
+    accent: "text-cyan-300",
+  },
+  {
+    stage: "Квалификация",
+    value: "37%",
+    detail: "понятен запрос, есть контакт, выбран сценарий",
+    accent: "text-sky-300",
+  },
+  {
+    stage: "Тест-райд / бронь",
+    value: "18%",
+    detail: "оператор подтвердил слот и байк",
+    accent: "text-violet-300",
+  },
+  {
+    stage: "Оплата / сделка",
+    value: "9%",
+    detail: "аренда, покупка, сервис или партнёрский пакет",
+    accent: "text-emerald-300",
+  },
+];
+
+const pilotKpiSignals = [
+  {
+    icon: TrendingUp,
+    label: "Conversion",
+    value: "9%",
+    hint: "lead → paid booking",
+  },
+  {
+    icon: TimerReset,
+    label: "SLA ответа",
+    value: "≤ 15 мин",
+    hint: "первый операторский контакт",
+  },
+  {
+    icon: Users,
+    label: "Партнёры",
+    value: "3 пилота",
+    hint: "готовы к франшизной упаковке",
+  },
+  {
+    icon: ClipboardCheck,
+    label: "PR-срез",
+    value: "FRZ-R5",
+    hint: "KPI board для SupaPlan",
+  },
+];
 
 const readyExamples = [
   {
@@ -138,7 +211,6 @@ export default function NexusPage() {
         })}
       </section>
 
-
       <section className="container mx-auto mt-8 px-4">
         <Card className="border-zinc-800 bg-zinc-900/60 backdrop-blur">
           <CardHeader>
@@ -173,6 +245,81 @@ export default function NexusPage() {
                 <Bike className="mr-2 h-4 w-4" /> VIP Bike Map Riders
               </Link>
             </Button>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="container mx-auto mt-8 px-4">
+        <Card className="overflow-hidden border-emerald-500/30 bg-emerald-500/5 backdrop-blur">
+          <CardHeader className="border-b border-white/10 bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-transparent">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <CardDescription className="font-mono text-[11px] uppercase tracking-[0.28em] text-emerald-300">
+                  FRZ-R5 · pilot KPI scoreboard
+                </CardDescription>
+                <CardTitle className="mt-2 flex items-center gap-2 text-2xl text-zinc-100">
+                  <BarChart3 className="h-6 w-6 text-emerald-300" />
+                  Воронка франшизы без табличного ада
+                </CardTitle>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-300">
+                  Быстрый операторский срез показывает, где VIP Bike теряет или выигрывает деньги:
+                  от входящего лида до оплаченной брони, сделки или партнёрского пакета. Значения — пилотные
+                  ориентиры для еженедельной сверки, не фейковая live-аналитика.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-emerald-400/20 bg-black/30 px-4 py-3 text-sm text-zinc-300">
+                <div className="text-xs font-mono uppercase tracking-widest text-emerald-300">North Star</div>
+                <div className="mt-1 text-2xl font-bold text-white">lead → paid booking</div>
+                <div className="mt-1 text-xs text-zinc-400">единый язык для продаж, аренды и onboarding</div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-6">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {pilotKpiSignals.map((signal) => {
+                const Icon = signal.icon;
+                return (
+                  <div key={signal.label} className="rounded-2xl border border-white/10 bg-black/25 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-mono uppercase tracking-wider text-zinc-500">{signal.label}</p>
+                      <Icon className="h-4 w-4 text-emerald-300" />
+                    </div>
+                    <p className="mt-3 text-2xl font-bold text-white">{signal.value}</p>
+                    <p className="mt-1 text-xs text-zinc-400">{signal.hint}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+              {pilotKpiFunnel.map((step, index) => (
+                <div key={step.stage} className="relative rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4">
+                  {index < pilotKpiFunnel.length - 1 ? (
+                    <div className="absolute -right-3 top-1/2 hidden h-px w-6 bg-emerald-400/40 lg:block" />
+                  ) : null}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-mono text-zinc-400">
+                      STEP {index + 1}
+                    </span>
+                    <span className={`text-xl font-black ${step.accent}`}>{step.value}</span>
+                  </div>
+                  <h3 className="mt-4 font-semibold text-zinc-100">{step.stage}</h3>
+                  <p className="mt-2 text-xs leading-5 text-zinc-400">{step.detail}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-zinc-300">
+                Следующий полезный шаг: подключить эти KPI к реальным событиям заказа и MapRiders без изменения
+                текущих публичных маршрутов.
+              </p>
+              <Button asChild variant="outline" className="border-emerald-500/40 hover:bg-emerald-500/10">
+                <Link href="/supaplan/franchize">
+                  Открыть задачи франшизы <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </section>

@@ -120,3 +120,12 @@ This root file stays intentionally compact so operators and agents can load it q
 - `next_step`: Merge PR, then verify Telegram WebApp auth/navigation on `vip-bike` under slow network throttling.
 - `risks`: Runtime Telegram validation still depends on configured bot/API env and a real WebApp launch context.
 
+
+### 2026-05-06 — FRZ-R5 pilot KPI scoreboard
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T22:55:00Z
+- `owner`: codex-cli
+- `notes`: Added a compact `/nexus` KPI scoreboard for the VIP Bike franchise funnel with pilot conversion/SLA/partner signals and lead-to-paid-booking stages. SupaPlan task `913e8a73-46f6-4c22-8278-c1b5aabe661e`.
+- `next_step`: Wire the same KPI cards to real order/lead events after event analytics storage is finalized.
+- `risks`: Current numbers are explicitly pilot targets, not live production analytics.
