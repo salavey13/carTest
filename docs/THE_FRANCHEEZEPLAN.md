@@ -96,3 +96,12 @@ This root file stays intentionally compact so operators and agents can load it q
 - `risks`: Visual/live invoice verification still depends on reachable Supabase and Telegram bot credentials.
 
 - 2026-05-06 — Claimed SupaPlan franchize accessibility task `dc8f8c2b-2234-4c0a-6789-ccc000ccf789`; labeled MapRiders dropdown/input controls and configurator option controls for screen readers. Next step: PR review + runtime accessibility smoke on `vip-bike`.
+### 2026-05-06 — Telegram auth unmount guard
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T22:25:00Z
+- `owner`: codex
+- `notes`: Claimed SupaPlan `CQ-TELEGRAM-GUARD` and moved `useTelegram` async initialization from a local boolean to a lifecycle ref guard so delayed auth results do not update state after unmount.
+- `next_step`: Merge PR, then verify Telegram WebApp auth/navigation on `vip-bike` under slow network throttling.
+- `risks`: Runtime Telegram validation still depends on configured bot/API env and a real WebApp launch context.
+
