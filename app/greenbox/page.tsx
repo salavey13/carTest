@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { CapabilityLaunchGrid } from "@/components/CapabilityLaunchGrid";
 
 import { IrrigationQueueForm } from "./IrrigationQueueForm";
-import { demoTomatoBushes, healthTone } from "./demo-content";
+import { careRecommendations, demoTomatoBushes, healthTone, riskTone } from "./demo-content";
 
 type StatTone = "ok" | "warn" | "hot";
 
@@ -61,15 +61,33 @@ function humanStatus(status: string): string {
   return "открыто";
 }
 
+async function withGreenboxTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timeoutId = setTimeout(() => resolve(fallback), 2500);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 async function loadGreenboxTasks(): Promise<GreenboxTask[]> {
   try {
-    const { data, error } = await supabaseAdmin
-      .from("supaplan_tasks")
-      .select("id,title,capability,status")
-      .in("capability", ["greenbox.telemetry", "greenbox.irrigation", "greenbox.disease", "greenbox.voice"])
-      .in("status", ["open", "claimed", "running", "ready_for_pr", "done"])
-      .order("updated_at", { ascending: false })
-      .limit(10);
+    const { data, error } = await withGreenboxTimeout(
+      supabaseAdmin
+        .from("supaplan_tasks")
+        .select("id,title,capability,status")
+        .in("capability", ["greenbox.telemetry", "greenbox.irrigation", "greenbox.disease", "greenbox.voice"])
+        .in("status", ["open", "claimed", "running", "ready_for_pr", "done"])
+        .order("updated_at", { ascending: false })
+        .limit(10),
+      { data: null, error: null },
+    );
 
     if (error || !data) return [];
 
@@ -94,11 +112,14 @@ async function loadGreenboxTasks(): Promise<GreenboxTask[]> {
 async function loadQueue(): Promise<QueueItem[]> {
   try {
     const admin = supabaseAdmin as any;
-    const { data, error } = await admin
-      .from("greenbox_irrigation_queue")
-      .select("id,requested_at,zone,intensity,status")
-      .order("requested_at", { ascending: false })
-      .limit(6);
+    const { data, error } = await withGreenboxTimeout(
+      admin
+        .from("greenbox_irrigation_queue")
+        .select("id,requested_at,zone,intensity,status")
+        .order("requested_at", { ascending: false })
+        .limit(6),
+      { data: null, error: null },
+    );
 
     if (error || !data) return [];
 
@@ -182,6 +203,47 @@ export default async function GreenboxPage() {
                 <div className="rounded-xl border border-emerald-300/50 bg-white/65 p-2 dark:border-emerald-500/20 dark:bg-emerald-950/35"><dt>pH</dt><dd className="font-medium">{bush.ph}</dd></div>
                 <div className="rounded-xl border border-emerald-300/50 bg-white/65 p-2 dark:border-emerald-500/20 dark:bg-emerald-950/35"><dt>Плоды</dt><dd className="font-medium">{bush.fruitCount}</dd></div>
               </dl>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-[2rem] border border-rose-200/75 bg-white/85 p-4 shadow-[0_14px_36px_-26px_rgba(244,63,94,0.35)] dark:border-rose-400/20 dark:bg-slate-950/45">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-rose-900/70 dark:text-rose-100/70">GBX-G2-S2 · лечение без гадания</p>
+            <h2 className="mt-1 text-2xl font-semibold text-rose-950 dark:text-rose-50">Рекомендации лечения и риск-оценка</h2>
+          </div>
+          <span className="rounded-full border border-rose-300/70 bg-rose-100/70 px-3 py-1 text-xs uppercase tracking-widest text-rose-900 dark:border-rose-400/35 dark:bg-rose-500/10 dark:text-rose-100">rule engine</span>
+        </div>
+        <p className="mt-3 text-sm text-rose-900/80 dark:text-rose-100/80">
+          Блок больше не обещает магическую диагностику: он прозрачно считает риск по влажности, pH, EC и ручной отметке здоровья, а затем даёт безопасный первый уход.
+        </p>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          {careRecommendations.map((recommendation) => (
+            <article key={recommendation.plantName} className={`rounded-2xl border p-4 ${riskTone[recommendation.risk]}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] opacity-75">риск: {recommendation.risk}</p>
+                  <h3 className="mt-1 text-lg font-semibold">{recommendation.plantName}</h3>
+                </div>
+                <span className="rounded-full border border-current/25 px-3 py-1 text-sm font-semibold">{recommendation.score}/100</span>
+              </div>
+              <p className="mt-3 text-sm opacity-85">{recommendation.summary}</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <h4 className="text-sm font-semibold">Что проверить</h4>
+                  <ul className="mt-2 space-y-1 text-sm opacity-85">
+                    {recommendation.checks.slice(0, 2).map((item) => <li key={item}>• {item}</li>)}
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold">Первый уход</h4>
+                  <ul className="mt-2 space-y-1 text-sm opacity-85">
+                    {(recommendation.treatment.length ? recommendation.treatment : ["Ничего резко не менять: только наблюдение и повторный замер вечером."]).slice(0, 2).map((item) => <li key={item}>• {item}</li>)}
+                  </ul>
+                </div>
+              </div>
             </article>
           ))}
         </div>
