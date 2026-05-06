@@ -463,7 +463,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                   </div>
                   <div className="mb-4 inline-flex rounded-xl border border-[#27272a] bg-[#09090b] p-1">
                     {(['regular', 'lithium'] as const).map((mode) => (
-                      <button key={mode} onClick={() => { setBatteryMode(mode); setBatteryCapacity((mode === 'regular' ? regularBatteries[0] : lithiumBatteries[0])?.capacity ?? '') }}
+                      <button key={mode} type="button" onClick={() => { setBatteryMode(mode); setBatteryCapacity((mode === 'regular' ? regularBatteries[0] : lithiumBatteries[0])?.capacity ?? '') }}
                         aria-label={`Тип аккумулятора ${mode === 'regular' ? 'Regular' : 'Lithium'}`}
                         className={['rounded-lg px-4 py-2 text-xs font-semibold transition-all', batteryMode === mode ? 'bg-[#00ffea] text-black shadow-md' : 'text-[#71717a] hover:text-white'].join(' ')}>
                         {mode === 'regular' ? 'Regular' : 'Lithium'}
