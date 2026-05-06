@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppContext } from "@/contexts/AppContext";
@@ -401,13 +402,21 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               </Button>
             ) : null}
             <div className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-3">
+              <Label htmlFor="map-riders-ride-name" className="sr-only">
+                Название заезда
+              </Label>
               <Input
+                id="map-riders-ride-name"
                 value={state.rideName}
                 onChange={(event) => dispatch({ type: "ui/set-ride-name", payload: event.target.value })}
                 placeholder="Название заезда"
                 className="h-9"
               />
+              <Label htmlFor="map-riders-vehicle-label" className="sr-only">
+                Мотоцикл
+              </Label>
               <Input
+                id="map-riders-vehicle-label"
                 value={state.vehicleLabel}
                 onChange={(event) => dispatch({ type: "ui/set-vehicle-label", payload: event.target.value })}
                 placeholder="Мотоцикл"
@@ -417,7 +426,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
                 value={state.rideMode}
                 onValueChange={(value: "rental" | "personal") => dispatch({ type: "ui/set-ride-mode", payload: value })}
               >
-                <SelectTrigger className="h-9">
+                <SelectTrigger aria-label="Режим поездки" className="h-9">
                   <SelectValue placeholder="Режим поездки" />
                 </SelectTrigger>
                 <SelectContent>
@@ -426,26 +435,30 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
                 </SelectContent>
               </Select>
               <div className="grid grid-cols-2 gap-2">
-                <Select value={state.visibilityMode} onValueChange={(value: "crew" | "public") => dispatch({ type: "privacy/set-visibility", payload: value })}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Видимость" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="crew">Только экипаж</SelectItem>
-                    <SelectItem value="public">Все авторизованные</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={String(state.autoExpireMinutes)} onValueChange={(value: "1" | "5" | "15" | "60") => dispatch({ type: "privacy/set-auto-expire", payload: Number(value) as 1 | 5 | 15 | 60 })}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Авто-стоп" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 мин</SelectItem>
-                    <SelectItem value="5">5 мин</SelectItem>
-                    <SelectItem value="15">15 мин</SelectItem>
-                    <SelectItem value="60">60 мин</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="space-y-1">
+                  <Select value={state.visibilityMode} onValueChange={(value: "crew" | "public") => dispatch({ type: "privacy/set-visibility", payload: value })}>
+                    <SelectTrigger aria-label="Кто видит мою позицию" className="h-9">
+                      <SelectValue placeholder="Видимость" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="crew">Только экипаж</SelectItem>
+                      <SelectItem value="public">Все авторизованные</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Select value={String(state.autoExpireMinutes)} onValueChange={(value: "1" | "5" | "15" | "60") => dispatch({ type: "privacy/set-auto-expire", payload: Number(value) as 1 | 5 | 15 | 60 })}>
+                    <SelectTrigger aria-label="Автоматически остановить геошеринг" className="h-9">
+                      <SelectValue placeholder="Авто-стоп" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 мин</SelectItem>
+                      <SelectItem value="5">5 мин</SelectItem>
+                      <SelectItem value="15">15 мин</SelectItem>
+                      <SelectItem value="60">60 мин</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => dispatch({ type: "privacy/toggle-home-blur" })}>
                 {state.homeBlurEnabled ? "Дом размыт: ВКЛ" : "Дом размыт: ВЫКЛ"}

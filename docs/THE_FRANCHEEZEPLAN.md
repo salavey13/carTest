@@ -54,9 +54,9 @@ This root file stays intentionally compact so operators and agents can load it q
 - status: `ready_for_pr`
 - updated_at: `2026-05-06T00:00:00Z`
 - owner: `codex`
-- notes: `Final polish complete: Hero, Electro-Enduro, MapRiders preview, StepsProgress newbie flow, original downstream content blocks, docs, and safe fallbacks are preserved/synced.`
-- next_step: `Create PR. Remaining TODO entries are future backlog and should not auto-trigger unless operator explicitly asks.`
-- risks: `Local runtime can render fallback data when Supabase is unavailable; production QA should verify real vip-bike catalog/map records.`
+- notes: `Quick action follow-up plus sale-config cleanup complete: Hero, Electro-Enduro, MapRiders preview, StepsProgress, RentalQuickActionHub, and shared sale config parsing are synced with safe catalog/map fallbacks.`
+- next_step: `Create PR. Remaining TODO entries are OSRM/route loading cleanup and production QA with real data.`
+- risks: `Local runtime can render fallback data when Supabase is unavailable; production QA should verify real vip-bike catalog/map records and active rental states.`
 
 
 ### 2026-05-06 — SupaPlan franchize maintenance pair
@@ -75,7 +75,19 @@ This root file stays intentionally compact so operators and agents can load it q
 - 2026-05-06 — Self-reviewed `/vipbikerental` refactor by comparing old/new section headings, then shipped lightweight MapRiders preview: static glowing route map, live rider dots, meetup labels, latest ride stats and SVG speed sparkline. Next step: interactive newbie stepper.
 - 2026-05-06 — Finalized `/vipbikerental` PR readiness review: updated TODO with finished/not-finished checklist, confirmed no important visible sections were intentionally removed, and moved active status to `ready_for_pr`. Next PR should begin with the interactive newbie stepper.
 - 2026-05-06 — Final polish iteration: implemented `StepsProgress` for the newbie flow and reworded `/app/vipbikerental/todo.md` so completed scope is clearly closed while remaining quick-action/technical items are future backlog, not an automatic trigger.
+- 2026-05-06 — Continued explicit `/vipbikerental` TODO work: replaced static quick-action link cards with `RentalQuickActionHub`, including latest rental readiness, live rider counters and a quick bike chooser modal hydrated from catalog/fallback items. Next step: technical cleanup backlog or production QA with real Supabase rental/map data.
+- 2026-05-06 — Continued cleanup after quick actions: extracted shared sale config/color parsing into `app/franchize/lib/sale-config.ts` and reused it in both the sale buy page and `/vipbikerental` Electro-Enduro quick preview, removing duplicated package/color constants. Next step: OSRM/route loading cleanup or production QA.
 ## 3) Active implementation slices
+
+
+### 2026-05-06 — Franchize accessibility labels for MapRiders/configurator
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T22:25:00Z
+- `owner`: codex
+- `notes`: Added screen-reader labels/aria names for MapRiders ride controls, privacy dropdowns, meetup drawer inputs, replay scrubber, and configurator option controls. SupaPlan task `dc8f8c2b-2234-4c0a-6789-ccc000ccf789`.
+- `next_step`: Verify `vip-bike` configurator and `/franchize/vip-bike/map-riders` with a browser accessibility audit when a local runtime is available.
+- `risks`: Visual layout should be unchanged because labels are hidden where needed; runtime audit still depends on app boot and route data.
 
 ### 2026-05-06 — Sale buy page VS + test-drive reservation
 
@@ -97,3 +109,14 @@ This root file stays intentionally compact so operators and agents can load it q
 - 2026-05-06 — SupaPlan franchize maintenance pair: fixed repeated `startapp` handling in `useStartParamRouter` and added a test-coverage foundation for franchize helper libraries. Next step: mocked Supabase action validation tests.
 - 2026-05-06 — Self-reviewed SupaPlan franchize maintenance pair: replaced the boolean start-param guard with active/last-handled param refs to prevent duplicate processing during pathname/clear races, removed dead sale metadata, and normalized category anchors before tests codify the behavior.
 - 2026-05-06 — Final code review polish for SupaPlan franchize maintenance: added a run-id freshness guard so slow async start-param resolutions cannot navigate after a newer deep link wins.
+
+- 2026-05-06 — Claimed SupaPlan franchize accessibility task `dc8f8c2b-2234-4c0a-6789-ccc000ccf789`; labeled MapRiders dropdown/input controls and configurator option controls for screen readers. Next step: PR review + runtime accessibility smoke on `vip-bike`.
+### 2026-05-06 — Telegram auth unmount guard
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T22:25:00Z
+- `owner`: codex
+- `notes`: Claimed SupaPlan `CQ-TELEGRAM-GUARD` and moved `useTelegram` async initialization from a local boolean to a lifecycle ref guard so delayed auth results do not update state after unmount.
+- `next_step`: Merge PR, then verify Telegram WebApp auth/navigation on `vip-bike` under slow network throttling.
+- `risks`: Runtime Telegram validation still depends on configured bot/API env and a real WebApp launch context.
+

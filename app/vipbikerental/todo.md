@@ -16,16 +16,24 @@
 - [x] MapRiders preview: lightweight static mini-map, live rider dots, meetup labels, weekly stats, latest ride summary, SVG speed sparkline, click-through to full MapRiders.
 - [x] Interactive newbie stepper: `StepsProgress` replaces static newbie cards with tabs, animated content, bike preview carousel and mini-cart visualization.
 - [x] Documentation sync: this TODO and `docs/THE_FRANCHEEZEPLAN.md` now reflect completed slices and explicitly separated future backlog.
+- [x] Quick action hub follow-up: static rental-flow link cards were replaced with a tabbed in-place action panel, live MapRiders counters, rental readiness checklist, and a quick bike chooser modal using real catalog data/fallbacks.
 
 ### Future backlog — not an active trigger unless operator explicitly asks
-- [ ] Quick action cards with in-place micro-actions: latest rental status, live rider counter, quick bike chooser modal.
-- [ ] Technical cleanup backlog: duplicated sale configurator constants, protected OSRM/fallback routing layer, lighter route/POI loading strategy.
+- [x] Technical cleanup slice: duplicated sale configurator constants were centralized into `app/franchize/lib/sale-config.ts` and reused by sale landing + `/vipbikerental` quick preview.
+- [ ] Remaining technical cleanup backlog: protected OSRM/fallback routing layer, lighter route/POI loading strategy.
 - [ ] Deeper production QA with real Supabase data available in runtime; local runner currently falls back safely when Supabase fetch fails.
 
 ### Final code-review notes
 - No important visible section was intentionally removed during the server/client split; the main content sequence is preserved.
 - The MapRiders landing preview deliberately avoids loading Leaflet or heavy GeoJSON on first paint; it uses overview data first and safe fallbacks second.
 - Current interactive landing scope is complete and PR-ready; future backlog above should not auto-trigger new work unless explicitly requested.
+
+### Follow-up implementation note — 2026-05-06
+- Quick action backlog item completed: the old static rental-flow cards were replaced by `RentalQuickActionHub` with in-section tabs for latest rental status, live rider counter and quick bike chooser.
+- The chooser modal uses hydrated `vip-bike` catalog items first and existing safe Electro-Enduro fallbacks second, preserving local runtime resilience when Supabase data is unavailable.
+
+### Technical cleanup note — 2026-05-06
+- Sale config options/colors are now shared through `app/franchize/lib/sale-config.ts`, so `/franchize/[slug]/market/[bike_id]/buy` and `/vipbikerental` use the same default packages, DB `buy_options`, and DB `buy_colors` parsing.
 
 ## 📐 0. Принцип: «кликай, не покидая секцию»
 
