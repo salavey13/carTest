@@ -68,6 +68,16 @@ This root file stays intentionally compact so operators and agents can load it q
 - `next_step`: Visual-smoke `/franchize/vip-bike/about`, `/contacts`, `/rentals`, a rental card, and a sale-buy route in a browser-capable environment; next polish task should focus route-specific metadata coverage.
 - `risks`: Local screenshot capture remains blocked by missing Playwright host libraries; curl smoke reached the about route after fallback crew loading.
 
+
+### 2026-05-07 — Franchize route metadata coverage
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `notes`: Added route-specific `generateMetadata` coverage for franchize community, electro-enduro, configurator, cart, profile, admin, MapRiders, sale-buy, order, rental, and review routes via the shared `[slug]/metadata.ts` helper with canonical paths, OpenGraph/Twitter-compatible social cards, VK meta hints, and route-aware item imagery when available; self-review tightened sale-buy title/description to include the selected bike when hydrated.
+- `next_step`: Production-smoke `/franchize/vip-bike/community`, `/electro-enduro`, `/configurator`, `/cart`, `/profile`, `/admin`, `/map-riders`, and one dynamic buy/order/rental/review route to confirm crawlers/VK/Telegram receive expected tags.
+- `risks`: Dynamic order/rental/review metadata intentionally uses crew/logo fallback imagery unless the page has an item-specific image source in route params or hydrated catalog data.
+
 ## 3) Active ad-hoc task — `/vipbikerental` interactive landing
 
 - status: `ready_for_pr`
