@@ -114,36 +114,41 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   });
 
   // ── Build map points from state ──
-  const mapPoints = useMemo(() => {
-    const riderPoints = Array.from(state.liveRiders.values())
-      .filter((r) => r.status !== "evicted")
-      .map((rider) => {
-        const session = state.sessions.find((s) => s.user_id === rider.user_id);
-        const name = riderDisplayName(session?.users, rider.user_id);
-        const isStale = rider.status === "stale";
-        return {
-          id: `live-rider-${rider.user_id}`,
-          name: `${name} • ${Math.round(rider.speed_kmh)} км/ч`,
-          type: "point" as const,
-          icon: `image:https://placehold.co/56x56/${rider.isSelf ? "facc15" : isStale ? "4b5563" : "111827"}/ffffff?text=${encodeURIComponent(initialsFromName(name))}`,
-          color: rider.isSelf ? "#facc15" : isStale ? "#6b7280" : "#60a5fa",
-          coords: [[rider.lat, rider.lng]] as [number, number][],
-        };
-      });
+  const riderPoints = useMemo(
+    () =>
+      Array.from(state.liveRiders.values())
+        .filter((r) => r.status !== "evicted")
+        .map((rider) => {
+          const session = state.sessions.find((s) => s.user_id === rider.user_id);
+          const name = riderDisplayName(session?.users, rider.user_id);
+          const isStale = rider.status === "stale";
+          return {
+            id: `live-rider-${rider.user_id}`,
+            name: `${name} • ${Math.round(rider.speed_kmh)} км/ч`,
+            type: "point" as const,
+            icon: `image:https://placehold.co/56x56/${rider.isSelf ? "facc15" : isStale ? "4b5563" : "111827"}/ffffff?text=${encodeURIComponent(initialsFromName(name))}`,
+            color: rider.isSelf ? "#facc15" : isStale ? "#6b7280" : "#60a5fa",
+            coords: [[rider.lat, rider.lng]] as [number, number][],
+          };
+        }),
+    [state.liveRiders, state.sessions],
+  );
+  const showDemo = riderPoints.length === 0 && !state.shareEnabled;
 
-    const demoPoints =
-      riderPoints.length > 0
-        ? []
-        : [
-            {
-              id: "demo-rider-alpha",
-              name: "Demo Rider База • 14 км/ч",
-              type: "point" as const,
-              icon: "image:https://placehold.co/56x56/111827/ffffff?text=SB",
-              color: "#60a5fa",
-              coords: [HOME_BASE],
-            },
-          ];
+  const mapPoints = useMemo(() => {
+    const demoPoints = showDemo
+      ? [
+          {
+            id: "demo-rider-alpha",
+            name: "Demo Rider База • 14 км/ч",
+            type: "point" as const,
+            icon: "image:https://placehold.co/56x56/111827/ffffff?text=SB",
+            color: "#60a5fa",
+            coords: [HOME_BASE],
+            markerClassName: "animate-in fade-in duration-300",
+          },
+        ]
+      : [];
 
     const meetupPoints = state.meetups.map((m) => ({
       id: `meetup-${m.id}`,
@@ -175,7 +180,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     });
 
     return [...sanitizedMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints];
-  }, [state.liveRiders, state.sessions, state.meetups, state.sessionDetail, mapData?.points]);
+  }, [riderPoints, showDemo, state.meetups, state.sessionDetail, mapData?.points]);
 
   const riderStatusCounts = useMemo(() => {
     const riders = Array.from(state.liveRiders.values());
@@ -371,7 +376,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             {riderStatusCounts.stale ? <Badge className="border border-amber-300/45 bg-amber-500/20 text-amber-100">stale {riderStatusCounts.stale}</Badge> : null}
             {mapData?.routes?.length ? <Badge className="border border-sky-300/50 bg-sky-500/20 text-sky-100">{mapData.routes.length} маршрутов</Badge> : null}
             <Badge className="border border-white/20 bg-black/45 text-white/90">{shareModeLabel} • автостоп {nextAutoStopLabel}</Badge>
-            {state.liveRiders.size === 0 && state.sessions.length === 0 ? (
+            {showDemo ? (
               <Badge className="border border-emerald-300/40 bg-emerald-500/20 text-emerald-100">Демо-режим</Badge>
             ) : null}
           </div>

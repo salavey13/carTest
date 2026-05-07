@@ -132,7 +132,13 @@ export function RacingMap({
                 key={poi.id}
                 center={center}
                 radius={8}
-                pathOptions={{ color: poi.color, fillColor: poi.color, fillOpacity: 0.9, weight: 2 }}
+                pathOptions={{
+                  color: poi.color,
+                  fillColor: poi.color,
+                  fillOpacity: 0.9,
+                  weight: 2,
+                  className: poi.markerClassName,
+                }}
                 eventHandlers={{
                   click: () => onPointClick?.(poi),
                 }}
