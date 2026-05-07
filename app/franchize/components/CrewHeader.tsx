@@ -10,14 +10,16 @@ import type { FranchizeCrewVM } from "../actions";
 import { HeaderMenu } from "../modals/HeaderMenu";
 import { FranchizeProfileButton } from "./FranchizeProfileButton";
 import { toCategoryId } from "../lib/navigation";
+import type { FranchizeSectionLink } from "../lib/section-links";
 
 interface CrewHeaderProps {
   crew: FranchizeCrewVM;
   activePath: string;
   groupLinks?: string[];
+  sectionLinks?: FranchizeSectionLink[];
 }
 
-export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProps) {
+export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [] }: CrewHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [catalogLinks, setCatalogLinks] = useState<string[]>([]);
@@ -46,9 +48,25 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
   );
 
   const visibleRailLinks = useMemo(() => {
-    if (pathname === mainCatalogPath && catalogLinks.length > 0) return catalogLinks;
-    return defaultGroupLinks;
-  }, [catalogLinks, defaultGroupLinks, mainCatalogPath, pathname]);
+    if (pathname === mainCatalogPath && catalogLinks.length > 0) {
+      return catalogLinks.map((label) => ({ label, href: `#${toCategoryId(label)}`, active: activeCategory === label, categoryLabel: label }));
+    }
+
+    if (pathname !== mainCatalogPath && sectionLinks.length > 0) {
+      const normalizedSectionLinks = sectionLinks
+        .filter((link) => link.label.trim() && link.href.trim())
+        .map((link) => ({ ...link, categoryLabel: link.label }));
+
+      if (normalizedSectionLinks.length > 0) return normalizedSectionLinks;
+    }
+
+    return defaultGroupLinks.map((label) => ({
+      label,
+      href: pathname === mainCatalogPath ? `#${toCategoryId(label)}` : `${mainCatalogPath}#${toCategoryId(label)}`,
+      active: activeCategory === label,
+      categoryLabel: label,
+    }));
+  }, [activeCategory, catalogLinks, defaultGroupLinks, mainCatalogPath, pathname, sectionLinks]);
 
   // --- FIXED: Hysteresis Scroll Listener ---
   useEffect(() => {
@@ -120,23 +138,26 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
 
   // --- NEW: Плавный скролл активного бейджа (pill) в центр экрана ---
   useEffect(() => {
-    if (activeCategory && railRef.current) {
-      // Экранируем кавычки на случай нестандартных названий категорий
-      const safeCategory = activeCategory.replace(/"/g, '\\"');
-      const activeEl = railRef.current.querySelector(`[data-category-pill="${safeCategory}"]`) as HTMLElement;
-      
-      if (activeEl) {
-        const container = railRef.current;
-        // Вычисляем нужный сдвиг (позиция элемента относительно контейнера - половина контейнера + половина элемента)
-        const scrollLeft = activeEl.offsetLeft - container.clientWidth / 2 + activeEl.clientWidth / 2;
-        
-        container.scrollTo({
-          left: scrollLeft,
-          behavior: "smooth",
-        });
-      }
+    const activeRailLink = visibleRailLinks.find(
+      (link) => link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href)),
+    );
+    if (!activeRailLink || !railRef.current) return;
+
+    const activeEl = Array.from(railRef.current.querySelectorAll<HTMLElement>("[data-category-pill]")).find(
+      (element) => element.dataset.categoryPill === activeRailLink.categoryLabel,
+    );
+
+    if (activeEl) {
+      const container = railRef.current;
+      // Вычисляем нужный сдвиг (позиция элемента относительно контейнера - половина контейнера + половина элемента)
+      const scrollLeft = activeEl.offsetLeft - container.clientWidth / 2 + activeEl.clientWidth / 2;
+
+      container.scrollTo({
+        left: scrollLeft,
+        behavior: "smooth",
+      });
     }
-  }, [activeCategory]);
+  }, [activePath, pathname, visibleRailLinks]);
   // ------------------------------------------------------------------
 
   return (
@@ -228,24 +249,22 @@ export function CrewHeader({ crew, activePath, groupLinks = [] }: CrewHeaderProp
             ref={railRef}
             className="relative mx-auto flex w-full max-w-7xl gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
           >
-            {visibleRailLinks.map((linkLabel) => {
-              const targetId = toCategoryId(linkLabel);
-              const href = pathname === mainCatalogPath ? `#${targetId}` : `${mainCatalogPath}#${targetId}`;
-              const isActive = activeCategory === linkLabel;
+            {visibleRailLinks.map((link) => {
+              const isActive = link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href));
               return (
                 <Link
-                  key={linkLabel}
-                  href={href}
-                  data-category-pill={linkLabel}
+                  key={`${link.label}-${link.href}`}
+                  href={link.href}
+                  data-category-pill={link.categoryLabel}
                   aria-current={isActive ? "location" : undefined}
-                  aria-label={`Перейти к разделу ${linkLabel}`}
+                  aria-label={`Перейти к разделу ${link.label}`}
                   className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-4 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] transition-colors pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
                     ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
                     ["--pill-text" as string]: isActive ? "#000000" : crew.theme.palette.textPrimary,
                   }}
                 >
-                  {linkLabel}
+                  {link.label}
                 </Link>
               );
             })}

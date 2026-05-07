@@ -4,6 +4,7 @@ import { CheckCircle2, ClipboardCheck, FileText, Handshake, MessageCircle, Shiel
 import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
+import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
@@ -55,13 +56,14 @@ export default async function PartnerOnboardingPage({ params }: PartnerOnboardin
   const { slug } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
   const crewSlug = crew.slug || slug;
+  const activePath = `/franchize/${crewSlug}/onboarding`;
   const surface = crewPaletteForSurface(crew.theme);
   const brandName = crew.header.brandName || crew.name || "VIP BIKE";
   const telegramHref = crew.contacts.telegram ? `https://t.me/${crew.contacts.telegram.replace("@", "")}` : "https://t.me/oneBikePlsBot";
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crewSlug}/onboarding`} groupLinks={items.map((item) => item.category)} />
+      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} />
       <div
         className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-20 md:pt-24"
         style={{
