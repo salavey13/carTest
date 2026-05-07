@@ -1,7 +1,8 @@
-# Telegram auth SHA/HMAC mismatch checklist
+# Telegram auth SHA/HMAC mismatch checklist — archived
 
-Use this as the production debug runbook when `/api/validate-telegram-auth` rejects real `Telegram.WebApp.initData`.
-The server now logs `API_VALIDATE_HASH_DIAG` with a variant matrix on every strict mismatch, so each hypothesis below can be tested one by one from Vercel logs without returning forgery-friendly hashes to the browser.
+> Status: **not needed for normal operation**. The May 7, 2026 Telegram WebApp auth incident was fixed: production `initData` now validates with the canonical bot-token HMAC path. Keep this file as an archived checklist only if a future mismatch appears again.
+
+The production `/api/validate-telegram-auth` route intentionally does **not** emit the old `API_VALIDATE_HASH_DIAG` variant matrix anymore. That extensive logging was useful for the one-shot investigation, but after the fix it is too noisy and can expose sensitive auth-validation details in server logs.
 
 ## Canonical algorithm we expect
 
@@ -13,7 +14,11 @@ The server now logs `API_VALIDATE_HASH_DIAG` with a variant matrix on every stri
 6. Derive the binary secret as `HMAC-SHA256(key = "WebAppData", message = TELEGRAM_BOT_TOKEN)`.
 7. Compute `HMAC-SHA256(key = derivedSecret, message = dataCheckString)` and compare its hex digest to the received `hash`.
 
-## Hypotheses to test in production
+## If this ever breaks again
+
+Do **not** re-enable broad production logging by default. First reproduce with a safe sample and use the existing helper tests around `computeTelegramWebAppHashDiagnostics` to inspect the variant matrix locally.
+
+Hypotheses to test if validation starts rejecting real `Telegram.WebApp.initData` again:
 
 - **Wrong bot token / wrong bot launched the app.** Production may be opened from one Telegram bot while Vercel has another `TELEGRAM_BOT_TOKEN`.
 - **`signature` field confusion.** Bot-token HMAC should exclude `hash` but include `signature`; old snippets sometimes exclude both.
@@ -26,9 +31,9 @@ The server now logs `API_VALIDATE_HASH_DIAG` with a variant matrix on every stri
 - **Client sends wrong source.** Backend must receive `window.Telegram.WebApp.initData`, not `initDataUnsafe`, not `tgWebAppData` after accidental partial decoding/re-encoding, and not the full launch URL.
 - **Stale auth date is a separate failure.** `auth_date` freshness can reject a request later, but it should not change the HMAC digest itself.
 
-## How to read the new log matrix
+## Archived variant matrix meanings
 
-Look for `API_VALIDATE_HASH_DIAG` in server logs after a 401 response:
+If you run the diagnostics helper locally:
 
 - `official_include_signature_exclude_hash` matching means the strict path is correct and any failure is likely outside hash comparison.
 - `legacy_exclude_signature_and_hash` matching means `signature` handling is the bug.
