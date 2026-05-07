@@ -6,6 +6,7 @@ import { FranchizeHero } from "../../components/FranchizeHero";
 import { FranchizePageShell } from "../../components/FranchizePageShell";
 import { FranchizeRentalsBridge } from "../../components/FranchizeRentalsBridge";
 import { FranchizeErrorBoundary } from "../../components/ErrorBoundary";
+import { buildFranchizeIntentLinks } from "../../lib/section-links";
 import { crewPaletteForSurface } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
@@ -26,11 +27,12 @@ export default async function FranchizeRentalsPage({ params }: FranchizeRentalsP
   const { slug } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
   const resolvedSlug = crew.slug || slug;
+  const activePath = `/franchize/${resolvedSlug}/rentals`;
   const surface = crewPaletteForSurface(crew.theme);
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${resolvedSlug}/rentals`} groupLinks={items.map((item) => item.category)} />
+      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath)} />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6">
         <FranchizeHero
           eyebrow={`/franchize/${resolvedSlug}/rentals · control-center`}

@@ -6,6 +6,7 @@ import { FranchizeFloatingCart } from "../../components/FranchizeFloatingCart";
 import { FranchizeHero } from "../../components/FranchizeHero";
 import { FranchizePageShell } from "../../components/FranchizePageShell";
 import { FranchizeContactsMap } from "../../components/FranchizeContactsMap";
+import { buildFranchizeIntentLinks } from "../../lib/section-links";
 import { crewPaletteForSurface } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
@@ -27,6 +28,7 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
   const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteForSurface(crew.theme);
   const resolvedSlug = crew.slug || slug;
+  const activePath = `/franchize/${resolvedSlug}/contacts`;
   const telegramHref = crew.contacts.telegram
     ? crew.contacts.telegram.startsWith("http")
       ? crew.contacts.telegram
@@ -35,7 +37,7 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${resolvedSlug}/contacts`} groupLinks={items.map((item) => item.category)} />
+      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath)} />
 
       <FranchizePageShell theme={crew.theme}>
         <FranchizeHero
