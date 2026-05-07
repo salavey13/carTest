@@ -4,100 +4,20 @@
 
 "use client";
 
-import { useCallback, useState } from "react";
-import { toast } from "sonner";
 import { useMapRiders } from "@/hooks/useMapRidersContext";
-import { useAppContext } from "@/contexts/AppContext";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
-import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
+import { useSessionManager } from "@/app/franchize/hooks/useSessionManager";
 
 export function RiderFAB() {
-  const { state, dispatch, crewSlug, fetchSnapshot } = useMapRiders();
-  const { dbUser } = useAppContext();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleToggle = useCallback(async () => {
-    if (!dbUser?.user_id) {
-      toast.error("Авторизуйся в Telegram/VIP BIKE");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      if (!state.shareEnabled) {
-        // START
-        const headers = await getMapRidersWriteHeaders();
-        const res = await fetch("/api/map-riders/session", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            action: "start",
-            userId: dbUser.user_id,
-            crewSlug,
-            rideName: state.rideName,
-            vehicleLabel: state.vehicleLabel,
-            rideMode: state.rideMode,
-            visibility: state.visibilityMode === "public" ? "all_auth" : "crew",
-            privacy: {
-              homeBlurEnabled: state.homeBlurEnabled,
-              autoExpireMinutes: state.autoExpireMinutes,
-            },
-          }),
-        });
-        const json = await res.json();
-        if (!res.ok || !json.success) throw new Error(json.error);
-        dispatch({
-          type: "share/started",
-          payload: { sessionId: json.data.id, rideName: state.rideName, vehicleLabel: state.vehicleLabel, rideMode: state.rideMode },
-        });
-        await fetchSnapshot();
-        toast.success("MapRiders активирован!");
-      } else {
-        // STOP
-        const headers = await getMapRidersWriteHeaders();
-        const res = await fetch("/api/map-riders/session", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            action: "stop",
-            sessionId: state.sessionId,
-            userId: dbUser.user_id,
-            crewSlug,
-            routePoints: [],
-          }),
-        });
-        const json = await res.json();
-        if (!res.ok || !json.success) throw new Error(json.error);
-        dispatch({ type: "share/stopped" });
-        await fetchSnapshot();
-        toast.success("Заезд завершён!");
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Ошибка");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [
-    dbUser,
-    state.shareEnabled,
-    state.sessionId,
-    state.rideName,
-    state.vehicleLabel,
-    state.rideMode,
-    state.visibilityMode,
-    state.homeBlurEnabled,
-    state.autoExpireMinutes,
-    crewSlug,
-    dispatch,
-    fetchSnapshot,
-  ]);
+  const { state } = useMapRiders();
+  const { isSubmitting, toggleSession } = useSessionManager();
 
   const isRecording = state.shareEnabled;
 
   return (
     <button
       type="button"
-      onClick={handleToggle}
+      onClick={toggleSession}
       disabled={isSubmitting}
       className={`
         fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center

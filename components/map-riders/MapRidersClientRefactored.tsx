@@ -34,6 +34,7 @@ import { SpeedGradientRoute } from "@/components/map-riders/SpeedGradientRoute";
 import { MapRidersDebugPanel } from "@/components/map-riders/MapRidersDebugPanel";
 import { MapRidersSkeleton } from "@/components/map-riders/LoadingSkeleton";
 import { BeginnerRiderOnboardingQuiz } from "@/components/map-riders/BeginnerRiderOnboardingQuiz";
+import { useSessionManager } from "@/app/franchize/hooks/useSessionManager";
 
 // Lazy-load map (SSR disabled)
 const RacingMap = dynamic(() => import("@/components/maps/RacingMap").then((mod) => mod.RacingMap), { ssr: false });
@@ -64,6 +65,10 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     defaultTileLayer: "cartodb-dark",
   });
   const { createMeetup } = useMeetupCreator(crewSlug);
+  const { canStart, canStop, startSession, stopSession } = useSessionManager({
+    authErrorMessage: "Авторизуйся",
+    stopSuccessMessage: "Заезд завершён",
+  });
 
   // ── GPS tracking hook ──
   const { isUsingTelegram, lastBroadcastAt, queuedPoints } = useLiveRiders({
@@ -504,39 +509,12 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
                 {state.homeBlurEnabled ? "Дом размыт: ВКЛ" : "Дом размыт: ВЫКЛ"}
               </Button>
             </div>
-            {/* TODO: Wire up session start/stop from useSessionManager */}
             <Button
               type="button"
-              disabled={state.shareEnabled}
+              disabled={!canStart}
               className="w-full text-black"
               style={{ backgroundColor: crew.theme.palette.accentMain }}
-              onClick={async () => {
-                if (!dbUser?.user_id) { toast.error("Авторизуйся"); return; }
-                try {
-                  const headers = await getMapRidersWriteHeaders();
-                  const res = await fetch("/api/map-riders/session", {
-                    method: "POST",
-                    headers,
-                    body: JSON.stringify({
-                      action: "start",
-                      userId: dbUser.user_id,
-                      crewSlug,
-                      rideName: state.rideName,
-                      vehicleLabel: state.vehicleLabel,
-                      rideMode: state.rideMode,
-                      visibility: state.visibilityMode === "public" ? "all_auth" : "crew",
-                      privacy: {
-                        homeBlurEnabled: state.homeBlurEnabled,
-                        autoExpireMinutes: state.autoExpireMinutes,
-                      },
-                    }),
-                  });
-                  const json = await res.json();
-                  if (!res.ok || !json.success) throw new Error(json.error);
-                  dispatch({ type: "share/started", payload: { sessionId: json.data.id, rideName: state.rideName, vehicleLabel: state.vehicleLabel, rideMode: state.rideMode } });
-                  toast.success("MapRiders активирован!");
-                } catch (err) { toast.error(err instanceof Error ? err.message : "Ошибка запуска"); }
-              }}
+              onClick={startSession}
             >
               <VibeContentRenderer content="::FaLocationArrow::" className="mr-2" />
               Включить геошеринг
@@ -554,24 +532,9 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             <Button
               type="button"
               variant="outline"
-              disabled={!state.shareEnabled}
+              disabled={!canStop}
               className="w-full"
-              onClick={async () => {
-                if (!dbUser?.user_id || !state.sessionId) return;
-                try {
-                  const headers = await getMapRidersWriteHeaders();
-                  const res = await fetch("/api/map-riders/session", {
-                    method: "POST",
-                    headers,
-                    body: JSON.stringify({ action: "stop", sessionId: state.sessionId, userId: dbUser.user_id, crewSlug, routePoints: [] }),
-                  });
-                  const json = await res.json();
-                  if (!res.ok || !json.success) throw new Error(json.error);
-                  dispatch({ type: "share/stopped" });
-                  await fetchSnapshot();
-                  toast.success("Заезд завершён");
-                } catch (err) { toast.error(err instanceof Error ? err.message : "Ошибка остановки"); }
-              }}
+              onClick={stopSession}
             >
               <VibeContentRenderer content="::FaPowerOff::" className="mr-2" />
               Завершить заезд
