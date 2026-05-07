@@ -1,20 +1,23 @@
-# /app/franchize — convert to extension (OpenClaw style)
+# /app/franchize TODO
 
-Purpose
-Turn current proto-franchize into formal extension living under /app/franchize with manifest.
+## Current status
+- Status: `in_progress`
+- Owner: Codex / franchize integration lane
+- Franchize is a formal app plugin with manifest, contract, hydration docs, slug routes, and stable compatibility exports.
+- Public server actions now route through focused server-only modules while preserving `app/franchize/actions.ts` imports.
+- Archive/changelog: `app/franchize/CHANGELOG.md`.
 
-Tasks
-- [x] Create /app/franchize/plugin.ts (manifest: id, capabilities, uses)
-- [x] Add /app/franchize/hydration.md (context, public surface)
-- [x] Add /app/franchize/CONTRACT.md (what API it guarantees)
-- [ ] Extract business logic into cores where duplicated (refer to /app/core/todo.md)
-- [ ] Add todo.md entries for leftover features (payments, items sync)
-- [ ] Minimal UI wrapper: /app/franchize/layout.tsx & page.tsx to register route
+## Next action
+- Continue extracting duplicated business logic into shared cores where it is reused outside franchize.
+- Add focused TODO entries for remaining payments/items-sync work only when those scopes become active.
+- Add or finish a minimal wrapper route registration if plugin registry wiring requires it.
 
-Notes
-- Do not move files out of /app — keep plugin in place, formalize with manifest.
+## Blockers
+- Core extraction depends on stable shared contracts in `/app/core`.
+- Live payment/items-sync verification requires configured Supabase and Telegram runtime credentials.
 
-## SupaPlan execution — 2026-05-06
-
-- [x] `RENT-P3.1` (`a58aea2f-b6ff-43f1-ad0e-a946ac359d9a`): storefront a11y pass added explicit search labels/live result status, pressed/current states, focus-visible affordances, dialog/menu semantics, focus containment/return for overlays, and clearer cart/gallery/modal labels.
-- [x] `FIX-ORPHAN-INVOICE` (`d1a6f7d0-1234-4a1e-bcde-11110001abcd`): `createFranchizeOrderInvoiceInternal` now deletes the just-created pending invoice when Telegram XTR invoice sending fails, guarded by invoice id/status/rental metadata.
+## Links
+- Plugin manifest: `app/franchize/plugin.ts`
+- Public contract: `app/franchize/CONTRACT.md`
+- Hydration notes: `app/franchize/hydration.md`
+- Core extraction tracker: `app/core/todo.md`
