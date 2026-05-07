@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { debugLogger } from "@/lib/debugLogger"; 
 import { logger as globalLogger } from "@/lib/logger"; 
 import { isAllowedMockContext } from "@/lib/telegram-mock-context";
+import { getTelegramLaunchParamsFromWindow } from "@/lib/telegram-launch-params";
 import { 
   fetchDbUserAction,
   upsertTelegramUserAction
@@ -238,21 +239,21 @@ export function useTelegram() {
       
       let authCandidate: WebAppUser | null = null;
       let inTgContextReal = false; 
-      let tempTgWebApp: TelegramWebApp | null = null; 
       let rawStartParam: string | null = null;
 
       try { 
         globalLogger.log("[HOOK_TELEGRAM initialize TRY_BLOCK_START] STEP 3: Checking for window.Telegram.WebApp...");
-        if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
-          const telegram = (window as any).Telegram.WebApp;
-          tempTgWebApp = telegram; 
+        const launchParams = getTelegramLaunchParamsFromWindow();
+        const telegram = typeof window !== "undefined" ? (window as any).Telegram?.WebApp : null;
+        const initDataForValidation = telegram?.initData || launchParams.initData || "";
+
+        if (telegram) {
           if (canUpdateState()) {
             setTgWebApp(telegram);
             globalLogger.log("[HOOK_TELEGRAM initialize] STEP 3.1: Telegram WebApp object FOUND and set to state (tgWebApp).");
           }
           
-          inTgContextReal = !!telegram.initData && telegram.initData.length > 0; 
-          rawStartParam = telegram.initDataUnsafe?.start_param || null;
+          rawStartParam = telegram.initDataUnsafe?.start_param || launchParams.startParam || null;
           if (canUpdateState() && rawStartParam) {
             setStartParam(rawStartParam);
             globalLogger.info(`[HOOK_TELEGRAM initialize] STEP 3.1.1: start_param found: "${rawStartParam}" and set to state.`);
@@ -261,7 +262,7 @@ export function useTelegram() {
           if (canUpdateState()) {
             safeReady(telegram);
             globalLogger.log("[HOOK_TELEGRAM initialize] STEP 3.3: Called telegram.ready()");
-            if (inTgContextReal && telegram.expand) {
+            if (initDataForValidation && telegram.expand) {
               const expanded = await safeExpand(telegram, { attempts: 3, delayMs: 120 });
               if (!canUpdateState()) {
                 return;
@@ -274,29 +275,36 @@ export function useTelegram() {
               detachVisibilityRecovery = attachVisibilityExpandRecovery(telegram, { attempts: 2, delayMs: 150 });
             }
           }
-
-          if (inTgContextReal) { 
-              globalLogger.log("[HOOK_TELEGRAM initialize] STEP 4A: REAL Telegram initData found. Validating via API...");
-              const validatedUserFromApi = await validateTelegramAuthWithApi(telegram.initData); 
-              if (validatedUserFromApi) {
-                  authCandidate = validatedUserFromApi;
-                  globalLogger.info(`[HOOK_TELEGRAM initialize] STEP 4A.1: REAL Telegram auth validated successfully via API. Auth Candidate User ID: ${authCandidate.id}`);
-              } else {
-                  globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 4A.2: REAL Telegram initData validation FAILED via API or returned no user.");
-                  if (MOCK_USER && isAllowedMockContext()) {
-                    globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 4A.3: Validation failed, but preview/dev mock context is allowed. Falling back to MOCK_USER without blocking.");
-                  } else if (canUpdateState()) {
-                    const validationError = new Error("Telegram data validation failed. Please open this page through the Telegram App to continue.");
-                    setError((prev) => prev ?? validationError);
-                  }
-              }
-          } else if (telegram.initDataUnsafe?.user?.id && process.env.NODE_ENV === 'development') {
-             globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 4B: Using initDataUnsafe.user as fallback. INSECURE - DEV ONLY.");
-             authCandidate = telegram.initDataUnsafe.user;
-             inTgContextReal = true; 
-          }
         } else {
-          globalLogger.log("[HOOK_TELEGRAM initialize] STEP 3 (FAIL): window.Telegram.WebApp not found.");
+          rawStartParam = launchParams.startParam;
+          globalLogger.log("[HOOK_TELEGRAM initialize] STEP 3 (FALLBACK): window.Telegram.WebApp not found; checking launch params from URL.");
+          if (canUpdateState() && rawStartParam) {
+            setStartParam(rawStartParam);
+            globalLogger.info(`[HOOK_TELEGRAM initialize] STEP 3.1.1_FALLBACK: start_param found in URL: "${rawStartParam}" and set to state.`);
+          }
+        }
+
+        inTgContextReal = initDataForValidation.length > 0;
+
+        if (initDataForValidation) {
+            globalLogger.log("[HOOK_TELEGRAM initialize] STEP 4A: REAL Telegram initData found. Validating via API...");
+            const validatedUserFromApi = await validateTelegramAuthWithApi(initDataForValidation);
+            if (validatedUserFromApi) {
+                authCandidate = validatedUserFromApi;
+                globalLogger.info(`[HOOK_TELEGRAM initialize] STEP 4A.1: REAL Telegram auth validated successfully via API. Auth Candidate User ID: ${authCandidate.id}`);
+            } else {
+                globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 4A.2: REAL Telegram initData validation FAILED via API or returned no user.");
+                if (MOCK_USER && isAllowedMockContext()) {
+                  globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 4A.3: Validation failed, but preview/dev mock context is allowed. Falling back to MOCK_USER without blocking.");
+                } else if (canUpdateState()) {
+                  const validationError = new Error("Telegram data validation failed. Please open this page through the Telegram App to continue.");
+                  setError((prev) => prev ?? validationError);
+                }
+            }
+        } else if (telegram?.initDataUnsafe?.user?.id && process.env.NODE_ENV === 'development') {
+           globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 4B: Using initDataUnsafe.user as fallback. INSECURE - DEV ONLY.");
+           authCandidate = telegram.initDataUnsafe.user;
+           inTgContextReal = true;
         }
 
         // Preview/Dev safety net: Allows mockuser bypass ONLY when the URL contains

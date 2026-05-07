@@ -12,7 +12,7 @@ export function buildTelegramDataCheckString(initDataString: string): { dataChec
   const params = new URLSearchParams(initDataString);
   const hashFromClient = params.get("hash");
   const keys = Array.from(params.keys())
-    .filter((key) => key !== "hash" && key !== "signature")
+    .filter((key) => key !== "hash")
     .sort();
 
   return {
