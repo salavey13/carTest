@@ -9,7 +9,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
-import { checkFranchizeCarsAvailability, createFranchizeOrderCheckout } from "../actions";
+import { checkFranchizeCarsAvailability, createFranchizeOrderCheckout, validateFranchizePromoCode } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
 import { getFranchizeFormPrefillAction } from "../profile-actions";
@@ -51,6 +51,9 @@ type CheckoutPayload = {
   delivery: "pickup" | "delivery";
   extras: Array<{ id: string; label: string; amount: number }>;
   extrasTotal: number;
+  promoCode?: string;
+  promoTitle?: string;
+  promoDiscount: number;
   totalAmount: number;
   cartLines: Array<{
     lineId: string;
@@ -85,11 +88,26 @@ const orderFormSchema = z.object({
 type OrderFormValues = z.infer<typeof orderFormSchema>;
 const EMPTY_SELECTED_EXTRAS: string[] = [];
 
+type AppliedPromo = {
+  code: string;
+  title: string;
+  discountAmount: number;
+  description: string;
+  baseAmount: number;
+};
+
+function normalizePromoCode(value: string): string {
+  return value.trim().replace(/\s+/g, "").toUpperCase();
+}
+
 export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientProps) {
   const { user, dbUser } = useAppContext();
   const { cartLines, subtotal } = useFranchizeCartLines(slug, items);
   const [isSubmitting, startSubmitTransition] = useTransition();
   const [paymentRetryHint, setPaymentRetryHint] = useState<string | null>(null);
+  const [isPromoValidating, setIsPromoValidating] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
+  const [promoMessage, setPromoMessage] = useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
   const lastSubmitFingerprintRef = useRef<string | null>(null);
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
@@ -122,6 +140,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const comment = watch("comment") ?? "";
   const rentalStartDate = watch("rentalStartDate") ?? "";
   const signatureName = watch("signatureName") ?? "";
+  const promo = watch("promo") ?? "";
   const payment = watch("payment") as PaymentMethod;
   const deliveryMode = watch("deliveryMode");
   const selectedExtras = watch("selectedExtras") ?? EMPTY_SELECTED_EXTRAS;
@@ -145,7 +164,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     () => selectedExtraItems.reduce((sum, extra) => sum + extra.amount, 0),
     [selectedExtraItems],
   );
-  const totalAmount = subtotal + extrasTotal;
+  const baseOrderAmount = subtotal + extrasTotal;
+  const promoDiscount = appliedPromo ? Math.min(appliedPromo.discountAmount, baseOrderAmount) : 0;
+  const totalAmount = Math.max(0, baseOrderAmount - promoDiscount);
   const maxRentalDays = useMemo(() => Math.max(1, ...cartLines.map((line) => line.rentalDays ?? 1)), [cartLines]);
   const rentalEndDate = useMemo(() => {
     if (!rentalStartDate) return "";
@@ -155,7 +176,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   }, [maxRentalDays, rentalStartDate]);
   const requiresTelegram = payment === "telegram_xtr";
   const hasTelegramUser = Boolean(user?.id);
-  const canSubmit = isValid && !isCartEmpty && (!requiresTelegram || hasTelegramUser);
+  const normalizedPromoInput = normalizePromoCode(promo);
+  const hasUnvalidatedPromo = normalizedPromoInput.length > 0 && appliedPromo?.code !== normalizedPromoInput;
+  const canSubmit = isValid && !isCartEmpty && !hasUnvalidatedPromo && (!requiresTelegram || hasTelegramUser);
   const checkoutMilestones = useMemo(
     () => [
       { id: "cart", label: "Байк выбран", done: !isCartEmpty },
@@ -177,9 +200,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       { id: "dates", label: `Выберите дату начала ${flowLabel}`, active: !rentalStartDate },
       { id: "signature", label: "Введите ФИО для электронной подписи", active: signatureName.trim().length <= 2 },
       { id: "consent", label: `Подтвердите условия ${flowLabel}`, active: !consent },
+      { id: "promo", label: "Примените введённый промокод или очистите поле", active: hasUnvalidatedPromo },
       { id: "telegram", label: "Для Stars откройте страницу через Telegram WebApp", active: requiresTelegram && !hasTelegramUser },
     ].filter((item) => item.active),
-    [consent, flowLabel, hasTelegramUser, isCartEmpty, phone, recipient, rentalStartDate, requiresTelegram, signatureName, time],
+    [consent, flowLabel, hasTelegramUser, hasUnvalidatedPromo, isCartEmpty, phone, recipient, rentalStartDate, requiresTelegram, signatureName, time],
   );
   const nextAction = checkoutBlockers[0];
 
@@ -189,7 +213,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       recipient: recipient.trim(),
       phone: phone.trim(),
       time: time.trim(),
-      comment: comment.trim(),
+      comment: appliedPromo
+        ? [comment.trim(), `Промокод ${appliedPromo.code}: ${appliedPromo.description}${appliedPromo.discountAmount > 0 ? ` (-${appliedPromo.discountAmount.toLocaleString("ru-RU")} ₽)` : ""}`].filter(Boolean).join("\n")
+        : comment.trim(),
       rentalStartDate: rentalStartDate || undefined,
       rentalEndDate: rentalEndDate || undefined,
       signatureName: signatureName.trim() || undefined,
@@ -199,6 +225,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       delivery: deliveryMode,
       extras: selectedExtraItems.map((extra) => ({ id: extra.id, label: extra.label, amount: extra.amount })),
       extrasTotal,
+      promoCode: appliedPromo?.code,
+      promoTitle: appliedPromo?.title,
+      promoDiscount,
       totalAmount,
       cartLines: cartLines.map((line) => ({
         lineId: line.lineId,
@@ -210,7 +239,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       })),
       flowType,
     }),
-    [cartLines, comment, consent, deliveryMode, extrasTotal, flowType, orderId, payment, phone, recipient, rentalEndDate, rentalStartDate, selectedExtraItems, signatureName, time, totalAmount, user?.id],
+    [appliedPromo, cartLines, comment, consent, deliveryMode, extrasTotal, flowType, orderId, payment, phone, promoDiscount, recipient, rentalEndDate, rentalStartDate, selectedExtraItems, signatureName, time, totalAmount, user?.id],
   );
 
   const submitLabel = isSubmitting
@@ -227,8 +256,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         ? `Подтвердите согласие с условиями ${flowLabel}, чтобы отправить заказ.`
         : requiresTelegram && !hasTelegramUser
           ? "Для оплаты Stars откройте оформление из Telegram WebApp и повторите попытку."
-          : payment === "telegram_xtr"
-            ? "XTR-счёт будет рассчитан как 1% от полной суммы (с учётом доп. опций)."
+          : hasUnvalidatedPromo
+            ? "Промокод введён, но ещё не применён. Нажмите «Применить» или очистите поле."
+            : appliedPromo
+              ? `Промокод ${appliedPromo.code} применён: ${appliedPromo.description}.`
+              : payment === "telegram_xtr"
+                ? "XTR-счёт будет рассчитан как 1% от полной суммы (с учётом доп. опций и промокода)."
             : "Проверьте контакты и способ получения, затем подтверждайте заказ.";
 
   useEffect(() => {
@@ -244,6 +277,19 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     };
     void loadPrefill();
   }, [dbUser?.user_id, setValue, slug]);
+
+  useEffect(() => {
+    if (!appliedPromo) return;
+    if (normalizePromoCode(promo) !== appliedPromo.code) {
+      setAppliedPromo(null);
+      setPromoMessage(promo.trim() ? { tone: "info", text: "Промокод изменён — примените новый код перед отправкой." } : null);
+      return;
+    }
+    if (appliedPromo.baseAmount !== baseOrderAmount) {
+      setAppliedPromo(null);
+      setPromoMessage({ tone: "info", text: "Сумма заказа изменилась — примените промокод ещё раз." });
+    }
+  }, [appliedPromo, baseOrderAmount, promo]);
 
   const checkAvailabilityBeforeSubmit = async () => {
     const carIds = Array.from(new Set(submitPayload.cartLines.map((line) => line.itemId).filter(Boolean)));
@@ -276,6 +322,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       signatureAccepted: values.consent,
       totalAmount: submitPayload.totalAmount,
       extras: submitPayload.extras,
+      promoCode: submitPayload.promoCode,
+      promoDiscount: submitPayload.promoDiscount,
       cartLines: submitPayload.cartLines,
     });
 
@@ -301,7 +349,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         recipient: values.recipient.trim(),
         phone: values.phone.trim(),
         time: values.time.trim(),
-        comment: values.comment.trim(),
+        comment: submitPayload.comment,
         rentalStartDate: submitPayload.rentalStartDate,
         rentalEndDate: submitPayload.rentalEndDate,
         signatureName: values.signatureName.trim(),
@@ -311,6 +359,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         delivery: values.deliveryMode,
         subtotal,
         extrasTotal: submitPayload.extrasTotal,
+        promoCode: submitPayload.promoCode,
+        promoTitle: submitPayload.promoTitle,
+        promoDiscount: submitPayload.promoDiscount,
         totalAmount: submitPayload.totalAmount,
         extras: submitPayload.extras,
         cartLines: submitPayload.cartLines,
@@ -353,6 +404,53 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     }
     if (blockerId === "consent") {
       setFocus("consent");
+      return;
+    }
+    if (blockerId === "promo") {
+      setFocus("promo");
+    }
+  };
+
+  const handleApplyPromo = async () => {
+    const requestedCode = normalizePromoCode(promo);
+    setIsPromoValidating(true);
+
+    try {
+      const result = await validateFranchizePromoCode({ slug, code: promo, baseAmount: baseOrderAmount });
+      if (!result.success) {
+        setAppliedPromo(null);
+        setPromoMessage({ tone: "error", text: result.error });
+        toast.error(result.error);
+        return;
+      }
+
+      if (normalizePromoCode(promo) !== requestedCode || result.code !== requestedCode) {
+        setPromoMessage({ tone: "info", text: "Поле промокода изменилось во время проверки — примените актуальный код ещё раз." });
+        return;
+      }
+
+      const promoResult: AppliedPromo = {
+        code: result.code,
+        title: result.title,
+        discountAmount: result.discountAmount,
+        description: result.description,
+        baseAmount: baseOrderAmount,
+      };
+      setAppliedPromo(promoResult);
+      setPromoMessage({
+        tone: "success",
+        text: result.discountAmount > 0
+          ? `${result.code} применён: −${result.discountAmount.toLocaleString("ru-RU")} ₽ (${result.description}).`
+          : `${result.code} проверен: ${result.description}.`,
+      });
+      toast.success(result.discountAmount > 0 ? "Промокод применён к заказу." : "Промокод проверен и закреплён за заказом.");
+    } catch {
+      const error = "Не удалось проверить промокод. Попробуйте ещё раз.";
+      setAppliedPromo(null);
+      setPromoMessage({ tone: "error", text: error });
+      toast.error(error);
+    } finally {
+      setIsPromoValidating(false);
     }
   };
 
@@ -501,11 +599,28 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               </div>
             ) : null}
             <div className="mt-3 flex gap-2">
-              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Промокод" {...register("promo")} />
-              <button type="button" className="rounded-xl border border-[var(--order-border)] px-3 text-sm transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={focusRingOutlineStyle(crew.theme)}>
-                Применить
+              <input
+                className="w-full rounded-xl border px-3 py-2 text-sm uppercase tracking-[0.08em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                placeholder={crew.catalog.promoBanners.length > 0 ? "Промокод" : "Промокодов нет"}
+                aria-invalid={promoMessage?.tone === "error"}
+                {...register("promo")}
+              />
+              <button
+                type="button"
+                onClick={handleApplyPromo}
+                disabled={!promo.trim() || isSubmitting || isPromoValidating}
+                className="rounded-xl border border-[var(--order-border)] px-3 text-sm transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                style={focusRingOutlineStyle(crew.theme)}
+              >
+                {isPromoValidating ? "Проверяем..." : "Применить"}
               </button>
             </div>
+            {promoMessage ? (
+              <p className={`mt-2 text-xs ${promoMessage.tone === "error" ? "text-rose-300" : promoMessage.tone === "success" ? "text-emerald-300" : "text-[var(--order-muted)]"}`}>
+                {promoMessage.text}
+              </p>
+            ) : null}
           </div>
 
 
@@ -616,7 +731,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 ))}
               </ul>
             )}
-            {nextAction && ["recipient", "phone", "time", "consent"].includes(nextAction.id) ? (
+            {nextAction && ["recipient", "phone", "time", "consent", "promo"].includes(nextAction.id) ? (
               <button
                 type="button"
                 onClick={() => focusBlockerControl(nextAction.id)}
@@ -658,6 +773,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             <p className="mt-1 flex justify-between"><span>Период</span><span>{rentalStartDate || "—"} → {rentalEndDate || "—"}</span></p>
             <p className="mt-2 flex justify-between"><span>Подытог</span><span>{subtotal.toLocaleString("ru-RU")} ₽</span></p>
             <p className="mt-1 flex justify-between"><span>Доп. опции</span><span>{extrasTotal.toLocaleString("ru-RU")} ₽</span></p>
+            {appliedPromo ? (
+              <p className="mt-1 flex justify-between text-emerald-300">
+                <span>Промокод {appliedPromo.code}</span>
+                <span>{promoDiscount > 0 ? `−${promoDiscount.toLocaleString("ru-RU")} ₽` : "бонус"}</span>
+              </p>
+            ) : null}
             <p className="mt-2 flex justify-between text-base font-semibold text-[var(--order-accent)]">
               <span>Итого</span>
               <span>{totalAmount.toLocaleString("ru-RU")} ₽</span>
