@@ -117,7 +117,7 @@ export function FranchizeRentalLifecycleActions({
                   return;
                 }
                 if (!hasPickupFreeze) {
-                  toast.error("Сначала заполните Pickup Freeze в Rental Documents.");
+                  toast.error("Сначала сохраните выдачу в документах аренды.");
                   return;
                 }
                 const result = await confirmVehiclePickup(rentalId, dbUser.user_id);
@@ -210,7 +210,7 @@ export function FranchizeRentalLifecycleActions({
       {role === "guest" && <p className="mt-3 text-xs text-[var(--lifecycle-muted)]">Действия доступны владельцу или арендатору этой сделки.</p>}
       {pickupActionBlockedByFreeze && (
         <p className="mt-3 text-xs text-[var(--lifecycle-muted)]">
-          Подтверждение выдачи будет доступно после сохранения Pickup Freeze в разделе Rental Documents.
+          Подтверждение выдачи будет доступно после сохранения выдачи в документах аренды.
         </p>
       )}
     </div>

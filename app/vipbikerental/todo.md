@@ -3,12 +3,12 @@
 ## Current status
 - Status: `ready_for_pr`
 - Owner: Codex / franchize integration lane
-- Scope: interactive `vip-bike` landing is complete for the current slice.
+- Scope: interactive `vip-bike` landing is complete for the current slice; latest polish removed redundant copy, moved catalog cards to client-side skeleton hydration, russified fresh UI labels, and brightened the MapRiders preview card.
 - Archive: see `app/vipbikerental/TODO_ARCHIVE.md` for completed implementation notes and older backlog detail.
 
 ## Next action
 - No automatic follow-up. Only resume when the operator explicitly asks for `/vipbikerental` follow-up work.
-- If resumed, prioritize protected OSRM/fallback routing and lighter route/POI loading.
+- If resumed, prioritize protected OSRM/fallback routing, lighter route/POI loading, and production QA of the skeleton-to-real-catalog transition.
 
 ## Blockers
 - Production QA with live Supabase/runtime data still needs an environment with real credentials and mobile coverage.

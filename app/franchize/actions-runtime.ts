@@ -475,15 +475,15 @@ function extractFooterSocialLinks(franchize: UnknownRecord, fallbackTelegram: st
 const emptyCrew = (slug: string): FranchizeCrewVM => ({
   id: "",
   slug,
-  name: "Crew not found",
-  description: "No franchise crew found for this slug yet.",
+  name: "Экипаж не найден",
+  description: "Для этого slug пока нет витрины экипажа.",
   logoUrl: "",
   hqLocation: "",
   isFound: false,
   theme: defaultTheme,
   header: {
-    brandName: "Franchize",
-    tagline: "Hydration pending",
+    brandName: "Франшиза",
+    tagline: "Витрина готовится",
     logoUrl: "",
     logoHref: `/franchize/${slug}`,
     menuLinks: fallbackMenuLinks(slug),
@@ -613,14 +613,14 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
 
     const resolvedTheme = resolveFranchizeTheme(franchize);
     const menuLinksRaw = readArrayPath<UnknownRecord>(franchize, ["header", "menuLinks"], fallbackMenuLinks(safeSlug)).map((link) => ({
-      label: readPath(link, ["label"], "Link"),
+      label: readPath(link, ["label"], "Ссылка"),
       href: withSlug(readPath(link, ["href"], `/franchize/${crew.slug ?? safeSlug}`), crew.slug ?? safeSlug),
     }));
     const menuLinks = menuLinksRaw.some((link) => link.href === `/franchize/${crew.slug ?? safeSlug}/map-riders`)
       ? menuLinksRaw
       : [
           ...menuLinksRaw.slice(0, 1),
-          { label: "Map Riders", href: `/franchize/${crew.slug ?? safeSlug}/map-riders` },
+          { label: "Карта райдеров", href: `/franchize/${crew.slug ?? safeSlug}/map-riders` },
           ...menuLinksRaw.slice(1),
         ];
 
@@ -628,7 +628,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const showcaseGroups = (metadataShowcaseGroups.length > 0
       ? metadataShowcaseGroups.map((group, index) => ({
           id: readPath(group, ["id"], `showcase-${index + 1}`),
-          label: readPath(group, ["label"], readPath(group, ["title"], `Showcase ${index + 1}`)),
+          label: readPath(group, ["label"], readPath(group, ["title"], `Витрина ${index + 1}`)),
           mode: readPath(group, ["mode"], "subtype") as "subtype" | "price",
           subtype: readPath(group, ["subtype"], ""),
           minPrice: Number(readPath(group, ["minPrice"], 0)),
@@ -640,7 +640,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const hydratedCrew: FranchizeCrewVM = {
       id: crew.id,
       slug: crew.slug ?? safeSlug,
-      name: crew.name ?? "Unnamed crew",
+      name: crew.name ?? "Экипаж без названия",
       description: crew.description ?? "",
       logoUrl: crew.logo_url ?? "",
       hqLocation: crew.hq_location ?? "",
@@ -735,7 +735,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         (typeof specs.bike_subtype === "string" && specs.bike_subtype.trim()) ||
         (typeof specs.segment === "string" && specs.segment.trim()) ||
         (typeof specs.type === "string" && specs.type.trim().toLowerCase() !== "bike" && specs.type.trim()) ||
-        "Unsorted";
+        "Без категории";
 
       const mediaUrls = Array.from(new Set([
         car.image_url ?? "",
@@ -775,7 +775,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       return {
         id: car.id,
         title: `${car.make} ${car.model}`.trim(),
-        subtitle: (typeof specs.subtitle === "string" ? specs.subtitle : "Ready to ride") as string,
+        subtitle: (typeof specs.subtitle === "string" ? specs.subtitle : "Готов к выезду") as string,
         description: car.description ?? (typeof specs.description === "string" ? specs.description : "Подробности откроются в карточке"),
         imageUrl: mediaUrls[0] ?? "",
         mediaUrls,
@@ -947,11 +947,11 @@ function parseAdCards(lines: string, slug: string): Array<{ id: string; title: s
       const [id, title, subtitle, href, imageUrl, badge, activeFrom, activeTo, priority, ctaLabel] = line.split("|").map((value) => value.trim());
       return {
         id: id || `ad-${index + 1}`,
-        title: trimCampaignTitle(title || "", `Ad ${index + 1}`),
+        title: trimCampaignTitle(title || "", `Анонс ${index + 1}`),
         subtitle: subtitle || "",
         href: normalizeCampaignHref(href || "", slug),
         imageUrl: imageUrl || "",
-        badge: badge || "Ad",
+        badge: badge || "Анонс",
         activeFrom: activeFrom || "",
         activeTo: activeTo || "",
         priority: Number.isFinite(Number(priority)) ? Number(priority) : 40,
@@ -968,7 +968,7 @@ function parseMenuLinks(lines: string, slug: string): Array<{ label: string; hre
     .map((line) => {
       const [label, href] = line.split("|").map((value) => value.trim());
       return {
-        label: label || "Link",
+        label: label || "Ссылка",
         href: withSlug(href || `/franchize/${slug}`, slug),
       };
     });
@@ -1066,7 +1066,7 @@ async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promis
       .map((entry) => `${entry.label}|${entry.href}`)
       .join("\n"),
     menuLinksText: menuLinks
-      .map((entry) => `${readPath(entry, ["label"], "Link")}|${readPath(entry, ["href"], `/franchize/${slug}`)}`)
+      .map((entry) => `${readPath(entry, ["label"], "Ссылка")}|${readPath(entry, ["href"], `/franchize/${slug}`)}`)
       .join("\n"),
     categoryOrderText: readArrayPath<string>(franchize, ["catalog", "groupOrder"]).join(", "),
     promoBannersText: readArrayPath<unknown>(franchize, ["catalog", "promoBanners"])

@@ -20,14 +20,14 @@ const EXPERIENCE_OPTIONS: Array<{ id: ExperienceLevel; label: string; helper: st
 ];
 
 const BIKE_OPTIONS: Array<{ id: BikeGoal; label: string; helper: string }> = [
-  { id: "rental", label: "Беру байк в аренду", helper: "Карта подпишет заезд как VIP rental и оставит видимость внутри экипажа." },
+  { id: "rental", label: "Беру байк в аренду", helper: "Карта подпишет заезд как аренда VIP и оставит видимость внутри экипажа." },
   { id: "personal", label: "На своём байке", helper: "Карта подготовит личный режим и короткий автостоп геошеринга." },
 ];
 
 const INTENT_OPTIONS: Array<{ id: RideIntent; label: string; helper: string }> = [
   { id: "learn", label: "Понять что делать", helper: "Сначала безопасный режим: экипаж, размытие дома, 15 минут." },
-  { id: "meetup", label: "Найти встречу", helper: "Фокус на meetup-точках: тап по карте и кнопка +." },
-  { id: "route", label: "Катнуть маршрут", helper: "Подготовим название заезда и публичный crew-сигнал." },
+  { id: "meetup", label: "Найти встречу", helper: "Фокус на точках встречи: тап по карте и кнопка +." },
+  { id: "route", label: "Катнуть маршрут", helper: "Подготовим название заезда и публичный сигнал экипажа." },
 ];
 
 function optionClass(isActive: boolean) {
@@ -46,8 +46,8 @@ export function BeginnerRiderOnboardingQuiz({ crew }: { crew: FranchizeCrewVM })
 
   const recommendation = useMemo(() => {
     const isNewbie = experience === "new" || intent === "learn";
-    const rideName = intent === "meetup" ? "Meetup с экипажем" : intent === "route" ? "Городской выезд" : "Первый безопасный выезд";
-    const vehicleLabel = bikeGoal === "rental" ? `${crew.header.brandName || "VIP BIKE"} rental` : "Личный байк";
+    const rideName = intent === "meetup" ? "Встреча с экипажем" : intent === "route" ? "Городской выезд" : "Первый безопасный выезд";
+    const vehicleLabel = bikeGoal === "rental" ? `${crew.header.brandName || "VIP BIKE"} · аренда` : "Личный байк";
     const visibilityMode = experience === "crew" && intent === "route" ? "public" : "crew";
     const autoExpireMinutes = isNewbie ? 15 : intent === "route" ? 60 : 5;
 
@@ -57,7 +57,7 @@ export function BeginnerRiderOnboardingQuiz({ crew }: { crew: FranchizeCrewVM })
       rideMode: bikeGoal,
       visibilityMode,
       autoExpireMinutes,
-      homeBlurLabel: isNewbie ? "Дом размыт, позиция только для экипажа" : visibilityMode === "public" ? "Публичный сигнал для маршрута" : "Короткий crew-сигнал",
+      homeBlurLabel: isNewbie ? "Дом размыт, позиция только для экипажа" : visibilityMode === "public" ? "Публичный сигнал для маршрута" : "Короткий сигнал экипажа",
     } as const;
   }, [bikeGoal, crew.header.brandName, experience, intent]);
 
@@ -74,7 +74,7 @@ export function BeginnerRiderOnboardingQuiz({ crew }: { crew: FranchizeCrewVM })
     <section className="overflow-hidden rounded-3xl border border-white/10 bg-black/35 p-4 text-white shadow-2xl shadow-black/25 backdrop-blur-xl md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Badge className="border border-[var(--mr-accent)]/45 bg-[var(--mr-accent)]/15 text-[var(--mr-accent)]">RENT-P1.1 • newbie gate</Badge>
+          <Badge className="border border-[var(--mr-accent)]/45 bg-[var(--mr-accent)]/15 text-[var(--mr-accent)]">Старт новичка</Badge>
           <h2 className="mt-3 font-orbitron text-2xl">Быстрый старт райдера</h2>
           <p className="mt-2 max-w-2xl text-sm text-white/65">
             Три вопроса — и MapRiders сам подготовит название заезда, тип байка, приватность и автостоп геошеринга для <span className="text-white">/{crewSlug}</span>.
@@ -123,7 +123,7 @@ export function BeginnerRiderOnboardingQuiz({ crew }: { crew: FranchizeCrewVM })
 
         <aside className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">
-            <VibeContentRenderer content="::FaShieldAlt::" /> Рекомендация
+            <VibeContentRenderer content="::FaShieldCat::" /> Рекомендация
           </div>
           <dl className="mt-4 space-y-3 text-sm">
             <div><dt className="text-white/45">Заезд</dt><dd>{recommendation.rideName}</dd></div>
