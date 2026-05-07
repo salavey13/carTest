@@ -27,6 +27,8 @@ const {
 } = docx;
 
 const TABLE_BORDER_COLOR = "D1D5DB";
+type DocxChild = InstanceType<typeof Paragraph> | InstanceType<typeof Table>;
+type DocxTableRow = InstanceType<typeof TableRow>;
 const PAGE_WIDTH_DXA = 11906;
 const PAGE_MARGIN_DXA = 1440;
 const CONTENT_WIDTH_DXA = PAGE_WIDTH_DXA - PAGE_MARGIN_DXA * 2;
@@ -124,7 +126,7 @@ function createParagraph(text: string, options?: { heading?: (typeof HeadingLeve
 }
 
 export async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
-  const children: docx.FileChild[] = [];
+  const children: DocxChild[] = [];
   const lines = markdown.split(/\r?\n/);
   let i = 0;
 
@@ -140,7 +142,7 @@ export async function generateDocxBytes(markdown: string): Promise<Uint8Array> {
       const heading = level === 1 ? HeadingLevel.HEADING_1 : HeadingLevel.HEADING_2;
       children.push(createParagraph(line.replace(/^#+\s*/, ""), { heading }));
     } else if (line.startsWith("|")) {
-      const tableRows: TableRow[] = [];
+      const tableRows: DocxTableRow[] = [];
       const markdownRows: string[][] = [];
 
       let checkI = i;

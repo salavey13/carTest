@@ -1007,7 +1007,7 @@ export const getUserResults = async (userId: string): Promise<{ success: boolean
     try {
         const { data, error } = await client
             .from("user_results")
-            .select("car_id, created_at")
+            .select("user_id, car_id, created_at")
             .eq("user_id", userId)
             .order("created_at", { ascending: false });
 

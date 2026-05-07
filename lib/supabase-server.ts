@@ -14,7 +14,17 @@ if (typeof window !== "undefined") {
 }
 
 import { logger } from "@/lib/logger";
+import { createAuthenticatedClient } from "@/hooks/supabase";
 import type { Database } from "@/types/database.types";
+import type { WebAppUser } from "@/types/telegram";
+
+type DbUser = Database["public"]["Tables"]["users"]["Row"];
+type DbArticle = Database["public"]["Tables"]["articles"]["Row"];
+type DbArticleSection = Database["public"]["Tables"]["article_sections"]["Row"];
+type DbInvoice = Database["public"]["Tables"]["invoices"]["Row"];
+type DbRental = Database["public"]["Tables"]["rentals"]["Row"];
+type DbCar = Database["public"]["Tables"]["cars"]["Row"];
+type DbUserResult = Database["public"]["Tables"]["user_results"]["Row"];
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://inmctohsodgdohamhzag.supabase.co";
 const anonKey =
@@ -794,7 +804,7 @@ export const getUserResults = async (userId: string): Promise<{ success: boolean
     try {
         const { data, error } = await client
             .from("user_results")
-            .select("car_id, created_at")
+            .select("user_id, car_id, created_at")
             .eq("user_id", userId)
             .order("created_at", { ascending: false });
 

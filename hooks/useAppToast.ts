@@ -6,8 +6,10 @@ import { toastHistoryManager } from '@/lib/toastHistoryManager'; // ДОБАВЛ
 import type { ToastRecord } from '@/types/toast';
 import { debugLogger as logger } from '@/lib/debugLogger';
 import { useCallback, useMemo } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' | 'custom';
+type ToastMessage = string | ReactNode | ((id: number | string) => ReactElement);
 
 export const useAppToast = () => {
     // УДАЛЯЕМ ВЫЗОВ ХУКА
@@ -15,7 +17,7 @@ export const useAppToast = () => {
 
     const showToast = useCallback((
         type: ToastType,
-        message: string | React.ReactNode,
+        message: ToastMessage,
         options?: any
     ) => {
         // УДАЛЯЕМ ПРОВЕРКИ КОНТЕКСТА
@@ -27,15 +29,17 @@ export const useAppToast = () => {
             const messageString = typeof message === 'string' ? message : (type === 'custom' ? '[Custom Component]' : '[ReactNode]');
             let toastId: string | number | undefined;
 
+            const toastContent = typeof message === 'function' ? messageString : message;
+
             switch(type) {
-                case 'success': toastId = sonnerToast.success(message, options); break;
-                case 'error': toastId = sonnerToast.error(message, options); break;
-                case 'info': toastId = sonnerToast.info(message, options); break;
-                case 'warning': toastId = sonnerToast.warning(message, options); break;
-                case 'loading': toastId = sonnerToast.loading(message, options); break;
+                case 'success': toastId = sonnerToast.success(toastContent, options); break;
+                case 'error': toastId = sonnerToast.error(toastContent, options); break;
+                case 'info': toastId = sonnerToast.info(toastContent, options); break;
+                case 'warning': toastId = sonnerToast.warning(toastContent, options); break;
+                case 'loading': toastId = sonnerToast.loading(toastContent, options); break;
                 case 'custom':
                     if (typeof message === 'function') {
-                       toastId = sonnerToast.custom(message as (id: number | string) => React.ReactNode, options);
+                       toastId = sonnerToast.custom(message as (id: number | string) => ReactElement, options);
                     } else {
                         logger.warn("useAppToast: 'custom' type requires a function as message. Falling back to 'message'.");
                         toastId = sonnerToast.message(messageString, options); 
@@ -43,7 +47,7 @@ export const useAppToast = () => {
                     break;
                 case 'message':
                 default:
-                    toastId = sonnerToast.message(message, options); break;
+                    toastId = sonnerToast.message(toastContent, options); break;
             }
 
             // ИЗМЕНЕНИЕ: Отправляем запись в наш новый менеджер
@@ -72,13 +76,13 @@ export const useAppToast = () => {
     // Этот хук теперь полностью независим и не вызовет цикла
     return useMemo(() => {
         return {
-            success: (message: string | React.ReactNode, options?: any) => showToast('success', message, options),
-            error: (message: string | React.ReactNode, options?: any) => showToast('error', message, options),
-            info: (message: string | React.ReactNode, options?: any) => showToast('info', message, options),
-            warning: (message: string | React.ReactNode, options?: any) => showToast('warning', message, options),
-            loading: (message: string | React.ReactNode, options?: any) => showToast('loading', message, options),
-            message: (message: string | React.ReactNode, options?: any) => showToast('message', message, options),
-            custom: (component: (id: number | string) => React.ReactNode, options?: any) => showToast('custom', component, options),
+            success: (message: ToastMessage, options?: any) => showToast('success', message, options),
+            error: (message: ToastMessage, options?: any) => showToast('error', message, options),
+            info: (message: ToastMessage, options?: any) => showToast('info', message, options),
+            warning: (message: ToastMessage, options?: any) => showToast('warning', message, options),
+            loading: (message: ToastMessage, options?: any) => showToast('loading', message, options),
+            message: (message: ToastMessage, options?: any) => showToast('message', message, options),
+            custom: (component: (id: number | string) => ReactElement, options?: any) => showToast('custom', component, options),
             dismiss: (toastId?: string | number) => {
                 try {
                     sonnerToast.dismiss(toastId);

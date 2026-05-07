@@ -85,6 +85,7 @@ interface InvoiceData {
   };
   created_at?: string; // Timestamp
   updated_at?: string; // Timestamp
+  subscription_id?: string | null;
   // Add other relevant invoice fields
 }
 
@@ -123,7 +124,7 @@ export interface WebhookHandler {
     userId: string,
     userData: UserData,
     totalAmount: number,
-    supabase: SupabaseClient, // Keep SupabaseClient type
+    supabase: SupabaseClient<any>, // Keep SupabaseClient type
     telegramToken: string,
     adminChatId: string,
     baseUrl: string

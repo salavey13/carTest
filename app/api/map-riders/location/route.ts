@@ -4,6 +4,7 @@ import { guardMapRidersWriteRequest, applyRateLimitHeaders } from "@/lib/map-rid
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { assertCrewMembership } from "@/app/api/map-riders/_lib/crew-access";
+import { blurCoordinate } from "@/lib/map-riders-privacy";
 
 const locationSchema = z.object({
   sessionId: z.string().uuid(),
