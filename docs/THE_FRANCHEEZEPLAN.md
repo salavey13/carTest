@@ -213,3 +213,12 @@ This root file stays intentionally compact so operators and agents can load it q
 - `risks`: Electro-Enduro fallback prevents an empty showroom but does not replace the need to seed/repair production Supabase crew + catalog rows.
 
 - 2026-05-07 — VIP Bike QA pass: reduced `/vipbikerental` post-hero depth, contained configurator styles, made configurator bike imagery readable with fallback art, removed the mustard footer from the configurator flow, compacted shared footer scale, hardened Electro-Enduro contrast, and added a temporary non-empty VipBike fallback catalog for hydration failures.
+
+### 2026-05-07 — Telegram back + VIP Bike MapRiders triage
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `notes`: Fixed Telegram WebApp back handling to use an internal SPA history stack instead of `router.back()`, corrected Seqvens Zero code identifiers to `seqvens-zero` while intentionally preserving existing `carpix/seqvenz-zero/*` storage paths, and tightened MapRiders QA to smoke the requested `vip-bike` slug APIs with JSON success checks.
+- `next_step`: Field-test Telegram BackButton in the real bot WebApp and collect the exact MapRiders failing action if testers still report “doesn't work”.
+- `risks`: CLI smoke confirms the route/APIs are alive, but two-phone live GPS and Telegram BackButton behavior still need real Telegram WebApp device verification.

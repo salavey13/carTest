@@ -21,14 +21,10 @@ const isRentEnabled = (value: unknown) =>
   String(value).toLowerCase() === "1" ||
   String(value).toLowerCase() === "true";
 const SALE_ID_OVERRIDES = new Set([
-  "sequence-zero",
-  "seqvenz-zero",
   "falcon-gt-2025",
   "500gt",
 ]);
 const RENT_ID_OVERRIDES = new Set([
-  "sequence-zero",
-  "seqvenz-zero",
   "falcon-gt-2025",
   "500gt",
 ]);
@@ -137,7 +133,7 @@ export default async function ElectroEnduroPage({
     );
   });
   const featuredRentItems = rentItems
-    .filter((item) => item.id.toLowerCase().includes("sequence-zero"))
+    .filter((item) => item.id.toLowerCase().includes("seqvens-zero"))
     .slice(0, 3);
   const featuredSaleItems = saleItems
     .filter((item) => item.id.toLowerCase().includes("falcon-gt-2025"))
