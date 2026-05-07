@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { User, Bot } from "lucide-react";
+import { Bot, Send } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAppContext } from "@/contexts/AppContext";
@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { Button } from "@/components/ui/button"; 
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+
+const TELEGRAM_WEB_APP_URL = "https://t.me/oneBikePlBVot/app";
 
 // Исправление 1: Делаем именованный экспорт (убрано default)
 export function UserInfo() {
@@ -37,7 +39,7 @@ export function UserInfo() {
             <span className="font-mono text-xs">Auth Error!</span>
         </div>
         <Button asChild variant="outline" size="sm" className="text-xs border-destructive/50 text-destructive-foreground/80 hover:bg-destructive/70 hover:text-destructive-foreground">
-            <Link href="/profile">Войти/Регистрация</Link>
+            <a href={TELEGRAM_WEB_APP_URL} target="_blank" rel="noopener noreferrer">Открыть WebApp</a>
         </Button>
       </motion.div>
     );
@@ -47,20 +49,21 @@ export function UserInfo() {
 
   if (!effectiveUser) {
     return ( 
-      <Button 
-        asChild 
-        variant="ghost" 
+      <Button
+        asChild
+        variant="ghost"
         className={cn(
-            "p-2 rounded-full transition-all",
+            "rounded-full px-3 py-2 transition-all",
             "bg-gradient-to-br from-brand-purple/30 via-brand-pink/30 to-brand-orange/30",
             "hover:from-brand-purple/50 hover:via-brand-pink/50 hover:to-brand-orange/50",
             "text-light-text hover:text-white",
             "shadow-[0_0_10px_rgba(var(--brand-pink-rgb),0.4)] hover:shadow-[0_0_15px_rgba(var(--brand-pink-rgb),0.6)]"
         )}
-        >
-        <Link href="/profile" aria-label="Профиль пользователя">
-          <User className="h-6 w-6" />
-        </Link>
+      >
+        <a href={TELEGRAM_WEB_APP_URL} target="_blank" rel="noopener noreferrer" aria-label="Открыть Telegram WebApp" className="inline-flex items-center gap-2">
+          <Send className="h-5 w-5" />
+          <span className="hidden text-xs font-semibold sm:inline">WebApp</span>
+        </a>
       </Button>
     );
   }
