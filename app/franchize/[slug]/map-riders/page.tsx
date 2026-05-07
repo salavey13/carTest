@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
+import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import dynamic from "next/dynamic";
 import { buildFranchizeSectionMetadata } from "../metadata";
@@ -24,12 +25,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function MapRidersPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { crew } = await getFranchizeBySlug(slug);
+  const crewSlug = crew.slug || slug;
+  const activePath = `/franchize/${crewSlug}/map-riders`;
   const surface = crewPaletteForSurface(crew.theme);
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/map-riders`} />
-      <MapRidersClient crew={crew} slug={crew.slug || slug} />
+      <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} />
+      <MapRidersClient crew={crew} slug={crewSlug} />
       <CrewFooter crew={crew} />
     </main>
   );

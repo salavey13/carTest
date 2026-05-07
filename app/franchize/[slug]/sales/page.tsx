@@ -4,6 +4,7 @@ import { ArrowRight, BatteryCharging, Bike, ClipboardList, RefreshCcw, Sparkles 
 import { getFranchizeBySlug, type CatalogItemVM } from "@/app/franchize/actions";
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
+import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
@@ -71,13 +72,14 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
   const { slug } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
   const crewSlug = crew.slug || slug;
+  const activePath = `/franchize/${crewSlug}/sales`;
   const surface = crewPaletteForSurface(crew.theme);
   const brandName = crew.header.brandName || crew.name || "VIP BIKE";
   const saleItems = items.filter((item) => item.saleAvailable || Number(item.salePrice || 0) > 0 || isTruthySpec(item.rawSpecs?.sale));
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crewSlug}/sales`} groupLinks={items.map((item) => item.category)} />
+      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} />
       <div
         className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-20 md:pt-24"
         style={{

@@ -5,6 +5,7 @@ import { CrewHeader } from "../../components/CrewHeader";
 import { FranchizeFloatingCart } from "../../components/FranchizeFloatingCart";
 import { FranchizeHero } from "../../components/FranchizeHero";
 import { FranchizePageShell } from "../../components/FranchizePageShell";
+import { buildFranchizeIntentLinks } from "../../lib/section-links";
 import { crewPaletteForSurface } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
@@ -26,10 +27,11 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
   const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteForSurface(crew.theme);
   const resolvedSlug = crew.slug || slug;
+  const activePath = `/franchize/${resolvedSlug}/about`;
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${resolvedSlug}/about`} groupLinks={items.map((item) => item.category)} />
+      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath)} />
       <FranchizePageShell theme={crew.theme}>
         <FranchizeHero
           eyebrow={`/franchize/${resolvedSlug}/about · экипаж`}

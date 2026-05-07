@@ -49,6 +49,15 @@ This root file stays intentionally compact so operators and agents can load it q
 
 - 2026-05-04 — Added support for metadata-driven franchize header logo routing via `header.logoHref` with default fallback to `/franchize/{slug}`; seeded `vip-bike` to land on `/vipbikerental` instead of catalog. Next step: expose `header.logoHref` in admin configurator UI for non-SQL operators.
 
+### 2026-05-07 — Franchize intent rail navigation
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `notes`: Added optional CrewHeader section intent links for non-catalog franchize routes while preserving catalog category rail behavior and SPA Next.js Link navigation. Applied shared intent rails to about, contacts, sales, onboarding, community, MapRiders, and rentals.
+- `next_step`: Visual-smoke `/franchize/vip-bike/about`, `/contacts`, `/sales`, `/onboarding`, `/community`, `/map-riders`, and `/rentals` on mobile width to confirm active pill visibility/touch comfort.
+- `risks`: Runtime screenshot not captured in this non-browser code pass; route hydration still depends on crew/catalog data availability.
+
 ### 2026-05-07 — VS same-propulsion micropolish
 
 - `status`: ready_for_pr
