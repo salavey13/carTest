@@ -3,6 +3,8 @@ import { getFranchizeBySlug } from "../../actions";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { FranchizeFloatingCart } from "../../components/FranchizeFloatingCart";
+import { FranchizeHero } from "../../components/FranchizeHero";
+import { FranchizePageShell } from "../../components/FranchizePageShell";
 import { crewPaletteForSurface } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
@@ -23,30 +25,31 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
   const { slug } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteForSurface(crew.theme);
+  const resolvedSlug = crew.slug || slug;
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/about`} groupLinks={items.map((item) => item.category)} />
-      <section className="mx-auto w-full max-w-4xl px-4 py-6">
-        <p className="text-xs uppercase tracking-[0.2em]" style={{ color: crew.theme.palette.accentMain }}>
-          /franchize/{crew.slug || slug}/about
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold">О нас</h1>
-        <p className="mt-2 max-w-2xl text-sm" style={surface.mutedText}>
-          {crew.description ||
-            "Раздел в процессе наполнения. Подробный текст, преимущества и FAQ подгрузятся из метаданных франшизы."}
-        </p>
-        {crew.ratingSummary.count > 0 && (
-          <div className="mt-4 inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm" style={surface.card}>
-            <span className="font-bold" style={{ color: crew.theme.palette.accentMain }}>★ {crew.ratingSummary.average.toFixed(1)}</span>
-            <span style={surface.mutedText}>общий рейтинг экипажа · {crew.ratingSummary.count} отзывов</span>
-          </div>
-        )}
-      </section>
+      <CrewHeader crew={crew} activePath={`/franchize/${resolvedSlug}/about`} groupLinks={items.map((item) => item.category)} />
+      <FranchizePageShell theme={crew.theme}>
+        <FranchizeHero
+          eyebrow={`/franchize/${resolvedSlug}/about · экипаж`}
+          title="О нас"
+          subcopy={crew.description || "Операторская страница экипажа: ценности, формат работы и доверие перед первой заявкой. Подробности подтянутся из метаданных франшизы."}
+          primaryCta={{ label: "Смотреть каталог", href: `/franchize/${resolvedSlug}` }}
+          secondaryCta={{ label: "Связаться", href: `/franchize/${resolvedSlug}/contacts` }}
+        >
+          {crew.ratingSummary.count > 0 ? (
+            <div className="rounded-2xl border px-4 py-3 text-sm" style={surface.subtleCard}>
+              <span className="font-bold" style={{ color: crew.theme.palette.accentMain }}>★ {crew.ratingSummary.average.toFixed(1)}</span>
+              <span style={surface.mutedText}> · {crew.ratingSummary.count} отзывов экипажа</span>
+            </div>
+          ) : null}
+        </FranchizeHero>
+      </FranchizePageShell>
       <CrewFooter crew={crew} />
       <FranchizeFloatingCart
-        slug={crew.slug || slug}
-        href={`/franchize/${crew.slug || slug}/cart`}
+        slug={resolvedSlug}
+        href={`/franchize/${resolvedSlug}/cart`}
         items={items}
         accentColor={crew.theme.palette.accentMain}
         textColor={crew.theme.palette.textPrimary}
