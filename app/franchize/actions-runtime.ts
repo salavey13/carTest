@@ -9,6 +9,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { getCrewSensitiveData, getUserSensitiveData, saveCrewSensitiveData } from "@/app/lib/private-secrets";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
+import { cloneFranchizeContentBlocks, readFranchizeContentBlocks, type FranchizeContentBlocks } from "@/app/franchize/lib/content-blocks";
 import { resolveFranchizeTheme, resolvePaletteByMode } from "@/app/franchize/lib/theme-resolver";
 import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context";
 import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
@@ -145,6 +146,7 @@ export interface FranchizeCrewVM {
     socialLinks: Array<{ label: string; href: string }>;
     textColor: string;
   };
+  contentBlocks: FranchizeContentBlocks;
 }
 
 export interface FranchizeBySlugResult {
@@ -520,6 +522,7 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     socialLinks: [],
     textColor: "#16130A",
   },
+  contentBlocks: cloneFranchizeContentBlocks(),
 });
 
 export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugResult> {
@@ -726,6 +729,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         socialLinks: extractFooterSocialLinks(franchize, readPath(franchize, ["contacts", "telegram"], "")),
         textColor: readPath(franchize, ["footer", "textColor"], DEFAULT_FOOTER_TEXT_COLOR),
       },
+      contentBlocks: readFranchizeContentBlocks(franchize),
     };
 
     const items: CatalogItemVM[] = (cars ?? []).map((car) => {
