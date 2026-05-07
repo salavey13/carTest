@@ -2,7 +2,7 @@ import { createHmac } from "crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context";
 import { isAllowedMockContext } from "@/lib/telegram-mock-context";
-import { buildTelegramDataCheckString, computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
+import { buildTelegramDataCheckString, computeTelegramWebAppHash, computeTelegramWebAppHashDiagnostics, explainTelegramHashMismatchReasons } from "@/lib/telegram-webapp-auth";
 import { extractTelegramLaunchParams } from "@/lib/telegram-launch-params";
 
 function signInitData(initDataWithoutHash: string, botToken: string): string {
@@ -52,6 +52,49 @@ user=${user}`,
 
     expect(result.isValid).toBe(false);
     expect(result.computedHash).not.toBe(legacyHash);
+  });
+
+  it("signs every duplicate query pair instead of collapsing to params.get(key)", async () => {
+    const duplicatePayload = "auth_date=1710000000&tag=a&tag=b&user=" + encodeURIComponent(user);
+    const dataCheckString = `auth_date=1710000000
+tag=a
+tag=b
+user=${user}`;
+    const secret = createHmac("sha256", "WebAppData").update(botToken).digest();
+    const hash = createHmac("sha256", secret).update(dataCheckString).digest("hex");
+
+    expect(buildTelegramDataCheckString(`${duplicatePayload}&hash=${hash}`)).toEqual({
+      hashFromClient: hash,
+      dataCheckString,
+    });
+    await expect(computeTelegramWebAppHash(`${duplicatePayload}&hash=${hash}`, botToken)).resolves.toMatchObject({
+      isValid: true,
+      computedHash: hash,
+    });
+  });
+
+  it("produces a mismatch variant matrix for production sha debugging", () => {
+    const legacyHash = signLegacyInitDataWithoutSignature(initDataWithoutHash, botToken);
+    const diagnostics = computeTelegramWebAppHashDiagnostics(`${initDataWithoutHash}&hash=${legacyHash}`, botToken);
+
+    expect(diagnostics.hashFromClient).toBe(legacyHash);
+    expect(diagnostics.variants.map((variant) => variant.id)).toEqual([
+      "official_include_signature_exclude_hash",
+      "legacy_exclude_signature_and_hash",
+      "wrong_reversed_derivation",
+      "wrong_direct_bot_token_key",
+      "wrong_direct_webappdata_key",
+      "wrong_sha256_token_secret",
+      "wrong_include_hash",
+      "wrong_preserve_input_order",
+    ]);
+    expect(diagnostics.variants.find((variant) => variant.id === "legacy_exclude_signature_and_hash")).toMatchObject({
+      matches: true,
+      excludedFields: ["signature", "hash"],
+    });
+    expect(explainTelegramHashMismatchReasons()).toEqual(
+      expect.arrayContaining([expect.stringContaining("Wrong bot token or wrong bot/environment")]),
+    );
   });
 
   it("extracts initData and start_param from Telegram launch URL hash fallback", () => {
