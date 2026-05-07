@@ -291,3 +291,27 @@ This root file stays intentionally compact so operators and agents can load it q
 - `notes`: Self-review found the new partner onboarding and sales routes were only direct URLs, so the VIP-bike hydration SQL now seeds both routes into header menu links and footer section links.
 - `next_step`: Re-apply `docs/sql/vip-bike-franchize-hydration.sql` after merge and smoke `/franchize/vip-bike/onboarding` + `/franchize/vip-bike/sales` from hydrated navigation.
 - `risks`: Existing production metadata will not show the new links until the updated seed/hydration SQL is applied.
+
+### 2026-05-07 — SupaPlan franchize UX/perf/type strict trio
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `supaplan_tasks`: `021bb5f2-9183-4733-b911-606cae9eb6d8`, `3905fad7-650a-446f-832d-d9bc848fa691`, `d6f2c2c5-6234-4f6b-0123-66660006f123`
+- `notes`: Executed PERF-01, RENT-P3.3, and TS-STRICT together: MapRiders now exposes split state/action contexts for lower-noise consumers, the franchize profile menu has persisted notification opt-in/out controls, and a dedicated franchize TypeScript config/script starts the stricter path without changing the whole repo at once.
+- `next_step`: Run preview smoke for `/franchize/vip-bike/map-riders` and the franchize header profile menu with a Telegram-authenticated user.
+- `risks`: The new franchize typecheck surfaces existing legacy type debt outside this slice, so follow-up strict cleanup should burn down the current errors before making it merge-blocking.
+
+- 2026-05-07 — SupaPlan trio pass: split MapRiders provider state/actions, added per-slug notification preference persistence in the profile dropdown, and introduced a dedicated franchize TypeScript check command for incremental strictness.
+
+### 2026-05-07 — Self-review fixes for SupaPlan franchize trio
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex-review
+- `supaplan_tasks`: `021bb5f2-9183-4733-b911-606cae9eb6d8`, `3905fad7-650a-446f-832d-d9bc848fa691`, `d6f2c2c5-6234-4f6b-0123-66660006f123`
+- `notes`: Self-review fixed the first pass: profile notification prefs now normalize slugs, handle read/write rejections, and protect metadata shape; RiderFAB no longer double-subscribes to MapRiders state; `useSessionManager` uses the split context hooks directly; the franchize typecheck command now exits cleanly for the allowlisted strict slice while summarizing legacy transitive debt.
+- `next_step`: Burn down the surfaced transitive TypeScript debt in follow-up slices, then expand `tsconfig.franchize.json` allowlist.
+- `risks`: The TypeScript check is intentionally allowlist-gated; it is a gradual guardrail, not yet a full `app/franchize/**` merge blocker.
+
+- 2026-05-07 — Self-reviewed the SupaPlan trio and fixed the main regressions: no knowingly failing typecheck command, safer notification preference IO, normalized metadata keys, and reduced RiderFAB duplicate state subscription.

@@ -3,7 +3,7 @@
 
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type Dispatch, type ReactNode } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useAppContext } from "@/contexts/AppContext";
 import {
@@ -16,9 +16,12 @@ import {
 } from "@/lib/map-riders-reducer";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
 
-interface MapRidersContextValue {
+interface MapRidersStateContextValue {
   state: MapRidersState;
-  dispatch: React.Dispatch<MapRidersAction>;
+}
+
+interface MapRidersActionsContextValue {
+  dispatch: Dispatch<MapRidersAction>;
   crewSlug: string;
   crew: FranchizeCrewVM;
   // Convenience actions
@@ -26,12 +29,25 @@ interface MapRidersContextValue {
   fetchSessionDetail: (sessionId: string) => Promise<void>;
 }
 
-const MapRidersContext = createContext<MapRidersContextValue | null>(null);
+type MapRidersContextValue = MapRidersStateContextValue & MapRidersActionsContextValue;
 
-export function useMapRiders() {
-  const ctx = useContext(MapRidersContext);
-  if (!ctx) throw new Error("useMapRiders must be used within MapRidersProvider");
+const MapRidersStateContext = createContext<MapRidersStateContextValue | null>(null);
+const MapRidersActionsContext = createContext<MapRidersActionsContextValue | null>(null);
+
+export function useMapRidersState() {
+  const ctx = useContext(MapRidersStateContext);
+  if (!ctx) throw new Error("useMapRidersState must be used within MapRidersProvider");
   return ctx;
+}
+
+export function useMapRidersActions() {
+  const ctx = useContext(MapRidersActionsContext);
+  if (!ctx) throw new Error("useMapRidersActions must be used within MapRidersProvider");
+  return ctx;
+}
+
+export function useMapRiders(): MapRidersContextValue {
+  return { ...useMapRidersState(), ...useMapRidersActions() };
 }
 
 export function MapRidersProvider({
@@ -39,7 +55,7 @@ export function MapRidersProvider({
   crew,
   slug,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   crew: FranchizeCrewVM;
   slug: string;
 }) {
@@ -147,10 +163,15 @@ export function MapRidersProvider({
     return () => clearInterval(interval);
   }, []);
 
-  const value = useMemo(
-    () => ({ state, dispatch, crewSlug, crew, fetchSnapshot, fetchSessionDetail }),
-    [state, dispatch, crewSlug, crew, fetchSnapshot, fetchSessionDetail],
+  const stateValue = useMemo(() => ({ state }), [state]);
+  const actionsValue = useMemo(
+    () => ({ dispatch, crewSlug, crew, fetchSnapshot, fetchSessionDetail }),
+    [dispatch, crewSlug, crew, fetchSnapshot, fetchSessionDetail],
   );
 
-  return <MapRidersContext.Provider value={value}>{children}</MapRidersContext.Provider>;
+  return (
+    <MapRidersActionsContext.Provider value={actionsValue}>
+      <MapRidersStateContext.Provider value={stateValue}>{children}</MapRidersStateContext.Provider>
+    </MapRidersActionsContext.Provider>
+  );
 }

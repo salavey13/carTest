@@ -109,6 +109,7 @@ export interface FranchizeCrewVM {
     telegram: string;
     workingHours: string;
     map: {
+      id?: string;
       gps: string;
       publicTransport: string;
       carDirections: string;

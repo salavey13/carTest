@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "tsBuildInfoFile": ".next/cache/tsconfig.franchize.tsbuildinfo"
+  },
+  "include": [
+    "next-env.d.ts",
+    "app/franchize/components/MapRidersClient.tsx",
+    "app/franchize/components/FranchizeProfileButton.tsx",
+    "app/franchize/profile-actions.ts",
+    "hooks/useMapRidersContext.tsx",
+    "components/map-riders/MapRidersClientRefactored.tsx",
+    "components/map-riders/BeginnerRiderOnboardingQuiz.tsx",
+    "components/map-riders/RiderFAB.tsx",
+    "components/map-riders/StatusOverlay.tsx",
+    "components/map-riders/RiderMarkerLayer.tsx",
+    "components/map-riders/RidersDrawer.tsx"
+  ],
+  "exclude": ["node_modules", ".next"]
+}
