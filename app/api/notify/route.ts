@@ -112,7 +112,21 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ ok: true, message: "No handler for event type" });
         }
         
-        const deep_link_url = `${TELEGRAM_BOT_LINK}?startapp=rental_${action_link_slug}_${rental_id}`;
+        let deep_link_url = `${TELEGRAM_BOT_LINK}?startapp=rental_${action_link_slug}_${rental_id}`;
+        if (action_link_slug === 'review') {
+            let crewSlug = 'vip-bike';
+            if (vehicle?.crew_id) {
+                const { data: crewRow, error: crewSlugError } = await supabaseAnon
+                    .from('crews')
+                    .select('slug')
+                    .eq('id', vehicle.crew_id)
+                    .maybeSingle();
+                if (crewSlugError) logger.warn(`[Notify API] Failed to fetch crew slug for review link: ${crewSlugError.message}`);
+                if (typeof crewRow?.slug === "string" && crewRow.slug.trim().length > 0) crewSlug = crewRow.slug.trim();
+            }
+            const reviewPath = `/franchize/${crewSlug}/review/${rental_id}`;
+            deep_link_url = `${TELEGRAM_BOT_LINK}?startapp=${reviewPath.replace(/^\//, '')}`;
+        }
 
         for (const recipientId of Array.from(recipient_ids)) {
              if (doNotNotifyCreator && recipientId === created_by) continue; 

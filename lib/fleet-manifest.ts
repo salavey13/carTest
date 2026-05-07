@@ -117,7 +117,7 @@ export const V_FLEET_ASSETS: VehicleAsset[] = [
     specs: { category: 'Naked', gallery: [] }
   },
   {
-    id: 'seqvenz-zero', make: 'Seqvenz', model: 'Zero',
+    id: 'seqvens-zero', make: 'Seqvens', model: 'Zero',
     description: "Мощный крутой электробайк с дерзким силуэтом и уверенной тягой. Мощность двигателя 15–30 кВт, запас хода до 300 километров. Базовую карточку уже добавили, расширенное описание и детали дополним следующим апдейтом.",
     daily_price_rub: 15000,
     image_url: 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/seqvenz-zero/image_1.jpg',

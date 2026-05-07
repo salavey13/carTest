@@ -13,6 +13,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM } from "@/app/franchize/actions";
+import {
+  DEFAULT_COLOR_OPTIONS,
+  DEFAULT_CONFIG_OPTIONS,
+  resolveBuyColorOptions,
+  resolveBuyConfigOptions,
+} from "@/app/franchize/lib/sale-config";
 
 type ServiceItem = { icon: string; text: string };
 
@@ -62,6 +68,17 @@ type HeroPanel = {
 
 const formatCompactNumber = (value: number | undefined, fallback: number) =>
   Number(value ?? fallback).toLocaleString("ru-RU", { maximumFractionDigits: 1 });
+
+const getRussianRiderLabel = (count: number) => {
+  const rounded = Math.abs(Math.round(count));
+  const lastTwo = rounded % 100;
+  const last = rounded % 10;
+
+  if (lastTwo >= 11 && lastTwo <= 14) return "райдеров онлайн";
+  if (last === 1) return "райдер онлайн";
+  if (last >= 2 && last <= 4) return "райдера онлайн";
+  return "райдеров онлайн";
+};
 
 const fallbackHeroPanels: Record<HeroMode, HeroPanel> = {
   rent: {
@@ -188,43 +205,17 @@ const ServiceCard = ({
   </Card>
 );
 
-const quickActions = [
-  {
-    title: "Купить электромотоцикл",
-    icon: "::FaCartShopping::",
-    text: "Открыть конфигуратор с выбором модели, мотора, батареи и допов.",
-    href: "/franchize/vip-bike/configurator",
-    cta: "Купить",
-  },
-  {
-    title: "Каталог байков",
-    icon: "::FaMotorcycle::",
-    text: "Подбор модели под стиль езды, бюджет и маршрут.",
-    href: "/franchize/vip-bike",
-    cta: "Открыть",
-  },
-  {
-    title: "Контроль сделок",
-    icon: "::FaTicket::",
-    text: "Проверка статусов, подтверждений и активных аренд.",
-    href: "/franchize/vip-bike/rentals",
-    cta: "Мои аренды",
-  },
-  {
-    title: "MapRiders",
-    icon: "::FaMapLocationDot::",
-    text: "Живая карта райдеров, маршруты, точки встречи и недельный лидерборд.",
-    href: "/franchize/vip-bike/map-riders",
-    cta: "Открыть карту",
-  },
-  {
-    title: "Быстрый вход",
-    icon: "::FaBolt::",
-    text: "Прямой сценарий: выбрать → подтвердить → поехать.",
-    href: "/franchize/vip-bike",
-    cta: "Старт",
-  },
+const rentalStatusSteps = [
+  { label: "Выбор", value: "открыт", icon: "::FaMotorcycle::" },
+  { label: "Экип", value: "готов", icon: "::FaHelmetSafety::" },
+  { label: "Слот", value: "сегодня", icon: "::FaStopwatch::" },
 ];
+
+const quickChooserFilters = [
+  { id: "first", label: "Первый выезд", hint: "мягкая тяга" },
+  { id: "range", label: "Дальше ехать", hint: "батарея +" },
+  { id: "buy", label: "Купить", hint: "sale-ready" },
+] as const;
 
 const heroMetrics = [
   "::FaStopwatch:: Быстрая онлайн-бронь",
@@ -233,6 +224,35 @@ const heroMetrics = [
   "::FaHeadset:: Поддержка на маршруте",
 ];
 
+const conversionPilotChecks = [
+  { label: "Hero", value: "понятный старт", icon: "::FaLayerGroup::" },
+  { label: "Trust", value: "экип + ОСАГО", icon: "::FaShieldHeart::" },
+  { label: "Action", value: "3 пути", icon: "::FaBolt::" },
+];
+
+const decisionRoutes = [
+  {
+    title: "Первый выезд",
+    text: "Если хочешь просто попробовать: выбери байк, слот и комплект экипа без лишних шагов.",
+    href: "/franchize/vip-bike",
+    cta: "Выбрать аренду",
+    icon: "::FaMotorcycle::",
+  },
+  {
+    title: "Тест → покупка",
+    text: "Если присматриваешь свой электроэндуро: сначала собери конфиг, потом закрепи тест-драйв.",
+    href: "/franchize/vip-bike/configurator",
+    cta: "Собрать байк",
+    icon: "::FaCartShopping::",
+  },
+  {
+    title: "Кататься с группой",
+    text: "Если важен вайб комьюнити: открой райдеров рядом, точки старта и ближайшие meetup.",
+    href: "/franchize/vip-bike/map-riders",
+    cta: "Смотреть карту",
+    icon: "::FaMapLocationDot::",
+  },
+];
 
 const partnerLinks = [
   {
@@ -280,6 +300,101 @@ const newbieFlow = [
     cta: "Проверить оформление",
   },
 ];
+
+function ConversionPilot({ items, overview }: { items: CatalogItemVM[]; overview: MapRidersOverview | null }) {
+  const rentableItems = items.filter((item) => item.availabilityStatus === "available" && item.pricePerDay > 0);
+  const pricedRentalItems = items.filter((item) => item.pricePerDay > 0);
+  const availableItems = rentableItems.length > 0 ? rentableItems : pricedRentalItems;
+  const saleItems = items.filter((item) => item.saleAvailable || isEnabled(item.rawSpecs?.sale));
+  const dayPrices = availableItems.map((item) => item.pricePerDay).filter((price) => price > 0);
+  const minDayPrice = dayPrices.length ? Math.min(...dayPrices) : fallbackElectroItems[0]?.pricePerDay ?? 4900;
+  const activeRidersCount = Number(overview?.stats?.activeRiders ?? overview?.liveLocations?.length ?? fallbackMapLocations.length);
+  const activeRiders = formatCompactNumber(activeRidersCount, fallbackMapLocations.length);
+  const leadItem = availableItems[0] ?? saleItems[0] ?? items[0] ?? fallbackElectroItems[0];
+  const leadHref = leadItem?.id ? `/franchize/vip-bike?vehicle=${leadItem.id}` : "/franchize/vip-bike";
+  const score = Math.min(9.2, 8.4 + (availableItems.length > 0 ? 0.3 : 0) + (saleItems.length > 0 ? 0.25 : 0) + (overview ? 0.25 : 0));
+  const scoreLabel = score.toLocaleString("ru-RU", { maximumFractionDigits: 1 });
+  const riderLabel = getRussianRiderLabel(activeRidersCount);
+  const scoreReasons = [
+    `${availableItems.length || fallbackElectroItems.length} вариантов аренды`,
+    saleItems.length > 0 ? "есть sale-конфиг" : "тест-драйв перед покупкой",
+    overview ? "live MapRiders подключен" : "MapRiders fallback готов",
+  ];
+
+  return (
+    <section className="rounded-[2rem] border border-primary/30 bg-card/50 p-4 shadow-2xl shadow-black/10 backdrop-blur-sm sm:p-6 lg:p-8">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.24em] text-primary">быстрый выбор</p>
+          <h2 className="mt-2 font-orbitron text-3xl sm:text-4xl">Выбери сценарий за 30 секунд</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+            После первого вау-экрана не нужно искать следующий шаг: выбери аренду, покупку после теста или групповую поездку —
+            лендинг сразу ведёт в нужный раздел VIP Bike.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm">
+          <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">готовность</span>
+          <span className="ml-3 font-orbitron text-2xl text-primary">{scoreLabel}/10</span>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-stretch">
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-black/70 p-6 text-white">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,179,71,0.25),transparent_38%),radial-gradient(circle_at_80%_70%,rgba(34,197,94,0.16),transparent_34%)]" />
+          <div className="relative z-10 flex h-full flex-col justify-between gap-8">
+            <div>
+              <p className="text-xs uppercase tracking-[0.24em] text-brand-yellow">best next action</p>
+              <h3 className="mt-3 font-orbitron text-3xl sm:text-4xl">{leadItem?.title || "VIP Bike"}</h3>
+              <p className="mt-3 text-sm leading-relaxed text-white/75">
+                От {minDayPrice.toLocaleString("ru-RU")} ₽ / день · {activeRiders} {riderLabel} · быстрый старт из каталога VIP Bike.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {scoreReasons.map((reason) => (
+                  <span key={reason} className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/75">
+                    {reason}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {conversionPilotChecks.map((check) => (
+                <div key={check.label} className="rounded-2xl border border-white/10 bg-white/5 p-3 text-center">
+                  <VibeContentRenderer content={check.icon} className="mx-auto text-lg text-brand-yellow" />
+                  <p className="mt-2 text-[10px] uppercase tracking-[0.18em] text-white/45">{check.label}</p>
+                  <p className="mt-1 font-orbitron text-xs text-white sm:text-sm">{check.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-1">
+          {decisionRoutes.map((route, index) => (
+            <Link
+              key={route.title}
+              href={route.href}
+              aria-label={`${route.cta}: ${route.title}`}
+              className="group rounded-2xl border border-border/70 bg-card/60 p-4 transition hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <VibeContentRenderer content={route.icon} className="text-2xl text-primary" />
+                <span className="rounded-full border border-border/70 bg-background/45 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                  0{index + 1}
+                </span>
+              </div>
+              <h4 className="mt-3 font-orbitron text-lg">{route.title}</h4>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{route.text}</p>
+              <span className="mt-4 inline-flex text-xs font-medium text-primary group-hover:underline">{route.cta}</span>
+            </Link>
+          ))}
+          <Button asChild className="mt-1 w-full md:col-span-3 lg:col-span-1">
+            <Link href={leadHref}>Начать с рекомендованного байка</Link>
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function StepsProgress({ items }: { items: CatalogItemVM[] }) {
   const [activeStepIndex, setActiveStepIndex] = useState(0);
@@ -403,6 +518,342 @@ function StepsProgress({ items }: { items: CatalogItemVM[] }) {
           </motion.div>
         </AnimatePresence>
       </div>
+    </section>
+  );
+}
+
+
+function VipBikeCompanyServiceHub() {
+  const serviceLanes = [
+    {
+      title: "Прокат и выдача",
+      icon: "::FaKey::",
+      text: "Быстрая бронь, договор, экипировка и понятная выдача без лишних звонков.",
+      href: "/franchize/vip-bike",
+      cta: "Выбрать байк",
+    },
+    {
+      title: "Сервис и ремонт",
+      icon: "::FaWrench::",
+      text: "Обслуживание своего мотоцикла, диагностика, сезонная подготовка и расходники на базе VIP BIKE.",
+      href: "https://t.me/salavey13",
+      cta: "Написать в сервис",
+    },
+    {
+      title: "Комьюнити райдеров",
+      icon: "::FaUsersViewfinder::",
+      text: "MapRiders, точки встреч, живые маршруты и социальное доказательство вокруг реальных поездок.",
+      href: "/franchize/vip-bike/map-riders",
+      cta: "Открыть карту",
+    },
+  ];
+
+  const companyFacts = [
+    "Локация: ул. Комсомольская 2",
+    "Формат: аренда, продажа, сервис, комьюнити",
+    "Фокус: electro-enduro и городские тест-драйвы",
+  ];
+
+  return (
+    <section className="overflow-hidden rounded-[2rem] border border-primary/20 bg-card/50 p-5 shadow-2xl shadow-primary/10 sm:p-7">
+      <div className="grid gap-6 lg:grid-cols-[0.9fr,1.1fr]">
+        <div className="rounded-3xl border border-white/10 bg-black/35 p-5 text-white">
+          <p className="text-xs uppercase tracking-[0.24em] text-primary">company hub</p>
+          <h2 className="mt-3 font-orbitron text-3xl sm:text-4xl">VIP BIKE — не только прокат, а база райдера</h2>
+          <p className="mt-4 text-sm leading-relaxed text-white/70">
+            Один экран объясняет компанию простыми словами: где взять байк, где обслужить свой мотоцикл, куда приехать и как попасть в живое сообщество.
+          </p>
+          <div className="mt-5 grid gap-2">
+            {companyFacts.map((fact) => (
+              <div key={fact} className="flex items-start gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85">
+                <VibeContentRenderer content="::FaCircleCheck::" className="mt-0.5 text-primary" />
+                <span>{fact}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-1">
+          {serviceLanes.map((lane) => (
+            <article key={lane.title} className="rounded-3xl border border-border/70 bg-background/55 p-4 transition hover:-translate-y-1 hover:border-primary/50">
+              <div className="flex items-start gap-3">
+                <div className="rounded-2xl bg-primary/10 p-3 text-primary">
+                  <VibeContentRenderer content={lane.icon} />
+                </div>
+                <div>
+                  <h3 className="font-orbitron text-lg">{lane.title}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">{lane.text}</p>
+                  <Button asChild size="sm" variant="outline" className="mt-3">
+                    <Link href={lane.href}>{lane.cta}</Link>
+                  </Button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+function RentalQuickActionHub({ items, overview }: { items: CatalogItemVM[]; overview: MapRidersOverview | null }) {
+  const [selectedAction, setSelectedAction] = useState<"status" | "riders" | "chooser">("status");
+  const [isChooserOpen, setIsChooserOpen] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<(typeof quickChooserFilters)[number]["id"]>("first");
+
+  const chooserItems = useMemo(() => {
+    const availableItems = items.filter((item) => item.availabilityStatus === "available" || item.pricePerDay > 0);
+    const saleItems = items.filter((item) => item.saleAvailable || isEnabled(item.rawSpecs?.sale));
+    const source = activeFilter === "buy" && saleItems.length > 0 ? saleItems : availableItems.length > 0 ? availableItems : items;
+    return (source.length > 0 ? source : fallbackElectroItems).slice(0, 3);
+  }, [activeFilter, items]);
+
+  const leadItem = chooserItems[0];
+  const activeRiders = formatCompactNumber(overview?.stats?.activeRiders, overview?.liveLocations?.length || fallbackMapLocations.length);
+  const meetupCount = formatCompactNumber(overview?.stats?.meetupCount, overview?.meetups?.length || fallbackMeetups.length);
+  const weeklyDistance = formatCompactNumber(overview?.stats?.totalWeeklyDistanceKm, 127);
+
+  const actionCards = [
+    {
+      id: "status" as const,
+      title: "Статус аренды",
+      icon: "::FaTicket::",
+      metric: "3 шага",
+      text: "Проверь, что уже закрыто перед поездкой: байк, экип и слот выдачи.",
+      cta: "Открыть сделки",
+      href: "/franchize/vip-bike/rentals",
+    },
+    {
+      id: "riders" as const,
+      title: "Райдеры рядом",
+      icon: "::FaMapLocationDot::",
+      metric: `${activeRiders} онлайн`,
+      text: `За неделю комьюнити проехало ${weeklyDistance} км, активных встреч: ${meetupCount}.`,
+      cta: "Открыть карту",
+      href: "/franchize/vip-bike/map-riders",
+    },
+    {
+      id: "chooser" as const,
+      title: "Быстрый подбор",
+      icon: "::FaBolt::",
+      metric: leadItem?.title || "VIP Bike",
+      text: "Открой мини-подбор прямо здесь: цель поездки → карточки байков → следующий шаг.",
+      cta: "Подобрать байк",
+      href: "/franchize/vip-bike",
+    },
+  ];
+
+  const selectedCard = actionCards.find((card) => card.id === selectedAction) ?? actionCards[0];
+
+  return (
+    <section>
+      <div className="mb-8 text-center">
+        <h2 className="font-orbitron text-3xl sm:text-4xl">Rental-флоу — живые действия вместо ссылок</h2>
+        <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
+          Быстрые карточки теперь не просто уводят в разделы: они показывают статус аренды, live-счётчик райдеров и мини-подбор байка прямо на лендинге.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="grid gap-3" role="tablist" aria-label="Быстрые действия VIP Bike">
+          {actionCards.map((card) => {
+            const isActive = selectedAction === card.id;
+            return (
+              <button
+                key={card.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setSelectedAction(card.id)}
+                className={cn(
+                  "rounded-2xl border p-4 text-left transition-all",
+                  isActive ? "border-primary bg-primary/15 shadow-lg shadow-primary/10" : "border-border/70 bg-card/55 hover:-translate-y-0.5 hover:border-primary/50",
+                )}
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2 font-orbitron text-lg">
+                    <VibeContentRenderer content={card.icon} className="text-primary" />
+                    {card.title}
+                  </span>
+                  <span className="rounded-full border border-border/70 bg-background/55 px-3 py-1 text-xs text-muted-foreground">{card.metric}</span>
+                </span>
+                <span className="mt-2 block text-sm text-muted-foreground">{card.text}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="overflow-hidden rounded-3xl border border-border/70 bg-card/55 p-4 backdrop-blur-sm sm:p-6">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={selectedCard.id}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22 }}
+              className="min-h-[320px]"
+            >
+              {selectedCard.id === "status" && (
+                <div className="space-y-5">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.22em] text-primary">latest rental status</p>
+                    <h3 className="mt-2 font-orbitron text-2xl">Готовность к выезду за один взгляд</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">Если активной сделки ещё нет — блок работает как чеклист перед бронированием.</p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {rentalStatusSteps.map((step, index) => (
+                      <div key={step.label} className="rounded-2xl border border-border/70 bg-background/45 p-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <VibeContentRenderer content={step.icon} className="text-primary" />
+                          <span className="text-xs text-muted-foreground">0{index + 1}</span>
+                        </div>
+                        <p className="mt-4 font-orbitron text-lg">{step.label}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{step.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <Button asChild className="w-full sm:w-fit">
+                    <Link href="/franchize/vip-bike/rentals">Проверить мои аренды</Link>
+                  </Button>
+                </div>
+              )}
+
+              {selectedCard.id === "riders" && (
+                <div className="grid gap-5 md:grid-cols-[0.9fr_1.1fr]">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.22em] text-primary">live rider counter</p>
+                    <h3 className="mt-2 font-orbitron text-2xl">{activeRiders} райдера онлайн</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">Смотри активность перед стартом и решай: ехать соло или присоединиться к группе.</p>
+                    <Button asChild variant="outline" className="mt-5 w-full sm:w-fit">
+                      <Link href="/franchize/vip-bike/map-riders">Открыть MapRiders</Link>
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "онлайн", value: activeRiders },
+                      { label: "meetup", value: meetupCount },
+                      { label: "за неделю", value: `${weeklyDistance} км` },
+                      { label: "формат", value: "group ride" },
+                    ].map((stat) => (
+                      <div key={stat.label} className="rounded-2xl border border-border/70 bg-background/45 p-4">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{stat.label}</p>
+                        <p className="mt-2 font-orbitron text-xl">{stat.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedCard.id === "chooser" && (
+                <div className="space-y-5">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.22em] text-primary">quick bike chooser</p>
+                    <h3 className="mt-2 font-orbitron text-2xl">Мини-подбор без ухода со страницы</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">Выбери цель, посмотри 3 релевантные карточки и открой полную аренду или покупку.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {quickChooserFilters.map((filter) => (
+                      <button
+                        key={filter.id}
+                        type="button"
+                        onClick={() => setActiveFilter(filter.id)}
+                        className={cn(
+                          "rounded-full border px-3 py-2 text-xs transition",
+                          activeFilter === filter.id ? "border-primary bg-primary text-primary-foreground" : "border-border/70 bg-background/45 hover:border-primary/50",
+                        )}
+                      >
+                        {filter.label} · {filter.hint}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button type="button" className="flex-1" onClick={() => setIsChooserOpen(true)}>
+                      Открыть мини-подбор
+                    </Button>
+                    <Button asChild variant="outline" className="flex-1">
+                      <Link href="/franchize/vip-bike">Весь каталог</Link>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {isChooserOpen && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quick-bike-chooser-title"
+            onClick={() => setIsChooserOpen(false)}
+          >
+            <motion.div
+              className="max-h-[92dvh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-white/15 bg-background p-4 shadow-2xl sm:p-6"
+              initial={{ y: 28, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 20, opacity: 0 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.22em] text-primary">мини-подбор</p>
+                  <h3 id="quick-bike-chooser-title" className="mt-1 font-orbitron text-2xl">Быстрый выбор VIP Bike</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">Подборка использует реальные карточки каталога, а при пустых данных — безопасные демо-карточки.</p>
+                </div>
+                <button type="button" onClick={() => setIsChooserOpen(false)} className="rounded-full border border-border/70 px-3 py-1 text-sm hover:bg-card" aria-label="Закрыть мини-подбор">
+                  ×
+                </button>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                {chooserItems.map((item) => {
+                  const imageUrl = getBikeGallery(item)[0];
+                  const buyHref = item.saleAvailable || isEnabled(item.rawSpecs?.sale) ? `/franchize/vip-bike/market/${item.id}/buy` : `/franchize/vip-bike?vehicle=${item.id}`;
+                  return (
+                    <article key={item.id} className="overflow-hidden rounded-2xl border border-border/70 bg-card/55">
+                      <div className="relative h-44 bg-black/35">
+                        {imageUrl ? <Image src={imageUrl} alt={item.title} fill className="object-cover" /> : null}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                      </div>
+                      <div className="space-y-3 p-4">
+                        <div>
+                          <h4 className="font-orbitron text-lg">{item.title}</h4>
+                          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{item.subtitle || item.description}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                            <p className="text-muted-foreground">Аренда</p>
+                            <p className="mt-1 font-medium">{item.rentPriceLabel || `${item.pricePerDay.toLocaleString("ru-RU")} ₽ / день`}</p>
+                          </div>
+                          <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                            <p className="text-muted-foreground">Покупка</p>
+                            <p className="mt-1 font-medium">{item.saleAvailable || isEnabled(item.rawSpecs?.sale) ? getSalePriceLabel(item) : "тест-драйв"}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <Button asChild size="sm">
+                            <Link href={`/franchize/vip-bike?vehicle=${item.id}`}>Арендовать</Link>
+                          </Button>
+                          <Button asChild size="sm" variant="outline">
+                            <Link href={buyHref}>Подробнее</Link>
+                          </Button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }
@@ -639,8 +1090,8 @@ const fallbackElectroItems: ElectroPreviewItem[] = [
 
 function ElectroEnduroShowcase({ items }: { items: CatalogItemVM[] }) {
   const [selectedItem, setSelectedItem] = useState<ElectroPreviewItem | null>(null);
-  const [selectedColor, setSelectedColor] = useState("Lime");
-  const [selectedPackage, setSelectedPackage] = useState("Стандарт");
+  const [selectedColorId, setSelectedColorId] = useState(DEFAULT_COLOR_OPTIONS[2]?.id ?? DEFAULT_COLOR_OPTIONS[0]?.id ?? "black");
+  const [selectedConfigId, setSelectedConfigId] = useState(DEFAULT_CONFIG_OPTIONS[0]?.id ?? "standard");
 
   const electroItems = useMemo<ElectroPreviewItem[]>(() => {
     const realItems = items
@@ -654,8 +1105,23 @@ function ElectroEnduroShowcase({ items }: { items: CatalogItemVM[] }) {
   }, [items]);
 
   const activePreview = selectedItem ?? electroItems[0];
-  const packageDelta = selectedPackage === "Long Range" ? 55000 : selectedPackage === "Comfort" ? 25000 : 0;
-  const configuredPrice = activePreview?.salePrice ? activePreview.salePrice + packageDelta : null;
+  const colorOptions = useMemo(() => resolveBuyColorOptions(activePreview?.rawSpecs), [activePreview?.rawSpecs]);
+  const configOptions = useMemo(() => resolveBuyConfigOptions(activePreview?.rawSpecs), [activePreview?.rawSpecs]);
+  const selectedColor = colorOptions.find((color) => color.id === selectedColorId) ?? colorOptions[0];
+  const selectedConfig = configOptions.find((option) => option.id === selectedConfigId) ?? configOptions[0];
+  const configuredPrice = activePreview?.salePrice ? activePreview.salePrice + (selectedConfig?.priceDelta ?? 0) : null;
+
+  useEffect(() => {
+    if (!colorOptions.some((color) => color.id === selectedColorId)) {
+      setSelectedColorId(colorOptions[0]?.id ?? DEFAULT_COLOR_OPTIONS[0]?.id ?? "black");
+    }
+  }, [colorOptions, selectedColorId]);
+
+  useEffect(() => {
+    if (!configOptions.some((option) => option.id === selectedConfigId)) {
+      setSelectedConfigId(configOptions[0]?.id ?? DEFAULT_CONFIG_OPTIONS[0]?.id ?? "standard");
+    }
+  }, [configOptions, selectedConfigId]);
 
   return (
     <section>
@@ -753,7 +1219,7 @@ function ElectroEnduroShowcase({ items }: { items: CatalogItemVM[] }) {
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,170,80,0.28),transparent_58%)]" />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                  <div className="absolute bottom-4 left-4 rounded-full bg-brand-yellow px-3 py-1 font-orbitron text-xs text-black">{selectedColor}</div>
+                  <div className="absolute bottom-4 left-4 rounded-full bg-brand-yellow px-3 py-1 font-orbitron text-xs text-black">{selectedColor?.label ?? "Цвет"}</div>
                 </div>
 
                 <div className="space-y-5">
@@ -776,17 +1242,18 @@ function ElectroEnduroShowcase({ items }: { items: CatalogItemVM[] }) {
                   <div>
                     <p className="mb-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">Цвет</p>
                     <div className="flex flex-wrap gap-2">
-                      {["Black", "Graphite", "Lime", "White"].map((color) => (
+                      {colorOptions.map((color) => (
                         <button
-                          key={color}
+                          key={color.id}
                           type="button"
-                          onClick={() => setSelectedColor(color)}
+                          onClick={() => setSelectedColorId(color.id)}
                           className={cn(
-                            "rounded-full border px-3 py-1.5 text-xs transition",
-                            selectedColor === color ? "border-primary bg-primary text-primary-foreground" : "border-border/70 hover:bg-card",
+                            "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition",
+                            selectedColor?.id === color.id ? "border-primary bg-primary text-primary-foreground" : "border-border/70 hover:bg-card",
                           )}
                         >
-                          {color}
+                          <span className="h-3 w-3 rounded-full border border-white/30" style={{ backgroundColor: color.hex }} />
+                          {color.label}
                         </button>
                       ))}
                     </div>
@@ -795,18 +1262,18 @@ function ElectroEnduroShowcase({ items }: { items: CatalogItemVM[] }) {
                   <div>
                     <p className="mb-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">Пакет</p>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                      {["Стандарт", "Comfort", "Long Range"].map((pack) => (
+                      {configOptions.map((option) => (
                         <button
-                          key={pack}
+                          key={option.id}
                           type="button"
-                          onClick={() => setSelectedPackage(pack)}
+                          onClick={() => setSelectedConfigId(option.id)}
                           className={cn(
                             "rounded-xl border p-3 text-left text-xs transition",
-                            selectedPackage === pack ? "border-primary bg-primary/15" : "border-border/70 hover:bg-card",
+                            selectedConfig?.id === option.id ? "border-primary bg-primary/15" : "border-border/70 hover:bg-card",
                           )}
                         >
-                          <span className="block font-orbitron text-sm">{pack}</span>
-                          <span className="mt-1 block text-muted-foreground">{pack === "Long Range" ? "+55 000 ₽" : pack === "Comfort" ? "+25 000 ₽" : "база"}</span>
+                          <span className="block font-orbitron text-sm">{option.label}</span>
+                          <span className="mt-1 block text-muted-foreground">{option.priceDelta > 0 ? `+${option.priceDelta.toLocaleString("ru-RU")} ₽` : option.subtitle || "база"}</span>
                         </button>
                       ))}
                     </div>
@@ -827,7 +1294,7 @@ function ElectroEnduroShowcase({ items }: { items: CatalogItemVM[] }) {
 
                   <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
                     <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Ваша конфигурация</p>
-                    <p className="mt-1 font-orbitron text-lg">{activePreview.title} · {selectedColor} · {selectedPackage}</p>
+                    <p className="mt-1 font-orbitron text-lg">{activePreview.title} · {selectedColor?.label ?? "Цвет"} · {selectedConfig?.label ?? "Пакет"}</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {configuredPrice ? `${configuredPrice.toLocaleString("ru-RU")} ₽ ориентир покупки` : `${activePreview.rentPriceLabel} для тест-драйва`}
                     </p>
@@ -1103,6 +1570,8 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
       </motion.section>
 
       <div className="container mx-auto max-w-7xl space-y-20 px-4 py-16 sm:space-y-24 sm:py-24">
+        <ConversionPilot items={items} overview={mapOverview} />
+
         <section className="rounded-2xl border border-border/60 bg-card/40 p-5 sm:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1164,36 +1633,9 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
 
         <StepsProgress items={items} />
 
-        <section>
-          <div className="mb-8 text-center">
-            <h2 className="font-orbitron text-3xl sm:text-4xl">Уже внедрённый rental-флоу — в один клик</h2>
-            <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
-              На платформе уже реализованы ключевые инструменты аренды. Ниже — прямые входы в рабочие сценарии, чтобы
-              пользователь сразу попадал в полезные действия.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {quickActions.map((card) => (
-              <Card
-                key={card.title}
-                className="border-border/70 bg-card/60 backdrop-blur-sm transition-all hover:-translate-y-1 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/20"
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-xl">
-                    <VibeContentRenderer content={card.icon} className="text-primary" />
-                    {card.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="mb-5 text-sm text-muted-foreground">{card.text}</p>
-                  <Button asChild variant="outline" className="w-full">
-                    <Link href={card.href}>{card.cta}</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
+        <RentalQuickActionHub items={items} overview={mapOverview} />
+
+        <VipBikeCompanyServiceHub />
 
         <motion.section
           initial={{ opacity: 0, y: 50 }}
@@ -1223,7 +1665,7 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
               { icon: "::FaCircleCheck::", text: "Полностью обслуженный и чистый мотоцикл" },
               { icon: "::FaFileSignature::", text: "Открытый полис ОСАГО" },
               { icon: "::FaUserShield::", text: "Полный комплект защитной экипировки" },
-              { icon: "::FaTag::", text: "Скидка 10% на первую аренду по промокоду 'ЛЕТО2025'" },
+              { icon: "::FaTag::", text: "Скидка 10% на первую аренду по промокоду 'VIPSTART'" },
             ]}
           />
           <ServiceCard
@@ -1234,7 +1676,7 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
             items={[
               { icon: "::FaTools::", text: "Обслуживание и ремонт вашего мотоцикла" },
               { icon: "::FaGamepad::", text: "Лаунж-зона с кальяном и игровыми приставками" },
-              { icon: "::FaMapLocationDot::", text: "Новая удобная локация: Стригинский переулок 13Б" },
+              { icon: "::FaMapLocationDot::", text: "Новая удобная локация: ул. Комсомольская 2" },
               { icon: "::FaBeerMugEmpty::", text: "Место, где можно встретить единомышленников" },
             ]}
           />
@@ -1254,7 +1696,7 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
               Свяжитесь с нами для подтверждения. Возьмите с собой оригиналы документов и залог.
             </StepItem>
             <StepItem num="3" title="Получение" icon="::FaKey::">
-              Приезжайте в наш новый дом на Стригинском переулке 13Б, подписываем договор и забираете байк.
+              Приезжайте в наш новый дом на ул. Комсомольская 2, подписываем договор и забираете байк.
             </StepItem>
             <StepItem num="4" title="Возврат и отдых" icon="::FaFlagCheckered::">
               Верните мотоцикл в срок. После поездки можно отдохнуть в нашей лаунж-зоне.

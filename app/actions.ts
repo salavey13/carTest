@@ -28,6 +28,20 @@ type User = Database["public"]["Tables"]["users"]["Row"];
 type UserSettings = User['metadata']; 
 type MapBounds = { top: number; bottom: number; left: number; right: number; };
 
+type JsonObject = Record<string, any>;
+type MapPresetRow = {
+  id: string;
+  name?: string | null;
+  data?: unknown;
+  created_at?: string | null;
+  updated_at?: string | null;
+  [key: string]: unknown;
+};
+
+function asJsonObject(value: unknown): JsonObject {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonObject) : {};
+}
+
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DEFAULT_CHAT_ID = "413553377"; 
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || DEFAULT_CHAT_ID;
@@ -61,6 +75,7 @@ interface CreateCrewArgs {
   owner_id: string;
   slug: string;
   hq_location: string;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -72,12 +87,12 @@ export async function saveThemePreference(userId: string, theme: 'light' | 'dark
   }
   
   try {
-    const { data: user, error: fetchError } = await dbFetchUserData(userId);
-    if (fetchError || !user) {
-      throw new Error(fetchError?.message || "User not found.");
+    const user = await dbFetchUserData(userId);
+    if (!user) {
+      throw new Error("User not found.");
     }
     
-    const currentMetadata = user.metadata || {};
+    const currentMetadata = asJsonObject(user.metadata);
     const updatedMetadata = { ...currentMetadata, theme: theme };
 
     // Используем существующую функцию для обновления метаданных
@@ -254,12 +269,38 @@ export async function handleWebhookUpdate(update: any) {
 
 export async function sendTelegramMessage(
   message: string,
-  buttons: InlineButton[] = [],
+  buttons?: InlineButton[],
   imageUrl?: string,
   chatId?: string,
-  carId?: string
+  carId?: string,
+  parseMode?: string,
+): Promise<{ success: boolean; data?: any; error?: string }>;
+export async function sendTelegramMessage(
+  telegramToken: string,
+  message: string,
+  buttons?: InlineButton[],
+  imageUrl?: string,
+  chatId?: string,
+  carId?: string,
+  parseMode?: string,
+): Promise<{ success: boolean; data?: any; error?: string }>;
+export async function sendTelegramMessage(
+  firstArg: string,
+  secondArg: string | InlineButton[] = [],
+  thirdArg?: InlineButton[] | string,
+  fourthArg?: string,
+  fifthArg?: string,
+  sixthArg?: string,
+  _seventhArg?: string,
 ): Promise<{ success: boolean; data?: any; error?: string }> {
-  return sendTelegramMessageCore(message, buttons, imageUrl, chatId, carId);
+  const isLegacyTokenSignature = typeof secondArg === "string";
+  const message = isLegacyTokenSignature ? secondArg : firstArg;
+  const buttons = (isLegacyTokenSignature ? thirdArg : secondArg) as InlineButton[] | undefined;
+  const imageUrl = (isLegacyTokenSignature ? fourthArg : thirdArg) as string | undefined;
+  const chatId = isLegacyTokenSignature ? fifthArg : fourthArg;
+  const carId = isLegacyTokenSignature ? sixthArg : fifthArg;
+
+  return sendTelegramMessageCore(message, buttons ?? [], imageUrl, chatId, carId);
 }
 
 export async function sendTelegramDocument(chatId: string, fileContent: string | Blob | Uint8Array, fileName: string): Promise<{ success: boolean; data?: any; error?: string }> {
@@ -576,7 +617,7 @@ export async function authenticateUser(chatId: string, userInfo?: Partial<WebApp
 
 export async function validateToken(token: string): Promise<{ success: boolean; user?: User | null; error?: string }> {
   try {
-    const decoded = verifyJwtToken(token); 
+    const decoded = await verifyJwtToken(token); 
     if (!decoded || !decoded.sub) { logger.warn("Token validation failed: Invalid or expired token."); return { success: false, error: "Invalid or expired token", user: null }; }
     const user = await dbFetchUserData(decoded.sub); // Uses supabaseAdmin internally
     if (!user) { logger.warn(`Token valid but user ${decoded.sub} not found in database.`); return { success: false, error: "User not found", user: null }; }
@@ -735,12 +776,12 @@ export async function updateUserSettings(userId: string, partialSettingsToUpdate
       return { success: false, error: "User not found." };
     }
     
-    const currentMetadata = currentUserData.metadata || {};
+    const currentMetadata = asJsonObject(currentUserData.metadata);
     
     // 2. Merge current metadata with the partial updates
-    const updatedFullMetadata: UserSettings = {
+    const updatedFullMetadata = {
       ...currentMetadata,
-      ...partialSettingsToUpdate 
+      ...asJsonObject(partialSettingsToUpdate),
     };
     
     // 3. Update the database with the full, merged metadata object
@@ -801,11 +842,11 @@ export async function getUserPaddockData(userId: string) {
     }
 }
 
-export async function getMapPresets(): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row'][]; error?: string; }> {
+export async function getMapPresets(): Promise<{ success: boolean; data?: MapPresetRow[]; error?: string; }> {
     try {
-        const { data, error } = await supabaseAdmin.from('maps').select('*');
+        const { data, error } = await supabaseAdmin.from('maps' as never).select('*');
         if (error) throw error;
-        return { success: true, data };
+        return { success: true, data: (data ?? []) as MapPresetRow[] };
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         logger.error("[getMapPresets Action] Error:", errorMessage);
@@ -819,7 +860,7 @@ export async function saveMapPreset(
     map_image_url: string,
     bounds: MapBounds,
     is_default: boolean = false
-): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row']; error?: string; }> {
+): Promise<{ success: boolean; data?: MapPresetRow; error?: string; }> {
     try {
         // Simple admin check
         const { data: user, error: userError } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
@@ -829,12 +870,12 @@ export async function saveMapPreset(
         
         // If setting this as default, unset other defaults first
         if (is_default) {
-            const { error: updateError } = await supabaseAdmin.from('maps').update({ is_default: false }).eq('is_default', true);
+            const { error: updateError } = await supabaseAdmin.from('maps' as never).update({ is_default: false }).eq('is_default', true);
             if (updateError) throw new Error(`Failed to unset other default maps: ${updateError.message}`);
         }
 
         const { data, error } = await supabaseAdmin
-            .from('maps')
+            .from('maps' as never)
             .insert({
                 name,
                 map_image_url,
@@ -847,7 +888,7 @@ export async function saveMapPreset(
 
         if (error) throw error;
 
-        return { success: true, data };
+        return { success: true, data: data as MapPresetRow };
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         logger.error("[saveMapPreset Action] Error:", errorMessage);

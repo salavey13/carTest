@@ -18,6 +18,7 @@ export function MapInteractionCapture({
   const map = useMap();
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggeredRef = useRef(false);
+  const clickSuppressionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartRef = useRef<{ timestamp: number; lat: number; lng: number } | null>(null);
 
   const TOUCH_MOVE_CANCEL_METERS = 18;
@@ -27,26 +28,39 @@ export function MapInteractionCapture({
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
-    longPressTriggeredRef.current = false;
   }, []);
+
+  const triggerLongPress = useCallback(
+    (coords: [number, number]) => {
+      if (longPressTriggeredRef.current) return;
+      longPressTriggeredRef.current = true;
+      if (clickSuppressionTimerRef.current) clearTimeout(clickSuppressionTimerRef.current);
+      clickSuppressionTimerRef.current = setTimeout(() => {
+        longPressTriggeredRef.current = false;
+        clickSuppressionTimerRef.current = null;
+      }, 700);
+      onMapLongPress?.(coords);
+    },
+    [onMapLongPress],
+  );
 
   useEffect(() => {
     const handleContextMenu = (event: L.LeafletMouseEvent) => {
       event.originalEvent.preventDefault();
-      onMapLongPress?.([event.latlng.lat, event.latlng.lng]);
-      longPressTriggeredRef.current = true;
+      clearLongPress();
+      triggerLongPress([event.latlng.lat, event.latlng.lng]);
     };
 
     const handleTouchStart = (event: L.LeafletMouseEvent) => {
       clearLongPress();
+      longPressTriggeredRef.current = false;
       touchStartRef.current = {
         timestamp: Date.now(),
         lat: event.latlng.lat,
         lng: event.latlng.lng,
       };
       longPressTimerRef.current = setTimeout(() => {
-        onMapLongPress?.([event.latlng.lat, event.latlng.lng]);
-        longPressTriggeredRef.current = true;
+        triggerLongPress([event.latlng.lat, event.latlng.lng]);
       }, longPressDelay);
     };
 
@@ -64,25 +78,29 @@ export function MapInteractionCapture({
       const started = touchStartRef.current;
       const holdMs = started ? Date.now() - started.timestamp : 0;
       if (!longPressTriggeredRef.current && started && holdMs >= longPressDelay) {
-        onMapLongPress?.([started.lat, started.lng]);
+        triggerLongPress([started.lat, started.lng]);
       }
       touchStartRef.current = null;
       clearLongPress();
     };
 
     map.on("contextmenu", handleContextMenu);
-    map.on("touchstart", handleTouchStart);
-    map.on("touchmove", handleTouchMove);
-    map.on("touchend", handleTouchEnd);
+    map.on("touchstart" as keyof L.LeafletEventHandlerFnMap, handleTouchStart as L.LeafletEventHandlerFn);
+    map.on("touchmove" as keyof L.LeafletEventHandlerFnMap, handleTouchMove as L.LeafletEventHandlerFn);
+    map.on("touchend" as keyof L.LeafletEventHandlerFnMap, handleTouchEnd as L.LeafletEventHandlerFn);
 
     return () => {
       clearLongPress();
+      if (clickSuppressionTimerRef.current) {
+        clearTimeout(clickSuppressionTimerRef.current);
+        clickSuppressionTimerRef.current = null;
+      }
       map.off("contextmenu", handleContextMenu);
-      map.off("touchstart", handleTouchStart);
-      map.off("touchmove", handleTouchMove);
-      map.off("touchend", handleTouchEnd);
+      map.off("touchstart" as keyof L.LeafletEventHandlerFnMap, handleTouchStart as L.LeafletEventHandlerFn);
+      map.off("touchmove" as keyof L.LeafletEventHandlerFnMap, handleTouchMove as L.LeafletEventHandlerFn);
+      map.off("touchend" as keyof L.LeafletEventHandlerFnMap, handleTouchEnd as L.LeafletEventHandlerFn);
     };
-  }, [map, onMapClick, onMapLongPress, longPressDelay, clearLongPress]);
+  }, [map, triggerLongPress, longPressDelay, clearLongPress]);
 
   useMapEvents({
     click(event) {

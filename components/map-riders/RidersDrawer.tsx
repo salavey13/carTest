@@ -161,10 +161,25 @@ export function RidersDrawer() {
               <div className="space-y-3">
                 {state.selectedMeetupPoint && (
                   <div className="rounded-xl border border-amber-300/30 bg-amber-500/10 p-3">
-                    <Label className="text-xs text-amber-200">Название</Label>
-                    <Input value={meetupTitle} onChange={(e) => setMeetupTitle(e.target.value)} className="mt-1 bg-transparent text-white" />
-                    <Label className="mt-2 text-xs text-amber-200">Комментарий</Label>
-                    <Input value={meetupComment} onChange={(e) => setMeetupComment(e.target.value)} placeholder="Ориентир" className="mt-1 bg-transparent text-white" />
+                    <Label htmlFor="map-riders-meetup-title" className="text-xs text-amber-200">
+                      Название
+                    </Label>
+                    <Input
+                      id="map-riders-meetup-title"
+                      value={meetupTitle}
+                      onChange={(e) => setMeetupTitle(e.target.value)}
+                      className="mt-1 bg-transparent text-white"
+                    />
+                    <Label htmlFor="map-riders-meetup-comment" className="mt-2 text-xs text-amber-200">
+                      Комментарий
+                    </Label>
+                    <Input
+                      id="map-riders-meetup-comment"
+                      value={meetupComment}
+                      onChange={(e) => setMeetupComment(e.target.value)}
+                      placeholder="Ориентир"
+                      className="mt-1 bg-transparent text-white"
+                    />
                     <Button type="button" size="sm" className="mt-2 w-full" disabled={isSubmitting} onClick={handleCreateMeetup}>
                       {isSubmitting ? "Сохраняем meetup..." : "Сохранить meetup"}
                     </Button>
@@ -254,6 +269,58 @@ function ReplayFullscreen({
   const [speedMs, setSpeedMs] = useState<250 | 500 | 1000>(500);
   const current = points[index];
 
+  const replayGeometry = useMemo(() => {
+    if (!points.length) {
+      return { path: "", playedPath: "", currentPoint: null as { x: number; y: number } | null, distanceKm: 0, durationLabel: "0 мин" };
+    }
+
+    const padding = 7;
+    const width = 100;
+    const height = 100;
+    const lats = points.map((point) => point.lat);
+    const lons = points.map((point) => point.lon);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLon = Math.min(...lons);
+    const maxLon = Math.max(...lons);
+    const latSpan = Math.max(maxLat - minLat, 0.0001);
+    const lonSpan = Math.max(maxLon - minLon, 0.0001);
+
+    const project = (point: { lat: number; lon: number }) => ({
+      x: padding + ((point.lon - minLon) / lonSpan) * (width - padding * 2),
+      y: height - padding - ((point.lat - minLat) / latSpan) * (height - padding * 2),
+    });
+
+    const projected = points.map(project);
+    const makePath = (items: Array<{ x: number; y: number }>) =>
+      items.map((point, pointIndex) => `${pointIndex === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
+
+    const played = projected.slice(0, Math.min(index + 1, projected.length));
+    let distanceKm = 0;
+    for (let pointIndex = 1; pointIndex < points.length; pointIndex += 1) {
+      const prev = points[pointIndex - 1];
+      const next = points[pointIndex];
+      const latRad = (next.lat - prev.lat) * (Math.PI / 180);
+      const lonRad = (next.lon - prev.lon) * (Math.PI / 180);
+      const prevLatRad = prev.lat * (Math.PI / 180);
+      const nextLatRad = next.lat * (Math.PI / 180);
+      const a = Math.sin(latRad / 2) ** 2 + Math.cos(prevLatRad) * Math.cos(nextLatRad) * Math.sin(lonRad / 2) ** 2;
+      distanceKm += 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    const startedMs = new Date(points[0]?.capturedAt || Date.now()).getTime();
+    const endedMs = new Date(points[points.length - 1]?.capturedAt || Date.now()).getTime();
+    const durationSeconds = Number.isFinite(startedMs) && Number.isFinite(endedMs) ? Math.max(0, Math.round((endedMs - startedMs) / 1000)) : 0;
+
+    return {
+      path: makePath(projected),
+      playedPath: makePath(played),
+      currentPoint: projected[index] || projected[0] || null,
+      distanceKm,
+      durationLabel: formatRideDuration(durationSeconds),
+    };
+  }, [index, points]);
+
   useEffect(() => {
     if (!playing || total < 2) return;
     const timer = setInterval(() => {
@@ -293,54 +360,101 @@ function ReplayFullscreen({
   }, [onClose, total]);
 
   const progress = total > 1 ? (index / (total - 1)) * 100 : 0;
+  const currentTime = current?.capturedAt ? new Date(current.capturedAt).toLocaleString("ru-RU") : "—";
 
   return (
-    <div className="fixed inset-0 z-[90] flex flex-col bg-black/95 p-4">
-      <div className="flex items-center justify-between">
+    <div className="fixed inset-0 z-[90] flex flex-col bg-black/95 p-4 text-white" role="dialog" aria-modal="true" aria-label="Полноэкранный replay маршрута">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wide text-emerald-200/80">Route replay</div>
-          <h3 className="text-base font-semibold text-white">{title}</h3>
+          <div className="text-xs uppercase tracking-wide text-emerald-200/80">Route replay cockpit</div>
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <div className="mt-1 text-xs text-zinc-400">Space — play/pause • ←/→ — шаг • Esc — закрыть</div>
         </div>
-        <Button type="button" size="sm" variant="outline" onClick={onClose}>Закрыть</Button>
+        <Button type="button" size="sm" variant="outline" onClick={onClose} aria-label="Закрыть replay маршрута">
+          Закрыть
+        </Button>
       </div>
 
-      <div className="mt-4 flex-1 rounded-xl border border-white/10 bg-white/5 p-3">
-        {!total ? (
-          <div className="text-sm text-zinc-400">Нет точек маршрута для воспроизведения.</div>
-        ) : (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2 text-xs text-zinc-300">
-              <div>Точка: {index + 1} / {total}</div>
-              <div className="text-right">Скорость: {Number(current?.speedKmh || 0).toFixed(1)} км/ч</div>
-              <div className="col-span-2 break-all text-zinc-400">
-                {current?.capturedAt ? new Date(current.capturedAt).toLocaleString("ru-RU") : "—"}
-              </div>
+      <div className="mt-4 grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="relative min-h-[46vh] overflow-hidden rounded-2xl border border-emerald-300/20 bg-[radial-gradient(circle_at_30%_20%,rgba(16,185,129,0.22),transparent_36%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] p-3 shadow-2xl shadow-emerald-950/40">
+          <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:28px_28px]" />
+          {!total ? (
+            <div className="relative z-10 flex h-full items-center justify-center rounded-xl border border-dashed border-white/20 text-sm text-zinc-400">
+              Нет точек маршрута для воспроизведения.
             </div>
-            <div className="h-2 w-full overflow-hidden rounded bg-white/10">
-              <div className="h-full rounded bg-emerald-400 transition-all" style={{ width: `${progress}%` }} />
+          ) : (
+            <svg className="relative z-10 h-full min-h-[46vh] w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Схема replay маршрута">
+              <path d={replayGeometry.path} fill="none" stroke="rgba(148,163,184,0.42)" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              <path d={replayGeometry.playedPath || replayGeometry.path} fill="none" stroke="url(#map-riders-replay-gradient)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              <defs>
+                <linearGradient id="map-riders-replay-gradient" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0%" stopColor="#34d399" />
+                  <stop offset="52%" stopColor="#facc15" />
+                  <stop offset="100%" stopColor="#fb923c" />
+                </linearGradient>
+              </defs>
+              {replayGeometry.currentPoint ? (
+                <g>
+                  <circle cx={replayGeometry.currentPoint.x} cy={replayGeometry.currentPoint.y} r="4.4" fill="rgba(16,185,129,0.22)" />
+                  <circle cx={replayGeometry.currentPoint.x} cy={replayGeometry.currentPoint.y} r="2" fill="#fef3c7" stroke="#10b981" strokeWidth="0.9" />
+                </g>
+              ) : null}
+            </svg>
+          )}
+          <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-black/55 px-3 py-2 text-xs backdrop-blur">
+            <span>{replayGeometry.distanceKm.toFixed(2)} км</span>
+            <span>{replayGeometry.durationLabel}</span>
+            <span>{progress.toFixed(0)}%</span>
+          </div>
+        </div>
+
+        <aside className="flex min-h-0 flex-col rounded-2xl border border-white/10 bg-white/5 p-3">
+          <div className="grid grid-cols-2 gap-2 text-xs text-zinc-300">
+            <div className="rounded-xl bg-black/30 p-3">
+              <div className="text-zinc-500">Точка</div>
+              <div className="mt-1 text-lg text-white">{total ? index + 1 : 0} / {total}</div>
             </div>
-            <input
-              type="range"
-              min={0}
-              max={Math.max(total - 1, 0)}
-              value={index}
-              onChange={(event) => setIndex(Number(event.target.value))}
-              className="w-full"
-            />
-            <div className="grid grid-cols-3 gap-2">
-              <Button type="button" variant="outline" onClick={() => setIndex((prev) => Math.max(prev - 1, 0))}>← Шаг</Button>
-              <Button type="button" onClick={() => setPlaying((prev) => !prev)} disabled={total < 2}>
-                {playing ? "Пауза" : "Play"}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setIndex((prev) => Math.min(prev + 1, Math.max(total - 1, 0)))}>Шаг →</Button>
+            <div className="rounded-xl bg-black/30 p-3 text-right">
+              <div className="text-zinc-500">Скорость</div>
+              <div className="mt-1 text-lg text-emerald-200">{Number(current?.speedKmh || 0).toFixed(1)} км/ч</div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <Button type="button" size="sm" variant={speedMs === 250 ? "default" : "outline"} onClick={() => setSpeedMs(250)}>x2</Button>
-              <Button type="button" size="sm" variant={speedMs === 500 ? "default" : "outline"} onClick={() => setSpeedMs(500)}>x1</Button>
-              <Button type="button" size="sm" variant={speedMs === 1000 ? "default" : "outline"} onClick={() => setSpeedMs(1000)}>x0.5</Button>
+            <div className="col-span-2 rounded-xl bg-black/30 p-3">
+              <div className="text-zinc-500">Время GPS</div>
+              <div className="mt-1 break-all text-white">{currentTime}</div>
             </div>
           </div>
-        )}
+
+          <div className="mt-4 h-2 w-full overflow-hidden rounded bg-white/10" aria-hidden="true">
+            <div className="h-full rounded bg-emerald-400 transition-all" style={{ width: `${progress}%` }} />
+          </div>
+          <Label htmlFor="map-riders-replay-position" className="mt-4 text-xs text-zinc-400">
+            Timeline scrubber
+          </Label>
+          <input
+            id="map-riders-replay-position"
+            type="range"
+            min={0}
+            max={Math.max(total - 1, 0)}
+            value={index}
+            onChange={(event) => setIndex(Number(event.target.value))}
+            className="mt-2 w-full accent-emerald-300"
+          />
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <Button type="button" variant="outline" onClick={() => setIndex((prev) => Math.max(prev - 1, 0))}>← Шаг</Button>
+            <Button type="button" onClick={() => setPlaying((prev) => !prev)} disabled={total < 2} aria-pressed={playing}>
+              {playing ? "Пауза" : "Play"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setIndex((prev) => Math.min(prev + 1, Math.max(total - 1, 0)))}>Шаг →</Button>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <Button type="button" size="sm" variant={speedMs === 250 ? "default" : "outline"} onClick={() => setSpeedMs(250)} aria-pressed={speedMs === 250}>x2</Button>
+            <Button type="button" size="sm" variant={speedMs === 500 ? "default" : "outline"} onClick={() => setSpeedMs(500)} aria-pressed={speedMs === 500}>x1</Button>
+            <Button type="button" size="sm" variant={speedMs === 1000 ? "default" : "outline"} onClick={() => setSpeedMs(1000)} aria-pressed={speedMs === 1000}>x0.5</Button>
+          </div>
+          <div className="mt-auto pt-4 text-xs text-zinc-500">
+            Replay не пишет данные обратно — это безопасный просмотр уже сохранённого трека.
+          </div>
+        </aside>
       </div>
     </div>
   );

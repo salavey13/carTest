@@ -2,19 +2,44 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, Palette, Settings, Shield, User, IdCard, MessageCircle } from "lucide-react";
+import { Bell, ChevronDown, Palette, Settings, Shield, User, IdCard, MessageCircle, Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { isMockUserModeEnabled } from "@/lib/mockUserMode";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  getFranchizeNotificationPreferencesAction,
+  saveFranchizeNotificationPreferencesAction,
+  type FranchizeNotificationPreferences,
+} from "@/app/franchize/profile-actions";
+import { toast } from "sonner";
+
+const TELEGRAM_WEB_APP_URL = "https://t.me/oneBikePlsBot/app";
+
+const DEFAULT_NOTIFICATION_PREFERENCES: FranchizeNotificationPreferences = {
+  orderUpdates: true,
+  mapRidersAlerts: true,
+  marketingDigest: false,
+};
+
+const NOTIFICATION_OPTIONS: Array<{ key: keyof FranchizeNotificationPreferences; label: string; helper: string }> = [
+  { key: "orderUpdates", label: "Статусы заказов", helper: "бронь, покупка, документы" },
+  { key: "mapRidersAlerts", label: "MapRiders", helper: "заезды и встречи экипажа" },
+  { key: "marketingDigest", label: "Редкие акции", helper: "промо и новости VIP BIKE" },
+];
+
+function normalizeSlug(slug: string | undefined): string {
+  return (slug || "vip-bike").trim().toLowerCase() || "vip-bike";
+}
 
 interface FranchizeProfileButtonProps {
   bgColor: string;
@@ -35,14 +60,16 @@ function getInitials(name: string): string {
 
 export function FranchizeProfileButton({ bgColor, textColor, borderColor, currentSlug }: FranchizeProfileButtonProps) {
   const { dbUser, user, userCrewInfo, isInTelegramContext } = useAppContext();
-  const effectiveUser = dbUser || user;
-  const displayName = effectiveUser?.username || effectiveUser?.full_name || effectiveUser?.first_name || "Operator";
+  const hasUser = Boolean(dbUser || user);
+  const displayName = dbUser?.username || dbUser?.full_name || user?.username || user?.first_name || "Operator";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = useIsAdmin();
-  const scopeSlug = currentSlug || userCrewInfo?.slug || "vip-bike";
+  const scopeSlug = normalizeSlug(currentSlug || userCrewInfo?.slug);
   const franchizeAdminHref = `/franchize/${scopeSlug}/admin`;
   const franchizeProfileHref = `/franchize/${scopeSlug}/profile`;
   const [tempCartId, setTempCartId] = useState<string | null>(null);
+  const [notificationPreferences, setNotificationPreferences] = useState<FranchizeNotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
+  const [isNotificationSaving, setIsNotificationSaving] = useState(false);
   const canShowTelegramCartCta = !dbUser?.user_id && !isInTelegramContext && !isMockUserModeEnabled();
 
   useEffect(() => {
@@ -51,10 +78,73 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
     setTempCartId(id);
   }, [canShowTelegramCartCta]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!dbUser?.user_id) {
+      setNotificationPreferences(DEFAULT_NOTIFICATION_PREFERENCES);
+      return;
+    }
+
+    getFranchizeNotificationPreferencesAction({ userId: dbUser.user_id, slug: scopeSlug })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.success && res.data) setNotificationPreferences(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setNotificationPreferences(DEFAULT_NOTIFICATION_PREFERENCES);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dbUser?.user_id, scopeSlug]);
+
+  const handleNotificationPreferenceChange = async (key: keyof FranchizeNotificationPreferences, checked: boolean) => {
+    if (!dbUser?.user_id || isNotificationSaving) return;
+
+    const previous = notificationPreferences;
+    const next = { ...previous, [key]: checked };
+    setNotificationPreferences(next);
+    setIsNotificationSaving(true);
+
+    try {
+      const res = await saveFranchizeNotificationPreferencesAction({ userId: dbUser.user_id, slug: scopeSlug, preferences: next });
+
+      if (!res.success) {
+        setNotificationPreferences(previous);
+        toast.error(res.error || "Не удалось сохранить уведомления");
+        return;
+      }
+
+      toast.success("Настройки уведомлений сохранены");
+    } catch (error) {
+      setNotificationPreferences(previous);
+      toast.error(error instanceof Error ? error.message : "Не удалось сохранить уведомления");
+    } finally {
+      setIsNotificationSaving(false);
+    }
+  };
+
   const telegramCartHref = useMemo(() => {
     if (!tempCartId) return null;
     return `https://t.me/oneBikePlsBot/app?startapp=cart_id_${encodeURIComponent(tempCartId)}`;
   }, [tempCartId]);
+
+  if (!hasUser) {
+    return (
+      <a
+        href={TELEGRAM_WEB_APP_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Открыть Telegram WebApp"
+        className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+        style={{ backgroundColor: bgColor, color: textColor, borderColor }}
+      >
+        <Send className="h-4 w-4" />
+        <span className="hidden sm:inline">WebApp</span>
+      </a>
+    );
+  }
 
   return (
     <div style={{ isolation: "isolate" }}>
@@ -132,6 +222,31 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
               <DropdownMenuLabel className="pt-0 text-[11px] font-normal text-muted-foreground">
                 Добавленные позиции уже сохранены
               </DropdownMenuLabel>
+            </>
+          ) : null}
+
+          {dbUser?.user_id ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                <Bell className="h-3.5 w-3.5" />
+                Уведомления
+              </DropdownMenuLabel>
+              {NOTIFICATION_OPTIONS.map((option) => (
+                <DropdownMenuCheckboxItem
+                  key={option.key}
+                  checked={notificationPreferences[option.key]}
+                  disabled={isNotificationSaving}
+                  onCheckedChange={(checked) => handleNotificationPreferenceChange(option.key, Boolean(checked))}
+                  onSelect={(event) => event.preventDefault()}
+                  className="cursor-pointer items-start gap-2 py-2"
+                >
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm">{option.label}</span>
+                    <span className="text-[11px] text-muted-foreground">{option.helper}</span>
+                  </span>
+                </DropdownMenuCheckboxItem>
+              ))}
             </>
           ) : null}
 

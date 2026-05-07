@@ -5,11 +5,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useMapRiders } from "@/hooks/useMapRidersContext";
+import { useMapRidersState } from "@/hooks/useMapRidersContext";
 import { SPEED_BANDS } from "@/components/map-riders/speedGradient";
 
 export function StatusOverlay() {
-  const { state } = useMapRiders();
+  const { state } = useMapRidersState();
   const [elapsed, setElapsed] = useState("0:00");
 
   // Live elapsed timer

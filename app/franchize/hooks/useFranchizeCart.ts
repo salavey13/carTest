@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { upsertTempFranchizeCartAction } from "@/contexts/actions";
 import { isMockUserModeEnabled } from "@/lib/mockUserMode";
 
 export type FranchizeCartOptions = {
@@ -29,6 +28,22 @@ type CartEnvelope = {
 const CART_STORAGE_PREFIX = "franchize-cart";
 const CART_SYNC_EVENT = "franchize-cart-sync";
 const TEMP_CART_ID_KEY = "franchize-temp-cart-id";
+
+async function syncTempFranchizeCart(input: {
+  cartId: string;
+  cartBySlug: Record<string, unknown>;
+}) {
+  try {
+    await fetch("/api/franchize/temp-cart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+  } catch {
+    // Temporary carts are best-effort. Local storage remains the source of truth
+    // until a server-side checkpoint can persist or consume the anonymous cart.
+  }
+}
 
 const DEFAULT_OPTIONS: FranchizeCartOptions = {
   package: "Базовый",
@@ -204,7 +219,7 @@ export function useFranchizeCart(slug: string) {
     if (window.sessionStorage.getItem(syncHash) === nextHash) return;
     window.sessionStorage.setItem(syncHash, nextHash);
 
-    void upsertTempFranchizeCartAction({ cartId, cartBySlug: payloadBySlug });
+    void syncTempFranchizeCart({ cartId, cartBySlug: payloadBySlug });
   }, [cart, dbUser?.user_id, isHydrated, slug, tempCartFeatureEnabled]);
 
   // 3. Sync Listener

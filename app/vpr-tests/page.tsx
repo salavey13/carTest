@@ -427,7 +427,7 @@ function CheatIconSVG({ type, color, size = 40 }: { type: string; color: string;
       return (
         <svg viewBox="0 0 40 40" width={s} height={s} xmlns="http://www.w3.org/2000/svg">
           <rect x="8" y="4" width="24" height="32" rx="3" fill="none" stroke={color} strokeWidth="1.5" opacity="0.5" />
-          <rect x="12" y="8" width="16" height="8" rx="1" fill={color} opacity="0.15" stroke={color} strokeWidth="0.8" opacity="0.3" />
+          <rect x="12" y="8" width="16" height="8" rx="1" fill={color} opacity="0.15" stroke={color} strokeWidth="0.8" />
           <circle cx="14" cy="22" r="2" fill={color} opacity="0.3" />
           <circle cx="20" cy="22" r="2" fill={color} opacity="0.3" />
           <circle cx="26" cy="22" r="2" fill={color} opacity="0.3" />

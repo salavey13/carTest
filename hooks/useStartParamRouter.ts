@@ -63,6 +63,7 @@ export function useStartParamRouter() {
 
   const activeStartParamRef = useRef<string | null>(null);
   const lastHandledStartParamRef = useRef<string | null>(null);
+  const startParamRunIdRef = useRef(0);
   const mountedRef = useRef(false);
   const consumedTempCartRef = useRef<string | null>(null);
 
@@ -166,6 +167,13 @@ export function useStartParamRouter() {
       }
 
       activeStartParamRef.current = paramToProcess;
+      const runId = startParamRunIdRef.current + 1;
+      startParamRunIdRef.current = runId;
+      const isLatestRun = () => (
+        mountedRef.current &&
+        startParamRunIdRef.current === runId &&
+        activeStartParamRef.current === paramToProcess
+      );
       let targetPath: string | undefined;
 
       try {
@@ -250,17 +258,19 @@ export function useStartParamRouter() {
           targetPath = `/${paramToProcess}`;
         }
 
+        if (!isLatestRun()) {
+          logger.info(`[ClientLayout] Skipping stale Start Param result: ${paramToProcess}`);
+          return;
+        }
+
         lastHandledStartParamRef.current = paramToProcess;
 
         if (targetPath && targetPath !== pathname) {
-          if (!mountedRef.current) {
-            return;
-          }
           logger.info(`[ClientLayout] Redirecting to ${targetPath}`);
           router.replace(targetPath);
         }
 
-        if (!mountedRef.current) {
+        if (!isLatestRun()) {
           return;
         }
 

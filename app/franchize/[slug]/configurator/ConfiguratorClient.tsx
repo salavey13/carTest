@@ -46,6 +46,28 @@ const _PART_ICONS: Record<string, typeof Zap> = {
   wheels: Gauge,
 }
 
+
+const buildBikeImageFallback = (label: string) => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#101014"/><stop offset="0.55" stop-color="#182526"/><stop offset="1" stop-color="#00ffea" stop-opacity="0.35"/></linearGradient></defs><rect width="800" height="560" fill="url(#g)"/><path d="M126 362h548" stroke="#00ffea" stroke-opacity="0.24" stroke-width="8" stroke-linecap="round"/><circle cx="230" cy="362" r="70" fill="none" stroke="#f8fafc" stroke-opacity="0.72" stroke-width="18"/><circle cx="570" cy="362" r="70" fill="none" stroke="#f8fafc" stroke-opacity="0.72" stroke-width="18"/><path d="M240 348l98-120h104l98 120m-202-120l56 120m48-120l-80 120" fill="none" stroke="#00ffea" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/><text x="400" y="132" fill="#f8fafc" font-family="Inter,Arial,sans-serif" font-size="42" font-weight="800" text-anchor="middle">${label.replace(/[<>&]/g, '')}</text><text x="400" y="184" fill="#99f6e4" font-family="Inter,Arial,sans-serif" font-size="22" text-anchor="middle">image fallback / spec visible</text></svg>`
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
+function ConfiguratorBikeImage({ src, alt, className = '', sizes }: { src?: string; alt: string; className?: string; sizes: string }) {
+  const [failed, setFailed] = useState(false)
+  const safeSrc = failed || !src ? buildBikeImageFallback(alt || 'VipBike') : src
+
+  return (
+    <Image
+      src={safeSrc}
+      alt={alt}
+      fill
+      sizes={sizes}
+      className={`object-contain p-3 drop-shadow-[0_24px_34px_rgba(0,0,0,0.65)] transition-transform duration-700 ${className}`}
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
 // ──────────────── STEP INDICATOR ────────────────
 function StepBar({ current, goTo, disabled }: {
   current: string; goTo: (s: string) => void; disabled: Record<string, boolean>
@@ -288,17 +310,17 @@ export function ConfiguratorClient({ crew, slug }: Props) {
 
   return (
     <>
-      {/* ── Global styles ── */}
-      <style jsx global>{`
+      {/* ── Configurator-scoped styles ── */}
+      <style jsx>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
-        :root {
+        .cfg-root {
           --cfg-bg: #09090b; --cfg-surface: #111113; --cfg-surface-raised: #1a1a1f;
           --cfg-border: #27272a; --cfg-border-hover: #3f3f46;
           --cfg-text: #fafafa; --cfg-text-muted: #a1a1aa; --cfg-text-dim: #71717a;
           --cfg-accent: #00ffea; --cfg-accent-dim: #00ffea30; --cfg-accent-glow: #00ffea15;
           --cfg-danger: #ef4444;
+          font-family: 'Inter', system-ui, sans-serif; background: var(--cfg-bg); color: var(--cfg-text); -webkit-font-smoothing: antialiased;
         }
-        .cfg-root { font-family: 'Inter', system-ui, sans-serif; background: var(--cfg-bg); color: var(--cfg-text); -webkit-font-smoothing: antialiased; }
         .cfg-mono { font-family: 'JetBrains Mono', monospace; }
         .cfg-fade-in { animation: cfgFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes cfgFadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
@@ -320,7 +342,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
         .cfg-root::-webkit-scrollbar { width: 6px; }
         .cfg-root::-webkit-scrollbar-track { background: transparent; }
         .cfg-root::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
-        .cfg-img-wrap { background: linear-gradient(110deg, #1a1a1f 8%, #222 18%, #1a1a1f 33%); background-size: 200% 100%; animation: shimmer 1.5s linear infinite; }
+        .cfg-img-wrap { background: radial-gradient(circle at 50% 42%, rgba(0,255,234,0.22), transparent 36%), linear-gradient(145deg, #f4f4f5 0%, #d4d4d8 46%, #18181b 47%, #09090b 100%); }
         @keyframes shimmer { to { background-position: -200% 0; } }
         .cfg-stagger > * { opacity: 0; animation: cfgFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .cfg-stagger > *:nth-child(1)  { animation-delay: 0.02s; } .cfg-stagger > *:nth-child(2)  { animation-delay: 0.06s; }
@@ -382,7 +404,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                     <article key={bike.id} className={['group relative overflow-hidden rounded-2xl border bg-[#111113] cfg-card-hover', isSelected ? 'cfg-selected-ring border-[#00ffea]' : 'border-[#27272a]'].join(' ')}>
                       <button type="button" className="block w-full text-left" onClick={() => selectBike(bike.id)}>
                         <div className="cfg-img-wrap relative aspect-[4/3] w-full overflow-hidden lg:aspect-square">
-                          <Image src={bike.image_url} alt={`${bike.make} ${bike.model}`} fill sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 25vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
+                          <ConfiguratorBikeImage src={bike.image_url} alt={`${bike.make} ${bike.model}`} sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 25vw" className="group-hover:scale-105" />
                           <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-transparent to-transparent opacity-60" />
                           <div className="absolute left-3 top-3"><TierBadge tier={bike.specs.tier} /></div>
                           {isSelected && <div className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-[#00ffea] shadow-lg shadow-[#00ffea]/30"><Check className="h-4 w-4 text-black" /></div>}
@@ -415,7 +437,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
             <div className="cfg-fade-in space-y-6">
               <div className="overflow-hidden rounded-2xl border border-[#27272a] bg-[#111113]">
                 <div className="relative aspect-[21/9] w-full overflow-hidden sm:aspect-[3/1]">
-                  <Image src={selectedBike.image_url} alt="" fill sizes="(max-width: 1024px) 100vw, 66vw" className="object-cover" />
+                  <ConfiguratorBikeImage src={selectedBike.image_url} alt={`${selectedBike.make} ${selectedBike.model}`} sizes="(max-width: 1024px) 100vw, 66vw" />
                   <div className="absolute inset-0 bg-gradient-to-r from-[#09090b] via-[#09090b]/60 to-transparent" />
                   <div className="absolute bottom-0 left-0 p-6 sm:p-8">
                     <TierBadge tier={selectedBike.specs.tier} />
@@ -426,7 +448,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                 {selectedBike.specs.gallery && selectedBike.specs.gallery.length > 0 && (
                   <div className="flex gap-2 overflow-x-auto border-t border-[#27272a] p-3">
                     {[selectedBike.image_url, ...selectedBike.specs.gallery].map((img, i) => (
-                      <div key={img + i} className="relative h-16 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-[#27272a]"><Image src={img} alt="" fill sizes="96px" className="object-cover" /></div>
+                      <div key={img + i} className="relative h-16 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-[#27272a]"><ConfiguratorBikeImage src={img} alt={`${selectedBike.make} ${selectedBike.model} фото ${i + 1}`} sizes="96px" /></div>
                     ))}
                   </div>
                 )}
@@ -444,7 +466,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                     return (
                       <label key={motor.value} className={['cfg-option flex items-center justify-between rounded-xl border p-4', active ? 'cfg-option-active' : 'border-[#27272a]'].join(' ')}>
                         <span className="flex items-center gap-3">
-                          <input type="radio" name="motor" className="cfg-radio-dot" value={motor.value} checked={active} onChange={() => setMotorPower(motor.value)} />
+                          <input type="radio" name="motor" className="cfg-radio-dot" value={motor.value} checked={active} onChange={() => setMotorPower(motor.value)} aria-label={`Мощность мотора ${motor.value}W`} />
                           <span><span className="block text-sm font-semibold">{motor.value}W</span><span className="block text-[11px] text-[#71717a]">{motor.extra === 0 ? 'Базовая комплектация' : `+${formatPrice(motor.extra)}`}</span></span>
                         </span>
                         {motor.extra > 0 && <span className="cfg-mono text-xs font-medium text-[#a1a1aa]">+{formatPrice(motor.extra)}</span>}
@@ -463,7 +485,8 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                   </div>
                   <div className="mb-4 inline-flex rounded-xl border border-[#27272a] bg-[#09090b] p-1">
                     {(['regular', 'lithium'] as const).map((mode) => (
-                      <button key={mode} onClick={() => { setBatteryMode(mode); setBatteryCapacity((mode === 'regular' ? regularBatteries[0] : lithiumBatteries[0])?.capacity ?? '') }}
+                      <button key={mode} type="button" onClick={() => { setBatteryMode(mode); setBatteryCapacity((mode === 'regular' ? regularBatteries[0] : lithiumBatteries[0])?.capacity ?? '') }}
+                        aria-label={`Тип аккумулятора ${mode === 'regular' ? 'Regular' : 'Lithium'}`}
                         className={['rounded-lg px-4 py-2 text-xs font-semibold transition-all', batteryMode === mode ? 'bg-[#00ffea] text-black shadow-md' : 'text-[#71717a] hover:text-white'].join(' ')}>
                         {mode === 'regular' ? 'Regular' : 'Lithium'}
                       </button>
@@ -475,7 +498,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                       return (
                         <label key={`${batteryMode}-${battery.capacity}`} className={['cfg-option flex items-center justify-between rounded-xl border p-4', active ? 'cfg-option-active' : 'border-[#27272a]'].join(' ')}>
                           <span className="flex items-center gap-3">
-                            <input type="radio" name="battery" className="cfg-radio-dot" value={battery.capacity} checked={active} onChange={() => setBatteryCapacity(battery.capacity)} />
+                            <input type="radio" name="battery" className="cfg-radio-dot" value={battery.capacity} checked={active} onChange={() => setBatteryCapacity(battery.capacity)} aria-label={`Аккумулятор ${battery.capacity}`} />
                             <span><span className="block text-sm font-semibold">{battery.capacity}</span><span className="block text-[11px] text-[#71717a]">Запас хода: {battery.range_km} км</span></span>
                           </span>
                           <span className="cfg-mono text-xs font-medium text-[#a1a1aa]">{battery.battery_price === 0 ? 'Вкл.' : `+${formatPrice(battery.battery_price)}`}</span>
@@ -499,6 +522,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                         key={color.id}
                         type="button"
                         onClick={() => setSelectedColorId(color.id)}
+                        aria-label={`Цвет рамы ${color.label}`}
                         className={[
                           'cfg-option flex items-center justify-between rounded-xl border p-4 text-left',
                           active ? 'cfg-option-active' : 'border-[#27272a]',
@@ -542,7 +566,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                         return (
                           <label key={part.id} className={['cfg-option flex items-start justify-between gap-3 rounded-xl border p-4', checked ? 'cfg-option-active' : 'border-[#27272a]'].join(' ')}>
                             <span className="flex items-start gap-3">
-                              <input type="checkbox" className="cfg-check mt-0.5" checked={checked} onChange={() => setSelectedAccessories((prev) => prev.includes(part.id) ? prev.filter((id) => id !== part.id) : [...prev, part.id])} />
+                              <input type="checkbox" className="cfg-check mt-0.5" checked={checked} onChange={() => setSelectedAccessories((prev) => prev.includes(part.id) ? prev.filter((id) => id !== part.id) : [...prev, part.id])} aria-label={`Аксессуар ${part.model}`} />
                               <span><span className="block text-sm font-semibold">{part.model}</span><span className="mt-0.5 block text-[11px] leading-relaxed text-[#71717a]">{part.description}</span></span>
                             </span>
                             <span className="cfg-mono whitespace-nowrap text-xs font-medium text-[#a1a1aa]">+{formatPrice(part.daily_price)}</span>
@@ -572,7 +596,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
               <div className="grid gap-6 lg:grid-cols-5">
                 <div className="lg:col-span-3 space-y-4">
                   <div className="overflow-hidden rounded-2xl border border-[#27272a] bg-[#111113]">
-                    <div className="relative aspect-[16/7] w-full overflow-hidden"><Image src={selectedBike.image_url} alt="" fill sizes="(max-width: 1280px) 100vw, 60vw" className="object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-[#111113] via-transparent to-transparent" /></div>
+                    <div className="relative aspect-[16/7] w-full overflow-hidden"><ConfiguratorBikeImage src={selectedBike.image_url} alt={`${selectedBike.make} ${selectedBike.model}`} sizes="(max-width: 1280px) 100vw, 60vw" /><div className="absolute inset-0 bg-gradient-to-t from-[#111113] via-transparent to-transparent" /></div>
                     <div className="p-5"><TierBadge tier={selectedBike.specs.tier} /><h2 className="mt-2 text-xl font-black">{selectedBike.make} {selectedBike.model}</h2></div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
