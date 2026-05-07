@@ -54,6 +54,10 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY }: Ride
   }, []);
 
   const drawerSnapPoints = useMemo(() => (prefersReducedMotion ? [1] : [0.64, 380 / 820, 640 / 820]), [prefersReducedMotion]);
+  const activeHistoryWarmupSessions = useMemo(
+    () => state.sessions.filter((session) => session.status === "active" && Number(session.total_distance_km || 0) <= 0),
+    [state.sessions],
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -216,6 +220,33 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY }: Ride
             {/* ── History tab ── */}
             <TabsContent value="history" className="flex-1 overflow-auto p-4">
               <div className="space-y-2">
+                {activeHistoryWarmupSessions.map((session) => {
+                  const selectedSessionId = state.sessionDetail?.session?.id;
+                  const capturedRoutePoints = selectedSessionId === session.id ? state.sessionDetail?.points?.length || 0 : 0;
+                  const gpsWarmupHint = capturedRoutePoints > 0
+                    ? "Маршрут записывается, но дистанция еще не посчитана."
+                    : "⚠️ GPS прогревается, подожди секунду...";
+
+                  return (
+                    <div key={`active-warmup-${session.id}`} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
+                      <button
+                        type="button"
+                        onClick={() => fetchSessionDetail(session.id)}
+                        className="flex w-full items-center justify-between text-left transition hover:text-emerald-100"
+                      >
+                        <div>
+                          <div className="text-sm font-medium text-white">{riderDisplayName(session.users, session.user_id)}</div>
+                          <div className="text-xs text-zinc-400">{session.ride_name || "Без названия"} • {formatRideDuration(0)}</div>
+                        </div>
+                        <div className="text-right text-sm text-emerald-200">
+                          <div>{Number(session.total_distance_km || 0).toFixed(1)} км</div>
+                          <div className="text-xs">{Number(session.latest_speed_kmh || 0).toFixed(0)} км/ч</div>
+                        </div>
+                      </button>
+                      <div className="mt-2 text-[11px] text-zinc-400">{gpsWarmupHint}</div>
+                    </div>
+                  );
+                })}
                 {state.recentCompleted.map((session) => (
                   <div key={session.id} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
                     <button
@@ -246,7 +277,7 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY }: Ride
                     </Button>
                   </div>
                 ))}
-                {!state.recentCompleted.length && (
+                {!state.recentCompleted.length && !activeHistoryWarmupSessions.length && (
                   <div className="rounded-xl border border-dashed border-white/25 p-4 text-center text-xs text-muted-foreground">
                     {emptyStateCopy.history}
                   </div>
@@ -285,7 +316,7 @@ function ReplayFullscreen({
 
   const replayGeometry = useMemo(() => {
     if (!points.length) {
-      return { path: "", playedPath: "", currentPoint: null as { x: number; y: number } | null, distanceKm: 0, durationLabel: "0 мин" };
+      return { path: "", playedPath: "", currentPoint: null as { x: number; y: number } | null, distanceKm: 0, durationLabel: formatRideDuration(0) };
     }
 
     const padding = 7;
@@ -393,8 +424,8 @@ function ReplayFullscreen({
         <div className="relative min-h-[46vh] overflow-hidden rounded-2xl border border-emerald-300/20 bg-[radial-gradient(circle_at_30%_20%,rgba(16,185,129,0.22),transparent_36%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] p-3 shadow-2xl shadow-emerald-950/40">
           <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:28px_28px]" />
           {!total ? (
-            <div className="relative z-10 flex h-full items-center justify-center rounded-xl border border-dashed border-white/20 text-sm text-zinc-400">
-              Нет точек маршрута для воспроизведения.
+            <div className="relative z-10 flex h-full items-center justify-center rounded-xl border border-dashed border-white/20 px-4 text-center text-sm text-zinc-400">
+              Нет точек маршрута для воспроизведения — GPS ещё прогревается или заезд только начался.
             </div>
           ) : (
             <svg className="relative z-10 h-full min-h-[46vh] w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Схема replay маршрута">
