@@ -41,6 +41,10 @@ import {
   VsSpecRow,
   getCatalogVsSpecValue,
 } from "@/components/franchize/VsSpecRow";
+import {
+  getCatalogPropulsionLabel,
+  getCatalogPropulsionSegment,
+} from "@/app/franchize/lib/catalog-propulsion";
 
 type SaleActionState = "idle" | "loading" | "success" | "error";
 type SaleBikeLandingClientProps = {
@@ -112,6 +116,11 @@ export function SaleBikeLandingClient({
   );
 
   const canShowConcretePrice = basePrice > 0;
+  const propulsionSegment = useMemo(
+    () => getCatalogPropulsionSegment(item),
+    [item],
+  );
+  const propulsionLabel = getCatalogPropulsionLabel(propulsionSegment);
 
   const trustStats = useMemo(
     () => ({
@@ -397,8 +406,11 @@ export function SaleBikeLandingClient({
                       className="pointer-events-none absolute right-0 top-full z-20 mt-2 w-64 rounded-2xl border p-2 opacity-0 shadow-2xl transition group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
                       style={surface.card}
                     >
-                      <p className="px-2 pb-2 text-xs opacity-70">
+                      <p className="px-2 pb-1 text-xs opacity-70">
                         Выберите байк для VS
+                      </p>
+                      <p className="px-2 pb-2 text-[11px] opacity-55">
+                        Показываем только {propulsionLabel}
                       </p>
                       {otherSaleBikes.slice(0, 5).map((bike) => (
                         <button
@@ -520,7 +532,12 @@ export function SaleBikeLandingClient({
               style={surface.subtleCard}
             >
               <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
-                <p className="text-sm font-semibold">{item.title}</p>
+                <div>
+                  <p className="text-sm font-semibold">{item.title}</p>
+                  <p className="text-[10px] uppercase tracking-[0.12em] opacity-55">
+                    {propulsionLabel}
+                  </p>
+                </div>
                 <Swords
                   className="h-7 w-7"
                   style={{ color: crew.theme.palette.accentMain }}
