@@ -8,6 +8,7 @@ import type { FranchizeTheme } from '@/app/franchize/actions';
 
 const theme: FranchizeTheme = {
   mode: 'dark',
+  radius: 'xl',
   palette: {
     bgBase: '#101113',
     bgCard: '#20242a',
@@ -15,6 +16,7 @@ const theme: FranchizeTheme = {
     textSecondary: '#a1a1aa',
     borderSoft: '#3f3f46',
     accentMain: '#f97316',
+    accentSecondary: '#fed7aa',
     accentMainHover: '#ea580c',
   },
 };

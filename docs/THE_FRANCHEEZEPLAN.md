@@ -68,6 +68,16 @@ This root file stays intentionally compact so operators and agents can load it q
 - `next_step`: Add mocked Supabase coverage for server action validators after this PR lands.
 - `risks`: Server-action integration tests remain future work because this slice intentionally focused on low-conflict pure helper coverage.
 
+
+### 2026-05-06 — SupaPlan franchize maintenance pair
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T22:30:00Z
+- `owner`: codex-frz-couple-01
+- `notes`: Implemented `FIX-STARTPARAM` stale-ref reset for repeated Telegram deep links and started `RENT-P3.2` with Vitest coverage for franchize navigation/theme helpers; self-review tightened duplicate-processing guards and category anchor normalization.
+- `next_step`: Add mocked Supabase coverage for server action validators after this PR lands.
+- `risks`: Server-action integration tests remain future work because this slice intentionally focused on low-conflict pure helper coverage.
+
 ## 4) Mini execution diary addendum
 
 - 2026-05-06 — Started `/vipbikerental` interactive enhancement stream from `app/vipbikerental/todo.md`; shipped the first Hero tabs slice with animated mode preview and MapRiders overview metrics. Next step: replace fallback rent/buy preview cards with real catalog item data.
