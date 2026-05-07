@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
-import { useMapRiders } from "@/hooks/useMapRidersContext";
+import { useMapRidersActions, useMapRidersState } from "@/hooks/useMapRidersContext";
 import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 
 interface UseSessionManagerOptions {
@@ -18,6 +18,7 @@ interface SessionManagerResult {
   isSubmitting: boolean;
   canStart: boolean;
   canStop: boolean;
+  isRecording: boolean;
   startSession: () => Promise<boolean>;
   stopSession: () => Promise<boolean>;
   toggleSession: () => Promise<boolean>;
@@ -32,7 +33,8 @@ export function useSessionManager(options: UseSessionManagerOptions = {}): Sessi
     refreshOnStop = true,
   } = options;
   const { dbUser } = useAppContext();
-  const { state, dispatch, crewSlug, fetchSnapshot } = useMapRiders();
+  const { state } = useMapRidersState();
+  const { dispatch, crewSlug, fetchSnapshot } = useMapRidersActions();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const startSession = useCallback(async () => {
@@ -140,6 +142,7 @@ export function useSessionManager(options: UseSessionManagerOptions = {}): Sessi
       isSubmitting,
       canStart: !state.shareEnabled && !isSubmitting,
       canStop: state.shareEnabled && Boolean(state.sessionId) && !isSubmitting,
+      isRecording: state.shareEnabled,
       startSession,
       stopSession,
       toggleSession,

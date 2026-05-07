@@ -37,6 +37,12 @@ export type FranchizeActivityDigest = {
   buyOrders: Array<{ orderId: string; status: string; vehicleIds: string[]; docLink: string; createdAt: string; docFileName?: string }>;
 };
 
+export type FranchizeNotificationPreferences = {
+  orderUpdates: boolean;
+  mapRidersAlerts: boolean;
+  marketingDigest: boolean;
+};
+
 const FRANCHIZE_ACHIEVEMENT_CAPABILITIES = {
   onboarding: "Tracks onboarding participation (/start survey completion) and marks crew-level readiness.",
   operations: "Tracks recurring crew operations and delivery signals for franchize execution.",
@@ -63,6 +69,30 @@ const DEFAULT_PREFILL: FranchizeFormPrefill = {
   deliveryMode: "pickup",
   comment: "",
 };
+
+const DEFAULT_NOTIFICATION_PREFERENCES: FranchizeNotificationPreferences = {
+  orderUpdates: true,
+  mapRidersAlerts: true,
+  marketingDigest: false,
+};
+
+function normalizeSlug(slug: string): string {
+  return (slug || "vip-bike").trim().toLowerCase() || "vip-bike";
+}
+
+function asRecord(value: unknown): Record<string, any> {
+  return typeof value === "object" && value ? (value as Record<string, any>) : {};
+}
+
+function normalizeNotificationPreferences(value: unknown): FranchizeNotificationPreferences {
+  const raw = typeof value === "object" && value ? (value as Partial<FranchizeNotificationPreferences>) : {};
+  return {
+    orderUpdates: typeof raw.orderUpdates === "boolean" ? raw.orderUpdates : DEFAULT_NOTIFICATION_PREFERENCES.orderUpdates,
+    mapRidersAlerts:
+      typeof raw.mapRidersAlerts === "boolean" ? raw.mapRidersAlerts : DEFAULT_NOTIFICATION_PREFERENCES.mapRidersAlerts,
+    marketingDigest: typeof raw.marketingDigest === "boolean" ? raw.marketingDigest : DEFAULT_NOTIFICATION_PREFERENCES.marketingDigest,
+  };
+}
 
 function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
   const shared: FranchizeAchievementDefinition[] = [
@@ -220,6 +250,57 @@ export async function saveFranchizeFormPrefillAction(params: { userId: string; s
     },
   };
   const { error: updateError } = await supabaseAdmin.from("users").update({ metadata: next, updated_at: new Date().toISOString() }).eq("user_id", params.userId);
+  return updateError ? { success: false, error: updateError.message } : { success: true };
+}
+
+export async function getFranchizeNotificationPreferencesAction(params: {
+  userId: string;
+  slug: string;
+}): Promise<{ success: boolean; data?: FranchizeNotificationPreferences; error?: string }> {
+  if (!params.userId) return { success: false, error: "userId is required" };
+  const slug = normalizeSlug(params.slug);
+
+  const { data: user, error } = await supabaseAdmin.from("users").select("metadata").eq("user_id", params.userId).maybeSingle();
+  if (error) return { success: false, error: error.message };
+
+  const metadata = asRecord(user?.metadata);
+  const notificationPreferences = asRecord(metadata.franchizeNotificationPreferences);
+  const slugPreferences = notificationPreferences[slug];
+  const defaultPreferences = notificationPreferences.default;
+
+  return {
+    success: true,
+    data: normalizeNotificationPreferences(slugPreferences ?? defaultPreferences),
+  };
+}
+
+export async function saveFranchizeNotificationPreferencesAction(params: {
+  userId: string;
+  slug: string;
+  preferences: FranchizeNotificationPreferences;
+}): Promise<{ success: boolean; error?: string }> {
+  if (!params.userId) return { success: false, error: "userId is required" };
+  const slug = normalizeSlug(params.slug);
+
+  const { data: user, error } = await supabaseAdmin.from("users").select("metadata").eq("user_id", params.userId).maybeSingle();
+  if (error) return { success: false, error: error.message };
+
+  const metadata = asRecord(user?.metadata);
+  const currentNotificationPreferences = asRecord(metadata.franchizeNotificationPreferences);
+  const normalized = normalizeNotificationPreferences(params.preferences);
+  const next = {
+    ...metadata,
+    franchizeNotificationPreferences: {
+      ...currentNotificationPreferences,
+      [slug]: normalized,
+    },
+  };
+
+  const { error: updateError } = await supabaseAdmin
+    .from("users")
+    .update({ metadata: next, updated_at: new Date().toISOString() })
+    .eq("user_id", params.userId);
+
   return updateError ? { success: false, error: updateError.message } : { success: true };
 }
 
