@@ -26,7 +26,7 @@ const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string }> = [
   { key: "budget", label: "До 5000" },
   { key: "premium", label: "Премиум 7000+" },
   { key: "newbie", label: "Для новичка" },
-  { key: "topRated", label: "Top rated" },
+  { key: "topRated", label: "Лучшие отзывы" },
 ];
 
 const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
@@ -34,6 +34,26 @@ const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
   const wbItems = groups.filter((group) => group.category.toLowerCase().includes("wbitem"));
   return [...regular, ...wbItems];
 };
+
+
+function CatalogCardSkeleton({ index }: { index: number }) {
+  return (
+    <article className="overflow-hidden rounded-3xl border border-[var(--catalog-border)] bg-[var(--catalog-card-bg)]" aria-hidden="true">
+      <div className="relative aspect-[4/3] overflow-hidden bg-black/20 lg:aspect-square">
+        <div
+          className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent"
+          style={{ animationDelay: `${index * 120}ms` }}
+        />
+      </div>
+      <div className="space-y-3 p-3">
+        <div className="h-4 w-2/3 rounded-full bg-[var(--catalog-muted)]/25" />
+        <div className="h-3 w-full rounded-full bg-[var(--catalog-muted)]/20" />
+        <div className="h-3 w-4/5 rounded-full bg-[var(--catalog-muted)]/20" />
+        <div className="h-10 rounded-xl bg-[var(--catalog-accent)]/25" />
+      </div>
+    </article>
+  );
+}
 
 export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogClientProps) {
   const surface = crewPaletteForSurface(crew.theme);
@@ -64,7 +84,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
         subtitle: item.subtitle,
         href: item.href,
         imageUrl: item.imageUrl,
-        badge: item.code || "Promo",
+        badge: item.code || "Промо",
         priority: item.priority ?? 50,
         activeFrom: item.activeFrom ?? "",
         activeTo: item.activeTo ?? "",
@@ -76,7 +96,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
         subtitle: item.subtitle,
         href: item.href,
         imageUrl: item.imageUrl,
-        badge: item.badge || "Ad",
+        badge: item.badge || "Анонс",
         priority: item.priority ?? 40,
         activeFrom: item.activeFrom ?? "",
         activeTo: item.activeTo ?? "",
@@ -109,7 +129,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
       subtitle: "",
       href: item.href?.trim() || `/franchize/${crew.slug || slug}#catalog-sections`,
       imageUrl: "",
-      badge: "Promo",
+      badge: "Промо",
       priority: 0,
       activeFrom: "",
       activeTo: "",
@@ -399,9 +419,15 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
         </div>
 
         {items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed p-4 text-sm" style={surface.mutedText}>
-            Каталог пуст. Добавь позиции типов `bike`, `accessories`, `gear` или `wbitem`, чтобы наполнить витрину.
-          </div>
+          <section aria-label="Загружаем каталог" className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-2xl font-bold uppercase leading-tight tracking-tight text-[var(--catalog-text)]">Каталог</h2>
+              <span className="inline-flex rounded-full bg-[var(--catalog-card-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--catalog-muted)]">обновляем наличие</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+              {[0, 1, 2, 3].map((index) => <CatalogCardSkeleton key={index} index={index} />)}
+            </div>
+          </section>
         ) : itemsByCategory.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-4 text-sm" style={surface.mutedText}>
             По запросу ничего не найдено. Попробуй другое название или категорию.
@@ -447,7 +473,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
                           <div className="mb-2 flex flex-wrap gap-1.5">
                             {item.isHot && (
                               <span className="inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
-                                HOT 🔥
+                                Горячее 🔥
                               </span>
                             )}
                             <span

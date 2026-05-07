@@ -204,13 +204,13 @@ const ScannerLine = () => (
 // --- COMPONENT: TERMINAL LOGS ---
 const TerminalLogs = ({ text }: { text?: string }) => {
   const logs = useMemo(() => [
-    "> Initializing neural handshake...",
-    "> Bypassing security protocols...",
-    "> Decrypting data streams...",
-    "> Establishing secure connection...",
-    text || "> Loading assets...",
-    "> Optimizing performance...",
-    "> Rendering interface..."
+    "> Готовим связь...",
+    "> Проверяем доступ...",
+    "> Собираем данные...",
+    "> Открываем защищённый канал...",
+    text || "> Загружаем интерфейс...",
+    "> Ускоряем отрисовку...",
+    "> Показываем экран..."
   ], [text]);
 
   const [visibleLogs, setVisibleLogs] = useState<string[]>([]);
@@ -361,7 +361,7 @@ const KineticCore = () => {
 };
 
 // --- COMPONENT: BIKE SPEEDSTER (Enhanced) ---
-const BikeSpeedster = () => {
+const BikeSpeedster = ({ gear }: { gear: number }) => {
   return (
     <div className="relative mx-auto flex h-64 w-full max-w-lg items-center justify-center overflow-hidden">
       {/* Speed Lines Background */}
@@ -372,10 +372,10 @@ const BikeSpeedster = () => {
             className="absolute h-[2px] w-40 rounded-full bg-gradient-to-r from-transparent via-orange-500/90 to-transparent"
             style={{
               top: `${16 + i * 5}%`,
-              left: "8%",
+              right: "8%",
             }}
             animate={{
-              x: [0, 300],
+              x: [280, -220],
               opacity: [0, 1, 0]
             }}
             transition={{
@@ -409,22 +409,30 @@ const BikeSpeedster = () => {
         >
           <div className="relative h-28 w-[260px]">
             <motion.div
-              className="absolute left-[36px] top-[58px] h-[72px] w-[72px] rounded-full border-4 border-orange-400/90"
-              animate={{ rotate: -360 }}
-              transition={{ duration: 0.45, repeat: Infinity, ease: "linear" }}
+              key={`wheel-pack-${gear}`}
+              className="absolute inset-0"
+              initial={{ scale: 0.96, opacity: 0.86 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
             >
-              {[0, 45, 90, 135].map((deg) => (
-                <div key={deg} className="absolute left-1/2 top-1/2 h-[2px] w-[30px] -translate-x-1/2 -translate-y-1/2 bg-orange-200/90" style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
-              ))}
-            </motion.div>
-            <motion.div
-              className="absolute left-[152px] top-[58px] h-[72px] w-[72px] rounded-full border-4 border-orange-400/90"
-              animate={{ rotate: -360 }}
-              transition={{ duration: 0.45, repeat: Infinity, ease: "linear" }}
-            >
-              {[0, 45, 90, 135].map((deg) => (
-                <div key={deg} className="absolute left-1/2 top-1/2 h-[2px] w-[30px] -translate-x-1/2 -translate-y-1/2 bg-orange-200/90" style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
-              ))}
+              <motion.div
+                className="absolute left-[41px] top-[63px] h-[63px] w-[63px] rounded-full border-4 border-orange-400/90"
+                animate={{ rotate: -360 }}
+                transition={{ duration: 0.45, repeat: Infinity, ease: "linear" }}
+              >
+                {[0, 45, 90, 135].map((deg) => (
+                  <div key={deg} className="absolute left-1/2 top-1/2 h-[2px] w-[26px] -translate-x-1/2 -translate-y-1/2 bg-orange-200/90" style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
+                ))}
+              </motion.div>
+              <motion.div
+                className="absolute left-[157px] top-[63px] h-[63px] w-[63px] rounded-full border-4 border-orange-400/90"
+                animate={{ rotate: -360 }}
+                transition={{ duration: 0.45, repeat: Infinity, ease: "linear" }}
+              >
+                {[0, 45, 90, 135].map((deg) => (
+                  <div key={deg} className="absolute left-1/2 top-1/2 h-[2px] w-[26px] -translate-x-1/2 -translate-y-1/2 bg-orange-200/90" style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
+                ))}
+              </motion.div>
             </motion.div>
 
             <Bike size={170} className="absolute left-1/2 top-[-10px] -translate-x-1/2 text-orange-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.65)]" strokeWidth={1.5} />
@@ -506,7 +514,7 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
             className="mt-8 text-center space-y-6 w-full max-w-md"
           >
             <GlitchText 
-              text="NEURAL SYNC" 
+              text="СВЯЗЬ ГОТОВА"
               className="text-4xl md:text-6xl bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent"
             />
             
@@ -525,15 +533,15 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
             <div className="flex items-center justify-center gap-4 text-xs font-mono text-slate-500">
               <span className="flex items-center gap-1">
                 <Wifi className="w-3 h-3 text-emerald-400" />
-                SECURE
+                ЗАЩИТА
               </span>
               <span className="flex items-center gap-1">
                 <Shield className="w-3 h-3 text-cyan-400" />
-                ENCRYPTED
+                ШИФР
               </span>
               <span className="flex items-center gap-1">
                 <Radio className="w-3 h-3 text-amber-400 animate-pulse" />
-                LIVE
+                ЖИВОЙ
               </span>
             </div>
           </motion.div>
@@ -565,7 +573,7 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
               animate={{ opacity: [0.5, 1, 0.5] }}
               transition={{ duration: 2, repeat: Infinity }}
             >
-              SYSTEM BOOT
+              ЗАПУСК
             </motion.h2>
             
             <div className="flex items-center gap-2 justify-center">
@@ -580,7 +588,7 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
             </div>
             
             <p className="font-mono text-sm text-slate-500">
-              {text || 'Initializing modules...'}
+              {text || 'Запускаем модули...'}
             </p>
           </motion.div>
         </div>
@@ -597,7 +605,7 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
       )}>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(251,146,60,0.18),transparent_42%),linear-gradient(120deg,transparent,rgba(251,191,36,0.06),transparent)]" />
         <div className="absolute left-0 right-0 top-1/2 h-px bg-gradient-to-r from-transparent via-orange-400/60 to-transparent" />
-        <BikeSpeedster />
+        <BikeSpeedster gear={bikeTelemetry.gear} />
         
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
@@ -607,10 +615,10 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
         >
           <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/20 bg-black/30 px-3 py-1 text-[10px] font-mono uppercase tracking-[0.28em] text-orange-200/80 shadow-[0_0_22px_rgba(251,146,60,0.18)]">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)]" />
-            first-paint loader online
+            витрина готовится
           </div>
           <h2 className="font-orbitron text-3xl font-black uppercase tracking-wider text-orange-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)] md:text-5xl">
-            RIDE LINK
+            МАРШРУТ
           </h2>
           
           {/* Animated Speed Bar */}
@@ -630,9 +638,9 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
           </p>
           
           <div className="flex justify-center gap-2 mt-4">
-            <TelemetryMetric label="RPM" value={`${Math.round(bikeTelemetry.rpm)}`} />
-            <TelemetryMetric label="KM/H" value={`${Math.round(bikeTelemetry.speed)}`} />
-            <TelemetryMetric label="GEAR" value={`${bikeTelemetry.gear}`} />
+            <TelemetryMetric label="ОБ/МИН" value={`${Math.round(bikeTelemetry.rpm)}`} />
+            <TelemetryMetric label="КМ/Ч" value={`${Math.round(bikeTelemetry.speed)}`} />
+            <TelemetryMetric label="ПЕР." value={`${bikeTelemetry.gear}`} />
           </div>
         </motion.div>
       </div>

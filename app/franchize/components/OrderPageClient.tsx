@@ -415,7 +415,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       if (!result.success) {
         toast.error(result.error ?? "Не удалось отправить заказ.");
         if (values.payment === "telegram_xtr") {
-          setPaymentRetryHint("XTR-оплата не завершилась. Проверьте Telegram WebApp и повторите отправку или выберите fallback-оплату.");
+          setPaymentRetryHint("XTR-оплата не завершилась. Проверьте Telegram WebApp и повторите отправку или выберите резервную оплату.");
         }
         lastSubmitFingerprintRef.current = null;
         return;
@@ -505,7 +505,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const handleSwitchToFallbackPayment = () => {
     setValue("payment", "card", { shouldDirty: true, shouldValidate: true });
     setPaymentRetryHint(null);
-    toast.message("Переключили на fallback-оплату картой. Проверьте данные и отправьте заказ снова.");
+    toast.message("Переключили на резервную оплату картой. Проверьте данные и отправьте заказ снова.");
   };
 
   return (
@@ -760,7 +760,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <p className="text-sm" style={surface.mutedText}>Заказ #{orderId}</p>
           <div className="mt-3 rounded-xl border border-[var(--order-border)] px-3 py-2" style={surface.subtleCard}>
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs uppercase tracking-[0.18em]" style={surface.mutedText}>Checkout vibe</p>
+              <p className="text-xs uppercase tracking-[0.18em]" style={surface.mutedText}>Финальная проверка</p>
               <span
                 className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
                 style={{
@@ -804,9 +804,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
           <div className="mt-3 rounded-xl border border-[var(--order-border)] p-3" style={surface.subtleCard}>
             <div className="flex items-start justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--order-accent)]">Checkout copilot</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--order-accent)]">Помощник заказа</p>
               <span className="rounded-full bg-[var(--order-accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--order-accent)]">
-                {checkoutBlockers.length === 0 ? "ready" : `${checkoutBlockers.length} blockers`}
+                {checkoutBlockers.length === 0 ? "готово" : `${checkoutBlockers.length} стоп-фактор${checkoutBlockers.length === 1 ? "" : "а"}`}
               </span>
             </div>
             {checkoutBlockers.length === 0 ? (

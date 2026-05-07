@@ -190,7 +190,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           <DropdownMenuItem asChild>
             <Link href="/franchize/create" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
               <Palette className="mr-2 h-4 w-4 shrink-0" />
-              <span className="truncate">Branding (экипаж)</span>
+              <span className="truncate">Оформление экипажа</span>
             </Link>
           </DropdownMenuItem>
 
@@ -198,7 +198,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             <DropdownMenuItem asChild>
               <Link href={franchizeAdminHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
                 <Shield className="mr-2 h-4 w-4 shrink-0" />
-                <span className="truncate">Franchize admin</span>
+                <span className="truncate">Админка франшизы</span>
               </Link>
             </DropdownMenuItem>
           ) : null}
@@ -206,7 +206,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           <DropdownMenuItem asChild>
             <Link href={franchizeProfileHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
               <IdCard className="mr-2 h-4 w-4 shrink-0" />
-              <span className="truncate">Franchize profile</span>
+              <span className="truncate">Профиль франшизы</span>
             </Link>
           </DropdownMenuItem>
 
@@ -265,7 +265,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
               <DropdownMenuItem asChild>
                 <Link href="/admin" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
                   <Shield className="mr-2 h-4 w-4" />
-                  <span className="truncate">Admin</span>
+                  <span className="truncate">Админка</span>
                 </Link>
               </DropdownMenuItem>
             </>
