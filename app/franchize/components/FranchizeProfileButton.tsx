@@ -60,8 +60,8 @@ function getInitials(name: string): string {
 
 export function FranchizeProfileButton({ bgColor, textColor, borderColor, currentSlug }: FranchizeProfileButtonProps) {
   const { dbUser, user, userCrewInfo, isInTelegramContext } = useAppContext();
-  const effectiveUser = dbUser || user;
-  const displayName = effectiveUser?.username || effectiveUser?.full_name || effectiveUser?.first_name || "Operator";
+  const hasUser = Boolean(dbUser || user);
+  const displayName = dbUser?.username || dbUser?.full_name || user?.username || user?.first_name || "Operator";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = useIsAdmin();
   const scopeSlug = normalizeSlug(currentSlug || userCrewInfo?.slug);
@@ -130,7 +130,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
     return `https://t.me/oneBikePlsBot/app?startapp=cart_id_${encodeURIComponent(tempCartId)}`;
   }, [tempCartId]);
 
-  if (!effectiveUser) {
+  if (!hasUser) {
     return (
       <a
         href={TELEGRAM_WEB_APP_URL}

@@ -2,6 +2,16 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 
+type SupabaseSchemaClient = {
+  schema: (schema: string) => {
+    from: (table: string) => any;
+  };
+};
+
+function privateSchema() {
+  return (supabaseAdmin as unknown as SupabaseSchemaClient).schema("private");
+}
+
 function parseJsonRecord(raw: unknown): Record<string, unknown> {
   if (typeof raw !== "string" || raw.trim().length === 0) {
     return {};
@@ -18,8 +28,7 @@ function parseJsonRecord(raw: unknown): Record<string, unknown> {
 }
 
 export async function getUserSensitiveData(userId: string) {
-  const { data } = await supabaseAdmin
-    .schema("private")
+  const { data } = await privateSchema()
     .from("user_secrets")
     .select("driver_license, passport")
     .eq("user_id", userId)
@@ -35,7 +44,7 @@ export async function saveUserSensitiveData(userId: string, data: {
   driverLicense?: string;
   passport?: string;
 }) {
-  await supabaseAdmin.schema("private").from("user_secrets").upsert({
+  await privateSchema().from("user_secrets").upsert({
     user_id: userId,
     driver_license: data.driverLicense,
     passport: data.passport,
@@ -47,8 +56,7 @@ export async function saveUserSensitiveData(userId: string, data: {
 // CREW / FRANCHIZE SECRETS (Stage 2 — ready for future use)
 // ──────────────────────────────────────────────────────────────
 export async function getCrewSensitiveData(crewSlug: string) {
-  const { data } = await supabaseAdmin
-    .schema("private")
+  const { data } = await privateSchema()
     .from("crew_secrets")
     .select("contract_defaults, doc_templates")
     .eq("crew_slug", crewSlug)
@@ -65,7 +73,7 @@ export async function saveCrewSensitiveData(crewSlug: string, data: {
   docTemplates?: Record<string, unknown>;
   // priceLists?: Record<string, any>;       // ← future
 }) {
-  await supabaseAdmin.schema("private").from("crew_secrets").upsert({
+  await privateSchema().from("crew_secrets").upsert({
     crew_slug: crewSlug,
     contract_defaults: data.contractDefaults ? JSON.stringify(data.contractDefaults) : undefined,
     doc_templates: data.docTemplates ? JSON.stringify(data.docTemplates) : undefined,
