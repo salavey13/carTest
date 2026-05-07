@@ -11,14 +11,15 @@ interface FloatingCartIconLinkProps {
   textColor: string;
   borderColor: string;
   backgroundColor: string;
+  className?: string;
 }
 
-export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor, textColor, borderColor, backgroundColor }: FloatingCartIconLinkProps) {
+export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor, textColor, borderColor, backgroundColor, className }: FloatingCartIconLinkProps) {
   const isCartEmpty = itemCount === 0;
 
   return (
     <div
-      className="fixed bottom-24 right-4 z-[60] flex items-center gap-3"
+      className={className ?? "fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-[60] flex items-center gap-3"}
       style={{
         ["--floating-cart-accent" as string]: accentColor,
         ["--floating-cart-border" as string]: borderColor,

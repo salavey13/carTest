@@ -11,9 +11,10 @@ interface FranchizeFloatingCartProps {
   textColor: string;
   borderColor: string;
   theme: FranchizeTheme;
+  className?: string;
 }
 
-export function FranchizeFloatingCart({ slug, href, items, accentColor, textColor, borderColor, theme }: FranchizeFloatingCartProps) {
+export function FranchizeFloatingCart({ slug, href, items, accentColor, textColor, borderColor, theme, className }: FranchizeFloatingCartProps) {
   return (
     <FloatingCartIconLinkBySlug
       slug={slug}
@@ -23,6 +24,7 @@ export function FranchizeFloatingCart({ slug, href, items, accentColor, textColo
       textColor={textColor}
       borderColor={borderColor}
       theme={theme}
+      className={className}
     />
   );
 }

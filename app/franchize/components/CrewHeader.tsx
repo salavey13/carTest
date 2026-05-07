@@ -10,6 +10,7 @@ import type { FranchizeCrewVM } from "../actions";
 import { HeaderMenu } from "../modals/HeaderMenu";
 import { FranchizeProfileButton } from "./FranchizeProfileButton";
 import { toCategoryId } from "../lib/navigation";
+import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
 
 interface CrewHeaderProps {
@@ -162,8 +163,9 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
 
   return (
     <header
-      className="sticky top-0 z-50 border-b px-4 pb-2 pt-[max(env(safe-area-inset-top),0.2rem)] backdrop-blur-2xl"
+      className="sticky top-0 z-50 border-b pb-2 backdrop-blur-2xl"
       style={{
+        ...FRANCHIZE_HEADER_SAFE_AREA_STYLE,
         borderColor: crew.theme.palette.borderSoft,
         backgroundColor: `${crew.theme.palette.bgCard}F0`,
         color: crew.theme.palette.textPrimary,
@@ -172,6 +174,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
       <div className="mx-auto w-full max-w-7xl overflow-hidden">
         <div
           style={{
+            ...FRANCHIZE_HEADER_CORNER_GUARD_STYLE,
             display: "grid",
             gridTemplateColumns: "44px 1fr auto",
             alignItems: "center",
@@ -179,7 +182,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             maxHeight: isCompact ? 0 : 112,
             opacity: isCompact ? 0 : 1,
             paddingBottom: isCompact ? 0 : "0.5rem",
-            transform: isCompact ? "scaleY(0.85) translateY(-8px)" : "scaleY(1) translateY(0)",
+            transform: isCompact ? "scaleY(0.85) translateY(-6px)" : "scaleY(1) translateY(0.15rem)",
             transformOrigin: "top center",
             transition: "transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, padding 0.3s ease, max-height 0.32s ease",
             pointerEvents: "auto",
