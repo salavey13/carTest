@@ -6,6 +6,7 @@ import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { FranchizeFloatingCart } from "@/app/franchize/components/FranchizeFloatingCart";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { SaleBikeLanding } from "@/app/franchize/components/SaleBikeLanding";
+import { isSameCatalogPropulsion } from "@/app/franchize/lib/catalog-propulsion";
 
 interface BuyBikePageProps {
   params: Promise<{ slug: string; bike_id: string }>;
@@ -54,7 +55,8 @@ export default async function BuyBikePage({
   const otherSaleBikes = items.filter(
     (candidate) =>
       candidate.id !== item.id &&
-      (candidate.saleAvailable || isSaleEnabled(candidate.rawSpecs?.sale)),
+      (candidate.saleAvailable || isSaleEnabled(candidate.rawSpecs?.sale)) &&
+      isSameCatalogPropulsion(item, candidate),
   );
   const vsItem = vs
     ? (otherSaleBikes.find((candidate) => candidate.id === vs) ?? null)
