@@ -132,7 +132,7 @@ export function ProviderOffers({ lobbyId, playerCount, activityType, selectedPro
                     {/* Header: Provider Intel */}
                     <div className="p-4 bg-muted/30 flex justify-between items-start relative">
                         <Link href={`/crews/${provider.providerSlug}`} className="flex gap-4 group">
-                            <img src={provider.logo} className="w-12 h-12 bg-black border border-border grayscale group-hover:grayscale-0 transition-all object-cover rounded-md" />
+                            <img src={provider.logo} className="w-12 h-12 bg-black border border-border grayscale group-hover:grayscale-0 transition-all object-cover rounded-md" alt={`${provider.providerName} logo`} />
                             <div>
                                 <h4 className="font-black text-sm uppercase group-hover:text-brand-cyan text-foreground">{provider.providerName}</h4>
                                 <div className="flex items-center gap-3 text-[9px] text-foreground dark:text-muted-foreground font-mono mt-1">

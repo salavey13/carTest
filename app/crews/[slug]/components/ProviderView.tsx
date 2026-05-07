@@ -23,7 +23,7 @@ export const ProviderView = ({ crew }: { crew: any }) => {
             {services.map((s: any) => (
                 <Card key={s.id} className="bg-black/60 border-accent/30 overflow-hidden group">
                     <div className="h-48 relative overflow-hidden">
-                        <img src={s.image_url || crew.logo_url} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
+                        <img src={s.image_url || crew.logo_url} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" alt={`${s.name || crew.name || "Provider"} service`} />
                         <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
                         <h3 className="absolute bottom-4 left-4 text-2xl font-black uppercase">{s.name}</h3>
                     </div>
