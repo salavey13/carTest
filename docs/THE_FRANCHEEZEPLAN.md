@@ -201,3 +201,15 @@ This root file stays intentionally compact so operators and agents can load it q
 - `notes`: Re-checked the stale ready_for_pr task with no visible PR and implemented the missing public-facing company/service hub on `/vipbikerental`: one section now explains VIP BIKE as rental + service + rider community, links to catalog, service contact and MapRiders, and keeps the existing service cards/FAQ as supporting detail.
 - `next_step`: Production-smoke `/vipbikerental` with real `vip-bike` catalog data and verify service CTA destination with operator.
 - `risks`: Service CTA currently routes to the existing Telegram operator contact until a dedicated service booking route exists.
+
+### 2026-05-07 — VIP Bike QA rhythm + configurator style containment
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T07:20:00Z
+- `owner`: codex
+- `supaplan_task`: d3c8f9f2-3234-4c3a-def0-33330003cdef
+- `notes`: Addressed operator QA notes across `/vipbikerental`, `/franchize/vip-bike/configurator`, and `/franchize/vip-bike/electro-enduro`: tightened the hero-to-showcase rhythm, scoped ConfiguratorClient CSS variables away from `:root`, added resilient bike image presentation/fallbacks, removed the global franchize footer from the configurator page, compacted the shared footer elsewhere, and added a VipBike fallback catalog for Electro-Enduro when live crew hydration is empty.
+- `next_step`: Browser-smoke the three routes against production data/preview and verify the Electro-Enduro fallback notice disappears when the live `vip-bike` crew/items hydrate correctly.
+- `risks`: Electro-Enduro fallback prevents an empty showroom but does not replace the need to seed/repair production Supabase crew + catalog rows.
+
+- 2026-05-07 — VIP Bike QA pass: reduced `/vipbikerental` post-hero depth, contained configurator styles, made configurator bike imagery readable with fallback art, removed the mustard footer from the configurator flow, compacted shared footer scale, hardened Electro-Enduro contrast, and added a temporary non-empty VipBike fallback catalog for hydration failures.
