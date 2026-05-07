@@ -12,6 +12,7 @@ import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { checkFranchizeCarsAvailability, createFranchizeOrderCheckout, validateFranchizePromoCode } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
+import { getTelegramHandleHref, getTelegramWebAppFallbackHref } from "../lib/telegram-links";
 import { getFranchizeFormPrefillAction } from "../profile-actions";
 
 interface OrderPageClientProps {
@@ -178,6 +179,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const saleLinesCount = useMemo(() => cartLines.filter((line) => line.saleAvailable).length, [cartLines]);
   const flowType: "rental" | "sale" | "mixed" = saleLinesCount === 0 ? "rental" : saleLinesCount === cartLines.length ? "sale" : "mixed";
   const flowLabel = flowType === "sale" ? "покупки" : flowType === "mixed" ? "аренды/покупки" : "аренды";
+  const catalogHref = `/franchize/${slug}`;
+  const profileHref = `/franchize/${slug}/profile`;
+  const contactsHref = `/franchize/${slug}/contacts`;
+  const telegramSupportHref = getTelegramHandleHref(crew.contacts.telegram);
+  const telegramWebAppFallbackHref = getTelegramWebAppFallbackHref("franchize", slug, crew.contacts.telegramBotUsername);
   const selectedExtraItems = useMemo(
     () => orderExtras.filter((extra) => selectedExtras.includes(extra.id)),
     [selectedExtras],
@@ -529,6 +535,54 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       </p>
       <h1 className="mt-2 text-2xl font-semibold">Оформление заказа</h1>
 
+      <div className="mt-4 grid gap-3 rounded-3xl border p-4 text-sm md:grid-cols-[1.2fr_0.8fr]" style={surface.subtleCard}>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--order-accent)]">Что будет дальше</p>
+          <ol className="mt-3 space-y-2">
+            {[
+              `Проверим корзину, даты и контакт для ${flowLabel}.`,
+              payment === "telegram_xtr" ? "Передадим счёт в Telegram Stars и покажем резервный способ, если WebApp не открылся." : "Передадим заявку оператору: оплату подтвердим вручную до выдачи.",
+              "Оператор сверит договор, подготовку байка и точку выдачи без скрытых списаний.",
+            ].map((step, index) => (
+              <li key={step} className="flex gap-2">
+                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--order-accent-soft)] text-[11px] font-semibold text-[var(--order-accent)]">{index + 1}</span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-3 rounded-2xl border border-[var(--order-border)] p-3 text-xs" style={surface.card}>
+            Безопасность оплаты и договора: сумма фиксируется в заявке, договор/чек проверяются до старта, спорные изменения подтверждаются только через оператора или Telegram.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <a
+            href={telegramSupportHref}
+            target="_blank"
+            rel="noreferrer"
+            className="flex w-full justify-center rounded-xl bg-[var(--order-accent)] px-3 py-2 text-center text-sm font-semibold text-[var(--order-accent-contrast)] transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            style={focusRingOutlineStyle(crew.theme)}
+          >
+            Написать оператору в Telegram
+          </a>
+          <a
+            href={telegramWebAppFallbackHref}
+            target="_blank"
+            rel="noreferrer"
+            className="flex w-full justify-center rounded-xl border border-[var(--order-border)] px-3 py-2 text-center text-xs transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            style={focusRingOutlineStyle(crew.theme)}
+          >
+            Открыть WebApp fallback
+          </a>
+          <Link href={contactsHref} className="flex w-full justify-center rounded-xl border border-[var(--order-border)] px-3 py-2 text-center text-xs transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={focusRingOutlineStyle(crew.theme)}>
+            Поддержка / контакты
+          </Link>
+          <div className="grid grid-cols-2 gap-2">
+            <Link href={catalogHref} className="rounded-xl border border-[var(--order-border)] px-3 py-2 text-center text-xs transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={focusRingOutlineStyle(crew.theme)}>Каталог</Link>
+            <Link href={profileHref} className="rounded-xl border border-[var(--order-border)] px-3 py-2 text-center text-xs transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={focusRingOutlineStyle(crew.theme)}>Профиль</Link>
+          </div>
+        </div>
+      </div>
+
       <div className="mt-4 flex items-center gap-2 text-xs" style={surface.mutedText}>
         {[
           ["1", "Корзина"],
@@ -839,13 +893,22 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
           {isCartEmpty ? (
             <div className="mt-3 rounded-xl border border-dashed p-3 text-sm" style={surface.subtleCard}>
-              <p>Корзина пуста — добавьте байк из каталога перед оформлением.</p>
-              <Link
-                href={`/franchize/${slug}`}
-                className="mt-3 inline-flex font-medium text-[var(--order-accent)] underline-offset-4 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--order-accent)]"
-              >
-                Вернуться в каталог
-              </Link>
+              <p className="font-medium">Корзина пуста — заказ ещё некуда оформлять.</p>
+              <p className="mt-1 text-xs" style={surface.mutedText}>Вернитесь в каталог, выберите байк и пакет аренды/покупки. Если позиция пропала — напишите оператору, он подберёт замену.</p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <Link
+                  href={catalogHref}
+                  className="inline-flex font-medium text-[var(--order-accent)] underline-offset-4 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--order-accent)]"
+                >
+                  Вернуться в каталог
+                </Link>
+                <Link
+                  href={profileHref}
+                  className="inline-flex font-medium text-[var(--order-accent)] underline-offset-4 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--order-accent)]"
+                >
+                  Открыть профиль
+                </Link>
+              </div>
             </div>
           ) : (
             <ul className="mt-2 space-y-2 text-sm">
@@ -888,6 +951,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             {submitLabel}
           </button>
           <p className="mt-2 text-xs" style={surface.mutedText}>{submitHint}</p>
+          <p className="mt-3 rounded-xl border border-[var(--order-border)] p-3 text-xs" style={surface.subtleCard}>
+            Если оплата или договор не открылись, не перезагружайте страницу: нажмите Telegram fallback выше или напишите в поддержку — оператор продолжит заявку по #{orderId}.
+          </p>
         </aside>
       </form>
     </section>

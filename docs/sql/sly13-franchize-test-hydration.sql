@@ -115,6 +115,7 @@ set
           'phone', '+7 9200-789-888',
           'email', 'sly13@cybervibe.local',
           'telegram', '@SALAVEY13',
+          'telegramBotUsername', 'oneBikePlsBot',
           'workingHours', 'Гибкий график по договорённости',
           'map', jsonb_build_object(
             'imageUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/nnmap.jpg',
