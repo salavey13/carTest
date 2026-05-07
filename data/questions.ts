@@ -1,4 +1,6 @@
 // /data/questions.ts
+
+interface Answer {
   text: string
   result: string
 }
@@ -8,7 +10,7 @@ interface Question {
   text: string
   answers: Answer[]
   theme: string
-}*/
+}
 
 export const questions: Question[] = [
   {
