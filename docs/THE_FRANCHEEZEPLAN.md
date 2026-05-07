@@ -271,3 +271,23 @@ This root file stays intentionally compact so operators and agents can load it q
 - `notes`: Addressed Codex review P1: auth bypass no longer reads caller-controlled URL/query/origin/referer; it now depends only on server-known Vercel deployment metadata (`VERCEL_ENV=preview` + deployment URL containing `salavey13`) or exact `TELEGRAM_AUTH_BYPASS_ALLOWED_HOSTS`. Added regression tests for forged `?salavey13` production URLs, live-like Telegram initData recreation, and preview/allowlist behavior. Updated VIP Bike seed SQL header/footer with `/franchize/{slug}/community`, and replaced `/vipbikerental` hardcoded Стригинский address with `ул. Комсомольская 2`.
 - `next_step`: Apply updated `docs/sql/vip-bike-franchize-hydration.sql` to staging/prod Supabase after merge, then smoke header/footer navigation.
 - `risks`: Bypass now requires Vercel preview metadata or explicit allowlist; if a preview runtime lacks `VERCEL_ENV/VERCEL_URL`, set `TELEGRAM_AUTH_BYPASS_ALLOWED_HOSTS` to the exact preview host.
+
+### 2026-05-07 — FRZ-R4 + FRZ-R8 + CQ-01 partner/sales/session slice
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `supaplan_tasks`: `941503e4-9092-4d1f-bc93-3bf3147dbd69`, `b6180fa5-a62e-434b-b4c0-437cf996430e`, `b3950a88-bbd2-4eeb-9db4-b29da8026be8`
+- `notes`: Added VIP-bike partner onboarding checklist route, added four-lane sales vertical route for new/electric/used/trade-in intent capture, and extracted duplicated MapRiders session start/stop write logic into `useSessionManager` for the map panel + floating FAB.
+- `next_step`: Preview-smoke `/franchize/vip-bike/onboarding`, `/franchize/vip-bike/sales`, and `/franchize/vip-bike/map-riders`; after production data is verified, add onboarding/sales links to default crew menu metadata.
+- `risks`: Local checks validate TypeScript/lint shape, but real Telegram GPS/session writes still require device QA with configured runtime secrets.
+
+### 2026-05-07 — FRZ self-review navigation polish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex-review
+- `supaplan_tasks`: `941503e4-9092-4d1f-bc93-3bf3147dbd69`, `b6180fa5-a62e-434b-b4c0-437cf996430e`, `b3950a88-bbd2-4eeb-9db4-b29da8026be8`
+- `notes`: Self-review found the new partner onboarding and sales routes were only direct URLs, so the VIP-bike hydration SQL now seeds both routes into header menu links and footer section links.
+- `next_step`: Re-apply `docs/sql/vip-bike-franchize-hydration.sql` after merge and smoke `/franchize/vip-bike/onboarding` + `/franchize/vip-bike/sales` from hydrated navigation.
+- `risks`: Existing production metadata will not show the new links until the updated seed/hydration SQL is applied.
