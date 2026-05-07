@@ -18,7 +18,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { useMaps } from "@/lib/maps/useMaps";
-import { MapRidersProvider, useMapRiders } from "@/hooks/useMapRidersContext";
+import { MapRidersProvider, useMapRiders, useMapRidersState } from "@/hooks/useMapRidersContext";
 import { formatRideDuration, initialsFromName, riderDisplayName } from "@/lib/map-riders";
 import { useLiveRiders } from "@/hooks/useLiveRiders";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
@@ -589,7 +589,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
 // ── Lazy-loaded leaderboard (own fetch) ──
 function LeaderboardSection({ crew, crewSlug }: { crew: FranchizeCrewVM; crewSlug: string }) {
   const surface = crewPaletteForSurface(crew.theme);
-  const { state } = useMapRiders();
+  const { state } = useMapRidersState();
 
   return (
     <section className="rounded-2xl border p-6 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
