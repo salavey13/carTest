@@ -9,6 +9,11 @@ import {
   VsSpecRow,
   getCatalogVsSpecValue,
 } from "@/components/franchize/VsSpecRow";
+import {
+  getCatalogPropulsionLabel,
+  getCatalogPropulsionSegment,
+  isSameCatalogPropulsion,
+} from "@/app/franchize/lib/catalog-propulsion";
 import { ItemGallery } from "../components/ItemGallery";
 import { crewPaletteForSurface } from "../lib/theme";
 
@@ -216,13 +221,20 @@ export function ItemModal({
     [gallery.length],
   );
 
+  const propulsionSegment = useMemo(
+    () => (item ? getCatalogPropulsionSegment(item) : "unknown"),
+    [item],
+  );
+  const propulsionLabel = getCatalogPropulsionLabel(propulsionSegment);
+
   const comparableBikes = useMemo(() => {
     if (!item) return [];
     return items
       .filter(
         (candidate) =>
           candidate.id !== item.id &&
-          candidate.availabilityStatus === "available",
+          candidate.availabilityStatus === "available" &&
+          isSameCatalogPropulsion(item, candidate),
       )
       .slice(0, 6);
   }, [item, items]);
@@ -415,6 +427,9 @@ export function ItemModal({
               >
                 <summary className="cursor-pointer list-none text-sm font-semibold">
                   Сравнить с другой моделью
+                  <span className="ml-2 text-xs font-normal opacity-60">
+                    {propulsionLabel}
+                  </span>
                 </summary>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {comparableBikes.map((bike) => (
@@ -439,7 +454,12 @@ export function ItemModal({
                     style={surface.subtleCard}
                   >
                     <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center text-xs font-semibold">
-                      <span>{item.title}</span>
+                      <span>
+                        {item.title}
+                        <span className="mt-0.5 block text-[10px] uppercase tracking-[0.12em] opacity-55">
+                          {propulsionLabel}
+                        </span>
+                      </span>
                       <Swords className="h-5 w-5 text-[var(--item-accent)]" />
                       <span>{vsBike.title}</span>
                     </div>

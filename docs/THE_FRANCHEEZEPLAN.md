@@ -49,6 +49,15 @@ This root file stays intentionally compact so operators and agents can load it q
 
 - 2026-05-04 — Added support for metadata-driven franchize header logo routing via `header.logoHref` with default fallback to `/franchize/{slug}`; seeded `vip-bike` to land on `/vipbikerental` instead of catalog. Next step: expose `header.logoHref` in admin configurator UI for non-SQL operators.
 
+### 2026-05-07 — VS same-propulsion micropolish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `notes`: Tightened franchize bike VS comparisons so electric bikes compare only with electric bikes, gas bikes compare only with gas bikes, and both sale-buy + rental modal surfaces explain the active comparison class. Self-review moved propulsion inference into a focused lib with score-based structured-spec detection and regression coverage for gas bikes that mention a support battery.
+- `next_step`: Smoke `/franchize/vip-bike` catalog modal and `/franchize/vip-bike/market/<bike_id>/buy` with mixed electric/gas catalog data.
+- `risks`: Propulsion is inferred from existing free-text category/spec metadata until catalog rows get a structured propulsion field.
+
 ## 3) Active ad-hoc task — `/vipbikerental` interactive landing
 
 - status: `ready_for_pr`
