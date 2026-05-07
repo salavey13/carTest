@@ -90,9 +90,13 @@ export function initialsFromName(name: string) {
 }
 
 export function formatRideDuration(seconds: number) {
+  if (seconds === 0) return "Только что начали!";
+  if (!Number.isFinite(seconds) || seconds < 0) return "Меньше минуты";
+
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   if (hours > 0) return `${hours} ч ${minutes} мин`;
+  if (minutes <= 0) return "Меньше минуты";
   return `${minutes} мин`;
 }
 

@@ -867,9 +867,13 @@ const normalizeMapPoint = (lat: number | undefined, lng: number | undefined, ind
 };
 
 const formatRideDuration = (seconds: number | undefined) => {
-  const safeSeconds = Math.max(0, Number(seconds || 0));
+  const safeSeconds = Number(seconds);
+  if (!Number.isFinite(safeSeconds)) return "—";
+  if (safeSeconds === 0) return "Только что начали!";
+  if (safeSeconds < 60) return "Меньше минуты";
+
   const minutes = Math.round(safeSeconds / 60);
-  if (minutes < 60) return `${minutes || 18} мин`;
+  if (minutes < 60) return `${minutes} мин`;
   return `${Math.floor(minutes / 60)} ч ${minutes % 60} мин`;
 };
 
@@ -880,6 +884,18 @@ function MapRidersLivePreview({ overview }: { overview: MapRidersOverview | null
   const activeRiders = formatCompactNumber(overview?.stats?.activeRiders, liveLocations.length);
   const meetupCount = formatCompactNumber(overview?.stats?.meetupCount, meetups.length);
   const weeklyDistance = formatCompactNumber(overview?.stats?.totalWeeklyDistanceKm, 127);
+  const isMapRidersWarmup = Boolean(
+    overview &&
+      !overview.liveLocations?.length &&
+      !overview.meetups?.length &&
+      !overview.latestCompleted?.length &&
+      Number(overview.stats?.activeRiders || 0) <= 0 &&
+      Number(overview.stats?.totalWeeklyDistanceKm || 0) <= 0,
+  );
+  const latestRideDistanceKm = Number(latestRide?.total_distance_km || 0);
+  const latestRideHint = latestRide
+    ? latestRideDistanceKm <= 0 ? "Последний заезд сохранён, дистанция ещё уточняется." : null
+    : "Ждём первый живой заезд — он появится здесь после старта MapRiders.";
   const speedPath = "M4 42 C18 34 24 18 38 28 C50 36 58 12 70 22 C82 30 88 18 96 10";
 
   return (
@@ -945,6 +961,9 @@ function MapRidersLivePreview({ overview }: { overview: MapRidersOverview | null
               <p className="text-xs uppercase tracking-[0.22em] text-emerald-900/70">превью маршрута</p>
               <h3 className="mt-2 font-orbitron text-2xl text-[#182016]">Райдеры на карте прямо сейчас</h3>
               <p className="mt-2 text-sm text-[#354131]">Откроется полная карта с геопозицией, встречами и рейтингом.</p>
+              {isMapRidersWarmup ? (
+                <p className="mt-2 text-xs font-medium text-emerald-950/70">Живые данные появятся после первого заезда — пока показываем демо-сцену.</p>
+              ) : null}
             </div>
             <div className="grid grid-cols-3 gap-2">
               {[
@@ -970,17 +989,18 @@ function MapRidersLivePreview({ overview }: { overview: MapRidersOverview | null
               <div className="grid grid-cols-3 gap-2 text-sm">
                 <div className="rounded-xl border border-border/60 bg-background/40 p-3">
                   <p className="text-xs text-muted-foreground">Райдер</p>
-                  <p className="mt-1 font-medium">{latestRide?.rider_name || "VIP rider"}</p>
+                  <p className="mt-1 font-medium">{latestRide?.rider_name || "Ждём первый заезд"}</p>
                 </div>
                 <div className="rounded-xl border border-border/60 bg-background/40 p-3">
                   <p className="text-xs text-muted-foreground">Дистанция</p>
-                  <p className="mt-1 font-medium">{formatCompactNumber(latestRide?.total_distance_km, 24)} км</p>
+                  <p className="mt-1 font-medium">{latestRide ? `${formatCompactNumber(latestRide.total_distance_km, 0)} км` : "—"}</p>
                 </div>
                 <div className="rounded-xl border border-border/60 bg-background/40 p-3">
                   <p className="text-xs text-muted-foreground">Время</p>
                   <p className="mt-1 font-medium">{formatRideDuration(latestRide?.duration_seconds)}</p>
                 </div>
               </div>
+              {latestRideHint ? <p className="text-xs text-muted-foreground">{latestRideHint}</p> : null}
               <svg viewBox="0 0 100 48" className="h-24 w-full rounded-2xl border border-border/60 bg-background/40 p-3" role="img" aria-label="Мини график скорости последней поездки">
                 <path d={speedPath} fill="none" stroke="currentColor" strokeWidth="3" className="text-primary drop-shadow-[0_0_8px_rgba(255,170,80,0.65)]" />
                 <path d="M4 42 L96 42" stroke="currentColor" strokeWidth="1" className="text-muted-foreground/40" />

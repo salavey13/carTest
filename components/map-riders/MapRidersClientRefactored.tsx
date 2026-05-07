@@ -135,6 +135,14 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   );
   const showDemo = riderPoints.length === 0 && !state.shareEnabled;
 
+  const staticMapPoints = useMemo(() => {
+    return (mapData?.points || []).filter((point) => {
+      const normalizedId = String(point.id || "").toLowerCase();
+      const normalizedName = String(point.name || "").toLowerCase();
+      return normalizedId !== "demo-rider-beta" && !normalizedName.includes("demo rider beta");
+    });
+  }, [mapData?.points, mapData?.bounds]);
+
   const mapPoints = useMemo(() => {
     const demoPoints = showDemo
       ? [
@@ -173,14 +181,8 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
           ]
         : [];
 
-    const sanitizedMapPoints = (mapData?.points || []).filter((point) => {
-      const normalizedId = String(point.id || "").toLowerCase();
-      const normalizedName = String(point.name || "").toLowerCase();
-      return normalizedId !== "demo-rider-beta" && !normalizedName.includes("demo rider beta");
-    });
-
-    return [...sanitizedMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints];
-  }, [riderPoints, showDemo, state.meetups, state.sessionDetail, mapData?.points]);
+    return [...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints];
+  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail]);
 
   const riderStatusCounts = useMemo(() => {
     const riders = Array.from(state.liveRiders.values());
