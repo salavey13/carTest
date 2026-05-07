@@ -108,6 +108,7 @@ export interface FranchizeCrewVM {
     email: string;
     address: string;
     telegram: string;
+    telegramBotUsername: string;
     workingHours: string;
     map: {
       id?: string;
@@ -495,6 +496,7 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     email: "",
     address: "",
     telegram: "",
+    telegramBotUsername: "oneBikePlsBot",
     workingHours: "",
     map: {
       gps: "",
@@ -665,6 +667,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
           readPath(franchize, ["footer", "address"], crew.hq_location ?? ""),
         ),
         telegram: readPath(franchize, ["contacts", "telegram"], ""),
+        telegramBotUsername: readPath(franchize, ["contacts", "telegramBotUsername"], "oneBikePlsBot"),
         workingHours: readPath(franchize, ["contacts", "workingHours"], ""),
         map: {
           gps: readPath(franchize, ["contacts", "map", "gps"], ""),
