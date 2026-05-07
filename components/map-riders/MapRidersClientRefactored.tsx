@@ -158,11 +158,28 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     return [...sanitizedMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints];
   }, [state.liveRiders, state.sessions, state.meetups, state.sessionDetail, mapData?.points]);
 
-  const heroStats = [
-    { label: "В эфире", value: state.stats.activeRiders, icon: "::FaSatelliteDish::" },
-    { label: "Точки встречи", value: state.stats.meetupCount, icon: "::FaUsersViewfinder::" },
-    { label: "Км за 7 дней", value: state.stats.totalWeeklyDistanceKm, icon: "::FaRoad::" },
-  ];
+  const riderStatusCounts = useMemo(() => {
+    const riders = Array.from(state.liveRiders.values());
+    return {
+      live: riders.filter((rider) => rider.status === "live").length,
+      stale: riders.filter((rider) => rider.status === "stale").length,
+      offline: riders.filter((rider) => rider.status === "evicted").length,
+    };
+  }, [state.liveRiders]);
+
+  const heroStats = useMemo(
+    () => [
+      { label: "В эфире", value: state.stats.activeRiders, icon: "::FaSatelliteDish::" },
+      { label: "Точки встречи", value: state.stats.meetupCount, icon: "::FaUsersViewfinder::" },
+      { label: "Км за 7 дней", value: state.stats.totalWeeklyDistanceKm, icon: "::FaRoad::" },
+    ],
+    [state.stats.activeRiders, state.stats.meetupCount, state.stats.totalWeeklyDistanceKm],
+  );
+
+  const shareModeLabel = state.visibilityMode === "public" ? "публично" : "экипаж";
+  const nextAutoStopLabel = state.shareExpiresAt
+    ? new Date(state.shareExpiresAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+    : `${state.autoExpireMinutes} мин`;
 
   const handleQuickMeetupCreate = useCallback(async () => {
     if (!dbUser?.user_id) {
@@ -329,19 +346,25 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         <div className="pointer-events-none relative z-30 flex min-h-[62vh] flex-col justify-between p-3 md:min-h-[74vh] md:p-6">
           <div className="flex flex-wrap gap-2">
             <Badge className="border bg-black/55 text-white backdrop-blur-md">{useLeafletMap ? `Leaflet${isUsingTelegram ? " + Telegram GPS" : " + Browser GPS"}` : "VibeMap"}</Badge>
+            <Badge className="border border-emerald-300/45 bg-emerald-500/20 text-emerald-100">live {riderStatusCounts.live}</Badge>
+            {riderStatusCounts.stale ? <Badge className="border border-amber-300/45 bg-amber-500/20 text-amber-100">stale {riderStatusCounts.stale}</Badge> : null}
             {mapData?.routes?.length ? <Badge className="border border-sky-300/50 bg-sky-500/20 text-sky-100">{mapData.routes.length} маршрутов</Badge> : null}
+            <Badge className="border border-white/20 bg-black/45 text-white/90">{shareModeLabel} • автостоп {nextAutoStopLabel}</Badge>
             {state.liveRiders.size === 0 && state.sessions.length === 0 ? (
               <Badge className="border border-emerald-300/40 bg-emerald-500/20 text-emerald-100">Демо-режим</Badge>
             ) : null}
           </div>
           <div className="flex justify-end">
-            <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-white/30 bg-black/50 px-3 py-1 text-xs text-white">
-              <span>
-                {selectedMeetup
-                  ? `Точка встречи: ${selectedMeetup.title}`
-                  : state.selectedMeetupPoint
-                  ? `Точка: ${state.selectedMeetupPoint[0].toFixed(4)}, ${state.selectedMeetupPoint[1].toFixed(4)}`
-                  : "Тапни по карте, чтобы выбрать точку или уже созданный meetup"}
+            <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-2xl border border-white/30 bg-black/60 px-3 py-2 text-xs text-white shadow-2xl shadow-black/30 backdrop-blur-md">
+              <span className="min-w-0">
+                <span className="block font-medium text-white">
+                  {selectedMeetup
+                    ? `Точка встречи: ${selectedMeetup.title}`
+                    : state.selectedMeetupPoint
+                    ? `Точка: ${state.selectedMeetupPoint[0].toFixed(4)}, ${state.selectedMeetupPoint[1].toFixed(4)}`
+                    : "Тапни — выбрать, удерживай — meetup"}
+                </span>
+                <span className="block text-[11px] text-white/65">Long-press не двигает карту и сразу готовит точку встречи.</span>
               </span>
               <Button
                 type="button"
@@ -395,6 +418,20 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
           <p className="mt-1 text-sm text-muted-foreground">
             {state.shareEnabled ? "Ты сейчас в эфире на карте" : "Геошеринг выключен"}
           </p>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-2 py-2 text-emerald-100">
+              <div className="font-semibold">{riderStatusCounts.live}</div>
+              <div className="text-[10px] uppercase tracking-wide text-emerald-200/70">live</div>
+            </div>
+            <div className="rounded-xl border border-amber-300/20 bg-amber-500/10 px-2 py-2 text-amber-100">
+              <div className="font-semibold">{riderStatusCounts.stale}</div>
+              <div className="text-[10px] uppercase tracking-wide text-amber-200/70">stale</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 px-2 py-2 text-white">
+              <div className="font-semibold">{queuedPoints}</div>
+              <div className="text-[10px] uppercase tracking-wide text-white/60">queue</div>
+            </div>
+          </div>
           <div className="mt-4 space-y-3">
             {isAdmin ? (
               <Button asChild variant="outline" className="w-full justify-center">

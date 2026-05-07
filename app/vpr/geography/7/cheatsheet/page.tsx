@@ -292,9 +292,10 @@ function TerrainProfileSVG({ profile }: { profile: TerrainProfile }) {
 }
 
 function ScaleCalculator({ scaleInfo, onAnswer }: { scaleInfo: Question['scaleInfo']; onAnswer: (km: number) => void }) {
-  if (!scaleInfo) return null;
   const [input, setInput] = useState('');
   const [submitted, setSubmitted] = useState<number | null>(null);
+
+  if (!scaleInfo) return null;
 
   const handleSubmit = () => {
     const val = parseFloat(input.replace(',', '.'));

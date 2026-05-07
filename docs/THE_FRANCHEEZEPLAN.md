@@ -222,3 +222,14 @@ This root file stays intentionally compact so operators and agents can load it q
 - `notes`: Fixed Telegram WebApp back handling to use an internal SPA history stack instead of `router.back()`, corrected Seqvens Zero code identifiers to `seqvens-zero` while intentionally preserving existing `carpix/seqvenz-zero/*` storage paths, and tightened MapRiders QA to smoke the requested `vip-bike` slug APIs with JSON success checks.
 - `next_step`: Field-test Telegram BackButton in the real bot WebApp and collect the exact MapRiders failing action if testers still report “doesn't work”.
 - `risks`: CLI smoke confirms the route/APIs are alive, but two-phone live GPS and Telegram BackButton behavior still need real Telegram WebApp device verification.
+
+### 2026-05-07 — MapRiders lint + mobile UX hardening
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `notes`: Bulk lint pass normalized the legacy warning policy and fixed remaining blocking lint findings, then MapRiders review fixed mobile long-press duplicate/click suppression, coalesced fallback realtime snapshot refreshes, synced FAB privacy/start payloads with the main rider panel, and added clearer live/stale/queue cockpit UI hints for `vip-bike` riders.
+- `next_step`: Smoke `/franchize/vip-bike/map-riders` in a real Telegram WebApp with two devices to verify long-press meetup creation and privacy-preserving geoshare start from both CTA surfaces.
+- `risks`: Local CI can validate lint/build/API shape, but true GPS accuracy and Telegram permission UX still require device testing.
+
+- 2026-05-07 — MapRiders review pass: reduced realtime overfetch pressure, made mobile long-press meetup selection safer, aligned floating and panel start actions, and surfaced live/stale/queue state directly in the map cockpit.
