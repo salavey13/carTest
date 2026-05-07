@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getFranchizeBySlug } from "../../actions";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
+import { FranchizeHero } from "../../components/FranchizeHero";
+import { FranchizePageShell } from "../../components/FranchizePageShell";
 import { FranchizeRentalsBridge } from "../../components/FranchizeRentalsBridge";
 import { FranchizeErrorBoundary } from "../../components/ErrorBoundary";
+import { crewPaletteForSurface } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
 interface FranchizeRentalsPageProps {
@@ -23,37 +25,31 @@ export async function generateMetadata({ params }: FranchizeRentalsPageProps): P
 export default async function FranchizeRentalsPage({ params }: FranchizeRentalsPageProps) {
   const { slug } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
+  const resolvedSlug = crew.slug || slug;
+  const surface = crewPaletteForSurface(crew.theme);
 
   return (
-    <>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/rentals`} groupLinks={items.map((item) => item.category)} />
-      <section className="mx-auto w-full max-w-4xl px-4 pt-6">
-        <p className="text-xs uppercase tracking-[0.2em]" style={{ color: crew.theme.palette.accentMain }}>
-          /franchize/{slug}/rentals
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold">Мои аренды · Franchize shell</h1>
-        <p className="mt-2 text-sm" style={{ color: crew.theme.palette.textSecondary }}>
-          Полноценный rentals control-center в franchize оболочке: используем существующий движок, но сохраняем бренд и навигацию экипажа.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-3 text-sm">
-          <Link href={`/franchize/${crew.slug || slug}`} className="underline underline-offset-4" style={{ color: crew.theme.palette.accentMain }}>
-            ← Вернуться в каталог
-          </Link>
-          <Link href="/rentals" className="underline underline-offset-4" style={{ color: crew.theme.palette.accentMain }}>
-            Открыть классический /rentals
-          </Link>
-        </div>
+    <main className="min-h-screen" style={surface.page}>
+      <CrewHeader crew={crew} activePath={`/franchize/${resolvedSlug}/rentals`} groupLinks={items.map((item) => item.category)} />
+      <FranchizePageShell theme={crew.theme} contentClassName="space-y-6">
+        <FranchizeHero
+          eyebrow={`/franchize/${resolvedSlug}/rentals · control-center`}
+          title="Мои аренды"
+          subcopy="Операторская оболочка для текущих, завершённых и ожидающих аренд: оставляем рабочий движок, но держим бренд экипажа и быстрые возвраты."
+          primaryCta={{ label: "Вернуться в каталог", href: `/franchize/${resolvedSlug}` }}
+          secondaryCta={{ label: "Классический /rentals", href: "/rentals" }}
+        />
 
         <FranchizeErrorBoundary
           resetKey={slug}
           fallbackTitle="Раздел аренд временно недоступен"
-          fallbackHref={`/franchize/${crew.slug || slug}/rentals`}
+          fallbackHref={`/franchize/${resolvedSlug}/rentals`}
           fallbackLinkLabel="Остаться в арендном разделе"
         >
           <FranchizeRentalsBridge />
         </FranchizeErrorBoundary>
-      </section>
+      </FranchizePageShell>
       <CrewFooter crew={crew} />
-    </>
+    </main>
   );
 }
