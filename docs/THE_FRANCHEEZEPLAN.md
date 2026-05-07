@@ -88,8 +88,18 @@ This root file stays intentionally compact so operators and agents can load it q
 - `next_step`: Preview-smoke `/franchize/vip-bike/map-riders` once Playwright host dependencies are available.
 - `risks`: Local screenshot capture was blocked by missing browser shared libraries in the runner; runtime visual QA still needs a browser-capable environment.
 
+### 2026-05-07 — MapRiders idle tick + dead-stat polish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `notes`: Kept idle eviction ticks referentially stable when no live rider changes are needed, split static map point sanitization away from dynamic rider/session/meetup points, softened just-started ride overlays/duration formatting for zero-distance and zero-speed states, added History-tab GPS warmup hints for active zero-distance rides, clarified empty replay warmup, and made `/vipbikerental` MapRiders preview honest when live ride data has not arrived yet.
+- `next_step`: Preview-smoke `/franchize/vip-bike/map-riders` and `/vipbikerental` with empty/just-started MapRiders data to confirm the surfaces explain GPS/data warmup without visual regressions or render noise.
+- `risks`: Runtime render-count validation still needs a browser/profiler session; this pass used code review and type/lint checks.
+
 ## 4) Mini execution diary addendum
 
+- 2026-05-07 — MapRiders idle/perceived-live polish: eviction ticks now clone the rider map only when stale/evicted status actually changes, static map points are memoized separately from moving riders/routes/meetups, the live overlay and drawer explain zero-distance GPS warmup, replay empty-state copy no longer looks broken, and `/vipbikerental` avoids fake/latest-ride dead stats while live data is warming up. Next step: profiler + mobile drawer/landing smoke on `/franchize/vip-bike/map-riders` and `/vipbikerental`.
 - 2026-05-07 — MapRiders drawer UX copy pass: parent state now prepares live-aware History/Meetups fallback copy, the drawer consumes those strings instead of hardcoded “go do it first” text, and genuinely empty tabs use a shorter playful fallback. Screenshot capture remains blocked until Playwright host libraries are installed.
 - 2026-05-07 — UX cleanup for `/vipbikerental`: removed literal explanatory copy and duplicated partner-link section, changed active hero tabs to light-on-tinted styling, added a route-level VIP Bike loader plus client-side catalog skeleton hydration, and tuned the global bike loader wheel/wind animation. Next step: mobile smoke with live Supabase catalog latency.
 - 2026-05-07 — Self-review polish for the UX cleanup: reduced new English labels in loader/landing/onboarding surfaces, brightened the MapRiders preview into a lighter VibeMap-like card, and replaced the invalid `FaShieldAlt` VCR token with `FaShieldCat` for the production-history easter egg. Next step: mobile visual smoke once browser libraries are available.

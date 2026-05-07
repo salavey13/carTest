@@ -37,8 +37,12 @@ export function StatusOverlay() {
   if (!state.shareEnabled) return null;
 
   const session = state.sessions.find((s) => s.id === state.sessionId);
-  const distance = Number(session?.total_distance_km || 0).toFixed(1);
-  const speed = Math.round(session?.latest_speed_kmh || 0);
+  const distanceKm = Number(session?.total_distance_km || 0);
+  const speedKmh = Number(session?.latest_speed_kmh || 0);
+  const hasDistance = distanceKm > 0;
+  const hasSpeed = speedKmh > 0;
+  const distance = hasDistance ? `${distanceKm.toFixed(1)} км` : "0 км";
+  const speed = hasSpeed ? `${Math.round(speedKmh)} км/ч` : "Ожидаем твою скорость...";
   const showSpeedLegend = Boolean(state.sessionDetail?.points?.length);
 
   return (
@@ -59,12 +63,13 @@ export function StatusOverlay() {
         <div className="h-4 w-px bg-white/20" />
         <div className="text-center">
           <div className="text-[10px] uppercase tracking-wider text-zinc-400">Дист.</div>
-          <div className="font-mono text-sm font-semibold">{distance} км</div>
+          <div className="font-mono text-sm font-semibold">{distance}</div>
+          {!hasDistance ? <div className="text-[10px] text-zinc-400">Жми, чтобы увидеть статистику 🏎</div> : null}
         </div>
         <div className="h-4 w-px bg-white/20" />
         <div className="text-center">
           <div className="text-[10px] uppercase tracking-wider text-zinc-400">Скор.</div>
-          <div className="font-mono text-sm font-semibold">{speed} км/ч</div>
+          <div className={`font-mono text-sm font-semibold ${hasSpeed ? "" : "animate-pulse"}`}>{speed}</div>
         </div>
       </div>
       {showSpeedLegend ? (
