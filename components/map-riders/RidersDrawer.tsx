@@ -18,7 +18,21 @@ import { toast } from "sonner";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useMeetupCreator } from "@/hooks/useMeetupCreator";
 
-export function RidersDrawer() {
+type RidersDrawerEmptyStateCopy = {
+  history: string;
+  meetups: string;
+};
+
+type RidersDrawerProps = {
+  emptyStateCopy?: RidersDrawerEmptyStateCopy;
+};
+
+const DEFAULT_EMPTY_STATE_COPY: RidersDrawerEmptyStateCopy = {
+  history: "Пока тут пусто... maybe go ride first?",
+  meetups: "Пока тут пусто... maybe go ride first?",
+};
+
+export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY }: RidersDrawerProps) {
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
   const { dbUser } = useAppContext();
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -193,7 +207,7 @@ export function RidersDrawer() {
                 ))}
                 {!state.meetups.length && !state.selectedMeetupPoint && (
                   <div className="rounded-xl border border-dashed border-white/25 p-4 text-center text-xs text-muted-foreground">
-                    Ткни по карте, чтобы создать meetup
+                    {emptyStateCopy.meetups}
                   </div>
                 )}
               </div>
@@ -234,7 +248,7 @@ export function RidersDrawer() {
                 ))}
                 {!state.recentCompleted.length && (
                   <div className="rounded-xl border border-dashed border-white/25 p-4 text-center text-xs text-muted-foreground">
-                    Заверши первый заезд, чтобы увидеть историю
+                    {emptyStateCopy.history}
                   </div>
                 )}
               </div>

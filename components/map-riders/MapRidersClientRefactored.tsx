@@ -69,6 +69,19 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     authErrorMessage: "Авторизуйся",
     stopSuccessMessage: "Заезд завершён",
   });
+  const drawerEmptyStateCopy = useMemo(
+    () => ({
+      history:
+        state.recentCompleted.length > 0
+          ? `У вас ${state.recentCompleted.length} завершённых заезд(ов) за эту неделю 🏆`
+          : "Пока тут пусто... maybe go ride first?",
+      meetups:
+        state.meetups.length > 0
+          ? `Активных точек встречи: ${state.meetups.length}. Тапни на карту, чтобы добавить свою.`
+          : "Пока тут пусто... maybe go ride first?",
+    }),
+    [state.meetups.length, state.recentCompleted.length],
+  );
 
   // ── GPS tracking hook ──
   const { isUsingTelegram, lastBroadcastAt, queuedPoints } = useLiveRiders({
@@ -556,7 +569,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       {state.isLoading ? <MapRidersSkeleton /> : null}
       <StatusOverlay />
       <RiderFAB />
-      <RidersDrawer />
+      <RidersDrawer emptyStateCopy={drawerEmptyStateCopy} />
       <FranchizePromptModal
         open={isPromptOpen}
         onClose={() => setIsPromptOpen(false)}
