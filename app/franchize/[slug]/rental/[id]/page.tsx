@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { ExternalLink, Info, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
@@ -8,6 +9,7 @@ import { FranchizeHero } from "../../../components/FranchizeHero";
 import { FranchizePageShell } from "../../../components/FranchizePageShell";
 import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRentalDocumentsPanel";
 import { crewPaletteForSurface } from "../../../lib/theme";
+import { buildFranchizeSectionMetadata } from "../../metadata";
 
 interface FranchizeRentalPageProps {
   params: Promise<{ slug: string; id: string }>;
@@ -20,6 +22,16 @@ const statusLabel: Record<string, string> = {
   completed: "Завершена",
   cancelled: "Отменена",
 };
+
+
+export async function generateMetadata({ params }: FranchizeRentalPageProps): Promise<Metadata> {
+  const { slug, id } = await params;
+  return buildFranchizeSectionMetadata(slug, {
+    sectionTitle: "Карточка аренды",
+    sectionDescription: "Карточка аренды экипажа: статус сделки, документы, проверка контракта и дальнейшие действия.",
+    pathSuffix: `/rental/${id}`,
+  });
+}
 
 export default async function FranchizeRentalPage({ params }: FranchizeRentalPageProps) {
   const { slug, id } = await params;

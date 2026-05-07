@@ -1,34 +1,22 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { getFranchizeBySlug } from "../actions";
+import { resolveFranchizeSiteUrl, toAbsoluteFranchizeUrl } from "./metadata";
 
 interface FranchizeSlugLayoutProps {
   children: ReactNode;
   params: Promise<{ slug: string }>;
 }
 
-const DEFAULT_SITE_URL = "https://v0-car-test.vercel.app";
-
-function resolveSiteUrl() {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL || DEFAULT_SITE_URL;
-  return raw.startsWith("http://") || raw.startsWith("https://") ? raw : `https://${raw}`;
-}
-
-function toAbsoluteUrl(siteUrl: string, maybeRelativeUrl: string) {
-  if (!maybeRelativeUrl) return `${siteUrl}/icon0.svg`;
-  if (maybeRelativeUrl.startsWith("http://") || maybeRelativeUrl.startsWith("https://")) return maybeRelativeUrl;
-  return new URL(maybeRelativeUrl, siteUrl).toString();
-}
-
 export async function generateMetadata({ params }: Omit<FranchizeSlugLayoutProps, "children">): Promise<Metadata> {
   const { slug } = await params;
-  const siteUrl = resolveSiteUrl();
+  const siteUrl = resolveFranchizeSiteUrl();
 
   try {
     const { crew, items } = await getFranchizeBySlug(slug);
     const title = `${crew.header.brandName} | oneSitePls`;
     const description = crew.header.subtitle?.trim() || `Каталог, аренда и покупка техники экипажа ${crew.header.brandName}.`;
-    const image = toAbsoluteUrl(siteUrl, crew.header.logoUrl || items.find((item) => item.imageUrl)?.imageUrl || "/icon0.svg");
+    const image = toAbsoluteFranchizeUrl(siteUrl, crew.header.logoUrl || items.find((item) => item.imageUrl)?.imageUrl || "/icon0.svg");
     const path = `/franchize/${crew.slug || slug}`;
     const keywords = [
       crew.header.brandName,
