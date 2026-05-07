@@ -6,10 +6,30 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+type LooseSupabaseRow = { [key: string]: any }
+type LooseSupabaseTable = {
+  Row: LooseSupabaseRow
+  Insert: LooseSupabaseRow
+  Update: LooseSupabaseRow
+  Relationships: []
+}
+
 export interface Database {
   public: {
     Tables: {
-      
+      arbitrage_user_settings: LooseSupabaseTable
+      article_sections: LooseSupabaseTable
+      articles: LooseSupabaseTable
+      characters: LooseSupabaseTable
+      coze_responses: LooseSupabaseTable
+      feedback: LooseSupabaseTable
+      invoices: LooseSupabaseTable
+      page_visits: LooseSupabaseTable
+      rentals: LooseSupabaseTable
+      subscriptions: LooseSupabaseTable
+      tasks: LooseSupabaseTable
+      user_activity: LooseSupabaseTable
+      videos: LooseSupabaseTable
       lobbies: {
         Row: {
           id: string
@@ -89,7 +109,7 @@ export interface Database {
           make: string
           model: string
           description: string
-          embedding: string | null
+          embedding: string | number[] | null
           daily_price: number
           image_url: string
           rent_link: string
@@ -98,28 +118,14 @@ export interface Database {
           specs: Json | null
           owner_id: string | null
           crew_id: string | null
+          status?: string | null
         }
         Insert: {
-          id: string
+          id?: string
           make: string
           model: string
           description: string
-          embedding?: string | null
-          daily_price: number
-          image_url: string
-          rent_link: string
-          is_test_result?: boolean
-          type?: string
-          specs?: Json | null
-          owner_id?: string | null
-          crew_id?: string | null
-        }
-        Update: {
-          id?: string
-          make?: string
-          model?: string
-          description?: string
-          embedding?: string | null
+          embedding?: string | number[] | null
           daily_price?: number
           image_url?: string
           rent_link?: string
@@ -128,6 +134,23 @@ export interface Database {
           specs?: Json | null
           owner_id?: string | null
           crew_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          id?: string
+          make?: string
+          model?: string
+          description?: string
+          embedding?: string | number[] | null
+          daily_price?: number
+          image_url?: string
+          rent_link?: string
+          is_test_result?: boolean
+          type?: string
+          specs?: Json | null
+          owner_id?: string | null
+          crew_id?: string | null
+          status?: string | null
         }
         Relationships: [
           {

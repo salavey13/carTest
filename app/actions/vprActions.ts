@@ -34,6 +34,11 @@ interface ResetResult {
     error?: string;
 }
 
+type AttemptAnswerWithQuestion = {
+    was_correct: boolean | null;
+    question?: { position?: number | null } | Array<{ position?: number | null }> | null;
+};
+
 // --- Helper Function for Notifications ---
 // Consolidate fetching and formatting logic for notifications
 async function sendCompletionNotification(
@@ -74,9 +79,10 @@ async function sendCompletionNotification(
         // Process answers
         const correctPositions: number[] = [];
         const incorrectPositions: number[] = [];
-        (answersData || []).forEach(answer => {
-            // Handle potential null join result
-            const position = answer.question?.position;
+        ((answersData || []) as AttemptAnswerWithQuestion[]).forEach(answer => {
+            // Handle potential null/array join result
+            const questionRow = Array.isArray(answer.question) ? answer.question[0] : answer.question;
+            const position = questionRow?.position;
             if (typeof position === 'number') {
                 if (answer.was_correct) {
                     correctPositions.push(position);
@@ -173,14 +179,15 @@ export async function startOrResumeVprAttempt(userId: string, subjectId: number)
         const { data: subjData, error: subjectError } = await supabaseAnon.from('subjects').select('*').eq('id', subjectId).single();
         if (subjectError) throw new Error(`Ошибка загрузки предмета: ${subjectError.message}`);
         if (!subjData) throw new Error(`Предмет с ID ${subjectId} не найден`);
-        subjectData = subjData;
-        debugLogger.log(`[VprAction] Subject data loaded: ${subjectData.name}`);
+        const loadedSubject = subjData as SubjectData;
+        subjectData = loadedSubject;
+        debugLogger.log(`[VprAction] Subject data loaded: ${loadedSubject.name}`);
 
         // --- 3. Fetch Questions ---
         const { data: qData, error: questionError } = await supabaseAnon.from('vpr_questions').select(`*, vpr_answers ( * )`).eq('subject_id', subjectId).eq('variant_number', variantToLoad).order('position', { ascending: true });
         if (questionError) throw new Error(`Ошибка загрузки вопросов: ${questionError.message}`);
-        if (!qData || qData.length === 0) throw new Error(`Вопросы для предмета '${subjectData.name}', варианта ${variantToLoad} не найдены`);
-        questionData = qData;
+        if (!qData || qData.length === 0) throw new Error(`Вопросы для предмета '${loadedSubject.name}', варианта ${variantToLoad} не найдены`);
+        questionData = qData as VprQuestionData[];
         const loadedQuestionCount = questionData.length;
         debugLogger.log(`[VprAction] Loaded ${loadedQuestionCount} questions.`);
 
@@ -188,20 +195,21 @@ export async function startOrResumeVprAttempt(userId: string, subjectId: number)
         const { data: existingAttempts, error: attemptError } = await supabaseAnon.from('vpr_test_attempts').select('*').eq('user_id', userId).eq('subject_id', subjectId).eq('variant_number', variantToLoad).is('completed_at', null).order('started_at', { ascending: false }).limit(1);
         if (attemptError) throw new Error(`Ошибка поиска попытки: ${attemptError.message}`);
         if (existingAttempts && existingAttempts.length > 0) {
-            const potentialAttempt = existingAttempts[0];
+            const potentialAttempt = existingAttempts[0] as VprTestAttempt;
             if (typeof potentialAttempt.total_questions !== 'number' || potentialAttempt.total_questions !== loadedQuestionCount) {
                 debugLogger.warn(`[VprAction] Question count mismatch... Deleting old attempt ID: ${potentialAttempt.id}...`);
                 const { error: deleteErr } = await supabaseAnon.from('vpr_test_attempts').delete().eq('id', potentialAttempt.id);
                 if (deleteErr) { logger.error(`[VprAction] Failed to delete outdated attempt ${potentialAttempt.id}: ${deleteErr.message}`); }
                 else { debugLogger.log(`[VprAction] Deleted outdated attempt ID: ${potentialAttempt.id}`); }
-            } else { attemptToUse = potentialAttempt; debugLogger.log(`[VprAction] Resuming active attempt ID: ${attemptToUse.id}`); }
+            } else { attemptToUse = potentialAttempt; debugLogger.log(`[VprAction] Resuming active attempt ID: ${potentialAttempt.id}`); }
         }
         if (!attemptToUse) {
             debugLogger.log(`[VprAction] Creating new attempt for variant ${variantToLoad}.`);
             const { data: newAttemptData, error: newAttemptError } = await supabaseAnon.from('vpr_test_attempts').insert({ user_id: userId, subject_id: subjectId, variant_number: variantToLoad, total_questions: loadedQuestionCount, last_question_index: 0, score: 0, status: 'in_progress' }).select().single();
             if (newAttemptError) throw new Error(`Не удалось создать новую попытку: ${newAttemptError.message}`);
             if (!newAttemptData) throw new Error('Не удалось получить данные новой попытки после создания.');
-            attemptToUse = newAttemptData; debugLogger.log(`[VprAction] New attempt created ID: ${attemptToUse.id}`);
+            const createdAttempt = newAttemptData as VprTestAttempt;
+            attemptToUse = createdAttempt; debugLogger.log(`[VprAction] New attempt created ID: ${createdAttempt.id}`);
         }
 
         return {

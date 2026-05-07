@@ -5,19 +5,7 @@ type MaybeLogRow = {
 };
 
 type SupabaseLike = {
-  from: (table: string) => {
-    select: (query: string) => {
-      eq: (column: string, value: string) => {
-        eq: (column: string, value: string) => {
-          order: (column: string, options: { ascending: boolean }) => {
-            limit: (value: number) => {
-              maybeSingle: () => Promise<{ data: MaybeLogRow | null; error: { message: string } | null }>;
-            };
-          };
-        };
-      };
-    };
-  };
+  from: (table: string) => any;
 };
 
 export async function ensureFranchizeOrderDocDelivery(params: {
