@@ -26,6 +26,6 @@ Use this domain for customer-facing `/franchize/*` experiences where one crew sl
 - Prefer metadata-first hydration and additive UI changes over destructive route rewrites.
 
 ## Data contract notes
-- Runtime reads crews + cars and derives storefront view models in `app/franchize/actions.ts`.
+- Runtime reads crews + cars and derives storefront view models through the `app/franchize/actions.ts` facade and focused `app/franchize/server-actions/*` modules.
 - Crew metadata remains primary source for branding/theme/navigation blocks.
 - Missing metadata must degrade gracefully with defaults (no crash, no blank viewport).
