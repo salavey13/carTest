@@ -52,11 +52,11 @@ This root file stays intentionally compact so operators and agents can load it q
 ## 3) Active ad-hoc task — `/vipbikerental` interactive landing
 
 - status: `ready_for_pr`
-- updated_at: `2026-05-06T23:45:00Z`
+- updated_at: `2026-05-07T00:00:00Z`
 - owner: `codex`
-- notes: `Self-reviewed and polished ConversionPilot into a more customer-facing route cockpit: score is now a compact operator signal, while the main surface recommends the next bike and three clear rent/buy/group-ride paths with better copy and accessibility labels.`
-- next_step: `Create PR and production-smoke /vipbikerental with real vip-bike catalog/map data.`
-- risks: `Local runtime can render fallback data when Supabase is unavailable; production QA should verify real vip-bike catalog/map records and active rental states.`
+- notes: `Polished /vipbikerental copy density, removed the duplicated partner-link audit block, improved hero-tab contrast over video, moved VIP Bike catalog hydration behind client-side skeleton cards, russified the newest loader/landing labels, brightened the MapRiders preview map, and replaced the invalid FaShieldAlt marker with FaShieldCat.`
+- next_step: `Production-smoke /vipbikerental and /franchize/vip-bike with real catalog latency; confirm skeleton-to-card transition on mobile Telegram WebApp.`
+- risks: `Catalog API still depends on server Supabase env; production QA should verify live item hydration and fallback behavior when Supabase is slow.`
 
 
 ### 2026-05-06 — SupaPlan franchize maintenance pair
@@ -80,6 +80,9 @@ This root file stays intentionally compact so operators and agents can load it q
 
 ## 4) Mini execution diary addendum
 
+- 2026-05-07 — UX cleanup for `/vipbikerental`: removed literal explanatory copy and duplicated partner-link section, changed active hero tabs to light-on-tinted styling, added a route-level VIP Bike loader plus client-side catalog skeleton hydration, and tuned the global bike loader wheel/wind animation. Next step: mobile smoke with live Supabase catalog latency.
+- 2026-05-07 — Self-review polish for the UX cleanup: reduced new English labels in loader/landing/onboarding surfaces, brightened the MapRiders preview into a lighter VibeMap-like card, and replaced the invalid `FaShieldAlt` VCR token with `FaShieldCat` for the production-history easter egg. Next step: mobile visual smoke once browser libraries are available.
+- 2026-05-07 — Franchize-wide text polish: reduced fresh English labels in create/admin/catalog/order/rental-document surfaces, russified launch/order helper chips, and kept technical field names only where operators need exact JSON/DB keys. Next step: spot-check `/franchize/vip-bike`, `/franchize/create`, and rental document flows in preview.
 - 2026-05-06 — Started `/vipbikerental` interactive enhancement stream from `app/vipbikerental/todo.md`; shipped the first Hero tabs slice with animated mode preview and MapRiders overview metrics. Next step: replace fallback rent/buy preview cards with real catalog item data.
 - 2026-05-06 — Continued `/vipbikerental` stream: split page into server wrapper + client runtime, hydrated real `vip-bike` catalog items, upgraded Hero rent/buy cards to catalog data, and replaced static Electro-Enduro cards with horizontal slider + quick preview configurator. Next step: MapRiders mini-map/social proof preview.
 - 2026-05-06 — Self-reviewed `/vipbikerental` refactor by comparing old/new section headings, then shipped lightweight MapRiders preview: static glowing route map, live rider dots, meetup labels, latest ride stats and SVG speed sparkline. Next step: interactive newbie stepper.

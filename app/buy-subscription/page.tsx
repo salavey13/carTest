@@ -177,7 +177,7 @@ const WAREHOUSE_PLANS = [
       "::FaUserTie className='text-purple-500 mr-2 align-middle w-4 h-4':: Dedicated менеджер",
       "::FaTools className='text-purple-500 mr-2 align-middle w-4 h-4':: Индивидуальные доработки",
       "::FaChalkboardTeacher className='text-purple-500 mr-2 align-middle w-4 h-4':: Обучение команды (5 часов)",
-      "::FaShieldAlt className='text-purple-500 mr-2 align-middle w-4 h-4':: Гарантия снижения недостач на 50%+"
+      "::FaShieldCat className='text-purple-500 mr-2 align-middle w-4 h-4':: Гарантия снижения недостач на 50%+"
     ],
     who_is_this_for: "Для крупных сетей и бизнесов с высокими оборотами. Когда нужны индивидуальные решения и гарантированный результат.",
     hormozi_easter_egg_title: "::FaChessKing className='text-purple-500':: ДЛЯ ТЕХ, КТО ИГРАЕТ В ДОЛГУЮ",

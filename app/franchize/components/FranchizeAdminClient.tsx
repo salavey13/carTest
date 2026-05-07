@@ -349,7 +349,7 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
 
         <div className="mt-4 rounded-2xl border p-3" style={{ ...surface.subtleCard, borderColor: "var(--fr-admin-border)" }}>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-[var(--fr-admin-text)]">Rental reviews moderation</p>
+            <p className="text-sm font-semibold text-[var(--fr-admin-text)]">Модерация отзывов аренды</p>
             <span className="rounded-full border px-2 py-1 text-xs text-[var(--fr-admin-muted)]" style={{ borderColor: "var(--fr-admin-border)" }}>{reviews.length}</span>
           </div>
           {!reviews.length ? (
@@ -364,7 +364,7 @@ export function FranchizeAdminClient({ initialSlug, editId }: FranchizeAdminClie
                       {review.hiddenAt ? "Показать" : "Скрыть"}
                     </Button>
                   </div>
-                  <p className="mt-1 text-xs text-[var(--fr-admin-muted)]">bike: {review.bikeId} · user: {review.userId}</p>
+                  <p className="mt-1 text-xs text-[var(--fr-admin-muted)]">байк: {review.bikeId} · пользователь: {review.userId}</p>
                   {review.text && <p className="mt-2 text-sm text-[var(--fr-admin-text)]">{review.text}</p>}
                 </div>
               ))}
