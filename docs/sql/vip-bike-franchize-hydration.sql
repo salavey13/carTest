@@ -186,6 +186,7 @@ set
           'phone', '+7 9200-789-888',
           'email', 'hello@vipbike-rental.example',
           'telegram', '@I_O_S_NN',
+          'telegramBotUsername', 'oneBikePlsBot',
           'workingHours', '10:00 - 22:00 (ежедневно)',
           'map', jsonb_build_object(
             'imageUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/nnmap.jpg',
