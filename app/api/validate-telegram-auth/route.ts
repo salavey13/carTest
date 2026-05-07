@@ -1,63 +1,15 @@
 // /app/api/validate-telegram-auth/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
-import {
-  computeTelegramWebAppHash,
-  computeTelegramWebAppHashDiagnostics,
-  explainTelegramHashMismatchReasons,
-} from "@/lib/telegram-webapp-auth";
+import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
 import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BYPASS_VALIDATION_ENV =
   process.env.TEMP_BYPASS_TG_AUTH_VALIDATION === "true";
-const TELEGRAM_AUTH_DEBUG_LOGS =
-  process.env.TELEGRAM_AUTH_DEBUG_LOGS === "true";
 if (BYPASS_VALIDATION_ENV) {
   logger.warn(
     "API_VALIDATE_INIT: TEMP_BYPASS_TG_AUTH_VALIDATION is TRUE, but bypass will only activate for trusted preview deployment metadata.",
-  );
-}
-
-function logTelegramHashDiagnostics(initDataString: string, botToken: string) {
-  if (!TELEGRAM_AUTH_DEBUG_LOGS) {
-    logger.warn(
-      "[API_VALIDATE_HASH_DIAG] Hash diagnostics suppressed. Set TELEGRAM_AUTH_DEBUG_LOGS=true temporarily to inspect mismatch variants.",
-    );
-    return;
-  }
-
-  const diagnostics = computeTelegramWebAppHashDiagnostics(
-    initDataString,
-    botToken,
-  );
-  logger.warn(
-    "[API_VALIDATE_HASH_DIAG] Received fields:",
-    diagnostics.receivedFields,
-  );
-  if (diagnostics.duplicateFields.length > 0) {
-    logger.warn(
-      "[API_VALIDATE_HASH_DIAG] Duplicate initData fields detected:",
-      diagnostics.duplicateFields,
-    );
-  }
-  logger.warn(
-    "[API_VALIDATE_HASH_DIAG] Variant matrix:",
-    diagnostics.variants.map((variant) => ({
-      id: variant.id,
-      label: variant.label,
-      matches: variant.matches,
-      computedHash: variant.computedHash,
-      dataCheckStringLength: variant.dataCheckStringLength,
-      includedFields: variant.includedFields,
-      excludedFields: variant.excludedFields,
-      dataCheckStringPreview: `${variant.dataCheckString.slice(0, 240)}${variant.dataCheckString.length > 240 ? "..." : ""}`,
-      note: variant.note,
-    })),
-  );
-  logger.warn(
-    "[API_VALIDATE_HASH_DIAG] Possible mismatch reasons:",
-    explainTelegramHashMismatchReasons(),
   );
 }
 
@@ -93,7 +45,6 @@ async function validateTelegramHash(
         logger.warn(
           "[API_VALIDATE_HASH_FN_WARN] Hash mismatch detected during trusted bypass.",
         );
-        logTelegramHashDiagnostics(initDataString, BOT_TOKEN);
       }
       logger.warn(
         "[API_VALIDATE_HASH_FN_INFO] BYPASS ACTIVE: Proceeding anyway.",
@@ -135,7 +86,6 @@ async function validateTelegramHash(
     }
 
     logger.error("[API_VALIDATE_HASH_FN_ERROR] Hash mismatch.");
-    logTelegramHashDiagnostics(initDataString, BOT_TOKEN);
     return {
       isValid: false,
       error: "Hash mismatch (strict check failed).",
