@@ -181,3 +181,13 @@ This root file stays intentionally compact so operators and agents can load it q
 - `notes`: Completed SupaPlan `RENT-P3.1` and `FIX-ORPHAN-INVOICE`: public storefront controls now expose stronger labels/current/pressed states, overlay focus containment/return was tightened in self-review, and failed Telegram XTR sends clean up newly-created pending franchize invoices.
 - `next_step`: Merge PR, then run browser accessibility smoke on `/franchize/vip-bike` and a Telegram invoice failure-path smoke with test credentials.
 - `risks`: Visual a11y smoke depends on a bootable local/prod runtime; invoice delivery/failure verification depends on Telegram bot credentials.
+
+### 2026-05-06 — FRZ-R6 VIP BIKE company + service hub
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:58:00Z
+- `owner`: codex
+- `supaplan_task`: 4de0a224-e88d-4bf7-909f-f27e96a2d5e1
+- `notes`: Re-checked the stale ready_for_pr task with no visible PR and implemented the missing public-facing company/service hub on `/vipbikerental`: one section now explains VIP BIKE as rental + service + rider community, links to catalog, service contact and MapRiders, and keeps the existing service cards/FAQ as supporting detail.
+- `next_step`: Production-smoke `/vipbikerental` with real `vip-bike` catalog data and verify service CTA destination with operator.
+- `risks`: Service CTA currently routes to the existing Telegram operator contact until a dedicated service booking route exists.

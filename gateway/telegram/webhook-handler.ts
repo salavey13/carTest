@@ -28,6 +28,152 @@ function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2:
     return calculateDistance(lat1, lon1, lat2, lon2) * 1000;
 }
 
+
+type TelegramLocationPayload = {
+    latitude: number;
+    longitude: number;
+    speed?: number | null;
+    heading?: number | null;
+    horizontal_accuracy?: number | null;
+};
+
+function getTelegramCapturedAt(message: any) {
+    const unixSeconds = Number(message.edit_date || message.date || 0);
+    if (Number.isFinite(unixSeconds) && unixSeconds > 0) {
+        return new Date(unixSeconds * 1000).toISOString();
+    }
+    return new Date().toISOString();
+}
+
+async function broadcastMapRiderMove(crewSlug: string, payload: Record<string, unknown>) {
+    const channel = supabaseAdmin.channel(`map-riders:${crewSlug}`);
+    await new Promise<void>((resolve) => {
+        const timeout = setTimeout(async () => {
+            await supabaseAdmin.removeChannel(channel);
+            resolve();
+        }, 1200);
+
+        channel.subscribe(async (status) => {
+            if (status !== "SUBSCRIBED") return;
+            await channel.send({ type: "broadcast", event: "rider:move", payload });
+            clearTimeout(timeout);
+            await supabaseAdmin.removeChannel(channel);
+            resolve();
+        });
+    });
+}
+
+async function mirrorTelegramLocationToActiveMapRiderSession(userId: string, location: TelegramLocationPayload, capturedAt: string) {
+    const { data: activeSession, error: sessionError } = await supabaseAdmin
+        .from("map_rider_sessions")
+        .select("id, crew_slug, sharing_enabled, started_at, stats")
+        .eq("user_id", userId)
+        .eq("status", "active")
+        .eq("sharing_enabled", true)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (sessionError) {
+        throw sessionError;
+    }
+
+    if (!activeSession) {
+        return false;
+    }
+
+    const crewSlug = activeSession.crew_slug || "vip-bike";
+    const speedKmh = Number(location.speed || 0) * 3.6;
+    const heading = location.heading != null ? Number(location.heading) : null;
+    const accuracyMeters = location.horizontal_accuracy != null ? Number(location.horizontal_accuracy) : null;
+
+    const { data: previousLiveLocation } = await supabaseAdmin
+        .from("live_locations")
+        .select("lat,lng,updated_at")
+        .eq("user_id", userId)
+        .eq("crew_slug", crewSlug)
+        .maybeSingle();
+
+    if (previousLiveLocation?.updated_at) {
+        const lastUpdatedMs = new Date(previousLiveLocation.updated_at).getTime();
+        const currentUpdatedMs = new Date(capturedAt).getTime();
+        const elapsedMs = Math.max(currentUpdatedMs - lastUpdatedMs, 0);
+        const distanceMeters = calculateDistanceMeters(
+            Number(location.latitude),
+            Number(location.longitude),
+            Number(previousLiveLocation.lat),
+            Number(previousLiveLocation.lng),
+        );
+
+        if (elapsedMs < TELEGRAM_LOCATION_DEDUPE_WINDOW_MS && distanceMeters < TELEGRAM_LOCATION_DEDUPE_METERS) {
+            logger.info(`[MapRiders Telegram GPS] Skipping duplicate live-location burst for user ${userId}`);
+            return true;
+        }
+    }
+
+    const [{ error: liveError }, { error: sessionUpdateError }, { error: pointInsertError }] = await Promise.all([
+        supabaseAdmin.from("live_locations").upsert(
+            {
+                user_id: userId,
+                crew_slug: crewSlug,
+                lat: Number(location.latitude),
+                lng: Number(location.longitude),
+                speed_kmh: speedKmh,
+                heading,
+                is_riding: true,
+                updated_at: capturedAt,
+            },
+            { onConflict: "user_id" },
+        ),
+        supabaseAdmin
+            .from("map_rider_sessions")
+            .update({
+                latest_lat: Number(location.latitude),
+                latest_lon: Number(location.longitude),
+                latest_speed_kmh: speedKmh,
+                last_ping_at: capturedAt,
+                updated_at: new Date().toISOString(),
+                stats: {
+                    ...((activeSession.stats as Record<string, unknown> | null) || {}),
+                    telegramNativeGps: {
+                        lastCapturedAt: capturedAt,
+                        lastAccuracyMeters: accuracyMeters,
+                        source: "telegram-webhook",
+                    },
+                },
+            })
+            .eq("id", activeSession.id),
+        supabaseAdmin.from("map_rider_points").insert({
+            session_id: activeSession.id,
+            user_id: userId,
+            crew_slug: crewSlug,
+            lat: Number(location.latitude),
+            lon: Number(location.longitude),
+            speed_kmh: speedKmh,
+            heading_deg: heading,
+            accuracy_meters: accuracyMeters,
+            captured_at: capturedAt,
+        }),
+    ]);
+
+    if (liveError || sessionUpdateError || pointInsertError) {
+        throw liveError || sessionUpdateError || pointInsertError;
+    }
+
+    await broadcastMapRiderMove(crewSlug, {
+        user_id: userId,
+        lat: Number(location.latitude),
+        lng: Number(location.longitude),
+        speed_kmh: speedKmh,
+        heading,
+        updated_at: capturedAt,
+        source: "telegram-native-live-location",
+    });
+
+    logger.info(`[MapRiders Telegram GPS] Mirrored native live-location into active session ${activeSession.id} for user ${userId}`);
+    return true;
+}
+
 async function handlePhotoMessage(message: any) {
     const userId = message.from.id.toString();
     const chatId = message.chat.id;
@@ -164,10 +310,22 @@ async function handlePhotoMessage(message: any) {
 }
 
 // --- ИЗМЕНЕНО: Эта функция теперь является универсальным обработчиком геолокации ---
-async function handleLocationMessage(message: any) {
+async function handleLocationMessage(message: any, options: { preferMapRiders?: boolean } = {}) {
     const userId = message.from.id.toString();
     const chatId = message.chat.id;
     const { latitude, longitude } = message.location;
+    const capturedAt = getTelegramCapturedAt(message);
+
+    if (options.preferMapRiders) {
+        try {
+            const mirroredToMapRiders = await mirrorTelegramLocationToActiveMapRiderSession(userId, message.location, capturedAt);
+            if (mirroredToMapRiders) {
+                return;
+            }
+        } catch (error) {
+            logger.error(`[MapRiders Telegram GPS] Could not mirror native live-location for user ${userId}`, error);
+        }
+    }
 
     // --- ДОБАВЛЕНО: Сценарий 1 - Обновление геолокации члена экипажа на смене ---
     try {
@@ -202,7 +360,7 @@ async function handleLocationMessage(message: any) {
                 }
             }
 
-            const capturedAt = new Date().toISOString();
+            const shiftCapturedAt = new Date().toISOString();
             const { data: previousLiveLocation } = await supabaseAdmin
                 .from("live_locations")
                 .select("lat,lng,updated_at")
@@ -236,7 +394,7 @@ async function handleLocationMessage(message: any) {
                         speed_kmh: Number(message.location?.speed || 0) * 3.6,
                         heading: message.location?.heading != null ? Number(message.location.heading) : null,
                         is_riding: true,
-                        updated_at: capturedAt,
+                        updated_at: shiftCapturedAt,
                     },
                     { onConflict: "user_id" },
                 );
@@ -263,7 +421,7 @@ async function handleLocationMessage(message: any) {
                             lng: Number(longitude),
                             speed_kmh: Number(message.location?.speed || 0) * 3.6,
                             heading: message.location?.heading != null ? Number(message.location.heading) : null,
-                            updated_at: capturedAt,
+                            updated_at: shiftCapturedAt,
                             source: "telegram-webhook",
                         },
                     });
@@ -361,11 +519,11 @@ export async function handleTelegramWebhook(request: Request) {
     } else if (update.message?.photo) {
       await handlePhotoMessage(update.message);
     } else if (update.message?.location) {
-      await handleLocationMessage(update.message);
+      await handleLocationMessage(update.message, { preferMapRiders: Boolean(update.message.location?.live_period) });
     } else if (update.edited_message?.location) {
       // Live-location updates from Telegram arrive as edited_message payloads.
       // We support them to keep MapRiders location feed in sync for Telegram-first flow.
-      await handleLocationMessage(update.edited_message);
+      await handleLocationMessage(update.edited_message, { preferMapRiders: true });
     } else if (update.message?.text || update.callback_query) {
       await handleCommand(update);
     } else {
