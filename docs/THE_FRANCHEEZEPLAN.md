@@ -182,6 +182,16 @@ This root file stays intentionally compact so operators and agents can load it q
 - `next_step`: Merge PR, then run browser accessibility smoke on `/franchize/vip-bike` and a Telegram invoice failure-path smoke with test credentials.
 - `risks`: Visual a11y smoke depends on a bootable local/prod runtime; invoice delivery/failure verification depends on Telegram bot credentials.
 
+### 2026-05-06 — RENT-P1.2 promo validation engine
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T00:00:00Z
+- `owner`: codex-cli
+- `supaplan_task`: c272370f-4cbe-4063-83c8-1120c3494699
+- `notes`: Replaced checkout promo UI stub with Supabase-backed promo validation, active-window checks, discount extraction, checkout blocker handling, and server-side total revalidation before order notification/XTR invoice creation.
+- `next_step`: Smoke-test `/franchize/vip-bike/order/<id>` with active `NEURO2026` promo in a real cart and confirm Telegram invoice metadata shows the discounted total.
+- `risks`: Live validation depends on crew metadata containing active `catalog.promoBanners` and `order.allowPromo` in Supabase.
+- 2026-05-07 — RENT-P1.2 self-review polish: made promo resolution canonical across notification, direct invoice, and checkout paths; added structured discount fields/minimum subtotal support; moved checkout cooldown after successful promo validation; and invalidated applied promos when cart/extras totals change.
 ### 2026-05-06 — FRZ-R6 VIP BIKE company + service hub
 
 - `status`: ready_for_pr
