@@ -307,20 +307,22 @@ export function mapRidersReducer(state: MapRidersState, action: MapRidersAction)
     case "eviction/tick": {
       const now = Date.now();
       let changed = false;
-      const nextRiders = new Map(state.liveRiders);
+      let nextRiders: Map<string, LiveRider> | null = null;
 
-      for (const [userId, rider] of nextRiders) {
+      for (const [userId, rider] of state.liveRiders) {
         if (isPinnedDemoRider(userId)) continue;
         const age = now - new Date(rider.updated_at).getTime();
         if (age > EVICT_MS) {
+          nextRiders = nextRiders ?? new Map(state.liveRiders);
           nextRiders.delete(userId);
           changed = true;
         } else if (age > STALE_MS && rider.status !== "stale") {
+          nextRiders = nextRiders ?? new Map(state.liveRiders);
           nextRiders.set(userId, { ...rider, status: "stale" });
           changed = true;
         }
       }
-      return changed ? { ...state, liveRiders: nextRiders } : state;
+      return changed && nextRiders ? { ...state, liveRiders: nextRiders } : state;
     }
 
     case "rider/evicted": {
