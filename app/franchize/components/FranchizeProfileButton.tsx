@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, ChevronDown, Palette, Settings, Shield, User, IdCard, MessageCircle } from "lucide-react";
+import { Bell, ChevronDown, Palette, Settings, Shield, User, IdCard, MessageCircle, Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
@@ -22,6 +22,8 @@ import {
   type FranchizeNotificationPreferences,
 } from "@/app/franchize/profile-actions";
 import { toast } from "sonner";
+
+const TELEGRAM_WEB_APP_URL = "https://t.me/oneBikePlsBot/app";
 
 const DEFAULT_NOTIFICATION_PREFERENCES: FranchizeNotificationPreferences = {
   orderUpdates: true,
@@ -127,6 +129,22 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
     if (!tempCartId) return null;
     return `https://t.me/oneBikePlsBot/app?startapp=cart_id_${encodeURIComponent(tempCartId)}`;
   }, [tempCartId]);
+
+  if (!effectiveUser) {
+    return (
+      <a
+        href={TELEGRAM_WEB_APP_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Открыть Telegram WebApp"
+        className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+        style={{ backgroundColor: bgColor, color: textColor, borderColor }}
+      >
+        <Send className="h-4 w-4" />
+        <span className="hidden sm:inline">WebApp</span>
+      </a>
+    );
+  }
 
   return (
     <div style={{ isolation: "isolate" }}>
