@@ -23,7 +23,7 @@ import {
 } from "@/app/franchize/profile-actions";
 import { toast } from "sonner";
 
-const TELEGRAM_WEB_APP_URL = "https://t.me/oneBikePlBVot/app";
+const TELEGRAM_WEB_APP_URL = "https://t.me/oneBikePlsBot/app";
 
 const DEFAULT_NOTIFICATION_PREFERENCES: FranchizeNotificationPreferences = {
   orderUpdates: true,

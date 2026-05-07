@@ -10,7 +10,7 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import { Button } from "@/components/ui/button"; 
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 
-const TELEGRAM_WEB_APP_URL = "https://t.me/oneBikePlBVot/app";
+const TELEGRAM_WEB_APP_URL = "https://t.me/oneBikePlsBot/app";
 
 // Исправление 1: Делаем именованный экспорт (убрано default)
 export function UserInfo() {
