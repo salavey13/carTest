@@ -126,7 +126,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
   const [form, setForm] = useState<FranchizeConfigInput>({
     slug: "",
     brandName: "VIP BIKE",
-    tagline: "Ride the vibe",
+    tagline: "Маршрут начинается здесь",
     logoUrl: "",
     themeMode: "pepperolli_dark",
     bgBase: "#0B0C10",
@@ -155,9 +155,9 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
     mapBoundsRight: "44.12",
     socialLinksText: "Telegram|https://t.me/oneBikePlsBot",
     menuLinksText: "Каталог|/franchize/{slug}\nО нас|/franchize/{slug}/about\nКонтакты|/franchize/{slug}/contacts\nКорзина|/franchize/{slug}/cart",
-    categoryOrderText: "Naked, Supersport, Touring, Neo-retro",
-    promoBannersText: "weekend-boost|Weekend boost|Скидка 10% на выходные|WEEKEND10|/franchize/{slug}#catalog-sections||2026-02-01|2026-12-31|90|Забрать скидку",
-    adCardsText: "safety-kit|Экипировка PRO|Подбор шлема и защиты перед выдачей|/franchize/{slug}/about||Safety|2026-02-01|2026-12-31|70|Смотреть детали",
+    categoryOrderText: "Электроэндуро, Город, Туризм, Экип",
+    promoBannersText: "weekend-boost|Выходные на байке|Скидка 10% на выходные|WEEKEND10|/franchize/{slug}#catalog-sections||2026-02-01|2026-12-31|90|Забрать скидку",
+    adCardsText: "safety-kit|Экипировка PRO|Подбор шлема и защиты перед выдачей|/franchize/{slug}/about||Безопасность|2026-02-01|2026-12-31|70|Смотреть детали",
     allowPromo: true,
     deliveryModesText: "pickup, delivery",
     paymentOptionsText: "telegram_xtr, card, sbp, cash",
@@ -230,12 +230,12 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
       const lightContrastPass = contrastRatio(form.lightBgCard, form.lightTextPrimary);
       const hasContrast = (darkContrastPass ?? 0) >= 4.5 && (lightContrastPass ?? 0) >= 4.5;
       const checks = [
-        { id: "slug", label: "Crew slug + brand identity", done: hasSlug && hasBrand && hasTagline, hint: "Задайте slug, название и читаемый слоган." },
-        { id: "contacts", label: "Telegram-first контакты", done: hasContacts, hint: "Добавьте телефон + Telegram @handle." },
-        { id: "map", label: "VibeMap комплект", done: hasMap, hint: "Проверьте GPS и map image URL." },
-        { id: "menu", label: "Маршрутная сетка /franchize/{slug}", done: hasMenuLinks, hint: "В menu links должна быть canonical ссылка /franchize/{slug}." },
-        { id: "catalog", label: "Каталог готов к запуску", done: hasCategories, hint: "Укажите минимум 3 категории для rail/filter UX." },
-        { id: "contrast", label: "Контраст dark/light", done: hasContrast, hint: "Цель: контраст 4.5+ для главного текста в dark и light." },
+        { id: "slug", label: "Slug экипажа + бренд", done: hasSlug && hasBrand && hasTagline, hint: "Задайте slug, название и читаемый слоган." },
+        { id: "contacts", label: "Контакты для Telegram", done: hasContacts, hint: "Добавьте телефон + Telegram @handle." },
+        { id: "map", label: "VibeMap комплект", done: hasMap, hint: "Проверьте координаты и ссылку на карту." },
+        { id: "menu", label: "Маршрутная сетка /franchize/{slug}", done: hasMenuLinks, hint: "В меню должна быть основная ссылка /franchize/{slug}." },
+        { id: "catalog", label: "Каталог готов к запуску", done: hasCategories, hint: "Укажите минимум 3 категории для витрины и фильтров." },
+        { id: "contrast", label: "Контраст тёмной/светлой темы", done: hasContrast, hint: "Цель: контраст 4.5+ для главного текста в обеих темах." },
       ];
       const doneCount = checks.filter((item) => item.done).length;
       const score = Math.round((doneCount / checks.length) * 100);
@@ -407,7 +407,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
           ["content", "Фаза 2: Контент"],
           ["map", "Фаза 3: Карта"],
           ["ai", "Фаза 4: AI JSON"],
-          ["ops", "Launch cockpit"],
+          ["ops", "Пульт запуска"],
         ].map(([value, label]) => (
           <button
             key={value}
@@ -462,11 +462,11 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
             ))}
           </div>
           <div className="rounded-xl border p-3" style={{ borderColor: form.lightBorderSoft, backgroundColor: form.lightBgBase, color: form.lightTextPrimary }}>
-            <p className="text-xs uppercase tracking-[0.12em]" style={{ color: form.lightAccentMain }}>Light preview</p>
+            <p className="text-xs uppercase tracking-[0.12em]" style={{ color: form.lightAccentMain }}>Светлая тема</p>
             <div className="mt-2 rounded-lg border p-3" style={{ borderColor: form.lightBorderSoft, backgroundColor: form.lightBgCard }}>
               <h4 className="font-semibold" style={{ color: form.lightTextPrimary }}>Карточка в светлой теме</h4>
               <p className="mt-1 text-sm" style={{ color: form.lightTextSecondary }}>Проверьте читаемость текста и заметность CTA.</p>
-              <button type="button" className="mt-2 rounded-lg px-3 py-2 text-sm font-semibold" style={{ backgroundColor: form.lightAccentMain, color: "#16130A" }}>Light action</button>
+              <button type="button" className="mt-2 rounded-lg px-3 py-2 text-sm font-semibold" style={{ backgroundColor: form.lightAccentMain, color: "#16130A" }}>Проверить действие</button>
             </div>
           </div>
           <div className="rounded-xl border p-3 text-sm" style={{ borderColor: ui.border, backgroundColor: ui.inputBg }}>
@@ -488,17 +488,17 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
             <textarea className={`${inputClass} min-h-28`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.menuLinksText} onChange={(e) => updateField("menuLinksText", e.target.value)} />
           </label>
           <label className="text-sm">Категории (CSV)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.categoryOrderText} onChange={(e) => updateField("categoryOrderText", e.target.value)} /></label>
-          <label className="text-sm md:col-span-3">Promo cards (`id|title|subtitle|code|href|imageUrl|activeFrom|activeTo|priority|ctaLabel`)
+          <label className="text-sm md:col-span-3">Промо-карточки (`id|title|subtitle|code|href|imageUrl|activeFrom|activeTo|priority|ctaLabel`)
             <textarea className={`${inputClass} min-h-24`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.promoBannersText} onChange={(e) => updateField("promoBannersText", e.target.value)} />
           </label>
-          <label className="text-sm md:col-span-3">Ad cards (`id|title|subtitle|href|imageUrl|badge|activeFrom|activeTo|priority|ctaLabel`)
+          <label className="text-sm md:col-span-3">Рекламные карточки (`id|title|subtitle|href|imageUrl|badge|activeFrom|activeTo|priority|ctaLabel`)
             <textarea className={`${inputClass} min-h-24`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.adCardsText} onChange={(e) => updateField("adCardsText", e.target.value)} />
           </label>
           <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={form.allowPromo} onChange={(e) => updateField("allowPromo", e.target.checked)} /> Разрешить промокод</label>
           <label className="text-sm">Режимы выдачи (CSV)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.deliveryModesText} onChange={(e) => updateField("deliveryModesText", e.target.value)} /></label>
           <label className="text-sm">Оплата (CSV: telegram_xtr, card, sbp, cash ...)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.paymentOptionsText} onChange={(e) => updateField("paymentOptionsText", e.target.value)} /></label>
           <label className="text-sm">Режим по умолчанию<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.defaultMode} onChange={(e) => updateField("defaultMode", e.target.value)} /></label>
-          <h3 className="md:col-span-3 mt-2 text-base font-semibold" style={{ color: ui.text }}>Private crew secrets (contract defaults)</h3>
+          <h3 className="md:col-span-3 mt-2 text-base font-semibold" style={{ color: ui.text }}>Приватные настройки экипажа и договора</h3>
           <label className="text-sm">Юрлицо / issuerName<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.issuerName} onChange={(e) => updateField("issuerName", e.target.value)} /></label>
           <label className="text-sm">Представитель / issuer_representative<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.issuerRepresentative} onChange={(e) => updateField("issuerRepresentative", e.target.value)} /></label>
           <label className="text-sm">Пробег включён (км)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.includedMileage} onChange={(e) => updateField("includedMileage", e.target.value)} /></label>
@@ -507,10 +507,10 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
           <label className="text-sm">Оценка байка (прописью)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.bikeValueWords} onChange={(e) => updateField("bikeValueWords", e.target.value)} /></label>
           <label className="text-sm">Штраф за просрочку (руб)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.lateReturnPenaltyRub} onChange={(e) => updateField("lateReturnPenaltyRub", e.target.value)} /></label>
           <label className="text-sm md:col-span-2">Адрес возврата<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.returnAddress} onChange={(e) => updateField("returnAddress", e.target.value)} /></label>
-          <label className="text-sm md:col-span-3">Contract defaults JSON (private.crew_secrets.contract_defaults)
+          <label className="text-sm md:col-span-3">Настройки договора JSON (private.crew_secrets.contract_defaults)
             <textarea className={`${inputClass} min-h-24 font-mono text-xs`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.contractDefaultsJson} onChange={(e) => updateField("contractDefaultsJson", e.target.value)} />
           </label>
-          <label className="text-sm md:col-span-3">DOC templates JSON (private.crew_secrets.doc_templates)
+          <label className="text-sm md:col-span-3">Шаблоны документов JSON (private.crew_secrets.doc_templates)
             <textarea className={`${inputClass} min-h-24 font-mono text-xs`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.docTemplatesJson} onChange={(e) => updateField("docTemplatesJson", e.target.value)} />
           </label>
         </section>
@@ -521,28 +521,28 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
         <section className={`${sectionClass} grid gap-3 md:grid-cols-2`} style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
           <h2 className="md:col-span-2 text-lg font-medium" style={{ color: ui.text }}>Карта и онлайн-каналы</h2>
           <label className="text-sm">Telegram экипажа<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.telegram} onChange={(e) => updateField("telegram", e.target.value)} placeholder="@oneBikePlsBot" /></label>
-          <label className="text-sm">GPS (lat, lon)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapGps} onChange={(e) => updateField("mapGps", e.target.value)} placeholder="56.2042, 43.7985" /></label>
-          <label className="text-sm md:col-span-2">Map image URL (VibeMap)
+          <label className="text-sm">Координаты (lat, lon)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapGps} onChange={(e) => updateField("mapGps", e.target.value)} placeholder="56.2042, 43.7985" /></label>
+          <label className="text-sm md:col-span-2">Картинка карты (VibeMap)
             <input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapImageUrl} onChange={(e) => updateField("mapImageUrl", e.target.value)} />
           </label>
-          <label className="text-sm">Bounds top<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapBoundsTop} onChange={(e) => updateField("mapBoundsTop", e.target.value)} /></label>
-          <label className="text-sm">Bounds bottom<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapBoundsBottom} onChange={(e) => updateField("mapBoundsBottom", e.target.value)} /></label>
-          <label className="text-sm">Bounds left<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapBoundsLeft} onChange={(e) => updateField("mapBoundsLeft", e.target.value)} /></label>
-          <label className="text-sm">Bounds right<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapBoundsRight} onChange={(e) => updateField("mapBoundsRight", e.target.value)} /></label>
+          <label className="text-sm">Верхняя граница<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapBoundsTop} onChange={(e) => updateField("mapBoundsTop", e.target.value)} /></label>
+          <label className="text-sm">Нижняя граница<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapBoundsBottom} onChange={(e) => updateField("mapBoundsBottom", e.target.value)} /></label>
+          <label className="text-sm">Левая граница<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapBoundsLeft} onChange={(e) => updateField("mapBoundsLeft", e.target.value)} /></label>
+          <label className="text-sm">Правая граница<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.mapBoundsRight} onChange={(e) => updateField("mapBoundsRight", e.target.value)} /></label>
           <label className="text-sm md:col-span-2">Соцсети (`название|ссылка`)
             <textarea className={`${inputClass} min-h-28`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.socialLinksText} onChange={(e) => updateField("socialLinksText", e.target.value)} />
           </label>
           <div className="md:col-span-2 rounded-2xl border p-4" style={{ borderColor: ui.border, backgroundColor: ui.cardBg }}>
-            <p className="text-xs uppercase tracking-[0.16em]" style={{ color: ui.accent }}>Map control center</p>
+            <p className="text-xs uppercase tracking-[0.16em]" style={{ color: ui.accent }}>Центр карты</p>
             <p className="mt-2 text-sm" style={{ color: ui.muted }}>
-              Вся полезная map-инфраструктура теперь в одном месте: кастомизация, map-riders, публичные контакты и калибратор для новых presets.
+              Всё для карты в одном месте: оформление, MapRiders, публичные контакты и калибратор для новых пресетов.
             </p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {[
-                { label: "MapRiders preview", href: `/franchize/${form.slug || "vip-bike"}/map-riders` },
-                { label: "Contacts map", href: `/franchize/${form.slug || "vip-bike"}/contacts` },
-                { label: "Franchize admin", href: `/franchize/${form.slug || "vip-bike"}/admin` },
-                { label: "Map calibrator", href: "/admin/map-calibrator" },
+                { label: "Превью MapRiders", href: `/franchize/${form.slug || "vip-bike"}/map-riders` },
+                { label: "Карта контактов", href: `/franchize/${form.slug || "vip-bike"}/contacts` },
+                { label: "Админка франшизы", href: `/franchize/${form.slug || "vip-bike"}/admin` },
+                { label: "Калибратор карты", href: "/admin/map-calibrator" },
               ].map((item) => (
                 <Link key={item.href} href={item.href} className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90" style={{ borderColor: ui.border, color: ui.text }}>
                   {item.label}
@@ -554,10 +554,10 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
       )}
       {stage === "ai" && (
         <section className={`${sectionClass} grid gap-3`} style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
-          <h2 className="text-lg font-medium" style={{ color: ui.text }}>AI-фаза: экономим мозговое время</h2>
+          <h2 className="text-lg font-medium" style={{ color: ui.text }}>AI-фаза: экономим время</h2>
           <div className="grid gap-2 sm:grid-cols-3">
-            <button type="button" className="rounded-xl px-3 py-2 text-sm font-semibold" style={{ backgroundColor: ui.accent, color: ui.accentText }} onClick={() => copyToClipboard(JSON.stringify(TEMPLATE_PAYLOAD, null, 2), "Template скопирован")}>Copy template</button>
-            <button type="button" className="rounded-xl border px-3 py-2 text-sm font-semibold" style={{ borderColor: ui.border, color: ui.text }} onClick={() => copyToClipboard(BOT_PROMPT, "Промпт скопирован")}>Copy prompt for bot</button>
+            <button type="button" className="rounded-xl px-3 py-2 text-sm font-semibold" style={{ backgroundColor: ui.accent, color: ui.accentText }} onClick={() => copyToClipboard(JSON.stringify(TEMPLATE_PAYLOAD, null, 2), "Шаблон скопирован")}>Скопировать шаблон</button>
+            <button type="button" className="rounded-xl border px-3 py-2 text-sm font-semibold" style={{ borderColor: ui.border, color: ui.text }} onClick={() => copyToClipboard(BOT_PROMPT, "Промпт скопирован")}>Скопировать промпт для бота</button>
             <button type="button" className="rounded-xl border px-3 py-2 text-sm font-semibold" style={{ borderColor: ui.border, color: ui.text }} onClick={applyAdvancedJsonLocally}>Применить JSON локально</button>
           </div>
           <textarea className={`${inputClass} min-h-[420px] font-mono text-xs`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.advancedJson} onChange={(e) => updateField("advancedJson", e.target.value)} />
@@ -570,8 +570,8 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
           <div className="rounded-2xl border p-4" style={{ borderColor: ui.border, backgroundColor: ui.cardBg }}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-xs uppercase tracking-[0.16em]" style={{ color: ui.accent }}>Franchize launch cockpit</p>
-                <h2 className="mt-1 text-lg font-semibold">Сводный readiness score</h2>
+                <p className="text-xs uppercase tracking-[0.16em]" style={{ color: ui.accent }}>Пульт запуска франшизы</p>
+                <h2 className="mt-1 text-lg font-semibold">Готовность к запуску</h2>
               </div>
               <span className="rounded-full px-3 py-1 text-sm font-semibold" style={{ backgroundColor: `${ui.accent}22`, color: ui.accent }}>
                 {launchChecks.score}%
@@ -581,13 +581,13 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
               <div className="h-full rounded-full transition-all duration-500" style={{ width: `${launchChecks.score}%`, background: `linear-gradient(90deg, ${ui.accent}, ${form.accentMainHover})` }} />
             </div>
             <p className="mt-2 text-xs" style={{ color: ui.muted }}>
-              Пройдено {launchChecks.doneCount} из {launchChecks.checks.length} launch-checkов. Цель перед релизом: 100%.
+              Пройдено {launchChecks.doneCount} из {launchChecks.checks.length} проверок. Цель перед релизом: 100%.
             </p>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
             <div className="rounded-2xl border p-4" style={{ borderColor: ui.border, backgroundColor: ui.cardBg }}>
-              <h3 className="text-sm font-semibold uppercase tracking-[0.14em]" style={{ color: ui.accent }}>Launch checks</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-[0.14em]" style={{ color: ui.accent }}>Проверки запуска</h3>
               <ul className="mt-3 space-y-2 text-sm">
                 {launchChecks.checks.map((check) => (
                   <li key={check.id} className="rounded-xl border px-3 py-2" style={{ borderColor: check.done ? `${ui.accent}88` : ui.border, backgroundColor: check.done ? `${ui.accent}15` : ui.sectionBg }}>
@@ -599,7 +599,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
             </div>
 
             <div className="rounded-2xl border p-4" style={{ borderColor: ui.border, backgroundColor: ui.cardBg }}>
-              <h3 className="text-sm font-semibold uppercase tracking-[0.14em]" style={{ color: ui.accent }}>Execution surfaces</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-[0.14em]" style={{ color: ui.accent }}>Публичные разделы</h3>
               <p className="mt-2 text-xs" style={{ color: ui.muted }}>Быстрые переходы по каноническому маршруту: каталог → инфо → контакты → корзина.</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {[
@@ -614,11 +614,11 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
                 ))}
               </div>
               <div className="mt-4 rounded-xl border p-3" style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
-                <p className="text-xs uppercase tracking-[0.12em]" style={{ color: ui.accent }}>Next strategic beat</p>
+                <p className="text-xs uppercase tracking-[0.12em]" style={{ color: ui.accent }}>Следующий шаг</p>
                 <p className="mt-1 text-sm" style={{ color: ui.muted }}>
                   {launchChecks.blockers[0]
-                    ? `Закройте первым: ${launchChecks.blockers[0].label}. Потом прогоните smoke на /franchize/${form.slug || "vip-bike"}.`
-                    : "Конфиг готов к launch. Следом можно идти в QA smoke + скриншоты и ship в PR."}
+                    ? `Закройте первым: ${launchChecks.blockers[0].label}. Потом проверьте страницу /franchize/${form.slug || "vip-bike"}.`
+                    : "Конфиг готов к запуску. Следом — проверка, скриншоты и PR."}
                 </p>
               </div>
             </div>

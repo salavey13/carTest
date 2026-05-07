@@ -60,10 +60,10 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
         notes: freezeNotes,
       });
       if (!result.success) {
-        toast.error(result.error || "Не удалось сохранить Pickup Freeze");
+        toast.error(result.error || "Не удалось сохранить выдачу");
         return;
       }
-      toast.success("Pickup Freeze сохранен. Теперь можно подтверждать выдачу.");
+      toast.success("Выдача сохранена. Теперь можно подтверждать старт аренды.");
     });
   };
 
@@ -79,11 +79,11 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
         notes: damageNotes,
       });
       if (!result.success) {
-        toast.error(result.error || "Не удалось добавить Damage Report");
+        toast.error(result.error || "Не удалось добавить отчёт о повреждении");
         return;
       }
       setDamageNotes("");
-      toast.success("Damage Report добавлен в Rental Documents.");
+      toast.success("Отчёт о повреждении добавлен в документы аренды.");
     });
   };
 
@@ -93,14 +93,14 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
       style={{ borderColor: palette.borderSoft, backgroundColor: `${palette.bgCard}CC` }}
     >
       <p className="text-xs uppercase tracking-[0.16em]" style={{ color: palette.textSecondary }}>
-        Rental Documents
+        Документы аренды
       </p>
       <h3 className="mt-1 text-base font-semibold" style={{ color: palette.textPrimary }}>
-        Pickup Freeze + Damage Report
+        Фиксация выдачи и повреждений
       </h3>
 
       <div className="mt-3 rounded-xl border p-3" style={{ borderColor: palette.borderSoft }}>
-        <p className="text-sm font-medium">Pickup Freeze</p>
+        <p className="text-sm font-medium">Фиксация выдачи</p>
         {pickupFreeze?.frozen_at ? (
           <div className="mt-2 space-y-1 text-xs" style={{ color: palette.textSecondary }}>
             <p>Статус: зафиксировано {new Date(pickupFreeze.frozen_at).toLocaleString("ru-RU")}</p>
@@ -108,7 +108,7 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
             <p>Чеклист: {(pickupFreeze.checklist || []).join(", ") || "—"}</p>
           </div>
         ) : (
-          <p className="mt-2 text-xs" style={{ color: palette.textSecondary }}>Freeze пока не зафиксирован.</p>
+          <p className="mt-2 text-xs" style={{ color: palette.textSecondary }}>Выдача пока не зафиксирована.</p>
         )}
 
         {canFreeze && (
@@ -131,7 +131,7 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
                 </button>
               ))}
             </div>
-            <textarea className="min-h-16 w-full rounded-lg border px-2 py-1.5" style={{ borderColor: palette.borderSoft }} value={freezeNotes} onChange={(e) => setFreezeNotes(e.target.value)} placeholder="Комментарий к freeze (опционально)" />
+            <textarea className="min-h-16 w-full rounded-lg border px-2 py-1.5" style={{ borderColor: palette.borderSoft }} value={freezeNotes} onChange={(e) => setFreezeNotes(e.target.value)} placeholder="Комментарий к выдаче (опционально)" />
             <button
               type="button"
               disabled={isPending}
@@ -139,22 +139,22 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
               className="rounded-lg px-3 py-2 text-sm font-semibold"
               style={{ backgroundColor: palette.accentMain, color: "#16130A" }}
             >
-              {isPending ? "Сохраняем..." : "Сохранить Pickup Freeze"}
+              {isPending ? "Сохраняем..." : "Сохранить выдачу"}
             </button>
           </div>
         )}
       </div>
 
       <div className="mt-3 rounded-xl border p-3" style={{ borderColor: palette.borderSoft }}>
-        <p className="text-sm font-medium">Damage Reports ({damageReports.length})</p>
+        <p className="text-sm font-medium">Отчёты о повреждениях ({damageReports.length})</p>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           <select className="rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: palette.borderSoft }} value={damagePhase} onChange={(e) => setDamagePhase(e.target.value as "pickup" | "return")}>
             <option value="pickup">На выдаче</option>
             <option value="return">На возврате</option>
           </select>
           <select className="rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: palette.borderSoft }} value={damageSeverity} onChange={(e) => setDamageSeverity(e.target.value as "minor" | "major")}>
-            <option value="minor">Minor</option>
-            <option value="major">Major</option>
+            <option value="minor">Лёгкое</option>
+            <option value="major">Серьёзное</option>
           </select>
         </div>
         <textarea className="mt-2 min-h-16 w-full rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: palette.borderSoft }} value={damageNotes} onChange={(e) => setDamageNotes(e.target.value)} placeholder="Описание повреждения / замечания" />
@@ -165,7 +165,7 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
           className="mt-2 rounded-lg border px-3 py-2 text-sm"
           style={{ borderColor: palette.borderSoft, color: palette.textPrimary }}
         >
-          Добавить Damage Report
+          Добавить отчёт
         </button>
 
         <ul className="mt-3 space-y-2 text-xs" style={{ color: palette.textSecondary }}>
@@ -175,7 +175,7 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
                 {report.phase === "pickup" ? "Выдача" : "Возврат"} · {report.severity}
               </p>
               <p>{report.notes}</p>
-              <p>{report.reporter_role || "user"} · {report.reported_at ? new Date(report.reported_at).toLocaleString("ru-RU") : "—"}</p>
+              <p>{report.reporter_role || "пользователь"} · {report.reported_at ? new Date(report.reported_at).toLocaleString("ru-RU") : "—"}</p>
             </li>
           ))}
           {damageReports.length === 0 && <li>Отчётов о повреждениях пока нет.</li>}

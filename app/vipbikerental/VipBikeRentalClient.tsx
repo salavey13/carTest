@@ -117,7 +117,7 @@ const fallbackHeroPanels: Record<HeroMode, HeroPanel> = {
     mode: "map",
     label: "Карта",
     icon: "::FaMapLocationDot::",
-    eyebrow: "MapRiders live",
+    eyebrow: "Живая карта",
     title: "Райдеры, маршруты и встречи",
     description: "Смотри активность комьюнити, ближайшие точки сбора и недельный прогресс прямо перед выездом.",
     href: "/franchize/vip-bike/map-riders",
@@ -125,7 +125,7 @@ const fallbackHeroPanels: Record<HeroMode, HeroPanel> = {
     meta: [
       { label: "онлайн", value: "3 райдера" },
       { label: "маршруты", value: "речные точки" },
-      { label: "встречи", value: "2 meetup" },
+      { label: "встречи", value: "2" },
     ],
   },
   rentals: {
@@ -225,9 +225,9 @@ const heroMetrics = [
 ];
 
 const conversionPilotChecks = [
-  { label: "Hero", value: "понятный старт", icon: "::FaLayerGroup::" },
-  { label: "Trust", value: "экип + ОСАГО", icon: "::FaShieldHeart::" },
-  { label: "Action", value: "3 пути", icon: "::FaBolt::" },
+  { label: "Старт", value: "понятный", icon: "::FaLayerGroup::" },
+  { label: "Защита", value: "экип + ОСАГО", icon: "::FaShieldHeart::" },
+  { label: "Путь", value: "3 сценария", icon: "::FaBolt::" },
 ];
 
 const decisionRoutes = [
@@ -247,33 +247,10 @@ const decisionRoutes = [
   },
   {
     title: "Кататься с группой",
-    text: "Если важен вайб комьюнити: открой райдеров рядом, точки старта и ближайшие meetup.",
+    text: "Если важен вайб комьюнити: открой райдеров рядом, точки старта и ближайшие встречи.",
     href: "/franchize/vip-bike/map-riders",
     cta: "Смотреть карту",
     icon: "::FaMapLocationDot::",
-  },
-];
-
-const partnerLinks = [
-  {
-    name: "Каталог аренды VIP Bike",
-    href: "/franchize/vip-bike",
-    note: "Подбор электроэндуро по уровню, трассе и формату аренды.",
-  },
-  {
-    name: "Конфигуратор электричек и заказ",
-    href: "/franchize/vip-bike/configurator",
-    note: "Актуальная конфигурация: модель → батарея → допы → корзина.",
-  },
-  {
-    name: "MapRiders",
-    href: "/franchize/vip-bike/map-riders",
-    note: "Карта райдеров, маршруты и точки встречи.",
-  },
-  {
-    name: "Личный раздел аренды",
-    href: "/franchize/vip-bike/rentals",
-    note: "Активные заказы, подтверждения, управление поездками.",
   },
 ];
 
@@ -301,7 +278,7 @@ const newbieFlow = [
   },
 ];
 
-function ConversionPilot({ items, overview }: { items: CatalogItemVM[]; overview: MapRidersOverview | null }) {
+function ConversionPilot({ items, overview, isCatalogLoading = false }: { items: CatalogItemVM[]; overview: MapRidersOverview | null; isCatalogLoading?: boolean }) {
   const rentableItems = items.filter((item) => item.availabilityStatus === "available" && item.pricePerDay > 0);
   const pricedRentalItems = items.filter((item) => item.pricePerDay > 0);
   const availableItems = rentableItems.length > 0 ? rentableItems : pricedRentalItems;
@@ -317,8 +294,8 @@ function ConversionPilot({ items, overview }: { items: CatalogItemVM[]; overview
   const riderLabel = getRussianRiderLabel(activeRidersCount);
   const scoreReasons = [
     `${availableItems.length || fallbackElectroItems.length} вариантов аренды`,
-    saleItems.length > 0 ? "есть sale-конфиг" : "тест-драйв перед покупкой",
-    overview ? "live MapRiders подключен" : "MapRiders fallback готов",
+    saleItems.length > 0 ? "покупка доступна" : "тест-драйв перед покупкой",
+    overview ? "карта подключена" : "карта готова",
   ];
 
   return (
@@ -327,10 +304,6 @@ function ConversionPilot({ items, overview }: { items: CatalogItemVM[]; overview
         <div>
           <p className="text-xs uppercase tracking-[0.24em] text-primary">быстрый выбор</p>
           <h2 className="mt-2 font-orbitron text-3xl sm:text-4xl">Выбери сценарий за 30 секунд</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-            После первого вау-экрана не нужно искать следующий шаг: выбери аренду, покупку после теста или групповую поездку —
-            лендинг сразу ведёт в нужный раздел VIP Bike.
-          </p>
         </div>
         <div className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm">
           <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">готовность</span>
@@ -343,10 +316,10 @@ function ConversionPilot({ items, overview }: { items: CatalogItemVM[]; overview
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,179,71,0.25),transparent_38%),radial-gradient(circle_at_80%_70%,rgba(34,197,94,0.16),transparent_34%)]" />
           <div className="relative z-10 flex h-full flex-col justify-between gap-8">
             <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-brand-yellow">best next action</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-brand-yellow">следующий шаг</p>
               <h3 className="mt-3 font-orbitron text-3xl sm:text-4xl">{leadItem?.title || "VIP Bike"}</h3>
               <p className="mt-3 text-sm leading-relaxed text-white/75">
-                От {minDayPrice.toLocaleString("ru-RU")} ₽ / день · {activeRiders} {riderLabel} · быстрый старт из каталога VIP Bike.
+                {isCatalogLoading ? "Подтягиваем актуальные карточки..." : `От ${minDayPrice.toLocaleString("ru-RU")} ₽ / день · ${activeRiders} ${riderLabel}`}
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
                 {scoreReasons.map((reason) => (
@@ -597,7 +570,7 @@ function VipBikeCompanyServiceHub() {
 }
 
 
-function RentalQuickActionHub({ items, overview }: { items: CatalogItemVM[]; overview: MapRidersOverview | null }) {
+function RentalQuickActionHub({ items, overview, isCatalogLoading = false }: { items: CatalogItemVM[]; overview: MapRidersOverview | null; isCatalogLoading?: boolean }) {
   const [selectedAction, setSelectedAction] = useState<"status" | "riders" | "chooser">("status");
   const [isChooserOpen, setIsChooserOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<(typeof quickChooserFilters)[number]["id"]>("first");
@@ -620,7 +593,7 @@ function RentalQuickActionHub({ items, overview }: { items: CatalogItemVM[]; ove
       title: "Статус аренды",
       icon: "::FaTicket::",
       metric: "3 шага",
-      text: "Проверь, что уже закрыто перед поездкой: байк, экип и слот выдачи.",
+      text: "Байк, экип и слот выдачи — в одном личном разделе.",
       cta: "Открыть сделки",
       href: "/franchize/vip-bike/rentals",
     },
@@ -629,7 +602,7 @@ function RentalQuickActionHub({ items, overview }: { items: CatalogItemVM[]; ove
       title: "Райдеры рядом",
       icon: "::FaMapLocationDot::",
       metric: `${activeRiders} онлайн`,
-      text: `За неделю комьюнити проехало ${weeklyDistance} км, активных встреч: ${meetupCount}.`,
+      text: `Неделя: ${weeklyDistance} км · встречи: ${meetupCount}.`,
       cta: "Открыть карту",
       href: "/franchize/vip-bike/map-riders",
     },
@@ -638,7 +611,7 @@ function RentalQuickActionHub({ items, overview }: { items: CatalogItemVM[]; ove
       title: "Быстрый подбор",
       icon: "::FaBolt::",
       metric: leadItem?.title || "VIP Bike",
-      text: "Открой мини-подбор прямо здесь: цель поездки → карточки байков → следующий шаг.",
+      text: isCatalogLoading ? "Готовим актуальные карточки..." : "Подборка по цели поездки и доступности.",
       cta: "Подобрать байк",
       href: "/franchize/vip-bike",
     },
@@ -649,10 +622,7 @@ function RentalQuickActionHub({ items, overview }: { items: CatalogItemVM[]; ove
   return (
     <section>
       <div className="mb-8 text-center">
-        <h2 className="font-orbitron text-3xl sm:text-4xl">Rental-флоу — живые действия вместо ссылок</h2>
-        <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
-          Быстрые карточки теперь не просто уводят в разделы: они показывают статус аренды, live-счётчик райдеров и мини-подбор байка прямо на лендинге.
-        </p>
+        <h2 className="font-orbitron text-3xl sm:text-4xl">Быстрые действия VIP Bike</h2>
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[0.95fr_1.05fr]">
@@ -722,7 +692,7 @@ function RentalQuickActionHub({ items, overview }: { items: CatalogItemVM[]; ove
               {selectedCard.id === "riders" && (
                 <div className="grid gap-5 md:grid-cols-[0.9fr_1.1fr]">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.22em] text-primary">live rider counter</p>
+                    <p className="text-xs uppercase tracking-[0.22em] text-primary">райдеры сейчас</p>
                     <h3 className="mt-2 font-orbitron text-2xl">{activeRiders} райдера онлайн</h3>
                     <p className="mt-2 text-sm text-muted-foreground">Смотри активность перед стартом и решай: ехать соло или присоединиться к группе.</p>
                     <Button asChild variant="outline" className="mt-5 w-full sm:w-fit">
@@ -732,9 +702,9 @@ function RentalQuickActionHub({ items, overview }: { items: CatalogItemVM[]; ove
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       { label: "онлайн", value: activeRiders },
-                      { label: "meetup", value: meetupCount },
+                      { label: "встречи", value: meetupCount },
                       { label: "за неделю", value: `${weeklyDistance} км` },
-                      { label: "формат", value: "group ride" },
+                      { label: "формат", value: "группа" },
                     ].map((stat) => (
                       <div key={stat.label} className="rounded-2xl border border-border/70 bg-background/45 p-4">
                         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{stat.label}</p>
@@ -917,35 +887,39 @@ function MapRidersLivePreview({ overview }: { overview: MapRidersOverview | null
       <div className="mb-8 text-center">
         <h2 className="font-orbitron text-3xl sm:text-4xl">MapRiders — карта, которой реально хочется пользоваться</h2>
         <p className="mx-auto mt-3 max-w-3xl text-muted-foreground">
-          Мини-превью теперь показывает живой слой без тяжелой Leaflet-карты: райдеры, встреча, недельный прогресс и последняя поездка
-          видны прямо на лендинге, а полный режим открывается одним кликом.
+          Райдеры, встречи и последние поездки — без тяжёлой карты на первом экране.
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.1fr_0.9fr]">
         <Link
           href="/franchize/vip-bike/map-riders"
-          className="group relative min-h-[360px] overflow-hidden rounded-3xl border border-primary/30 bg-[#07100d] p-5 shadow-2xl shadow-black/25"
+          className="group relative min-h-[360px] overflow-hidden rounded-3xl border border-primary/35 bg-[#d8c99b] p-5 text-[#182016] shadow-2xl shadow-black/20"
           aria-label="Открыть полную карту MapRiders"
         >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,179,71,0.22),transparent_28%),radial-gradient(circle_at_72%_60%,rgba(34,197,94,0.20),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.06),transparent)]" />
-          <div className="absolute inset-x-6 top-1/2 h-px rotate-[-12deg] bg-primary/60 shadow-[0_0_24px_rgba(255,170,80,0.75)]" />
-          <div className="absolute left-10 right-8 top-[38%] h-px rotate-[8deg] bg-emerald-300/45 shadow-[0_0_18px_rgba(74,222,128,0.45)]" />
-          <div className="absolute bottom-10 left-8 right-14 h-px rotate-[-4deg] bg-cyan-300/30 shadow-[0_0_18px_rgba(103,232,249,0.35)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_18%,rgba(255,244,196,0.78),transparent_28%),radial-gradient(circle_at_72%_64%,rgba(48,142,94,0.30),transparent_30%),linear-gradient(135deg,rgba(255,249,219,0.82),rgba(96,131,91,0.42))]" />
+          <svg className="absolute inset-0 h-full w-full opacity-80" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
+            <path d="M-6 78 C18 66 30 54 52 54 C70 54 84 42 106 30" fill="none" stroke="rgba(31,54,36,0.20)" strokeWidth="10" strokeLinecap="round" />
+            <path d="M-4 76 C18 64 30 52 52 52 C70 52 84 40 104 28" fill="none" stroke="rgba(255,246,210,0.78)" strokeWidth="3" strokeLinecap="round" />
+            <path d="M8 14 C24 22 28 36 42 42 C56 49 68 44 91 56" fill="none" stroke="rgba(23,88,63,0.42)" strokeWidth="2" strokeLinecap="round" strokeDasharray="7 4" />
+            <path d="M2 40 C20 35 28 28 42 26 C58 23 69 16 98 12" fill="none" stroke="rgba(171,112,38,0.45)" strokeWidth="1.7" strokeLinecap="round" />
+            <path d="M12 92 C22 78 34 72 48 72 C64 72 74 82 92 78" fill="none" stroke="rgba(24,89,116,0.32)" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(24,32,22,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(24,32,22,0.08)_1px,transparent_1px)] bg-[size:34px_34px] mix-blend-multiply" />
 
           {liveLocations.map((location, index) => {
             const point = normalizeMapPoint(location.lat, location.lng, index);
             return (
               <div
                 key={location.user_id || `${location.lat}-${location.lng}-${index}`}
-                className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2"
+                className="absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2"
                 style={{ left: `${point.left}%`, top: `${point.top}%` }}
               >
                 <span className="relative flex h-4 w-4">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
-                  <span className="relative inline-flex h-4 w-4 rounded-full border-2 border-black bg-primary" />
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-600 opacity-50" />
+                  <span className="relative inline-flex h-4 w-4 rounded-full border-2 border-white bg-emerald-600 shadow-[0_0_16px_rgba(22,163,74,0.8)]" />
                 </span>
-                <span className="rounded-full border border-white/15 bg-black/55 px-2 py-1 text-[10px] text-white backdrop-blur-sm">
+                <span className="rounded-full border border-emerald-900/15 bg-white/75 px-2 py-1 text-[10px] font-semibold text-emerald-950 shadow-sm backdrop-blur-sm">
                   {Math.round(Number(location.speed_kmh || 0)) || 18} км/ч
                 </span>
               </div>
@@ -956,31 +930,31 @@ function MapRidersLivePreview({ overview }: { overview: MapRidersOverview | null
             const point = normalizeMapPoint(meetup.lat, meetup.lng, index + 4);
             return (
               <div
-                key={`${meetup.title || "meetup"}-${index}`}
-                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-brand-yellow/45 bg-black/60 px-3 py-2 text-xs text-white backdrop-blur-sm"
+                key={`${meetup.title || "vstrecha"}-${index}`}
+                className="absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-amber-900/20 bg-amber-100/85 px-3 py-2 text-xs font-semibold text-amber-950 shadow-sm backdrop-blur-sm"
                 style={{ left: `${point.left}%`, top: `${point.top}%` }}
               >
-                <VibeContentRenderer content="::FaLocationDot::" className="mr-1 inline text-brand-yellow" />
+                <VibeContentRenderer content="::FaLocationDot::" className="mr-1 inline text-amber-700" />
                 {meetup.title || "Точка встречи"}
               </div>
             );
           })}
 
           <div className="relative z-10 flex h-full min-h-[320px] flex-col justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-brand-yellow">live preview</p>
-              <h3 className="mt-2 font-orbitron text-2xl text-white">Райдеры на карте прямо сейчас</h3>
-              <p className="mt-2 max-w-md text-sm text-white/70">Клик по превью открывает полный MapRiders с GPS, meetup и лидербордом.</p>
+            <div className="max-w-md rounded-2xl border border-white/60 bg-white/60 p-4 shadow-sm backdrop-blur-md">
+              <p className="text-xs uppercase tracking-[0.22em] text-emerald-900/70">превью маршрута</p>
+              <h3 className="mt-2 font-orbitron text-2xl text-[#182016]">Райдеры на карте прямо сейчас</h3>
+              <p className="mt-2 text-sm text-[#354131]">Откроется полная карта с геопозицией, встречами и рейтингом.</p>
             </div>
             <div className="grid grid-cols-3 gap-2">
               {[
                 { label: "онлайн", value: activeRiders },
                 { label: "за неделю", value: `${weeklyDistance} км` },
-                { label: "meetup", value: meetupCount },
+                { label: "встречи", value: meetupCount },
               ].map((stat) => (
-                <div key={stat.label} className="rounded-2xl border border-white/15 bg-black/45 p-3 backdrop-blur-sm">
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-white/45">{stat.label}</p>
-                  <p className="mt-1 font-orbitron text-lg text-white">{stat.value}</p>
+                <div key={stat.label} className="rounded-2xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-md">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-[#52604d]">{stat.label}</p>
+                  <p className="mt-1 font-orbitron text-lg text-[#182016]">{stat.value}</p>
                 </div>
               ))}
             </div>
@@ -1088,7 +1062,33 @@ const fallbackElectroItems: ElectroPreviewItem[] = [
   },
 ];
 
-function ElectroEnduroShowcase({ items }: { items: CatalogItemVM[] }) {
+
+function BikeCardSkeleton({ index }: { index: number }) {
+  return (
+    <article className="relative min-w-[280px] snap-start overflow-hidden rounded-2xl border border-border/70 bg-background/45 shadow-xl shadow-black/10 sm:min-w-[340px]" aria-hidden="true">
+      <div className="relative h-52 overflow-hidden bg-black/40">
+        <motion.div
+          className="absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-primary/25 to-transparent"
+          initial={{ x: "-120%" }}
+          animate={{ x: "260%" }}
+          transition={{ duration: 1.25, repeat: Infinity, delay: index * 0.12, ease: "easeInOut" }}
+        />
+        <div className="absolute bottom-3 left-3 h-6 w-28 rounded-full bg-white/15" />
+      </div>
+      <div className="space-y-3 p-4">
+        <div className="h-5 w-2/3 rounded-full bg-muted/60" />
+        <div className="h-4 w-full rounded-full bg-muted/35" />
+        <div className="grid grid-cols-2 gap-2">
+          <div className="h-16 rounded-xl bg-muted/35" />
+          <div className="h-16 rounded-xl bg-muted/35" />
+        </div>
+        <div className="h-10 rounded-xl bg-primary/20" />
+      </div>
+    </article>
+  );
+}
+
+function ElectroEnduroShowcase({ items, isCatalogLoading = false }: { items: CatalogItemVM[]; isCatalogLoading?: boolean }) {
   const [selectedItem, setSelectedItem] = useState<ElectroPreviewItem | null>(null);
   const [selectedColorId, setSelectedColorId] = useState(DEFAULT_COLOR_OPTIONS[2]?.id ?? DEFAULT_COLOR_OPTIONS[0]?.id ?? "black");
   const [selectedConfigId, setSelectedConfigId] = useState(DEFAULT_CONFIG_OPTIONS[0]?.id ?? "standard");
@@ -1126,18 +1126,14 @@ function ElectroEnduroShowcase({ items }: { items: CatalogItemVM[] }) {
   return (
     <section>
       <div className="mb-8 text-center">
-        <h2 className="font-orbitron text-3xl sm:text-4xl">Electro-Enduro: аренда + продажа в одном потоке</h2>
-        <p className="mx-auto mt-3 max-w-3xl text-muted-foreground">
-          Реальные карточки из каталога теперь можно пролистать прямо здесь: увидеть фото, тариф, сценарий аренды/покупки
-          и открыть быстрый просмотр с мини-конфигурацией без ухода со страницы.
-        </p>
+        <h2 className="font-orbitron text-3xl sm:text-4xl">Electro-Enduro: аренда и покупка</h2>
       </div>
 
       <div className="overflow-hidden rounded-3xl border border-primary/30 bg-card/50 p-4 backdrop-blur-sm sm:p-6">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">живой горизонтальный слайдер</p>
-            <h3 className="mt-1 font-orbitron text-2xl">Выбери электроэндуро и открой быстрый конфиг</h3>
+            <p className="text-xs uppercase tracking-[0.22em] text-primary">гараж на витрине</p>
+            <h3 className="mt-1 font-orbitron text-2xl">Свободные модели и быстрый конфиг</h3>
           </div>
           <Button asChild variant="outline" className="sm:w-fit">
             <Link href="/franchize/vip-bike/electro-enduro">Полный раздел Electro-Enduro</Link>
@@ -1145,7 +1141,8 @@ function ElectroEnduroShowcase({ items }: { items: CatalogItemVM[] }) {
         </div>
 
         <div className="flex snap-x gap-4 overflow-x-auto pb-3 [scrollbar-width:thin]">
-          {electroItems.map((item) => {
+          {isCatalogLoading && items.length === 0 && [0, 1, 2].map((index) => <BikeCardSkeleton key={index} index={index} />)}
+          {(!isCatalogLoading || items.length > 0) && electroItems.map((item) => {
             const imageUrl = getBikeGallery(item)[0];
 
             return (
@@ -1324,9 +1321,36 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
   const y = useTransform(scrollYProgress, [0, 1], [0, -90]);
   const [heroMode, setHeroMode] = useState<HeroMode>("rent");
   const [mapOverview, setMapOverview] = useState<MapRidersOverview | null>(null);
+  const [catalogItems, setCatalogItems] = useState<CatalogItemVM[]>(items);
+  const [isCatalogLoading, setIsCatalogLoading] = useState(items.length === 0);
+
+  useEffect(() => {
+    setCatalogItems(items);
+    setIsCatalogLoading(items.length === 0);
+  }, [items]);
 
   useEffect(() => {
     let isMounted = true;
+
+    if (items.length === 0) {
+      fetch("/api/franchize/catalog?slug=vip-bike")
+        .then((response) => (response.ok ? response.json() : null))
+        .then((payload) => {
+          if (isMounted && payload?.success && Array.isArray(payload.data?.items)) {
+            setCatalogItems(payload.data.items as CatalogItemVM[]);
+          }
+        })
+        .catch(() => {
+          if (isMounted) {
+            setCatalogItems([]);
+          }
+        })
+        .finally(() => {
+          if (isMounted) {
+            setIsCatalogLoading(false);
+          }
+        });
+    }
 
     fetch("/api/map-riders/overview?slug=vip-bike")
       .then((response) => (response.ok ? response.json() : null))
@@ -1344,11 +1368,11 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [items.length]);
 
   const heroPanels = useMemo<Record<HeroMode, HeroPanel>>(() => {
-    const rentItem = items.find((item) => item.availabilityStatus === "available" && item.pricePerDay > 0) ?? items.find((item) => item.pricePerDay > 0);
-    const saleItem = items.find((item) => item.saleAvailable || isEnabled(item.rawSpecs?.sale));
+    const rentItem = catalogItems.find((item) => item.availabilityStatus === "available" && item.pricePerDay > 0) ?? catalogItems.find((item) => item.pricePerDay > 0);
+    const saleItem = catalogItems.find((item) => item.saleAvailable || isEnabled(item.rawSpecs?.sale));
 
     return {
       ...fallbackHeroPanels,
@@ -1385,11 +1409,11 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
         meta: [
           { label: "онлайн", value: `${formatCompactNumber(mapOverview?.stats?.activeRiders, 3)} райдера` },
           { label: "за неделю", value: `${formatCompactNumber(mapOverview?.stats?.totalWeeklyDistanceKm, 127)} км` },
-          { label: "встречи", value: `${formatCompactNumber(mapOverview?.stats?.meetupCount, 2)} meetup` },
+          { label: "встречи", value: formatCompactNumber(mapOverview?.stats?.meetupCount, 2) },
         ],
       },
     };
-  }, [items, mapOverview]);
+  }, [catalogItems, mapOverview]);
 
   const activeHeroPanel = heroPanels[heroMode];
 
@@ -1454,7 +1478,7 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
         >
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/45 px-4 py-2 text-sm text-white/90 backdrop-blur-sm">
             <VibeContentRenderer content="::FaBolt::" className="text-brand-yellow" />
-            <span>VIPBIKE RENTAL ECOSYSTEM</span>
+            <span>VIP BIKE · ПРОКАТ И МАРШРУТЫ</span>
           </div>
           <div className="mb-5 w-full max-w-2xl rounded-2xl border border-white/20 bg-black/40 p-4 text-left text-sm text-white/90 backdrop-blur-sm">
             <div className="mb-1 font-medium text-brand-yellow"><VibeContentRenderer content={vibeProfile.badge} /></div>
@@ -1487,7 +1511,7 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
                     className={cn(
                       "rounded-2xl border px-3 py-3 text-left transition-all duration-300",
                       isActive
-                        ? "border-brand-yellow bg-brand-yellow text-black shadow-lg shadow-brand-yellow/25"
+                        ? "border-brand-yellow bg-brand-yellow/20 text-white shadow-lg shadow-brand-yellow/25 ring-1 ring-brand-yellow/40"
                         : "border-white/15 bg-white/5 text-white/75 hover:border-white/40 hover:bg-white/10 hover:text-white",
                     )}
                   >
@@ -1547,7 +1571,7 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
                   <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/15 bg-black/50 p-4 backdrop-blur-sm">
                     <div className="flex items-center justify-between gap-3 text-sm text-white/80">
                       <span>Интерактивный режим</span>
-                      <span className="rounded-full bg-brand-yellow px-3 py-1 font-orbitron text-xs text-black">{activeHeroPanel.label}</span>
+                      <span className="rounded-full border border-brand-yellow/40 bg-black/55 px-3 py-1 font-orbitron text-xs text-brand-yellow">{activeHeroPanel.label}</span>
                     </div>
                   </div>
                 </div>
@@ -1570,39 +1594,9 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
       </motion.section>
 
       <div className="container mx-auto max-w-7xl space-y-20 px-4 py-16 sm:space-y-24 sm:py-24">
-        <ConversionPilot items={items} overview={mapOverview} />
+        <ConversionPilot items={catalogItems} overview={mapOverview} isCatalogLoading={isCatalogLoading} />
 
-        <section className="rounded-2xl border border-border/60 bg-card/40 p-5 sm:p-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="font-orbitron text-2xl sm:text-3xl">Актуальность контента / партнёрских ссылок</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Раздел обновлён под новый franchize-поток: Electro-Enduro + Configurator + MapRiders.
-                Последний аудит контента: <span className="font-medium text-foreground">04 мая 2026</span>.
-              </p>
-            </div>
-            <Button asChild variant="outline">
-              <Link href="/franchize/vip-bike/configurator">Начать с конфигуратора</Link>
-            </Button>
-          </div>
-          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
-            {partnerLinks.map((item) => (
-              <Card key={item.name} className="border-border/70 bg-background/40">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{item.name}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="mb-3 text-sm text-muted-foreground">{item.note}</p>
-                  <Button asChild size="sm" variant="outline" className="w-full">
-                    <Link href={item.href}>Открыть раздел</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        <ElectroEnduroShowcase items={items} />
+        <ElectroEnduroShowcase items={catalogItems} isCatalogLoading={isCatalogLoading} />
 
         <MapRidersLivePreview overview={mapOverview} />
 
@@ -1631,9 +1625,9 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
           </div>
         </section>
 
-        <StepsProgress items={items} />
+        <StepsProgress items={catalogItems} />
 
-        <RentalQuickActionHub items={items} overview={mapOverview} />
+        <RentalQuickActionHub items={catalogItems} overview={mapOverview} isCatalogLoading={isCatalogLoading} />
 
         <VipBikeCompanyServiceHub />
 

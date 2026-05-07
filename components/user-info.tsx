@@ -29,17 +29,22 @@ export function UserInfo() {
 
   if (error) {
     return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="flex flex-col items-center gap-1"
-      >
-        <div className="flex items-center gap-2 p-2 bg-destructive/80 text-destructive-foreground rounded-md border border-destructive shadow-lg animate-pulse">
-            <VibeContentRenderer content="::FaTriangleExclamation::" className="h-5 w-5" />
-            <span className="font-mono text-xs">Auth Error!</span>
-        </div>
-        <Button asChild variant="outline" size="sm" className="text-xs border-destructive/50 text-destructive-foreground/80 hover:bg-destructive/70 hover:text-destructive-foreground">
-            <a href={TELEGRAM_WEB_APP_URL} target="_blank" rel="noopener noreferrer">Открыть WebApp</a>
+      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+        <Button
+          asChild
+          variant="ghost"
+          className={cn(
+            "rounded-full px-3 py-2 transition-all",
+            "bg-gradient-to-br from-brand-purple/30 via-brand-pink/30 to-brand-orange/30",
+            "hover:from-brand-purple/50 hover:via-brand-pink/50 hover:to-brand-orange/50",
+            "text-light-text hover:text-white",
+            "shadow-[0_0_10px_rgba(var(--brand-pink-rgb),0.4)] hover:shadow-[0_0_15px_rgba(var(--brand-pink-rgb),0.6)]",
+          )}
+        >
+          <a href={TELEGRAM_WEB_APP_URL} target="_blank" rel="noopener noreferrer" aria-label="Открыть Telegram WebApp" className="inline-flex items-center gap-2">
+            <Send className="h-5 w-5" />
+            <span className="hidden text-xs font-semibold sm:inline">WebApp</span>
+          </a>
         </Button>
       </motion.div>
     );
