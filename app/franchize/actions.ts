@@ -1346,6 +1346,188 @@ function formatMoney(value: number): string {
   return Number(value || 0).toLocaleString("ru-RU");
 }
 
+const franchizePromoValidationSchema = z.object({
+  slug: z.string().trim().min(1),
+  code: z.string().trim().min(1),
+  baseAmount: z.number().finite().nonnegative(),
+});
+
+type PromoValidationBanner = {
+  title: string;
+  subtitle: string;
+  code: string;
+  activeFrom: string;
+  activeTo: string;
+  ctaLabel: string;
+  discountType: string;
+  discountPercent: number;
+  discountAmount: number;
+  maxDiscount: number;
+  minSubtotal: number;
+};
+
+function normalizePromoCode(value: string): string {
+  return value.trim().replace(/\s+/g, "").toUpperCase();
+}
+
+function parsePromoDate(value: string, boundary: "start" | "end"): Date | null {
+  if (!value.trim()) return null;
+  const date = new Date(boundary === "start" ? `${value}T00:00:00` : `${value}T23:59:59`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isPromoActiveNow(banner: PromoValidationBanner, now = new Date()): boolean {
+  const activeFrom = parsePromoDate(banner.activeFrom, "start");
+  const activeTo = parsePromoDate(banner.activeTo, "end");
+  return (!activeFrom || now >= activeFrom) && (!activeTo || now <= activeTo);
+}
+
+function readPromoNumber(banner: UnknownRecord, keys: string[]): number {
+  for (const key of keys) {
+    const value = readPath<unknown>(banner, [key], undefined);
+    const numericValue = typeof value === "string" ? Number(value.replace(/\s+/g, "")) : Number(value);
+    if (Number.isFinite(numericValue) && numericValue > 0) return numericValue;
+  }
+  return 0;
+}
+
+function capPromoDiscount(amount: number, baseAmount: number, maxDiscount: number): number {
+  const cappedBySubtotal = Math.min(baseAmount, Math.round(amount));
+  return maxDiscount > 0 ? Math.min(cappedBySubtotal, Math.round(maxDiscount)) : cappedBySubtotal;
+}
+
+function extractPromoDiscount(banner: PromoValidationBanner, baseAmount: number): { amount: number; description: string } {
+  if (banner.discountPercent > 0) {
+    const percent = Math.min(90, Math.max(1, banner.discountPercent));
+    const amount = capPromoDiscount((baseAmount * percent) / 100, baseAmount, banner.maxDiscount);
+    return { amount, description: `${percent}% скидка` };
+  }
+
+  if (banner.discountAmount > 0) {
+    const amount = capPromoDiscount(banner.discountAmount, baseAmount, banner.maxDiscount);
+    return { amount, description: `${amount.toLocaleString("ru-RU")} ₽ скидка` };
+  }
+
+  const promoText = [banner.subtitle, banner.title, banner.ctaLabel, banner.code].filter(Boolean).join(" ");
+  const percentMatch = promoText.match(/(?:-|скидка\s*)?(\d{1,2})\s*%/i);
+  if (percentMatch) {
+    const percent = Math.min(90, Math.max(1, Number(percentMatch[1])));
+    const amount = capPromoDiscount((baseAmount * percent) / 100, baseAmount, banner.maxDiscount);
+    return { amount, description: `${percent}% скидка` };
+  }
+
+  const fixedRubMatch = promoText.match(/(?:-|скидка\s*)?(\d[\d\s]{2,})\s*(?:₽|руб\.?)/i);
+  if (fixedRubMatch) {
+    const fixedAmount = Number(fixedRubMatch[1].replace(/\s+/g, ""));
+    if (Number.isFinite(fixedAmount) && fixedAmount > 0) {
+      const amount = capPromoDiscount(fixedAmount, baseAmount, banner.maxDiscount);
+      return { amount, description: `${amount.toLocaleString("ru-RU")} ₽ скидка` };
+    }
+  }
+
+  return { amount: 0, description: banner.subtitle.trim() || banner.title.trim() || "Бонус применён" };
+}
+
+export async function validateFranchizePromoCode(input: unknown): Promise<
+  | { success: true; code: string; title: string; discountAmount: number; description: string }
+  | { success: false; error: string }
+> {
+  const parsed = franchizePromoValidationSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Некорректный промокод." };
+  }
+
+  const slug = normalizeCrewSlug(parsed.data.slug);
+  const code = normalizePromoCode(parsed.data.code);
+  const baseAmount = Math.round(parsed.data.baseAmount);
+  if (!slug || !code) return { success: false, error: "Введите промокод из активной акции." };
+  if (baseAmount <= 0) return { success: false, error: "Промокод можно применить после добавления товаров в заказ." };
+
+  const { data: crew, error } = await supabaseAdmin
+    .from("crews")
+    .select("metadata")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (error) {
+    logger.error("[franchize] promo validation crew lookup failed", error);
+    return { success: false, error: "Не удалось проверить промокод. Попробуйте ещё раз." };
+  }
+  if (!crew) return { success: false, error: "Витрина для промокода не найдена." };
+
+  const franchize = readPath<UnknownRecord>(crew.metadata, ["franchize"], {});
+  if (!readPath(franchize, ["order", "allowPromo"], true)) {
+    return { success: false, error: "Промокоды отключены для этой витрины." };
+  }
+
+  const availablePromos = readArrayPath<unknown>(franchize, ["catalog", "promoBanners"])
+    .map((item: unknown): PromoValidationBanner => {
+      const banner = (item ?? {}) as UnknownRecord;
+      const discountType = readPath(banner, ["discountType"], readPath(banner, ["discount_type"], "")).toLowerCase();
+      const discountValue = readPromoNumber(banner, ["discountValue", "discount_value"]);
+      return {
+        title: readPath(banner, ["title"], ""),
+        subtitle: readPath(banner, ["subtitle"], ""),
+        code: readPath(banner, ["code"], ""),
+        activeFrom: readPath(banner, ["activeFrom"], ""),
+        activeTo: readPath(banner, ["activeTo"], ""),
+        ctaLabel: readPath(banner, ["ctaLabel"], ""),
+        discountType,
+        discountPercent: readPromoNumber(banner, ["discountPercent", "discount_percent", "percent"]) || (discountType === "percent" ? discountValue : 0),
+        discountAmount: readPromoNumber(banner, ["discountAmount", "discount_amount", "amountRub", "amount_rub"]) || (discountType === "fixed" ? discountValue : 0),
+        maxDiscount: readPromoNumber(banner, ["maxDiscount", "max_discount", "maxDiscountRub", "max_discount_rub"]),
+        minSubtotal: readPromoNumber(banner, ["minSubtotal", "min_subtotal", "minAmount", "min_amount"]),
+      };
+    })
+    .filter((banner) => normalizePromoCode(banner.code).length > 0);
+
+  if (availablePromos.length === 0) return { success: false, error: "Для этой витрины сейчас нет промокодов." };
+
+  const matchedPromo = availablePromos.find((banner) => normalizePromoCode(banner.code) === code);
+  if (!matchedPromo) return { success: false, error: "Промокод не найден. Проверьте код с карточки акции." };
+  if (!isPromoActiveNow(matchedPromo)) return { success: false, error: "Срок действия промокода уже не активен для выбранной витрины." };
+  if (matchedPromo.minSubtotal > 0 && baseAmount < matchedPromo.minSubtotal) {
+    return { success: false, error: `Минимальная сумма для промокода — ${matchedPromo.minSubtotal.toLocaleString("ru-RU")} ₽.` };
+  }
+
+  const discount = extractPromoDiscount(matchedPromo, baseAmount);
+  return {
+    success: true,
+    code,
+    title: matchedPromo.title || code,
+    discountAmount: discount.amount,
+    description: discount.description,
+  };
+}
+
+async function resolveFranchizeCheckoutTotal(
+  payload: z.infer<typeof franchizeOrderInvoiceSchema>,
+): Promise<
+  | { success: true; totalAmount: number; promoCode?: string; promoTitle?: string; promoDiscount: number }
+  | { success: false; error: string }
+> {
+  const baseAmount = Math.round(payload.subtotal + payload.extrasTotal);
+  const code = normalizePromoCode(payload.promoCode ?? "");
+  if (!code) return { success: true, totalAmount: baseAmount, promoDiscount: 0 };
+
+  const result = await validateFranchizePromoCode({ slug: payload.slug, code, baseAmount });
+  if (!result.success) return result;
+
+  const expectedDiscount = Math.min(result.discountAmount, baseAmount);
+  const submittedDiscount = Math.min(Math.round(payload.promoDiscount ?? 0), baseAmount);
+  if (submittedDiscount !== expectedDiscount) {
+    return { success: false, error: "Сумма промокода изменилась. Примените промокод ещё раз перед отправкой." };
+  }
+
+  return {
+    success: true,
+    totalAmount: Math.max(0, baseAmount - expectedDiscount),
+    promoCode: result.code,
+    promoTitle: result.title,
+    promoDiscount: expectedDiscount,
+  };
+}
+
 function parseDurationDays(rawDuration: string): number {
   const normalized = String(rawDuration || "").toLowerCase();
   const numericMatch = normalized.match(/\d+/);
@@ -1749,6 +1931,9 @@ const franchizeOrderInvoiceSchema = z.object({
   delivery: z.enum(["pickup", "delivery"]),
   subtotal: z.number().finite().nonnegative(),
   extrasTotal: z.number().finite().nonnegative().default(0),
+  promoCode: z.string().trim().optional(),
+  promoTitle: z.string().trim().optional(),
+  promoDiscount: z.number().finite().nonnegative().default(0),
   totalAmount: z.number().finite().nonnegative().default(0),
   extras: z
     .array(
@@ -1785,10 +1970,13 @@ export async function submitFranchizeOrderNotification(input: unknown): Promise<
   }
 
   const payload = parsed.data;
-  const effectiveTotal = payload.totalAmount > 0 ? payload.totalAmount : payload.subtotal + payload.extrasTotal;
+  const totalResult = await resolveFranchizeCheckoutTotal(payload);
+  if (!totalResult.success) return totalResult;
+  const effectiveTotal = totalResult.totalAmount;
+  const validatedPayload = { ...payload, ...totalResult, totalAmount: effectiveTotal };
 
   try {
-    await buildFranchizeOrderDocAndNotify({ ...payload, totalAmount: effectiveTotal, subtotal: payload.subtotal, extrasTotal: payload.extrasTotal });
+    await buildFranchizeOrderDocAndNotify({ ...validatedPayload, totalAmount: effectiveTotal, subtotal: payload.subtotal, extrasTotal: payload.extrasTotal });
     return { success: true };
   } catch (error) {
     logger.error("[franchize] submitFranchizeOrderNotification failed", error);
@@ -2130,6 +2318,7 @@ async function createFranchizeOrderInvoiceInternal(
     cartText,
     `Subtotal: ${payload.subtotal.toLocaleString("ru-RU")} ₽`,
     `Extras: ${payload.extrasTotal.toLocaleString("ru-RU")} ₽`,
+    payload.promoCode ? `Promo: ${payload.promoCode} (-${payload.promoDiscount.toLocaleString("ru-RU")} ₽)` : "",
     `Total: ${effectiveTotal.toLocaleString("ru-RU")} ₽`,
     `${invoiceProofLabel}: ${amountXtr} XTR${flowType === "sale" ? "" : " (1%)"}`,
     `WebApp: ${telegramWebappLink}`,
@@ -2149,6 +2338,9 @@ async function createFranchizeOrderInvoiceInternal(
     delivery: payload.delivery,
     subtotal: payload.subtotal,
     extrasTotal: payload.extrasTotal,
+    promoCode: payload.promoCode,
+    promoTitle: payload.promoTitle,
+    promoDiscount: payload.promoDiscount,
     totalAmount: effectiveTotal,
     tipPercent: flowType === "sale" ? 0.1 : 1,
     amountXtr,
@@ -2213,7 +2405,9 @@ export async function createFranchizeOrderInvoice(input: unknown): Promise<{ suc
     };
   }
 
-  return createFranchizeOrderInvoiceInternal(parsed.data);
+  const totalResult = await resolveFranchizeCheckoutTotal(parsed.data);
+  if (!totalResult.success) return totalResult;
+  return createFranchizeOrderInvoiceInternal({ ...parsed.data, ...totalResult, totalAmount: totalResult.totalAmount });
 }
 
 export async function createFranchizeOrderCheckout(
@@ -2231,20 +2425,22 @@ export async function createFranchizeOrderCheckout(
   if (now - lastRequestAt < FRANCHIZE_CHECKOUT_COOLDOWN_MS) {
     return { success: false, error: "Слишком частые запросы. Повторите через несколько секунд." };
   }
+  const totalResult = await resolveFranchizeCheckoutTotal(payload);
+  if (!totalResult.success) return totalResult;
   franchizeCheckoutRateLimits.set(throttleKey, now);
-
-  const effectiveTotal = payload.totalAmount > 0 ? payload.totalAmount : payload.subtotal + payload.extrasTotal;
+  const effectiveTotal = totalResult.totalAmount;
+  const validatedPayload = { ...payload, ...totalResult, totalAmount: effectiveTotal };
 
   try {
     await buildFranchizeOrderDocAndNotify({
-      ...payload,
+      ...validatedPayload,
       subtotal: payload.subtotal,
       extrasTotal: payload.extrasTotal,
       totalAmount: effectiveTotal,
     });
 
     if (payload.payment === "telegram_xtr") {
-      return createFranchizeOrderInvoiceInternal(payload, { skipNotification: true });
+      return createFranchizeOrderInvoiceInternal(validatedPayload, { skipNotification: true });
     }
 
     return { success: true };
