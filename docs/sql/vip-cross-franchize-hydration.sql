@@ -187,6 +187,43 @@ set
             'carDirections', 'Подъезд к локации — см. указатели на месте'
           )
         ),
+        'contentBlocks', jsonb_build_object(
+          'communityEvents', jsonb_build_array(
+            jsonb_build_object('title', 'Эндуро-брифинг новичков', 'time', 'Пт • 18:30', 'place', 'База VIP CROSS', 'text', 'Подбор защиты, посадка, базовые команды инструктора и правила группы.'),
+            jsonb_build_object('title', 'Лесной loop MapRiders', 'time', 'Сб • 10:30', 'place', 'Старт от Стригинского переулка 13Б', 'text', 'Едем оффроуд-маршрут с live-точками, паузами и темпом под самого спокойного райдера.'),
+            jsonb_build_object('title', 'Техчек эндуро-парка', 'time', 'Вс • 09:30', 'place', 'Сервис-зона VIP CROSS', 'text', 'Проверяем давление, рычаги, цепь, тормоза и защиту перед выездом на грунт.')
+          ),
+          'partnerCards', jsonb_build_array(
+            jsonb_build_object('name', 'VIP CROSS сервис', 'role', 'эндуро подготовка', 'perk', 'Осмотр мотоцикла и защиты перед маршрутом'),
+            jsonb_build_object('name', 'Инструктор маршрута', 'role', 'безопасный темп', 'perk', 'Помогает новичкам проходить сложные участки без давления'),
+            jsonb_build_object('name', 'Фото-точка оффроуд', 'role', 'контент', 'perk', 'Кадры с маршрута для команды и соцсетей')
+          ),
+          'cityRiderTips', jsonb_build_array(
+            'На грунте не едь один: держим группу и видимость инструктора.',
+            'Перед стартом включай MapRiders и проверь заряд телефона.',
+            'Если устал — говори сразу, группа подстроит темп и точку отдыха.',
+            'После маршрута отметь замечания по байку, чтобы сервис успел подготовить парк.'
+          ),
+          'salesVerticals', jsonb_build_array(
+            jsonb_build_object('id', 'new', 'title', 'Новые эндуро', 'pitch', 'Заявки на новые эндуро и кроссовые модели под заказ.', 'cta', 'Заявка на новый'),
+            jsonb_build_object('id', 'electric', 'title', 'Electro off-road', 'pitch', 'Электро-эндуро, батареи и настройки под тихий оффроуд.', 'cta', 'Собрать электро'),
+            jsonb_build_object('id', 'used', 'title', 'Проверенные б/у', 'pitch', 'Техника с понятной историей проката, диагностикой и сервисной подготовкой.', 'cta', 'Подобрать б/у'),
+            jsonb_build_object('id', 'trade-in', 'title', 'Trade-in эндуро', 'pitch', 'Оценка старого байка и обмен на аренду, новый или подготовленный б/у.', 'cta', 'Оценить байк')
+          ),
+          'onboardingChecklist', jsonb_build_array(
+            jsonb_build_object('title', 'Заявка и контакт', 'text', 'Фиксируем город, трассы, сезонность, ответственных и ожидаемый объём эндуро-парка.', 'icon', 'message-circle'),
+            jsonb_build_object('title', 'Парк и безопасность', 'text', 'Описываем модели, защиту, статусы аренды/продажи, инструкторов и сервис.', 'icon', 'clipboard-check'),
+            jsonb_build_object('title', 'Документы и правила', 'text', 'Согласуем договор, депозит, ограничения маршрутов, ответственность и чеклист выдачи.', 'icon', 'file-text'),
+            jsonb_build_object('title', 'Пилотный маршрут', 'text', 'Запускаем витрину, тестовую бронь, MapRiders-маршрут и проверку на телефоне.', 'icon', 'shield-check')
+          ),
+          'onboardingReadinessRows', jsonb_build_array(
+            jsonb_build_object('label', 'Брендинг', 'text', 'лого, цвета, оффер, адрес базы и сезонные часы'),
+            jsonb_build_object('label', 'Каталог', 'text', 'эндуро, кросс, питбайки, защита и инструкторские пакеты'),
+            jsonb_build_object('label', 'Операции', 'text', 'выдача, возврат, сервис, маршрутные ограничения'),
+            jsonb_build_object('label', 'Продажи', 'text', 'новые/электро/б/у/trade-in лиды и тест-драйв'),
+            jsonb_build_object('label', 'Комьюнити', 'text', 'MapRiders, события, инструкторы и Telegram-канал')
+          )
+        ),
         'catalog', jsonb_build_object(
           'groupOrder', jsonb_build_array('Enduro', 'Cross', 'Pitbike', 'Trial', 'Kids'),
           'quickLinks', jsonb_build_array('Эндуро выходного дня', 'Все по 449', 'Выгодное комбо', 'Trial week'),

@@ -124,6 +124,43 @@ set
             'carDirections', 'Оффлайн встречи согласовываются заранее'
           )
         ),
+        'contentBlocks', jsonb_build_object(
+          'communityEvents', jsonb_build_array(
+            jsonb_build_object('title', 'CyberVIBE разбор недели', 'time', 'Ср • 20:00', 'place', 'Telegram / онлайн-комната', 'text', 'Разбираем идею, упаковку, контекст для AI и первый runnable шаг.'),
+            jsonb_build_object('title', 'Snowboard video review', 'time', 'Сб • 11:00', 'place', 'Онлайн + склон по договорённости', 'text', 'Короткий видеоразбор техники, ошибок стойки и плана следующей тренировки.'),
+            jsonb_build_object('title', 'Dota2 micro-coaching', 'time', 'Вс • 18:00', 'place', 'Discord / Telegram', 'text', 'Смотрим реплей, фиксируем 2-3 решения и домашку без токсичности.')
+          ),
+          'partnerCards', jsonb_build_array(
+            jsonb_build_object('name', 'oneSitePls', 'role', 'web runtime', 'perk', 'Быстрый путь от идеи до Telegram-first страницы'),
+            jsonb_build_object('name', 'CyberVIBE labs', 'role', 'AI-практика', 'perk', 'Промпты, контекст и чеклист запуска для оператора'),
+            jsonb_build_object('name', 'SLY13 coaching', 'role', 'спорт / игры', 'perk', 'Спокойный разбор навыка и понятный следующий шаг')
+          ),
+          'cityRiderTips', jsonb_build_array(
+            'Перед созвоном собери 3 ссылки, 1 цель и 1 главный страх.',
+            'Для AI-задачи сначала выгрузи контекст, потом проси правку.',
+            'Для спорта записывай короткое видео: без факта сложно улучшать технику.',
+            'После сессии фиксируй одно действие на 24 часа, а не бесконечный план.'
+          ),
+          'salesVerticals', jsonb_build_array(
+            jsonb_build_object('id', 'new', 'title', 'CyberVIBE запуск', 'pitch', 'Разбор идеи, оффера и первой страницы с AI-контекстом.', 'cta', 'Запустить разбор'),
+            jsonb_build_object('id', 'electric', 'title', 'AI workflow custom', 'pitch', 'Сборка личного процесса: контекст, промпты, проверки и PR-ритм.', 'cta', 'Собрать workflow'),
+            jsonb_build_object('id', 'used', 'title', 'Разбор текущего проекта', 'pitch', 'Аккуратная диагностика существующей страницы, воронки или Telegram-флоу.', 'cta', 'Разобрать проект'),
+            jsonb_build_object('id', 'trade-in', 'title', 'Trade-in хаоса', 'pitch', 'Меняем разрозненные заметки и чаты на понятную доску решений.', 'cta', 'Навести порядок')
+          ),
+          'onboardingChecklist', jsonb_build_array(
+            jsonb_build_object('title', 'Цель и канал', 'text', 'Фиксируем, что запускаем, кому это нужно и где будет первый контакт.', 'icon', 'message-circle'),
+            jsonb_build_object('title', 'Материалы и роли', 'text', 'Собираем ссылки, тексты, ограничения, доступы и ответственного за решения.', 'icon', 'clipboard-check'),
+            jsonb_build_object('title', 'Правила результата', 'text', 'Определяем формат выдачи, критерии готовности и безопасные границы.', 'icon', 'file-text'),
+            jsonb_build_object('title', 'Первый пилот', 'text', 'Делаем короткий запуск, проверяем на реальном пользователе и фиксируем следующий шаг.', 'icon', 'shield-check')
+          ),
+          'onboardingReadinessRows', jsonb_build_array(
+            jsonb_build_object('label', 'Оффер', 'text', 'что продаём, кому и каким первым сообщением'),
+            jsonb_build_object('label', 'Контекст', 'text', 'ссылки, материалы, ограничения и текущая боль'),
+            jsonb_build_object('label', 'Процесс', 'text', 'созвон/чат, домашка, сроки и формат результата'),
+            jsonb_build_object('label', 'Продажи', 'text', 'пакеты, цена, CTA и быстрый способ оплаты'),
+            jsonb_build_object('label', 'Комьюнити', 'text', 'канал обратной связи и место для следующих итераций')
+          )
+        ),
         'catalog', jsonb_build_object(
           'groupOrder', jsonb_build_array('CyberVIBE', 'Snowboard', 'Dota2', 'Labs'),
           'quickLinks', jsonb_build_array('CyberVIBE', 'Snowboard', 'Dota2', 'Labs'),
