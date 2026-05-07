@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { catalogCardVariantStyles, crewPaletteForSurface, floatingCartOverlayBackground } from '@/app/franchize/lib/theme';
 import { resolveFranchizeTheme, resolvePaletteByMode } from '@/app/franchize/lib/theme-resolver';
 import { isExternalHref, toCategoryId } from '@/app/franchize/lib/navigation';
+import { getCatalogPropulsionSegment, isSameCatalogPropulsion } from '@/app/franchize/lib/catalog-propulsion';
 import { DEFAULT_FRANCHIZE_THEME } from '@/lib/franchize-config';
 import type { FranchizeTheme } from '@/app/franchize/actions';
 
@@ -32,6 +33,36 @@ describe('franchize navigation helpers', () => {
     expect(isExternalHref('http://example.com')).toBe(true);
     expect(isExternalHref('/franchize/vip-bike')).toBe(false);
     expect(isExternalHref('tg://resolve?domain=oneBikePlsBot')).toBe(false);
+  });
+});
+
+
+describe('franchize catalog propulsion helpers', () => {
+  it('keeps electric and gas bikes in separate VS lanes', () => {
+    const electricBike = {
+      title: 'Y-VOLT Surge V',
+      category: 'Electro-Enduro',
+      rawSpecs: { type: 'Electric', power_kw: '15+', range_km: '120' },
+    };
+    const gasBike = {
+      title: 'Kawasaki Ninja H2',
+      category: 'Hypersport',
+      rawSpecs: { engine_cc: 998, horsepower: 231, fuel_tank_l: 17 },
+    };
+
+    expect(getCatalogPropulsionSegment(electricBike)).toBe('electric');
+    expect(getCatalogPropulsionSegment(gasBike)).toBe('gas');
+    expect(isSameCatalogPropulsion(electricBike, gasBike)).toBe(false);
+  });
+
+  it('does not classify a gas bike as electric just because support text mentions a battery', () => {
+    const gasBikeWithBatteryNote = {
+      title: 'Yamaha MT-09 SP',
+      description: 'Бензиновый нейкед, обслужена 12V battery перед выдачей.',
+      rawSpecs: { engine_cc: 890, horsepower: 119 },
+    };
+
+    expect(getCatalogPropulsionSegment(gasBikeWithBatteryNote)).toBe('gas');
   });
 });
 

@@ -8,6 +8,13 @@ type VsSpecRowProps = {
   lowerIsBetter?: boolean;
 };
 
+export {
+  getCatalogPropulsionLabel,
+  getCatalogPropulsionSegment,
+  isSameCatalogPropulsion,
+  type CatalogPropulsionSegment,
+} from "@/app/franchize/lib/catalog-propulsion";
+
 export type CatalogVsSpec = {
   label: string;
   keys: string[];
