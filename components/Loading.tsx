@@ -158,32 +158,31 @@ const MatrixRain = () => {
 
 // --- COMPONENT: PARTICLE FIELD ---
 const ParticleField = () => {
-  const particleCount = 50;
-  
+  const particles = useMemo(() => {
+    return Array.from({ length: 50 }, (_, i) => ({
+      id: i,
+      left: `${seededRandom(i + 11) * 100}%`,
+      top: `${seededRandom(i + 101) * 100}%`,
+      drift: -(seededRandom(i + 211) * 360 + 120),
+      scale: seededRandom(i + 307) * 2 + 1,
+      opacity: seededRandom(i + 401) * 0.5 + 0.3,
+      duration: seededRandom(i + 503) * 10 + 10,
+      delay: seededRandom(i + 607) * 5,
+    }));
+  }, []);
+
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {Array.from({ length: particleCount }).map((_, i) => (
+      {particles.map((particle) => (
         <motion.div
-          key={i}
-          className="absolute w-1 h-1 bg-cyan-500 rounded-full"
-          initial={{ 
-            x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1000),
-            y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1000),
-            scale: 0,
-            opacity: 0 
-          }}
-          animate={{ 
-            y: [null, Math.random() * -500],
-            scale: [0, Math.random() * 2 + 1, 0],
-            opacity: [0, Math.random() * 0.5 + 0.3, 0]
-          }}
-          transition={{ 
-            duration: Math.random() * 10 + 10,
-            repeat: Infinity,
-            delay: Math.random() * 5,
-            ease: "linear"
-          }}
+          key={particle.id}
+          className="absolute h-1 w-1 rounded-full bg-cyan-500"
+          initial={{ y: 0, scale: 0, opacity: 0 }}
+          animate={{ y: [0, particle.drift], scale: [0, particle.scale, 0], opacity: [0, particle.opacity, 0] }}
+          transition={{ duration: particle.duration, repeat: Infinity, delay: particle.delay, ease: "linear" }}
           style={{
+            left: particle.left,
+            top: particle.top,
             boxShadow: '0 0 6px rgba(6,182,212,0.8)'
           }}
         />
@@ -482,9 +481,7 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
     return () => clearInterval(interval);
   }, [mounted, variant]);
 
-  if (!mounted) return null;
-
-  const displayProgress = Math.min(progress, 100);
+  const displayProgress = mounted ? Math.min(progress, 100) : 18;
 
   // ================= KINETIC VARIANT (Next Level) =================
   if (variant === 'kinetic') {
@@ -595,18 +592,24 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
   if (variant === 'bike') {
     return (
       <div className={cn(
-        "min-h-screen bg-gradient-to-br from-slate-950 via-orange-950/20 to-slate-950 text-slate-200 flex flex-col items-center justify-center overflow-hidden relative",
+        "min-h-screen min-h-[100svh] bg-gradient-to-br from-slate-950 via-orange-950/20 to-slate-950 text-slate-200 flex flex-col items-center justify-center overflow-hidden relative px-4",
         className
       )}>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(251,146,60,0.18),transparent_42%),linear-gradient(120deg,transparent,rgba(251,191,36,0.06),transparent)]" />
+        <div className="absolute left-0 right-0 top-1/2 h-px bg-gradient-to-r from-transparent via-orange-400/60 to-transparent" />
         <BikeSpeedster />
         
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="mt-12 text-center space-y-4 z-10"
+          className="z-10 mt-8 w-full max-w-md space-y-4 text-center sm:mt-12"
         >
-          <h2 className="font-orbitron font-black text-3xl md:text-5xl uppercase tracking-wider text-orange-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]">
+          <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/20 bg-black/30 px-3 py-1 text-[10px] font-mono uppercase tracking-[0.28em] text-orange-200/80 shadow-[0_0_22px_rgba(251,146,60,0.18)]">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)]" />
+            first-paint loader online
+          </div>
+          <h2 className="font-orbitron text-3xl font-black uppercase tracking-wider text-orange-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)] md:text-5xl">
             RIDE LINK
           </h2>
           
@@ -622,7 +625,7 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
             />
           </div>
           
-          <p className="font-mono text-sm text-orange-300/80">
+          <p className="mx-auto max-w-sm font-mono text-sm text-orange-300/80">
             {text || 'Синхронизируем телеметрию экипажа...'}
           </p>
           
