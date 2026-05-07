@@ -13,9 +13,10 @@ interface FloatingCartIconLinkBySlugProps {
   textColor: string;
   borderColor: string;
   theme: FranchizeTheme;
+  className?: string;
 }
 
-export function FloatingCartIconLinkBySlug({ slug, href, items, accentColor, textColor, borderColor, theme }: FloatingCartIconLinkBySlugProps) {
+export function FloatingCartIconLinkBySlug({ slug, href, items, accentColor, textColor, borderColor, theme, className }: FloatingCartIconLinkBySlugProps) {
   const { itemCount, subtotal } = useFranchizeCartLines(slug, items);
 
   return (
@@ -27,6 +28,7 @@ export function FloatingCartIconLinkBySlug({ slug, href, items, accentColor, tex
       textColor={textColor}
       borderColor={borderColor}
       backgroundColor={floatingCartOverlayBackground(theme)}
+      className={className}
     />
   );
 }

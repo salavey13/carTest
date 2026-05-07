@@ -11,6 +11,7 @@ import {
   getTelegramHandleHref,
   getTelegramWebAppFallbackHref,
 } from "@/app/franchize/lib/telegram-links";
+import { getFranchizeRouteCtaPolicy, shouldShowFloatingCart } from "@/app/franchize/lib/route-cta-policy";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { SaleBikeLanding } from "@/app/franchize/components/SaleBikeLanding";
 import { isSameCatalogPropulsion } from "@/app/franchize/lib/catalog-propulsion";
@@ -75,6 +76,7 @@ export default async function BuyBikePage({
   const { crew, items } = await getFranchizeBySlug(slug);
   const resolvedSlug = crew.slug || slug;
   const surface = crewPaletteForSurface(crew.theme);
+  const ctaPolicy = getFranchizeRouteCtaPolicy("product-buy");
   const item = items.find((candidate) => candidate.id === bike_id);
   const contactHref = `/franchize/${resolvedSlug}/contacts`;
   const catalogHref = `/franchize/${resolvedSlug}`;
@@ -87,7 +89,7 @@ export default async function BuyBikePage({
   if (!item.saleAvailable && !isSaleEnabled(item.rawSpecs?.sale)) {
     return (
       <main
-        className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-4 p-6 text-center"
+          className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-4 p-6 text-center"
         style={surface.page}
       >
         <h1 className="text-2xl font-semibold">
@@ -133,6 +135,8 @@ export default async function BuyBikePage({
     );
   }
 
+  const showFloatingCart = shouldShowFloatingCart(ctaPolicy, { cartRelevant: true, hasItemContext: true });
+
   const otherSaleBikes = items.filter(
     (candidate) =>
       candidate.id !== item.id &&
@@ -144,7 +148,7 @@ export default async function BuyBikePage({
     : null;
 
   return (
-    <main className="min-h-screen" style={surface.page}>
+    <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
       <CrewHeader
         crew={crew}
         activePath={`/franchize/${resolvedSlug}/market/${bike_id}/buy`}
@@ -264,15 +268,18 @@ export default async function BuyBikePage({
         otherSaleBikes={otherSaleBikes}
       />
       <CrewFooter crew={crew} />
-      <FranchizeFloatingCart
-        slug={resolvedSlug}
-        href={`/franchize/${resolvedSlug}/cart`}
-        items={items}
-        accentColor={crew.theme.palette.accentMain}
-        textColor={crew.theme.palette.textPrimary}
-        borderColor={crew.theme.palette.borderSoft}
-        theme={crew.theme}
-      />
+      {showFloatingCart && (
+        <FranchizeFloatingCart
+          slug={resolvedSlug}
+          href={`/franchize/${resolvedSlug}/cart`}
+          items={items}
+          accentColor={crew.theme.palette.accentMain}
+          textColor={crew.theme.palette.textPrimary}
+          borderColor={crew.theme.palette.borderSoft}
+          theme={crew.theme}
+          className={ctaPolicy.floatingCartClassName}
+        />
+      )}
     </main>
   );
 }

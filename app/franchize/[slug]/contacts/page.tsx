@@ -8,6 +8,7 @@ import { FranchizeFloatingCart } from "../../components/FranchizeFloatingCart";
 import { FranchizeHero } from "../../components/FranchizeHero";
 import { FranchizePageShell } from "../../components/FranchizePageShell";
 import { FranchizeContactsMap } from "../../components/FranchizeContactsMap";
+import { getFranchizeRouteCtaPolicy, shouldShowFloatingCart } from "../../lib/route-cta-policy";
 import { buildFranchizeIntentLinks } from "../../lib/section-links";
 import { crewPaletteForSurface } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
@@ -48,9 +49,11 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
   const directionsHref = directionsTarget
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(directionsTarget)}`
     : "";
+  const ctaPolicy = getFranchizeRouteCtaPolicy("contacts");
+  const showFloatingCart = shouldShowFloatingCart(ctaPolicy, { cartRelevant: false });
 
   return (
-    <main className="min-h-screen" style={surface.page}>
+    <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
       <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath)} />
 
       <FranchizePageShell theme={crew.theme}>
@@ -186,15 +189,18 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
       </FranchizePageShell>
 
       <CrewFooter crew={crew} />
-      <FranchizeFloatingCart
-        slug={resolvedSlug}
-        href={`/franchize/${resolvedSlug}/cart`}
-        items={items}
-        accentColor={crew.theme.palette.accentMain}
-        textColor={crew.theme.palette.textPrimary}
-        borderColor={crew.theme.palette.borderSoft}
-        theme={crew.theme}
-      />
+      {showFloatingCart && (
+        <FranchizeFloatingCart
+          slug={resolvedSlug}
+          href={`/franchize/${resolvedSlug}/cart`}
+          items={items}
+          accentColor={crew.theme.palette.accentMain}
+          textColor={crew.theme.palette.textPrimary}
+          borderColor={crew.theme.palette.borderSoft}
+          theme={crew.theme}
+          className={ctaPolicy.floatingCartClassName}
+        />
+      )}
     </main>
   );
 }

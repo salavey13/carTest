@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { ShoppingCart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toCategoryId } from "../lib/navigation";
+import type { FranchizeRouteCtaPolicy } from "../lib/route-cta-policy";
+import { shouldShowFloatingCart } from "../lib/route-cta-policy";
 import { catalogCardVariantStyles, crewPaletteForSurface, interactionRingStyle } from "../lib/theme";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
@@ -17,6 +19,7 @@ interface CatalogClientProps {
   slug: string;
   items: CatalogItemVM[];
   mode?: "rental" | "electro";
+  ctaPolicy?: FranchizeRouteCtaPolicy;
 }
 
 type QuickFilterKey = "all" | "budget" | "premium" | "newbie" | "topRated";
@@ -55,7 +58,7 @@ function CatalogCardSkeleton({ index }: { index: number }) {
   );
 }
 
-export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogClientProps) {
+export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }: CatalogClientProps) {
   const surface = crewPaletteForSurface(crew.theme);
   const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
   const { addItem } = useFranchizeCart(crew.slug || slug);
@@ -68,6 +71,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
   const [quickFilter, setQuickFilter] = useState<QuickFilterKey>("all");
   const [campaignIndex, setCampaignIndex] = useState(0);
   const searchParams = useSearchParams();
+  const showFloatingCart = ctaPolicy ? shouldShowFloatingCart(ctaPolicy, { cartRelevant: true }) : true;
 
   const promoModules = useMemo(() => {
     const now = Date.now();
@@ -530,7 +534,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
       </section>
 
       {/* 🛒 Floating Cart: Hide when modal is open to avoid z-index overlap */}
-      {!selectedItem && (
+      {!selectedItem && showFloatingCart && (
         <FloatingCartIconLinkBySlug
           slug={crew.slug || slug}
           href={`/franchize/${crew.slug || slug}/cart`}
@@ -539,6 +543,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental" }: CatalogCli
           textColor={crew.theme.palette.textPrimary}
           borderColor={crew.theme.palette.borderSoft}
           theme={crew.theme}
+          className={ctaPolicy?.floatingCartClassName}
         />
       )}
 

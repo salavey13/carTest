@@ -3,7 +3,7 @@ import { getFranchizeBySlug } from "../../actions";
 import { CartPageClient } from "../../components/CartPageClient";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
-import { FranchizeFloatingCart } from "../../components/FranchizeFloatingCart";
+import { getFranchizeRouteCtaPolicy } from "../../lib/route-cta-policy";
 import { crewPaletteForSurface } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
@@ -25,21 +25,13 @@ export default async function FranchizeCartPage({ params }: FranchizeCartPagePro
   const { slug } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteForSurface(crew.theme);
+  const ctaPolicy = getFranchizeRouteCtaPolicy("checkout");
 
   return (
-    <main className="min-h-screen" style={surface.page}>
+    <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/cart`} groupLinks={items.map((item) => item.category)} />
       <CartPageClient crew={crew} slug={crew.slug || slug} items={items} />
       <CrewFooter crew={crew} />
-      <FranchizeFloatingCart
-        slug={crew.slug || slug}
-        href={`/franchize/${crew.slug || slug}/cart`}
-        items={items}
-        accentColor={crew.theme.palette.accentMain}
-        textColor={crew.theme.palette.textPrimary}
-        borderColor={crew.theme.palette.borderSoft}
-        theme={crew.theme}
-      />
     </main>
   );
 }
