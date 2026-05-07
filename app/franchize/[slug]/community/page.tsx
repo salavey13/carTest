@@ -8,39 +8,6 @@ import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
-const cityEvents = [
-  {
-    title: "Вечерний сбор новичков",
-    time: "Пт • 19:30",
-    place: "Старт у базы экипажа",
-    text: "Короткий городской круг, проверка экипировки, объяснение жестов и правил колонны.",
-  },
-  {
-    title: "MapRiders city loop",
-    time: "Сб • 12:00",
-    place: "Маршрут через набережную и тихие улицы",
-    text: "Открываем live-карту, ставим meetup-пины и едем в темпе самого спокойного райдера.",
-  },
-  {
-    title: "Техно-час перед покатушкой",
-    time: "Вс • 11:00",
-    place: "Партнёрская сервис-зона",
-    text: "Давление, цепь, свет, тормоза и быстрый чек арендного или личного байка.",
-  },
-];
-
-const partnerCards = [
-  { name: "VIP BIKE сервис", role: "осмотр и подготовка", perk: "Экспресс-чек перед выездом для экипажа" },
-  { name: "Кофе-точка райдеров", role: "место встречи", perk: "Тёплый старт, зарядка телефона, быстрый брифинг" },
-  { name: "Экипировка рядом", role: "перчатки / дождевик / защита", perk: "Помощь новичку без лишнего пафоса" },
-];
-
-const cityTips = [
-  "Не стартуй один, если это первый выезд на незнакомом байке.",
-  "Включай MapRiders до старта: экипаж увидит скорость, stale-статус и точку встречи.",
-  "Для новичков держим видимость «только экипаж» и автостоп геошеринга.",
-  "Meetup-пин ставим long-press на карте или тапом по точке + кнопка «+».",
-];
 
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -60,6 +27,7 @@ export default async function FranchizeCommunityPage({ params }: { params: Promi
   const surface = crewPaletteForSurface(crew.theme);
   const brandName = crew.header.brandName || crew.name || "VIP BIKE";
   const telegramHref = crew.contacts.telegram ? `https://t.me/${crew.contacts.telegram.replace("@", "")}` : "https://t.me/oneBikePlsBot";
+  const { communityEvents, partnerCards, cityRiderTips } = crew.contentBlocks;
 
   return (
     <main className="min-h-screen" style={surface.page}>
@@ -108,7 +76,7 @@ export default async function FranchizeCommunityPage({ params }: { params: Promi
         </section>
 
         <section className="grid gap-4 md:grid-cols-3">
-          {cityEvents.map((event) => (
+          {communityEvents.map((event) => (
             <article key={event.title} className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl">
               <CalendarDays className="h-6 w-6 text-[var(--community-accent)]" />
               <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-white/45">{event.time}</p>
@@ -126,10 +94,10 @@ export default async function FranchizeCommunityPage({ params }: { params: Promi
               <h2 className="font-orbitron text-2xl text-white">Городской riding-гайд</h2>
             </div>
             <ul className="mt-5 space-y-3 text-sm text-white/68">
-              {cityTips.map((tip) => (
-                <li key={tip} className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+              {cityRiderTips.map((tip) => (
+                <li key={tip.text} className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
                   <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[var(--community-accent)]" />
-                  <span>{tip}</span>
+                  <span>{tip.text}</span>
                 </li>
               ))}
             </ul>
