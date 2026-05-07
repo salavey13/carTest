@@ -233,3 +233,41 @@ This root file stays intentionally compact so operators and agents can load it q
 - `risks`: Local CI can validate lint/build/API shape, but true GPS accuracy and Telegram permission UX still require device testing.
 
 - 2026-05-07 — MapRiders review pass: reduced realtime overfetch pressure, made mobile long-press meetup selection safer, aligned floating and panel start actions, and surfaced live/stale/queue state directly in the map cockpit.
+
+### 2026-05-07 — FRZ-R9 + UX-03 + RENT-P1.1 MapRiders visible value slice
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `notes`: Executed the explicit operator scope: MapRiders now has self-hosted inline SVG initial avatars instead of external placeholder-style marker art, a Russian 3-step beginner quiz that configures ride name/bike/privacy/auto-stop before sharing, a new `/franchize/[slug]/community` city events + partners hub, and `TEMP_BYPASS_TG_AUTH_VALIDATION` is allowed only on preview request URLs/headers containing `salavey13`.
+- `next_step`: Browser-smoke `/franchize/vip-bike/map-riders` and `/franchize/vip-bike/community` on a Vercel preview URL that contains `salavey13`.
+- `risks`: Community events/partners are curated starter content until real operator calendar/partner data is connected; auth bypass remains explicitly env-gated and preview-host-gated.
+
+### 2026-05-07 — supaplan_task:dd9a9d3c-3234-4d1b-7890-ddd000ddf890 Telegram auth + smart mockuser fallback
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex-tg-auth-fallback
+- `supaplan_task`: dd9a9d3c-3234-4d1b-7890-ddd000ddf890
+- `notes`: Claimed the SupaPlan security task and corrected Telegram WebApp HMAC derivation (`WebAppData` as the HMAC key, bot token as message) in both auth validators. Mock user activation is now explicitly gated: allowed only when `NEXT_PUBLIC_USE_MOCK_USER=true` and the client URL contains `salavey13` or `NEXT_PUBLIC_IS_PREVIEW=true`; otherwise production shows a strict Telegram-open/auth error. MapRiders write headers can request the mock app JWT only in that same allowed preview context.
+- `next_step`: Verify on a real Telegram WebApp session and a Vercel preview URL containing `salavey13`; keep `TEMP_BYPASS_TG_AUTH_VALIDATION` unset on real production domains.
+- `risks`: Local runner cannot provide real Telegram signed initData; production verification needs bot-generated `initData` and current `TELEGRAM_BOT_TOKEN`.
+
+### 2026-05-07 — SupaPlan four-task self-review + Telegram auth test harness
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex-review
+- `supaplan_tasks`: FRZ-R9=`74fcc094-6990-4657-bf13-91460a291e32`, RENT-P1.1=`309a8777-6bc0-4d9d-aa8a-b6a9ec11b730`, UX-03=`9db00978-92dd-48a3-8913-d6972243dfbd`, SEC-BYPASS-CHECK=`dd9a9d3c-3234-4d1b-7890-ddd000ddf890`
+- `notes`: Self-review found the Telegram HMAC fix should not remain duplicated, so validation was extracted to `lib/telegram-webapp-auth.ts` with Vitest coverage using an independent Node `createHmac` oracle. RENT-P1.1 was tightened from a MapRiders-only quiz into checkout gating too: `OrderPageClient` now blocks confirmation until the 3-question beginner safety quiz is passed and persists the pass in browser storage per slug/user.
+- `next_step`: Real-device Telegram WebApp smoke with a current signed `initData`, plus production preview smoke on a `salavey13` Vercel URL with `NEXT_PUBLIC_USE_MOCK_USER=true`.
+- `risks`: The checkout safety completion is browser-local for this slice, not yet persisted to `users.metadata.quiz_completed_at`; follow-up DB persistence can make it cross-device.
+
+### 2026-05-07 — Telegram bypass review fix + VIP Bike seed/navigation polish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex-review
+- `notes`: Addressed Codex review P1: auth bypass no longer reads caller-controlled URL/query/origin/referer; it now depends only on server-known Vercel deployment metadata (`VERCEL_ENV=preview` + deployment URL containing `salavey13`) or exact `TELEGRAM_AUTH_BYPASS_ALLOWED_HOSTS`. Added regression tests for forged `?salavey13` production URLs, live-like Telegram initData recreation, and preview/allowlist behavior. Updated VIP Bike seed SQL header/footer with `/franchize/{slug}/community`, and replaced `/vipbikerental` hardcoded Стригинский address with `ул. Комсомольская 2`.
+- `next_step`: Apply updated `docs/sql/vip-bike-franchize-hydration.sql` to staging/prod Supabase after merge, then smoke header/footer navigation.
+- `risks`: Bypass now requires Vercel preview metadata or explicit allowlist; if a preview runtime lacks `VERCEL_ENV/VERCEL_URL`, set `TELEGRAM_AUTH_BYPASS_ALLOWED_HOSTS` to the exact preview host.

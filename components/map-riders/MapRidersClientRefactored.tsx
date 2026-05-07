@@ -33,6 +33,7 @@ import { StatusOverlay } from "@/components/map-riders/StatusOverlay";
 import { SpeedGradientRoute } from "@/components/map-riders/SpeedGradientRoute";
 import { MapRidersDebugPanel } from "@/components/map-riders/MapRidersDebugPanel";
 import { MapRidersSkeleton } from "@/components/map-riders/LoadingSkeleton";
+import { BeginnerRiderOnboardingQuiz } from "@/components/map-riders/BeginnerRiderOnboardingQuiz";
 
 // Lazy-load map (SSR disabled)
 const RacingMap = dynamic(() => import("@/components/maps/RacingMap").then((mod) => mod.RacingMap), { ssr: false });
@@ -297,6 +298,8 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         ["--mr-muted" as string]: crew.theme.palette.textSecondary,
       }}
     >
+      <BeginnerRiderOnboardingQuiz crew={crew} />
+
       {/* ── MAP (fullscreen hero) ── */}
       <section className="relative -mx-4 overflow-hidden border md:mx-0 md:rounded-3xl" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
         <div className="absolute inset-0 z-0">
@@ -577,6 +580,9 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               <Link href={`https://t.me/share/url?url=${encodeURIComponent(`https://t.me/oneBikePlsBot/app?startapp=mapriders_${crewSlug}`)}&text=${encodeURIComponent(`${crew.header.brandName || "VIP BIKE"} MapRiders`)}`}>
                 Поделиться в Telegram
               </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full">
+              <Link href={`/franchize/${crewSlug}/community`}>События и партнёры</Link>
             </Button>
           </div>
         </div>
