@@ -246,18 +246,16 @@ Network Fee: $${networkFee}
   });
 });
 
-/*
-To Deploy & Schedule:
-1. Set ENV Vars in Supabase Dashboard for this function:
-   - SUPABASE_URL
-   - SUPABASE_SERVICE_ROLE_KEY
-   - TELEGRAM_BOT_TOKEN
-   - CRON_SECRET (for authorizing cron trigger)
-   - TEST_USER_ID_FOR_ARBITRAGE_SCAN (optional, for testing)
-2. Deploy: `supabase functions deploy arbitrage-scan-instance --no-verify-jwt`
-3. Schedule (e.g., every 5 minutes for user-specific scans, or less frequently for batch scans):
-   `SELECT cron.schedule('arbitrage-scan-user-TARGETUSERID', '*/5 * * * *', 'SELECT net.http_post(url:=''https://YOUR_PROJECT_REF.supabase.co/functions/v1/arbitrage-scan-instance'', headers:=''{"Authorization": "Bearer YOUR_CRON_SECRET", "Content-Type": "application/json"}'', body:=''{"userId": "TARGET_USER_ID"}''::jsonb)');`
-   Replace YOUR_PROJECT_REF, YOUR_CRON_SECRET, and TARGET_USER_ID.
-   Or for a generic run (if function logic supports batching users):
-   `SELECT cron.schedule('arbitrage-scan-batch', '0 * * * *', 'SELECT net.http_post(url:=''https://YOUR_PROJECT_REF.supabase.co/functions/v1/arbitrage-scan-instance'', headers:=''{"Authorization": "Bearer YOUR_CRON_SECRET"}'')');`
-*/
+// To Deploy & Schedule:
+// 1. Set ENV Vars in Supabase Dashboard for this function:
+//    - SUPABASE_URL
+//    - SUPABASE_SERVICE_ROLE_KEY
+//    - TELEGRAM_BOT_TOKEN
+//    - CRON_SECRET (for authorizing cron trigger)
+//    - TEST_USER_ID_FOR_ARBITRAGE_SCAN (optional, for testing)
+// 2. Deploy: `supabase functions deploy arbitrage-scan-instance --no-verify-jwt`
+// 3. Schedule (e.g., every 5 minutes for user-specific scans, or less frequently for batch scans):
+//    `SELECT cron.schedule('arbitrage-scan-user-TARGETUSERID', '*/5 * * * *', 'SELECT net.http_post(url:=''https://YOUR_PROJECT_REF.supabase.co/functions/v1/arbitrage-scan-instance'', headers:=''{"Authorization": "Bearer YOUR_CRON_SECRET", "Content-Type": "application/json"}'', body:=''{"userId": "TARGET_USER_ID"}''::jsonb)');`
+//    Replace YOUR_PROJECT_REF, YOUR_CRON_SECRET, and TARGET_USER_ID.
+//    Or for a generic run (if function logic supports batching users):
+//    `SELECT cron.schedule('arbitrage-scan-batch', '0 * * * *', 'SELECT net.http_post(url:=''https://YOUR_PROJECT_REF.supabase.co/functions/v1/arbitrage-scan-instance'', headers:=''{"Authorization": "Bearer YOUR_CRON_SECRET"}'')');`
