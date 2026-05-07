@@ -58,6 +58,16 @@ This root file stays intentionally compact so operators and agents can load it q
 - `next_step`: Smoke `/franchize/vip-bike` catalog modal and `/franchize/vip-bike/market/<bike_id>/buy` with mixed electric/gas catalog data.
 - `risks`: Propulsion is inferred from existing free-text category/spec metadata until catalog rows get a structured propulsion field.
 
+
+### 2026-05-07 — Franchize reusable content shell
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T21:22:00Z
+- `owner`: codex
+- `notes`: Added reusable `FranchizePageShell` + `FranchizeHero` components and applied the themed content hero/card shell to about, contacts, rentals, rental detail, and sale-buy franchize pages. Self-review tightened the shell toward agency polish: contrast-safe accent CTA text, richer badge/card treatment, sanitized sale anchors, and removal of the duplicate sale-page H1.
+- `next_step`: Visual-smoke `/franchize/vip-bike/about`, `/contacts`, `/rentals`, a rental card, and a sale-buy route in a browser-capable environment; next polish task should focus route-specific metadata coverage.
+- `risks`: Local screenshot capture remains blocked by missing Playwright host libraries; curl smoke reached the about route after fallback crew loading.
+
 ## 3) Active ad-hoc task — `/vipbikerental` interactive landing
 
 - status: `ready_for_pr`
