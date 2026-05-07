@@ -144,3 +144,11 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 - Historical/stat flows remain intact (`sessions`, `points`, `meetups`, replay).
 - SQL migrations are additive and reviewable in `supabase/migrations/*`.
 - SupaPlan + `docs/THE_FRANCHEEZEPLAN.md` reflect actual progress.
+
+### I6.2 — Codex lint + UX/code-review pass (2026-05-07)
+
+- [x] Coalesce fallback `live_locations` snapshot refreshes so group rides do not refetch `/overview` on every realtime packet.
+- [x] Harden Leaflet mobile long-press handling against duplicate `contextmenu`/timer callbacks and accidental synthetic click selection.
+- [x] Align floating FAB session start payload with the main privacy controls (`crew/public`, home blur, auto-expire).
+- [x] Add cockpit visibility for live/stale riders, queued GPS points, share mode, and meetup long-press guidance.
+- [ ] Field-check with two Telegram devices: long-press meetup creation, live/stale transitions, and both geoshare CTAs.

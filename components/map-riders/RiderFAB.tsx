@@ -37,7 +37,11 @@ export function RiderFAB() {
             rideName: state.rideName,
             vehicleLabel: state.vehicleLabel,
             rideMode: state.rideMode,
-            visibility: "crew",
+            visibility: state.visibilityMode === "public" ? "all_auth" : "crew",
+            privacy: {
+              homeBlurEnabled: state.homeBlurEnabled,
+              autoExpireMinutes: state.autoExpireMinutes,
+            },
           }),
         });
         const json = await res.json();
@@ -73,7 +77,20 @@ export function RiderFAB() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [dbUser, state.shareEnabled, state.sessionId, state.rideName, state.vehicleLabel, state.rideMode, crewSlug, dispatch, fetchSnapshot]);
+  }, [
+    dbUser,
+    state.shareEnabled,
+    state.sessionId,
+    state.rideName,
+    state.vehicleLabel,
+    state.rideMode,
+    state.visibilityMode,
+    state.homeBlurEnabled,
+    state.autoExpireMinutes,
+    crewSlug,
+    dispatch,
+    fetchSnapshot,
+  ]);
 
   const isRecording = state.shareEnabled;
 
