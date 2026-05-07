@@ -36,6 +36,24 @@ const orderExtras = [
   { id: "hotel-dropoff", label: "Доставка к отелю", amount: 900 },
 ] as const;
 
+const beginnerSafetyQuiz = [
+  {
+    id: "gear",
+    question: "Перед выездом новичок едет только в шлеме, перчатках и закрытой обуви?",
+    correct: true,
+  },
+  {
+    id: "speed",
+    question: "В колонне можно обгонять ведущего райдера, если кажется, что темп слишком медленный?",
+    correct: false,
+  },
+  {
+    id: "meetup",
+    question: "Если отстал или остановился, лучше поставить meetup-точку/написать экипажу, а не догонять на максимальной скорости?",
+    correct: true,
+  },
+] as const;
+
 type CheckoutPayload = {
   orderId: string;
   recipient: string;
@@ -108,6 +126,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const [isPromoValidating, setIsPromoValidating] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
   const [promoMessage, setPromoMessage] = useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
+  const [safetyAnswers, setSafetyAnswers] = useState<Record<string, boolean | null>>(() =>
+    Object.fromEntries(beginnerSafetyQuiz.map((item) => [item.id, null])),
+  );
+  const [safetyPersisted, setSafetyPersisted] = useState(false);
   const lastSubmitFingerprintRef = useRef<string | null>(null);
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
@@ -178,16 +200,19 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const hasTelegramUser = Boolean(user?.id);
   const normalizedPromoInput = normalizePromoCode(promo);
   const hasUnvalidatedPromo = normalizedPromoInput.length > 0 && appliedPromo?.code !== normalizedPromoInput;
-  const canSubmit = isValid && !isCartEmpty && !hasUnvalidatedPromo && (!requiresTelegram || hasTelegramUser);
+  const safetyQuizPassed = safetyPersisted || beginnerSafetyQuiz.every((item) => safetyAnswers[item.id] === item.correct);
+  const safetyStorageKey = dbUser?.user_id ? `franchize:${slug}:safety-quiz:${dbUser.user_id}` : null;
+  const canSubmit = isValid && !isCartEmpty && safetyQuizPassed && !hasUnvalidatedPromo && (!requiresTelegram || hasTelegramUser);
   const checkoutMilestones = useMemo(
     () => [
       { id: "cart", label: "Байк выбран", done: !isCartEmpty },
       { id: "contact", label: "Контакт заполнен", done: recipient.trim().length > 1 && phone.trim().length > 5 && time.trim().length > 0 },
       { id: "dates", label: `Период ${flowLabel} выбран`, done: Boolean(rentalStartDate) },
       { id: "signature", label: "Электронная подпись задана", done: signatureName.trim().length > 2 },
+      { id: "safety", label: "Safety quiz пройден", done: safetyQuizPassed },
       { id: "consent", label: `Условия ${flowLabel} подтверждены`, done: consent },
     ],
-    [consent, flowLabel, isCartEmpty, phone, recipient, rentalStartDate, signatureName, time],
+    [consent, flowLabel, isCartEmpty, phone, recipient, rentalStartDate, safetyQuizPassed, signatureName, time],
   );
   const completedMilestones = checkoutMilestones.filter((step) => step.done).length;
   const readinessPercent = Math.round((completedMilestones / checkoutMilestones.length) * 100);
@@ -199,11 +224,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       { id: "time", label: "Выберите удобное время", active: time.trim().length === 0 },
       { id: "dates", label: `Выберите дату начала ${flowLabel}`, active: !rentalStartDate },
       { id: "signature", label: "Введите ФИО для электронной подписи", active: signatureName.trim().length <= 2 },
+      { id: "safety", label: "Пройдите safety quiz новичка", active: !safetyQuizPassed },
       { id: "consent", label: `Подтвердите условия ${flowLabel}`, active: !consent },
       { id: "promo", label: "Примените введённый промокод или очистите поле", active: hasUnvalidatedPromo },
       { id: "telegram", label: "Для Stars откройте страницу через Telegram WebApp", active: requiresTelegram && !hasTelegramUser },
     ].filter((item) => item.active),
-    [consent, flowLabel, hasTelegramUser, hasUnvalidatedPromo, isCartEmpty, phone, recipient, rentalStartDate, requiresTelegram, signatureName, time],
+    [consent, flowLabel, hasTelegramUser, hasUnvalidatedPromo, isCartEmpty, phone, recipient, rentalStartDate, requiresTelegram, safetyQuizPassed, signatureName, time],
   );
   const nextAction = checkoutBlockers[0];
 
@@ -291,6 +317,18 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     }
   }, [appliedPromo, baseOrderAmount, promo]);
 
+  useEffect(() => {
+    if (!safetyStorageKey) return;
+    const stored = window.localStorage.getItem(safetyStorageKey);
+    if (stored === "passed") setSafetyPersisted(true);
+  }, [safetyStorageKey]);
+
+  useEffect(() => {
+    if (!safetyStorageKey || !safetyQuizPassed) return;
+    window.localStorage.setItem(safetyStorageKey, "passed");
+    setSafetyPersisted(true);
+  }, [safetyQuizPassed, safetyStorageKey]);
+
   const checkAvailabilityBeforeSubmit = async () => {
     const carIds = Array.from(new Set(submitPayload.cartLines.map((line) => line.itemId).filter(Boolean)));
     const startDate = submitPayload.rentalStartDate;
@@ -324,10 +362,16 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       extras: submitPayload.extras,
       promoCode: submitPayload.promoCode,
       promoDiscount: submitPayload.promoDiscount,
+      safetyQuizPassed,
       cartLines: submitPayload.cartLines,
     });
 
     if (isSubmitting || !canSubmit) {
+      return;
+    }
+
+    if (!safetyQuizPassed) {
+      toast.error("Пройдите safety quiz новичка перед подтверждением заказа.");
       return;
     }
 
@@ -404,6 +448,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     }
     if (blockerId === "consent") {
       setFocus("consent");
+      return;
+    }
+    if (blockerId === "safety") {
+      document.getElementById("beginner-safety-quiz")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     if (blockerId === "promo") {
@@ -655,6 +703,52 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             </div>
           </div>
 
+          <div id="beginner-safety-quiz" className="rounded-2xl border p-4" style={surface.card}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">Safety quiz новичка</p>
+                <p className="mt-1 text-xs" style={surface.mutedText}>
+                  Ответь на 3 быстрых вопроса перед первым выездом. После прохождения отметка сохранится в этом браузере для preview/Telegram WebApp тестов.
+                </p>
+              </div>
+              <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${safetyQuizPassed ? "bg-emerald-400/15 text-emerald-200" : "bg-amber-300/15 text-amber-200"}`}>
+                {safetyQuizPassed ? "пройден" : "нужно пройти"}
+              </span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {beginnerSafetyQuiz.map((item) => {
+                const answer = safetyAnswers[item.id];
+                return (
+                  <div key={item.id} className="rounded-xl border border-[var(--order-border)] p-3" style={surface.subtleCard}>
+                    <p className="text-sm">{item.question}</p>
+                    <div className="mt-2 flex gap-2">
+                      {[
+                        { label: "Да", value: true },
+                        { label: "Нет", value: false },
+                      ].map((option) => (
+                        <button
+                          key={option.label}
+                          type="button"
+                          onClick={() => setSafetyAnswers((current) => ({ ...current, [item.id]: option.value }))}
+                          className="rounded-lg border px-3 py-1 text-xs font-medium transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                          style={{
+                            borderColor: answer === option.value ? "var(--order-accent)" : "var(--order-border)",
+                            color: answer === option.value ? "var(--order-accent)" : "var(--order-text-primary)",
+                            ...focusRingOutlineStyle(crew.theme),
+                          }}
+                          aria-pressed={answer === option.value}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {!safetyQuizPassed ? <p className="mt-2 text-xs text-amber-200">Нужны все правильные ответы: экипировка — да, обгон ведущего — нет, meetup вместо погони — да.</p> : null}
+          </div>
+
           <label className="flex items-start gap-2 rounded-xl border p-3 text-sm" style={surface.card}>
             <input type="checkbox" className="mt-0.5" {...register("consent")} />
             <span>Согласен с условиями аренды и подтверждаю электронную подпись в Telegram WebApp.</span>
@@ -731,7 +825,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 ))}
               </ul>
             )}
-            {nextAction && ["recipient", "phone", "time", "consent", "promo"].includes(nextAction.id) ? (
+            {nextAction && ["recipient", "phone", "time", "consent", "promo", "safety"].includes(nextAction.id) ? (
               <button
                 type="button"
                 onClick={() => focusBlockerControl(nextAction.id)}
