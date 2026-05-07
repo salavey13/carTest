@@ -12,36 +12,23 @@ interface PartnerOnboardingPageProps {
   params: Promise<{ slug: string }>;
 }
 
-const checklist = [
-  {
-    title: "Заявка и контакт",
-    text: "Фиксируем Telegram/телефон, город, формат партнёрства и ожидаемый объём байков.",
-    icon: MessageCircle,
-  },
-  {
-    title: "Парк и роли",
-    text: "Описываем модели, статусы аренды/продажи, ответственных за выдачу, сервис и контент.",
-    icon: ClipboardCheck,
-  },
-  {
-    title: "Документы и правила",
-    text: "Согласуем договор, депозит, чеклист выдачи, ограничения по району и страховочные сценарии.",
-    icon: FileText,
-  },
-  {
-    title: "Пилотный запуск",
-    text: "Включаем витрину, тестовый заказ, MapRiders-сценарий и короткий smoke-check в Telegram WebApp.",
-    icon: ShieldCheck,
-  },
-];
+const checklistIcons = [MessageCircle, ClipboardCheck, FileText, ShieldCheck] as const;
 
-const readinessRows = [
-  ["Брендинг", "лого, цвета, оффер, адрес и рабочие часы"],
-  ["Каталог", "аренда, продажа, электробайки, аксессуары"],
-  ["Операции", "выдача, возврат, сервис, админ-доступы"],
-  ["Продажи", "новые/электро/б/у/trade-in лиды и тест-драйв"],
-  ["Комьюнити", "MapRiders, события, партнёры и Telegram-канал"],
-];
+const checklistIconByName = {
+  "message-circle": MessageCircle,
+  "clipboard-check": ClipboardCheck,
+  "file-text": FileText,
+  "shield-check": ShieldCheck,
+} as const;
+
+function getChecklistIcon(iconName: string | undefined, index: number) {
+  if (iconName && iconName in checklistIconByName) {
+    return checklistIconByName[iconName as keyof typeof checklistIconByName];
+  }
+
+  return checklistIcons[index % checklistIcons.length];
+}
+
 
 export async function generateMetadata({ params }: PartnerOnboardingPageProps): Promise<Metadata> {
   const { slug } = await params;
@@ -60,6 +47,7 @@ export default async function PartnerOnboardingPage({ params }: PartnerOnboardin
   const surface = crewPaletteForSurface(crew.theme);
   const brandName = crew.header.brandName || crew.name || "VIP BIKE";
   const telegramHref = crew.contacts.telegram ? `https://t.me/${crew.contacts.telegram.replace("@", "")}` : "https://t.me/oneBikePlsBot";
+  const { onboardingChecklist, onboardingReadinessRows } = crew.contentBlocks;
 
   return (
     <main className="min-h-screen" style={surface.page}>
@@ -96,10 +84,10 @@ export default async function PartnerOnboardingPage({ params }: PartnerOnboardin
                 <span className="text-sm font-semibold uppercase tracking-[0.16em]">Definition of ready</span>
               </div>
               <ul className="mt-4 space-y-3 text-sm opacity-75">
-                {readinessRows.map(([label, text]) => (
-                  <li key={label} className="grid gap-1 rounded-2xl border border-current/10 bg-white/[0.03] p-3">
-                    <span className="font-semibold opacity-100">{label}</span>
-                    <span>{text}</span>
+                {onboardingReadinessRows.map((row) => (
+                  <li key={row.label} className="grid gap-1 rounded-2xl border border-current/10 bg-white/[0.03] p-3">
+                    <span className="font-semibold opacity-100">{row.label}</span>
+                    <span>{row.text}</span>
                   </li>
                 ))}
               </ul>
@@ -108,8 +96,8 @@ export default async function PartnerOnboardingPage({ params }: PartnerOnboardin
         </section>
 
         <section className="grid gap-4 md:grid-cols-2">
-          {checklist.map((item, index) => {
-            const Icon = item.icon;
+          {onboardingChecklist.map((item, index) => {
+            const Icon = getChecklistIcon(item.icon, index);
             return (
               <article key={item.title} className="rounded-3xl border border-[var(--onboarding-border)] bg-[var(--onboarding-card)] p-5">
                 <div className="flex items-center justify-between gap-3">

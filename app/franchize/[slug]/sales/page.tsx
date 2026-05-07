@@ -12,36 +12,6 @@ interface SalesPageProps {
   params: Promise<{ slug: string }>;
 }
 
-const verticals = [
-  {
-    id: "new",
-    title: "Новые байки",
-    icon: Sparkles,
-    pitch: "Витрина для моделей под заказ, предпродажного расчёта и тест-драйва.",
-    cta: "Заявка на новый",
-  },
-  {
-    id: "electric",
-    title: "Electro / custom",
-    icon: BatteryCharging,
-    pitch: "Электро-эндуро, батареи, мощность, подвеска и сборка под райдера.",
-    cta: "Собрать электро",
-  },
-  {
-    id: "used",
-    title: "Б/у и проверенные",
-    icon: Bike,
-    pitch: "Лиды на технику с историей аренды, диагностикой и прозрачным состоянием.",
-    cta: "Подобрать б/у",
-  },
-  {
-    id: "trade-in",
-    title: "Trade-in",
-    icon: RefreshCcw,
-    pitch: "Быстрый вход для оценки старого байка и обмена на аренду, новый или электро.",
-    cta: "Оценить байк",
-  },
-];
 
 const isTruthySpec = (value: unknown) => value === true || value === 1 || String(value).toLowerCase() === "true" || String(value).toLowerCase() === "1";
 
@@ -57,6 +27,17 @@ function itemMatchesVertical(item: CatalogItemVM, verticalId: string): boolean {
 function previewItems(items: CatalogItemVM[], verticalId: string): CatalogItemVM[] {
   const matches = items.filter((item) => itemMatchesVertical(item, verticalId));
   return (matches.length ? matches : items.filter((item) => item.saleAvailable)).slice(0, 3);
+}
+
+const verticalIconById = {
+  new: Sparkles,
+  electric: BatteryCharging,
+  used: Bike,
+  "trade-in": RefreshCcw,
+} as const;
+
+function getVerticalIcon(verticalId: string) {
+  return verticalIconById[verticalId as keyof typeof verticalIconById] ?? Sparkles;
 }
 
 export async function generateMetadata({ params }: SalesPageProps): Promise<Metadata> {
@@ -76,6 +57,7 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
   const surface = crewPaletteForSurface(crew.theme);
   const brandName = crew.header.brandName || crew.name || "VIP BIKE";
   const saleItems = items.filter((item) => item.saleAvailable || Number(item.salePrice || 0) > 0 || isTruthySpec(item.rawSpecs?.sale));
+  const salesVerticals = crew.contentBlocks.salesVerticals;
 
   return (
     <main className="min-h-screen" style={surface.page}>
@@ -118,7 +100,7 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
                 </div>
                 <div className="rounded-2xl border border-current/10 bg-white/[0.03] p-3">
                   <dt className="opacity-55">Вертикалей</dt>
-                  <dd className="mt-1 text-2xl font-semibold text-[var(--sales-accent)]">4</dd>
+                  <dd className="mt-1 text-2xl font-semibold text-[var(--sales-accent)]">{salesVerticals.length}</dd>
                 </div>
               </dl>
             </aside>
@@ -126,8 +108,8 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
         </section>
 
         <section className="grid gap-4 md:grid-cols-2">
-          {verticals.map((vertical) => {
-            const Icon = vertical.icon;
+          {salesVerticals.map((vertical) => {
+            const Icon = getVerticalIcon(vertical.id);
             const previews = previewItems(items, vertical.id);
             return (
               <article key={vertical.id} className="rounded-3xl border border-[var(--sales-border)] bg-[var(--sales-card)] p-5">

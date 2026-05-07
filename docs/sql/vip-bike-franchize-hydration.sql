@@ -195,6 +195,43 @@ set
             'carDirections', 'Подъезд к новой локации — см. указатели на месте'
           )
         ),
+        'contentBlocks', jsonb_build_object(
+          'communityEvents', jsonb_build_array(
+            jsonb_build_object('title', 'Вечерний сбор новичков VIP BIKE', 'time', 'Пт • 19:30', 'place', 'База на Комсомольской 2', 'text', 'Короткий городской круг, проверка экипировки, объяснение жестов и правил колонны.'),
+            jsonb_build_object('title', 'MapRiders city loop', 'time', 'Сб • 12:00', 'place', 'Набережная + тихие улицы Нижнего', 'text', 'Открываем live-карту, ставим meetup-пины и едем в темпе самого спокойного райдера.'),
+            jsonb_build_object('title', 'Техно-час перед покатушкой', 'time', 'Вс • 11:00', 'place', 'VIP BIKE сервис-зона', 'text', 'Давление, цепь, свет, тормоза и быстрый чек арендного или личного байка.')
+          ),
+          'partnerCards', jsonb_build_array(
+            jsonb_build_object('name', 'VIP BIKE сервис', 'role', 'осмотр и подготовка', 'perk', 'Экспресс-чек перед выездом для экипажа'),
+            jsonb_build_object('name', 'Кофе-точка райдеров', 'role', 'место встречи', 'perk', 'Тёплый старт, зарядка телефона, быстрый брифинг'),
+            jsonb_build_object('name', 'Экипировка рядом', 'role', 'перчатки / дождевик / защита', 'perk', 'Помощь новичку без лишнего пафоса')
+          ),
+          'cityRiderTips', jsonb_build_array(
+            'Не стартуй один, если это первый выезд на незнакомом байке.',
+            'Включай MapRiders до старта: экипаж увидит скорость, stale-статус и точку встречи.',
+            'Для новичков держим видимость «только экипаж» и автостоп геошеринга.',
+            'Meetup-пин ставим long-press на карте или тапом по точке + кнопка «+».'
+          ),
+          'salesVerticals', jsonb_build_array(
+            jsonb_build_object('id', 'new', 'title', 'Новые байки', 'pitch', 'Витрина для моделей под заказ, предпродажного расчёта и тест-драйва.', 'cta', 'Заявка на новый'),
+            jsonb_build_object('id', 'electric', 'title', 'Electro / custom', 'pitch', 'Электро-круизеры, батареи, подвеска и сборка под райдера.', 'cta', 'Собрать электро'),
+            jsonb_build_object('id', 'used', 'title', 'Б/у и проверенные', 'pitch', 'Лиды на технику с историей аренды, диагностикой и прозрачным состоянием.', 'cta', 'Подобрать б/у'),
+            jsonb_build_object('id', 'trade-in', 'title', 'Trade-in', 'pitch', 'Быстрый вход для оценки старого байка и обмена на аренду, новый или электро.', 'cta', 'Оценить байк')
+          ),
+          'onboardingChecklist', jsonb_build_array(
+            jsonb_build_object('title', 'Заявка и контакт', 'text', 'Фиксируем Telegram/телефон, город, формат партнёрства и ожидаемый объём байков.', 'icon', 'message-circle'),
+            jsonb_build_object('title', 'Парк и роли', 'text', 'Описываем модели, статусы аренды/продажи, ответственных за выдачу, сервис и контент.', 'icon', 'clipboard-check'),
+            jsonb_build_object('title', 'Документы и правила', 'text', 'Согласуем договор, депозит, чеклист выдачи, ограничения по району и страховочные сценарии.', 'icon', 'file-text'),
+            jsonb_build_object('title', 'Пилотный запуск', 'text', 'Включаем витрину, тестовый заказ, MapRiders-сценарий и короткий smoke-check в Telegram WebApp.', 'icon', 'shield-check')
+          ),
+          'onboardingReadinessRows', jsonb_build_array(
+            jsonb_build_object('label', 'Брендинг', 'text', 'лого, цвета, оффер, адрес и рабочие часы'),
+            jsonb_build_object('label', 'Каталог', 'text', 'аренда, продажа, электробайки, аксессуары'),
+            jsonb_build_object('label', 'Операции', 'text', 'выдача, возврат, сервис, админ-доступы'),
+            jsonb_build_object('label', 'Продажи', 'text', 'новые/электро/б/у/trade-in лиды и тест-драйв'),
+            jsonb_build_object('label', 'Комьюнити', 'text', 'MapRiders, события, партнёры и Telegram-канал')
+          )
+        ),
         'catalog', jsonb_build_object(
           'groupOrder', jsonb_build_array('Naked', 'Supersport', 'Enduro', 'Touring', 'Neo-retro', 'Power-cruiser'),
           'quickLinks', jsonb_build_array('23 февраля', 'Все по 549', 'Выгодное комбо', 'Cruiser week'),
