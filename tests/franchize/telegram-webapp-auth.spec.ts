@@ -3,9 +3,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context";
 import { isAllowedMockContext } from "@/lib/telegram-mock-context";
 import { buildTelegramDataCheckString, computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
+import { extractTelegramLaunchParams } from "@/lib/telegram-launch-params";
 
 function signInitData(initDataWithoutHash: string, botToken: string): string {
   const { dataCheckString } = buildTelegramDataCheckString(initDataWithoutHash);
+  const secret = createHmac("sha256", "WebAppData").update(botToken).digest();
+  return createHmac("sha256", secret).update(dataCheckString).digest("hex");
+}
+
+function signLegacyInitDataWithoutSignature(initDataWithoutHash: string, botToken: string): string {
+  const params = new URLSearchParams(initDataWithoutHash);
+  params.delete("signature");
+  const keys = Array.from(params.keys()).sort();
+  const dataCheckString = keys.map((key) => `${key}=${params.get(key)}`).join("\n");
   const secret = createHmac("sha256", "WebAppData").update(botToken).digest();
   return createHmac("sha256", secret).update(dataCheckString).digest("hex");
 }
@@ -23,13 +33,38 @@ describe("Telegram WebApp initData validation", () => {
     signature: "ignored-third-party-signature",
   }).toString();
 
-  it("builds Telegram data-check-string by sorting fields and excluding hash/signature", () => {
+  it("builds Telegram data-check-string by sorting fields and excluding only hash", () => {
     const hash = signInitData(initDataWithoutHash, botToken);
     const initData = `${initDataWithoutHash}&hash=${hash}`;
 
     expect(buildTelegramDataCheckString(initData)).toEqual({
       hashFromClient: hash,
-      dataCheckString: `auth_date=1710000000\nquery_id=AAHdF6IQAAAAAN0XohDhrOrc\nuser=${user}`,
+      dataCheckString: `auth_date=1710000000
+query_id=AAHdF6IQAAAAAN0XohDhrOrc
+signature=ignored-third-party-signature
+user=${user}`,
+    });
+  });
+
+  it("rejects legacy signatures that omit Telegram's third-party signature field", async () => {
+    const legacyHash = signLegacyInitDataWithoutSignature(initDataWithoutHash, botToken);
+    const result = await computeTelegramWebAppHash(`${initDataWithoutHash}&hash=${legacyHash}`, botToken);
+
+    expect(result.isValid).toBe(false);
+    expect(result.computedHash).not.toBe(legacyHash);
+  });
+
+  it("extracts initData and start_param from Telegram launch URL hash fallback", () => {
+    const launchInitData = new URLSearchParams({
+      query_id: "AAE_HASH_FALLBACK",
+      user,
+      auth_date: "1710000000",
+    }).toString();
+    const href = `https://vip-bike.ee/franchize/vip-bike#tgWebAppData=${encodeURIComponent(launchInitData)}&tgWebAppStartParam=mapriders_vip-bike`;
+
+    expect(extractTelegramLaunchParams(href)).toEqual({
+      initData: launchInitData,
+      startParam: "mapriders_vip-bike",
     });
   });
 

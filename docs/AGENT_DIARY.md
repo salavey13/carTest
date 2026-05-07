@@ -45,3 +45,9 @@ Open archive only for deep forensics on:
 - Upgraded `/supaplan/franchize` from simple mapping to operator-grade execution board: phased sections, R1-R4 task-type legend, and expanded live task details (`task_id`, `todo_path`, `updated_at`, `pr_url`, `body`).
 - Added explicit epic decomposition hints per franchize capability so implementation can spawn child tasks deterministically instead of keeping oversized epics.
 - Screenshot captured via fallback skill (`scripts/page-screenshot-skill.mjs`) because browser container tooling was unavailable in this runner.
+
+### 2026-05-07
+- Symptom: production Telegram Mini App auth could show `No user data available for authentication` / hash mismatch after Telegram added the `signature` launch field.
+- Root cause: HMAC data-check-string incorrectly omitted `signature`; client also depended only on `window.Telegram.WebApp.initData`, missing raw `tgWebAppData` URL-hash fallback when WebApp bootstrap was unavailable or late.
+- Fix/workaround: include every initData field except `hash` for bot-token HMAC validation, parse `tgWebAppData`/`tgWebAppStartParam` from launch URL fallback, and keep handled start params guarded while stale URL params remain.
+- Verification command: `npm test -- tests/franchize/telegram-webapp-auth.spec.ts && npm run lint && git diff --check`.
