@@ -49,6 +49,16 @@ This root file stays intentionally compact so operators and agents can load it q
 
 - 2026-05-04 — Added support for metadata-driven franchize header logo routing via `header.logoHref` with default fallback to `/franchize/{slug}`; seeded `vip-bike` to land on `/vipbikerental` instead of catalog. Next step: expose `header.logoHref` in admin configurator UI for non-SQL operators.
 
+
+### 2026-05-07 — Franchize about page self-review polish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T22:45:00Z
+- `owner`: codex-review
+- `notes`: Self-reviewed the structured `/franchize/[slug]/about` slice: normalized theme usage toward shell CSS variables, added zero-catalog trust-strip copy, moved repeated trust card rendering into typed data, and routed the sales/configurator CTA through the sales hub so users see the full purchase/configurator funnel. Floating cart remains intentionally omitted from this intent page to avoid mobile CTA overlap.
+- `next_step`: Browser-smoke `/franchize/vip-bike/about` in a runtime where the operator wants visual QA; screenshot capture intentionally skipped in this pass per operator instruction.
+- `risks`: Live trust-strip values still depend on crew/catalog hydration; sparse metadata fallback is designed to keep the page useful when Supabase data is incomplete.
+
 ### 2026-05-07 — Franchize intent rail navigation
 
 - `status`: ready_for_pr
