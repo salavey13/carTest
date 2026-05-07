@@ -4,21 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 
-type TelegramWebApp = {
-  requestLocation?: (callback?: (location: { latitude: number; longitude: number; altitude?: number | null; course?: number | null; horizontal_accuracy?: number | null }) => void) => Promise<unknown> | void;
-  HapticFeedback?: {
-    impactOccurred?: (style: "light" | "medium" | "heavy" | "rigid" | "soft") => void;
-  };
-};
-
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp?: TelegramWebApp;
-    };
-  }
-}
-
 interface GPSPoint {
   lat: number;
   lng: number;
@@ -261,7 +246,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
           horizontal_accuracy?: number | null;
         };
         if (!gotPoint && resolved?.latitude != null && resolved?.longitude != null) {
-          handleLocation(resolved);
+          handleLocation({ ...resolved, latitude: resolved.latitude, longitude: resolved.longitude });
         }
       } catch {
         return false;

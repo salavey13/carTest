@@ -85,9 +85,9 @@ export function MapInteractionCapture({
     };
 
     map.on("contextmenu", handleContextMenu);
-    map.on("touchstart", handleTouchStart);
-    map.on("touchmove", handleTouchMove);
-    map.on("touchend", handleTouchEnd);
+    map.on("touchstart" as keyof L.LeafletEventHandlerFnMap, handleTouchStart as L.LeafletEventHandlerFn);
+    map.on("touchmove" as keyof L.LeafletEventHandlerFnMap, handleTouchMove as L.LeafletEventHandlerFn);
+    map.on("touchend" as keyof L.LeafletEventHandlerFnMap, handleTouchEnd as L.LeafletEventHandlerFn);
 
     return () => {
       clearLongPress();
@@ -96,9 +96,9 @@ export function MapInteractionCapture({
         clickSuppressionTimerRef.current = null;
       }
       map.off("contextmenu", handleContextMenu);
-      map.off("touchstart", handleTouchStart);
-      map.off("touchmove", handleTouchMove);
-      map.off("touchend", handleTouchEnd);
+      map.off("touchstart" as keyof L.LeafletEventHandlerFnMap, handleTouchStart as L.LeafletEventHandlerFn);
+      map.off("touchmove" as keyof L.LeafletEventHandlerFnMap, handleTouchMove as L.LeafletEventHandlerFn);
+      map.off("touchend" as keyof L.LeafletEventHandlerFnMap, handleTouchEnd as L.LeafletEventHandlerFn);
     };
   }, [map, triggerLongPress, longPressDelay, clearLongPress]);
 

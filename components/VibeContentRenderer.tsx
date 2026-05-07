@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps, Text, Comment } from 'html-react-parser';
+import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps, Text, Comment, type DOMNode } from 'html-react-parser';
 import Link from 'next/link';
 import * as Fa6Icons from "react-icons/fa6";
 import { debugLogger as logger } from "@/lib/debugLogger";
@@ -68,7 +68,7 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
             
             const mutableAttribs = attributesToProps(domNode.attribs || {});
             const children = domNode.children && domNode.children.length > 0
-                           ? domToReact(domNode.children, simplifiedParserOptions) 
+                           ? domToReact(domNode.children as DOMNode[], simplifiedParserOptions) 
                            : null;
 
             let iconToRender: keyof typeof Fa6Icons | undefined = undefined;
@@ -116,7 +116,7 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
             if (lowerCaseName === 'em') {
                 mutableAttribs.className = `${mutableAttribs.className || ''} italic text-brand-cyan`.trim();
             }
-            if (lowerCaseName === 'code' && domNode.parent?.name !== 'pre') {
+            if (lowerCaseName === 'code' && (!(domNode.parent instanceof Element) || domNode.parent.name !== 'pre')) {
                  mutableAttribs.className = `${mutableAttribs.className || ''} bg-muted px-1 py-0.5 rounded text-sm font-mono text-accent-foreground`.trim();
             }
             if (lowerCaseName === 'pre') {
@@ -162,7 +162,7 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
       const parsedContent = parse(processedContent, simplifiedParserOptions); 
       
       if (className) {
-        if (React.isValidElement(parsedContent)) {
+        if (React.isValidElement<{ className?: string }>(parsedContent)) {
           return React.cloneElement(parsedContent, {
             className: cn(parsedContent.props.className, className)
           });

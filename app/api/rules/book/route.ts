@@ -78,7 +78,10 @@ export async function POST(request: Request) {
     await sendComplexMessage(userId, `${summaryMd}\nPay deposit below.`, [], { parseMode: 'MarkdownV2' });
 
     // Admin notif
-    await sendComplexMessage(process.env.ADMIN_CHAT_ID, `${summaryMd}\nApprove?`, [[{ text: '/approve_' + rentalId }, { text: '/decline_' + rentalId }]], { keyboardType: 'reply' });
+    const adminChatId = process.env.ADMIN_CHAT_ID;
+    if (adminChatId) {
+      await sendComplexMessage(adminChatId, `${summaryMd}\nApprove?`, [[{ text: '/approve_' + rentalId }, { text: '/decline_' + rentalId }]], { keyboardType: 'reply' });
+    }
 
     // Rigger notif if set
     if (riggerId) {

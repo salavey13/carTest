@@ -485,6 +485,7 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     brandName: "Franchize",
     tagline: "Hydration pending",
     logoUrl: "",
+    logoHref: `/franchize/${slug}`,
     menuLinks: fallbackMenuLinks(slug),
   },
   contacts: {
@@ -791,11 +792,10 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
           Boolean(readPath(specs, ["is_hot"], false)) ||
           Boolean(readPath(specs, ["hot"], false)) ||
           /hot|🔥/i.test(String(readPath(specs, ["badge"], ""))),
-        saleAvailable:
-          readPath(specs, ["sale"], 0) === 1 ||
-          readPath(specs, ["sale"], false) === true ||
-          String(readPath(specs, ["sale"], "")).toLowerCase() === "1" ||
-          String(readPath(specs, ["sale"], "")).toLowerCase() === "true",
+        saleAvailable: (() => {
+          const saleFlag = readPath<unknown>(specs, ["sale"], "");
+          return saleFlag === 1 || saleFlag === true || ["1", "true"].includes(String(saleFlag).toLowerCase());
+        })(),
         salePrice:
           Number(readPath(specs, ["sale_price"], 0)) > 0
             ? Number(readPath(specs, ["sale_price"], 0))
@@ -1036,7 +1036,7 @@ async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promis
     slug,
     brandName: readPath(franchize, ["branding", "name"], (crew.name as string) ?? defaultFranchizeConfig.brandName),
     tagline: readPath(franchize, ["branding", "tagline"], defaultFranchizeConfig.tagline),
-    logoUrl: readPath(franchize, ["branding", "logoUrl"], (crew.logo_url as string) ?? ""),
+    logoUrl: readPath(franchize, ["branding", "logoUrl"], (crew.logo_url as string) ?? "") ?? "",
     themeMode: readPath(franchize, ["theme", "mode"], defaultTheme.mode),
     bgBase: readPath(themePalette, ["bgBase"], defaultTheme.palette.bgBase),
     bgCard: readPath(themePalette, ["bgCard"], defaultTheme.palette.bgCard),
@@ -1155,7 +1155,7 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput, actorUser
     };
   }
 
-  const payload = parsed.data;
+  const payload: FranchizeConfigInput = { ...parsed.data, logoUrl: parsed.data.logoUrl ?? "" };
   const normalizedSlug = normalizeCrewSlug(payload.slug);
   payload.slug = normalizedSlug;
 
