@@ -4,7 +4,8 @@ import type { FranchizeCrewVM } from "@/app/franchize/actions";
 import { MapRidersClientRefactored } from "@/components/map-riders/MapRidersClientRefactored";
 
 export function MapRidersClient({ crew, slug }: { crew: FranchizeCrewVM; slug?: string }) {
-  // Meetup creation is centralized in MapRidersClientRefactored via useMeetupCreator,
-  // so this franchize entrypoint always consumes the deduplicated flow.
+  // Meetup creation and split MapRiders state/actions contexts are centralized
+  // in MapRidersClientRefactored/useMapRidersContext, so this franchize
+  // entrypoint always consumes the deduplicated, low-rerender flow.
   return <MapRidersClientRefactored crew={crew} slug={slug} />;
 }

@@ -4,15 +4,11 @@
 
 "use client";
 
-import { useMapRiders } from "@/hooks/useMapRidersContext";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useSessionManager } from "@/app/franchize/hooks/useSessionManager";
 
 export function RiderFAB() {
-  const { state } = useMapRiders();
-  const { isSubmitting, toggleSession } = useSessionManager();
-
-  const isRecording = state.shareEnabled;
+  const { isRecording, isSubmitting, toggleSession } = useSessionManager();
 
   return (
     <button

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
-import { useMapRiders } from "@/hooks/useMapRidersContext";
+import { useMapRidersActions } from "@/hooks/useMapRidersContext";
 
 type ExperienceLevel = "new" | "city" | "crew";
 type BikeGoal = "rental" | "personal";
@@ -37,7 +37,7 @@ function optionClass(isActive: boolean) {
 }
 
 export function BeginnerRiderOnboardingQuiz({ crew }: { crew: FranchizeCrewVM }) {
-  const { dispatch, crewSlug } = useMapRiders();
+  const { dispatch, crewSlug } = useMapRidersActions();
   const [step, setStep] = useState(0);
   const [experience, setExperience] = useState<ExperienceLevel>("new");
   const [bikeGoal, setBikeGoal] = useState<BikeGoal>("rental");
