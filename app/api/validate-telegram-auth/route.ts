@@ -1,7 +1,7 @@
 // /app/api/validate-telegram-auth/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { webcrypto } from 'crypto'; 
 import { logger } from '@/lib/logger'; 
+import { computeTelegramWebAppHash } from '@/lib/telegram-webapp-auth';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BYPASS_VALIDATION_ENV = process.env.TEMP_BYPASS_TG_AUTH_VALIDATION === 'true';
@@ -32,50 +32,21 @@ async function validateTelegramHash(initDataString: string, bypassValidation: bo
   }
 
   const params = new URLSearchParams(initDataString);
-  const hashFromClient = params.get("hash");
-
-  if (!hashFromClient) {
-    logger.warn("[API_VALIDATE_HASH_FN_WARN] Hash missing in initData.");
-    return { isValid: false, error: "Hash not found in initData." };
-  }
-
-  logger.log(`[API_VALIDATE_HASH_FN_INFO] Client hash: ${hashFromClient}`);
-
-  const keys = Array.from(params.keys())
-    .filter(key => key !== "hash" && key !== "signature")
-    .sort();
-
-  const dataCheckString = keys.map(key => `${key}=${params.get(key)}`).join('\n');
-
-  logger.log(`[API_VALIDATE_HASH_FN_INFO] DataCheckString (len: ${dataCheckString.length}): "${dataCheckString.slice(0, 200)}${dataCheckString.length > 200 ? '...' : ''}"`);
 
   try {
-    const secretKey = await webcrypto.subtle.importKey(
-      "raw", new TextEncoder().encode("WebAppData"),
-      { name: "HMAC", hash: "SHA-256" },
-      false, ["sign"]
-    );
+    const validation = await computeTelegramWebAppHash(initDataString, BOT_TOKEN);
+    const hashFromClient = validation.hashFromClient;
+    const signatureHex = validation.computedHash || "";
+    const isStrictlyValid = validation.isValid;
 
-    const derivedKeyBuffer = await webcrypto.subtle.sign(
-      "HMAC", secretKey, new TextEncoder().encode(BOT_TOKEN)
-    );
+    if (!hashFromClient) {
+      logger.warn("[API_VALIDATE_HASH_FN_WARN] Hash missing in initData.");
+      return { isValid: false, error: validation.error || "Hash not found in initData." };
+    }
 
-    const derivedKey = await webcrypto.subtle.importKey(
-      "raw", derivedKeyBuffer,
-      { name: "HMAC", hash: "SHA-256" },
-      false, ["sign"]
-    );
-
-    const signatureBuffer = await webcrypto.subtle.sign(
-      "HMAC", derivedKey, new TextEncoder().encode(dataCheckString)
-    );
-
-    const signatureHex = Array.from(new Uint8Array(signatureBuffer))
-      .map(b => b.toString(16).padStart(2, '0')).join('');
-
+    logger.log(`[API_VALIDATE_HASH_FN_INFO] Client hash: ${hashFromClient}`);
+    logger.log(`[API_VALIDATE_HASH_FN_INFO] DataCheckString (len: ${validation.dataCheckString?.length || 0}): "${validation.dataCheckString?.slice(0, 200) || ""}${(validation.dataCheckString?.length || 0) > 200 ? '...' : ''}"`);
     logger.log(`[API_VALIDATE_HASH_FN_INFO] Computed hash: ${signatureHex}`);
-
-    const isStrictlyValid = signatureHex === hashFromClient;
 
     if (bypassValidation) {
       if (!isStrictlyValid) {
@@ -85,7 +56,7 @@ async function validateTelegramHash(initDataString: string, bypassValidation: bo
       const userParam = params.get("user");
       if (userParam) {
         try {
-          const user = JSON.parse(decodeURIComponent(userParam));
+          const user = JSON.parse(userParam);
           logger.info("[API_VALIDATE_HASH_FN_INFO] (Bypass Mode) User parsed successfully:", { userId: user?.id, username: user?.username });
           return { isValid: true, user };
         } catch (e) {
@@ -101,7 +72,7 @@ async function validateTelegramHash(initDataString: string, bypassValidation: bo
       const userParam = params.get("user");
       if (userParam) {
         try {
-          const user = JSON.parse(decodeURIComponent(userParam));
+          const user = JSON.parse(userParam);
           logger.info("[API_VALIDATE_HASH_FN_SUCCESS] User parsed successfully:", { userId: user?.id, username: user?.username });
           return { isValid: true, user };
         } catch (e) {

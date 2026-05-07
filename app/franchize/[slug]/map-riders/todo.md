@@ -165,3 +165,8 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 - Corrected Telegram WebApp hash derivation in `/api/validate-telegram-auth` and franchize review auth: HMAC key is `WebAppData`, signed message is the bot token, then the resulting key signs the sorted data-check string.
 - Added preview/dev mockuser gating: `NEXT_PUBLIC_USE_MOCK_USER=true` only activates mock auth when browser URL contains `salavey13` or `NEXT_PUBLIC_IS_PREVIEW=true`; real production without that marker stays blocked on failed Telegram validation.
 - MapRiders write-header fallback now requests an app JWT for the mock user only inside the same allowed preview context, so preview testing can start sessions without opening a real Telegram WebApp.
+
+## Investigation notes (2026-05-07 — self-review hardening)
+- Self-reviewed the Telegram auth mystery: the old implementation had the HMAC key/message reversed for the derivation step. Shared helper `lib/telegram-webapp-auth.ts` now owns data-check-string building + hash computation, and tests compare it against an independent Node `createHmac` fixture.
+- SupaPlan statuses verified as `ready_for_pr` for FRZ-R9 (`74fcc094-6990-4657-bf13-91460a291e32`), RENT-P1.1 (`309a8777-6bc0-4d9d-aa8a-b6a9ec11b730`), UX-03 (`9db00978-92dd-48a3-8913-d6972243dfbd`) and SEC-BYPASS-CHECK (`dd9a9d3c-3234-4d1b-7890-ddd000ddf890`).
+- RENT-P1.1 follow-up added checkout-level safety gate in `OrderPageClient`: three beginner safety answers are required before order confirmation, with browser-local persistence by slug/user.

@@ -252,3 +252,13 @@ This root file stays intentionally compact so operators and agents can load it q
 - `notes`: Claimed the SupaPlan security task and corrected Telegram WebApp HMAC derivation (`WebAppData` as the HMAC key, bot token as message) in both auth validators. Mock user activation is now explicitly gated: allowed only when `NEXT_PUBLIC_USE_MOCK_USER=true` and the client URL contains `salavey13` or `NEXT_PUBLIC_IS_PREVIEW=true`; otherwise production shows a strict Telegram-open/auth error. MapRiders write headers can request the mock app JWT only in that same allowed preview context.
 - `next_step`: Verify on a real Telegram WebApp session and a Vercel preview URL containing `salavey13`; keep `TEMP_BYPASS_TG_AUTH_VALIDATION` unset on real production domains.
 - `risks`: Local runner cannot provide real Telegram signed initData; production verification needs bot-generated `initData` and current `TELEGRAM_BOT_TOKEN`.
+
+### 2026-05-07 — SupaPlan four-task self-review + Telegram auth test harness
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex-review
+- `supaplan_tasks`: FRZ-R9=`74fcc094-6990-4657-bf13-91460a291e32`, RENT-P1.1=`309a8777-6bc0-4d9d-aa8a-b6a9ec11b730`, UX-03=`9db00978-92dd-48a3-8913-d6972243dfbd`, SEC-BYPASS-CHECK=`dd9a9d3c-3234-4d1b-7890-ddd000ddf890`
+- `notes`: Self-review found the Telegram HMAC fix should not remain duplicated, so validation was extracted to `lib/telegram-webapp-auth.ts` with Vitest coverage using an independent Node `createHmac` oracle. RENT-P1.1 was tightened from a MapRiders-only quiz into checkout gating too: `OrderPageClient` now blocks confirmation until the 3-question beginner safety quiz is passed and persists the pass in browser storage per slug/user.
+- `next_step`: Real-device Telegram WebApp smoke with a current signed `initData`, plus production preview smoke on a `salavey13` Vercel URL with `NEXT_PUBLIC_USE_MOCK_USER=true`.
+- `risks`: The checkout safety completion is browser-local for this slice, not yet persisted to `users.metadata.quiz_completed_at`; follow-up DB persistence can make it cross-device.

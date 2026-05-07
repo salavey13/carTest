@@ -4,13 +4,14 @@ import { createInvoice, supabaseAdmin } from "@/lib/supabase-server";
 import { notifyAdmin, sendTelegramDocument, sendTelegramInvoice } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
-import { randomUUID, webcrypto } from "crypto";
+import { randomUUID } from "crypto";
 import { readFile } from "fs/promises";
 import path from "path";
 import { headers } from "next/headers";
 import { getCrewSensitiveData, getUserSensitiveData, saveCrewSensitiveData } from "@/app/lib/private-secrets";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 import { resolveFranchizeTheme, resolvePaletteByMode } from "@/app/franchize/lib/theme-resolver";
+import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 import {
   DEFAULT_AD_CARDS_TEXT,
@@ -2078,29 +2079,10 @@ async function resolveVerifiedTelegramUserId(initDataString: string): Promise<{ 
   const hashFromClient = params.get("hash");
   if (!hashFromClient) return { success: false, error: "Telegram init data hash is missing." };
 
-  const keys = Array.from(params.keys()).filter((key) => key !== "hash" && key !== "signature").sort();
-  const dataCheckString = keys.map((key) => `${key}=${params.get(key)}`).join("\n");
-
-  const botTokenKey = await webcrypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode("WebAppData"),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const derivedKeyBuffer = await webcrypto.subtle.sign("HMAC", botTokenKey, new TextEncoder().encode(botToken));
-  const telegramWebAppKey = await webcrypto.subtle.importKey(
-    "raw",
-    derivedKeyBuffer,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signatureBuffer = await webcrypto.subtle.sign("HMAC", telegramWebAppKey, new TextEncoder().encode(dataCheckString));
-  const signatureHex = Array.from(new Uint8Array(signatureBuffer)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const validation = await computeTelegramWebAppHash(initDataString, botToken);
   const bypassValidation = process.env.TEMP_BYPASS_TG_AUTH_VALIDATION === "true" && isTempTelegramBypassAllowedForPreview();
 
-  if (signatureHex !== hashFromClient && !bypassValidation) {
+  if (!validation.isValid && !bypassValidation) {
     return { success: false, error: "Telegram init data hash mismatch." };
   }
 
