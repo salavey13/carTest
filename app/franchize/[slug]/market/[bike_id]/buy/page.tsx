@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getFranchizeBySlug } from "@/app/franchize/actions";
@@ -10,6 +11,7 @@ import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { SaleBikeLanding } from "@/app/franchize/components/SaleBikeLanding";
 import { isSameCatalogPropulsion } from "@/app/franchize/lib/catalog-propulsion";
 import { buildSaleBuySectionId } from "@/app/franchize/lib/sale-anchors";
+import { buildFranchizeSectionMetadata, findCatalogItemImage } from "../../../metadata";
 
 interface BuyBikePageProps {
   params: Promise<{ slug: string; bike_id: string }>;
@@ -21,6 +23,36 @@ const isSaleEnabled = (value: unknown) =>
   value === true ||
   String(value).toLowerCase() === "1" ||
   String(value).toLowerCase() === "true";
+
+
+export async function generateMetadata({ params }: BuyBikePageProps): Promise<Metadata> {
+  const { slug, bike_id } = await params;
+  return buildFranchizeSectionMetadata(slug, {
+    sectionTitle: ({ items }) => {
+      const item = items.find((candidate) => candidate.id === bike_id);
+      return item ? `Покупка · ${item.title}` : "Покупка байка";
+    },
+    sectionDescription: ({ items }) => {
+      const item = items.find((candidate) => candidate.id === bike_id);
+      return item
+        ? `Покупка ${item.title}: характеристики, сравнение, тест-драйв и заявка экипажу.`
+        : "Страница покупки выбранного байка: характеристики, сравнение, тест-драйв и заявка экипажу.";
+    },
+    pathSuffix: `/market/${bike_id}/buy`,
+    ogTitle: ({ items, crew }) => {
+      const item = items.find((candidate) => candidate.id === bike_id);
+      return item ? `Купить ${item.title} · ${crew.header.brandName}` : "Покупка байка в экипаже oneSitePls";
+    },
+    ogDescription: ({ items }) => {
+      const item = items.find((candidate) => candidate.id === bike_id);
+      return item
+        ? `Открой карточку ${item.title}, сравни комплектацию и отправь заявку на покупку.`
+        : "Открой карточку выбранного байка, сравни комплектацию и отправь заявку на покупку.";
+    },
+    image: ({ items }) => findCatalogItemImage(items, bike_id),
+    imageAlt: ({ items, crew }) => items.find((item) => item.id === bike_id)?.title || `${crew.header.brandName} bike preview`,
+  });
+}
 
 export default async function BuyBikePage({
   params,

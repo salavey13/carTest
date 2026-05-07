@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { CatalogClient } from "../../components/CatalogClient";
@@ -5,6 +6,7 @@ import { type CatalogItemVM, getFranchizeBySlug } from "../../actions";
 import { crewPaletteForSurface } from "../../lib/theme";
 import Link from "next/link";
 import { fallbackBikes } from "../configurator/fallback-catalog";
+import { buildFranchizeSectionMetadata } from "../metadata";
 
 interface ElectroEnduroPageProps {
   params: Promise<{ slug: string }>;
@@ -77,6 +79,18 @@ const configuratorFallbackItems = (): CatalogItemVM[] =>
       { label: "tier", value: String(bike.specs.tier ?? "standard") },
     ],
   }));
+
+
+export async function generateMetadata({ params }: ElectroEnduroPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  return buildFranchizeSectionMetadata(slug, {
+    sectionTitle: "Электро-эндуро",
+    sectionDescription: "Электро-эндуро витрина экипажа: аренда, тест-драйв, покупка и сборка кастомного байка.",
+    pathSuffix: "/electro-enduro",
+    image: ({ items }) => items.find((item) => item.imageUrl && (item.category.toLowerCase().includes("electro") || item.title.toLowerCase().includes("electro") || item.title.toLowerCase().includes("электро")))?.imageUrl,
+    imageAlt: ({ crew }) => `${crew.header.brandName} electro-enduro preview`,
+  });
+}
 
 export default async function ElectroEnduroPage({
   params,

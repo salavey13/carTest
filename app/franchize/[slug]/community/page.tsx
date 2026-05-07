@@ -1,9 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays, Handshake, MapPinned, ShieldCheck, UsersRound } from "lucide-react";
 import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+import { buildFranchizeSectionMetadata } from "../metadata";
 
 const cityEvents = [
   {
@@ -38,6 +40,16 @@ const cityTips = [
   "Для новичков держим видимость «только экипаж» и автостоп геошеринга.",
   "Meetup-пин ставим long-press на карте или тапом по точке + кнопка «+».",
 ];
+
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  return buildFranchizeSectionMetadata(slug, {
+    sectionTitle: "Сообщество и поездки",
+    sectionDescription: "События, партнёры и городские маршруты экипажа для совместных выездов.",
+    pathSuffix: "/community",
+  });
+}
 
 export default async function FranchizeCommunityPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

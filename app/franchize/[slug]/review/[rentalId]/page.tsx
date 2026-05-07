@@ -1,11 +1,23 @@
+import type { Metadata } from "next";
 import { getFranchizeBySlug, getRentalReviewContext } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
 import { CrewFooter } from "../../../components/CrewFooter";
 import { crewPaletteForSurface } from "../../../lib/theme";
 import { ReviewForm } from "./ReviewForm";
+import { buildFranchizeSectionMetadata } from "../../metadata";
 
 interface RentalReviewPageProps {
   params: Promise<{ slug: string; rentalId: string }>;
+}
+
+
+export async function generateMetadata({ params }: RentalReviewPageProps): Promise<Metadata> {
+  const { slug, rentalId } = await params;
+  return buildFranchizeSectionMetadata(slug, {
+    sectionTitle: "Отзыв об аренде",
+    sectionDescription: "Страница отзыва после аренды: оценка байка, впечатления райдера и обратная связь экипажу.",
+    pathSuffix: `/review/${rentalId}`,
+  });
 }
 
 export default async function RentalReviewPage({ params }: RentalReviewPageProps) {
