@@ -55,6 +55,7 @@ export interface PointOfInterest {
     }>;
     properties?: Record<string, unknown>;
   };
+  markerClassName?: string;
   roadHighlight?: {
     weight?: number;
     glow?: boolean;
