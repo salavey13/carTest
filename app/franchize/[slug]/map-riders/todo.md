@@ -54,7 +54,7 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 
 ### I6 — Production-hardening backlog (new)
 - [x] Privacy controls: visibility mode (`crew/public`) + home-blur option + auto-expire presets (1/5/15/60).
-- [ ] Route replay full-screen UI with timeline scrubber.
+- [x] Route replay full-screen UI with timeline scrubber.
 - [ ] Speed-gradient route polyline rendering (segment color by speed).
 - [ ] Long-press meetup creation mode (keep tap safe for exploration UX).
 - [x] Write API hardening: CSRF-style guards (`Authorization` + `Origin` + `X-Requested-With`) and per-user in-memory rate limits for session/meetups/batch writes.
@@ -123,6 +123,10 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
   - Wired privacy payload from client GPS pipeline into `/api/map-riders/batch-points` and fallback `/api/map-riders/location`.
   - Added server-side expire enforcement: expired sessions auto-stop and return 409 to client writes.
   - Added location blur transform when home-blur is enabled and persisted privacy metadata in session stats.
+
+## Investigation notes (2026-05-06)
+- Completed SupaPlan task `b2fb8b78-dc2d-4913-b379-caf22eb1c4e5` (I6 route replay full-screen scrubber UI): replay opens from History into a full-screen cockpit with SVG route projection, current rider marker, timeline range scrubber, play/pause, keyboard controls and speed presets.
+- Continued SupaPlan task `696922bd-8186-4903-ab7b-ef999d7ac11b` (RENT-P2.4 Telegram native GPS bridge): Telegram `message.location`/`edited_message.location` now first checks active MapRiders sessions and persists native live-location updates into live feed + replay history before falling back to legacy crew shift handling.
 
 ## Investigation notes (2026-04-26)
 - SupaPlan task `e9c8f76f-0863-4f20-a871-6a09dd3bf7f8` (I6.1 evidence pack) progressed with fresh `vip-bike` smoke + screenshot refresh:
