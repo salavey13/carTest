@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
+import { getFranchizeRouteCtaPolicy } from "@/app/franchize/lib/route-cta-policy";
 import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import dynamic from "next/dynamic";
@@ -28,9 +29,10 @@ export default async function MapRidersPage({ params }: { params: Promise<{ slug
   const crewSlug = crew.slug || slug;
   const activePath = `/franchize/${crewSlug}/map-riders`;
   const surface = crewPaletteForSurface(crew.theme);
+  const ctaPolicy = getFranchizeRouteCtaPolicy("map-riders");
 
   return (
-    <main className="min-h-screen" style={surface.page}>
+    <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
       <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} />
       <MapRidersClient crew={crew} slug={crewSlug} />
       <CrewFooter crew={crew} />
