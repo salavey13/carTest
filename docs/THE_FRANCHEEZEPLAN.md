@@ -52,11 +52,21 @@ This root file stays intentionally compact so operators and agents can load it q
 ## 3) Active ad-hoc task — `/vipbikerental` interactive landing
 
 - status: `ready_for_pr`
-- updated_at: `2026-05-06T00:00:00Z`
+- updated_at: `2026-05-06T23:45:00Z`
 - owner: `codex`
-- notes: `Final polish complete: Hero, Electro-Enduro, MapRiders preview, StepsProgress newbie flow, original downstream content blocks, docs, and safe fallbacks are preserved/synced.`
-- next_step: `Create PR. Remaining TODO entries are future backlog and should not auto-trigger unless operator explicitly asks.`
-- risks: `Local runtime can render fallback data when Supabase is unavailable; production QA should verify real vip-bike catalog/map records.`
+- notes: `Self-reviewed and polished ConversionPilot into a more customer-facing route cockpit: score is now a compact operator signal, while the main surface recommends the next bike and three clear rent/buy/group-ride paths with better copy and accessibility labels.`
+- next_step: `Create PR and production-smoke /vipbikerental with real vip-bike catalog/map data.`
+- risks: `Local runtime can render fallback data when Supabase is unavailable; production QA should verify real vip-bike catalog/map records and active rental states.`
+
+
+### 2026-05-06 — SupaPlan franchize maintenance pair
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T22:30:00Z
+- `owner`: codex-frz-couple-01
+- `notes`: Implemented `FIX-STARTPARAM` stale-ref reset for repeated Telegram deep links and started `RENT-P3.2` with Vitest coverage for franchize navigation/theme helpers; self-review tightened duplicate-processing/stale-result guards and category anchor normalization.
+- `next_step`: Add mocked Supabase coverage for server action validators after this PR lands.
+- `risks`: Server-action integration tests remain future work because this slice intentionally focused on low-conflict pure helper coverage.
 
 
 ### 2026-05-06 — SupaPlan franchize maintenance pair
@@ -75,7 +85,22 @@ This root file stays intentionally compact so operators and agents can load it q
 - 2026-05-06 — Self-reviewed `/vipbikerental` refactor by comparing old/new section headings, then shipped lightweight MapRiders preview: static glowing route map, live rider dots, meetup labels, latest ride stats and SVG speed sparkline. Next step: interactive newbie stepper.
 - 2026-05-06 — Finalized `/vipbikerental` PR readiness review: updated TODO with finished/not-finished checklist, confirmed no important visible sections were intentionally removed, and moved active status to `ready_for_pr`. Next PR should begin with the interactive newbie stepper.
 - 2026-05-06 — Final polish iteration: implemented `StepsProgress` for the newbie flow and reworded `/app/vipbikerental/todo.md` so completed scope is clearly closed while remaining quick-action/technical items are future backlog, not an automatic trigger.
+- 2026-05-06 — Continued explicit `/vipbikerental` TODO work: replaced static quick-action link cards with `RentalQuickActionHub`, including latest rental readiness, live rider counters and a quick bike chooser modal hydrated from catalog/fallback items. Next step: technical cleanup backlog or production QA with real Supabase rental/map data.
+- 2026-05-06 — Continued cleanup after quick actions: extracted shared sale config/color parsing into `app/franchize/lib/sale-config.ts` and reused it in both the sale buy page and `/vipbikerental` Electro-Enduro quick preview, removing duplicated package/color constants. Next step: OSRM/route loading cleanup or production QA.
+
+- 2026-05-06 — Responded to operator rating request for `/vipbikerental`: added a visible ConversionPilot scorecard/decision dock after the hero showcase, deriving score/next action from catalog and MapRiders data, plus replaced the stale 2025 promo code with evergreen `VIPSTART`. Next step: visual smoke in local/preview runtime.
+- 2026-05-06 — Self-reviewed the ConversionPilot slice: reduced the audit feeling, made the score compact, rewrote the section as a customer-facing route cockpit, added route aria labels, fixed rider pluralization, and kept the recommended bike CTA data-driven. Next step: preview QA with production catalog/map data.
 ## 3) Active implementation slices
+
+
+### 2026-05-06 — Franchize accessibility labels for MapRiders/configurator
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T22:25:00Z
+- `owner`: codex
+- `notes`: Added screen-reader labels/aria names for MapRiders ride controls, privacy dropdowns, meetup drawer inputs, replay scrubber, and configurator option controls. SupaPlan task `dc8f8c2b-2234-4c0a-6789-ccc000ccf789`.
+- `next_step`: Verify `vip-bike` configurator and `/franchize/vip-bike/map-riders` with a browser accessibility audit when a local runtime is available.
+- `risks`: Visual layout should be unchanged because labels are hidden where needed; runtime audit still depends on app boot and route data.
 
 ### 2026-05-06 — Sale buy page VS + test-drive reservation
 
@@ -96,3 +121,207 @@ This root file stays intentionally compact so operators and agents can load it q
 - `risks`: Visual/live invoice verification still depends on reachable Supabase and Telegram bot credentials.
 - 2026-05-06 — SupaPlan franchize maintenance pair: fixed repeated `startapp` handling in `useStartParamRouter` and added a test-coverage foundation for franchize helper libraries. Next step: mocked Supabase action validation tests.
 - 2026-05-06 — Self-reviewed SupaPlan franchize maintenance pair: replaced the boolean start-param guard with active/last-handled param refs to prevent duplicate processing during pathname/clear races, removed dead sale metadata, and normalized category anchors before tests codify the behavior.
+- 2026-05-06 — Final code review polish for SupaPlan franchize maintenance: added a run-id freshness guard so slow async start-param resolutions cannot navigate after a newer deep link wins.
+
+- 2026-05-06 — Claimed SupaPlan franchize accessibility task `dc8f8c2b-2234-4c0a-6789-ccc000ccf789`; labeled MapRiders dropdown/input controls and configurator option controls for screen readers. Next step: PR review + runtime accessibility smoke on `vip-bike`.
+### 2026-05-06 — Telegram auth unmount guard
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T22:25:00Z
+- `owner`: codex
+- `notes`: Claimed SupaPlan `CQ-TELEGRAM-GUARD` and moved `useTelegram` async initialization from a local boolean to a lifecycle ref guard so delayed auth results do not update state after unmount.
+- `next_step`: Merge PR, then verify Telegram WebApp auth/navigation on `vip-bike` under slow network throttling.
+- `risks`: Runtime Telegram validation still depends on configured bot/API env and a real WebApp launch context.
+
+
+### 2026-05-06 — SupaPlan RENT-P2.2 rental reviews
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:20:00Z
+- `owner`: codex-franchize-1778108121
+- `supaplan_task`: 88d44bfc-1f3b-4004-b5e2-d123479d7d39
+- `notes`: Added rental review schema, completed-rental review form route, catalog card/modal review display, Top rated filter, crew rating blocks, Telegram review deep link, and admin soft-hide moderation panel.
+- `next_step`: Apply migration in Supabase, complete a real return_confirmed rental, submit a review through Telegram WebApp, and verify public catalog/admin moderation with live data.
+- `risks`: Review table must be migrated before runtime review queries can hydrate; local smoke is limited by unavailable production Supabase data.
+
+### 2026-05-06 — RENT-P2.2 self-review polish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:18:00Z
+- `owner`: codex-franchize-1778108121
+- `supaplan_task`: 88d44bfc-1f3b-4004-b5e2-d123479d7d39
+- `notes`: Self-review tightened the review flow: notification slug lookup no longer depends on nested PostgREST embeds, review form disables submission for non-renter Telegram profiles before server call, and RLS insert checks now verify the bike belongs to the submitted crew.
+- `next_step`: Merge after applying the migration in the target Supabase project and smoke-test one completed rental review from the renter account.
+- `risks`: Existing runtime still relies on Telegram WebApp identity hydration; production smoke should verify the renter user id matches stored rental user_id.
+
+### 2026-05-06 — RENT-P2.2 Codex review fixes
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:32:00Z
+- `owner`: codex
+- `supaplan_task`: 88d44bfc-1f3b-4004-b5e2-d123479d7d39
+- `notes`: Fixed automated review findings: review submission now verifies Telegram initData server-side instead of trusting caller-provided userId, and hidden reviews cannot be restored by renter upsert/edit.
+- `next_step`: Production smoke with a real Telegram WebApp review link after migration apply.
+- `risks`: TEMP_BYPASS_TG_AUTH_VALIDATION must remain disabled in production for the server-side initData check to be authoritative.
+### 2026-05-06 — FRZ-R5 pilot KPI scoreboard
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T22:55:00Z
+- `owner`: codex-cli
+- `notes`: Added a compact `/nexus` KPI scoreboard for the VIP Bike franchise funnel with pilot conversion/SLA/partner signals and lead-to-paid-booking stages. SupaPlan task `913e8a73-46f6-4c22-8278-c1b5aabe661e`.
+- `next_step`: Wire the same KPI cards to real order/lead events after event analytics storage is finalized.
+- `risks`: Current numbers are explicitly pilot targets, not live production analytics.
+
+### 2026-05-06 — CQ franchize config/theme hardening
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:15:00Z
+- `owner`: codex
+- `notes`: Executed SupaPlan CQ-03 (`9513da34-2e8b-445e-a43a-09a22c8e5bc3`) and CQ-04 (`43499f79-1513-47b3-9b2c-3a85fdb30653`): extracted franchise defaults into shared config constants and moved crew theme resolution behind null-safe metadata guards.
+- `next_step`: Merge PR, then use the shared config constants for future create-form cleanup slices.
+- `risks`: Full repository typecheck is still blocked by pre-existing syntax errors outside this slice (`data/questions.ts`, `supabase/functions/arbitrage-scan-instance/index.ts`).
+
+- 2026-05-06 — CQ franchize config/theme hardening: centralized hardcoded default palette/map/menu/promo/contract values and added malformed theme metadata coverage so bad crew records fall back to defaults instead of crashing.
+- 2026-05-06 — Self-review polish for CQ config/theme hardening: removed the type-only cycle between shared config and server actions, kept `FranchizeTheme` exported through the old action module contract, and made array-shaped crew metadata reads defensive for menu/footer/catalog/order buckets.
+### 2026-05-06 — Storefront a11y + XTR orphan invoice cleanup
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:20:00Z
+- `owner`: codex
+- `notes`: Completed SupaPlan `RENT-P3.1` and `FIX-ORPHAN-INVOICE`: public storefront controls now expose stronger labels/current/pressed states, overlay focus containment/return was tightened in self-review, and failed Telegram XTR sends clean up newly-created pending franchize invoices.
+- `next_step`: Merge PR, then run browser accessibility smoke on `/franchize/vip-bike` and a Telegram invoice failure-path smoke with test credentials.
+- `risks`: Visual a11y smoke depends on a bootable local/prod runtime; invoice delivery/failure verification depends on Telegram bot credentials.
+
+### 2026-05-06 — RENT-P1.2 promo validation engine
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T00:00:00Z
+- `owner`: codex-cli
+- `supaplan_task`: c272370f-4cbe-4063-83c8-1120c3494699
+- `notes`: Replaced checkout promo UI stub with Supabase-backed promo validation, active-window checks, discount extraction, checkout blocker handling, and server-side total revalidation before order notification/XTR invoice creation.
+- `next_step`: Smoke-test `/franchize/vip-bike/order/<id>` with active `NEURO2026` promo in a real cart and confirm Telegram invoice metadata shows the discounted total.
+- `risks`: Live validation depends on crew metadata containing active `catalog.promoBanners` and `order.allowPromo` in Supabase.
+- 2026-05-07 — RENT-P1.2 self-review polish: made promo resolution canonical across notification, direct invoice, and checkout paths; added structured discount fields/minimum subtotal support; moved checkout cooldown after successful promo validation; and invalidated applied promos when cart/extras totals change.
+### 2026-05-06 — FRZ-R6 VIP BIKE company + service hub
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-06T23:58:00Z
+- `owner`: codex
+- `supaplan_task`: 4de0a224-e88d-4bf7-909f-f27e96a2d5e1
+- `notes`: Re-checked the stale ready_for_pr task with no visible PR and implemented the missing public-facing company/service hub on `/vipbikerental`: one section now explains VIP BIKE as rental + service + rider community, links to catalog, service contact and MapRiders, and keeps the existing service cards/FAQ as supporting detail.
+- `next_step`: Production-smoke `/vipbikerental` with real `vip-bike` catalog data and verify service CTA destination with operator.
+- `risks`: Service CTA currently routes to the existing Telegram operator contact until a dedicated service booking route exists.
+
+### 2026-05-07 — VIP Bike QA rhythm + configurator style containment
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T07:20:00Z
+- `owner`: codex
+- `supaplan_task`: d3c8f9f2-3234-4c3a-def0-33330003cdef
+- `notes`: Addressed operator QA notes across `/vipbikerental`, `/franchize/vip-bike/configurator`, and `/franchize/vip-bike/electro-enduro`: tightened the hero-to-showcase rhythm, scoped ConfiguratorClient CSS variables away from `:root`, added resilient bike image presentation/fallbacks, removed the global franchize footer from the configurator page, compacted the shared footer elsewhere, and added a VipBike fallback catalog for Electro-Enduro when live crew hydration is empty.
+- `next_step`: Browser-smoke the three routes against production data/preview and verify the Electro-Enduro fallback notice disappears when the live `vip-bike` crew/items hydrate correctly.
+- `risks`: Electro-Enduro fallback prevents an empty showroom but does not replace the need to seed/repair production Supabase crew + catalog rows.
+
+- 2026-05-07 — VIP Bike QA pass: reduced `/vipbikerental` post-hero depth, contained configurator styles, made configurator bike imagery readable with fallback art, removed the mustard footer from the configurator flow, compacted shared footer scale, hardened Electro-Enduro contrast, and added a temporary non-empty VipBike fallback catalog for hydration failures.
+
+### 2026-05-07 — Telegram back + VIP Bike MapRiders triage
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `notes`: Fixed Telegram WebApp back handling to use an internal SPA history stack instead of `router.back()`, corrected Seqvens Zero code identifiers to `seqvens-zero` while intentionally preserving existing `carpix/seqvenz-zero/*` storage paths, and tightened MapRiders QA to smoke the requested `vip-bike` slug APIs with JSON success checks.
+- `next_step`: Field-test Telegram BackButton in the real bot WebApp and collect the exact MapRiders failing action if testers still report “doesn't work”.
+- `risks`: CLI smoke confirms the route/APIs are alive, but two-phone live GPS and Telegram BackButton behavior still need real Telegram WebApp device verification.
+
+### 2026-05-07 — MapRiders lint + mobile UX hardening
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `notes`: Bulk lint pass normalized the legacy warning policy and fixed remaining blocking lint findings, then MapRiders review fixed mobile long-press duplicate/click suppression, coalesced fallback realtime snapshot refreshes, synced FAB privacy/start payloads with the main rider panel, and added clearer live/stale/queue cockpit UI hints for `vip-bike` riders.
+- `next_step`: Smoke `/franchize/vip-bike/map-riders` in a real Telegram WebApp with two devices to verify long-press meetup creation and privacy-preserving geoshare start from both CTA surfaces.
+- `risks`: Local CI can validate lint/build/API shape, but true GPS accuracy and Telegram permission UX still require device testing.
+
+- 2026-05-07 — MapRiders review pass: reduced realtime overfetch pressure, made mobile long-press meetup selection safer, aligned floating and panel start actions, and surfaced live/stale/queue state directly in the map cockpit.
+
+### 2026-05-07 — FRZ-R9 + UX-03 + RENT-P1.1 MapRiders visible value slice
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `notes`: Executed the explicit operator scope: MapRiders now has self-hosted inline SVG initial avatars instead of external placeholder-style marker art, a Russian 3-step beginner quiz that configures ride name/bike/privacy/auto-stop before sharing, a new `/franchize/[slug]/community` city events + partners hub, and `TEMP_BYPASS_TG_AUTH_VALIDATION` is allowed only on preview request URLs/headers containing `salavey13`.
+- `next_step`: Browser-smoke `/franchize/vip-bike/map-riders` and `/franchize/vip-bike/community` on a Vercel preview URL that contains `salavey13`.
+- `risks`: Community events/partners are curated starter content until real operator calendar/partner data is connected; auth bypass remains explicitly env-gated and preview-host-gated.
+
+### 2026-05-07 — supaplan_task:dd9a9d3c-3234-4d1b-7890-ddd000ddf890 Telegram auth + smart mockuser fallback
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex-tg-auth-fallback
+- `supaplan_task`: dd9a9d3c-3234-4d1b-7890-ddd000ddf890
+- `notes`: Claimed the SupaPlan security task and corrected Telegram WebApp HMAC derivation (`WebAppData` as the HMAC key, bot token as message) in both auth validators. Mock user activation is now explicitly gated: allowed only when `NEXT_PUBLIC_USE_MOCK_USER=true` and the client URL contains `salavey13` or `NEXT_PUBLIC_IS_PREVIEW=true`; otherwise production shows a strict Telegram-open/auth error. MapRiders write headers can request the mock app JWT only in that same allowed preview context.
+- `next_step`: Verify on a real Telegram WebApp session and a Vercel preview URL containing `salavey13`; keep `TEMP_BYPASS_TG_AUTH_VALIDATION` unset on real production domains.
+- `risks`: Local runner cannot provide real Telegram signed initData; production verification needs bot-generated `initData` and current `TELEGRAM_BOT_TOKEN`.
+
+### 2026-05-07 — SupaPlan four-task self-review + Telegram auth test harness
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex-review
+- `supaplan_tasks`: FRZ-R9=`74fcc094-6990-4657-bf13-91460a291e32`, RENT-P1.1=`309a8777-6bc0-4d9d-aa8a-b6a9ec11b730`, UX-03=`9db00978-92dd-48a3-8913-d6972243dfbd`, SEC-BYPASS-CHECK=`dd9a9d3c-3234-4d1b-7890-ddd000ddf890`
+- `notes`: Self-review found the Telegram HMAC fix should not remain duplicated, so validation was extracted to `lib/telegram-webapp-auth.ts` with Vitest coverage using an independent Node `createHmac` oracle. RENT-P1.1 was tightened from a MapRiders-only quiz into checkout gating too: `OrderPageClient` now blocks confirmation until the 3-question beginner safety quiz is passed and persists the pass in browser storage per slug/user.
+- `next_step`: Real-device Telegram WebApp smoke with a current signed `initData`, plus production preview smoke on a `salavey13` Vercel URL with `NEXT_PUBLIC_USE_MOCK_USER=true`.
+- `risks`: The checkout safety completion is browser-local for this slice, not yet persisted to `users.metadata.quiz_completed_at`; follow-up DB persistence can make it cross-device.
+
+### 2026-05-07 — Telegram bypass review fix + VIP Bike seed/navigation polish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex-review
+- `notes`: Addressed Codex review P1: auth bypass no longer reads caller-controlled URL/query/origin/referer; it now depends only on server-known Vercel deployment metadata (`VERCEL_ENV=preview` + deployment URL containing `salavey13`) or exact `TELEGRAM_AUTH_BYPASS_ALLOWED_HOSTS`. Added regression tests for forged `?salavey13` production URLs, live-like Telegram initData recreation, and preview/allowlist behavior. Updated VIP Bike seed SQL header/footer with `/franchize/{slug}/community`, and replaced `/vipbikerental` hardcoded Стригинский address with `ул. Комсомольская 2`.
+- `next_step`: Apply updated `docs/sql/vip-bike-franchize-hydration.sql` to staging/prod Supabase after merge, then smoke header/footer navigation.
+- `risks`: Bypass now requires Vercel preview metadata or explicit allowlist; if a preview runtime lacks `VERCEL_ENV/VERCEL_URL`, set `TELEGRAM_AUTH_BYPASS_ALLOWED_HOSTS` to the exact preview host.
+
+### 2026-05-07 — FRZ-R4 + FRZ-R8 + CQ-01 partner/sales/session slice
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `supaplan_tasks`: `941503e4-9092-4d1f-bc93-3bf3147dbd69`, `b6180fa5-a62e-434b-b4c0-437cf996430e`, `b3950a88-bbd2-4eeb-9db4-b29da8026be8`
+- `notes`: Added VIP-bike partner onboarding checklist route, added four-lane sales vertical route for new/electric/used/trade-in intent capture, and extracted duplicated MapRiders session start/stop write logic into `useSessionManager` for the map panel + floating FAB.
+- `next_step`: Preview-smoke `/franchize/vip-bike/onboarding`, `/franchize/vip-bike/sales`, and `/franchize/vip-bike/map-riders`; after production data is verified, add onboarding/sales links to default crew menu metadata.
+- `risks`: Local checks validate TypeScript/lint shape, but real Telegram GPS/session writes still require device QA with configured runtime secrets.
+
+### 2026-05-07 — FRZ self-review navigation polish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex-review
+- `supaplan_tasks`: `941503e4-9092-4d1f-bc93-3bf3147dbd69`, `b6180fa5-a62e-434b-b4c0-437cf996430e`, `b3950a88-bbd2-4eeb-9db4-b29da8026be8`
+- `notes`: Self-review found the new partner onboarding and sales routes were only direct URLs, so the VIP-bike hydration SQL now seeds both routes into header menu links and footer section links.
+- `next_step`: Re-apply `docs/sql/vip-bike-franchize-hydration.sql` after merge and smoke `/franchize/vip-bike/onboarding` + `/franchize/vip-bike/sales` from hydrated navigation.
+- `risks`: Existing production metadata will not show the new links until the updated seed/hydration SQL is applied.
+
+### 2026-05-07 — SupaPlan franchize UX/perf/type strict trio
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `supaplan_tasks`: `021bb5f2-9183-4733-b911-606cae9eb6d8`, `3905fad7-650a-446f-832d-d9bc848fa691`, `d6f2c2c5-6234-4f6b-0123-66660006f123`
+- `notes`: Executed PERF-01, RENT-P3.3, and TS-STRICT together: MapRiders now exposes split state/action contexts for lower-noise consumers, the franchize profile menu has persisted notification opt-in/out controls, and a dedicated franchize TypeScript config/script starts the stricter path without changing the whole repo at once.
+- `next_step`: Run preview smoke for `/franchize/vip-bike/map-riders` and the franchize header profile menu with a Telegram-authenticated user.
+- `risks`: The new franchize typecheck surfaces existing legacy type debt outside this slice, so follow-up strict cleanup should burn down the current errors before making it merge-blocking.
+
+- 2026-05-07 — SupaPlan trio pass: split MapRiders provider state/actions, added per-slug notification preference persistence in the profile dropdown, and introduced a dedicated franchize TypeScript check command for incremental strictness.
+
+### 2026-05-07 — Self-review fixes for SupaPlan franchize trio
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex-review
+- `supaplan_tasks`: `021bb5f2-9183-4733-b911-606cae9eb6d8`, `3905fad7-650a-446f-832d-d9bc848fa691`, `d6f2c2c5-6234-4f6b-0123-66660006f123`
+- `notes`: Self-review fixed the first pass: profile notification prefs now normalize slugs, handle read/write rejections, and protect metadata shape; RiderFAB no longer double-subscribes to MapRiders state; `useSessionManager` uses the split context hooks directly; the franchize typecheck command now exits cleanly for the allowlisted strict slice while summarizing legacy transitive debt.
+- `next_step`: Burn down the surfaced transitive TypeScript debt in follow-up slices, then expand `tsconfig.franchize.json` allowlist.
+- `risks`: The TypeScript check is intentionally allowlist-gated; it is a gradual guardrail, not yet a full `app/franchize/**` merge blocker.
+
+- 2026-05-07 — Self-reviewed the SupaPlan trio and fixed the main regressions: no knowingly failing typecheck command, safer notification preference IO, normalized metadata keys, and reduced RiderFAB duplicate state subscription.

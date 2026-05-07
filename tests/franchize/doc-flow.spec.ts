@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getUserSensitiveData: vi.fn(),
   getCrewSensitiveData: vi.fn(),
   from: vi.fn(),
+  invoiceDeleteContains: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase-server', () => ({
@@ -118,6 +119,27 @@ function buildSupabaseFromMock() {
             maybeSingle: async () => ({ data: null, error: null }),
           }),
         }),
+        delete: () => ({
+          eq: () => ({
+            eq: () => ({
+              contains: mocks.invoiceDeleteContains,
+            }),
+          }),
+        }),
+      };
+    }
+
+    if (table === 'rentals') {
+      return {
+        select: () => ({
+          eq: () => ({
+            order: () => ({
+              limit: () => ({
+                maybeSingle: async () => ({ data: null, error: null }),
+              }),
+            }),
+          }),
+        }),
       };
     }
 
@@ -134,7 +156,8 @@ describe('franchize checkout doc-flow', () => {
     mocks.sendTelegramDocument.mockResolvedValue({ success: true });
     mocks.notifyAdmin.mockResolvedValue({ success: true });
     mocks.sendTelegramInvoice.mockResolvedValue({ success: true });
-    mocks.createInvoice.mockResolvedValue({ success: true });
+    mocks.createInvoice.mockResolvedValue({ success: true, data: { status: 'pending' } });
+    mocks.invoiceDeleteContains.mockResolvedValue({ error: null });
     mocks.buildDocx.mockResolvedValue({ bytes: new Uint8Array([1, 2, 3]), renderedMarkdown: 'ok' });
     vi.stubEnv('ADMIN_CHAT_ID', '417553377');
   });
@@ -156,6 +179,19 @@ describe('franchize checkout doc-flow', () => {
     expect(result.success).toBe(true);
     expect(mocks.createInvoice).toHaveBeenCalledTimes(1);
     expect(mocks.sendTelegramInvoice).toHaveBeenCalledTimes(1);
+    expect(mocks.invoiceDeleteContains).not.toHaveBeenCalled();
     expect(mocks.sendTelegramDocument).toHaveBeenCalled();
+  });
+
+  it('cleans up the pending invoice when Telegram XTR send fails', async () => {
+    mocks.sendTelegramInvoice.mockResolvedValueOnce({ success: false, error: 'telegram send failed' });
+
+    const result = await createFranchizeOrderCheckout(buildPayload('telegram_xtr', 'order-cleanup'));
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('telegram send failed');
+    expect(mocks.createInvoice).toHaveBeenCalledTimes(1);
+    expect(mocks.invoiceDeleteContains).toHaveBeenCalledTimes(1);
+    expect(mocks.invoiceDeleteContains).toHaveBeenCalledWith('metadata', expect.objectContaining({ rental_id: expect.any(String) }));
   });
 });

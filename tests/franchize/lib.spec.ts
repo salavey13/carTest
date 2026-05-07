@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { catalogCardVariantStyles, crewPaletteForSurface, floatingCartOverlayBackground } from '@/app/franchize/lib/theme';
+import { resolveFranchizeTheme, resolvePaletteByMode } from '@/app/franchize/lib/theme-resolver';
 import { isExternalHref, toCategoryId } from '@/app/franchize/lib/navigation';
+import { DEFAULT_FRANCHIZE_THEME } from '@/lib/franchize-config';
 import type { FranchizeTheme } from '@/app/franchize/actions';
 
 const theme: FranchizeTheme = {
@@ -15,6 +17,7 @@ const theme: FranchizeTheme = {
     borderSoft: '#3f3f46',
     accentMain: '#f97316',
     accentSecondary: '#fed7aa',
+    accentMainHover: '#ea580c',
   },
 };
 
@@ -59,5 +62,33 @@ describe('franchize theme helpers', () => {
   it('uses stronger cart overlay opacity in dark mode', () => {
     expect(floatingCartOverlayBackground(theme)).toBe('rgba(32, 36, 42, 0.94)');
     expect(floatingCartOverlayBackground({ ...theme, mode: 'light' })).toBe('rgba(32, 36, 42, 0.9)');
+  });
+
+  it('resolves nested light palette metadata safely', () => {
+    expect(resolveFranchizeTheme({
+      theme: {
+        mode: 'pepperolli_light',
+        palettes: {
+          light: {
+            bgBase: '#fff7ed',
+            bgCard: '#ffffff',
+            accentMain: '#ea580c',
+          },
+        },
+      },
+    })).toMatchObject({
+      mode: 'pepperolli_light',
+      palette: {
+        bgBase: '#fff7ed',
+        bgCard: '#ffffff',
+        accentMain: '#ea580c',
+        textPrimary: DEFAULT_FRANCHIZE_THEME.palette.textPrimary,
+      },
+    });
+  });
+
+  it('falls back to defaults when crew theme metadata is malformed', () => {
+    expect(resolveFranchizeTheme({ theme: { mode: 42, palette: 'broken' } })).toEqual(DEFAULT_FRANCHIZE_THEME);
+    expect(resolvePaletteByMode({ theme: { mode: null, palettes: ['broken'] } })).toEqual(DEFAULT_FRANCHIZE_THEME.palette);
   });
 });

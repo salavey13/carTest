@@ -13,13 +13,13 @@ INSERT INTO public.cars (
   crew_id
 )
 VALUES (
-  'seqvenz-zero',
-  'Seqvenz',
+  'seqvens-zero',
+  'Seqvens',
   'Zero',
   'Мощный крутой электробайк с дерзким силуэтом и уверенной тягой. Мощность двигателя 15–30 кВт, запас хода до 300 километров. Базовую карточку уже добавили, расширенное описание и детали дополним следующим апдейтом.',
   15000,
   'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/seqvenz-zero/image_1.jpg',
-  '/rent/seqvenz-zero',
+  '/rent/seqvens-zero',
   false,
   'bike',
   jsonb_build_object(

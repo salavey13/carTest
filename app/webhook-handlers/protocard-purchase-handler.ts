@@ -15,7 +15,7 @@ interface UserProtoCard {
   data?: Record<string, any>;   
 }
 
-interface UserMetadataWithProtoCards extends UserMetadata {
+type UserMetadataWithProtoCards = Extract<UserMetadata, Record<string, unknown>> & {
   xtr_protocards?: {
     [cardId: string]: UserProtoCard;
   };

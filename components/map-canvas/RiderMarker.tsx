@@ -21,6 +21,15 @@ function getSpeedColor(speedKmh: number): string {
   return SPEED_COLORS.slow;
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function getInitials(name: string): string {
   return name
     .split(/\s+/)
@@ -37,6 +46,36 @@ interface RiderMarkerProps {
   onClick: () => void;
 }
 
+function createInitialsAvatarSvg(initials: string, speedColor: string, borderColor: string, isSelf: boolean, isStale: boolean): string {
+  const safeInitials = escapeHtml(initials);
+  const fill = isStale ? "#111827" : isSelf ? "#2a2103" : "#08111f";
+  const glow = isStale ? "#6b7280" : speedColor;
+  const gradientIdSuffix = `${safeInitials}-${speedColor}-${borderColor}`.replace(/[^a-zA-Z0-9]/g, "");
+  const glowId = `avatarGlow-${gradientIdSuffix}`;
+  const strokeId = `avatarStroke-${gradientIdSuffix}`;
+
+  return `
+    <svg class="rider-marker__avatar-svg" viewBox="0 0 48 48" role="img" aria-label="${safeInitials}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="${glowId}" cx="34%" cy="24%" r="70%">
+          <stop offset="0%" stop-color="${glow}" stop-opacity="0.55" />
+          <stop offset="48%" stop-color="${fill}" stop-opacity="0.96" />
+          <stop offset="100%" stop-color="#020617" stop-opacity="1" />
+        </radialGradient>
+        <linearGradient id="${strokeId}" x1="8" x2="40" y1="6" y2="42">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.7" />
+          <stop offset="45%" stop-color="${borderColor}" />
+          <stop offset="100%" stop-color="${speedColor}" />
+        </linearGradient>
+      </defs>
+      <circle cx="24" cy="24" r="21" fill="url(#${glowId})" stroke="url(#${strokeId})" stroke-width="4" />
+      <path d="M13 16C17 9 30 7 36 14" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.22" />
+      <circle cx="35" cy="14" r="3" fill="${speedColor}" opacity="${isStale ? "0.35" : "0.95"}" />
+      <text x="24" y="29" text-anchor="middle" font-size="13" font-weight="800" font-family="system-ui, -apple-system, BlinkMacSystemFont, sans-serif" fill="#ffffff" letter-spacing="0.8">${safeInitials}</text>
+    </svg>
+  `;
+}
+
 function createRiderIcon(rider: LiveRider, riderName: string, isSelected: boolean): L.DivIcon {
   const initials = getInitials(riderName);
   const speedColor = getSpeedColor(rider.speed_kmh);
@@ -44,12 +83,13 @@ function createRiderIcon(rider: LiveRider, riderName: string, isSelected: boolea
   const isStale = rider.status === "stale";
   const speed = Math.round(rider.speed_kmh);
   const heading = Number.isFinite(rider.heading) ? Number(rider.heading) : null;
+  const avatarSvg = createInitialsAvatarSvg(initials, speedColor, borderColor, rider.isSelf, isStale);
 
   const html = `
     <div class="rider-marker ${isStale ? "rider-marker--stale" : ""} ${isSelected ? "rider-marker--selected" : ""}"
          style="--marker-border: ${borderColor}; --marker-speed-color: ${speedColor};">
       <div class="rider-marker__ring"></div>
-      <div class="rider-marker__avatar">${initials}</div>
+      <div class="rider-marker__avatar">${avatarSvg}</div>
       ${
         heading !== null
           ? `<div class="rider-marker__heading" style="transform: translate(-50%, -50%) rotate(${heading}deg);"></div>`
@@ -71,18 +111,20 @@ function createRiderIcon(rider: LiveRider, riderName: string, isSelected: boolea
         width: 40px;
         height: 40px;
         border-radius: 50%;
-        background: #111827;
-        border: 3px solid var(--marker-border, #60a5fa);
+        background: transparent;
         color: white;
-        font-size: 13px;
-        font-weight: 700;
-        font-family: system-ui, sans-serif;
         display: flex;
         align-items: center;
         justify-content: center;
         z-index: 2;
         position: relative;
-        transition: border-color 0.3s, transform 0.3s;
+        transition: transform 0.3s, filter 0.3s;
+      }
+      .rider-marker__avatar-svg {
+        display: block;
+        height: 48px;
+        width: 48px;
+        filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
       }
       .rider-marker__heading {
         position: absolute;
@@ -101,7 +143,7 @@ function createRiderIcon(rider: LiveRider, riderName: string, isSelected: boolea
       }
       .rider-marker--selected .rider-marker__avatar {
         transform: scale(1.2);
-        box-shadow: 0 0 16px var(--marker-border);
+        filter: drop-shadow(0 0 14px var(--marker-border));
       }
       .rider-marker__speed {
         position: absolute;
@@ -128,8 +170,8 @@ function createRiderIcon(rider: LiveRider, riderName: string, isSelected: boolea
         z-index: 1;
       }
       .rider-marker--stale .rider-marker__avatar {
-        opacity: 0.4;
-        border-color: #6b7280;
+        opacity: 0.55;
+        filter: grayscale(0.35);
       }
       .rider-marker--stale .rider-marker__speed {
         background: #6b7280;

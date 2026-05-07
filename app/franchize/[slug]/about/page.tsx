@@ -36,6 +36,12 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
           {crew.description ||
             "Раздел в процессе наполнения. Подробный текст, преимущества и FAQ подгрузятся из метаданных франшизы."}
         </p>
+        {crew.ratingSummary.count > 0 && (
+          <div className="mt-4 inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm" style={surface.card}>
+            <span className="font-bold" style={{ color: crew.theme.palette.accentMain }}>★ {crew.ratingSummary.average.toFixed(1)}</span>
+            <span style={surface.mutedText}>общий рейтинг экипажа · {crew.ratingSummary.count} отзывов</span>
+          </div>
+        )}
       </section>
       <CrewFooter crew={crew} />
       <FranchizeFloatingCart

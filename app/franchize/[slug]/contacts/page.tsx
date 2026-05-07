@@ -39,6 +39,12 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
             <p>Telegram: {crew.contacts.telegram || "—"}</p>
             {crew.contacts.workingHours && <p>Часы работы: {crew.contacts.workingHours}</p>}
           </div>
+          {crew.ratingSummary.count > 0 && (
+            <div className="mt-4 rounded-2xl border px-3 py-2 text-sm" style={surface.subtleCard}>
+              <span className="font-bold" style={{ color: crew.theme.palette.accentMain }}>★ {crew.ratingSummary.average.toFixed(1)}</span>
+              <span style={surface.mutedText}> · рейтинг экипажа по {crew.ratingSummary.count} отзывам</span>
+            </div>
+          )}
 
           {crew.contacts.map.publicTransport && <p className="mt-3 text-xs" style={surface.mutedText}>Транспорт: {crew.contacts.map.publicTransport}</p>}
           {crew.contacts.map.carDirections && <p className="mt-1 text-xs" style={surface.mutedText}>Как добраться: {crew.contacts.map.carDirections}</p>}

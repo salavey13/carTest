@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { debugLogger } from "@/lib/debugLogger"; 
 import { logger as globalLogger } from "@/lib/logger"; 
+import { isAllowedMockContext } from "@/lib/telegram-mock-context";
 import { 
   fetchDbUserAction,
   upsertTelegramUserAction
@@ -51,7 +52,7 @@ const MOCK_USER: WebAppUser | null = process.env.NEXT_PUBLIC_USE_MOCK_USER === '
 } : null;
 
 if (MOCK_USER) {
-    globalLogger.warn("HOOK_TELEGRAM_INIT: Using MOCK Telegram user for development. Ensure NEXT_PUBLIC_USE_MOCK_USER is 'false' or unset in production.");
+    globalLogger.warn("HOOK_TELEGRAM_INIT: MOCK_USER configured; activation is gated by preview/dev context.");
 } else {
     globalLogger.info("HOOK_TELEGRAM_INIT: MOCK_USER is NOT active.");
 }
@@ -121,6 +122,7 @@ export function useTelegram() {
   const [error, setError] = useState<Error | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false); 
   const[startParam, setStartParam] = useState<string | null>(null);
+  const isMountedRef = useRef(false);
 
   const handleAuthentication = useCallback(
     async (userToAuth: WebAppUser): Promise<AuthResult> => {
@@ -208,9 +210,10 @@ export function useTelegram() {
   );
 
   useEffect(() => {
-    let isMounted = true;
+    isMountedRef.current = true;
+    const canUpdateState = () => isMountedRef.current;
     let detachVisibilityRecovery: (() => void) | undefined;
-    globalLogger.info("[HOOK_TELEGRAM EFFECT_MAIN_INIT] START. isMounted:", isMounted);
+    globalLogger.info("[HOOK_TELEGRAM EFFECT_MAIN_INIT] START. isMountedRef.current:", canUpdateState());
     
     setIsLoading(true);
     setIsAuthenticating(true);
@@ -223,10 +226,10 @@ export function useTelegram() {
     globalLogger.log("[HOOK_TELEGRAM EFFECT_MAIN_INIT] STEP 1: All relevant states reset to initial values.");
 
     const initialize = async () => {
-      globalLogger.log("[HOOK_TELEGRAM initialize ASYNC_FN_START] STEP 2: Starting async initialization. isMounted:", isMounted);
-      if (!isMounted) {
+      globalLogger.log("[HOOK_TELEGRAM initialize ASYNC_FN_START] STEP 2: Starting async initialization. isMountedRef.current:", canUpdateState());
+      if (!canUpdateState()) {
           globalLogger.warn("[HOOK_TELEGRAM initialize ASYNC_FN_ABORT] Aborted: component unmounted before async logic could run fully.");
-          if (isMounted) {
+          if (canUpdateState()) {
             setIsAuthenticating(false); 
             setIsLoading(false);
           }
@@ -243,23 +246,26 @@ export function useTelegram() {
         if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
           const telegram = (window as any).Telegram.WebApp;
           tempTgWebApp = telegram; 
-          if(isMounted) {
+          if (canUpdateState()) {
             setTgWebApp(telegram);
             globalLogger.log("[HOOK_TELEGRAM initialize] STEP 3.1: Telegram WebApp object FOUND and set to state (tgWebApp).");
           }
           
           inTgContextReal = !!telegram.initData && telegram.initData.length > 0; 
           rawStartParam = telegram.initDataUnsafe?.start_param || null;
-          if (isMounted && rawStartParam) {
+          if (canUpdateState() && rawStartParam) {
             setStartParam(rawStartParam);
             globalLogger.info(`[HOOK_TELEGRAM initialize] STEP 3.1.1: start_param found: "${rawStartParam}" and set to state.`);
           }
           
-          if (isMounted) {
+          if (canUpdateState()) {
             safeReady(telegram);
             globalLogger.log("[HOOK_TELEGRAM initialize] STEP 3.3: Called telegram.ready()");
             if (inTgContextReal && telegram.expand) {
               const expanded = await safeExpand(telegram, { attempts: 3, delayMs: 120 });
+              if (!canUpdateState()) {
+                return;
+              }
               if (expanded) {
                 globalLogger.info("[HOOK_TELEGRAM initialize] STEP 3.3.1: Called telegram.expand() to maximize Web App.");
               } else {
@@ -276,11 +282,13 @@ export function useTelegram() {
                   authCandidate = validatedUserFromApi;
                   globalLogger.info(`[HOOK_TELEGRAM initialize] STEP 4A.1: REAL Telegram auth validated successfully via API. Auth Candidate User ID: ${authCandidate.id}`);
               } else {
-                  globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 4A.2: REAL Telegram initData validation FAILED via API or returned no user. Error will be set.");
-                   if (isMounted) { 
-                     const validationError = new Error("Telegram data validation failed via API. User data might be compromised or API issue.");
-                     setError((prev) => prev ?? validationError);
-                   }
+                  globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 4A.2: REAL Telegram initData validation FAILED via API or returned no user.");
+                  if (MOCK_USER && isAllowedMockContext()) {
+                    globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 4A.3: Validation failed, but preview/dev mock context is allowed. Falling back to MOCK_USER without blocking.");
+                  } else if (canUpdateState()) {
+                    const validationError = new Error("Telegram data validation failed. Please open this page through the Telegram App to continue.");
+                    setError((prev) => prev ?? validationError);
+                  }
               }
           } else if (telegram.initDataUnsafe?.user?.id && process.env.NODE_ENV === 'development') {
              globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 4B: Using initDataUnsafe.user as fallback. INSECURE - DEV ONLY.");
@@ -291,13 +299,19 @@ export function useTelegram() {
           globalLogger.log("[HOOK_TELEGRAM initialize] STEP 3 (FAIL): window.Telegram.WebApp not found.");
         }
 
-        if (!authCandidate && MOCK_USER) {
-            globalLogger.warn(`[HOOK_TELEGRAM initialize] STEP 5: NO auth candidate from Telegram. Using MOCK_USER. Mock User ID: ${MOCK_USER.id}`);
+        // Preview/Dev safety net: Allows mockuser bypass ONLY when the URL contains
+        // the developer handle (salavey13) or NEXT_PUBLIC_IS_PREVIEW=true. On live
+        // production without this marker, TG auth is strictly enforced.
+        if (!authCandidate && MOCK_USER && isAllowedMockContext()) {
+            globalLogger.warn(`[HOOK_TELEGRAM initialize] STEP 5: NO verified Telegram auth candidate. Preview/dev context allowed; using MOCK_USER. Mock User ID: ${MOCK_USER.id}`);
             authCandidate = MOCK_USER;
             inTgContextReal = false; 
+            if (canUpdateState()) setError(null);
+        } else if (!authCandidate && MOCK_USER) {
+            globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 5: MOCK_USER configured but denied because current URL/env is not an allowed preview/dev context.");
         }
         
-        if (isMounted) { 
+        if (canUpdateState()) { 
           const finalInTgContext = inTgContextReal && !!authCandidate && authCandidate !== MOCK_USER;
           setIsInTelegramContext(finalInTgContext);
         }
@@ -306,7 +320,7 @@ export function useTelegram() {
           globalLogger.log(`[HOOK_TELEGRAM initialize] STEP 7: Auth Candidate found (ID: ${authCandidate.id}). Proceeding to handleAuthentication.`);
           try { 
             const authData = await handleAuthentication(authCandidate); 
-            if (isMounted) {
+            if (canUpdateState()) {
               setTgUser(authData.tgUserToSet);
               setDbUser(authData.dbUserToSet); 
               setIsAuthenticated(authData.isAuthenticatedToSet);
@@ -314,7 +328,7 @@ export function useTelegram() {
             }
           } catch (authProcessError: any) { 
             globalLogger.error(`[HOOK_TELEGRAM initialize] STEP 7.3 (ERROR): Error DURING handleAuthentication:`, authProcessError.message);
-            if (isMounted) {
+            if (canUpdateState()) {
               setError((prev) => prev ?? authProcessError); 
               setTgUser(authCandidate); 
               setDbUser(null);          
@@ -323,7 +337,7 @@ export function useTelegram() {
           }
         } else { 
            globalLogger.warn(`[HOOK_TELEGRAM initialize] STEP 7 (NO_CANDIDATE): No authCandidate available.`);
-           if (isMounted) {
+           if (canUpdateState()) {
              const noAuthCandidateError = new Error("No user data available for authentication.");
              setError((prev) => prev ?? noAuthCandidateError);
             setTgUser(null);
@@ -333,11 +347,11 @@ export function useTelegram() {
         }
       } catch (outerError: any) { 
         globalLogger.error("[HOOK_TELEGRAM initialize] STEP ERROR (OUTER_CATCH): CRITICAL OUTER ERROR:", outerError.message);
-        if (isMounted) { 
+        if (canUpdateState()) { 
           setError((prev) => prev ?? outerError);
         }
       } finally { 
-        if (isMounted) {
+        if (canUpdateState()) {
           setIsAuthenticating(false); 
         }
       }
@@ -347,7 +361,7 @@ export function useTelegram() {
 
     return () => {
       globalLogger.info("[HOOK_TELEGRAM EFFECT_MAIN_INIT_CLEANUP] Cleanup. Setting isMounted=false.");
-      isMounted = false;
+      isMountedRef.current = false;
       detachVisibilityRecovery?.();
     };
   }, [handleAuthentication]); 

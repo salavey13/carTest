@@ -1,4 +1,4 @@
-type LogLevel = "info" | "warn" | "error"
+type LogLevel = "debug" | "info" | "warn" | "error"
 
 type LogMessage = {
   level: LogLevel
@@ -12,7 +12,14 @@ type LogListener = (log: LogMessage) => void
 class Logger {
   private listeners: LogListener[] = []
 
-  private log(level: LogLevel, message: string, ...args: any[]) {
+  log(level: LogLevel, message: string, ...args: any[]): void;
+  log(message: string, ...args: any[]): void;
+  log(levelOrMessage: LogLevel | string, messageOrArg?: unknown, ...restArgs: any[]) {
+    const knownLevels: LogLevel[] = ["debug", "info", "warn", "error"]
+    const hasExplicitLevel = knownLevels.includes(levelOrMessage as LogLevel)
+    const level: LogLevel = hasExplicitLevel ? (levelOrMessage as LogLevel) : "info"
+    const message = hasExplicitLevel ? String(messageOrArg ?? "") : String(levelOrMessage)
+    const args = hasExplicitLevel ? restArgs : [messageOrArg, ...restArgs].filter((arg) => arg !== undefined)
     const timestamp = new Date().toISOString()
     const logMessage: LogMessage = { level, message, args, timestamp }
 
@@ -33,6 +40,10 @@ class Logger {
 
     // Notify all subscribed listeners
     this.listeners.forEach((listener) => listener(logMessage))
+  }
+
+  debug(message: string, ...args: any[]) {
+    this.log("debug", message, ...args)
   }
 
   info(message: string, ...args: any[]) {

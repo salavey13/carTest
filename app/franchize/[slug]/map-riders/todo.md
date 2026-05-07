@@ -54,7 +54,7 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 
 ### I6 — Production-hardening backlog (new)
 - [x] Privacy controls: visibility mode (`crew/public`) + home-blur option + auto-expire presets (1/5/15/60).
-- [ ] Route replay full-screen UI with timeline scrubber.
+- [x] Route replay full-screen UI with timeline scrubber.
 - [ ] Speed-gradient route polyline rendering (segment color by speed).
 - [ ] Long-press meetup creation mode (keep tap safe for exploration UX).
 - [x] Write API hardening: CSRF-style guards (`Authorization` + `Origin` + `X-Requested-With`) and per-user in-memory rate limits for session/meetups/batch writes.
@@ -124,6 +124,10 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
   - Added server-side expire enforcement: expired sessions auto-stop and return 409 to client writes.
   - Added location blur transform when home-blur is enabled and persisted privacy metadata in session stats.
 
+## Investigation notes (2026-05-06)
+- Completed SupaPlan task `b2fb8b78-dc2d-4913-b379-caf22eb1c4e5` (I6 route replay full-screen scrubber UI): replay opens from History into a full-screen cockpit with SVG route projection, current rider marker, timeline range scrubber, play/pause, keyboard controls and speed presets.
+- Continued SupaPlan task `696922bd-8186-4903-ab7b-ef999d7ac11b` (RENT-P2.4 Telegram native GPS bridge): Telegram `message.location`/`edited_message.location` now first checks active MapRiders sessions and persists native live-location updates into live feed + replay history before falling back to legacy crew shift handling.
+
 ## Investigation notes (2026-04-26)
 - SupaPlan task `e9c8f76f-0863-4f20-a871-6a09dd3bf7f8` (I6.1 evidence pack) progressed with fresh `vip-bike` smoke + screenshot refresh:
   - Re-ran `npm run qa:map-riders` with PASS for route + split APIs + legacy endpoint.
@@ -140,3 +144,34 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 - Historical/stat flows remain intact (`sessions`, `points`, `meetups`, replay).
 - SQL migrations are additive and reviewable in `supabase/migrations/*`.
 - SupaPlan + `docs/THE_FRANCHEEZEPLAN.md` reflect actual progress.
+
+### I6.2 — Codex lint + UX/code-review pass (2026-05-07)
+
+- [x] Coalesce fallback `live_locations` snapshot refreshes so group rides do not refetch `/overview` on every realtime packet.
+- [x] Harden Leaflet mobile long-press handling against duplicate `contextmenu`/timer callbacks and accidental synthetic click selection.
+- [x] Align floating FAB session start payload with the main privacy controls (`crew/public`, home blur, auto-expire).
+- [x] Add cockpit visibility for live/stale riders, queued GPS points, share mode, and meetup long-press guidance.
+- [ ] Field-check with two Telegram devices: long-press meetup creation, live/stale transitions, and both geoshare CTAs.
+
+## Investigation notes (2026-05-07 — FRZ-R9 / UX-03 / RENT-P1.1)
+- Completed explicit operator slice for rider-facing clarity:
+  - UX-03: `components/map-canvas/RiderMarker.tsx` now renders self-hosted inline SVG initials avatars with speed/border/stale styling instead of external placeholder-style marker art.
+  - RENT-P1.1: `BeginnerRiderOnboardingQuiz` adds a Russian 3-step newbie flow and applies ride name, bike label, ride mode, visibility and auto-stop settings before geosharing.
+  - FRZ-R9: `/franchize/[slug]/community` adds city events, partner cards and riding guidance with direct links back to MapRiders and Telegram.
+- Security note from operator: `TEMP_BYPASS_TG_AUTH_VALIDATION` is still useful for PR previews that behave like production, so bypass now requires request URL/header evidence containing `salavey13` and stays denied on real production hosts.
+
+## Investigation notes (2026-05-07 — SupaPlan SEC-BYPASS-CHECK follow-up)
+- Claimed SupaPlan task `dd9a9d3c-3234-4d1b-7890-ddd000ddf890` after operator clarified the bypass exists because Telegram hash validation was historically broken.
+- Corrected Telegram WebApp hash derivation in `/api/validate-telegram-auth` and franchize review auth: HMAC key is `WebAppData`, signed message is the bot token, then the resulting key signs the sorted data-check string.
+- Added preview/dev mockuser gating: `NEXT_PUBLIC_USE_MOCK_USER=true` only activates mock auth when browser URL contains `salavey13` or `NEXT_PUBLIC_IS_PREVIEW=true`; real production without that marker stays blocked on failed Telegram validation.
+- MapRiders write-header fallback now requests an app JWT for the mock user only inside the same allowed preview context, so preview testing can start sessions without opening a real Telegram WebApp.
+
+## Investigation notes (2026-05-07 — self-review hardening)
+- Self-reviewed the Telegram auth mystery: the old implementation had the HMAC key/message reversed for the derivation step. Shared helper `lib/telegram-webapp-auth.ts` now owns data-check-string building + hash computation, and tests compare it against an independent Node `createHmac` fixture.
+- SupaPlan statuses verified as `ready_for_pr` for FRZ-R9 (`74fcc094-6990-4657-bf13-91460a291e32`), RENT-P1.1 (`309a8777-6bc0-4d9d-aa8a-b6a9ec11b730`), UX-03 (`9db00978-92dd-48a3-8913-d6972243dfbd`) and SEC-BYPASS-CHECK (`dd9a9d3c-3234-4d1b-7890-ddd000ddf890`).
+- RENT-P1.1 follow-up added checkout-level safety gate in `OrderPageClient`: three beginner safety answers are required before order confirmation, with browser-local persistence by slug/user.
+
+## Investigation notes (2026-05-07 — trusted preview bypass review fix)
+- Addressed P1 review: `TEMP_BYPASS_TG_AUTH_VALIDATION` no longer trusts request URL/query/origin/referer markers. Bypass activation uses only server-known deployment env (`VERCEL_ENV=preview` + `VERCEL_URL`/`VERCEL_BRANCH_URL` containing `salavey13`) or exact `TELEGRAM_AUTH_BYPASS_ALLOWED_HOSTS`.
+- Added regression tests for forged production URL `?salavey13`, exact allowlist behavior, and live-like generated Telegram WebApp initData validation.
+- VIP Bike seed SQL now includes `/franchize/{slug}/community` in header/footer navigation; `/vipbikerental` hardcoded location copy now points to `ул. Комсомольская 2`.

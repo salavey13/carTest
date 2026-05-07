@@ -186,14 +186,14 @@ export async function saveUserFranchizeCartAction(
       },
     };
 
-    const { error: updateError, count } = await supabaseAdmin
+    const { data: updatedUsers, error: updateError } = await supabaseAdmin
       .from("users")
       .update({ metadata: nextMetadata, updated_at: new Date().toISOString() })
       .eq("user_id", userId)
-      .select('user_id', { count: 'exact' });
+      .select('user_id');
 
     if (updateError) throw updateError;
-    if (count === 0) return { ok: false, error: "User not found during update" };
+    if (!updatedUsers || updatedUsers.length === 0) return { ok: false, error: "User not found during update" };
 
     return { ok: true };
   } catch (error) {

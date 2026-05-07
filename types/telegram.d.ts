@@ -15,8 +15,27 @@ export interface TelegramWebApp {
   }
   openLink: (url: string) => void;
   close: () => void;
-  showPopup: (params: { message: string }) => void;
+  showPopup: (params: { title?: string; message: string; buttons?: Array<{ id?: string; type?: string; text?: string }> }) => void;
+  BackButton?: {
+    show: () => void;
+    hide: () => void;
+    onClick: (callback: () => void) => void;
+    offClick: (callback: () => void) => void;
+  };
   sendData: (data: string) => void;
+  requestLocation?: (callback?: (location: TelegramLocationData) => void) => Promise<TelegramLocationData | void> | void;
+  HapticFeedback?: {
+    impactOccurred?: (style: "light" | "medium" | "heavy" | "rigid" | "soft") => void;
+  };
+}
+
+export interface TelegramLocationData {
+  latitude: number;
+  longitude: number;
+  altitude?: number | null;
+  speed?: number | null;
+  course?: number | null;
+  horizontal_accuracy?: number | null;
 }
 
 // types/telegram.ts
@@ -28,6 +47,18 @@ export interface WebAppUser {
   language_code?: string
   photo_url?: string
   chat_id?: number // Add this if available in initDataUnsafe
+  is_premium?: boolean
+  is_bot?: boolean
+  added_to_attachment_menu?: boolean
+  allows_write_to_pm?: boolean
+}
+
+export interface WebAppInitData {
+  user?: WebAppUser
+  auth_date?: number
+  hash?: string
+  query_id?: string
+  start_param?: string
 }
 
 declare global {
