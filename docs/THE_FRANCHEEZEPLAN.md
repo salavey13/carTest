@@ -233,3 +233,22 @@ This root file stays intentionally compact so operators and agents can load it q
 - `risks`: Local CI can validate lint/build/API shape, but true GPS accuracy and Telegram permission UX still require device testing.
 
 - 2026-05-07 — MapRiders review pass: reduced realtime overfetch pressure, made mobile long-press meetup selection safer, aligned floating and panel start actions, and surfaced live/stale/queue state directly in the map cockpit.
+
+### 2026-05-07 — FRZ-R9 + UX-03 + RENT-P1.1 MapRiders visible value slice
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `notes`: Executed the explicit operator scope: MapRiders now has self-hosted inline SVG initial avatars instead of external placeholder-style marker art, a Russian 3-step beginner quiz that configures ride name/bike/privacy/auto-stop before sharing, a new `/franchize/[slug]/community` city events + partners hub, and `TEMP_BYPASS_TG_AUTH_VALIDATION` is allowed only on preview request URLs/headers containing `salavey13`.
+- `next_step`: Browser-smoke `/franchize/vip-bike/map-riders` and `/franchize/vip-bike/community` on a Vercel preview URL that contains `salavey13`.
+- `risks`: Community events/partners are curated starter content until real operator calendar/partner data is connected; auth bypass remains explicitly env-gated and preview-host-gated.
+
+### 2026-05-07 — supaplan_task:dd9a9d3c-3234-4d1b-7890-ddd000ddf890 Telegram auth + smart mockuser fallback
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex-tg-auth-fallback
+- `supaplan_task`: dd9a9d3c-3234-4d1b-7890-ddd000ddf890
+- `notes`: Claimed the SupaPlan security task and corrected Telegram WebApp HMAC derivation (`WebAppData` as the HMAC key, bot token as message) in both auth validators. Mock user activation is now explicitly gated: allowed only when `NEXT_PUBLIC_USE_MOCK_USER=true` and the client URL contains `salavey13` or `NEXT_PUBLIC_IS_PREVIEW=true`; otherwise production shows a strict Telegram-open/auth error. MapRiders write headers can request the mock app JWT only in that same allowed preview context.
+- `next_step`: Verify on a real Telegram WebApp session and a Vercel preview URL containing `salavey13`; keep `TEMP_BYPASS_TG_AUTH_VALIDATION` unset on real production domains.
+- `risks`: Local runner cannot provide real Telegram signed initData; production verification needs bot-generated `initData` and current `TELEGRAM_BOT_TOKEN`.

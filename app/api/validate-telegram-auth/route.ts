@@ -5,12 +5,25 @@ import { logger } from '@/lib/logger';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BYPASS_VALIDATION_ENV = process.env.TEMP_BYPASS_TG_AUTH_VALIDATION === 'true';
+const PREVIEW_BYPASS_HOST_MARKER = 'salavey13';
 
 if (BYPASS_VALIDATION_ENV) {
-  logger.warn("API_VALIDATE_INIT: TEMP_BYPASS_TG_AUTH_VALIDATION is TRUE. Hash validation will be bypassed! FOR DEBUGGING ONLY.");
+  logger.warn("API_VALIDATE_INIT: TEMP_BYPASS_TG_AUTH_VALIDATION is TRUE, but bypass will only activate for preview URLs containing salavey13.");
 }
 
-async function validateTelegramHash(initDataString: string): Promise<{ isValid: boolean; user?: any; error?: string }> {
+function isPreviewBypassRequest(req: NextRequest): boolean {
+  const candidates = [
+    req.nextUrl.href,
+    req.headers.get('host'),
+    req.headers.get('x-forwarded-host'),
+    req.headers.get('origin'),
+    req.headers.get('referer'),
+  ];
+
+  return candidates.some((value) => value?.toLowerCase().includes(PREVIEW_BYPASS_HOST_MARKER));
+}
+
+async function validateTelegramHash(initDataString: string, bypassValidation: boolean): Promise<{ isValid: boolean; user?: any; error?: string }> {
   logger.log("[API_VALIDATE_HASH_FN_ENTRY] Starting hash validation process.");
 
   if (!BOT_TOKEN) {
@@ -38,13 +51,13 @@ async function validateTelegramHash(initDataString: string): Promise<{ isValid: 
 
   try {
     const secretKey = await webcrypto.subtle.importKey(
-      "raw", new TextEncoder().encode(BOT_TOKEN),
+      "raw", new TextEncoder().encode("WebAppData"),
       { name: "HMAC", hash: "SHA-256" },
       false, ["sign"]
     );
 
     const derivedKeyBuffer = await webcrypto.subtle.sign(
-      "HMAC", secretKey, new TextEncoder().encode("WebAppData")
+      "HMAC", secretKey, new TextEncoder().encode(BOT_TOKEN)
     );
 
     const derivedKey = await webcrypto.subtle.importKey(
@@ -64,7 +77,7 @@ async function validateTelegramHash(initDataString: string): Promise<{ isValid: 
 
     const isStrictlyValid = signatureHex === hashFromClient;
 
-    if (BYPASS_VALIDATION_ENV) {
+    if (bypassValidation) {
       if (!isStrictlyValid) {
         logger.warn(`[API_VALIDATE_HASH_FN_WARN] HASH MISMATCH! Computed: ${signatureHex}, Received: ${hashFromClient}.`);
       }
@@ -126,10 +139,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ isValid: false, error: "Server bot token misconfigured." }, { status: 500 });
     }
 
-    const result = await validateTelegramHash(initData);
+    const bypassValidation = BYPASS_VALIDATION_ENV && isPreviewBypassRequest(req);
 
-    const status = BYPASS_VALIDATION_ENV ? 200 : result.isValid ? 200 : 401;
-    logger.log(`[API_VALIDATE_POST_INFO] Responding with status ${status}. Valid: ${result.isValid}, Bypass: ${BYPASS_VALIDATION_ENV}`);
+    if (BYPASS_VALIDATION_ENV && !bypassValidation) {
+      logger.warn("[API_VALIDATE_POST_WARN] TEMP bypass requested but denied because request URL/headers do not contain salavey13.");
+    }
+
+    const result = await validateTelegramHash(initData, bypassValidation);
+
+    const status = bypassValidation ? 200 : result.isValid ? 200 : 401;
+    logger.log(`[API_VALIDATE_POST_INFO] Responding with status ${status}. Valid: ${result.isValid}, Bypass: ${bypassValidation}`);
 
     return NextResponse.json(result, { status });
 
