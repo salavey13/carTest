@@ -66,6 +66,7 @@ export function useStartParamRouter() {
   const startParamRunIdRef = useRef(0);
   const mountedRef = useRef(false);
   const consumedTempCartRef = useRef<string | null>(null);
+  const ignoredUrlStartParamRef = useRef<string | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -146,12 +147,23 @@ export function useStartParamRouter() {
 
   useEffect(() => {
     const processStartParam = async () => {
-      const rawStartParam = startParamPayload || searchParams.get("tgWebAppStartParam");
+      const urlStartParam = searchParams.get("tgWebAppStartParam");
+      const rawStartParam = startParamPayload || urlStartParam;
       const paramToProcess = normalizeStartParamPath(rawStartParam);
+      const normalizedUrlStartParam = normalizeStartParamPath(urlStartParam);
+
+      if (normalizedUrlStartParam !== ignoredUrlStartParamRef.current) {
+        ignoredUrlStartParamRef.current = null;
+      }
 
       if (!paramToProcess) {
         activeStartParamRef.current = null;
         lastHandledStartParamRef.current = null;
+        ignoredUrlStartParamRef.current = null;
+        return;
+      }
+
+      if (!startParamPayload && normalizedUrlStartParam && ignoredUrlStartParamRef.current === normalizedUrlStartParam) {
         return;
       }
 
@@ -264,6 +276,9 @@ export function useStartParamRouter() {
         }
 
         lastHandledStartParamRef.current = paramToProcess;
+        if (startParamPayload && normalizedUrlStartParam) {
+          ignoredUrlStartParamRef.current = normalizedUrlStartParam;
+        }
 
         if (targetPath && targetPath !== pathname) {
           logger.info(`[ClientLayout] Redirecting to ${targetPath}`);
