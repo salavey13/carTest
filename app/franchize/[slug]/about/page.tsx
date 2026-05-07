@@ -21,6 +21,7 @@ import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { FranchizeHero } from "../../components/FranchizeHero";
 import { FranchizePageShell } from "../../components/FranchizePageShell";
+import { getFranchizeRouteCtaPolicy } from "../../lib/route-cta-policy";
 import { buildFranchizeIntentLinks } from "../../lib/section-links";
 import { crewPaletteForSurface } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
@@ -140,6 +141,7 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
   const { slug } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteForSurface(crew.theme);
+  const ctaPolicy = getFranchizeRouteCtaPolicy("content");
   const resolvedSlug = crew.slug || slug;
   const activePath = `/franchize/${resolvedSlug}/about`;
   const brandName = crew.header.brandName || crew.name || "Экипаж OneBikePls";
@@ -182,7 +184,7 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
   ];
 
   return (
-    <main className="min-h-screen" style={surface.page}>
+    <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
       <CrewHeader
         crew={crew}
         activePath={activePath}
