@@ -47,6 +47,7 @@ export function MapRidersProvider({
   const crewSlug = crew.slug || slug;
   const selfUserId = dbUser?.user_id;
   const [state, dispatch] = useReducer(mapRidersReducer, initialMapRidersState);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Snapshot fetch (split into overview only) ──
   const fetchSnapshot = useCallback(async () => {
@@ -71,6 +72,18 @@ export function MapRidersProvider({
       dispatch({ type: "error", payload: err instanceof Error ? err.message : "Session load failed" });
     }
   }, []);
+
+  // ── Snapshot refresh queue ──
+  // Postgres live location events can arrive in bursts on group rides. Keep the
+  // split overview endpoint as the fallback source of truth, but coalesce noisy
+  // packets so mobile clients do not create a refetch storm.
+  const scheduleSnapshotRefresh = useCallback(() => {
+    if (refreshTimerRef.current) return;
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null;
+      fetchSnapshot();
+    }, 1200);
+  }, [fetchSnapshot]);
 
   // ── Initial load ──
   useEffect(() => {
@@ -104,7 +117,7 @@ export function MapRidersProvider({
       })
       .on("broadcast", { event: "session:ended" }, () => {
         // Session ended — refresh stats
-        fetchSnapshot();
+        scheduleSnapshotRefresh();
       })
       // Fallback: listen to live_locations changes only (not sessions/meetups)
       .on(
@@ -112,15 +125,19 @@ export function MapRidersProvider({
         { event: "*", schema: "public", table: "live_locations", filter: `crew_slug=eq.${crewSlug}` },
         () => {
           // Delta: only re-fetch overview on live_locations change (throttled)
-          fetchSnapshot();
+          scheduleSnapshotRefresh();
         },
       )
       .subscribe();
 
     return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
-  }, [crewSlug, selfUserId, fetchSnapshot]);
+  }, [crewSlug, selfUserId, scheduleSnapshotRefresh]);
 
   // ── Eviction timer (runs every 5s) ──
   useEffect(() => {
