@@ -262,3 +262,12 @@ This root file stays intentionally compact so operators and agents can load it q
 - `notes`: Self-review found the Telegram HMAC fix should not remain duplicated, so validation was extracted to `lib/telegram-webapp-auth.ts` with Vitest coverage using an independent Node `createHmac` oracle. RENT-P1.1 was tightened from a MapRiders-only quiz into checkout gating too: `OrderPageClient` now blocks confirmation until the 3-question beginner safety quiz is passed and persists the pass in browser storage per slug/user.
 - `next_step`: Real-device Telegram WebApp smoke with a current signed `initData`, plus production preview smoke on a `salavey13` Vercel URL with `NEXT_PUBLIC_USE_MOCK_USER=true`.
 - `risks`: The checkout safety completion is browser-local for this slice, not yet persisted to `users.metadata.quiz_completed_at`; follow-up DB persistence can make it cross-device.
+
+### 2026-05-07 — Telegram bypass review fix + VIP Bike seed/navigation polish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex-review
+- `notes`: Addressed Codex review P1: auth bypass no longer reads caller-controlled URL/query/origin/referer; it now depends only on server-known Vercel deployment metadata (`VERCEL_ENV=preview` + deployment URL containing `salavey13`) or exact `TELEGRAM_AUTH_BYPASS_ALLOWED_HOSTS`. Added regression tests for forged `?salavey13` production URLs, live-like Telegram initData recreation, and preview/allowlist behavior. Updated VIP Bike seed SQL header/footer with `/franchize/{slug}/community`, and replaced `/vipbikerental` hardcoded Стригинский address with `ул. Комсомольская 2`.
+- `next_step`: Apply updated `docs/sql/vip-bike-franchize-hydration.sql` to staging/prod Supabase after merge, then smoke header/footer navigation.
+- `risks`: Bypass now requires Vercel preview metadata or explicit allowlist; if a preview runtime lacks `VERCEL_ENV/VERCEL_URL`, set `TELEGRAM_AUTH_BYPASS_ALLOWED_HOSTS` to the exact preview host.

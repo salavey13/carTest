@@ -2,25 +2,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger'; 
 import { computeTelegramWebAppHash } from '@/lib/telegram-webapp-auth';
+import { isTrustedTelegramBypassDeployment } from '@/lib/telegram-bypass-context';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BYPASS_VALIDATION_ENV = process.env.TEMP_BYPASS_TG_AUTH_VALIDATION === 'true';
-const PREVIEW_BYPASS_HOST_MARKER = 'salavey13';
-
 if (BYPASS_VALIDATION_ENV) {
-  logger.warn("API_VALIDATE_INIT: TEMP_BYPASS_TG_AUTH_VALIDATION is TRUE, but bypass will only activate for preview URLs containing salavey13.");
-}
-
-function isPreviewBypassRequest(req: NextRequest): boolean {
-  const candidates = [
-    req.nextUrl.href,
-    req.headers.get('host'),
-    req.headers.get('x-forwarded-host'),
-    req.headers.get('origin'),
-    req.headers.get('referer'),
-  ];
-
-  return candidates.some((value) => value?.toLowerCase().includes(PREVIEW_BYPASS_HOST_MARKER));
+  logger.warn("API_VALIDATE_INIT: TEMP_BYPASS_TG_AUTH_VALIDATION is TRUE, but bypass will only activate for trusted preview deployment metadata.");
 }
 
 async function validateTelegramHash(initDataString: string, bypassValidation: boolean): Promise<{ isValid: boolean; user?: any; error?: string }> {
@@ -110,10 +97,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ isValid: false, error: "Server bot token misconfigured." }, { status: 500 });
     }
 
-    const bypassValidation = BYPASS_VALIDATION_ENV && isPreviewBypassRequest(req);
+    const bypassValidation = BYPASS_VALIDATION_ENV && isTrustedTelegramBypassDeployment();
 
     if (BYPASS_VALIDATION_ENV && !bypassValidation) {
-      logger.warn("[API_VALIDATE_POST_WARN] TEMP bypass requested but denied because request URL/headers do not contain salavey13.");
+      logger.warn("[API_VALIDATE_POST_WARN] TEMP bypass requested but denied because server deployment metadata is not an allowed preview host.");
     }
 
     const result = await validateTelegramHash(initData, bypassValidation);

@@ -7,10 +7,10 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { readFile } from "fs/promises";
 import path from "path";
-import { headers } from "next/headers";
 import { getCrewSensitiveData, getUserSensitiveData, saveCrewSensitiveData } from "@/app/lib/private-secrets";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 import { resolveFranchizeTheme, resolvePaletteByMode } from "@/app/franchize/lib/theme-resolver";
+import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context";
 import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 import {
@@ -33,22 +33,6 @@ import {
   DEFAULT_TELEGRAM_BOT_URL,
 } from "@/lib/franchize-config";
 
-
-const PREVIEW_BYPASS_HOST_MARKER = "salavey13";
-
-function isTempTelegramBypassAllowedForPreview(): boolean {
-  const requestHeaders = headers();
-  const candidates = [
-    requestHeaders.get("host"),
-    requestHeaders.get("x-forwarded-host"),
-    requestHeaders.get("origin"),
-    requestHeaders.get("referer"),
-    process.env.VERCEL_URL,
-    process.env.NEXT_PUBLIC_SITE_URL,
-  ];
-
-  return candidates.some((value) => value?.toLowerCase().includes(PREVIEW_BYPASS_HOST_MARKER));
-}
 
 type UnknownRecord = Record<string, unknown>;
 type RentalAvailabilityRow = {
@@ -2080,7 +2064,7 @@ async function resolveVerifiedTelegramUserId(initDataString: string): Promise<{ 
   if (!hashFromClient) return { success: false, error: "Telegram init data hash is missing." };
 
   const validation = await computeTelegramWebAppHash(initDataString, botToken);
-  const bypassValidation = process.env.TEMP_BYPASS_TG_AUTH_VALIDATION === "true" && isTempTelegramBypassAllowedForPreview();
+  const bypassValidation = process.env.TEMP_BYPASS_TG_AUTH_VALIDATION === "true" && isTrustedTelegramBypassDeployment();
 
   if (!validation.isValid && !bypassValidation) {
     return { success: false, error: "Telegram init data hash mismatch." };
