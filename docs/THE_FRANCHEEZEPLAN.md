@@ -78,8 +78,19 @@ This root file stays intentionally compact so operators and agents can load it q
 - `next_step`: Add mocked Supabase coverage for server action validators after this PR lands.
 - `risks`: Server-action integration tests remain future work because this slice intentionally focused on low-conflict pure helper coverage.
 
+
+### 2026-05-07 — MapRiders drawer empty-state copy
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-07T00:00:00Z
+- `owner`: codex
+- `notes`: Replaced sad dead-copy fallbacks in the mobile MapRiders drawer with dynamic history/meetup summary text when parent state already knows about completed rides or active meetup points, plus a short genuinely-empty fallback.
+- `next_step`: Preview-smoke `/franchize/vip-bike/map-riders` once Playwright host dependencies are available.
+- `risks`: Local screenshot capture was blocked by missing browser shared libraries in the runner; runtime visual QA still needs a browser-capable environment.
+
 ## 4) Mini execution diary addendum
 
+- 2026-05-07 — MapRiders drawer UX copy pass: parent state now prepares live-aware History/Meetups fallback copy, the drawer consumes those strings instead of hardcoded “go do it first” text, and genuinely empty tabs use a shorter playful fallback. Screenshot capture remains blocked until Playwright host libraries are installed.
 - 2026-05-07 — UX cleanup for `/vipbikerental`: removed literal explanatory copy and duplicated partner-link section, changed active hero tabs to light-on-tinted styling, added a route-level VIP Bike loader plus client-side catalog skeleton hydration, and tuned the global bike loader wheel/wind animation. Next step: mobile smoke with live Supabase catalog latency.
 - 2026-05-07 — Self-review polish for the UX cleanup: reduced new English labels in loader/landing/onboarding surfaces, brightened the MapRiders preview into a lighter VibeMap-like card, and replaced the invalid `FaShieldAlt` VCR token with `FaShieldCat` for the production-history easter egg. Next step: mobile visual smoke once browser libraries are available.
 - 2026-05-07 — Franchize-wide text polish: reduced fresh English labels in create/admin/catalog/order/rental-document surfaces, russified launch/order helper chips, and kept technical field names only where operators need exact JSON/DB keys. Next step: spot-check `/franchize/vip-bike`, `/franchize/create`, and rental document flows in preview.
