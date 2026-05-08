@@ -2416,9 +2416,9 @@ async function readCheckoutRecoveryIntentMetadata(intentId: string) {
   return ((data?.metadata ?? {}) as Record<string, unknown>);
 }
 
-function wasCheckoutRecoveryRecentlyNotified(metadata: Record<string, unknown>, fingerprint: string, nowMs: number) {
+function wasCheckoutRecoveryRecentlyNotified(metadata: Record<string, unknown>, nowMs: number) {
   const recoveryNotification = metadata.recoveryNotification as Record<string, unknown> | undefined;
-  if (recoveryNotification?.fingerprint !== fingerprint || typeof recoveryNotification.notifiedAt !== "string") {
+  if (typeof recoveryNotification?.notifiedAt !== "string") {
     return false;
   }
 
@@ -2528,14 +2528,14 @@ export async function recordFranchizeCheckoutRecoverySnapshot(
     return { success: true, intentId: result.intentId, notified: false };
   }
 
-  const notifyKey = `${writeKey}:${fingerprint}`;
+  const notifyKey = writeKey;
   const lastNotifyAt = franchizeCheckoutRecoveryRateLimits.get(notifyKey) ?? 0;
   if (nowMs - lastNotifyAt < FRANCHIZE_RECOVERY_NOTIFY_COOLDOWN_MS) {
     return { success: true, intentId: result.intentId, notified: false, throttled: true };
   }
 
   const intentMetadata = await readCheckoutRecoveryIntentMetadata(result.intentId);
-  if (wasCheckoutRecoveryRecentlyNotified(intentMetadata, fingerprint, nowMs)) {
+  if (wasCheckoutRecoveryRecentlyNotified(intentMetadata, nowMs)) {
     franchizeCheckoutRecoveryRateLimits.set(notifyKey, nowMs);
     return { success: true, intentId: result.intentId, notified: false, throttled: true };
   }
