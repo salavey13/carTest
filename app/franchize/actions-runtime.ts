@@ -2336,7 +2336,6 @@ function getCheckoutRecoveryWriteKey(snapshot: FranchizeCheckoutRecoverySnapshot
   return [
     snapshot.slug,
     snapshot.orderId,
-    snapshot.contact.telegramUserId || snapshot.contact.phone || "anonymous",
     snapshot.stage,
   ].join(":");
 }
@@ -2500,6 +2499,7 @@ export async function recordFranchizeCheckoutRecoverySnapshot(
     telegramUserId: normalizedSnapshot.contact.telegramUserId,
     phone: normalizedSnapshot.contact.phone,
     metadata: {
+      dedupeKey: `checkout-recovery:${normalizedSnapshot.slug}:${normalizedSnapshot.orderId}:${normalizedSnapshot.stage}`,
       orderId: normalizedSnapshot.orderId,
       recoveryFingerprint: fingerprint,
       bikeIds: normalizedSnapshot.bikeIds,
