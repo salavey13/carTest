@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ShoppingCart } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { toCategoryId } from "../lib/navigation";
 import type { FranchizeRouteCtaPolicy } from "../lib/route-cta-policy";
@@ -75,6 +75,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const [campaignIndex, setCampaignIndex] = useState(0);
   const searchParams = useSearchParams();
   const { user, dbUser } = useAppContext();
+  const lastQueryViewedVehicleRef = useRef<string>("");
+  const resolvedSlug = crew.slug || slug;
   const showFloatingCart = ctaPolicy ? shouldShowFloatingCart(ctaPolicy, { cartRelevant: true }) : true;
 
   const promoModules = useMemo(() => {
@@ -247,11 +249,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const recordRentIntent = useCallback((item: CatalogItemVM, stage: "viewed" | "configured", metadata: Record<string, unknown> = {}) => {
     const strip = buildCatalogRentalStrip(item, crew);
     return upsertFranchizeIntent({
-      slug: crew.slug || slug,
+      slug: resolvedSlug,
       bikeId: item.id,
       intentType: "rent",
       stage,
-      sourceRoute: `/franchize/${crew.slug || slug}`,
+      sourceRoute: `/franchize/${resolvedSlug}`,
       contactChannel: "catalog_card",
       urgencyScore: stage === "configured" ? 68 : 42,
       telegramUserId: user?.id ? String(user.id) : dbUser?.user_id ? String(dbUser.user_id) : undefined,
@@ -266,7 +268,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         ...metadata,
       },
     }).catch((error) => console.warn("rent intent tracking failed", error));
-  }, [crew, dbUser, slug, user]);
+  }, [crew, dbUser, resolvedSlug, user]);
 
   const openItem = (item: CatalogItemVM) => {
     setSelectedItem(item);
@@ -284,7 +286,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     const focusedVehicle = (searchParams.get("vehicle") || "").trim().toLowerCase();
     if (!focusedVehicle) return;
     const target = items.find((item) => item.id.toLowerCase() === focusedVehicle);
-    if (target) {
+    if (target && lastQueryViewedVehicleRef.current !== target.id) {
+      lastQueryViewedVehicleRef.current = target.id;
       setSelectedItem(target);
       const defaultOptions = {
         package: "Базовый",
@@ -568,7 +571,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           <div className="mt-2 flex gap-2">
                             <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95">
                               <ShoppingCart className="h-4 w-4" />
-                              {item.saleAvailable ? "Hold this bike / купить" : "Забронировать байк"}
+                              {item.saleAvailable ? "Hold this bike / Забронировать байк" : "Забронировать байк"}
                             </span>
                           </div>
                         </div>
@@ -586,8 +589,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       {/* 🛒 Floating Cart: Hide when modal is open to avoid z-index overlap */}
       {!selectedItem && showFloatingCart && (
         <FloatingCartIconLinkBySlug
-          slug={crew.slug || slug}
-          href={`/franchize/${crew.slug || slug}/cart`}
+          slug={resolvedSlug}
+          href={`/franchize/${resolvedSlug}/cart`}
           items={items}
           accentColor={crew.theme.palette.accentMain}
           textColor={crew.theme.palette.textPrimary}
@@ -600,7 +603,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       <ItemModal
         item={selectedItem}
         items={items}
-        slug={crew.slug || slug}
+        slug={resolvedSlug}
         theme={crew.theme}
         pickupAddress={crew.contacts.address || crew.hqLocation}
         workingHours={crew.contacts.workingHours}
