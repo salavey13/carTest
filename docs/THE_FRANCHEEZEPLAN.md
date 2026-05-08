@@ -115,7 +115,7 @@ This root file stays intentionally compact so operators and agents can load it q
 - `updated_at`: 2026-05-08T00:00:00Z
 - `owner`: codex
 - `supaplan_task`: cc5ec5ef-e6bb-446b-8d91-a12002fbb57d
-- `notes`: Added checkout recovery snapshots for `/franchize/{slug}/order/{id}`: the client derives readiness/blocker/contact/date/amount state, sends debounced checkout-start telemetry, forces payment-failed recovery on XTR failures, and the server writes `rent` intents to `franchize_intents` before optional compact admin Telegram notifications.
+- `notes`: Added checkout recovery snapshots for `/franchize/{slug}/order/{id}`: the client derives readiness/blocker/contact/date/amount state, sends debounced checkout-start telemetry, forces payment-failed recovery on XTR failures, and the server writes `rent` intents to `franchize_intents` before optional compact admin Telegram notifications. Self-review tightened dedupe with an order/stage `dedupeKey` and order-scoped write throttling so anonymous/date-only leads do not collapse into one payment-channel row and phone typing cannot bypass cooldowns.
 - `next_step`: After merge, smoke `/franchize/vip-bike/order/<id>` with a populated cart and verify `franchize_intents` rows plus one recovery card per meaningful abandonment fingerprint.
 - `risks`: Recovery writes are best-effort and intentionally throttled; production operator visibility depends on `ADMIN_CHAT_ID` and the R1 intent-ledger migration being applied.
 

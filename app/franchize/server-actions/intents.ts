@@ -51,6 +51,13 @@ function sanitizeIntentMetadata(
   }
 }
 
+function readIntentMetadataDedupeKey(metadata: Record<string, unknown>) {
+  const value = metadata.dedupeKey;
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim().slice(0, 180)
+    : null;
+}
+
 const franchizeIntentInputSchema = z.object({
   slug: z
     .string()
@@ -137,7 +144,10 @@ export async function upsertFranchizeIntent(
       query = query.is("bike_id", null);
     }
 
-    if (intent.telegramUserId) {
+    const dedupeKey = readIntentMetadataDedupeKey(intent.metadata);
+    if (dedupeKey) {
+      query = query.contains("metadata", { dedupeKey });
+    } else if (intent.telegramUserId) {
       query = query.eq("telegram_user_id", intent.telegramUserId);
     } else if (intent.phone) {
       query = query.eq("phone", intent.phone);
