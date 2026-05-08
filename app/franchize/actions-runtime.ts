@@ -9,6 +9,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { getCrewSensitiveData, getUserSensitiveData, saveCrewSensitiveData } from "@/app/lib/private-secrets";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
+import { upsertFranchizeIntent } from "@/app/franchize/server-actions/intents";
 import { cloneFranchizeContentBlocks, readFranchizeContentBlocks, type FranchizeContentBlocks } from "@/app/franchize/lib/content-blocks";
 import { resolveFranchizeTheme, resolvePaletteByMode } from "@/app/franchize/lib/theme-resolver";
 import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context";
@@ -1985,6 +1986,11 @@ export async function submitFranchizeOrderNotification(input: unknown): Promise<
   if (!totalResult.success) return totalResult;
   const effectiveTotal = totalResult.totalAmount;
   const validatedPayload = { ...payload, ...totalResult, totalAmount: effectiveTotal };
+  await recordFranchizeOrderIntent(validatedPayload, {
+    intentType: "checkout_start",
+    stage: "checkout_started",
+    urgencyScore: validatedPayload.flowType === "rental" ? 75 : 85,
+  });
 
   try {
     await buildFranchizeOrderDocAndNotify({ ...validatedPayload, totalAmount: effectiveTotal, subtotal: payload.subtotal, extrasTotal: payload.extrasTotal });
@@ -2216,6 +2222,58 @@ export async function moderateRentalReview(input: unknown): Promise<{ success: b
 
 type FranchizeOrderInvoicePayload = z.infer<typeof franchizeOrderInvoiceSchema>;
 
+function summarizeFranchizeIntentCartLines(payload: FranchizeOrderInvoicePayload) {
+  return payload.cartLines.map((line) => ({
+    itemId: line.itemId,
+    qty: line.qty,
+    lineTotal: line.lineTotal,
+    options: line.options,
+  }));
+}
+
+async function recordFranchizeOrderIntent(
+  payload: FranchizeOrderInvoicePayload,
+  input: {
+    intentType: "checkout_start" | "payment_failure" | "hold_created" | "payment_success";
+    stage: "checkout_started" | "payment_failed" | "hold_created" | "payment_confirmed";
+    urgencyScore: number;
+    sourceRoute?: string;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  const firstLine = payload.cartLines[0];
+  const result = await upsertFranchizeIntent({
+    slug: payload.slug,
+    bikeId: firstLine?.itemId,
+    intentType: input.intentType,
+    stage: input.stage,
+    sourceRoute: input.sourceRoute ?? `/franchize/${payload.slug}/order/${payload.orderId}`,
+    contactChannel: payload.payment,
+    urgencyScore: input.urgencyScore,
+    telegramUserId: payload.telegramUserId,
+    phone: payload.phone,
+    metadata: {
+      orderId: payload.orderId,
+      flowType: payload.flowType ?? "rental",
+      totalAmount: payload.totalAmount,
+      subtotal: payload.subtotal,
+      cartLines: summarizeFranchizeIntentCartLines(payload),
+      ...input.metadata,
+    },
+  });
+
+  if (!result.success) {
+    logger.warn("[franchize] intent tracking skipped", {
+      slug: payload.slug,
+      orderId: payload.orderId,
+      intentType: input.intentType,
+      error: result.error,
+    });
+  }
+
+  return result;
+}
+
 const franchizeCheckoutRateLimits = new Map<string, number>();
 const FRANCHIZE_CHECKOUT_COOLDOWN_MS = 8_000;
 
@@ -2371,14 +2429,33 @@ async function createFranchizeOrderInvoiceInternal(
       if (createdPendingInvoiceForThisAttempt) {
         await cleanupPendingFranchizeInvoiceAfterSendFailure(invoiceId, rentalId);
       }
+      await recordFranchizeOrderIntent(payload, {
+        intentType: "payment_failure",
+        stage: "payment_failed",
+        urgencyScore: 90,
+        metadata: { invoiceId, rentalId, reason: invoiceSent.error ?? "telegram_invoice_send_failed" },
+      });
       return { success: false, error: invoiceSent.error ?? "Не удалось отправить XTR-счёт в Telegram." };
     }
+
+    await recordFranchizeOrderIntent(payload, {
+      intentType: "hold_created",
+      stage: "hold_created",
+      urgencyScore: flowType === "sale" ? 95 : 85,
+      metadata: { invoiceId, rentalId, amountXtr, telegramWebappLink, franchizeRentalLink },
+    });
 
     return { success: true, invoiceId, amountXtr };
   } catch (error) {
     if (createdPendingInvoiceForThisAttempt) {
       await cleanupPendingFranchizeInvoiceAfterSendFailure(invoiceId, rentalId);
     }
+    await recordFranchizeOrderIntent(payload, {
+      intentType: "payment_failure",
+      stage: "payment_failed",
+      urgencyScore: 90,
+      metadata: { invoiceId, rentalId, reason: error instanceof Error ? error.message : String(error) },
+    });
     logger.error("[franchize] createFranchizeOrderInvoice failed", error);
     return {
       success: false,
@@ -2422,6 +2499,11 @@ export async function createFranchizeOrderCheckout(
   franchizeCheckoutRateLimits.set(throttleKey, now);
   const effectiveTotal = totalResult.totalAmount;
   const validatedPayload = { ...payload, ...totalResult, totalAmount: effectiveTotal };
+  await recordFranchizeOrderIntent(validatedPayload, {
+    intentType: "checkout_start",
+    stage: "checkout_started",
+    urgencyScore: validatedPayload.flowType === "rental" ? 75 : 85,
+  });
 
   try {
     await buildFranchizeOrderDocAndNotify({
