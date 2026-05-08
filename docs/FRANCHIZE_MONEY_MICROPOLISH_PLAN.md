@@ -133,12 +133,14 @@ This turns the app from a catalog into sales memory: failed payments, checkout b
 ### R5 — Abandoned checkout recovery
 
 - SupaPlan task: `cc5ec5ef-e6bb-446b-8d91-a12002fbb57d`
-- Status: `todo`
+- Status: `ready_for_pr`
 - Capability: `franchize.telegram`
 - Primary zone: checkout blocker logic and operator notifications.
 - Goal: convert unfinished checkout state into a compact operator card with exact next action.
 - Depends on: R1, R3.
 - Acceptance: if a rider leaves after meaningful blockers, operator sees bike, dates, phone/Telegram channel when available, last blocker, and suggested next message.
+- 2026-05-08 update: Checkout now records validated rent recovery snapshots in `franchize_intents`, debounces client writes, rate-limits server writes/notifications, forces `payment_failed` snapshots for XTR failures, and sends compact admin Telegram cards only for meaningful abandonment signals.
+- 2026-05-08 self-review: Recovery intents now carry a stable `dedupeKey` so anonymous/date-only checkout snapshots stay tied to the order instead of merging by default payment channel, while write and notification throttling are keyed by order/stage to prevent phone-typing bypasses and repeated readiness/date changes from spamming Telegram.
 
 ### R6 — Operator closer dashboard
 

@@ -109,6 +109,17 @@ This root file stays intentionally compact so operators and agents can load it q
 - `risks`: External contact links still cap tracking wait time to protect tap latency; this intentionally favors UX over guaranteed analytics writes for low-criticality clicks.
 
 
+### 2026-05-08 — FRZ-MONEY-R5 abandoned checkout recovery
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T00:00:00Z
+- `owner`: codex
+- `supaplan_task`: cc5ec5ef-e6bb-446b-8d91-a12002fbb57d
+- `notes`: Added checkout recovery snapshots for `/franchize/{slug}/order/{id}`: the client derives readiness/blocker/contact/date/amount state, sends debounced checkout-start telemetry, forces payment-failed recovery on XTR failures, and the server writes `rent` intents to `franchize_intents` before optional compact admin Telegram notifications. Self-review tightened dedupe with an order/stage `dedupeKey`, order-scoped write throttling, and lead-level notification cooldowns so anonymous/date-only leads do not collapse into one payment-channel row, phone typing cannot bypass cooldowns, and readiness/date changes cannot spam Telegram cards.
+- `next_step`: After merge, smoke `/franchize/vip-bike/order/<id>` with a populated cart and verify `franchize_intents` rows plus one recovery card per meaningful abandonment fingerprint.
+- `risks`: Recovery writes are best-effort and intentionally throttled; production operator visibility depends on `ADMIN_CHAT_ID` and the R1 intent-ledger migration being applied.
+
+
 ### 2026-05-08 — Franchize intent ledger foundation
 
 - `status`: ready_for_pr
