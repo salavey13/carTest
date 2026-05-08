@@ -260,6 +260,7 @@ export function SaleBikeLandingClient({
   const selectedColorLabel =
     colorOptions.find((color) => color.id === selectedColorId)?.label ?? "—";
   const normalizedFallbackContact = fallbackContact.trim();
+  const normalizedTradeInContact = tradeInForm.contact.trim();
   const fallbackPhone = normalizedFallbackContact.startsWith("+")
     ? normalizedFallbackContact
     : undefined;
@@ -294,7 +295,7 @@ export function SaleBikeLandingClient({
     router.push(window.location.pathname, { scroll: false });
   };
 
-  const recordSaleIntent = (input: {
+  const recordSaleIntent = async (input: {
     intentType:
       | PrebuyIntentType
       | "test_ride_click"
@@ -308,42 +309,70 @@ export function SaleBikeLandingClient({
   }) => {
     const selectedFlowOption = input.selectedOption ?? selectedOption.id;
 
-    return upsertFranchizeIntent({
-      slug: resolvedSlug,
-      bikeId: item.id,
-      intentType: input.intentType,
-      stage: input.stage,
-      sourceRoute,
-      contactChannel:
-        input.contactChannel ??
-        (telegramFirstContinuation ? "telegram" : "phone_or_handle"),
-      urgencyScore: input.urgencyScore,
-      telegramUserId,
-      phone: currentContact ?? fallbackPhone,
-      metadata: {
-        itemTitle: item.title,
-        bikePrice: finalPrice,
-        basePrice,
-        condition: bikeCondition,
-        checkedStatus,
-        availability,
-        selectedOption: selectedFlowOption,
-        selectedOptionId,
-        selectedOptionLabel: selectedOption.label,
-        selectedColorId,
-        selectedColorLabel,
+    try {
+      const result = await upsertFranchizeIntent({
+        slug: resolvedSlug,
+        bikeId: item.id,
+        intentType: input.intentType,
+        stage: input.stage,
         sourceRoute,
-        telegramFirstContinuation,
-        fallbackContact: normalizedFallbackContact || undefined,
-        ...input.metadata,
-      },
-    }).catch((error) => console.warn("sale intent tracking failed", error));
+        contactChannel:
+          input.contactChannel ??
+          (telegramFirstContinuation ? "telegram" : "phone_or_handle"),
+        urgencyScore: input.urgencyScore,
+        telegramUserId,
+        phone: currentContact ?? fallbackPhone,
+        metadata: {
+          itemTitle: item.title,
+          bikePrice: finalPrice,
+          basePrice,
+          condition: bikeCondition,
+          checkedStatus,
+          availability,
+          selectedOption: selectedFlowOption,
+          selectedOptionId,
+          selectedOptionLabel: selectedOption.label,
+          selectedColorId,
+          selectedColorLabel,
+          sourceRoute,
+          telegramFirstContinuation,
+          fallbackContact: normalizedFallbackContact || undefined,
+          ...input.metadata,
+        },
+      });
+
+      if (!result.success) {
+        console.warn("sale intent tracking failed", result.error);
+      }
+
+      return result;
+    } catch (error) {
+      console.warn("sale intent tracking failed", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Не удалось сохранить заявку.",
+      };
+    }
   };
 
   const handleComparisonCta = async (option: PrebuyComparisonOption) => {
+    if (option.id === "buy_now") {
+      setIntentActionStates((prev) => ({ ...prev, [option.id]: "loading" }));
+      await handleAddToCart();
+      setIntentActionStates((prev) => ({ ...prev, [option.id]: "success" }));
+      return;
+    }
+
+    const hasFallbackContinuation = Boolean(
+      normalizedFallbackContact ||
+      (option.intentType === "trade_in" && normalizedTradeInContact),
+    );
     const requiresFallbackContact =
-      !telegramFirstContinuation && !fallbackContact.trim();
-    if (option.id !== "buy_now" && requiresFallbackContact) {
+      !telegramFirstContinuation && !hasFallbackContinuation;
+    if (requiresFallbackContact) {
       setCartMessage(
         "Оставьте телефон или Telegram @handle, чтобы оператор продолжил заявку.",
       );
@@ -358,8 +387,8 @@ export function SaleBikeLandingClient({
       if (
         !hasTradeInMinimum ||
         (!telegramFirstContinuation &&
-          !tradeInForm.contact.trim() &&
-          !fallbackContact.trim())
+          !normalizedTradeInContact &&
+          !normalizedFallbackContact)
       ) {
         setCartMessage(
           "Для trade-in заполните модель, год, состояние и контакт.",
@@ -372,7 +401,7 @@ export function SaleBikeLandingClient({
     setCartMessage("");
 
     try {
-      await recordSaleIntent({
+      const result = await recordSaleIntent({
         intentType: option.intentType,
         stage: stageForIntent(option.intentType),
         urgencyScore: option.urgencyScore,
@@ -380,7 +409,14 @@ export function SaleBikeLandingClient({
         metadata: {
           action: `comparison_${option.id}`,
           flowLabel: option.label,
-          tradeIn: option.intentType === "trade_in" ? tradeInForm : undefined,
+          tradeIn:
+            option.intentType === "trade_in"
+              ? {
+                  ...tradeInForm,
+                  contact:
+                    normalizedTradeInContact || normalizedFallbackContact,
+                }
+              : undefined,
           finance:
             option.intentType === "finance"
               ? {
@@ -391,12 +427,12 @@ export function SaleBikeLandingClient({
               : undefined,
         },
       });
-      setIntentActionStates((prev) => ({ ...prev, [option.id]: "success" }));
 
-      if (option.id === "buy_now") {
-        await handleAddToCart();
-        return;
+      if (!result.success) {
+        throw new Error(result.error ?? "Не удалось сохранить заявку.");
       }
+
+      setIntentActionStates((prev) => ({ ...prev, [option.id]: "success" }));
 
       setCartMessage(
         telegramFirstContinuation
