@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
 import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context";
+import {
+  createTelegramActorCookieValue,
+  TELEGRAM_ACTOR_COOKIE,
+  TELEGRAM_ACTOR_COOKIE_MAX_AGE_SECONDS,
+} from "@/lib/telegram-actor-cookie";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BYPASS_VALIDATION_ENV =
@@ -135,8 +140,27 @@ export async function POST(req: NextRequest) {
     const result = await validateTelegramHash(initData, bypassValidation);
 
     const status = bypassValidation ? 200 : result.isValid ? 200 : 401;
+    const response = NextResponse.json(result, { status });
+    const userId = result.user?.id;
+    const actorCookie =
+      result.isValid &&
+      (typeof userId === "number" || typeof userId === "string")
+        ? createTelegramActorCookieValue(String(userId))
+        : null;
 
-    return NextResponse.json(result, { status });
+    if (actorCookie) {
+      response.cookies.set(TELEGRAM_ACTOR_COOKIE, actorCookie, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: TELEGRAM_ACTOR_COOKIE_MAX_AGE_SECONDS,
+      });
+    } else {
+      response.cookies.delete(TELEGRAM_ACTOR_COOKIE);
+    }
+
+    return response;
   } catch (e: any) {
     logger.error(
       "[API_VALIDATE_POST_ERROR] JSON parsing or logic error:",
