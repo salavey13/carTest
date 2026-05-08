@@ -12,6 +12,7 @@ import { FranchizeProfileButton } from "./FranchizeProfileButton";
 import { toCategoryId } from "../lib/navigation";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
+import { readablePaletteTextOnColor, withAlpha } from "../lib/theme";
 
 interface CrewHeaderProps {
   crew: FranchizeCrewVM;
@@ -30,6 +31,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   const headerLogoHref = crew.header.logoHref || mainCatalogPath;
   const railRef = useRef<HTMLDivElement | null>(null);
   const prevPathnameRef = useRef<string | null>(null);
+  const activePillText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
 
   // Reset active category when navigating away from main catalog
   // Scheduling setState via setTimeout to satisfy linter
@@ -167,8 +169,14 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
       style={{
         ...FRANCHIZE_HEADER_SAFE_AREA_STYLE,
         borderColor: crew.theme.palette.borderSoft,
-        backgroundColor: `${crew.theme.palette.bgCard}F0`,
+        backgroundColor: withAlpha(crew.theme.palette.bgCard, 0.94),
         color: crew.theme.palette.textPrimary,
+        ["--crew-header-text" as string]: crew.theme.palette.textPrimary,
+        ["--crew-header-card" as string]: crew.theme.palette.bgCard,
+        ["--crew-header-base" as string]: crew.theme.palette.bgBase,
+        ["--crew-header-border" as string]: crew.theme.palette.borderSoft,
+        ["--crew-header-accent" as string]: crew.theme.palette.accentMain,
+        ["--crew-header-accent-text" as string]: activePillText,
       }}
     >
       <div className="mx-auto w-full max-w-7xl overflow-hidden">
@@ -196,7 +204,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             onClick={() => setMenuOpen(true)}
             className="inline-flex h-11 w-11 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             style={{
-              backgroundColor: `${crew.theme.palette.bgBase}CC`,
+              backgroundColor: withAlpha(crew.theme.palette.bgBase, 0.8),
               color: crew.theme.palette.textPrimary,
               pointerEvents: "auto",
             }}
@@ -237,7 +245,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
           </Link>
 
           <FranchizeProfileButton
-            bgColor={`${crew.theme.palette.bgBase}CC`}
+            bgColor={withAlpha(crew.theme.palette.bgBase, 0.8)}
             textColor={crew.theme.palette.textPrimary}
             borderColor={crew.theme.palette.borderSoft}
             currentSlug={crew.slug}
@@ -264,7 +272,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                   className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-4 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] transition-colors pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
                     ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
-                    ["--pill-text" as string]: isActive ? "#000000" : crew.theme.palette.textPrimary,
+                    ["--pill-text" as string]: isActive ? activePillText : crew.theme.palette.textPrimary,
                   }}
                 >
                   {link.label}

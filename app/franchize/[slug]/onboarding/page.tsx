@@ -5,7 +5,7 @@ import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
-import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+import { crewPaletteForSurface, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
 interface PartnerOnboardingPageProps {
@@ -48,6 +48,7 @@ export default async function PartnerOnboardingPage({ params }: PartnerOnboardin
   const brandName = crew.header.brandName || crew.name || "VIP BIKE";
   const telegramHref = crew.contacts.telegram ? `https://t.me/${crew.contacts.telegram.replace("@", "")}` : "https://t.me/oneBikePlsBot";
   const { onboardingChecklist, onboardingReadinessRows } = crew.contentBlocks;
+  const accentText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
 
   return (
     <main className="min-h-screen" style={surface.page}>
@@ -58,10 +59,13 @@ export default async function PartnerOnboardingPage({ params }: PartnerOnboardin
           ["--onboarding-accent" as string]: crew.theme.palette.accentMain,
           ["--onboarding-border" as string]: crew.theme.palette.borderSoft,
           ["--onboarding-card" as string]: surface.subtleCard.backgroundColor,
+          ["--onboarding-base-soft" as string]: withAlpha(crew.theme.palette.bgBase, 0.25),
+          ["--onboarding-card-faint" as string]: withAlpha(crew.theme.palette.bgCard, 0.55),
+          ["--onboarding-accent-text" as string]: accentText,
           color: crew.theme.palette.textPrimary,
         }}
       >
-        <section className="overflow-hidden rounded-3xl border border-[var(--onboarding-border)] bg-[var(--onboarding-card)] p-6 shadow-2xl shadow-black/20 md:p-8">
+        <section className="overflow-hidden rounded-3xl border border-[var(--onboarding-border)] bg-[var(--onboarding-card)] p-6 shadow-2xl md:p-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--onboarding-accent)]">FRZ-R4 • partner onboarding</p>
           <div className="mt-4 grid gap-8 lg:grid-cols-[1.1fr,0.9fr] lg:items-end">
             <div>
@@ -70,7 +74,7 @@ export default async function PartnerOnboardingPage({ params }: PartnerOnboardin
                 Один понятный маршрут от первого сообщения до живой витрины: каталог, продажи, аренда, MapRiders и операционные роли без хаоса в чатах.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <a href={telegramHref} target="_blank" rel="noreferrer" className="rounded-full bg-[var(--onboarding-accent)] px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110">
+                <a href={telegramHref} target="_blank" rel="noreferrer" className="rounded-full bg-[var(--onboarding-accent)] px-5 py-3 text-sm font-semibold text-[var(--onboarding-accent-text)] transition hover:brightness-110">
                   Начать в Telegram
                 </a>
                 <Link href={`/franchize/${crewSlug}/sales`} className="rounded-full border border-current/20 px-5 py-3 text-sm font-semibold transition hover:border-current/50">
@@ -78,14 +82,14 @@ export default async function PartnerOnboardingPage({ params }: PartnerOnboardin
                 </Link>
               </div>
             </div>
-            <div className="rounded-3xl border border-current/10 bg-black/25 p-5">
+            <div className="rounded-3xl border border-[var(--onboarding-border)] bg-[var(--onboarding-base-soft)] p-5">
               <div className="flex items-center gap-3 text-[var(--onboarding-accent)]">
                 <Handshake className="h-6 w-6" />
                 <span className="text-sm font-semibold uppercase tracking-[0.16em]">Definition of ready</span>
               </div>
               <ul className="mt-4 space-y-3 text-sm opacity-75">
                 {onboardingReadinessRows.map((row) => (
-                  <li key={row.label} className="grid gap-1 rounded-2xl border border-current/10 bg-white/[0.03] p-3">
+                  <li key={row.label} className="grid gap-1 rounded-2xl border border-[var(--onboarding-border)] bg-[var(--onboarding-card-faint)] p-3">
                     <span className="font-semibold opacity-100">{row.label}</span>
                     <span>{row.text}</span>
                   </li>
@@ -111,7 +115,7 @@ export default async function PartnerOnboardingPage({ params }: PartnerOnboardin
           })}
         </section>
 
-        <section className="rounded-3xl border border-[var(--onboarding-border)] bg-black/25 p-6">
+        <section className="rounded-3xl border border-[var(--onboarding-border)] bg-[var(--onboarding-base-soft)] p-6">
           <div className="flex items-start gap-3">
             <CheckCircle2 className="mt-1 h-6 w-6 shrink-0 text-[var(--onboarding-accent)]" />
             <div>
