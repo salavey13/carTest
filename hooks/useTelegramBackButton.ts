@@ -21,6 +21,13 @@ function fallbackPathFor(pathname: string) {
   return "/";
 }
 
+function shouldShowBackButton(pathname: string) {
+  // Telegram exposes BackButton and the default close affordance as a mixed pair:
+  // show BackButton only when we can provide an app-level back target; hide it at
+  // the app root so Telegram's native close control remains available.
+  return fallbackPathFor(pathname) !== pathname;
+}
+
 export function useTelegramBackButton() {
   const { tg, isInTelegramContext } = useAppContext();
   const router = useRouter();
@@ -73,14 +80,14 @@ export function useTelegramBackButton() {
       router.push(targetPath);
     };
 
-    if (pathname !== "/") {
-      if (!backButton.isVisible) {
-        logger.debug(`[Telegram BackButton] Path is "${pathname}". Showing button.`);
-        backButton.show();
-      }
+    if (shouldShowBackButton(pathname || "/")) {
+      logger.debug(`[Telegram BackButton] Path is "${pathname}". Showing native back button.`);
+      backButton.show();
       backButton.onClick(handleBackClick);
-    } else if (backButton.isVisible) {
-      logger.debug('[Telegram BackButton] Path is "/". Hiding button.');
+    } else {
+      logger.debug(
+        `[Telegram BackButton] Path is "${pathname}". Hiding native back button so Telegram close stays available.`,
+      );
       backButton.hide();
     }
 
