@@ -5,16 +5,16 @@ Owner: `product + codex`
 Default QA slug: `vip-bike`  
 Updated: `2026-05-08T00:00:00Z`
 
-## 1) Verdict: loading is correct, exact crew first-paint is the frontier
+## 1) Verdict: loading is correct, early `vip-bike` theme hint is implemented
 
-Current franchize loading is the right architecture: instant, static, safe for Suspense, and not blocked on Supabase. The remaining non-God-tier gap is **exact first-paint crew branding**: `/franchize/vip-bike/*` should be able to paint the VIP Bike palette before any page data query resolves.
+Current franchize loading now has the God-tier baseline for known crews: it remains instant, static, safe for Suspense, not blocked on Supabase, and `/franchize/vip-bike/*` can paint the VIP Bike Pepperolli-dark palette from an early static manifest hint before page data queries resolve.
 
-Recommended implementation order:
+Implemented loading path:
 
-1. Add a tiny static slug theme manifest for known high-value crews such as `vip-bike`.
-2. Let middleware or route helpers derive an early theme token from `/franchize/:slug`.
-3. Optionally set a `franchize_theme=<token>` cookie after the first resolved page view so repeat visits stay crew-accurate even before hydration.
-4. Keep `loading.tsx` free of Supabase calls; it may consume only static manifest/cookie/path hints.
+1. Static slug theme manifest contains the high-value `vip-bike` crew.
+2. Middleware derives the slug from `/franchize/:slug/*` and sets the cheap `franchize_slug_theme` cookie scoped to `/franchize`.
+3. `loading.tsx` reads only `cookies()`, the static hint helper, `DEFAULT_FRANCHIZE_THEME`, and `crewPaletteForSurface`; it does not query Supabase or import client modules.
+4. Unknown crews intentionally fall back to `DEFAULT_FRANCHIZE_THEME` until they are added to the manifest or a later safe theme-token path is introduced.
 
 Definition of God-tier loading: **instant fallback + crew-accurate palette + no server/data fetch inside loading fallback**.
 
