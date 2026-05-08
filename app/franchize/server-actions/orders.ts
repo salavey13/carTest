@@ -3,6 +3,7 @@
 import {
   createFranchizeOrderCheckout as createFranchizeOrderCheckoutRuntime,
   createFranchizeOrderInvoice as createFranchizeOrderInvoiceRuntime,
+  recordFranchizeCheckoutRecoverySnapshot as recordFranchizeCheckoutRecoverySnapshotRuntime,
   getFranchizeOrderNotificationFailures as getFranchizeOrderNotificationFailuresRuntime,
   retryFranchizeOrderNotification as retryFranchizeOrderNotificationRuntime,
   submitFranchizeOrderNotification as submitFranchizeOrderNotificationRuntime,
@@ -26,4 +27,8 @@ export async function createFranchizeOrderInvoice(input: unknown) {
 
 export async function createFranchizeOrderCheckout(input: unknown) {
   return createFranchizeOrderCheckoutRuntime(input);
+}
+
+export async function recordFranchizeCheckoutRecoverySnapshot(input: unknown) {
+  return recordFranchizeCheckoutRecoverySnapshotRuntime(input);
 }
