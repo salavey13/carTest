@@ -148,7 +148,18 @@ export interface FranchizeCrewVM {
     socialLinks: Array<{ label: string; href: string }>;
     textColor: string;
   };
+  reservationHold: FranchizeReservationHoldVM;
   contentBlocks: FranchizeContentBlocks;
+}
+
+export interface FranchizeReservationHoldVM {
+  amountRub: number;
+  amountXtr: number;
+  percent: number | null;
+  label: string;
+  invoiceLabel: string;
+  pickupAddress: string;
+  requiredDocs: string[];
 }
 
 export interface FranchizeBySlugResult {
@@ -333,6 +344,35 @@ function readPath<T>(obj: unknown, path: string[], fallback: T): T {
   return (current as T) ?? fallback;
 }
 
+function readNumberPath(obj: unknown, paths: string[][], fallback = 0): number {
+  for (const path of paths) {
+    const value = readPath<unknown>(obj, path, undefined);
+    const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value.replace(",", ".")) : NaN;
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  return fallback;
+}
+
+function buildFranchizeReservationHold(franchize: UnknownRecord, fallbackAddress: string): FranchizeReservationHoldVM {
+  const config = readPath<UnknownRecord>(franchize, ["order", "reservationHold"], readPath<UnknownRecord>(franchize, ["reservationHold"], {}));
+  const amountRub = Math.max(1, Math.round(readNumberPath(config, [["amountRub"], ["amount_rub"], ["depositRub"], ["deposit_rub"]], 500)));
+  const amountXtr = Math.max(1, Math.round(readNumberPath(config, [["amountXtr"], ["amount_xtr"], ["stars"], ["depositXtr"], ["deposit_xtr"]], amountRub)));
+  const percentRaw = readNumberPath(config, [["percent"], ["depositPercent"], ["deposit_percent"]], 0);
+  const percent = percentRaw > 0 ? percentRaw : null;
+  const requiredDocs = readArrayPath<string>(config, ["requiredDocs"], ["Паспорт", "Водительское удостоверение A/A1/M", "Электронная подпись договора"]);
+  const pickupAddress = readPath(config, ["pickupAddress"], readPath(franchize, ["contacts", "address"], fallbackAddress || "адрес выдачи подтвердит оператор"));
+  const label = readPath(config, ["label"], `Забронировать за ${amountRub.toLocaleString("ru-RU")}₽ / ${amountXtr.toLocaleString("ru-RU")} XTR`);
+
+  return {
+    amountRub,
+    amountXtr,
+    percent,
+    label,
+    invoiceLabel: readPath(config, ["invoiceLabel"], `Бронь байка: ${amountXtr.toLocaleString("ru-RU")} XTR`),
+    pickupAddress,
+    requiredDocs,
+  };
+}
 
 function toRentalReviewVM(row: UnknownRecord): RentalReviewVM {
   return {
@@ -525,6 +565,7 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     socialLinks: [],
     textColor: "#16130A",
   },
+  reservationHold: buildFranchizeReservationHold({}, ""),
   contentBlocks: cloneFranchizeContentBlocks(),
 });
 
@@ -733,6 +774,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         socialLinks: extractFooterSocialLinks(franchize, readPath(franchize, ["contacts", "telegram"], "")),
         textColor: readPath(franchize, ["footer", "textColor"], DEFAULT_FOOTER_TEXT_COLOR),
       },
+      reservationHold: buildFranchizeReservationHold(franchize, readPath(franchize, ["contacts", "address"], "")),
       contentBlocks: readFranchizeContentBlocks(franchize),
     };
 
@@ -1971,6 +2013,14 @@ const franchizeOrderInvoiceSchema = z.object({
       })
       .default({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона" }),
   })).min(1),
+  depositAmount: z.number().finite().nonnegative().optional(),
+  checkoutBlockers: z.array(z.object({
+    id: z.string().trim().min(1).max(80),
+    label: z.string().trim().min(1).max(180),
+  })).max(20).default([]),
+  safetyQuizPassed: z.boolean().optional(),
+  pickupAddress: z.string().trim().optional(),
+  requiredDocs: z.array(z.string().trim().min(1).max(120)).max(12).default([]),
   flowType: z.enum(["rental", "sale", "mixed"]).default("rental"),
 });
 
@@ -1987,7 +2037,7 @@ export async function submitFranchizeOrderNotification(input: unknown): Promise<
   const effectiveTotal = totalResult.totalAmount;
   const validatedPayload = { ...payload, ...totalResult, totalAmount: effectiveTotal };
   await recordFranchizeOrderIntent(validatedPayload, {
-    intentType: "checkout_start",
+    intentType: "rent",
     stage: "checkout_started",
     urgencyScore: validatedPayload.flowType === "rental" ? 75 : 85,
   });
@@ -2234,7 +2284,7 @@ function summarizeFranchizeIntentCartLines(payload: FranchizeOrderInvoicePayload
 async function recordFranchizeOrderIntent(
   payload: FranchizeOrderInvoicePayload,
   input: {
-    intentType: "checkout_start" | "payment_failure" | "hold_created" | "payment_success";
+    intentType: "checkout_start" | "payment_failure" | "hold_created" | "payment_success" | "rent";
     stage: "checkout_started" | "payment_failed" | "hold_created" | "payment_confirmed";
     urgencyScore: number;
     sourceRoute?: string;
@@ -2253,11 +2303,22 @@ async function recordFranchizeOrderIntent(
     telegramUserId: payload.telegramUserId,
     phone: payload.phone,
     metadata: {
+      dedupeKey: `order:${payload.slug}:${payload.orderId}:${input.stage}`,
       orderId: payload.orderId,
       flowType: payload.flowType ?? "rental",
       totalAmount: payload.totalAmount,
       subtotal: payload.subtotal,
+      price: payload.totalAmount,
+      depositAmount: payload.depositAmount,
+      selectedDate: payload.rentalStartDate,
+      selectedEndDate: payload.rentalEndDate,
+      selectedTime: payload.time,
+      bikeIds: payload.cartLines.map((line) => line.itemId),
       cartLines: summarizeFranchizeIntentCartLines(payload),
+      blockers: payload.checkoutBlockers,
+      safetyQuizPassed: payload.safetyQuizPassed,
+      pickupAddress: payload.pickupAddress,
+      requiredDocs: payload.requiredDocs,
       ...input.metadata,
     },
   });
@@ -2591,6 +2652,22 @@ async function cleanupPendingFranchizeInvoiceAfterSendFailure(invoiceId: string,
   return true;
 }
 
+async function resolveFranchizeReservationHold(slug: string): Promise<FranchizeReservationHoldVM> {
+  const { data: crew, error } = await supabaseAdmin
+    .from("crews")
+    .select("metadata")
+    .eq("slug", normalizeCrewSlug(slug))
+    .maybeSingle();
+
+  if (error) {
+    logger.warn("[franchize] reservation hold config lookup failed", { slug, error: error.message });
+  }
+
+  const metadata = ((crew?.metadata ?? {}) as UnknownRecord);
+  const franchize = (metadata.franchize ?? metadata) as UnknownRecord;
+  return buildFranchizeReservationHold(franchize, readPath(franchize, ["contacts", "address"], ""));
+}
+
 async function createFranchizeOrderInvoiceInternal(
   payload: FranchizeOrderInvoicePayload,
   options: { skipNotification?: boolean } = {},
@@ -2604,6 +2681,7 @@ async function createFranchizeOrderInvoiceInternal(
 
   const effectiveTotal = payload.totalAmount > 0 ? payload.totalAmount : payload.subtotal + payload.extrasTotal;
   const flowType = payload.flowType ?? "rental";
+  const holdConfig = await resolveFranchizeReservationHold(payload.slug);
   let amountXtr: number;
   let invoiceTitle = "Franchize: подтверждение намерения";
   let invoiceDescriptionPrefix = "Подтверждение аренды";
@@ -2615,8 +2693,21 @@ async function createFranchizeOrderInvoiceInternal(
     invoiceDescriptionPrefix = "Резерв на тест-драйв и получение спеццены на";
     invoiceProofLabel = "Бронь тест-драйва";
   } else {
-    amountXtr = Math.max(1, Math.ceil(effectiveTotal * 0.01));
+    amountXtr = holdConfig.percent
+      ? Math.max(1, Math.ceil(effectiveTotal * (holdConfig.percent / 100)))
+      : holdConfig.amountXtr;
+    invoiceTitle = "Franchize: Бронь байка";
+    invoiceDescriptionPrefix = "Бронь аренды";
+    invoiceProofLabel = holdConfig.invoiceLabel;
   }
+
+  const invoiceDepositAmount = amountXtr;
+  const invoiceDepositAmountRub = holdConfig.percent || flowType === "sale" ? amountXtr : holdConfig.amountRub;
+  const serverTrustedPayload = {
+    ...payload,
+    totalAmount: effectiveTotal,
+    depositAmount: invoiceDepositAmount,
+  };
 
   const invoiceId = buildFranchizeInvoiceId(payload);
 
@@ -2653,7 +2744,7 @@ async function createFranchizeOrderInvoiceInternal(
     `Extras: ${payload.extrasTotal.toLocaleString("ru-RU")} ₽`,
     payload.promoCode ? `Promo: ${payload.promoCode} (-${payload.promoDiscount.toLocaleString("ru-RU")} ₽)` : "",
     `Total: ${effectiveTotal.toLocaleString("ru-RU")} ₽`,
-    `${invoiceProofLabel}: ${amountXtr} XTR${flowType === "sale" ? "" : " (1%)"}`,
+    `${invoiceProofLabel}: ${amountXtr} XTR${holdConfig.percent ? ` (${holdConfig.percent}%)` : ""}`,
     `WebApp: ${telegramWebappLink}`,
     `Franchize card: ${franchizeRentalLink}`,
   ]
@@ -2666,6 +2757,8 @@ async function createFranchizeOrderInvoiceInternal(
     recipient: payload.recipient,
     phone: payload.phone,
     time: payload.time,
+    rentalStartDate: payload.rentalStartDate,
+    rentalEndDate: payload.rentalEndDate,
     comment: payload.comment,
     payment: payload.payment,
     delivery: payload.delivery,
@@ -2675,7 +2768,11 @@ async function createFranchizeOrderInvoiceInternal(
     promoTitle: payload.promoTitle,
     promoDiscount: payload.promoDiscount,
     totalAmount: effectiveTotal,
-    tipPercent: flowType === "sale" ? 0.1 : 1,
+    tipPercent: holdConfig.percent ?? (flowType === "sale" ? 0.1 : null),
+    reservationHold: holdConfig,
+    depositAmount: invoiceDepositAmount,
+    depositAmountRub: invoiceDepositAmountRub,
+    depositAmountXtr: amountXtr,
     amountXtr,
     rental_id: rentalId,
     startParam,
@@ -2712,17 +2809,23 @@ async function createFranchizeOrderInvoiceInternal(
       if (createdPendingInvoiceForThisAttempt) {
         await cleanupPendingFranchizeInvoiceAfterSendFailure(invoiceId, rentalId);
       }
-      await recordFranchizeOrderIntent(payload, {
-        intentType: "payment_failure",
+      await recordFranchizeOrderIntent(serverTrustedPayload, {
+        intentType: "rent",
         stage: "payment_failed",
         urgencyScore: 90,
-        metadata: { invoiceId, rentalId, reason: invoiceSent.error ?? "telegram_invoice_send_failed" },
+        metadata: {
+          invoiceId,
+          rentalId,
+          failureSource: "sendTelegramInvoice",
+          telegramError: invoiceSent.error ?? "telegram_invoice_send_failed",
+          reason: invoiceSent.error ?? "telegram_invoice_send_failed",
+        },
       });
       return { success: false, error: invoiceSent.error ?? "Не удалось отправить XTR-счёт в Telegram." };
     }
 
-    await recordFranchizeOrderIntent(payload, {
-      intentType: "hold_created",
+    await recordFranchizeOrderIntent(serverTrustedPayload, {
+      intentType: "rent",
       stage: "hold_created",
       urgencyScore: flowType === "sale" ? 95 : 85,
       metadata: { invoiceId, rentalId, amountXtr, telegramWebappLink, franchizeRentalLink },
@@ -2733,11 +2836,18 @@ async function createFranchizeOrderInvoiceInternal(
     if (createdPendingInvoiceForThisAttempt) {
       await cleanupPendingFranchizeInvoiceAfterSendFailure(invoiceId, rentalId);
     }
-    await recordFranchizeOrderIntent(payload, {
-      intentType: "payment_failure",
+    await recordFranchizeOrderIntent(serverTrustedPayload, {
+      intentType: "rent",
       stage: "payment_failed",
       urgencyScore: 90,
-      metadata: { invoiceId, rentalId, reason: error instanceof Error ? error.message : String(error) },
+      metadata: {
+        invoiceId,
+        rentalId,
+        failureSource: "createFranchizeOrderInvoice",
+        errorName: error instanceof Error ? error.name : undefined,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        reason: error instanceof Error ? error.message : String(error),
+      },
     });
     logger.error("[franchize] createFranchizeOrderInvoice failed", error);
     return {
@@ -2783,7 +2893,7 @@ export async function createFranchizeOrderCheckout(
   const effectiveTotal = totalResult.totalAmount;
   const validatedPayload = { ...payload, ...totalResult, totalAmount: effectiveTotal };
   await recordFranchizeOrderIntent(validatedPayload, {
-    intentType: "checkout_start",
+    intentType: "rent",
     stage: "checkout_started",
     urgencyScore: validatedPayload.flowType === "rental" ? 75 : 85,
   });

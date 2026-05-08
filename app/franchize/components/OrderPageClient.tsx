@@ -87,6 +87,11 @@ type CheckoutPayload = {
       auction: string;
     };
   }>;
+  depositAmount: number;
+  checkoutBlockers: Array<{ id: string; label: string }>;
+  safetyQuizPassed: boolean;
+  pickupAddress: string;
+  requiredDocs: string[];
   flowType: "rental" | "sale" | "mixed";
 };
 
@@ -240,6 +245,20 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     [consent, flowLabel, hasTelegramUser, hasUnvalidatedPromo, isCartEmpty, phone, recipient, rentalStartDate, requiresTelegram, safetyQuizPassed, signatureName, time],
   );
   const nextAction = checkoutBlockers[0];
+  const holdAmountRub = crew.reservationHold.amountRub;
+  const holdConfiguredAmountXtr = crew.reservationHold.amountXtr;
+  const holdDepositAmount = crew.reservationHold.percent
+    ? Math.max(1, Math.ceil(totalAmount * (crew.reservationHold.percent / 100)))
+    : holdAmountRub;
+  const holdPaymentAmountXtr = crew.reservationHold.percent ? holdDepositAmount : holdConfiguredAmountXtr;
+  const holdPaymentAmountRub = crew.reservationHold.percent ? holdDepositAmount : holdAmountRub;
+  const holdCtaLabel = crew.reservationHold.percent
+    ? `Забронировать за ${crew.reservationHold.percent}% / ${holdPaymentAmountXtr.toLocaleString("ru-RU")} XTR`
+    : crew.reservationHold.label;
+  const pickupAddress = crew.reservationHold.pickupAddress || crew.contacts.address || "адрес выдачи подтвердит оператор";
+  const requiredDocs = crew.reservationHold.requiredDocs.length > 0
+    ? crew.reservationHold.requiredDocs
+    : ["Паспорт", "Водительское удостоверение", "Электронная подпись договора"];
 
   const submitPayload = useMemo<CheckoutPayload>(
     () => ({
@@ -271,12 +290,17 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         lineTotal: line.lineTotal,
         options: line.options,
       })),
+      depositAmount: holdDepositAmount,
+      checkoutBlockers: checkoutBlockers.map((blocker) => ({ id: blocker.id, label: blocker.label })),
+      safetyQuizPassed,
+      pickupAddress,
+      requiredDocs,
       flowType,
     }),
-    [appliedPromo, cartLines, comment, consent, deliveryMode, extrasTotal, flowType, orderId, payment, phone, promoDiscount, recipient, rentalEndDate, rentalStartDate, selectedExtraItems, signatureName, time, totalAmount, user?.id],
+    [appliedPromo, cartLines, checkoutBlockers, comment, consent, deliveryMode, extrasTotal, flowType, holdDepositAmount, orderId, payment, phone, pickupAddress, promoDiscount, recipient, rentalEndDate, rentalStartDate, requiredDocs, safetyQuizPassed, selectedExtraItems, signatureName, time, totalAmount, user?.id],
   );
 
-  const recoveryDepositAmount = flowType === "sale" ? Math.round(totalAmount * 0.1) : totalAmount > 0 ? 20_000 : 0;
+  const recoveryDepositAmount = flowType === "sale" ? Math.round(totalAmount * 0.1) : holdDepositAmount;
 
   const buildRecoverySnapshot = (stage: "checkout_started" | "payment_failed") => ({
     slug,
@@ -332,9 +356,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   };
 
   const submitLabel = isSubmitting
-    ? "Подготавливаем оплату..."
+    ? "Подготавливаем бронь..."
     : payment === "telegram_xtr"
-      ? "Подтвердить и получить XTR-счёт"
+      ? holdCtaLabel
       : "Подтвердить заказ";
 
   const submitHint = isSubmitting
@@ -350,7 +374,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             : appliedPromo
               ? `Промокод ${appliedPromo.code} применён: ${appliedPromo.description}.`
               : payment === "telegram_xtr"
-                ? "XTR-счёт будет рассчитан как 1% от полной суммы (с учётом доп. опций и промокода)."
+                ? `Сейчас спишется только бронь: ${holdPaymentAmountRub.toLocaleString("ru-RU")}₽ / ${holdPaymentAmountXtr.toLocaleString("ru-RU")} XTR. Остальное подтвердит оператор.`
             : "Проверьте контакты и способ получения, затем подтверждайте заказ.";
 
   useEffect(() => {
@@ -488,6 +512,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         totalAmount: submitPayload.totalAmount,
         extras: submitPayload.extras,
         cartLines: submitPayload.cartLines,
+        depositAmount: submitPayload.depositAmount,
+        checkoutBlockers: submitPayload.checkoutBlockers,
+        safetyQuizPassed: submitPayload.safetyQuizPassed,
+        pickupAddress: submitPayload.pickupAddress,
+        requiredDocs: submitPayload.requiredDocs,
         flowType: submitPayload.flowType,
       });
 
@@ -615,8 +644,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <ol className="mt-3 space-y-2">
             {[
               `Проверим корзину, даты и контакт для ${flowLabel}.`,
-              payment === "telegram_xtr" ? "Передадим счёт в Telegram Stars и покажем резервный способ, если WebApp не открылся." : "Передадим заявку оператору: оплату подтвердим вручную до выдачи.",
-              "Оператор сверит договор, подготовку байка и точку выдачи без скрытых списаний.",
+              payment === "telegram_xtr" ? `Отправим hold-счёт: ${holdPaymentAmountRub.toLocaleString("ru-RU")}₽ / ${holdPaymentAmountXtr.toLocaleString("ru-RU")} XTR, чтобы закрепить байк.` : "Передадим заявку оператору: оплату подтвердим вручную до выдачи.",
+              `После подтверждения в Telegram пришлём адрес выдачи (${pickupAddress}), список документов и ссылку на сделку.`,
             ].map((step, index) => (
               <li key={step} className="flex gap-2">
                 <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--order-accent-soft)] text-[11px] font-semibold text-[var(--order-accent)]">{index + 1}</span>
@@ -627,6 +656,16 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <p className="mt-3 rounded-2xl border border-[var(--order-border)] p-3 text-xs" style={surface.card}>
             Безопасность оплаты и договора: сумма фиксируется в заявке, договор/чек проверяются до старта, спорные изменения подтверждаются только через оператора или Telegram.
           </p>
+          <div className="mt-3 rounded-2xl border border-[var(--order-border)] p-3 text-xs" style={surface.card}>
+            <p className="font-semibold text-[var(--order-accent)]">Hold-бронь</p>
+            <p className="mt-1">{holdCtaLabel} — это маленький депозит, который фиксирует выбранный слот и запускает Telegram-подтверждение.</p>
+            <ul className="mt-2 space-y-1 text-[var(--order-muted)]">
+              <li>Адрес выдачи: {pickupAddress}</li>
+              <li>Документы: {requiredDocs.join(", ")}</li>
+              <li>Safety quiz: {safetyQuizPassed ? "пройден" : "нужно пройти до отправки"}</li>
+              <li>После оплаты: Telegram пришлёт карточку сделки и следующий шаг оператора.</li>
+            </ul>
+          </div>
         </div>
         <div className="space-y-2">
           <a
@@ -755,7 +794,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                   }}
                 >
                   <p className="font-medium">{item.label}</p>
-                  <p className="text-xs" style={surface.mutedText}>{item.description}</p>
+                  <p className="text-xs" style={surface.mutedText}>
+                    {item.id === "telegram_xtr" ? `${item.description} · ${holdCtaLabel}` : item.description}
+                  </p>
                 </button>
               ))}
             </div>
@@ -1001,6 +1042,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <div className="mt-3 border-t border-[var(--order-border)] pt-3 text-sm">
             <p className="flex justify-between"><span>Получение</span><span>{deliveryMode === "pickup" ? "Самовывоз" : "Доставка"}</span></p>
             <p className="mt-1 flex justify-between"><span>Оплата</span><span>{payments.find((item) => item.id === payment)?.label ?? payment}</span></p>
+            <p className="mt-1 flex justify-between"><span>Hold</span><span>{payment === "telegram_xtr" ? `${holdPaymentAmountXtr.toLocaleString("ru-RU")} XTR` : `${holdDepositAmount.toLocaleString("ru-RU")} ₽`}</span></p>
             <p className="mt-1 flex justify-between"><span>Период</span><span>{rentalStartDate || "—"} → {rentalEndDate || "—"}</span></p>
             <p className="mt-2 flex justify-between"><span>Подытог</span><span>{subtotal.toLocaleString("ru-RU")} ₽</span></p>
             <p className="mt-1 flex justify-between"><span>Доп. опции</span><span>{extrasTotal.toLocaleString("ru-RU")} ₽</span></p>
@@ -1025,6 +1067,15 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             {submitLabel}
           </button>
           <p className="mt-2 text-xs" style={surface.mutedText}>{submitHint}</p>
+          <div className="mt-3 rounded-xl border border-[var(--order-border)] p-3 text-xs" style={surface.subtleCard}>
+            <p className="font-semibold text-[var(--order-accent)]">Следующие шаги после hold</p>
+            <ul className="mt-2 space-y-1" style={surface.mutedText}>
+              <li>1. Telegram подтвердит счёт и пришлёт ссылку на заказ.</li>
+              <li>2. Оператор закрепит байк, адрес выдачи: {pickupAddress}.</li>
+              <li>3. На выдаче проверим документы: {requiredDocs.join(", ")}.</li>
+              <li>4. Safety quiz: {safetyQuizPassed ? "готов" : "нужно пройти перед отправкой"}.</li>
+            </ul>
+          </div>
           <p className="mt-3 rounded-xl border border-[var(--order-border)] p-3 text-xs" style={surface.subtleCard}>
             Если оплата или договор не открылись, не перезагружайте страницу: нажмите Telegram fallback выше или напишите в поддержку — оператор продолжит заявку по #{orderId}.
           </p>
