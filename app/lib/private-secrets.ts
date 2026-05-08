@@ -6,7 +6,27 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 
 const MAX_SECRET_JSON_BYTES = 256 * 1024;
 const RESERVED_JSON_KEYS = new Set(["__proto__", "constructor", "prototype"]);
-const FORBIDDEN_CREW_SECRET_KEY_PATTERN = /(?:password|passphrase|secret|token|api[_-]?key|credential|private[_-]?key|client[_-]?secret|card|pan|cvv|cvc|iban|payment[_-]?(?:credential|secret|token|key)|acquiring|merchant[_-]?(?:key|secret|token))/i;
+const FORBIDDEN_CREW_SECRET_KEY_SIGNALS = new Set([
+  "password",
+  "passphrase",
+  "secret",
+  "secretkey",
+  "token",
+  "apikey",
+  "credential",
+  "credentials",
+  "privatekey",
+  "clientsecret",
+  "pan",
+  "cvv",
+  "cvc",
+  "iban",
+  "cardnumber",
+  "cardpan",
+  "cardtoken",
+  "accesstoken",
+  "refreshtoken",
+]);
 
 type SupabaseSchemaClient = {
   schema: (schema: string) => {
@@ -33,28 +53,62 @@ function normalizePrivateId(value: string, fieldName: string): string {
 }
 
 function parseJsonRecord(raw: unknown): Record<string, unknown> {
-  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    return raw as Record<string, unknown>;
-  }
+  const parsed = (() => {
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      return raw;
+    }
 
-  if (typeof raw !== "string" || raw.trim().length === 0) {
-    return {};
-  }
+    if (typeof raw !== "string" || raw.trim().length === 0) {
+      return null;
+    }
 
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {};
-  } catch {
-    return {};
-  }
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      return null;
+    }
+  })();
+
+  return sanitizeCrewSecretRecordForRead(parsed);
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
+}
+
+function normalizeSecretKeySignal(key: string): string {
+  return key.toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+function isForbiddenCrewSecretKey(key: string): boolean {
+  const signal = normalizeSecretKeySignal(key);
+  if (FORBIDDEN_CREW_SECRET_KEY_SIGNALS.has(signal)) return true;
+  if (/^(payment|acquiring|merchant).*(credential|credentials|secret|token|key|password)$/.test(signal)) return true;
+  return /^(card)(number|pan|token|cvv|cvc)$/.test(signal);
+}
+
+function sanitizeCrewSecretValueForRead(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sanitizeCrewSecretValueForRead);
+  }
+
+  if (isPlainRecord(value)) {
+    return sanitizeCrewSecretRecordForRead(value);
+  }
+
+  return value;
+}
+
+function sanitizeCrewSecretRecordForRead(value: unknown): Record<string, unknown> {
+  if (!isPlainRecord(value)) return {};
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !RESERVED_JSON_KEYS.has(key) && !isForbiddenCrewSecretKey(key))
+      .map(([key, nestedValue]) => [key, sanitizeCrewSecretValueForRead(nestedValue)]),
+  );
 }
 
 function assertSafeCrewSecretValue(value: unknown, fieldName: string, path: string[]): void {
@@ -93,7 +147,7 @@ function assertSafeCrewSecretRecord(value: unknown, fieldName: string, path: str
       throw new Error(`${fieldName}.${keyPath.join(".")} uses a reserved JSON key.`);
     }
 
-    if (FORBIDDEN_CREW_SECRET_KEY_PATTERN.test(key)) {
+    if (isForbiddenCrewSecretKey(key)) {
       throw new Error(
         `${fieldName}.${keyPath.join(".")} looks like a credential key and must not be stored in crew_secrets.`,
       );
