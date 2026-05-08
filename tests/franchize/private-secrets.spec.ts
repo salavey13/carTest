@@ -49,10 +49,26 @@ describe('crew private secret storage', () => {
   it('rejects credential-looking keys before writing crew secrets', async () => {
     await expect(saveCrewSensitiveData('vip-bike', {
       contractDefaults: { defaults: { issuerName: 'VIP Bike' } },
-      docTemplates: { paymentCredentials: { token: 'should-not-live-here' } },
+      docTemplates: { paymentCredentials: { accessToken: 'should-not-live-here' } },
     })).rejects.toThrow(/credential key/);
 
     expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  it('allows legitimate template/config key names that merely contain words like card or tokens', async () => {
+    await saveCrewSensitiveData('vip-bike', {
+      docTemplates: {
+        cardTemplate: 'Карточка {{bike_make_model}}',
+        designTokensText: 'orange/cyberpunk visual hints',
+      },
+    });
+
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      doc_templates: JSON.stringify({
+        cardTemplate: 'Карточка {{bike_make_model}}',
+        designTokensText: 'orange/cyberpunk visual hints',
+      }),
+    }));
   });
 
   it('rejects prototype pollution keys before writing crew secrets', async () => {
@@ -66,8 +82,8 @@ describe('crew private secret storage', () => {
   it('reads only allowed crew secret columns and parses JSON objects defensively', async () => {
     mocks.maybeSingle.mockResolvedValue({
       data: {
-        contract_defaults: '{"defaults":{"issuerName":"VIP Bike"}}',
-        doc_templates: 'not-json',
+        contract_defaults: '{"defaults":{"issuerName":"VIP Bike"},"paymentToken":"old-token"}',
+        doc_templates: '{"rentalDealTemplate":"OK","__proto__":{"polluted":true},"merchantSecret":"old-secret"}',
       },
       error: null,
     });
@@ -78,7 +94,7 @@ describe('crew private secret storage', () => {
     expect(mocks.select).toHaveBeenCalledWith('contract_defaults, doc_templates');
     expect(result).toEqual({
       contractDefaults: { defaults: { issuerName: 'VIP Bike' } },
-      docTemplates: {},
+      docTemplates: { rentalDealTemplate: 'OK' },
     });
   });
 });
