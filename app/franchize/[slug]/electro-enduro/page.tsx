@@ -3,7 +3,7 @@ import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { CatalogClient } from "../../components/CatalogClient";
 import { type CatalogItemVM, getFranchizeBySlug } from "../../actions";
-import { crewPaletteForSurface } from "../../lib/theme";
+import { crewPaletteForSurface, readablePaletteTextOnColor, withAlpha } from "../../lib/theme";
 import Link from "next/link";
 import { fallbackBikes } from "../configurator/fallback-catalog";
 import { buildFranchizeSectionMetadata } from "../metadata";
@@ -130,6 +130,7 @@ export default async function ElectroEnduroPage({
     ? configuratorFallbackItems()
     : hydrated.items;
   const surface = crewPaletteForSurface(crew.theme);
+  const accentText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
   const saleItems = items.filter((item) => {
     const id = item.id.toLowerCase();
     return (
@@ -174,29 +175,43 @@ export default async function ElectroEnduroPage({
   ).slice(0, 8);
 
   return (
-    <main className="min-h-screen" style={surface.page}>
+    <main
+      className="min-h-screen text-[var(--enduro-text)]"
+      style={{
+        ...surface.page,
+        ["--enduro-accent" as string]: crew.theme.palette.accentMain,
+        ["--enduro-accent-text" as string]: accentText,
+        ["--enduro-border" as string]: crew.theme.palette.borderSoft,
+        ["--enduro-text" as string]: crew.theme.palette.textPrimary,
+        ["--enduro-muted" as string]: crew.theme.palette.textSecondary,
+        ["--enduro-card" as string]: surface.subtleCard.backgroundColor,
+        ["--enduro-card-faint" as string]: withAlpha(crew.theme.palette.bgCard, 0.7),
+        ["--enduro-card-soft" as string]: withAlpha(crew.theme.palette.bgCard, 0.48),
+        ["--enduro-accent-faint" as string]: withAlpha(crew.theme.palette.accentMain, 0.12),
+      }}
+    >
       <CrewHeader
         crew={crew}
         activePath={`/franchize/${crew.slug || slug}/electro-enduro`}
         groupLinks={saleItems.map((item) => item.category)}
       />
       <section className="mx-auto w-full max-w-7xl px-4 pt-6 2xl:max-w-[1600px]">
-        <div className="rounded-3xl border border-white/15 bg-black/30 p-5 backdrop-blur-sm sm:p-8">
-          <p className="text-xs uppercase tracking-[0.18em] text-white/60">
+        <div className="rounded-3xl border border-[var(--enduro-border)] bg-[var(--enduro-card)] p-5 backdrop-blur-sm sm:p-8">
+          <p className="text-xs uppercase tracking-[0.18em] text-[var(--enduro-muted)]">
             Electro-Enduro flow
           </p>
-          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold text-[var(--enduro-text)] sm:text-3xl">
             Electro-enduro: два сценария в одном каталоге
           </h1>
-          <p className="mt-3 max-w-3xl text-sm text-white/75 sm:text-base">
+          <p className="mt-3 max-w-3xl text-sm text-[var(--enduro-muted)] sm:text-base">
             Для быстрого старта удобно взять байк в аренду и оценить поведение
             на маршруте. Для заказа в собственность используйте конфигуратор:
             параметры, комплектация и оформление идут отдельным потоком.
           </p>
           <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <article className="rounded-2xl border border-emerald-300/35 bg-emerald-950/70 p-4 text-white shadow-lg shadow-black/20">
+            <article className="rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-card-faint)] p-4 text-[var(--enduro-text)] shadow-lg">
               <h2 className="text-lg font-medium">Аренда / тест-драйв</h2>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-white/80">
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--enduro-muted)]">
                 <li>Быстрый старт для знакомства с техникой.</li>
                 <li>
                   Подходит для сравнения нескольких моделей перед покупкой.
@@ -204,17 +219,17 @@ export default async function ElectroEnduroPage({
                 <li>Маршрутный формат и базовый инструктаж перед выездом.</li>
               </ul>
               <Link
-                className="mt-4 inline-flex rounded-xl border border-white/30 px-3 py-2 text-sm hover:bg-white hover:text-black"
+                className="mt-4 inline-flex rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-text)] hover:border-[var(--enduro-accent)] hover:bg-[var(--enduro-accent)] hover:text-[var(--enduro-accent-text)]"
                 href={`/franchize/${crew.slug || slug}`}
               >
                 Открыть каталог аренды
               </Link>
             </article>
-            <article className="rounded-2xl border border-amber-300/35 bg-amber-950/75 p-4 text-white shadow-lg shadow-black/20">
+            <article className="rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-card-faint)] p-4 text-[var(--enduro-text)] shadow-lg">
               <h2 className="text-lg font-medium">
                 Продажа / кастомная сборка
               </h2>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-white/80">
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--enduro-muted)]">
                 <li>
                   Выбор батареи, мощности, подвески и дополнительных опций.
                 </li>
@@ -222,7 +237,7 @@ export default async function ElectroEnduroPage({
                 <li>Лучше для тех, кто ищет байк в постоянное владение.</li>
               </ul>
               <Link
-                className="mt-4 inline-flex rounded-xl border border-white/30 px-3 py-2 text-sm hover:bg-white hover:text-black"
+                className="mt-4 inline-flex rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-text)] hover:border-[var(--enduro-accent)] hover:bg-[var(--enduro-accent)] hover:text-[var(--enduro-accent-text)]"
                 href={`/franchize/${crew.slug || slug}/configurator`}
               >
                 Перейти в конфигуратор
@@ -233,11 +248,11 @@ export default async function ElectroEnduroPage({
       </section>
       <section className="mx-auto w-full max-w-7xl px-4 pt-6 2xl:max-w-[1600px]">
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <article className="rounded-3xl border border-emerald-300/35 bg-emerald-950/70 p-5 text-white shadow-lg shadow-black/20">
+          <article className="rounded-3xl border border-[var(--enduro-border)] bg-[var(--enduro-card-faint)] p-5 text-[var(--enduro-text)] shadow-lg">
             <h3 className="text-xl font-semibold">
               Группа аренды (test-ride friendly)
             </h3>
-            <p className="mt-2 text-sm text-white/75">
+            <p className="mt-2 text-sm text-[var(--enduro-muted)]">
               Включает модели для первого знакомства и коротких прокатных
               сессий.
             </p>
@@ -246,7 +261,7 @@ export default async function ElectroEnduroPage({
                 <Link
                   key={item.id}
                   href={`/franchize/${crew.slug || slug}/electro-enduro?vehicle=${item.id}`}
-                  className="flex items-center justify-between rounded-xl border border-white/20 px-3 py-2 text-sm hover:bg-white hover:text-black"
+                  className="flex items-center justify-between rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-text)] hover:border-[var(--enduro-accent)] hover:bg-[var(--enduro-accent)] hover:text-[var(--enduro-accent-text)]"
                 >
                   <span>{item.title}</span>
                   <span className="text-xs opacity-80">
@@ -256,11 +271,11 @@ export default async function ElectroEnduroPage({
               ))}
             </div>
           </article>
-          <article className="rounded-3xl border border-amber-300/35 bg-amber-950/75 p-5 text-white shadow-lg shadow-black/20">
+          <article className="rounded-3xl border border-[var(--enduro-border)] bg-[var(--enduro-card-faint)] p-5 text-[var(--enduro-text)] shadow-lg">
             <h3 className="text-xl font-semibold">
               Группа продажи (build-to-order)
             </h3>
-            <p className="mt-2 text-sm text-white/75">
+            <p className="mt-2 text-sm text-[var(--enduro-muted)]">
               Фокус на кастомизации и заказе модели в конфигураторе.
             </p>
             <div className="mt-4 space-y-2">
@@ -268,7 +283,7 @@ export default async function ElectroEnduroPage({
                 <Link
                   key={item.id}
                   href={`/franchize/${crew.slug || slug}/configurator?vehicle=${item.id}`}
-                  className="flex items-center justify-between rounded-xl border border-white/20 px-3 py-2 text-sm hover:bg-white hover:text-black"
+                  className="flex items-center justify-between rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-text)] hover:border-[var(--enduro-accent)] hover:bg-[var(--enduro-accent)] hover:text-[var(--enduro-accent-text)]"
                 >
                   <span>{item.title}</span>
                   <span className="text-xs opacity-80">
@@ -282,11 +297,11 @@ export default async function ElectroEnduroPage({
       </section>
       {accessoryHighlights.length > 0 && (
         <section className="mx-auto w-full max-w-7xl px-4 pt-6 2xl:max-w-[1600px]">
-          <div className="rounded-3xl border border-white/15 bg-white/5 p-5 text-white">
+          <div className="rounded-3xl border border-[var(--enduro-border)] bg-[var(--enduro-card-soft)] p-5 text-[var(--enduro-text)]">
             <h3 className="text-xl font-semibold">
               Экип и аксессуары из текущих спецификаций
             </h3>
-            <p className="mt-2 text-sm text-white/75">
+            <p className="mt-2 text-sm text-[var(--enduro-muted)]">
               Ниже карточки, которые уже встречаются в спецификациях моделей.
               Это помогает быстро проверить, что входит в комплект и что стоит
               добавить к заказу.
@@ -295,7 +310,7 @@ export default async function ElectroEnduroPage({
               {accessoryHighlights.map((entry) => (
                 <div
                   key={entry}
-                  className="rounded-xl border border-white/20 px-3 py-2 text-sm text-white/85"
+                  className="rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-text)]"
                 >
                   {entry}
                 </div>
@@ -306,7 +321,7 @@ export default async function ElectroEnduroPage({
       )}
       {shouldUseVipBikeFallback && (
         <section className="mx-auto w-full max-w-7xl px-4 pt-6 2xl:max-w-[1600px]">
-          <div className="rounded-2xl border border-amber-300/30 bg-amber-500/10 p-4 text-sm text-white/80">
+          <div className="rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-accent-faint)] p-4 text-sm text-[var(--enduro-muted)]">
             Live crew hydration is temporarily unavailable, so this page is
             using the VipBike configurator fallback catalog instead of an empty
             showroom.

@@ -5,7 +5,7 @@ import { getFranchizeBySlug, type CatalogItemVM } from "@/app/franchize/actions"
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
-import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+import { crewPaletteForSurface, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
 interface SalesPageProps {
@@ -58,6 +58,7 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
   const brandName = crew.header.brandName || crew.name || "VIP BIKE";
   const saleItems = items.filter((item) => item.saleAvailable || Number(item.salePrice || 0) > 0 || isTruthySpec(item.rawSpecs?.sale));
   const salesVerticals = crew.contentBlocks.salesVerticals;
+  const accentText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
 
   return (
     <main className="min-h-screen" style={surface.page}>
@@ -68,10 +69,13 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
           ["--sales-accent" as string]: crew.theme.palette.accentMain,
           ["--sales-border" as string]: crew.theme.palette.borderSoft,
           ["--sales-card" as string]: surface.subtleCard.backgroundColor,
+          ["--sales-base-soft" as string]: withAlpha(crew.theme.palette.bgBase, 0.25),
+          ["--sales-card-faint" as string]: withAlpha(crew.theme.palette.bgCard, 0.55),
+          ["--sales-accent-text" as string]: accentText,
           color: crew.theme.palette.textPrimary,
         }}
       >
-        <section className="rounded-3xl border border-[var(--sales-border)] bg-[var(--sales-card)] p-6 shadow-2xl shadow-black/20 md:p-8">
+        <section className="rounded-3xl border border-[var(--sales-border)] bg-[var(--sales-card)] p-6 shadow-2xl md:p-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--sales-accent)]">FRZ-R8 • sales vertical</p>
           <div className="mt-4 grid gap-8 lg:grid-cols-[1.15fr,0.85fr] lg:items-end">
             <div>
@@ -80,7 +84,7 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
                 Страница собирает все продажные сценарии в один операторский вход: от заявки на новый байк до trade-in оценки и электро-конфигуратора.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link href={`/franchize/${crewSlug}/configurator`} className="rounded-full bg-[var(--sales-accent)] px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110">
+                <Link href={`/franchize/${crewSlug}/configurator`} className="rounded-full bg-[var(--sales-accent)] px-5 py-3 text-sm font-semibold text-[var(--sales-accent-text)] transition hover:brightness-110">
                   Открыть конфигуратор
                 </Link>
                 <Link href={`/franchize/${crewSlug}/onboarding`} className="rounded-full border border-current/20 px-5 py-3 text-sm font-semibold transition hover:border-current/50">
@@ -88,17 +92,17 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
                 </Link>
               </div>
             </div>
-            <aside className="rounded-3xl border border-current/10 bg-black/25 p-5">
+            <aside className="rounded-3xl border border-[var(--sales-border)] bg-[var(--sales-base-soft)] p-5">
               <div className="flex items-center gap-3 text-[var(--sales-accent)]">
                 <ClipboardList className="h-6 w-6" />
                 <span className="text-sm font-semibold uppercase tracking-[0.16em]">pipeline snapshot</span>
               </div>
               <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-2xl border border-current/10 bg-white/[0.03] p-3">
+                <div className="rounded-2xl border border-[var(--sales-border)] bg-[var(--sales-card-faint)] p-3">
                   <dt className="opacity-55">Продажных SKU</dt>
                   <dd className="mt-1 text-2xl font-semibold text-[var(--sales-accent)]">{saleItems.length}</dd>
                 </div>
-                <div className="rounded-2xl border border-current/10 bg-white/[0.03] p-3">
+                <div className="rounded-2xl border border-[var(--sales-border)] bg-[var(--sales-card-faint)] p-3">
                   <dt className="opacity-55">Вертикалей</dt>
                   <dd className="mt-1 text-2xl font-semibold text-[var(--sales-accent)]">{salesVerticals.length}</dd>
                 </div>
@@ -121,7 +125,7 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
                 <p className="mt-2 text-sm leading-6 opacity-70">{vertical.pitch}</p>
                 <div className="mt-4 space-y-2">
                   {previews.map((item) => (
-                    <Link key={`${vertical.id}-${item.id}`} href={`/franchize/${crewSlug}/market/${item.id}/buy`} className="flex items-center justify-between gap-3 rounded-2xl border border-current/10 bg-black/20 px-3 py-2 text-sm transition hover:border-[var(--sales-accent)]/60">
+                    <Link key={`${vertical.id}-${item.id}`} href={`/franchize/${crewSlug}/market/${item.id}/buy`} className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--sales-border)] bg-[var(--sales-base-soft)] px-3 py-2 text-sm transition hover:border-[var(--sales-accent)]/60">
                       <span className="min-w-0 truncate">{item.title}</span>
                       <span className="shrink-0 text-xs opacity-65">{item.salePrice ? `${item.salePrice.toLocaleString("ru-RU")} ₽` : item.rentPriceLabel}</span>
                     </Link>
