@@ -2701,6 +2701,14 @@ async function createFranchizeOrderInvoiceInternal(
     invoiceProofLabel = holdConfig.invoiceLabel;
   }
 
+  const invoiceDepositAmount = amountXtr;
+  const invoiceDepositAmountRub = holdConfig.percent || flowType === "sale" ? amountXtr : holdConfig.amountRub;
+  const serverTrustedPayload = {
+    ...payload,
+    totalAmount: effectiveTotal,
+    depositAmount: invoiceDepositAmount,
+  };
+
   const invoiceId = buildFranchizeInvoiceId(payload);
 
   const { data: existingInvoice } = await supabaseAdmin
@@ -2762,7 +2770,9 @@ async function createFranchizeOrderInvoiceInternal(
     totalAmount: effectiveTotal,
     tipPercent: holdConfig.percent ?? (flowType === "sale" ? 0.1 : null),
     reservationHold: holdConfig,
-    depositAmount: payload.depositAmount ?? holdConfig.amountRub,
+    depositAmount: invoiceDepositAmount,
+    depositAmountRub: invoiceDepositAmountRub,
+    depositAmountXtr: amountXtr,
     amountXtr,
     rental_id: rentalId,
     startParam,
@@ -2799,7 +2809,7 @@ async function createFranchizeOrderInvoiceInternal(
       if (createdPendingInvoiceForThisAttempt) {
         await cleanupPendingFranchizeInvoiceAfterSendFailure(invoiceId, rentalId);
       }
-      await recordFranchizeOrderIntent(payload, {
+      await recordFranchizeOrderIntent(serverTrustedPayload, {
         intentType: "rent",
         stage: "payment_failed",
         urgencyScore: 90,
@@ -2814,7 +2824,7 @@ async function createFranchizeOrderInvoiceInternal(
       return { success: false, error: invoiceSent.error ?? "Не удалось отправить XTR-счёт в Telegram." };
     }
 
-    await recordFranchizeOrderIntent(payload, {
+    await recordFranchizeOrderIntent(serverTrustedPayload, {
       intentType: "rent",
       stage: "hold_created",
       urgencyScore: flowType === "sale" ? 95 : 85,
@@ -2826,7 +2836,7 @@ async function createFranchizeOrderInvoiceInternal(
     if (createdPendingInvoiceForThisAttempt) {
       await cleanupPendingFranchizeInvoiceAfterSendFailure(invoiceId, rentalId);
     }
-    await recordFranchizeOrderIntent(payload, {
+    await recordFranchizeOrderIntent(serverTrustedPayload, {
       intentType: "rent",
       stage: "payment_failed",
       urgencyScore: 90,
