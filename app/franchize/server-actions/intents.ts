@@ -52,6 +52,8 @@ const closerActionStages = {
   mark_closed: "closed",
 } as const;
 
+const operatorCloserStages = new Set<string>(Object.values(closerActionStages));
+
 type UnknownRecord = Record<string, unknown>;
 
 type FranchizeIntentStage = (typeof franchizeIntentStages)[number];
@@ -395,9 +397,21 @@ export type FranchizeIntentResult = {
 
 type FranchizeIntentRow = {
   id: string;
+  stage?: string | null;
   urgency_score?: number | null;
   metadata?: Record<string, unknown> | null;
 };
+
+function shouldPreserveOperatorCloserStage(
+  existingStage: string | null | undefined,
+  incomingStage: FranchizeIntentStage,
+) {
+  return Boolean(
+    existingStage &&
+    operatorCloserStages.has(existingStage) &&
+    incomingStage !== "payment_confirmed",
+  );
+}
 
 function toDbPayload(intent: z.output<typeof franchizeIntentInputSchema>) {
   return {
@@ -439,13 +453,17 @@ export async function upsertFranchizeIntent(
   const dbPayload = toDbPayload(intent);
 
   try {
+    const dedupeKey = readIntentMetadataDedupeKey(intent.metadata);
     let query = franchizeIntentsTable()
-      .select("id, urgency_score, metadata")
+      .select("id, stage, urgency_score, metadata")
       .eq("slug", intent.slug)
       .eq("intent_type", intent.intentType)
-      .eq("stage", intent.stage)
       .order("updated_at", { ascending: false })
       .limit(1);
+
+    if (!dedupeKey) {
+      query = query.eq("stage", intent.stage);
+    }
 
     if (intent.bikeId) {
       query = query.eq("bike_id", intent.bikeId);
@@ -453,7 +471,6 @@ export async function upsertFranchizeIntent(
       query = query.is("bike_id", null);
     }
 
-    const dedupeKey = readIntentMetadataDedupeKey(intent.metadata);
     if (dedupeKey) {
       query = query.contains("metadata", { dedupeKey });
     } else if (intent.telegramUserId) {
@@ -473,14 +490,20 @@ export async function upsertFranchizeIntent(
 
     const existing = (existingRows?.[0] ?? null) as FranchizeIntentRow | null;
     if (existing?.id) {
+      const preserveOperatorStage = shouldPreserveOperatorCloserStage(
+        existing.stage,
+        intent.stage,
+      );
       const mergedMetadata = {
         ...(existing.metadata ?? {}),
         ...intent.metadata,
-        lastStage: intent.stage,
+        lastSignalStage: intent.stage,
+        lastStage: preserveOperatorStage ? existing.stage : intent.stage,
       };
       const { data, error } = await franchizeIntentsTable()
         .update({
           ...dbPayload,
+          stage: preserveOperatorStage ? existing.stage : intent.stage,
           urgency_score: Math.max(
             Number(existing.urgency_score ?? 0),
             intent.urgencyScore,
