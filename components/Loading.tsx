@@ -364,6 +364,17 @@ const KineticCore = () => {
 const BikeSpeedster = ({ gear }: { gear: number }) => {
   return (
     <div className="relative mx-auto flex h-64 w-full max-w-lg items-center justify-center overflow-hidden">
+      <style>{`
+        @keyframes bike-loading-line {
+          0% { transform: translateX(280px); opacity: 0; }
+          45% { opacity: 1; }
+          100% { transform: translateX(-220px); opacity: 0; }
+        }
+        @keyframes bike-loading-wheel-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(-360deg); }
+        }
+      `}</style>
       {/* Speed Lines Background */}
       <div className="absolute inset-0">
         {[...Array(14)].map((_, i) => (
@@ -373,6 +384,7 @@ const BikeSpeedster = ({ gear }: { gear: number }) => {
             style={{
               top: `${16 + i * 5}%`,
               right: "8%",
+              animation: `bike-loading-line 0.7s ${i * 0.05}s ease-in infinite`,
             }}
             animate={{
               x: [280, -220],
@@ -419,6 +431,7 @@ const BikeSpeedster = ({ gear }: { gear: number }) => {
                 className="absolute left-[41px] top-[63px] h-[63px] w-[63px] rounded-full border-4 border-orange-400/90"
                 animate={{ rotate: -360 }}
                 transition={{ duration: 0.45, repeat: Infinity, ease: "linear" }}
+                style={{ animation: "bike-loading-wheel-spin 0.45s linear infinite" }}
               >
                 {[0, 45, 90, 135].map((deg) => (
                   <div key={deg} className="absolute left-1/2 top-1/2 h-[2px] w-[26px] -translate-x-1/2 -translate-y-1/2 bg-orange-200/90" style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
@@ -428,6 +441,7 @@ const BikeSpeedster = ({ gear }: { gear: number }) => {
                 className="absolute left-[157px] top-[63px] h-[63px] w-[63px] rounded-full border-4 border-orange-400/90"
                 animate={{ rotate: -360 }}
                 transition={{ duration: 0.45, repeat: Infinity, ease: "linear" }}
+                style={{ animation: "bike-loading-wheel-spin 0.45s linear infinite" }}
               >
                 {[0, 45, 90, 135].map((deg) => (
                   <div key={deg} className="absolute left-1/2 top-1/2 h-[2px] w-[26px] -translate-x-1/2 -translate-y-1/2 bg-orange-200/90" style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
