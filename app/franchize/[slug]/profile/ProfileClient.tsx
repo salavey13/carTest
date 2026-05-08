@@ -3,13 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { useAppContext } from "@/contexts/AppContext";
@@ -25,12 +18,83 @@ import {
   getFranchizeFormPrefillAction,
   saveFranchizeFormPrefillAction,
 } from "@/app/franchize/profile-actions";
-import { getFranchizeOperatorDashboardAccess } from "@/app/franchize/actions";
+import {
+  getFranchizeOperatorDashboardAccess,
+  type FranchizeCrewVM,
+} from "@/app/franchize/actions";
+import { readablePaletteTextOnColor } from "@/app/franchize/lib/theme";
+import {
+  FranchizeOperatorLinkButton,
+  FranchizeOperatorPanel,
+  FranchizeOperatorStatCard,
+  franchizeOperatorInputClassName,
+  franchizeOperatorInputStyle,
+} from "../../components/FranchizeOperatorSurface";
 
-export function FranchizeProfileClient() {
+const fallbackCrew: FranchizeCrewVM = {
+  id: "",
+  slug: "vip-bike",
+  name: "VIP BIKE",
+  description: "Crew profile",
+  logoUrl: "",
+  hqLocation: "",
+  isFound: false,
+  theme: {
+    mode: "pepperolli_dark",
+    palette: {
+      bgBase: "#0B0C10",
+      bgCard: "#111217",
+      accentMain: "#D99A00",
+      accentMainHover: "#E2A812",
+      textPrimary: "#F2F2F3",
+      textSecondary: "#A7ABB4",
+      borderSoft: "#24262E",
+    },
+  },
+  header: {
+    brandName: "VIP BIKE",
+    tagline: "Ride the vibe",
+    logoUrl: "",
+    logoHref: "",
+    menuLinks: [],
+  },
+  contacts: {
+    phone: "",
+    email: "",
+    address: "",
+    telegram: "",
+    workingHours: "",
+    map: {
+      gps: "",
+      publicTransport: "",
+      carDirections: "",
+      imageUrl: "",
+      bounds: { top: 0, bottom: 0, left: 0, right: 0 },
+    },
+  },
+  catalog: {
+    categories: [],
+    quickLinks: [],
+    tickerItems: [],
+    promoBanners: [],
+    adCards: [],
+    showcaseGroups: [],
+  },
+  ratingSummary: { average: 0, count: 0 },
+  footer: { socialLinks: [], textColor: "#16130A" },
+};
+
+type FranchizeProfileClientProps = {
+  initialCrew?: FranchizeCrewVM;
+};
+
+export function FranchizeProfileClient({
+  initialCrew,
+}: FranchizeProfileClientProps) {
   const { dbUser } = useAppContext();
   const params = useParams<{ slug: string }>();
-  const slug = params?.slug || "vip-bike";
+  const slug = params?.slug || initialCrew?.slug || "vip-bike";
+  const crew = initialCrew || fallbackCrew;
   const [catalog, setCatalog] = useState<FranchizeAchievementDefinition[]>([]);
   const [profile, setProfile] = useState<FranchizeProfileState | null>(null);
   const [capabilityContract, setCapabilityContract] = useState<
@@ -81,7 +145,7 @@ export function FranchizeProfileClient() {
         incrementCounters: { profileOpenCount: 1 },
       });
     };
-    run();
+    void run();
   }, [dbUser?.user_id, slug]);
 
   const unlockedSet = useMemo(
@@ -91,6 +155,11 @@ export function FranchizeProfileClient() {
   const unlockedCount = catalog.filter((item) =>
     unlockedSet.has(item.id),
   ).length;
+  const accentOn = readablePaletteTextOnColor(
+    crew.theme.palette.accentMain,
+    crew.theme.palette,
+  );
+
   const handlePrefillSave = async () => {
     if (!dbUser?.user_id) return;
     const res = await saveFranchizeFormPrefillAction({
@@ -102,208 +171,212 @@ export function FranchizeProfileClient() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pb-16">
-      <div className="container mx-auto max-w-4xl space-y-4">
-        <Card className="border-brand-cyan/40 bg-dark-card/80">
-          <CardHeader>
-            <CardTitle className="font-orbitron text-brand-cyan flex items-center gap-2">
-              <VibeContentRenderer content="::FaIdBadge::" /> Franchize Identity
-              — {profile?.crewName || slug}
-            </CardTitle>
-            <CardDescription className="font-mono text-xs">
-              Персональная страница достижений франшизы: slug-фильтр,
-              capability-треки и интеграционные триггеры.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="rounded-lg border border-brand-green/30 bg-black/20 p-3">
-              <p className="font-orbitron text-brand-green text-sm">
-                Разблокировано
-              </p>
-              <p className="font-mono text-xs text-muted-foreground mt-1">
-                {unlockedCount}/{catalog.length} достижений для slug `{slug}`
-              </p>
-            </div>
-            <div className="rounded-lg border border-brand-purple/30 bg-black/20 p-3">
-              <p className="font-orbitron text-brand-purple text-sm">
-                Счётчики
-              </p>
-              <p className="font-mono text-xs text-muted-foreground mt-1">
-                Открытий профиля: {profile?.counters?.profileOpenCount || 0}
-              </p>
-            </div>
-            <div className="rounded-lg border border-brand-yellow/30 bg-black/20 p-3">
-              <p className="font-orbitron text-brand-yellow text-sm">
-                Последняя активность
-              </p>
-              <p className="font-mono text-xs text-muted-foreground mt-1">
-                {profile?.lastActivityAt || "—"}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-brand-pink/30 bg-dark-card/70">
-          <CardHeader>
-            <CardTitle className="font-orbitron text-brand-pink flex items-center gap-2">
-              <VibeContentRenderer content="::FaUserSecret::" /> Достижения
-              франшизы (filtered by slug)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {catalog.map((achievement) => {
-              const unlocked = unlockedSet.has(achievement.id);
-              return (
-                <div
-                  key={achievement.id}
-                  className={`rounded-lg border bg-black/20 p-3 ${unlocked ? "border-brand-green/40" : "border-brand-pink/20"}`}
-                >
-                  <p
-                    className={`font-orbitron text-sm ${unlocked ? "text-brand-green" : "text-brand-pink"}`}
-                  >
-                    {achievement.title}
-                  </p>
-                  <p className="font-mono text-xs text-muted-foreground mt-1">
-                    {achievement.description}
-                  </p>
-                  <p className="font-mono text-2xs text-brand-yellow mt-1">
-                    Источник: {achievement.triggerSources.join(", ")}
-                  </p>
-                  <p className="font-mono text-2xs mt-1">
-                    {unlocked ? "✅ Разблокировано" : "🔒 Заблокировано"}
-                  </p>
-                </div>
-              );
-            })}
-            {!!error && (
-              <p className="text-xs font-mono text-red-400">{error}</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-brand-cyan/20 bg-dark-card/60">
-          <CardHeader>
-            <CardTitle className="font-orbitron text-brand-cyan text-base">
-              Capability contract (для интеграций)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            {Object.entries(capabilityContract).map(([key, value]) => (
-              <p key={key} className="font-mono text-xs text-muted-foreground">
-                <span className="text-brand-cyan">{key}:</span> {value}
-              </p>
-            ))}
-          </CardContent>
-        </Card>
-        <Card className="border-brand-green/30 bg-dark-card/70">
-          <CardHeader>
-            <CardTitle className="font-orbitron text-brand-green text-base">
-              Префилл данных для аренды/покупки
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            <input
-              className="rounded border bg-black/20 p-2 text-sm"
-              placeholder="ФИО"
-              value={prefill.fullName}
-              onChange={(e) =>
-                setPrefill((p) => ({ ...p, fullName: e.target.value }))
-              }
-            />
-            <input
-              className="rounded border bg-black/20 p-2 text-sm"
-              placeholder="Телефон"
-              value={prefill.phone}
-              onChange={(e) =>
-                setPrefill((p) => ({ ...p, phone: e.target.value }))
-              }
-            />
-            <input
-              className="rounded border bg-black/20 p-2 text-sm"
-              placeholder="Удобное время"
-              value={prefill.preferredTime}
-              onChange={(e) =>
-                setPrefill((p) => ({ ...p, preferredTime: e.target.value }))
-              }
-            />
-            <input
-              className="rounded border bg-black/20 p-2 text-sm"
-              placeholder="Комментарий по умолчанию"
-              value={prefill.comment}
-              onChange={(e) =>
-                setPrefill((p) => ({ ...p, comment: e.target.value }))
-              }
-            />
-            <Button className="md:col-span-2" onClick={handlePrefillSave}>
-              Сохранить профильные поля
-            </Button>
-          </CardContent>
-        </Card>
-        <Card className="border-brand-yellow/30 bg-dark-card/70">
-          <CardHeader>
-            <CardTitle className="font-orbitron text-brand-yellow text-base">
-              Аренды и покупки
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-xs text-muted-foreground">Текущие аренды</p>
-            {(digest?.rentals || []).slice(0, 5).map((r) => (
-              <Link
-                key={r.rentalId}
-                href={r.docLink}
-                className="block rounded border p-2 text-sm"
-              >
-                <span className="font-semibold">{r.vehicleLabel}</span> ·{" "}
-                <span className="opacity-80">{r.status}</span>
-              </Link>
-            ))}
-            <p className="pt-2 text-xs text-muted-foreground">
-              Планируемые покупки (sale)
+    <div
+      className="space-y-4"
+      style={{
+        ["--fr-profile-accent" as string]: crew.theme.palette.accentMain,
+        ["--fr-profile-border" as string]: crew.theme.palette.borderSoft,
+        ["--fr-profile-text" as string]: crew.theme.palette.textPrimary,
+        ["--fr-profile-muted" as string]: crew.theme.palette.textSecondary,
+      }}
+    >
+      <FranchizeOperatorPanel muted={false}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="flex items-center gap-2 text-xs font-medium tracking-wide text-[var(--fr-profile-accent)]">
+              <VibeContentRenderer content="::FaIdBadge::" /> Профиль райдера
             </p>
-            {(digest?.buyOrders || []).slice(0, 5).map((o) => (
-              <Link
-                key={o.orderId}
-                href={o.docLink}
-                className="block rounded border p-2 text-sm"
-              >
-                Заказ #{o.orderId} · {o.status} · {o.vehicleIds.join(", ")}
-                {o.docFileName ? (
-                  <span className="mt-1 block text-xs text-muted-foreground">
-                    Документ: {o.docFileName}
-                  </span>
-                ) : null}
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
+            <h1 className="mt-2 break-words text-2xl font-semibold text-[var(--fr-profile-text)]">
+              {profile?.crewName || crew.header.brandName || slug}
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-[var(--fr-profile-muted)]">
+              Персональная страница достижений, сохранённых данных и быстрых
+              возвратов в аренды экипажа.
+            </p>
+          </div>
+          <FranchizeOperatorLinkButton href={`/franchize/${slug}`}>
+            В каталог
+          </FranchizeOperatorLinkButton>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {canOpenCloserDashboard && (
-            <Button
-              asChild
-              className="bg-brand-yellow text-black hover:bg-brand-yellow/80 font-orbitron"
-            >
-              <Link href={`/franchize/${slug}/dashboard`}>
-                Открыть closer dashboard
-              </Link>
-            </Button>
-          )}
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <FranchizeOperatorStatCard
+            label="Достижения"
+            value={`${unlockedCount}/${catalog.length}`}
+            detail={`slug: ${slug}`}
+          />
+          <FranchizeOperatorStatCard
+            label="Открытия профиля"
+            value={profile?.counters?.profileOpenCount || 0}
+          />
+          <FranchizeOperatorStatCard
+            label="Последняя активность"
+            value={profile?.lastActivityAt || "—"}
+          />
+        </div>
+      </FranchizeOperatorPanel>
+
+      <FranchizeOperatorPanel>
+        <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--fr-profile-text)]">
+          <VibeContentRenderer content="::FaUserSecret::" /> Достижения
+        </h2>
+        <div className="mt-3 space-y-2">
+          {catalog.map((achievement) => {
+            const unlocked = unlockedSet.has(achievement.id);
+            return (
+              <div
+                key={achievement.id}
+                className="rounded-2xl border p-3"
+                style={{
+                  borderColor: unlocked
+                    ? "var(--fr-profile-accent)"
+                    : "var(--fr-profile-border)",
+                  backgroundColor: unlocked
+                    ? "color-mix(in srgb, var(--franchize-shell-accent) 9%, transparent)"
+                    : "color-mix(in srgb, var(--franchize-shell-card) 70%, transparent)",
+                }}
+              >
+                <p className="text-sm font-semibold text-[var(--fr-profile-text)]">
+                  {achievement.title}
+                </p>
+                <p className="mt-1 text-xs text-[var(--fr-profile-muted)]">
+                  {achievement.description}
+                </p>
+                <p className="mt-1 text-[11px] text-[var(--fr-profile-accent)]">
+                  Источник: {achievement.triggerSources.join(", ")}
+                </p>
+                <p className="mt-1 text-[11px] text-[var(--fr-profile-muted)]">
+                  {unlocked ? "✅ Разблокировано" : "🔒 Заблокировано"}
+                </p>
+              </div>
+            );
+          })}
+          {!!error && <p className="text-xs text-red-400">{error}</p>}
+        </div>
+      </FranchizeOperatorPanel>
+
+      <FranchizeOperatorPanel>
+        <h2 className="text-base font-semibold text-[var(--fr-profile-text)]">
+          Контракт интеграций
+        </h2>
+        <div className="mt-3 space-y-1">
+          {Object.entries(capabilityContract).map(([key, value]) => (
+            <p key={key} className="text-xs text-[var(--fr-profile-muted)]">
+              <span className="font-semibold text-[var(--fr-profile-accent)]">
+                {key}:
+              </span>{" "}
+              {value}
+            </p>
+          ))}
+        </div>
+      </FranchizeOperatorPanel>
+
+      <FranchizeOperatorPanel>
+        <h2 className="text-base font-semibold text-[var(--fr-profile-text)]">
+          Данные для заявок
+        </h2>
+        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+          <input
+            className={franchizeOperatorInputClassName}
+            style={franchizeOperatorInputStyle}
+            placeholder="ФИО"
+            value={prefill.fullName}
+            onChange={(e) =>
+              setPrefill((p) => ({ ...p, fullName: e.target.value }))
+            }
+          />
+          <input
+            className={franchizeOperatorInputClassName}
+            style={franchizeOperatorInputStyle}
+            placeholder="Телефон"
+            value={prefill.phone}
+            onChange={(e) =>
+              setPrefill((p) => ({ ...p, phone: e.target.value }))
+            }
+          />
+          <input
+            className={franchizeOperatorInputClassName}
+            style={franchizeOperatorInputStyle}
+            placeholder="Удобное время"
+            value={prefill.preferredTime}
+            onChange={(e) =>
+              setPrefill((p) => ({ ...p, preferredTime: e.target.value }))
+            }
+          />
+          <input
+            className={franchizeOperatorInputClassName}
+            style={franchizeOperatorInputStyle}
+            placeholder="Комментарий по умолчанию"
+            value={prefill.comment}
+            onChange={(e) =>
+              setPrefill((p) => ({ ...p, comment: e.target.value }))
+            }
+          />
           <Button
-            asChild
-            className="bg-brand-cyan text-black hover:bg-brand-cyan/80 font-orbitron"
+            className="md:col-span-2 rounded-full font-semibold"
+            onClick={handlePrefillSave}
+            style={{
+              backgroundColor: "var(--fr-profile-accent)",
+              color: accentOn,
+            }}
           >
-            <Link href={`/franchize/${slug}/map-riders`}>
-              Открыть Map Riders
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            className="border-brand-yellow text-brand-yellow hover:bg-brand-yellow/10"
-          >
-            <Link href="/profile">Вернуться в главный профиль</Link>
+            Сохранить данные
           </Button>
         </div>
+      </FranchizeOperatorPanel>
+
+      <FranchizeOperatorPanel>
+        <h2 className="text-base font-semibold text-[var(--fr-profile-text)]">
+          Аренды и покупки
+        </h2>
+        <div className="mt-3 space-y-3">
+          <p className="text-xs text-[var(--fr-profile-muted)]">
+            Текущие аренды
+          </p>
+          {(digest?.rentals || []).slice(0, 5).map((r) => (
+            <Link
+              key={r.rentalId}
+              href={r.docLink}
+              className="block rounded-2xl border p-3 text-sm transition hover:opacity-90"
+              style={{ borderColor: "var(--fr-profile-border)" }}
+            >
+              <span className="font-semibold">{r.vehicleLabel}</span> ·{" "}
+              <span className="opacity-80">{r.status}</span>
+            </Link>
+          ))}
+          <p className="pt-2 text-xs text-[var(--fr-profile-muted)]">
+            Планируемые покупки
+          </p>
+          {(digest?.buyOrders || []).slice(0, 5).map((o) => (
+            <Link
+              key={o.orderId}
+              href={o.docLink}
+              className="block rounded-2xl border p-3 text-sm transition hover:opacity-90"
+              style={{ borderColor: "var(--fr-profile-border)" }}
+            >
+              Заказ #{o.orderId} · {o.status} · {o.vehicleIds.join(", ")}
+              {o.docFileName ? (
+                <span className="mt-1 block text-xs text-[var(--fr-profile-muted)]">
+                  Документ: {o.docFileName}
+                </span>
+              ) : null}
+            </Link>
+          ))}
+        </div>
+      </FranchizeOperatorPanel>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {canOpenCloserDashboard && (
+          <FranchizeOperatorLinkButton href={`/franchize/${slug}/dashboard`}>
+            Заявки
+          </FranchizeOperatorLinkButton>
+        )}
+        <FranchizeOperatorLinkButton href={`/franchize/${slug}/map-riders`}>
+          Map Riders
+        </FranchizeOperatorLinkButton>
+        <FranchizeOperatorLinkButton href="/profile" variant="secondary">
+          Главный профиль
+        </FranchizeOperatorLinkButton>
       </div>
     </div>
   );

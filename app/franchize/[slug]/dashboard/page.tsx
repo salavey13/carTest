@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 
 import { FranchizeCloserDashboardClient } from "@/app/franchize/components/FranchizeCloserDashboardClient";
+import { CrewFooter } from "../../components/CrewFooter";
+import { CrewHeader } from "../../components/CrewHeader";
+import { FranchizePageShell } from "../../components/FranchizePageShell";
+import { getFranchizeBySlug } from "../../actions";
+import { crewPaletteForSurface } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
 interface FranchizeSlugDashboardPageProps {
@@ -12,7 +17,7 @@ export async function generateMetadata({
 }: FranchizeSlugDashboardPageProps): Promise<Metadata> {
   const { slug } = await params;
   return buildFranchizeSectionMetadata(slug, {
-    sectionTitle: "Operator closer dashboard",
+    sectionTitle: "Панель заявок",
     sectionDescription:
       "Отдельная панель горячих franchize leads, Telegram replies и ручных closing actions.",
     pathSuffix: "/dashboard",
@@ -23,5 +28,29 @@ export default async function FranchizeSlugDashboardPage({
   params,
 }: FranchizeSlugDashboardPageProps) {
   const { slug } = await params;
-  return <FranchizeCloserDashboardClient initialSlug={slug} />;
+  const { crew, items } = await getFranchizeBySlug(slug);
+  const resolvedSlug = crew.slug || slug;
+  const activePath = `/franchize/${resolvedSlug}/dashboard`;
+  const surface = crewPaletteForSurface(crew.theme);
+
+  return (
+    <main className="min-h-screen" style={surface.page}>
+      <CrewHeader
+        crew={crew}
+        activePath={activePath}
+        groupLinks={items.map((item) => item.category)}
+      />
+      <FranchizePageShell
+        theme={crew.theme}
+        width="wide"
+        contentClassName="space-y-4"
+      >
+        <FranchizeCloserDashboardClient
+          initialSlug={resolvedSlug}
+          initialCrew={crew}
+        />
+      </FranchizePageShell>
+      <CrewFooter crew={crew} />
+    </main>
+  );
 }
