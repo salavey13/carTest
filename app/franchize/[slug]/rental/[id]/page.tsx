@@ -239,7 +239,7 @@ export default async function FranchizeRentalPage({
             }}
           >
             <Sparkles className="h-3.5 w-3.5" />
-            Deal is starting for real — продолжаем оформление 🚀
+            Заявка принята — продолжаем оформление 🚀
           </div>
         )}
 

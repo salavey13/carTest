@@ -83,6 +83,10 @@ export async function generateMetadata({ params }: Omit<FranchizeSlugLayoutProps
   }
 }
 
+// Chrome policy for /franchize/[slug]: every public/customer/operator page should
+// server-load getFranchizeBySlug(slug), render CrewHeader, and use FranchizePageShell
+// for first-paint theme, spacing, and navigation continuity. Any route that opts out
+// must leave a local comment explaining why shared franchize chrome is intentionally skipped.
 export default function FranchizeSlugLayout({ children }: FranchizeSlugLayoutProps) {
   return children;
 }
