@@ -49,6 +49,17 @@ This root file stays intentionally compact so operators and agents can load it q
 ## 2) Mini execution diary
 
 
+### 2026-05-08 — SEC-04 crew sensitive storage audit
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T05:55:00Z
+- `owner`: codex
+- `supaplan_task`: 3cf3c946-7aa9-4c09-b675-5ef2f66d261e
+- `notes`: Hardened crew private data helpers so `getCrewSensitiveData`/`saveCrewSensitiveData` stay server-only, read/write only the `private.crew_secrets` contract/template columns, normalize private identifiers, surface DB errors, reject prototype-pollution keys, reject non-JSON values, cap stored JSON size, and block credential-looking/payment-secret keys from editable crew blobs. Self-review narrowed the credential-key matcher so legitimate `cardTemplate`/design-token config names remain usable, and read-path sanitization now strips unsafe legacy keys before returning parsed rows. Bonus UI polish lowered the loading bike wheel overlays to better align with the Lucide bike icon.
+- `next_step`: After merge, keep real payment provider credentials in deployment secrets or a dedicated encrypted vault instead of `private.crew_secrets` JSON fields.
+- `risks`: Existing rows with malformed JSON still read as empty objects for runtime resilience; operators should clean old bad rows during a controlled data audit if discovered.
+
+
 ### 2026-05-08 — FRZ-MONEY-R6 operator closer dashboard
 
 - `status`: ready_for_pr
