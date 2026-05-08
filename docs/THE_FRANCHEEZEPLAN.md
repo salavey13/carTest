@@ -50,6 +50,16 @@ This root file stays intentionally compact so operators and agents can load it q
 
 
 
+### 2026-05-08 — Franchize intent link review fix
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T02:22:00Z
+- `owner`: codex
+- `notes`: Addressed Codex review on the intent-link tracker: `tel:`/`mailto:` links now keep native click activation and do not wait on the tracking promise, while regular http(s) same-tab exits still get the short capped tracking wait. SupaPlan task `92bdb264-a626-450a-93b2-6eca5021711a` moved through `claimed -> running -> ready_for_pr` via `scripts/supaplan-skill.mjs`.
+- `next_step`: Merge the intent ledger PR, then let the merge automation mark the task done.
+- `risks`: External contact links still keep tracking non-blocking to protect tap latency; task status and claim-row verification were completed for the operator-specified SupaPlan task.
+
+
 ### 2026-05-08 — Franchize intent ledger self-review hardening
 
 - `status`: ready_for_pr
