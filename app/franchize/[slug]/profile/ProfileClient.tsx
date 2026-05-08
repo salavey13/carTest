@@ -286,7 +286,7 @@ export function FranchizeProfileClient() {
               asChild
               className="bg-brand-yellow text-black hover:bg-brand-yellow/80 font-orbitron"
             >
-              <Link href={`/franchize/${slug}/admin`}>
+              <Link href={`/franchize/${slug}/dashboard`}>
                 Открыть closer dashboard
               </Link>
             </Button>

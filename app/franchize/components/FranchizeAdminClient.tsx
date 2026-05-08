@@ -9,12 +9,10 @@ import { useAppContext } from "@/contexts/AppContext";
 import { getEditableVehiclesForUser } from "@/app/rentals/actions";
 import {
   getFranchizeBySlug,
-  getFranchizeCloserIntents,
   getFranchizeOrderNotificationFailures,
   getFranchizeRentalReviewsForModeration,
   moderateRentalReview,
   retryFranchizeOrderNotification,
-  updateFranchizeCloserIntentStage,
   type FranchizeCrewVM,
   type RentalReviewVM,
 } from "@/app/franchize/actions";
@@ -33,37 +31,6 @@ import {
 import type { Database } from "@/types/database.types";
 
 type Vehicle = Database["public"]["Tables"]["cars"]["Row"];
-
-type CloserIntent = {
-  id: string;
-  intentType: string;
-  stage: string;
-  urgencyScore: number;
-  bikeId: string | null;
-  bikeLabel: string;
-  selectedDates: string;
-  contactChannel: string;
-  lastBlocker: string;
-  paymentState: string;
-  telegramUserId: string | null;
-  telegramUsername: string | null;
-  suggestedNextAction: string;
-  suggestedTelegramReply: string;
-  updatedAt: string;
-};
-
-type CloserAction =
-  | "send_offer"
-  | "reserve_manually"
-  | "offer_alternative_bike"
-  | "mark_closed";
-
-const closerActionLabels: Record<CloserAction, string> = {
-  send_offer: "Send offer",
-  reserve_manually: "Reserve manually",
-  offer_alternative_bike: "Offer alternative bike",
-  mark_closed: "Mark closed",
-};
 
 const normalizeVin = (value: unknown) =>
   typeof value === "string" ? value.trim().toUpperCase() : "";
@@ -167,11 +134,6 @@ export function FranchizeAdminClient({
   const [moderatingReviewId, setModeratingReviewId] = useState<string | null>(
     null,
   );
-  const [closerIntents, setCloserIntents] = useState<CloserIntent[]>([]);
-  const [loadingCloserIntents, setLoadingCloserIntents] = useState(false);
-  const [closerActionIntentId, setCloserActionIntentId] = useState<
-    string | null
-  >(null);
 
   const slug = initialSlug?.trim() || "vip-bike";
 
@@ -259,21 +221,6 @@ export function FranchizeAdminClient({
     setReviews(result.items || []);
   }, [dbUser?.user_id, slug]);
 
-  const loadCloserIntents = useCallback(async () => {
-    if (!dbUser?.user_id) return;
-    setLoadingCloserIntents(true);
-    const result = await getFranchizeCloserIntents({
-      slug,
-      actorUserId: dbUser.user_id,
-    });
-    setLoadingCloserIntents(false);
-    if (!result.success) {
-      toast.error(result.error || "Не удалось загрузить closer intents");
-      return;
-    }
-    setCloserIntents((result.items || []) as CloserIntent[]);
-  }, [dbUser?.user_id, slug]);
-
   const handleModerateReview = useCallback(
     async (reviewId: string, hidden: boolean) => {
       if (!dbUser?.user_id) return;
@@ -303,51 +250,12 @@ export function FranchizeAdminClient({
     void loadReviews();
   }, [loadReviews]);
 
-  useEffect(() => {
-    void loadCloserIntents();
-  }, [loadCloserIntents]);
-
   const visible = useMemo(
     () =>
       fleet.filter((item) =>
         filterType === "all" ? true : item.type === filterType,
       ),
     [fleet, filterType],
-  );
-
-  const hotCloserCount = useMemo(
-    () => closerIntents.filter((item) => item.stage !== "closed").length,
-    [closerIntents],
-  );
-
-  const handleCopyTelegramReply = useCallback(async (intent: CloserIntent) => {
-    try {
-      await navigator.clipboard.writeText(intent.suggestedTelegramReply);
-      toast.success("Telegram reply скопирован");
-    } catch {
-      toast.error("Не удалось скопировать reply");
-    }
-  }, []);
-
-  const handleCloserAction = useCallback(
-    async (intentId: string, action: CloserAction) => {
-      if (!dbUser?.user_id) return;
-      setCloserActionIntentId(intentId);
-      const result = await updateFranchizeCloserIntentStage({
-        slug,
-        actorUserId: dbUser.user_id,
-        intentId,
-        action,
-      });
-      setCloserActionIntentId(null);
-      if (!result.success) {
-        toast.error(result.error || "Closer action не сохранён");
-        return;
-      }
-      toast.success(`${closerActionLabels[action]} сохранён`);
-      void loadCloserIntents();
-    },
-    [dbUser?.user_id, loadCloserIntents, slug],
   );
 
   const vinAudit = useMemo(() => {
@@ -571,185 +479,31 @@ export function FranchizeAdminClient({
             borderColor: "var(--fr-admin-border)",
           }}
         >
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr),auto] sm:items-center">
             <div>
               <p className="text-sm font-semibold text-[var(--fr-admin-text)]">
-                Operator closer dashboard
+                Operator closer dashboard moved
               </p>
               <p className="mt-1 text-xs leading-relaxed text-[var(--fr-admin-muted)]">
-                Горячие franchize_intents отсортированы по urgency score и
-                последнему обновлению. История не удаляется: actions меняют
-                stage и дописывают metadata.
+                Garage admin остаётся для техники, VIN, отзывов и документов.
+                Горячие лиды, Telegram replies и closing actions теперь живут на
+                отдельной dashboard page.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <span
-                className="rounded-full border px-2 py-1 text-xs font-semibold text-[var(--fr-admin-accent)]"
-                style={{ borderColor: "var(--fr-admin-border)" }}
-              >
-                hot {hotCloserCount}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-8 text-xs"
-                onClick={() => void loadCloserIntents()}
-                disabled={loadingCloserIntents}
-              >
-                {loadingCloserIntents ? "Loading…" : "Refresh"}
-              </Button>
-            </div>
-          </div>
-
-          {!closerIntents.length ? (
-            <p
-              className="mt-3 rounded-xl border px-3 py-2 text-xs text-[var(--fr-admin-muted)]"
-              style={{ borderColor: "var(--fr-admin-border)" }}
+            <Button
+              asChild
+              className="h-9 text-xs font-semibold"
+              style={{
+                ...buttonFocus,
+                backgroundColor: "var(--fr-admin-accent)",
+                color: accentOn,
+              }}
             >
-              Hot leads пока не найдены. После checkout/recovery сигналов здесь
-              появятся карточки для закрытия.
-            </p>
-          ) : (
-            <div className="mt-3 space-y-3">
-              {closerIntents.map((intent) => (
-                <article
-                  key={intent.id}
-                  className="rounded-2xl border p-3"
-                  style={{
-                    borderColor:
-                      intent.stage === "closed"
-                        ? "var(--fr-admin-border)"
-                        : "var(--fr-admin-accent)",
-                    backgroundColor:
-                      intent.stage === "closed"
-                        ? "rgba(255,255,255,0.02)"
-                        : "rgba(217,154,0,0.07)",
-                  }}
-                >
-                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1.15fr),minmax(0,1fr)]">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className="rounded-full bg-[var(--fr-admin-accent)] px-2 py-1 text-xs font-bold"
-                          style={{ color: accentOn }}
-                        >
-                          {intent.urgencyScore}
-                        </span>
-                        <span
-                          className="rounded-full border px-2 py-1 text-xs text-[var(--fr-admin-text)]"
-                          style={{ borderColor: "var(--fr-admin-border)" }}
-                        >
-                          {intent.intentType} · {intent.stage}
-                        </span>
-                        <span className="text-xs text-[var(--fr-admin-muted)]">
-                          updated{" "}
-                          {intent.updatedAt
-                            ? new Date(intent.updatedAt).toLocaleString()
-                            : "—"}
-                        </span>
-                      </div>
-                      <p className="mt-2 break-words text-base font-semibold text-[var(--fr-admin-text)]">
-                        {intent.bikeLabel}
-                      </p>
-                      <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
-                        <div>
-                          <dt className="uppercase tracking-[0.14em] text-[var(--fr-admin-muted)]">
-                            dates
-                          </dt>
-                          <dd className="mt-1 break-words text-[var(--fr-admin-text)]">
-                            {intent.selectedDates}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="uppercase tracking-[0.14em] text-[var(--fr-admin-muted)]">
-                            contact
-                          </dt>
-                          <dd className="mt-1 break-words text-[var(--fr-admin-text)]">
-                            {intent.contactChannel}
-                            {intent.telegramUsername
-                              ? ` · @${intent.telegramUsername}`
-                              : ""}
-                            {intent.telegramUserId
-                              ? ` · tg:${intent.telegramUserId}`
-                              : ""}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="uppercase tracking-[0.14em] text-[var(--fr-admin-muted)]">
-                            last blocker
-                          </dt>
-                          <dd className="mt-1 break-words text-[var(--fr-admin-text)]">
-                            {intent.lastBlocker}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="uppercase tracking-[0.14em] text-[var(--fr-admin-muted)]">
-                            payment
-                          </dt>
-                          <dd className="mt-1 break-words text-[var(--fr-admin-text)]">
-                            {intent.paymentState}
-                          </dd>
-                        </div>
-                      </dl>
-                    </div>
-                    <div
-                      className="min-w-0 rounded-xl border p-3"
-                      style={{
-                        borderColor: "var(--fr-admin-border)",
-                        backgroundColor: "rgba(0,0,0,0.16)",
-                      }}
-                    >
-                      <p className="text-xs uppercase tracking-[0.14em] text-[var(--fr-admin-muted)]">
-                        suggested next action
-                      </p>
-                      <p className="mt-1 text-sm text-[var(--fr-admin-text)]">
-                        {intent.suggestedNextAction}
-                      </p>
-                      <div
-                        className="mt-3 rounded-lg border p-2"
-                        style={{ borderColor: "var(--fr-admin-border)" }}
-                      >
-                        <p className="text-xs text-[var(--fr-admin-muted)]">
-                          Telegram reply
-                        </p>
-                        <p className="mt-1 break-words text-xs leading-relaxed text-[var(--fr-admin-text)]">
-                          {intent.suggestedTelegramReply}
-                        </p>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-8 text-xs"
-                          onClick={() => void handleCopyTelegramReply(intent)}
-                        >
-                          Copy Telegram reply
-                        </Button>
-                        {(
-                          Object.keys(closerActionLabels) as CloserAction[]
-                        ).map((action) => (
-                          <Button
-                            key={action}
-                            type="button"
-                            className="h-8 text-xs"
-                            variant={
-                              action === "mark_closed" ? "outline" : "default"
-                            }
-                            onClick={() =>
-                              void handleCloserAction(intent.id, action)
-                            }
-                            disabled={closerActionIntentId === intent.id}
-                          >
-                            {closerActionLabels[action]}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
+              <Link href={`/franchize/${slug}/dashboard`}>
+                Open closer dashboard
+              </Link>
+            </Button>
+          </div>
         </div>
 
         <div
