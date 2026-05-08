@@ -76,6 +76,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const searchParams = useSearchParams();
   const { user, dbUser } = useAppContext();
   const lastQueryViewedVehicleRef = useRef<string>("");
+  const recordRentIntentRef = useRef<
+    (item: CatalogItemVM, stage: "viewed" | "configured", metadata?: Record<string, unknown>) => Promise<unknown>
+  >();
   const resolvedSlug = crew.slug || slug;
   const showFloatingCart = ctaPolicy ? shouldShowFloatingCart(ctaPolicy, { cartRelevant: true }) : true;
 
@@ -270,6 +273,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     }).catch((error) => console.warn("rent intent tracking failed", error));
   }, [crew, dbUser, resolvedSlug, user]);
 
+  useEffect(() => {
+    recordRentIntentRef.current = recordRentIntent;
+  }, [recordRentIntent]);
+
   const openItem = (item: CatalogItemVM) => {
     setSelectedItem(item);
     const defaultOptions = {
@@ -296,9 +303,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         auction: auctionTickOptions[0] ?? "Без аукциона",
       };
       setSelectedOptions(defaultOptions);
-      void recordRentIntent(target, "viewed", { trigger: "vehicle_query", options: defaultOptions });
+      void recordRentIntentRef.current?.(target, "viewed", { trigger: "vehicle_query", options: defaultOptions });
     }
-  }, [auctionTickOptions, items, recordRentIntent, searchParams]);
+  }, [auctionTickOptions, items, searchParams]);
 
   return (
     <>
