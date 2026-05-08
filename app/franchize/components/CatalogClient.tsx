@@ -4,15 +4,18 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ShoppingCart } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAppContext } from "@/contexts/AppContext";
 import { toCategoryId } from "../lib/navigation";
 import type { FranchizeRouteCtaPolicy } from "../lib/route-cta-policy";
 import { shouldShowFloatingCart } from "../lib/route-cta-policy";
 import { catalogCardVariantStyles, crewPaletteForSurface, interactionRingStyle } from "../lib/theme";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
+import { upsertFranchizeIntent } from "../actions";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { ItemModal } from "../modals/Item";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
+import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 
 interface CatalogClientProps {
   crew: FranchizeCrewVM;
@@ -71,6 +74,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const [quickFilter, setQuickFilter] = useState<QuickFilterKey>("all");
   const [campaignIndex, setCampaignIndex] = useState(0);
   const searchParams = useSearchParams();
+  const { user, dbUser } = useAppContext();
   const showFloatingCart = ctaPolicy ? shouldShowFloatingCart(ctaPolicy, { cartRelevant: true }) : true;
 
   const promoModules = useMemo(() => {
@@ -240,14 +244,40 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     return [{ category: saleCategory, items: saleGroup }, ...normalized];
   }, [filteredItems, mode, orderedCategories, quickFilter]);
 
+  const recordRentIntent = useCallback((item: CatalogItemVM, stage: "viewed" | "configured", metadata: Record<string, unknown> = {}) => {
+    const strip = buildCatalogRentalStrip(item, crew);
+    return upsertFranchizeIntent({
+      slug: crew.slug || slug,
+      bikeId: item.id,
+      intentType: "rent",
+      stage,
+      sourceRoute: `/franchize/${crew.slug || slug}`,
+      contactChannel: "catalog_card",
+      urgencyScore: stage === "configured" ? 68 : 42,
+      telegramUserId: user?.id ? String(user.id) : dbUser?.user_id ? String(dbUser.user_id) : undefined,
+      phone: typeof (dbUser as { phone?: unknown } | null)?.phone === "string" ? (dbUser as { phone?: string } | null)?.phone : undefined,
+      metadata: {
+        itemTitle: item.title,
+        availabilityStatus: item.availabilityStatus,
+        availabilityLabel: strip.availabilityLabel,
+        nearestStartWindow: strip.nearestStartWindow,
+        pickupHint: strip.pickupHint,
+        priceTeaser: strip.priceTeaser,
+        ...metadata,
+      },
+    }).catch((error) => console.warn("rent intent tracking failed", error));
+  }, [crew, dbUser, slug, user]);
+
   const openItem = (item: CatalogItemVM) => {
     setSelectedItem(item);
-    setSelectedOptions({
+    const defaultOptions = {
       package: "Базовый",
       duration: "1 день",
       perk: "Стандарт",
       auction: auctionTickOptions[0] ?? "Без аукциона",
-    });
+    };
+    setSelectedOptions(defaultOptions);
+    void recordRentIntent(item, "viewed", { trigger: "catalog_card", options: defaultOptions });
   };
 
   useEffect(() => {
@@ -256,14 +286,16 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     const target = items.find((item) => item.id.toLowerCase() === focusedVehicle);
     if (target) {
       setSelectedItem(target);
-      setSelectedOptions({
+      const defaultOptions = {
         package: "Базовый",
         duration: "1 день",
         perk: "Стандарт",
         auction: auctionTickOptions[0] ?? "Без аукциона",
-      });
+      };
+      setSelectedOptions(defaultOptions);
+      void recordRentIntent(target, "viewed", { trigger: "vehicle_query", options: defaultOptions });
     }
-  }, [auctionTickOptions, items, searchParams]);
+  }, [auctionTickOptions, items, recordRentIntent, searchParams]);
 
   return (
     <>
@@ -449,7 +481,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
-                  {group.items.map((item) => (
+                  {group.items.map((item) => {
+                    const rentalStrip = buildCatalogRentalStrip(item, crew);
+                    return (
                     <article
                       key={item.id}
                       data-catalog-item="true"
@@ -483,12 +517,12 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             <span
                               className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em]"
                               style={{
-                                backgroundColor: item.availabilityStatus === "available" ? "#1f7a3a3d" : "#dc262640",
+                                backgroundColor: rentalStrip.isAvailable ? "#1f7a3a3d" : "#dc262640",
                                 color: "#e6f4ea",
-                                border: item.availabilityStatus === "available" ? "1px solid rgba(46, 160, 67, 0.45)" : "1px solid rgba(220, 38, 38, 0.45)",
+                                border: rentalStrip.isAvailable ? "1px solid rgba(46, 160, 67, 0.45)" : "1px solid rgba(220, 38, 38, 0.45)",
                               }}
                             >
-                              {item.availabilityLabel}
+                              {rentalStrip.availabilityLabel}
                             </span>
                             {item.saleAvailable && (
                               <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-amber-100">
@@ -503,6 +537,21 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           )}
                           <h3 className="mt-1 text-sm font-semibold leading-5">{item.title}</h3>
                           <p className="text-xs" style={surface.mutedText}>{item.description || item.subtitle}</p>
+                          <div
+                            className="mt-2 rounded-2xl border border-white/10 bg-black/15 p-2 text-[10px] leading-4"
+                            aria-label={`Аренда ${item.title}: ${rentalStrip.todayLabel}`}
+                          >
+                            <div className="flex items-center justify-between gap-2 font-semibold text-[var(--catalog-text)]">
+                              <span>Сегодня: {rentalStrip.todayLabel}</span>
+                              <span className={rentalStrip.isAvailable ? "text-emerald-200" : "text-amber-100"}>
+                                {rentalStrip.nearestStartWindow}
+                              </span>
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5" style={surface.mutedText}>
+                              <span>Выдача: {rentalStrip.pickupHint}</span>
+                              <span>{rentalStrip.priceTeaser}</span>
+                            </div>
+                          </div>
                           {item.reviewSummary.latest?.text && (
                             <p className="mt-2 rounded-xl border border-white/10 px-2 py-1.5 text-[11px] leading-4" style={surface.mutedText}>
                               “{item.reviewSummary.latest.text}”
@@ -519,13 +568,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           <div className="mt-2 flex gap-2">
                             <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95">
                               <ShoppingCart className="h-4 w-4" />
-                              {item.saleAvailable ? "Аренда / Покупка" : item.pricePerDay >= 6000 ? "Выбрать" : "Добавить"}
+                              {item.saleAvailable ? "Hold this bike / купить" : "Забронировать байк"}
                             </span>
                           </div>
                         </div>
                       </button>
                     </article>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             ))}
@@ -552,12 +602,18 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         items={items}
         slug={crew.slug || slug}
         theme={crew.theme}
+        pickupAddress={crew.contacts.address || crew.hqLocation}
+        workingHours={crew.contacts.workingHours}
         options={selectedOptions}
         auctionOptions={auctionTickOptions}
         onChangeOption={(key, value) => setSelectedOptions((prev) => ({ ...prev, [key]: value }))}
         onClose={() => setSelectedItem(null)}
         onAddToCart={() => {
           if (!selectedItem) return;
+          void recordRentIntent(selectedItem, "configured", {
+            trigger: "modal_cta",
+            options: selectedOptions,
+          });
           addItem(selectedItem.id, selectedOptions, 1);
           setSelectedItem(null);
         }}

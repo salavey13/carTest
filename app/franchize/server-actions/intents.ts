@@ -14,6 +14,7 @@ const franchizeIntentTypes = [
   "contact_click",
   "test_ride_click",
   "prebuy",
+  "rent",
 ] as const;
 
 const franchizeIntentStages = [
@@ -26,6 +27,8 @@ const franchizeIntentStages = [
   "payment_confirmed",
   "contacted",
   "test_ride_requested",
+  "viewed",
+  "configured",
 ] as const;
 
 const metadataSchema = z.record(z.string(), z.unknown()).default({});

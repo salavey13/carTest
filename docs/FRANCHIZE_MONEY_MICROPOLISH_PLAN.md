@@ -100,12 +100,14 @@ This turns the app from a catalog into sales memory: failed payments, checkout b
 ### R2 — Ride-today availability strip
 
 - SupaPlan task: `558d6b85-3f4a-48b5-ad4d-98b92746991e`
-- Status: `todo`
+- Status: `ready_for_pr`
 - Capability: `franchize.rental`
 - Primary zone: catalog cards and bike modal components.
 - Goal: answer “Can I ride today?” directly on bike cards and modal open.
 - Depends on: R1 for event capture, but visual availability can be built behind a feature-safe fallback first.
 - Acceptance: rider sees today/tomorrow availability, pickup hint, and a `Hold this bike` CTA in under five seconds.
+- Updated: `2026-05-08T14:30:00Z`
+- Notes: Catalog cards and item modal now show today availability, nearest start window, pickup hint, deposit/price teaser, and the dominant hold/reserve CTA; rent intents are recorded as `viewed` on modal open and `configured` on CTA taps.
 
 ### R3 — Hold/reservation CTA
 

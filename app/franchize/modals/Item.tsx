@@ -15,6 +15,7 @@ import {
   isSameCatalogPropulsion,
 } from "@/app/franchize/lib/catalog-propulsion";
 import { ItemGallery } from "../components/ItemGallery";
+import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 import { crewPaletteForSurface } from "../lib/theme";
 
 interface ItemModalProps {
@@ -22,6 +23,8 @@ interface ItemModalProps {
   items: CatalogItemVM[];
   slug: string;
   theme: FranchizeTheme;
+  pickupAddress?: string;
+  workingHours?: string;
   options: {
     package: string;
     duration: string;
@@ -34,7 +37,7 @@ interface ItemModalProps {
     value: string,
   ) => void;
   onClose: () => void;
-  onAddToCart: () => void;
+  onAddToCart: () => void | Promise<void>;
 }
 
 const packageOptions = ["Базовый", "Комфорт", "Максимум"];
@@ -103,6 +106,8 @@ export function ItemModal({
   items,
   slug,
   theme,
+  pickupAddress = "",
+  workingHours = "",
   options,
   auctionOptions,
   onChangeOption,
@@ -227,6 +232,14 @@ export function ItemModal({
   );
   const propulsionLabel = getCatalogPropulsionLabel(propulsionSegment);
 
+  const rentalStrip = useMemo(() => {
+    if (!item) return null;
+    return buildCatalogRentalStrip(item, {
+      hqLocation: pickupAddress,
+      contacts: { address: pickupAddress, workingHours },
+    });
+  }, [item, pickupAddress, workingHours]);
+
   const comparableBikes = useMemo(() => {
     if (!item) return [];
     return items
@@ -309,11 +322,41 @@ export function ItemModal({
               <p className="text-sm" style={surface.mutedText}>
                 {item.subtitle}
               </p>
-              {item.saleAvailable && (
-                <p className="mt-1 inline-flex rounded-full border border-amber-300/60 bg-amber-400/20 px-2 py-0.5 text-xs font-semibold text-amber-100">
-                  Этот мот доступен к покупке (параллельно аренде)
-                </p>
-              )}
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <span
+                  className={`inline-flex rounded-full border px-2.5 py-1 font-semibold ${
+                    rentalStrip?.isAvailable
+                      ? "border-emerald-300/50 bg-emerald-400/15 text-emerald-100"
+                      : "border-amber-300/50 bg-amber-400/15 text-amber-100"
+                  }`}
+                >
+                  Сегодня: {rentalStrip?.todayLabel ?? "Уточним в Telegram"}
+                </span>
+                {item.saleAvailable && (
+                  <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/20 px-2.5 py-1 font-semibold text-amber-100">
+                    Аренда + покупка
+                  </span>
+                )}
+              </div>
+              {rentalStrip ? (
+                <div
+                  className="mt-3 grid gap-2 rounded-2xl border border-white/10 bg-black/15 p-3 text-xs sm:grid-cols-3"
+                  aria-label={`Быстрая аренда ${item.title}`}
+                >
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">Ближайшее окно</p>
+                    <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.nearestStartWindow}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">Выдача</p>
+                    <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.pickupHint}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">Залог / тариф</p>
+                    <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.priceTeaser}</p>
+                  </div>
+                </div>
+              ) : null}
               <p
                 id={`item-modal-description-${item.id}`}
                 className={`mt-2 text-sm leading-6 ${descriptionExpanded ? "" : "line-clamp-4"}`}
@@ -511,8 +554,8 @@ export function ItemModal({
               {isAdding
                 ? "Добавляем..."
                 : item.saleAvailable
-                  ? `Оформить • аренда/покупка`
-                  : `Добавить • ${item.pricePerDay.toLocaleString("ru-RU")} ₽`}
+                  ? `Hold this bike • Забронировать байк`
+                  : `Забронировать байк • Hold this bike`}
             </button>
           </div>
         </div>
