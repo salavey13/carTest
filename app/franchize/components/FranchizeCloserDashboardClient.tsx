@@ -127,10 +127,7 @@ export function FranchizeCloserDashboardClient({
   const loadCloserIntents = useCallback(async () => {
     if (!dbUser?.user_id) return;
     setLoadingCloserIntents(true);
-    const result = await getFranchizeCloserIntents({
-      slug,
-      actorUserId: dbUser.user_id,
-    });
+    const result = await getFranchizeCloserIntents({ slug });
     setLoadingCloserIntents(false);
     if (!result.success) {
       toast.error(result.error || "Не удалось загрузить closer intents");
@@ -167,7 +164,6 @@ export function FranchizeCloserDashboardClient({
       setCloserActionIntentId(intentId);
       const result = await updateFranchizeCloserIntentStage({
         slug,
-        actorUserId: dbUser.user_id,
         intentId,
         action,
       });
