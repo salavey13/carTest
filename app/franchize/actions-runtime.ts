@@ -7,7 +7,7 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { readFile } from "fs/promises";
 import path from "path";
-import { getCrewSensitiveData, getUserSensitiveData, saveCrewSensitiveData } from "@/app/lib/private-secrets";
+import { getCrewSensitiveDataOrDefault, getUserSensitiveDataOrDefault, saveCrewSensitiveData } from "@/app/lib/private-secrets";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 import { upsertFranchizeIntent } from "@/app/franchize/server-actions/intents";
 import { cloneFranchizeContentBlocks, readFranchizeContentBlocks, type FranchizeContentBlocks } from "@/app/franchize/lib/content-blocks";
@@ -37,6 +37,23 @@ import {
 
 
 type UnknownRecord = Record<string, unknown>;
+const FRANCHIZE_RENTAL_DOCS_SAFE_ERROR =
+  "Не удалось подготовить документы аренды. Мы уже передали заявку оператору — попробуйте ещё раз или напишите в Telegram.";
+
+function logFranchizeCheckoutFailure(
+  failureSource: "submitFranchizeOrderNotification" | "createFranchizeOrderCheckout",
+  context: { slug: string; orderId: string },
+  error: unknown,
+) {
+  logger.error(`[franchize] ${failureSource} failed`, {
+    slug: context.slug,
+    orderId: context.orderId,
+    failureSource,
+    errorName: error instanceof Error ? error.name : undefined,
+    errorMessage: error instanceof Error ? error.message : String(error),
+  });
+}
+
 type RentalAvailabilityRow = {
   vehicle_id: string | null;
   status: string | null;
@@ -1076,7 +1093,7 @@ async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promis
   };
   const menuLinks = readArrayPath<UnknownRecord>(franchize, ["header", "menuLinks"], fallbackMenuLinks(slug));
 
-  const crewSecrets = await getCrewSensitiveData(slug);
+  const crewSecrets = await getCrewSensitiveDataOrDefault(slug, { source: "toFranchizeConfigInput" });
   const contractDefaults = (crewSecrets.contractDefaults ?? {}) as UnknownRecord;
   const defaults = (readPath(contractDefaults, ["defaults"], {}) ?? {}) as UnknownRecord;
   const docTemplates = (crewSecrets.docTemplates ?? {}) as UnknownRecord;
@@ -1601,7 +1618,7 @@ type FranchizeOrderNotifyPayload = z.infer<typeof franchizeOrderInvoiceSchema> &
 type FranchizeOrderFlowType = "rental" | "sale" | "mixed";
 
 async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderFlowType): Promise<string> {
-  const crewSensitive = await getCrewSensitiveData(slug);
+  const crewSensitive = await getCrewSensitiveDataOrDefault(slug, { source: "loadFranchizeDealTemplate" });
   const secureTemplateKey = flowType === "rental" ? "rentalDealTemplate" : "saleDealTemplate";
   const secureTemplate = readPath(crewSensitive.docTemplates ?? {}, [secureTemplateKey], "");
   if (typeof secureTemplate === "string" && secureTemplate.trim().length > 0) {
@@ -1710,8 +1727,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const dailyPriceRub = firstLine?.pricePerDay || Math.round(payload.subtotal / Math.max(1, rentDays));
 
     const template = await loadFranchizeDealTemplate(payload.slug, flowType);
-    const userSensitive = await getUserSensitiveData(payload.telegramUserId);
-    const crewSensitive = await getCrewSensitiveData(payload.slug);
+    const privateReadContext = { source: "buildFranchizeOrderDocAndNotify", orderId: payload.orderId };
+    const userSensitive = await getUserSensitiveDataOrDefault(payload.telegramUserId, privateReadContext);
+    const crewSensitive = await getCrewSensitiveDataOrDefault(payload.slug, privateReadContext);
     const contractDefaults = (crewSensitive.contractDefaults ?? {}) as UnknownRecord;
     const defaults = (readPath(contractDefaults, ["defaults"], {}) ?? {}) as UnknownRecord;
 
@@ -1875,6 +1893,13 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     return { renderedMarkdown, docFileName };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to submit order notification";
+    logger.error("[franchize] buildFranchizeOrderDocAndNotify failed", {
+      slug: payload.slug,
+      orderId: payload.orderId,
+      failureSource: "buildFranchizeOrderDocAndNotify",
+      errorName: error instanceof Error ? error.name : undefined,
+      errorMessage: message,
+    });
     await updateFranchizeOrderNotificationLog(logId, {
       send_status: "failed",
       last_error: message,
@@ -2046,8 +2071,8 @@ export async function submitFranchizeOrderNotification(input: unknown): Promise<
     await buildFranchizeOrderDocAndNotify({ ...validatedPayload, totalAmount: effectiveTotal, subtotal: payload.subtotal, extrasTotal: payload.extrasTotal });
     return { success: true };
   } catch (error) {
-    logger.error("[franchize] submitFranchizeOrderNotification failed", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to submit order notification" };
+    logFranchizeCheckoutFailure("submitFranchizeOrderNotification", { slug: payload.slug, orderId: payload.orderId }, error);
+    return { success: false, error: FRANCHIZE_RENTAL_DOCS_SAFE_ERROR };
   }
 }
 
@@ -2912,10 +2937,10 @@ export async function createFranchizeOrderCheckout(
 
     return { success: true };
   } catch (error) {
-    logger.error("[franchize] createFranchizeOrderCheckout failed", error);
+    logFranchizeCheckoutFailure("createFranchizeOrderCheckout", { slug: payload.slug, orderId: payload.orderId }, error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unexpected checkout error",
+      error: FRANCHIZE_RENTAL_DOCS_SAFE_ERROR,
     };
   }
 }
