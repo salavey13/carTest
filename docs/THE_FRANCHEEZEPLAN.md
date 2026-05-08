@@ -49,6 +49,17 @@ This root file stays intentionally compact so operators and agents can load it q
 ## 2) Mini execution diary
 
 
+### 2026-05-08 — FRZ-MONEY-R6 operator closer dashboard
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T19:30:00Z
+- `owner`: codex
+- `supaplan_task`: 5993dab3-dd18-49dc-8138-52862bc32edb
+- `notes`: Added the first operator closer dashboard slice: authorized crew owner/member/admin reads for `franchize_intents`, urgency/update-ranked lead cards in `/franchize/{slug}/admin`, bike/date/contact/blocker/payment/Telegram fields, copyable Telegram reply text, and stage-changing closer actions that append metadata history instead of deleting raw intent context.
+- `next_step`: Smoke `/franchize/vip-bike/admin` with live intent rows and then layer automated Telegram sending in R7 or a dedicated follow-up.
+- `risks`: The first version intentionally copies replies and records action metadata only; actual Telegram send/reserve automation remains manual/future work.
+
+
 
 ### 2026-05-08 — SupaPlan rent strip deep-link review fix
 

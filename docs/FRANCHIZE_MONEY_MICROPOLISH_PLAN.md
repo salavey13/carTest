@@ -147,12 +147,13 @@ This turns the app from a catalog into sales memory: failed payments, checkout b
 ### R6 — Operator closer dashboard
 
 - SupaPlan task: `5993dab3-dd18-49dc-8138-52862bc32edb`
-- Status: `todo`
+- Status: `ready_for_pr`
 - Capability: `franchize.ui.ux`
 - Primary zone: franchize admin/operator console.
 - Goal: show ranked hot leads with one-click Telegram replies, manual reserve, and alternative-bike offer actions.
 - Depends on: R1, R5.
 - Acceptance: operator can sort by urgency score, see last blocker, and take one closing action without opening raw database rows.
+- 2026-05-08 update: Admin console now fetches authorized `franchize_intents` rows for the current slug, ranks them by urgency/update time, shows bike/date/contact/blocker/payment/Telegram fields, includes copyable Telegram replies, and saves closer actions by moving stage plus appending `metadata.closerActions` history.
 
 ### R7 — AI closer assistant
 
@@ -181,4 +182,5 @@ The money metric is not “more forms submitted.” The target is: **every high-
 
 ## 7) Diary
 
+- 2026-05-08 — R6 operator closer dashboard: added authorized hot-lead cards to `/franchize/{slug}/admin`, copyable Telegram replies, action stage transitions (`offer_sent`, `manual_reserved`, `alternative_offered`, `closed`), metadata history append, and profile link visibility for crew owners/members.
 - 2026-05-08 — R3 hold/reservation CTA: moved checkout XTR copy from hidden 1% tip language to explicit configurable hold deposit, persisted rent intent metadata for checkout/payment states, and linked successful Telegram payment to hot confirmed rental/order metadata.
