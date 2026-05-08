@@ -2274,6 +2274,289 @@ async function recordFranchizeOrderIntent(
   return result;
 }
 
+
+const franchizeCheckoutRecoverySnapshotSchema = z.object({
+  slug: z.string().trim().min(1).max(80).transform((value) => normalizeCrewSlug(value)),
+  orderId: z.string().trim().min(1).max(120),
+  stage: z.enum(["checkout_started", "payment_failed"]).default("checkout_started"),
+  route: z.string().trim().min(1).max(240),
+  bikeIds: z.array(z.string().trim().min(1).max(120)).min(1).max(20),
+  dates: z.object({
+    start: z.string().trim().optional(),
+    end: z.string().trim().optional(),
+    preferredTime: z.string().trim().optional(),
+  }),
+  contact: z.object({
+    phone: z.string().trim().max(40).optional(),
+    telegramUserId: z.string().trim().max(80).optional(),
+    telegramPresent: z.boolean().default(false),
+    recipient: z.string().trim().max(120).optional(),
+  }),
+  readinessPercent: z.number().int().min(0).max(100),
+  blockers: z.array(z.object({
+    id: z.string().trim().min(1).max(80),
+    label: z.string().trim().min(1).max(180),
+  })).max(20),
+  totalAmount: z.number().finite().nonnegative(),
+  depositAmount: z.number().finite().nonnegative(),
+  payment: z.enum(["telegram_xtr", "card", "cash", "sbp"]).optional(),
+  flowType: z.enum(["rental", "sale", "mixed"]).default("rental"),
+});
+
+type FranchizeCheckoutRecoverySnapshot = z.infer<typeof franchizeCheckoutRecoverySnapshotSchema>;
+
+const franchizeCheckoutRecoveryRateLimits = new Map<string, number>();
+const FRANCHIZE_RECOVERY_NOTIFY_COOLDOWN_MS = 10 * 60_000;
+const FRANCHIZE_RECOVERY_WRITE_COOLDOWN_MS = 12_000;
+const FRANCHIZE_RECOVERY_READY_THRESHOLD = 67;
+
+function normalizeOptionalString(value?: string | null) {
+  const next = value?.trim() ?? "";
+  return next.length > 0 ? next : undefined;
+}
+
+function buildCheckoutRecoveryFingerprint(snapshot: FranchizeCheckoutRecoverySnapshot) {
+  const blocker = snapshot.blockers[0]?.id ?? "ready";
+  return [
+    snapshot.slug,
+    snapshot.orderId,
+    snapshot.stage,
+    snapshot.bikeIds.slice().sort().join(","),
+    snapshot.dates.start ?? "no-date",
+    snapshot.dates.end ?? "no-end",
+    snapshot.contact.phone ? "phone" : "no-phone",
+    snapshot.contact.telegramPresent ? "tg" : "no-tg",
+    Math.floor(snapshot.readinessPercent / 10) * 10,
+    blocker,
+    Math.round(snapshot.totalAmount),
+  ].join("|");
+}
+
+function getCheckoutRecoveryWriteKey(snapshot: FranchizeCheckoutRecoverySnapshot) {
+  return [
+    snapshot.slug,
+    snapshot.orderId,
+    snapshot.contact.telegramUserId || snapshot.contact.phone || "anonymous",
+    snapshot.stage,
+  ].join(":");
+}
+
+function shouldNotifyCheckoutRecovery(snapshot: FranchizeCheckoutRecoverySnapshot) {
+  const hasPhone = Boolean(normalizeOptionalString(snapshot.contact.phone));
+  const hasDate = Boolean(normalizeOptionalString(snapshot.dates.start));
+  const highReadiness = snapshot.readinessPercent >= FRANCHIZE_RECOVERY_READY_THRESHOLD;
+  const invoiceFailed = snapshot.stage === "payment_failed";
+  return invoiceFailed || hasPhone || hasDate || highReadiness;
+}
+
+function buildCheckoutRecoverySuggestion(snapshot: FranchizeCheckoutRecoverySnapshot) {
+  const lastBlocker = snapshot.blockers[0]?.label;
+  if (snapshot.stage === "payment_failed") {
+    return "Написать: «Вижу, XTR-счёт не прошёл. Забронирую байк вручную или переключим на карту/наличные?»";
+  }
+  if (lastBlocker?.toLowerCase().includes("telegram")) {
+    return "Написать: «Открой оформление из Telegram — помогу добить Stars-счёт и закреплю байк.»";
+  }
+  if (lastBlocker) {
+    return `Написать: «Вижу, остановились на шаге: ${lastBlocker}. Помочь закрыть бронь?»`;
+  }
+  return "Написать: «Вижу почти готовую бронь. Закрепить этот байк за вами?»";
+}
+
+async function buildCheckoutRecoveryBikeLabel(slug: string, bikeIds: string[]) {
+  const uniqueIds = Array.from(new Set(bikeIds));
+  if (!uniqueIds.length) return "—";
+
+  const { data, error } = await supabaseAdmin
+    .from("cars")
+    .select("id, make, model")
+    .in("id", uniqueIds);
+
+  if (error) {
+    logger.warn("[franchize] checkout recovery bike lookup failed", { slug, error });
+    return uniqueIds.join(", ");
+  }
+
+  const byId = new Map((data ?? []).map((row: any) => [String(row.id), `${row.make || "Bike"} ${row.model || row.id}`.trim()]));
+  return uniqueIds.map((id) => byId.get(id) ?? id).join(", ");
+}
+
+function buildCheckoutRecoveryAdminText(snapshot: FranchizeCheckoutRecoverySnapshot, bikeLabel: string) {
+  const lastBlocker = snapshot.blockers[0]?.label ?? "готов к ручному закрытию";
+  const phone = normalizeOptionalString(snapshot.contact.phone);
+  const telegram = snapshot.contact.telegramUserId ? `tg:${snapshot.contact.telegramUserId}` : snapshot.contact.telegramPresent ? "Telegram WebApp открыт" : "Telegram не виден";
+  const dateLabel = [snapshot.dates.start, snapshot.dates.end && snapshot.dates.end !== snapshot.dates.start ? snapshot.dates.end : null]
+    .filter(Boolean)
+    .join(" → ") || "дата не выбрана";
+
+  return [
+    snapshot.stage === "payment_failed" ? "⚠️ Franchize payment recovery" : "🧲 Franchize checkout recovery",
+    `Crew: ${snapshot.slug}`,
+    `Bike: ${bikeLabel}`,
+    `Date: ${dateLabel}${snapshot.dates.preferredTime ? `, ${snapshot.dates.preferredTime}` : ""}`,
+    `Contact: ${[snapshot.contact.recipient, phone, telegram].filter(Boolean).join(" / ")}`,
+    `Ready: ${snapshot.readinessPercent}% · ${snapshot.flowType} · ${formatMoney(snapshot.totalAmount)} ₽ · deposit ${formatMoney(snapshot.depositAmount)} ₽`,
+    `Last blocker: ${lastBlocker}`,
+    `Route: ${snapshot.route}`,
+    buildCheckoutRecoverySuggestion(snapshot),
+  ].join("\n");
+}
+
+async function readCheckoutRecoveryIntentMetadata(intentId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("franchize_intents")
+    .select("metadata")
+    .eq("id", intentId)
+    .maybeSingle();
+
+  if (error) {
+    logger.warn("[franchize] checkout recovery notification metadata read failed", { intentId, error });
+    return {} as Record<string, unknown>;
+  }
+
+  return ((data?.metadata ?? {}) as Record<string, unknown>);
+}
+
+function wasCheckoutRecoveryRecentlyNotified(metadata: Record<string, unknown>, fingerprint: string, nowMs: number) {
+  const recoveryNotification = metadata.recoveryNotification as Record<string, unknown> | undefined;
+  if (recoveryNotification?.fingerprint !== fingerprint || typeof recoveryNotification.notifiedAt !== "string") {
+    return false;
+  }
+
+  const notifiedAtMs = Date.parse(recoveryNotification.notifiedAt);
+  return Number.isFinite(notifiedAtMs) && nowMs - notifiedAtMs < FRANCHIZE_RECOVERY_NOTIFY_COOLDOWN_MS;
+}
+
+async function markCheckoutRecoveryNotification(
+  intentId: string,
+  metadata: Record<string, unknown>,
+  fingerprint: string,
+  notifiedAt: string,
+) {
+  const { error: updateError } = await supabaseAdmin
+    .from("franchize_intents")
+    .update({
+      metadata: {
+        ...metadata,
+        recoveryNotification: {
+          fingerprint,
+          notifiedAt,
+          channel: "admin_telegram",
+        },
+      },
+    })
+    .eq("id", intentId);
+
+  if (updateError) {
+    logger.warn("[franchize] checkout recovery notification metadata update failed", { intentId, error: updateError });
+  }
+}
+
+export async function recordFranchizeCheckoutRecoverySnapshot(
+  input: unknown,
+): Promise<{ success: boolean; intentId?: string; notified?: boolean; throttled?: boolean; error?: string }> {
+  const parsed = franchizeCheckoutRecoverySnapshotSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Некорректный checkout recovery snapshot.",
+    };
+  }
+
+  const snapshot = parsed.data;
+  const normalizedSnapshot = {
+    ...snapshot,
+    contact: {
+      ...snapshot.contact,
+      phone: normalizeOptionalString(snapshot.contact.phone),
+      recipient: normalizeOptionalString(snapshot.contact.recipient),
+      telegramUserId: normalizeOptionalString(snapshot.contact.telegramUserId),
+    },
+    dates: {
+      start: normalizeOptionalString(snapshot.dates.start),
+      end: normalizeOptionalString(snapshot.dates.end),
+      preferredTime: normalizeOptionalString(snapshot.dates.preferredTime),
+    },
+  } satisfies FranchizeCheckoutRecoverySnapshot;
+
+  const fingerprint = buildCheckoutRecoveryFingerprint(normalizedSnapshot);
+  const writeKey = getCheckoutRecoveryWriteKey(normalizedSnapshot);
+  const nowMs = Date.now();
+  const lastWriteAt = franchizeCheckoutRecoveryRateLimits.get(writeKey) ?? 0;
+  if (nowMs - lastWriteAt < FRANCHIZE_RECOVERY_WRITE_COOLDOWN_MS) {
+    return { success: true, throttled: true };
+  }
+  franchizeCheckoutRecoveryRateLimits.set(writeKey, nowMs);
+
+  const lastBlocker = normalizedSnapshot.blockers[0] ?? null;
+  const result = await upsertFranchizeIntent({
+    slug: normalizedSnapshot.slug,
+    bikeId: normalizedSnapshot.bikeIds[0],
+    intentType: "rent",
+    stage: normalizedSnapshot.stage,
+    sourceRoute: normalizedSnapshot.route,
+    contactChannel: normalizedSnapshot.contact.telegramPresent ? "telegram" : normalizedSnapshot.contact.phone ? "phone" : normalizedSnapshot.payment,
+    urgencyScore: normalizedSnapshot.stage === "payment_failed" ? 95 : Math.min(90, Math.max(35, normalizedSnapshot.readinessPercent)),
+    telegramUserId: normalizedSnapshot.contact.telegramUserId,
+    phone: normalizedSnapshot.contact.phone,
+    metadata: {
+      orderId: normalizedSnapshot.orderId,
+      recoveryFingerprint: fingerprint,
+      bikeIds: normalizedSnapshot.bikeIds,
+      dates: normalizedSnapshot.dates,
+      readinessPercent: normalizedSnapshot.readinessPercent,
+      blockers: normalizedSnapshot.blockers,
+      lastBlocker,
+      totalAmount: normalizedSnapshot.totalAmount,
+      depositAmount: normalizedSnapshot.depositAmount,
+      route: normalizedSnapshot.route,
+      payment: normalizedSnapshot.payment,
+      flowType: normalizedSnapshot.flowType,
+      contact: {
+        hasPhone: Boolean(normalizedSnapshot.contact.phone),
+        telegramPresent: normalizedSnapshot.contact.telegramPresent,
+        recipient: normalizedSnapshot.contact.recipient,
+      },
+    },
+  });
+
+  if (!result.success) {
+    return { success: false, error: result.error };
+  }
+
+  if (!result.intentId || !shouldNotifyCheckoutRecovery(normalizedSnapshot)) {
+    return { success: true, intentId: result.intentId, notified: false };
+  }
+
+  const notifyKey = `${writeKey}:${fingerprint}`;
+  const lastNotifyAt = franchizeCheckoutRecoveryRateLimits.get(notifyKey) ?? 0;
+  if (nowMs - lastNotifyAt < FRANCHIZE_RECOVERY_NOTIFY_COOLDOWN_MS) {
+    return { success: true, intentId: result.intentId, notified: false, throttled: true };
+  }
+
+  const intentMetadata = await readCheckoutRecoveryIntentMetadata(result.intentId);
+  if (wasCheckoutRecoveryRecentlyNotified(intentMetadata, fingerprint, nowMs)) {
+    franchizeCheckoutRecoveryRateLimits.set(notifyKey, nowMs);
+    return { success: true, intentId: result.intentId, notified: false, throttled: true };
+  }
+
+  try {
+    const bikeLabel = await buildCheckoutRecoveryBikeLabel(normalizedSnapshot.slug, normalizedSnapshot.bikeIds);
+    const text = buildCheckoutRecoveryAdminText(normalizedSnapshot, bikeLabel);
+    await notifyAdmin(text);
+    franchizeCheckoutRecoveryRateLimits.set(notifyKey, nowMs);
+    await markCheckoutRecoveryNotification(result.intentId, intentMetadata, fingerprint, new Date(nowMs).toISOString());
+    return { success: true, intentId: result.intentId, notified: true };
+  } catch (error) {
+    logger.warn("[franchize] checkout recovery admin notification failed", {
+      slug: normalizedSnapshot.slug,
+      orderId: normalizedSnapshot.orderId,
+      error,
+    });
+    return { success: true, intentId: result.intentId, notified: false, error: error instanceof Error ? error.message : "Не удалось отправить recovery notification." };
+  }
+}
+
 const franchizeCheckoutRateLimits = new Map<string, number>();
 const FRANCHIZE_CHECKOUT_COOLDOWN_MS = 8_000;
 

@@ -9,7 +9,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
-import { checkFranchizeCarsAvailability, createFranchizeOrderCheckout, validateFranchizePromoCode } from "../actions";
+import { checkFranchizeCarsAvailability, createFranchizeOrderCheckout, recordFranchizeCheckoutRecoverySnapshot, validateFranchizePromoCode } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
 import { getTelegramHandleHref, getTelegramWebAppFallbackHref } from "../lib/telegram-links";
@@ -132,6 +132,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   );
   const [safetyPersisted, setSafetyPersisted] = useState(false);
   const lastSubmitFingerprintRef = useRef<string | null>(null);
+  const lastRecoveryFingerprintRef = useRef<string | null>(null);
+  const recoveryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
     mode: "onChange",
@@ -274,6 +276,59 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     [appliedPromo, cartLines, comment, consent, deliveryMode, extrasTotal, flowType, orderId, payment, phone, promoDiscount, recipient, rentalEndDate, rentalStartDate, selectedExtraItems, signatureName, time, totalAmount, user?.id],
   );
 
+  const recoveryDepositAmount = flowType === "sale" ? Math.round(totalAmount * 0.1) : totalAmount > 0 ? 20_000 : 0;
+
+  const buildRecoverySnapshot = (stage: "checkout_started" | "payment_failed") => ({
+    slug,
+    orderId,
+    stage,
+    route: typeof window === "undefined" ? `/franchize/${slug}/order/${orderId}` : window.location.pathname,
+    bikeIds: submitPayload.cartLines.map((line) => line.itemId).filter(Boolean),
+    dates: {
+      start: submitPayload.rentalStartDate,
+      end: submitPayload.rentalEndDate,
+      preferredTime: submitPayload.time,
+    },
+    contact: {
+      phone: submitPayload.phone,
+      telegramUserId: user?.id ? String(user.id) : undefined,
+      telegramPresent: hasTelegramUser,
+      recipient: submitPayload.recipient,
+    },
+    readinessPercent,
+    blockers: checkoutBlockers.map((blocker) => ({ id: blocker.id, label: blocker.label })),
+    totalAmount,
+    depositAmount: recoveryDepositAmount,
+    payment,
+    flowType,
+  });
+
+  const sendRecoverySnapshot = (stage: "checkout_started" | "payment_failed", options?: { force?: boolean }) => {
+    if (isCartEmpty || submitPayload.cartLines.length === 0) return;
+    const meaningful = stage === "payment_failed" || phone.trim().length > 5 || Boolean(rentalStartDate) || readinessPercent >= 67;
+    if (!meaningful) return;
+
+    const snapshot = buildRecoverySnapshot(stage);
+    const fingerprint = JSON.stringify({
+      stage,
+      bikeIds: snapshot.bikeIds,
+      start: snapshot.dates.start,
+      end: snapshot.dates.end,
+      phonePresent: snapshot.contact.phone.trim().length > 5,
+      telegramPresent: snapshot.contact.telegramPresent,
+      readinessBucket: Math.floor(snapshot.readinessPercent / 10),
+      blocker: snapshot.blockers[0]?.id ?? "ready",
+      totalAmount: snapshot.totalAmount,
+    });
+
+    if (!options?.force && lastRecoveryFingerprintRef.current === fingerprint) return;
+    lastRecoveryFingerprintRef.current = fingerprint;
+
+    void recordFranchizeCheckoutRecoverySnapshot(snapshot).catch(() => {
+      // Best-effort lead recovery telemetry must never block checkout typing or payment submission.
+    });
+  };
+
   const submitLabel = isSubmitting
     ? "Подготавливаем оплату..."
     : payment === "telegram_xtr"
@@ -334,6 +389,22 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     window.localStorage.setItem(safetyStorageKey, "passed");
     setSafetyPersisted(true);
   }, [safetyQuizPassed, safetyStorageKey]);
+
+  useEffect(() => {
+    if (recoveryDebounceRef.current) {
+      window.clearTimeout(recoveryDebounceRef.current);
+    }
+
+    recoveryDebounceRef.current = window.setTimeout(() => {
+      sendRecoverySnapshot("checkout_started");
+    }, 2500);
+
+    return () => {
+      if (recoveryDebounceRef.current) {
+        window.clearTimeout(recoveryDebounceRef.current);
+      }
+    };
+  }, [checkoutBlockers, flowType, hasTelegramUser, isCartEmpty, orderId, payment, phone, readinessPercent, recoveryDepositAmount, rentalEndDate, rentalStartDate, slug, submitPayload, time, totalAmount, user?.id]);
 
   const checkAvailabilityBeforeSubmit = async () => {
     const carIds = Array.from(new Set(submitPayload.cartLines.map((line) => line.itemId).filter(Boolean)));
@@ -421,6 +492,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       if (!result.success) {
         toast.error(result.error ?? "Не удалось отправить заказ.");
         if (values.payment === "telegram_xtr") {
+          sendRecoverySnapshot("payment_failed", { force: true });
           setPaymentRetryHint("XTR-оплата не завершилась. Проверьте Telegram WebApp и повторите отправку или выберите резервную оплату.");
         }
         lastSubmitFingerprintRef.current = null;

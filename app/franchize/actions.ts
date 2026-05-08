@@ -28,6 +28,7 @@ import {
   createFranchizeOrderInvoice as createFranchizeOrderInvoiceAction,
   getFranchizeOrderNotificationFailures as getFranchizeOrderNotificationFailuresAction,
   retryFranchizeOrderNotification as retryFranchizeOrderNotificationAction,
+  recordFranchizeCheckoutRecoverySnapshot as recordFranchizeCheckoutRecoverySnapshotAction,
   submitFranchizeOrderNotification as submitFranchizeOrderNotificationAction,
 } from "@/app/franchize/server-actions/orders";
 import { upsertFranchizeIntent as upsertFranchizeIntentAction } from "@/app/franchize/server-actions/intents";
@@ -101,6 +102,12 @@ export async function submitFranchizeOrderNotification(
   ...args: Parameters<typeof submitFranchizeOrderNotificationAction>
 ) {
   return submitFranchizeOrderNotificationAction(...args);
+}
+
+export async function recordFranchizeCheckoutRecoverySnapshot(
+  ...args: Parameters<typeof recordFranchizeCheckoutRecoverySnapshotAction>
+) {
+  return recordFranchizeCheckoutRecoverySnapshotAction(...args);
 }
 
 export async function getFranchizeRentalReviewsForModeration(
