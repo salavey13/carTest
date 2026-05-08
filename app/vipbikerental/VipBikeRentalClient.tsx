@@ -85,9 +85,9 @@ const fallbackHeroPanels: Record<HeroMode, HeroPanel> = {
     mode: "rent",
     label: "Аренда",
     icon: "::FaMotorcycle::",
-    eyebrow: "Горячий слот сегодня",
+    eyebrow: "Премиальная бронь сегодня",
     title: "VIP Bike Electro-Enduro S1",
-    description: "Лучший старт для первого выезда: обслуженный байк, экип и поддержка на маршруте.",
+    description: "Контролируемый первый выезд: подготовленный электроэндуро, защитный комплект и сопровождение до уверенного возвращения.",
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_bg-cf31dc2b-291b-440b-953b-6e1b4a838e4e.jpg",
     href: "/franchize/vip-bike",
     cta: "Выбрать байк",
@@ -102,8 +102,8 @@ const fallbackHeroPanels: Record<HeroMode, HeroPanel> = {
     label: "Покупка",
     icon: "::FaCartShopping::",
     eyebrow: "Мини-конфигуратор",
-    title: "Собери свой электроэндуро",
-    description: "Модель, батарея, цвет и допы — собери конфиг, а потом заверши заказ в franchize-корзине.",
+    title: "Соберите электроэндуро под свой стиль",
+    description: "Модель, батарея, цвет и опции собираются в понятный заказ — без хаоса в переписке и с прозрачным следующим шагом.",
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/81Dts9uMBXZXTKC7PjIbBRRRHYGQx_2TPEKFWvaUwDzzgSQPjxUf4GjAiRaDWIcWgwmeaZQTKppFn5VBS6yZeK7R-38bfc7fb-0d5a-4b62-b7e6-ca83950cb265.jpg",
     href: "/franchize/vip-bike/configurator",
     cta: "Конфигуратор",
@@ -118,8 +118,8 @@ const fallbackHeroPanels: Record<HeroMode, HeroPanel> = {
     label: "Карта",
     icon: "::FaMapLocationDot::",
     eyebrow: "Живая карта",
-    title: "Райдеры, маршруты и встречи",
-    description: "Смотри активность комьюнити, ближайшие точки сбора и недельный прогресс прямо перед выездом.",
+    title: "Живые маршруты и точки сбора",
+    description: "Видите активность экипажа, точки встреч и темп группы заранее — поездка ощущается организованной ещё до старта.",
     href: "/franchize/vip-bike/map-riders",
     cta: "Открыть карту",
     meta: [
@@ -133,8 +133,8 @@ const fallbackHeroPanels: Record<HeroMode, HeroPanel> = {
     label: "Мои аренды",
     icon: "::FaTicket::",
     eyebrow: "Личный контроль",
-    title: "Проверь активные сделки",
-    description: "Статусы, подтверждения, фото до/после и возврат — всё собрано в контрольном центре аренды.",
+    title: "Контролируйте активные аренды",
+    description: "Статусы, подтверждения, фото до/после и возврат собраны в одном центре, чтобы сделка не зависала в чатах.",
     href: "/rentals",
     cta: "Мои аренды",
     meta: [
@@ -214,13 +214,13 @@ const rentalStatusSteps = [
 const quickChooserFilters = [
   { id: "first", label: "Первый выезд", hint: "мягкая тяга" },
   { id: "range", label: "Дальше ехать", hint: "батарея +" },
-  { id: "buy", label: "Купить", hint: "sale-ready" },
+  { id: "buy", label: "Купить", hint: "в наличии" },
 ] as const;
 
 const heroMetrics = [
-  "::FaStopwatch:: Быстрая онлайн-бронь",
+  "::FaStopwatch:: Бронь без лишних созвонов",
   "::FaShieldHeart:: ОСАГО + экип",
-  "::FaMapLocationDot:: Центр выдачи в городе",
+  "::FaMapLocationDot:: Выдача в удобной городской точке",
   "::FaHeadset:: Поддержка на маршруте",
 ];
 
@@ -233,21 +233,21 @@ const conversionPilotChecks = [
 const decisionRoutes = [
   {
     title: "Первый выезд",
-    text: "Если хочешь просто попробовать: выбери байк, слот и комплект экипа без лишних шагов.",
+    text: "Для первого контакта с электроэндуро: выбираете байк, слот и экипировку, а дальше система ведёт к подтверждённой выдаче.",
     href: "/franchize/vip-bike",
     cta: "Выбрать аренду",
     icon: "::FaMotorcycle::",
   },
   {
     title: "Тест → покупка",
-    text: "Если присматриваешь свой электроэндуро: сначала собери конфиг, потом закрепи тест-драйв.",
+    text: "Для покупки без сомнений: соберите конфигурацию, закрепите тест-драйв и сравните ощущения до оплаты.",
     href: "/franchize/vip-bike/configurator",
     cta: "Собрать байк",
     icon: "::FaCartShopping::",
   },
   {
     title: "Кататься с группой",
-    text: "Если важен вайб комьюнити: открой райдеров рядом, точки старта и ближайшие встречи.",
+    text: "Для групповых выездов: смотрите райдеров рядом, точки старта и ближайшие встречи вместо случайных договорённостей.",
     href: "/franchize/vip-bike/map-riders",
     cta: "Смотреть карту",
     icon: "::FaMapLocationDot::",
@@ -257,22 +257,22 @@ const decisionRoutes = [
 const newbieFlow = [
   {
     step: "Шаг 1",
-    title: "Старт с раздела и вводного гида",
-    description: "Открой страницу заказа, прочитай вводный блок про локацию, маршруты и правила безопасности.",
+    title: "Старт с понятного сценария",
+    description: "Откройте страницу заказа: локация, маршруты, ограничения и правила безопасности собраны до выбора слота.",
     href: "/vipbikerental",
     cta: "Открыть вводный блок",
   },
   {
     step: "Шаг 2",
-    title: "Выбор байка и конфигурации",
-    description: "Перейди в конфигуратор: выбери модель, батарею, режим мощности и нужные допы.",
+    title: "Подбор байка и конфигурации",
+    description: "Перейдите в конфигуратор: модель, батарея, режим мощности и допы фиксируются в одном заказе.",
     href: "/franchize/vip-bike/electro-enduro",
     cta: "Подобрать конфиг",
   },
   {
     step: "Шаг 3",
     title: "Корзина и оформление",
-    description: "Проверь заказ в корзине, добавь экип, подтверди данные и отправь заявку менеджеру.",
+    description: "Проверьте состав, добавьте защиту, подтвердите контакты и отправьте менеджеру уже структурированную заявку.",
     href: "/franchize/vip-bike/profile",
     cta: "Проверить оформление",
   },
@@ -303,7 +303,7 @@ function ConversionPilot({ items, overview, isCatalogLoading = false }: { items:
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.24em] text-primary">быстрый выбор</p>
-          <h2 className="mt-2 font-orbitron text-3xl sm:text-4xl">Выбери сценарий за 30 секунд</h2>
+          <h2 className="mt-2 font-orbitron text-3xl sm:text-4xl">Найдите правильный сценарий за 30 секунд</h2>
         </div>
         <div className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm">
           <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">готовность</span>
@@ -477,7 +477,7 @@ function StepsProgress({ items }: { items: CatalogItemVM[] }) {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl border border-border/70 bg-card/60 p-4">
                     <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Мини-корзина</p>
-                    <p className="mt-2 font-orbitron text-lg">Байк + экип + слот</p>
+                    <p className="mt-2 font-orbitron text-lg">Байк, экипировка и слот уже сведены в один путь</p>
                     <p className="mt-2 text-sm text-muted-foreground">Перед отправкой заявки пользователь видит состав заказа и может добавить защиту.</p>
                   </div>
                   <div className="space-y-2 rounded-2xl border border-border/70 bg-card/60 p-4 text-sm">
@@ -1444,31 +1444,31 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
     if (!bikeStyle) {
       return {
         badge: "::FaCompass:: Универсальный подбор",
-        title: "Подберем байк под ваш вайб за 2 минуты",
+        title: "Подберём байк под задачу за 2 минуты",
         note: "Пройди /start в Telegram, чтобы открыть персональные рекомендации на этой странице.",
       };
     }
 
     if (bikeStyle.toLowerCase().includes("спорт")) {
       return {
-        badge: "::FaBolt:: Sport Vibe Detected",
-        title: "Твой вайб: скорость и адреналин",
+        badge: "::FaBolt:: Спортивный сценарий",
+        title: "Ваш сценарий: скорость и адреналин",
         note: "Рекомендуем начать с Supersport и быстрых слотов выдачи.",
       };
     }
 
     if (bikeStyle.toLowerCase().includes("ретро") || bikeStyle.toLowerCase().includes("neo")) {
       return {
-        badge: "::FaWandSparkles:: Neo-Retro Mode",
-        title: "Твой вайб: стиль и харизма",
-        note: "Для тебя выделили neo-retro подборку с фото-ready маршрутами.",
+        badge: "::FaWandSparkles:: Neo-retro подборка",
+        title: "Ваш сценарий: стиль и харизма",
+        note: "Для вас выделили neo-retro подборку с маршрутами, которые выглядят хорошо и в поездке, и на фото.",
       };
     }
 
     return {
-      badge: "::FaRoute:: Rider Profile Active",
-      title: `Твой вайб: ${bikeStyle}`,
-      note: "Используй персональный фильтр в каталоге, чтобы быстрее выбрать байк.",
+      badge: "::FaRoute:: Персональный маршрут",
+      title: `Ваш сценарий: ${bikeStyle}`,
+      note: "Используйте персональный фильтр: меньше случайных карточек, быстрее уверенное решение.",
     };
   }, [dbUser?.metadata]);
 
@@ -1498,7 +1498,7 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
         >
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/45 px-4 py-2 text-sm text-white/90 backdrop-blur-sm">
             <VibeContentRenderer content="::FaBolt::" className="text-brand-yellow" />
-            <span>VIP BIKE · ПРОКАТ И МАРШРУТЫ</span>
+            <span>VIP BIKE · ПРЕМИАЛЬНЫЙ ПРОКАТ И МАРШРУТЫ</span>
           </div>
           <div className="mb-5 w-full max-w-2xl rounded-2xl border border-white/20 bg-black/40 p-4 text-left text-sm text-white/90 backdrop-blur-sm">
             <div className="mb-1 font-medium text-brand-yellow"><VibeContentRenderer content={vibeProfile.badge} /></div>
@@ -1508,12 +1508,11 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
 
           <h1 className="font-orbitron text-5xl font-black uppercase leading-[0.9] tracking-tight text-white drop-shadow-[0_8px_22px_rgba(0,0,0,0.75)] sm:text-6xl md:text-7xl lg:text-8xl">
             <span className="block">Скорость. Контроль.</span>
-            <span className="block text-brand-yellow">Твой путь на байке.</span>
+            <span className="block text-brand-yellow">Ваш выезд организован заранее.</span>
           </h1>
 
           <p className="mx-auto mt-6 max-w-3xl text-base font-light text-white/90 sm:text-lg md:text-xl">
-            Премиальный прокат в Нижнем Новгороде: от первого выбора модели до возврата — всё организовано в одном
-            потоке с онлайн-навигацией по аренде.
+            Премиальный прокат в Нижнем Новгороде: от выбора модели до возврата — единый управляемый поток, где клиент понимает цену, слот, защиту и следующий шаг.
           </p>
 
           <div className="mt-9 w-full max-w-5xl rounded-3xl border border-white/20 bg-black/45 p-3 text-left shadow-2xl shadow-black/40 backdrop-blur-md sm:p-4">
@@ -1671,7 +1670,7 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
             ]}
           />
           <ServiceCard
-            title="Что вы получаете"
+            title="Что получает клиент"
             icon="::FaGift::"
             borderColorClass="border-accent text-accent"
             imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/81Dts9uMBXZXTKC7PjIbBRRRHYGQx_2TPEKFWvaUwDzzgSQPjxUf4GjAiRaDWIcWgwmeaZQTKppFn5VBS6yZeK7R-38bfc7fb-0d5a-4b62-b7e6-ca83950cb265.jpg"
@@ -1679,7 +1678,7 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
               { icon: "::FaCircleCheck::", text: "Полностью обслуженный и чистый мотоцикл" },
               { icon: "::FaFileSignature::", text: "Открытый полис ОСАГО" },
               { icon: "::FaUserShield::", text: "Полный комплект защитной экипировки" },
-              { icon: "::FaTag::", text: "Скидка 10% на первую аренду по промокоду 'VIPSTART'" },
+              { icon: "::FaTag::", text: "Минус 10% на первый выезд по промокоду VIPSTART — мягкий вход без снижения уровня сервиса" },
             ]}
           />
           <ServiceCard
@@ -1710,7 +1709,7 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
               Свяжитесь с нами для подтверждения. Возьмите с собой оригиналы документов и залог.
             </StepItem>
             <StepItem num="3" title="Получение" icon="::FaKey::">
-              Приезжайте в наш новый дом на ул. Комсомольская 2, подписываем договор и забираете байк.
+              Приезжайте на ул. Комсомольская 2: быстро сверяем документы, подписываем договор и выдаём подготовленный байк.
             </StepItem>
             <StepItem num="4" title="Возврат и отдых" icon="::FaFlagCheckered::">
               Верните мотоцикл в срок. После поездки можно отдохнуть в нашей лаунж-зоне.
@@ -1736,7 +1735,7 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
       </div>
 
       <h2 className="font-orbitron text-4xl md:text-5xl font-bold text-white">
-        Зарабатывай на байках,
+        Включайте байки в доходную сеть,
         <br />
         пока другие катаются
       </h2>
@@ -1786,8 +1785,8 @@ export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
       <div className="space-y-3 text-sm text-white/80">
         <div><VibeContentRenderer content="::FaMotorcycle:: Байк добавляется в парк" /></div>
         <div><VibeContentRenderer content="::FaUsers:: Используется райдерами ежедневно" /></div>
-        <div><VibeContentRenderer content="::FaMoneyBillWave:: Генерирует доход с аренды" /></div>
-        <div><VibeContentRenderer content="::FaRepeat:: Ты получаешь выплаты каждый месяц" /></div>
+        <div><VibeContentRenderer content="::FaMoneyBillWave:: Работает в арендной модели с понятной загрузкой" /></div>
+        <div><VibeContentRenderer content="::FaRepeat:: Вы получаете регулярные выплаты по согласованной модели" /></div>
       </div>
     </div>
 

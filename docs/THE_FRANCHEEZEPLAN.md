@@ -560,3 +560,25 @@ This root file stays intentionally compact so operators and agents can load it q
 - `risks`: Таргетированный `rg` ещё находит технические имена компонентов/типов и checkout-идентификаторы в коде; это не пользовательские строки и не переводилось, чтобы не ломать API/типы.
 
 - 2026-05-08 — RU-полировка franchize copy и закрепление общего CrewHeader/FranchizePageShell для admin/dashboard/profile slug-страниц.
+
+### 2026-05-08 — VIP Bike conversion copy + Telegram-safe franchize header
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T00:00:00Z
+- `owner`: codex
+- `notes`: Выполнен явный операторский scope: отполированы VIP Bike rental и основные franchize catalog/onboarding формулировки до более агентского, сделочного тона; мобильные карточки горячих лидов в dashboard стали компактнее и раскрывают ответ/действия через collapsible; профильное меню header теперь ведёт прямо в `/franchize/{slug}/dashboard`, а верхние header controls отодвинуты ниже и ближе к центру для Telegram WebApp fullscreen.
+- `next_step`: Preview-smoke `/vipbikerental`, `/franchize/vip-bike`, `/franchize/vip-bike/dashboard` на мобильной ширине внутри Telegram WebApp и в обычном браузере.
+- `risks`: Локальная проверка не заменяет реальный Telegram fullscreen chrome; финальный зазор кнопок нужно подтвердить на устройстве.
+
+- 2026-05-08 — Conversion copy polish, compact dashboard lead cards, dashboard shortcut in profile dropdown, and Telegram-safe header spacing for VIP Bike/franchize surfaces.
+
+### 2026-05-08 — Self-review: VIP Bike copy/header micro-polish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T00:00:00Z
+- `owner`: codex-review
+- `notes`: Саморевью предыдущего VIP Bike polish: вернул menu/profile controls к боковым позициям, оставив только нижний вертикальный зазор для Telegram fullscreen; убрал мелкие RU/EN микронесостыковки (`sale-ready`, `live/meetup/stale/smoke-check`, `Electro / custom`) и сгладил CTA поиска.
+- `next_step`: Проверить header на реальном Telegram WebApp fullscreen: боковые кнопки должны быть на привычных местах, но ниже native chrome.
+- `risks`: Визуальный Telegram fullscreen всё ещё требует девайс-проверки, локальный браузер не воспроизводит native top buttons.
+
+- 2026-05-08 — Self-review micro-polish: side header controls restored, vertical safe offset retained, mixed-language copy tightened.

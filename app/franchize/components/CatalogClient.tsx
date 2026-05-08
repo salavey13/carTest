@@ -335,7 +335,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           <input
             id="catalog-search-input"
             type="text"
-            placeholder="Введите название байка"
+            placeholder="Найдите байк по модели или сценарию"
             autoComplete="off"
             aria-describedby="catalog-results-status"
             value={searchQuery}
@@ -386,7 +386,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
               ...(searchCtaFocused ? interactionRingStyle(crew.theme) : {}),
             }}
           >
-            Искать
+            Показать
           </button>
         </div>
 
@@ -467,8 +467,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         {items.length === 0 ? (
           <section aria-label="Загружаем каталог" className="space-y-4">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-2xl font-bold uppercase leading-tight tracking-tight text-[var(--catalog-text)]">Каталог</h2>
-              <span className="inline-flex rounded-full bg-[var(--catalog-card-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--catalog-muted)]">обновляем наличие</span>
+              <h2 className="text-2xl font-bold uppercase leading-tight tracking-tight text-[var(--catalog-text)]">Каталог готовых выездов</h2>
+              <span className="inline-flex rounded-full bg-[var(--catalog-card-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--catalog-muted)]">синхронизируем наличие</span>
             </div>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
               {[0, 1, 2, 3].map((index) => <CatalogCardSkeleton key={index} index={index} />)}
@@ -476,7 +476,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           </section>
         ) : itemsByCategory.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-4 text-sm" style={surface.mutedText}>
-            По запросу ничего не найдено. Попробуй другое название или категорию.
+            По этому запросу нет готового варианта. Попробуйте другую модель, бюджет или сценарий поездки.
           </div>
         ) : (
           <div className="space-y-6">
@@ -514,14 +514,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           {item.imageUrl ? (
                             <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 1279px) 50vw, (max-width: 1535px) 33vw, 25vw" className="object-cover" />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Изображение байка скоро загрузим</div>
+                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото байка загружается — карточка уже доступна для брони</div>
                           )}
                         </div>
                         <div className="p-3">
                           <div className="mb-2 flex flex-wrap gap-1.5">
                             {item.isHot && (
                               <span className="inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
-                                Горячее 🔥
+                                Высокий спрос
                               </span>
                             )}
                             <span
@@ -536,7 +536,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             </span>
                             {item.saleAvailable && (
                               <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-amber-100">
-                                На продажу
+                                Доступен к покупке
                               </span>
                             )}
                           </div>
@@ -552,13 +552,13 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             aria-label={`Аренда ${item.title}: ${rentalStrip.todayLabel}`}
                           >
                             <div className="flex items-center justify-between gap-2 font-semibold text-[var(--catalog-text)]">
-                              <span>Сегодня: {rentalStrip.todayLabel}</span>
+                              <span>Слот: {rentalStrip.todayLabel}</span>
                               <span className={rentalStrip.isAvailable ? "text-emerald-200" : "text-amber-100"}>
                                 {rentalStrip.nearestStartWindow}
                               </span>
                             </div>
                             <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5" style={surface.mutedText}>
-                              <span>Выдача: {rentalStrip.pickupHint}</span>
+                              <span>Точка: {rentalStrip.pickupHint}</span>
                               <span>{rentalStrip.priceTeaser}</span>
                             </div>
                           </div>
@@ -572,13 +572,13 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           </p>
                           {item.saleAvailable && item.salePrice ? (
                             <p className="mt-1 text-xs font-semibold text-amber-200">
-                              Покупка: {item.salePrice.toLocaleString("ru-RU")} ₽
+                              Цена покупки: {item.salePrice.toLocaleString("ru-RU")} ₽
                             </p>
                           ) : null}
                           <div className="mt-2 flex gap-2">
                             <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95">
                               <ShoppingCart className="h-4 w-4" />
-                              {item.saleAvailable ? "Hold this bike / Забронировать байк" : "Забронировать байк"}
+                              {item.saleAvailable ? "Закрепить байк" : "Забронировать выезд"}
                             </span>
                           </div>
                         </div>
