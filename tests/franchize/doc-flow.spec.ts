@@ -40,7 +40,9 @@ vi.mock('@/app/franchize/lib/docx-capability', () => ({
 
 vi.mock('@/app/lib/private-secrets', () => ({
   getUserSensitiveData: mocks.getUserSensitiveData,
+  getUserSensitiveDataOrDefault: mocks.getUserSensitiveData,
   getCrewSensitiveData: mocks.getCrewSensitiveData,
+  getCrewSensitiveDataOrDefault: mocks.getCrewSensitiveData,
   saveCrewSensitiveData: vi.fn(),
 }));
 
@@ -168,7 +170,7 @@ describe('franchize checkout doc-flow', () => {
     const result = await createFranchizeOrderCheckout(buildPayload('telegram_xtr', 'order-2'));
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('docx render failed');
+    expect(result.error).toContain('Не удалось подготовить документы аренды');
     expect(mocks.createInvoice).not.toHaveBeenCalled();
     expect(mocks.sendTelegramInvoice).not.toHaveBeenCalled();
   });
