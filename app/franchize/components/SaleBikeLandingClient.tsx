@@ -10,7 +10,10 @@ import {
   Battery,
   Check,
   Gauge,
+  CalendarCheck,
+  CreditCard,
   PhoneCall,
+  Repeat2,
   ShieldCheck,
   ShoppingBag,
   Sparkles,
@@ -23,15 +26,21 @@ import {
 } from "lucide-react";
 
 import type { CatalogItemVM, FranchizeCrewVM } from "@/app/franchize/actions";
-import { createFranchizeOrderInvoice, upsertFranchizeIntent } from "@/app/franchize/actions";
+import {
+  createFranchizeOrderInvoice,
+  upsertFranchizeIntent,
+} from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import {
   DEFAULT_COLOR_OPTIONS,
   DEFAULT_CONFIG_OPTIONS,
+  PREBUY_COMPARISON_OPTIONS,
   resolveBuyColorOptions,
   resolveBuyConfigOptions,
   type ColorOption,
   type ConfigOption,
+  type PrebuyComparisonOption,
+  type PrebuyIntentType,
 } from "@/app/franchize/lib/sale-config";
 import { buildCandidateImageUrls } from "@/app/franchize/lib/media";
 import { useFranchizeCart } from "@/app/franchize/hooks/useFranchizeCart";
@@ -47,6 +56,18 @@ import {
 } from "@/app/franchize/lib/catalog-propulsion";
 
 type SaleActionState = "idle" | "loading" | "success" | "error";
+type PrebuyStage =
+  | "prebuy_started"
+  | "test_ride_requested"
+  | "trade_in_requested"
+  | "finance_requested";
+
+type TradeInFormState = {
+  model: string;
+  year: string;
+  condition: string;
+  contact: string;
+};
 type SaleBikeLandingClientProps = {
   crew: FranchizeCrewVM;
   item: CatalogItemVM;
@@ -56,6 +77,26 @@ type SaleBikeLandingClientProps = {
 
 function formatPrice(value: number): string {
   return value > 0 ? `${value.toLocaleString("ru-RU")} ₽` : "по запросу";
+}
+
+function readSpecText(
+  specs: Record<string, unknown>,
+  keys: string[],
+  fallback = "—",
+): string {
+  const value = keys
+    .map((key) => specs[key])
+    .find(
+      (entry) => entry !== undefined && entry !== null && String(entry).trim(),
+    );
+  return value === undefined || value === null ? fallback : String(value);
+}
+
+function stageForIntent(intentType: PrebuyIntentType): PrebuyStage {
+  if (intentType === "test_ride") return "test_ride_requested";
+  if (intentType === "trade_in") return "trade_in_requested";
+  if (intentType === "finance") return "finance_requested";
+  return "prebuy_started";
 }
 
 export function SaleBikeLandingClient({
@@ -181,7 +222,55 @@ export function SaleBikeLandingClient({
   const [reservationState, setReservationState] =
     useState<SaleActionState>("idle");
   const [purchaseState, setPurchaseState] = useState<SaleActionState>("idle");
+  const [intentActionStates, setIntentActionStates] = useState<
+    Partial<Record<string, SaleActionState>>
+  >({});
   const [cartMessage, setCartMessage] = useState("");
+  const [tradeInForm, setTradeInForm] = useState<TradeInFormState>({
+    model: "",
+    year: "",
+    condition: "",
+    contact: "",
+  });
+  const [financeMonths, setFinanceMonths] = useState(24);
+  const [fallbackContact, setFallbackContact] = useState("");
+
+  const currentContact =
+    typeof (dbUser as { phone?: unknown } | null)?.phone === "string"
+      ? (dbUser as { phone?: string } | null)?.phone
+      : undefined;
+  const telegramUserId = user?.id
+    ? String(user.id)
+    : dbUser?.user_id
+      ? String(dbUser.user_id)
+      : undefined;
+  const telegramFirstContinuation = Boolean(telegramUserId);
+  const sourceRoute = `/franchize/${resolvedSlug}/market/${item.id}/buy`;
+  const bikeCondition = readSpecText(
+    specs,
+    ["condition", "state", "bike_condition"],
+    "new",
+  );
+  const checkedStatus = readSpecText(
+    specs,
+    ["checked_status", "checked", "inspection_status", "diagnostics"],
+    "operator_checked",
+  );
+  const availability = `${item.availabilityStatus}:${item.availabilityLabel}`;
+  const selectedColorLabel =
+    colorOptions.find((color) => color.id === selectedColorId)?.label ?? "—";
+  const normalizedFallbackContact = fallbackContact.trim();
+  const fallbackPhone = normalizedFallbackContact.startsWith("+")
+    ? normalizedFallbackContact
+    : undefined;
+  const contactHint = telegramFirstContinuation
+    ? "Продолжим в Telegram: оператор пришлёт подтверждение прямо в чат."
+    : "Оставьте телефон или Telegram @handle — оператор продолжит без лишних шагов.";
+  const monthlyPaymentEstimate = useMemo(() => {
+    if (finalPrice <= 0) return 0;
+    return Math.ceil((finalPrice * 1.08) / financeMonths / 100) * 100;
+  }, [financeMonths, finalPrice]);
+
   const reservationAmountXtr = useMemo(
     () =>
       Math.min(
@@ -206,29 +295,121 @@ export function SaleBikeLandingClient({
   };
 
   const recordSaleIntent = (input: {
-    intentType: "prebuy" | "test_ride_click" | "hold_created" | "payment_failure";
-    stage: "prebuy_started" | "test_ride_requested" | "hold_created" | "payment_failed";
+    intentType:
+      | PrebuyIntentType
+      | "test_ride_click"
+      | "hold_created"
+      | "payment_failure";
+    stage: PrebuyStage | "hold_created" | "payment_failed";
     urgencyScore: number;
+    selectedOption?: string;
+    contactChannel?: string;
     metadata?: Record<string, unknown>;
   }) => {
+    const selectedFlowOption = input.selectedOption ?? selectedOption.id;
+
     return upsertFranchizeIntent({
       slug: resolvedSlug,
       bikeId: item.id,
       intentType: input.intentType,
       stage: input.stage,
-      sourceRoute: `/franchize/${resolvedSlug}/market/${item.id}/buy`,
-      contactChannel: input.intentType === "test_ride_click" ? "telegram_xtr" : "web_cart",
+      sourceRoute,
+      contactChannel:
+        input.contactChannel ??
+        (telegramFirstContinuation ? "telegram" : "phone_or_handle"),
       urgencyScore: input.urgencyScore,
-      telegramUserId: user?.id ? String(user.id) : dbUser?.user_id ? String(dbUser.user_id) : undefined,
-      phone: typeof (dbUser as { phone?: unknown } | null)?.phone === "string" ? (dbUser as { phone?: string } | null)?.phone : undefined,
+      telegramUserId,
+      phone: currentContact ?? fallbackPhone,
       metadata: {
         itemTitle: item.title,
+        bikePrice: finalPrice,
+        basePrice,
+        condition: bikeCondition,
+        checkedStatus,
+        availability,
+        selectedOption: selectedFlowOption,
         selectedOptionId,
+        selectedOptionLabel: selectedOption.label,
         selectedColorId,
-        finalPrice,
+        selectedColorLabel,
+        sourceRoute,
+        telegramFirstContinuation,
+        fallbackContact: normalizedFallbackContact || undefined,
         ...input.metadata,
       },
     }).catch((error) => console.warn("sale intent tracking failed", error));
+  };
+
+  const handleComparisonCta = async (option: PrebuyComparisonOption) => {
+    const requiresFallbackContact =
+      !telegramFirstContinuation && !fallbackContact.trim();
+    if (option.id !== "buy_now" && requiresFallbackContact) {
+      setCartMessage(
+        "Оставьте телефон или Telegram @handle, чтобы оператор продолжил заявку.",
+      );
+      return;
+    }
+
+    if (option.intentType === "trade_in") {
+      const hasTradeInMinimum =
+        tradeInForm.model.trim() &&
+        tradeInForm.year.trim() &&
+        tradeInForm.condition.trim();
+      if (
+        !hasTradeInMinimum ||
+        (!telegramFirstContinuation &&
+          !tradeInForm.contact.trim() &&
+          !fallbackContact.trim())
+      ) {
+        setCartMessage(
+          "Для trade-in заполните модель, год, состояние и контакт.",
+        );
+        return;
+      }
+    }
+
+    setIntentActionStates((prev) => ({ ...prev, [option.id]: "loading" }));
+    setCartMessage("");
+
+    try {
+      await recordSaleIntent({
+        intentType: option.intentType,
+        stage: stageForIntent(option.intentType),
+        urgencyScore: option.urgencyScore,
+        selectedOption: option.id,
+        metadata: {
+          action: `comparison_${option.id}`,
+          flowLabel: option.label,
+          tradeIn: option.intentType === "trade_in" ? tradeInForm : undefined,
+          finance:
+            option.intentType === "finance"
+              ? {
+                  months: financeMonths,
+                  monthlyPaymentEstimate,
+                  disclaimer: "operator_will_confirm_terms",
+                }
+              : undefined,
+        },
+      });
+      setIntentActionStates((prev) => ({ ...prev, [option.id]: "success" }));
+
+      if (option.id === "buy_now") {
+        await handleAddToCart();
+        return;
+      }
+
+      setCartMessage(
+        telegramFirstContinuation
+          ? `${option.label}: заявка записана. Подтверждение придёт в Telegram.`
+          : `${option.label}: заявка записана. Оператор свяжется по указанному контакту.`,
+      );
+    } catch (error) {
+      console.error("buy/comparison intent failed", error);
+      setIntentActionStates((prev) => ({ ...prev, [option.id]: "error" }));
+      setCartMessage(
+        "Не удалось записать заявку. Проверьте контакт и попробуйте ещё раз.",
+      );
+    }
   };
 
   const buildBuyOptions = () => ({
@@ -261,6 +442,7 @@ export function SaleBikeLandingClient({
         intentType: "prebuy",
         stage: "prebuy_started",
         urgencyScore: 60,
+        selectedOption: "buy_now",
         metadata: { action: "add_to_cart" },
       });
       router.push(`/franchize/${resolvedSlug}/cart`);
@@ -273,7 +455,6 @@ export function SaleBikeLandingClient({
 
   const handleReserveTestDrive = async () => {
     if (!isHydrated) return;
-    const telegramUserId = user?.id ? String(user.id) : "";
     if (!telegramUserId) {
       setReservationState("error");
       setCartMessage(
@@ -283,9 +464,11 @@ export function SaleBikeLandingClient({
     }
 
     void recordSaleIntent({
-      intentType: "test_ride_click",
+      intentType: "test_ride",
       stage: "test_ride_requested",
       urgencyScore: 85,
+      selectedOption: "test_ride_paid_hold",
+      contactChannel: "telegram_xtr",
       metadata: { action: "reserve_test_drive_click" },
     });
 
@@ -326,7 +509,10 @@ export function SaleBikeLandingClient({
           intentType: "payment_failure",
           stage: "payment_failed",
           urgencyScore: 90,
-          metadata: { action: "test_drive_invoice_failed", error: result.error },
+          metadata: {
+            action: "test_drive_invoice_failed",
+            error: result.error,
+          },
         });
         setReservationState("error");
         setCartMessage(result.error ?? "Не удалось отправить счёт в Telegram.");
@@ -337,7 +523,11 @@ export function SaleBikeLandingClient({
         intentType: "hold_created",
         stage: "hold_created",
         urgencyScore: 95,
-        metadata: { action: "test_drive_invoice_sent", invoiceId: result.invoiceId, amountXtr: result.amountXtr },
+        metadata: {
+          action: "test_drive_invoice_sent",
+          invoiceId: result.invoiceId,
+          amountXtr: result.amountXtr,
+        },
       });
       setReservationState("success");
       setCartMessage(
@@ -348,7 +538,10 @@ export function SaleBikeLandingClient({
         intentType: "payment_failure",
         stage: "payment_failed",
         urgencyScore: 90,
-        metadata: { action: "test_drive_exception", error: error instanceof Error ? error.message : String(error) },
+        metadata: {
+          action: "test_drive_exception",
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
       console.error("buy/reserve-test-drive failed", error);
       setReservationState("error");
@@ -508,6 +701,194 @@ export function SaleBikeLandingClient({
                   <ShieldCheck className="h-3.5 w-3.5" />
                   Официальная сделка + документы
                 </p>
+              </div>
+
+              <div
+                className="rounded-2xl border p-3"
+                style={surface.subtleCard}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.16em] opacity-70">
+                      Prebuy flow
+                    </p>
+                    <h2 className="text-lg font-semibold">
+                      Покупка, тест или trade-in?
+                    </h2>
+                  </div>
+                  <span className="rounded-full border px-2.5 py-1 text-[11px] opacity-80">
+                    {contactHint}
+                  </span>
+                </div>
+
+                {!telegramFirstContinuation ? (
+                  <label className="mt-3 block text-xs font-semibold">
+                    Телефон или Telegram @handle для продолжения
+                    <input
+                      value={fallbackContact}
+                      onChange={(event) =>
+                        setFallbackContact(event.target.value)
+                      }
+                      placeholder="+7... или @username"
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none focus:border-white/30"
+                    />
+                  </label>
+                ) : null}
+
+                <div className="mt-3 grid gap-2">
+                  {PREBUY_COMPARISON_OPTIONS.map((option) => {
+                    const state = intentActionStates[option.id] ?? "idle";
+                    const Icon =
+                      option.intentType === "test_ride"
+                        ? CalendarCheck
+                        : option.intentType === "trade_in"
+                          ? Repeat2
+                          : option.intentType === "finance"
+                            ? CreditCard
+                            : ShoppingBag;
+
+                    return (
+                      <div
+                        key={option.id}
+                        className="rounded-2xl border p-3"
+                        style={surface.card}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span
+                            className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+                            style={surface.accentPill}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold">
+                              {option.label}
+                            </p>
+                            <p className="mt-0.5 text-xs opacity-70">
+                              {option.title}
+                            </p>
+                            <p className="mt-1 text-xs opacity-60">
+                              {option.description}
+                            </p>
+                          </div>
+                        </div>
+
+                        {option.intentType === "trade_in" ? (
+                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                            <input
+                              value={tradeInForm.model}
+                              onChange={(event) =>
+                                setTradeInForm((prev) => ({
+                                  ...prev,
+                                  model: event.target.value,
+                                }))
+                              }
+                              placeholder="Текущий байк: модель"
+                              className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs outline-none focus:border-white/30"
+                            />
+                            <input
+                              value={tradeInForm.year}
+                              onChange={(event) =>
+                                setTradeInForm((prev) => ({
+                                  ...prev,
+                                  year: event.target.value,
+                                }))
+                              }
+                              placeholder="Год"
+                              inputMode="numeric"
+                              className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs outline-none focus:border-white/30"
+                            />
+                            <input
+                              value={tradeInForm.condition}
+                              onChange={(event) =>
+                                setTradeInForm((prev) => ({
+                                  ...prev,
+                                  condition: event.target.value,
+                                }))
+                              }
+                              placeholder="Состояние"
+                              className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs outline-none focus:border-white/30"
+                            />
+                            <input
+                              value={tradeInForm.contact}
+                              onChange={(event) =>
+                                setTradeInForm((prev) => ({
+                                  ...prev,
+                                  contact: event.target.value,
+                                }))
+                              }
+                              placeholder={
+                                telegramFirstContinuation
+                                  ? "Контакт необязателен"
+                                  : "Телефон/@handle"
+                              }
+                              className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs outline-none focus:border-white/30"
+                            />
+                          </div>
+                        ) : null}
+
+                        {option.intentType === "finance" ? (
+                          <div className="mt-3 rounded-xl border border-white/10 p-3 text-xs">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="opacity-70">Срок</span>
+                              <select
+                                value={financeMonths}
+                                onChange={(event) =>
+                                  setFinanceMonths(Number(event.target.value))
+                                }
+                                className="rounded-lg border border-white/10 bg-black/30 px-2 py-1"
+                              >
+                                {[12, 18, 24, 36].map((months) => (
+                                  <option key={months} value={months}>
+                                    {months} мес.
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <p className="mt-2 text-lg font-bold">
+                              ≈{" "}
+                              {monthlyPaymentEstimate > 0
+                                ? monthlyPaymentEstimate.toLocaleString("ru-RU")
+                                : "—"}{" "}
+                              ₽/мес.
+                            </p>
+                            <p className="mt-1 opacity-60">
+                              Предварительная оценка. Условия, первый взнос и
+                              одобрение подтверждает оператор.
+                            </p>
+                          </div>
+                        ) : null}
+
+                        <button
+                          type="button"
+                          onClick={() => handleComparisonCta(option)}
+                          disabled={
+                            state === "loading" ||
+                            (option.id === "buy_now" &&
+                              purchaseState === "loading")
+                          }
+                          className="mt-3 w-full rounded-xl border px-3 py-2 text-sm font-semibold transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                          style={
+                            option.id === "buy_now"
+                              ? {
+                                  ...surface.subtleCard,
+                                  borderColor: crew.theme.palette.accentMain,
+                                }
+                              : surface.subtleCard
+                          }
+                        >
+                          {state === "loading"
+                            ? "Записываем..."
+                            : state === "success"
+                              ? "Заявка записана"
+                              : state === "error"
+                                ? "Повторить"
+                                : option.ctaLabel}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="grid gap-2">
