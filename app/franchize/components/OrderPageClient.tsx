@@ -246,12 +246,14 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   );
   const nextAction = checkoutBlockers[0];
   const holdAmountRub = crew.reservationHold.amountRub;
-  const holdAmountXtr = crew.reservationHold.amountXtr;
+  const holdConfiguredAmountXtr = crew.reservationHold.amountXtr;
   const holdDepositAmount = crew.reservationHold.percent
     ? Math.max(1, Math.ceil(totalAmount * (crew.reservationHold.percent / 100)))
     : holdAmountRub;
+  const holdPaymentAmountXtr = crew.reservationHold.percent ? holdDepositAmount : holdConfiguredAmountXtr;
+  const holdPaymentAmountRub = crew.reservationHold.percent ? holdDepositAmount : holdAmountRub;
   const holdCtaLabel = crew.reservationHold.percent
-    ? `Забронировать за ${crew.reservationHold.percent}% / ${Math.max(1, Math.ceil(totalAmount * (crew.reservationHold.percent / 100))).toLocaleString("ru-RU")} XTR`
+    ? `Забронировать за ${crew.reservationHold.percent}% / ${holdPaymentAmountXtr.toLocaleString("ru-RU")} XTR`
     : crew.reservationHold.label;
   const pickupAddress = crew.reservationHold.pickupAddress || crew.contacts.address || "адрес выдачи подтвердит оператор";
   const requiredDocs = crew.reservationHold.requiredDocs.length > 0
@@ -372,7 +374,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             : appliedPromo
               ? `Промокод ${appliedPromo.code} применён: ${appliedPromo.description}.`
               : payment === "telegram_xtr"
-                ? `Сейчас спишется только бронь: ${holdAmountRub.toLocaleString("ru-RU")}₽ / ${holdAmountXtr.toLocaleString("ru-RU")} XTR. Остальное подтвердит оператор.`
+                ? `Сейчас спишется только бронь: ${holdPaymentAmountRub.toLocaleString("ru-RU")}₽ / ${holdPaymentAmountXtr.toLocaleString("ru-RU")} XTR. Остальное подтвердит оператор.`
             : "Проверьте контакты и способ получения, затем подтверждайте заказ.";
 
   useEffect(() => {
@@ -642,7 +644,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <ol className="mt-3 space-y-2">
             {[
               `Проверим корзину, даты и контакт для ${flowLabel}.`,
-              payment === "telegram_xtr" ? `Отправим hold-счёт: ${holdAmountRub.toLocaleString("ru-RU")}₽ / ${holdAmountXtr.toLocaleString("ru-RU")} XTR, чтобы закрепить байк.` : "Передадим заявку оператору: оплату подтвердим вручную до выдачи.",
+              payment === "telegram_xtr" ? `Отправим hold-счёт: ${holdPaymentAmountRub.toLocaleString("ru-RU")}₽ / ${holdPaymentAmountXtr.toLocaleString("ru-RU")} XTR, чтобы закрепить байк.` : "Передадим заявку оператору: оплату подтвердим вручную до выдачи.",
               `После подтверждения в Telegram пришлём адрес выдачи (${pickupAddress}), список документов и ссылку на сделку.`,
             ].map((step, index) => (
               <li key={step} className="flex gap-2">
@@ -1040,7 +1042,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <div className="mt-3 border-t border-[var(--order-border)] pt-3 text-sm">
             <p className="flex justify-between"><span>Получение</span><span>{deliveryMode === "pickup" ? "Самовывоз" : "Доставка"}</span></p>
             <p className="mt-1 flex justify-between"><span>Оплата</span><span>{payments.find((item) => item.id === payment)?.label ?? payment}</span></p>
-            <p className="mt-1 flex justify-between"><span>Hold</span><span>{payment === "telegram_xtr" ? `${holdAmountXtr.toLocaleString("ru-RU")} XTR` : `${holdDepositAmount.toLocaleString("ru-RU")} ₽`}</span></p>
+            <p className="mt-1 flex justify-between"><span>Hold</span><span>{payment === "telegram_xtr" ? `${holdPaymentAmountXtr.toLocaleString("ru-RU")} XTR` : `${holdDepositAmount.toLocaleString("ru-RU")} ₽`}</span></p>
             <p className="mt-1 flex justify-between"><span>Период</span><span>{rentalStartDate || "—"} → {rentalEndDate || "—"}</span></p>
             <p className="mt-2 flex justify-between"><span>Подытог</span><span>{subtotal.toLocaleString("ru-RU")} ₽</span></p>
             <p className="mt-1 flex justify-between"><span>Доп. опции</span><span>{extrasTotal.toLocaleString("ru-RU")} ₽</span></p>
