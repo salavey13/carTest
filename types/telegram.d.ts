@@ -17,6 +17,7 @@ export interface TelegramWebApp {
   close: () => void;
   showPopup: (params: { title?: string; message: string; buttons?: Array<{ id?: string; type?: string; text?: string }> }) => void;
   BackButton?: {
+    isVisible?: boolean;
     show: () => void;
     hide: () => void;
     onClick: (callback: () => void) => void;
