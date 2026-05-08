@@ -190,6 +190,67 @@ export function FranchizeCloserDashboardClient({
   );
   const brandName = crew.header.brandName || crew.name || slug;
 
+  const renderCloserActionPanel = (intent: CloserIntent) => (
+    <div
+      className="min-w-0 rounded-xl border p-2.5 md:p-3"
+      style={{
+        borderColor: "var(--fr-dashboard-border)",
+        backgroundColor: withAlpha(
+          crew.theme.palette.bgBase,
+          0.22,
+        ),
+      }}
+    >
+      <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--fr-dashboard-muted)] md:text-xs">
+        Следующий шаг
+      </p>
+      <p className="mt-1 text-sm leading-snug text-[var(--fr-dashboard-text)]">
+        {intent.suggestedNextAction}
+      </p>
+      <div
+        className="mt-2 rounded-lg border p-2 md:mt-3"
+        style={{ borderColor: "var(--fr-dashboard-border)" }}
+      >
+        <p className="text-[11px] text-[var(--fr-dashboard-muted)] md:text-xs">
+          Ответ в Telegram
+        </p>
+        <p className="mt-1 break-words text-xs leading-relaxed text-[var(--fr-dashboard-text)]">
+          {intent.suggestedTelegramReply}
+        </p>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2 md:mt-3">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-8 text-xs"
+          onClick={() => void handleCopyTelegramReply(intent)}
+          style={buttonFocus}
+        >
+          Скопировать ответ
+        </Button>
+        {(Object.keys(closerActionLabels) as CloserAction[]).map(
+          (action) => (
+            <Button
+              key={action}
+              type="button"
+              className="h-8 text-xs"
+              variant={
+                action === "mark_closed" ? "outline" : "default"
+              }
+              onClick={() =>
+                void handleCloserAction(intent.id, action)
+              }
+              disabled={closerActionIntentId === intent.id}
+              style={buttonFocus}
+            >
+              {closerActionLabels[action]}
+            </Button>
+          ),
+        )}
+      </div>
+    </div>
+  );
+
   if (isLoading) return <Loading text="Загружаем заявки экипажа..." />;
 
   return (
@@ -272,7 +333,7 @@ export function FranchizeCloserDashboardClient({
             {closerIntents.map((intent) => (
               <article
                 key={intent.id}
-                className="rounded-2xl border p-3"
+                className="rounded-2xl border p-2 sm:p-3"
                 style={{
                   borderColor:
                     intent.stage === "closed"
@@ -284,7 +345,7 @@ export function FranchizeCloserDashboardClient({
                       : withAlpha(crew.theme.palette.accentMain, 0.07),
                 }}
               >
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,1.15fr),minmax(0,1fr)]">
+                <div className="grid gap-2 md:gap-3 lg:grid-cols-[minmax(0,1.15fr),minmax(0,1fr)]">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span
@@ -306,10 +367,10 @@ export function FranchizeCloserDashboardClient({
                           : "—"}
                       </span>
                     </div>
-                    <p className="mt-2 break-words text-base font-semibold text-[var(--fr-dashboard-text)]">
+                    <p className="mt-1 break-words text-sm font-semibold text-[var(--fr-dashboard-text)] sm:mt-2 sm:text-base">
                       {intent.bikeLabel}
                     </p>
-                    <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+                    <dl className="mt-2 grid gap-1.5 text-[11px] sm:grid-cols-2 sm:gap-2 sm:text-xs">
                       <div>
                         <dt className="uppercase tracking-[0.14em] text-[var(--fr-dashboard-muted)]">
                           Даты
@@ -350,63 +411,16 @@ export function FranchizeCloserDashboardClient({
                       </div>
                     </dl>
                   </div>
-                  <div
-                    className="min-w-0 rounded-xl border p-3"
-                    style={{
-                      borderColor: "var(--fr-dashboard-border)",
-                      backgroundColor: withAlpha(
-                        crew.theme.palette.bgBase,
-                        0.22,
-                      ),
-                    }}
-                  >
-                    <p className="text-xs uppercase tracking-[0.14em] text-[var(--fr-dashboard-muted)]">
-                      Следующий шаг
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--fr-dashboard-text)]">
-                      {intent.suggestedNextAction}
-                    </p>
-                    <div
-                      className="mt-3 rounded-lg border p-2"
-                      style={{ borderColor: "var(--fr-dashboard-border)" }}
-                    >
-                      <p className="text-xs text-[var(--fr-dashboard-muted)]">
-                        Ответ в Telegram
-                      </p>
-                      <p className="mt-1 break-words text-xs leading-relaxed text-[var(--fr-dashboard-text)]">
-                        {intent.suggestedTelegramReply}
-                      </p>
+                  <details className="mt-2 rounded-xl border p-2 md:hidden" style={{ borderColor: "var(--fr-dashboard-border)" }}>
+                    <summary className="cursor-pointer text-xs font-semibold text-[var(--fr-dashboard-text)]">
+                      Ответ и действия
+                    </summary>
+                    <div className="mt-2">
+                      {renderCloserActionPanel(intent)}
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-8 text-xs"
-                        onClick={() => void handleCopyTelegramReply(intent)}
-                        style={buttonFocus}
-                      >
-                        Скопировать ответ
-                      </Button>
-                      {(Object.keys(closerActionLabels) as CloserAction[]).map(
-                        (action) => (
-                          <Button
-                            key={action}
-                            type="button"
-                            className="h-8 text-xs"
-                            variant={
-                              action === "mark_closed" ? "outline" : "default"
-                            }
-                            onClick={() =>
-                              void handleCloserAction(intent.id, action)
-                            }
-                            disabled={closerActionIntentId === intent.id}
-                            style={buttonFocus}
-                          >
-                            {closerActionLabels[action]}
-                          </Button>
-                        ),
-                      )}
-                    </div>
+                  </details>
+                  <div className="hidden md:block">
+                    {renderCloserActionPanel(intent)}
                   </div>
                 </div>
               </article>

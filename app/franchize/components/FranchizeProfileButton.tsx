@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, ChevronDown, Palette, Settings, Shield, User, IdCard, MessageCircle, Send } from "lucide-react";
+import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, User, IdCard, MessageCircle, Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
@@ -66,6 +66,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   const userIsAdmin = useIsAdmin();
   const scopeSlug = normalizeSlug(currentSlug || userCrewInfo?.slug);
   const franchizeAdminHref = `/franchize/${scopeSlug}/admin`;
+  const franchizeDashboardHref = `/franchize/${scopeSlug}/dashboard`;
   const franchizeProfileHref = `/franchize/${scopeSlug}/profile`;
   const [tempCartId, setTempCartId] = useState<string | null>(null);
   const [notificationPreferences, setNotificationPreferences] = useState<FranchizeNotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
@@ -202,6 +203,13 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
               </Link>
             </DropdownMenuItem>
           ) : null}
+
+          <DropdownMenuItem asChild>
+            <Link href={franchizeDashboardHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+              <LayoutDashboard className="mr-2 h-4 w-4 shrink-0" />
+              <span className="truncate">Дашборд франшизы</span>
+            </Link>
+          </DropdownMenuItem>
 
           <DropdownMenuItem asChild>
             <Link href={franchizeProfileHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">

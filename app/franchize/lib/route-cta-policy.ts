@@ -42,7 +42,7 @@ const TELEGRAM_BOTTOM_SAFE_AREA_CLASS = "pb-[calc(1.5rem+env(safe-area-inset-bot
 const TELEGRAM_FORM_BOTTOM_SAFE_AREA_CLASS = "pb-[calc(2rem+env(safe-area-inset-bottom))]";
 
 export const FRANCHIZE_HEADER_SAFE_AREA_STYLE = {
-  paddingTop: "calc(max(env(safe-area-inset-top), 0px) + 0.55rem)",
+  paddingTop: "calc(max(env(safe-area-inset-top), 0px) + 0.9rem)",
   paddingLeft: "calc(max(env(safe-area-inset-left), 0px) + 1rem)",
   paddingRight: "calc(max(env(safe-area-inset-right), 0px) + 1rem)",
 } as const;

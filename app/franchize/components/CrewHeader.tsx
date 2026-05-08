@@ -190,7 +190,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             maxHeight: isCompact ? 0 : 112,
             opacity: isCompact ? 0 : 1,
             paddingBottom: isCompact ? 0 : "0.5rem",
-            transform: isCompact ? "scaleY(0.85) translateY(-6px)" : "scaleY(1) translateY(0.15rem)",
+            transform: isCompact ? "scaleY(0.85) translateY(-6px)" : "scaleY(1) translateY(0.45rem)",
             transformOrigin: "top center",
             transition: "transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, padding 0.3s ease, max-height 0.32s ease",
             pointerEvents: "auto",
