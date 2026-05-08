@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -18,36 +18,18 @@ import { Loading } from "@/components/Loading";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
 
-type CloserIntent = {
-  id: string;
-  intentType: string;
-  stage: string;
-  urgencyScore: number;
-  bikeId: string | null;
-  bikeLabel: string;
-  selectedDates: string;
-  contactChannel: string;
-  lastBlocker: string;
-  paymentState: string;
-  telegramUserId: string | null;
-  telegramUsername: string | null;
-  suggestedNextAction: string;
-  suggestedTelegramReply: string;
-  updatedAt: string;
-};
+type CloserIntent = NonNullable<
+  Awaited<ReturnType<typeof getFranchizeCloserIntents>>["items"]
+>[number];
 
-type CloserAction =
-  | "send_offer"
-  | "reserve_manually"
-  | "offer_alternative_bike"
-  | "mark_closed";
-
-const closerActionLabels: Record<CloserAction, string> = {
+const closerActionLabels = {
   send_offer: "Send offer",
   reserve_manually: "Reserve manually",
   offer_alternative_bike: "Offer alternative bike",
   mark_closed: "Mark closed",
-};
+} as const;
+
+type CloserAction = keyof typeof closerActionLabels;
 
 const fallbackCrew: FranchizeCrewVM = {
   id: "",
@@ -116,24 +98,45 @@ export function FranchizeCloserDashboardClient({
   const [closerActionIntentId, setCloserActionIntentId] = useState<
     string | null
   >(null);
+  const closerLoadRequestRef = useRef(0);
 
   const slug = initialSlug?.trim() || "vip-bike";
 
   const loadCrewTheme = useCallback(async () => {
-    const { crew: loaded } = await getFranchizeBySlug(slug);
-    setCrew(loaded || fallbackCrew);
+    try {
+      const { crew: loaded } = await getFranchizeBySlug(slug);
+      setCrew(loaded || fallbackCrew);
+    } catch {
+      setCrew(fallbackCrew);
+    }
   }, [slug]);
 
   const loadCloserIntents = useCallback(async () => {
     if (!dbUser?.user_id) return;
+    const requestId = closerLoadRequestRef.current + 1;
+    closerLoadRequestRef.current = requestId;
     setLoadingCloserIntents(true);
-    const result = await getFranchizeCloserIntents({ slug });
-    setLoadingCloserIntents(false);
-    if (!result.success) {
-      toast.error(result.error || "Не удалось загрузить closer intents");
-      return;
+    try {
+      const result = await getFranchizeCloserIntents({ slug });
+      if (closerLoadRequestRef.current !== requestId) return;
+      if (!result.success) {
+        toast.error(result.error || "Не удалось загрузить closer intents");
+        return;
+      }
+      setCloserIntents(result.items || []);
+    } catch (error) {
+      if (closerLoadRequestRef.current === requestId) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Не удалось загрузить closer intents",
+        );
+      }
+    } finally {
+      if (closerLoadRequestRef.current === requestId) {
+        setLoadingCloserIntents(false);
+      }
     }
-    setCloserIntents((result.items || []) as CloserIntent[]);
   }, [dbUser?.user_id, slug]);
 
   useEffect(() => {
@@ -162,18 +165,25 @@ export function FranchizeCloserDashboardClient({
     async (intentId: string, action: CloserAction) => {
       if (!dbUser?.user_id) return;
       setCloserActionIntentId(intentId);
-      const result = await updateFranchizeCloserIntentStage({
-        slug,
-        intentId,
-        action,
-      });
-      setCloserActionIntentId(null);
-      if (!result.success) {
-        toast.error(result.error || "Closer action не сохранён");
-        return;
+      try {
+        const result = await updateFranchizeCloserIntentStage({
+          slug,
+          intentId,
+          action,
+        });
+        if (!result.success) {
+          toast.error(result.error || "Closer action не сохранён");
+          return;
+        }
+        toast.success(`${closerActionLabels[action]} сохранён`);
+        void loadCloserIntents();
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Closer action не сохранён",
+        );
+      } finally {
+        setCloserActionIntentId(null);
       }
-      toast.success(`${closerActionLabels[action]} сохранён`);
-      void loadCloserIntents();
     },
     [dbUser?.user_id, loadCloserIntents, slug],
   );

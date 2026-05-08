@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createHmac, timingSafeEqual } from "crypto";
 
 export const TELEGRAM_ACTOR_COOKIE = "cartest_tg_actor";
