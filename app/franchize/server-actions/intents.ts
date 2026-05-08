@@ -13,7 +13,10 @@ const franchizeIntentTypes = [
   "map_click",
   "contact_click",
   "test_ride_click",
+  "test_ride",
   "prebuy",
+  "trade_in",
+  "finance",
   "rent",
 ] as const;
 
@@ -27,13 +30,17 @@ const franchizeIntentStages = [
   "payment_confirmed",
   "contacted",
   "test_ride_requested",
+  "trade_in_requested",
+  "finance_requested",
   "viewed",
   "configured",
 ] as const;
 
 const metadataSchema = z.record(z.string(), z.unknown()).default({});
 
-function sanitizeIntentMetadata(value: Record<string, unknown>): Record<string, unknown> {
+function sanitizeIntentMetadata(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
   try {
     return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
   } catch (error) {
@@ -45,7 +52,12 @@ function sanitizeIntentMetadata(value: Record<string, unknown>): Record<string, 
 }
 
 const franchizeIntentInputSchema = z.object({
-  slug: z.string().trim().min(1).max(80).transform((value) => value.toLowerCase()),
+  slug: z
+    .string()
+    .trim()
+    .min(1)
+    .max(80)
+    .transform((value) => value.toLowerCase()),
   bikeId: z.string().trim().min(1).max(120).optional(),
   intentType: z.enum(franchizeIntentTypes),
   stage: z.enum(franchizeIntentStages),
@@ -91,12 +103,16 @@ function franchizeIntentsTable() {
   return (supabaseAdmin as any).from("franchize_intents");
 }
 
-export async function upsertFranchizeIntent(input: unknown): Promise<FranchizeIntentResult> {
+export async function upsertFranchizeIntent(
+  input: unknown,
+): Promise<FranchizeIntentResult> {
   const parsed = franchizeIntentInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
       success: false,
-      error: parsed.error.issues[0]?.message ?? "Некорректный franchize intent payload.",
+      error:
+        parsed.error.issues[0]?.message ??
+        "Некорректный franchize intent payload.",
     };
   }
 
@@ -146,7 +162,10 @@ export async function upsertFranchizeIntent(input: unknown): Promise<FranchizeIn
       const { data, error } = await franchizeIntentsTable()
         .update({
           ...dbPayload,
-          urgency_score: Math.max(Number(existing.urgency_score ?? 0), intent.urgencyScore),
+          urgency_score: Math.max(
+            Number(existing.urgency_score ?? 0),
+            intent.urgencyScore,
+          ),
           metadata: mergedMetadata,
         })
         .eq("id", existing.id)
@@ -168,7 +187,10 @@ export async function upsertFranchizeIntent(input: unknown): Promise<FranchizeIn
     logger.error("[franchize] upsertFranchizeIntent failed", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Не удалось сохранить franchize intent.",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Не удалось сохранить franchize intent.",
     };
   }
 }

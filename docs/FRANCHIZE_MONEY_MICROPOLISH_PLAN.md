@@ -122,12 +122,13 @@ This turns the app from a catalog into sales memory: failed payments, checkout b
 ### R4 — Prebuy test-ride + trade-in mini-flow
 
 - SupaPlan task: `6c5623ac-4e8a-4499-9bef-b062887a9feb`
-- Status: `todo`
+- Status: `ready_for_pr`
 - Capability: `franchize.marketplace`
 - Primary zone: sale/buy pages and configurator handoff.
 - Goal: turn purchase pages into rent-before-buy, test-ride, trade-in, and financing lead machines.
 - Depends on: R1.
 - Acceptance: buyer can request test ride, trade-in estimate, financing hint, or rent-first comparison from the bike page.
+- 2026-05-08 update: Sale bike pages now expose the five-way comparison (`Купить сейчас`, rent-first, test-drive, trade-in, finance), write R1 ledger events with bike/option/source metadata, and include minimal trade-in/contact + finance estimate UX.
 
 ### R5 — Abandoned checkout recovery
 
