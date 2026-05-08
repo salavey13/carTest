@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 import type { CatalogItemVM, FranchizeCrewVM } from "@/app/franchize/actions";
-import { createFranchizeOrderInvoice } from "@/app/franchize/actions";
+import { createFranchizeOrderInvoice, upsertFranchizeIntent } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import {
   DEFAULT_COLOR_OPTIONS,
@@ -205,6 +205,32 @@ export function SaleBikeLandingClient({
     router.push(window.location.pathname, { scroll: false });
   };
 
+  const recordSaleIntent = (input: {
+    intentType: "prebuy" | "test_ride_click" | "hold_created" | "payment_failure";
+    stage: "prebuy_started" | "test_ride_requested" | "hold_created" | "payment_failed";
+    urgencyScore: number;
+    metadata?: Record<string, unknown>;
+  }) => {
+    return upsertFranchizeIntent({
+      slug: resolvedSlug,
+      bikeId: item.id,
+      intentType: input.intentType,
+      stage: input.stage,
+      sourceRoute: `/franchize/${resolvedSlug}/market/${item.id}/buy`,
+      contactChannel: input.intentType === "test_ride_click" ? "telegram_xtr" : "web_cart",
+      urgencyScore: input.urgencyScore,
+      telegramUserId: user?.id ? String(user.id) : dbUser?.user_id ? String(dbUser.user_id) : undefined,
+      phone: typeof (dbUser as { phone?: unknown } | null)?.phone === "string" ? (dbUser as { phone?: string } | null)?.phone : undefined,
+      metadata: {
+        itemTitle: item.title,
+        selectedOptionId,
+        selectedColorId,
+        finalPrice,
+        ...input.metadata,
+      },
+    }).catch((error) => console.warn("sale intent tracking failed", error));
+  };
+
   const buildBuyOptions = () => ({
     package: selectedOption.label,
     duration: "Покупка",
@@ -212,7 +238,7 @@ export function SaleBikeLandingClient({
     auction: "Покупка",
   });
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!isHydrated) return;
     setPurchaseState("loading");
     setCartMessage("");
@@ -231,6 +257,12 @@ export function SaleBikeLandingClient({
       setCartMessage(
         "Конфигурация добавлена в корзину. Открываем оформление покупки.",
       );
+      await recordSaleIntent({
+        intentType: "prebuy",
+        stage: "prebuy_started",
+        urgencyScore: 60,
+        metadata: { action: "add_to_cart" },
+      });
       router.push(`/franchize/${resolvedSlug}/cart`);
     } catch (error) {
       console.error("buy/add-to-cart failed", error);
@@ -249,6 +281,13 @@ export function SaleBikeLandingClient({
       );
       return;
     }
+
+    void recordSaleIntent({
+      intentType: "test_ride_click",
+      stage: "test_ride_requested",
+      urgencyScore: 85,
+      metadata: { action: "reserve_test_drive_click" },
+    });
 
     const options = buildBuyOptions();
     setReservationState("loading");
@@ -283,16 +322,34 @@ export function SaleBikeLandingClient({
       });
 
       if (!result.success) {
+        void recordSaleIntent({
+          intentType: "payment_failure",
+          stage: "payment_failed",
+          urgencyScore: 90,
+          metadata: { action: "test_drive_invoice_failed", error: result.error },
+        });
         setReservationState("error");
         setCartMessage(result.error ?? "Не удалось отправить счёт в Telegram.");
         return;
       }
 
+      void recordSaleIntent({
+        intentType: "hold_created",
+        stage: "hold_created",
+        urgencyScore: 95,
+        metadata: { action: "test_drive_invoice_sent", invoiceId: result.invoiceId, amountXtr: result.amountXtr },
+      });
       setReservationState("success");
       setCartMessage(
         `Счёт на бронь тест-драйва отправлен в Telegram: ${result.amountXtr ?? reservationAmountXtr} XTR.`,
       );
     } catch (error) {
+      void recordSaleIntent({
+        intentType: "payment_failure",
+        stage: "payment_failed",
+        urgencyScore: 90,
+        metadata: { action: "test_drive_exception", error: error instanceof Error ? error.message : String(error) },
+      });
       console.error("buy/reserve-test-drive failed", error);
       setReservationState("error");
       setCartMessage(

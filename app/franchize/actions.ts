@@ -30,6 +30,7 @@ import {
   retryFranchizeOrderNotification as retryFranchizeOrderNotificationAction,
   submitFranchizeOrderNotification as submitFranchizeOrderNotificationAction,
 } from "@/app/franchize/server-actions/orders";
+import { upsertFranchizeIntent as upsertFranchizeIntentAction } from "@/app/franchize/server-actions/intents";
 import {
   getFranchizeRentalReviewsForModeration as getFranchizeRentalReviewsForModerationAction,
   getRentalReviewContext as getRentalReviewContextAction,
@@ -130,6 +131,12 @@ export async function checkFranchizeCarsAvailability(
   ...args: Parameters<typeof checkFranchizeCarsAvailabilityAction>
 ) {
   return checkFranchizeCarsAvailabilityAction(...args);
+}
+
+export async function upsertFranchizeIntent(
+  ...args: Parameters<typeof upsertFranchizeIntentAction>
+) {
+  return upsertFranchizeIntentAction(...args);
 }
 
 export async function getFranchizeRentalCard(
