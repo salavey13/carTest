@@ -33,10 +33,15 @@ interface FranchizeIntentLinkProps extends AnchorProps {
   children: ReactNode;
 }
 
-function isSelfNavigatingExternalHref(href: string | undefined, target: string | undefined) {
+function shouldDelayForTrackedNavigation(href: string | undefined, target: string | undefined) {
   if (!href || target === "_blank") return false;
   if (href.startsWith("/") || href.startsWith("#")) return false;
-  return href.startsWith("http") || href.startsWith("tel:") || href.startsWith("mailto:");
+
+  // Keep external app schemes in the original user activation.
+  // Telegram/iOS/Android WebViews may ignore delayed tel:/mailto: navigations.
+  if (href.startsWith("tel:") || href.startsWith("mailto:")) return false;
+
+  return href.startsWith("http://") || href.startsWith("https://");
 }
 
 function intentTimeout(ms = 350) {
@@ -86,7 +91,7 @@ export function FranchizeIntentLink({
 
     const href = typeof anchorProps.href === "string" ? anchorProps.href : undefined;
     const target = typeof anchorProps.target === "string" ? anchorProps.target : undefined;
-    if (!isSelfNavigatingExternalHref(href, target)) {
+    if (!shouldDelayForTrackedNavigation(href, target)) {
       void recordIntent();
       return;
     }
