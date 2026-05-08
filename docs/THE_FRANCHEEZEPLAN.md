@@ -50,6 +50,16 @@ This root file stays intentionally compact so operators and agents can load it q
 
 
 
+### 2026-05-08 — SupaPlan rent strip deep-link review fix
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T14:55:00Z
+- `owner`: codex
+- `notes`: Addressed Codex review on `?vehicle=` deep-link modal initialization: rent tracking now uses a latest-callback ref, so Telegram auth/user hydration no longer recreates the effect dependency path and cannot reset in-progress modal options or double-log `viewed` for the same vehicle.
+- `next_step`: Keep the live-data mobile smoke as the final verification gate before merge.
+- `risks`: The deep-link initializer intentionally runs only from URL/items/auction option changes; user identity changes update the tracking ref but do not reinitialize the modal.
+
+
 ### 2026-05-08 — SupaPlan rent strip self-review polish
 
 - `status`: ready_for_pr
