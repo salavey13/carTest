@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import { randomUUID } from "crypto";
-import { getCrewSensitiveData } from "@/app/lib/private-secrets";
+import { getCrewSensitiveDataOrDefault } from "@/app/lib/private-secrets";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 import type {
   ConfiguratorLeadInput,
@@ -139,7 +139,7 @@ const CONFIGURATOR_DOC_TEMPLATE = `# ⚡ Конфигурация электро
 async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
   const configId = randomUUID().slice(0, 8);
   const now = new Date();
-  const crewSensitive = await getCrewSensitiveData(input.crewSlug);
+  const crewSensitive = await getCrewSensitiveDataOrDefault(input.crewSlug, { source: "buildConfiguratorDocAndNotify" });
   const contractDefaults = (crewSensitive.contractDefaults ?? {}) as Record<string, unknown>;
   const defaults = ((contractDefaults.defaults ?? {}) as Record<string, unknown>);
   const docTemplates = (crewSensitive.docTemplates ?? {}) as Record<string, unknown>;
