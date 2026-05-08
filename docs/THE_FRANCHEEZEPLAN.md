@@ -49,12 +49,22 @@ This root file stays intentionally compact so operators and agents can load it q
 ## 2) Mini execution diary
 
 
+
+### 2026-05-08 — Franchize early theme loading hint
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T00:00:00Z
+- `owner`: codex
+- `notes`: Addressed the loading frontier with a static `vip-bike` early theme manifest, middleware-provided `franchize_slug_theme` cookie for `/franchize/:slug/*`, and server-only `loading.tsx` theme resolution that falls back to `DEFAULT_FRANCHIZE_THEME` without Supabase/client imports.
+- `next_step`: Smoke `/franchize/vip-bike` in preview to confirm first-paint skeleton keeps the VIP Bike dark Pepperolli palette on cold navigations.
+- `risks`: Early exact palette is limited to crews present in the static manifest; new crew palettes still need an additive manifest entry or a future safe theme-token cookie write.
+
 ### 2026-05-08 — Franchize money micropolish backlog shaping
 
 - `status`: active-planning
 - `updated_at`: 2026-05-08T00:00:00Z
 - `owner`: codex
-- `notes`: Converted the operator money-printing direction into a sequenced micropolish plan and wrote seven open SupaPlan tasks (`92bdb264-a626-450a-93b2-6eca5021711a`, `558d6b85-3f4a-48b5-ad4d-98b92746991e`, `a55a75bb-2e1d-4685-b26b-53596a95b594`, `6c5623ac-4e8a-4499-9bef-b062887a9feb`, `cc5ec5ef-e6bb-446b-8d91-a12002fbb57d`, `5993dab3-dd18-49dc-8138-52862bc32edb`, `734d604d-e96f-4b56-830f-977e3d3cfa07`). Exact first-paint crew theme hints remain the loading frontier, while the revenue frontier is an intent ledger feeding ride-today availability, hold deposits, prebuy/test-ride/trade-in flows, abandoned checkout recovery, operator closing, and AI closer suggestions. Detailed plan lives in `docs/FRANCHIZE_MONEY_MICROPOLISH_PLAN.md`.
+- `notes`: Converted the operator money-printing direction into a sequenced micropolish plan and wrote seven open SupaPlan tasks (`92bdb264-a626-450a-93b2-6eca5021711a`, `558d6b85-3f4a-48b5-ad4d-98b92746991e`, `a55a75bb-2e1d-4685-b26b-53596a95b594`, `6c5623ac-4e8a-4499-9bef-b062887a9feb`, `cc5ec5ef-e6bb-446b-8d91-a12002fbb57d`, `5993dab3-dd18-49dc-8138-52862bc32edb`, `734d604d-e96f-4b56-830f-977e3d3cfa07`). Exact first-paint crew theme hints are now addressed for `vip-bike` via the no-fetch loading path, while the revenue frontier is an intent ledger feeding ride-today availability, hold deposits, prebuy/test-ride/trade-in flows, abandoned checkout recovery, operator closing, and AI closer suggestions. Detailed plan lives in `docs/FRANCHIZE_MONEY_MICROPOLISH_PLAN.md`.
 - `next_step`: Start R1 Franchize Intent Ledger before parallelizing R2/R4/R5 UI and recovery slices.
 - `risks`: SupaPlan has existing open franchize tasks; newly shaped money tasks should be claimed one-by-one and not used to move unrelated older tasks to ready_for_pr.
 
@@ -64,8 +74,8 @@ This root file stays intentionally compact so operators and agents can load it q
 - `updated_at`: 2026-05-08T00:00:00Z
 - `owner`: codex
 - `notes`: Corrected the previous client hydration fallback and then self-reviewed for loading best practice: removed the shared fallback component, kept loading markup inside the route loading files, removed Supabase/page-data fetches from `loading.tsx` so the fallback can appear immediately, and removed retry/contact/Telegram action clusters from loading/error states. Error boundaries remain client files because Next.js requires `error.tsx` to be client-side, but they render only safe fallback copy, skeleton cards, a subdued digest line, and a catalog link.
-- `next_step`: Mobile-smoke `/franchize/vip-bike` loading and a forced error state to confirm instant default shell, no action-button clutter, reduced-motion-safe shimmer, and safe digest behavior.
-- `risks`: Truly instant exact crew palette in `loading.tsx` needs an early theme source such as middleware/cookie/static slug theme manifest; fetching Supabase inside the loading boundary delays the fallback and was intentionally removed.
+- `next_step`: Mobile-smoke `/franchize/vip-bike` loading and a forced error state to confirm instant crew-themed shell, no action-button clutter, reduced-motion-safe shimmer, and safe digest behavior.
+- `risks`: Exact first-paint crew palette is now available for known static-manifest crews such as `vip-bike`; unknown crews intentionally fall back to the default theme until added to the manifest.
 
 
 ### 2026-05-07 — Franchize palette variable contrast pass

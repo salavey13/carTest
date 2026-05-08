@@ -1,4 +1,4 @@
-import type { FranchizeTheme } from "../actions";
+import type { FranchizeTheme } from "@/lib/franchize-config";
 
 export type CrewPalette = FranchizeTheme["palette"];
 
