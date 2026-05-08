@@ -112,12 +112,14 @@ This turns the app from a catalog into sales memory: failed payments, checkout b
 ### R3 — Hold/reservation CTA
 
 - SupaPlan task: `a55a75bb-2e1d-4685-b26b-53596a95b594`
-- Status: `todo`
+- Status: `ready_for_pr`
 - Capability: `franchize.sales`
 - Primary zone: checkout/order/payment server actions.
 - Goal: make small hold fee/deposit a visible product mechanism instead of hidden payment plumbing.
 - Depends on: R1, R2.
 - Acceptance: hold attempt writes an intent, successful payment marks hot intent/rental metadata, failed payment creates recovery-ready ledger details.
+- Updated: `2026-05-08T15:10:00Z`
+- Notes: Checkout now exposes configurable hold copy (`Забронировать за 500₽ / XTR` by default), forwards deposit/blockers/date/bike metadata into `franchize_intents` as `intent_type='rent'`, records XTR send failures as `payment_failed`, and webhook confirmation marks rent intent/rental metadata hot + confirmed.
 
 ### R4 — Prebuy test-ride + trade-in mini-flow
 
@@ -175,3 +177,8 @@ R3 should wait for R2 + payment-product copy, R6 waits for R1/R5 data, and R7 wa
 ## 6) Success metric
 
 The money metric is not “more forms submitted.” The target is: **every high-intent click becomes structured, ranked, recoverable commercial intent that Telegram/operator workflows can close.**
+
+
+## 7) Diary
+
+- 2026-05-08 — R3 hold/reservation CTA: moved checkout XTR copy from hidden 1% tip language to explicit configurable hold deposit, persisted rent intent metadata for checkout/payment states, and linked successful Telegram payment to hot confirmed rental/order metadata.
