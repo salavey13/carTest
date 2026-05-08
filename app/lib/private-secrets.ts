@@ -3,6 +3,7 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase-server";
+import { logger } from "@/lib/logger";
 
 const MAX_SECRET_JSON_BYTES = 256 * 1024;
 const RESERVED_JSON_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -37,6 +38,16 @@ type SupabaseSchemaClient = {
 export type CrewSensitiveData = {
   contractDefaults: Record<string, unknown>;
   docTemplates: Record<string, unknown>;
+};
+
+export type UserSensitiveData = {
+  driverLicense: string;
+  passport: string;
+};
+
+type PrivateReadFallbackContext = {
+  source: string;
+  orderId?: string;
 };
 
 function privateSchema() {
@@ -169,7 +180,42 @@ function serializeCrewSecretRecord(value: Record<string, unknown>, fieldName: st
   return serialized;
 }
 
-export async function getUserSensitiveData(userId: string) {
+function mapUserSensitiveRow(data: { driver_license?: unknown; passport?: unknown } | null | undefined): UserSensitiveData {
+  return {
+    driverLicense: typeof data?.driver_license === "string" ? data.driver_license : "",
+    passport: typeof data?.passport === "string" ? data.passport : "",
+  };
+}
+
+function emptyUserSensitiveData(): UserSensitiveData {
+  return { driverLicense: "", passport: "" };
+}
+
+function logPrivateReadFallback(
+  subject: "crew" | "user",
+  identifier: string,
+  context: PrivateReadFallbackContext,
+  error: unknown,
+) {
+  const supabaseError = error as { code?: unknown; status?: unknown; name?: unknown; message?: unknown };
+
+  logger.warn(`[private-secrets] ${subject} sensitive read fallback`, {
+    subject,
+    identifier,
+    source: context.source,
+    orderId: context.orderId,
+    errorCode: typeof supabaseError.code === "string" ? supabaseError.code : undefined,
+    errorStatus: typeof supabaseError.status === "number" || typeof supabaseError.status === "string" ? supabaseError.status : undefined,
+    errorName: error instanceof Error ? error.name : typeof supabaseError.name === "string" ? supabaseError.name : undefined,
+    errorMessage: error instanceof Error
+      ? error.message
+      : typeof supabaseError.message === "string"
+        ? supabaseError.message
+        : String(error),
+  });
+}
+
+export async function getUserSensitiveData(userId: string): Promise<UserSensitiveData> {
   const normalizedUserId = normalizePrivateId(userId, "userId");
   const { data, error } = await privateSchema()
     .from("user_secrets")
@@ -181,10 +227,32 @@ export async function getUserSensitiveData(userId: string) {
     throw new Error("Failed to read user private data.");
   }
 
-  return {
-    driverLicense: data?.driver_license ?? "",
-    passport: data?.passport ?? "",
-  };
+  return mapUserSensitiveRow(data);
+}
+
+export async function getUserSensitiveDataOrDefault(
+  userId: string,
+  context: PrivateReadFallbackContext = { source: "getUserSensitiveDataOrDefault" },
+): Promise<UserSensitiveData> {
+  const normalizedUserId = normalizePrivateId(userId, "userId");
+
+  try {
+    const { data, error } = await privateSchema()
+      .from("user_secrets")
+      .select("driver_license, passport")
+      .eq("user_id", normalizedUserId)
+      .maybeSingle();
+
+    if (error) {
+      logPrivateReadFallback("user", normalizedUserId, context, error);
+      return emptyUserSensitiveData();
+    }
+
+    return mapUserSensitiveRow(data);
+  } catch (error) {
+    logPrivateReadFallback("user", normalizedUserId, context, error);
+    return emptyUserSensitiveData();
+  }
 }
 
 export async function saveUserSensitiveData(userId: string, data: {
@@ -210,6 +278,20 @@ export async function saveUserSensitiveData(userId: string, data: {
 // Payment provider credentials/tokens must stay in deployment secrets or a
 // dedicated encrypted vault, never in editable crew JSON blobs.
 // ──────────────────────────────────────────────────────────────
+function emptyCrewSensitiveData(): CrewSensitiveData {
+  return {
+    contractDefaults: {},
+    docTemplates: {},
+  };
+}
+
+function mapCrewSensitiveRow(data: { contract_defaults?: unknown; doc_templates?: unknown } | null | undefined): CrewSensitiveData {
+  return {
+    contractDefaults: parseJsonRecord(data?.contract_defaults),
+    docTemplates: parseJsonRecord(data?.doc_templates),
+  };
+}
+
 export async function getCrewSensitiveData(crewSlug: string): Promise<CrewSensitiveData> {
   const normalizedCrewSlug = normalizePrivateId(crewSlug, "crewSlug");
   const { data, error } = await privateSchema()
@@ -222,10 +304,32 @@ export async function getCrewSensitiveData(crewSlug: string): Promise<CrewSensit
     throw new Error("Failed to read crew private data.");
   }
 
-  return {
-    contractDefaults: parseJsonRecord(data?.contract_defaults),
-    docTemplates: parseJsonRecord(data?.doc_templates),
-  };
+  return mapCrewSensitiveRow(data);
+}
+
+export async function getCrewSensitiveDataOrDefault(
+  crewSlug: string,
+  context: PrivateReadFallbackContext = { source: "getCrewSensitiveDataOrDefault" },
+): Promise<CrewSensitiveData> {
+  const normalizedCrewSlug = normalizePrivateId(crewSlug, "crewSlug");
+
+  try {
+    const { data, error } = await privateSchema()
+      .from("crew_secrets")
+      .select("contract_defaults, doc_templates")
+      .eq("crew_slug", normalizedCrewSlug)
+      .maybeSingle();
+
+    if (error) {
+      logPrivateReadFallback("crew", normalizedCrewSlug, context, error);
+      return emptyCrewSensitiveData();
+    }
+
+    return mapCrewSensitiveRow(data);
+  } catch (error) {
+    logPrivateReadFallback("crew", normalizedCrewSlug, context, error);
+    return emptyCrewSensitiveData();
+  }
 }
 
 export async function saveCrewSensitiveData(crewSlug: string, data: {

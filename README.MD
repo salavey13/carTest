@@ -26,6 +26,8 @@
 ### 2) База данных
 Минимум для старта:
 - `supabase/migrations/20240101000000_init.sql`
+- `supabase/migrations/20260304_private_scheme.sql` — приватные `user_secrets`/`crew_secrets` для документов аренды.
+- `supabase/migrations/20260508090000_repair_private_crew_secrets.sql` — idempotent repair/grants guard для окружений, где `private.crew_secrets` отсутствовал.
 
 Дальше — накатывай остальные миграции по модулям, которые реально используешь.
 
