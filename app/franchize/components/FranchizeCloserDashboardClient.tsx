@@ -39,7 +39,7 @@ const fallbackCrew: FranchizeCrewVM = {
   id: "",
   slug: "vip-bike",
   name: "VIP BIKE",
-  description: "Crew closer dashboard",
+  description: "Панель обработки заявок экипажа",
   logoUrl: "",
   hqLocation: "",
   isFound: false,
@@ -117,7 +117,7 @@ export function FranchizeCloserDashboardClient({
       const result = await getFranchizeCloserIntents({ slug });
       if (closerLoadRequestRef.current !== requestId) return;
       if (!result.success) {
-        toast.error(result.error || "Не удалось загрузить closer intents");
+        toast.error(result.error || "Не удалось загрузить заявки на обработку");
         return;
       }
       setCloserIntents(result.items || []);
@@ -126,7 +126,7 @@ export function FranchizeCloserDashboardClient({
         toast.error(
           error instanceof Error
             ? error.message
-            : "Не удалось загрузить closer intents",
+            : "Не удалось загрузить заявки на обработку",
         );
       }
     } finally {
@@ -148,9 +148,9 @@ export function FranchizeCloserDashboardClient({
   const handleCopyTelegramReply = useCallback(async (intent: CloserIntent) => {
     try {
       await navigator.clipboard.writeText(intent.suggestedTelegramReply);
-      toast.success("Telegram reply скопирован");
+      toast.success("Ответ для Telegram скопирован");
     } catch {
-      toast.error("Не удалось скопировать reply");
+      toast.error("Не удалось скопировать ответ");
     }
   }, []);
 
@@ -165,14 +165,16 @@ export function FranchizeCloserDashboardClient({
           action,
         });
         if (!result.success) {
-          toast.error(result.error || "Closer action не сохранён");
+          toast.error(result.error || "Действие по заявке не сохранено");
           return;
         }
         toast.success(`${closerActionLabels[action]} сохранён`);
         void loadCloserIntents();
       } catch (error) {
         toast.error(
-          error instanceof Error ? error.message : "Closer action не сохранён",
+          error instanceof Error
+            ? error.message
+            : "Действие по заявке не сохранено",
         );
       } finally {
         setCloserActionIntentId(null);
@@ -203,14 +205,14 @@ export function FranchizeCloserDashboardClient({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium tracking-wide text-[var(--fr-dashboard-accent)]">
-            Панель заявок
+            Панель обработки заявок
           </p>
           <h1 className="mt-2 break-words text-2xl font-semibold text-[var(--fr-dashboard-text)]">
-            {brandName}: горячие лиды
+            {brandName}: горячие заявки
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-[var(--fr-dashboard-muted)]">
-            Единая рабочая очередь для продаж: заявки читаются из server-only
-            ledger, сортируются по срочности и сохраняют историю действий.
+            Единая рабочая очередь для продаж: заявки защищённо собираются
+            на сервере, сортируются по приоритету и сохраняют историю действий.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -218,7 +220,7 @@ export function FranchizeCloserDashboardClient({
             href={`/franchize/${slug}/admin`}
             variant="secondary"
           >
-            Гараж
+            Админка гаража
           </FranchizeOperatorLinkButton>
           <FranchizeOperatorLinkButton href={`/franchize/${slug}`}>
             Витрина
@@ -237,7 +239,7 @@ export function FranchizeCloserDashboardClient({
         />
         <FranchizeOperatorStatCard
           label="Режим"
-          value="Копия + ручное закрытие"
+          value="Копирование ответа + ручное закрытие"
         />
       </div>
       <FranchizeOperatorPanel className="mt-4">
@@ -262,8 +264,8 @@ export function FranchizeCloserDashboardClient({
             className="mt-3 rounded-xl border px-3 py-2 text-xs text-[var(--fr-dashboard-muted)]"
             style={{ borderColor: "var(--fr-dashboard-border)" }}
           >
-            Заявок пока нет. После checkout, recovery или prebuy сигналов здесь
-            появятся карточки для закрытия.
+            Заявок пока нет. После оформления, возврата к брошенной заявке
+            или предзаказа здесь появятся карточки для обработки.
           </p>
         ) : (
           <div className="mt-3 space-y-3">

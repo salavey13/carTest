@@ -325,18 +325,18 @@ export function FranchizeAdminClient({
       }}
     >
       <p className="text-xs font-medium tracking-wide text-[var(--fr-admin-accent)]">
-        Консоль экипажа
+        Панель владельца экипажа
       </p>
       <h1 className="mt-2 break-words text-2xl font-semibold text-[var(--fr-admin-text)]">
-        {crew.header.brandName || crew.name || slug}: гараж
+        {crew.header.brandName || crew.name || slug}: админка гаража
       </h1>
       <p className="mt-2 max-w-3xl break-words text-sm leading-relaxed text-[var(--fr-admin-muted)]">
         Переключатель экипажа:{" "}
         <span className="font-semibold text-[var(--fr-admin-accent)]">
           {slug}
         </span>
-        . Редактируй технику, добавляй VIN и проверяй документы в той же
-        визуальной системе, что каталог и аренды.
+        . Редактируй карточки техники, добавляй VIN и проверяй документы заявки
+        в той же визуальной системе, что каталог и аренды.
       </p>
 
       <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -386,8 +386,8 @@ export function FranchizeAdminClient({
       </div>
       <FranchizeOperatorPanel className="mt-4 text-sm leading-relaxed">
         <p className="break-words text-[var(--fr-admin-text)]">
-          Для doc-шаблона используй specs: <code>vin</code>, <code>plate</code>,{" "}
-          <code>frame</code>.
+          Для шаблона документов используй характеристики: <code>vin</code>,{" "}
+          <code>plate</code>, <code>frame</code>.
         </p>
         <p className="mt-1 text-xs text-[var(--fr-admin-muted)]">
           Доступно записей по фильтру:{" "}
@@ -420,7 +420,7 @@ export function FranchizeAdminClient({
               onClick={() => void handleBulkFillVin()}
               disabled={isBulkFillingVin}
             >
-              {isBulkFillingVin ? "Заполняю VIN…" : "Bulk-fill VIN"}
+              {isBulkFillingVin ? "Заполняю VIN…" : "Заполнить VIN пачкой"}
             </Button>
           )}
         </div>
@@ -433,9 +433,9 @@ export function FranchizeAdminClient({
               Панель заявок вынесена
             </p>
             <p className="mt-1 text-xs leading-relaxed text-[var(--fr-admin-muted)]">
-              Гараж остаётся для техники, VIN, отзывов и документов. Горячие
-              заявки, ответы в Telegram и closing actions вынесены в отдельную
-              панель.
+              Админка гаража остаётся для карточек техники, VIN, отзывов и
+              документов заявки. Горячие заявки, ответы в Telegram и ручные
+              действия вынесены в отдельную панель.
             </p>
           </div>
           <Button
@@ -572,7 +572,7 @@ export function FranchizeAdminClient({
                   </Button>
                 </div>
                 <p className="mt-1 text-xs text-[var(--fr-admin-muted)]">
-                  байк: {review.bikeId} · пользователь: {review.userId}
+                  техника: {review.bikeId} · пользователь: {review.userId}
                 </p>
                 {review.text && (
                   <p className="mt-2 text-sm text-[var(--fr-admin-text)]">
@@ -602,10 +602,10 @@ export function FranchizeAdminClient({
                 style={{ borderColor: "var(--fr-admin-border)" }}
               >
                 <p className="text-xs text-[var(--fr-admin-text)]">
-                  Заказ #{item.orderId} → {item.sendTo || "unknown"}
+                  Заказ #{item.orderId} → {item.sendTo || "не указан"}
                 </p>
                 <p className="mt-1 text-xs text-rose-300">
-                  {item.lastError || "unknown error"}
+                  {item.lastError || "ошибка не указана"}
                 </p>
                 <Button
                   type="button"
