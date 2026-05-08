@@ -40,7 +40,7 @@ export default async function FranchizeProfilePage({
         groupLinks={items.map((item) => item.category)}
       />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4">
-        <FranchizeProfileClient initialCrew={crew} />
+        <FranchizeProfileClient initialCrew={crew} initialSlug={resolvedSlug} />
       </FranchizePageShell>
       <CrewFooter crew={crew} />
     </main>

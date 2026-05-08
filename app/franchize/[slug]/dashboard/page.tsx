@@ -17,9 +17,9 @@ export async function generateMetadata({
 }: FranchizeSlugDashboardPageProps): Promise<Metadata> {
   const { slug } = await params;
   return buildFranchizeSectionMetadata(slug, {
-    sectionTitle: "Панель заявок",
+    sectionTitle: "Панель горячих заявок",
     sectionDescription:
-      "Отдельная панель горячих franchize leads, Telegram replies и ручных closing actions.",
+      "Панель горячих заявок франшизы: быстрые ответы в Telegram и ручная обработка сделок.",
     pathSuffix: "/dashboard",
   });
 }

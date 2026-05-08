@@ -549,3 +549,14 @@ This root file stays intentionally compact so operators and agents can load it q
 - `risks`: The TypeScript check is intentionally allowlist-gated; it is a gradual guardrail, not yet a full `app/franchize/**` merge blocker.
 
 - 2026-05-07 — Self-reviewed the SupaPlan trio and fixed the main regressions: no knowingly failing typecheck command, safer notification preference IO, normalized metadata keys, and reduced RiderFAB duplicate state subscription.
+
+### 2026-05-08 — Франшизные страницы: RU-полировка и общий header/shell
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T00:00:00Z
+- `owner`: codex
+- `notes`: Выполнен явный операторский scope: заменены оставшиеся смешанные RU/EN строки в rental/admin/dashboard/profile поверхностях, уточнена политика общего CrewHeader + FranchizePageShell для slug-страниц, а профиль теперь получает slug с сервера для стабильного первого рендера.
+- `next_step`: Preview-smoke `/franchize/vip-bike/admin`, `/franchize/vip-bike/dashboard`, `/franchize/vip-bike/profile` в Telegram WebApp и браузере.
+- `risks`: Таргетированный `rg` ещё находит технические имена компонентов/типов и checkout-идентификаторы в коде; это не пользовательские строки и не переводилось, чтобы не ломать API/типы.
+
+- 2026-05-08 — RU-полировка franchize copy и закрепление общего CrewHeader/FranchizePageShell для admin/dashboard/profile slug-страниц.

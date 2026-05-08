@@ -86,14 +86,16 @@ const fallbackCrew: FranchizeCrewVM = {
 
 type FranchizeProfileClientProps = {
   initialCrew?: FranchizeCrewVM;
+  initialSlug?: string;
 };
 
 export function FranchizeProfileClient({
   initialCrew,
+  initialSlug,
 }: FranchizeProfileClientProps) {
   const { dbUser } = useAppContext();
   const params = useParams<{ slug: string }>();
-  const slug = params?.slug || initialCrew?.slug || "vip-bike";
+  const slug = initialSlug || params?.slug || initialCrew?.slug || "vip-bike";
   const crew = initialCrew || fallbackCrew;
   const [catalog, setCatalog] = useState<FranchizeAchievementDefinition[]>([]);
   const [profile, setProfile] = useState<FranchizeProfileState | null>(null);
