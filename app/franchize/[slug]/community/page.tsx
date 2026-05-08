@@ -5,7 +5,7 @@ import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
-import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+import { crewPaletteForSurface, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
 
@@ -28,48 +28,55 @@ export default async function FranchizeCommunityPage({ params }: { params: Promi
   const brandName = crew.header.brandName || crew.name || "VIP BIKE";
   const telegramHref = crew.contacts.telegram ? `https://t.me/${crew.contacts.telegram.replace("@", "")}` : "https://t.me/oneBikePlsBot";
   const { communityEvents, partnerCards, cityRiderTips } = crew.contentBlocks;
+  const accentText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
 
   return (
     <main className="min-h-screen" style={surface.page}>
       <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} />
 
       <div
-        className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-20 text-white md:pt-24"
+        className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-20 text-[var(--community-text)] md:pt-24"
         style={{
           ["--community-accent" as string]: crew.theme.palette.accentMain,
           ["--community-border" as string]: crew.theme.palette.borderSoft,
           ["--community-card" as string]: surface.subtleCard.backgroundColor,
+          ["--community-base-soft" as string]: withAlpha(crew.theme.palette.bgBase, 0.35),
+          ["--community-card-soft" as string]: withAlpha(crew.theme.palette.bgCard, 0.86),
+          ["--community-card-faint" as string]: withAlpha(crew.theme.palette.bgCard, 0.54),
+          ["--community-text" as string]: crew.theme.palette.textPrimary,
+          ["--community-muted" as string]: crew.theme.palette.textSecondary,
+          ["--community-accent-text" as string]: accentText,
           color: crew.theme.palette.textPrimary,
         }}
       >
-        <section className="overflow-hidden rounded-3xl border border-[var(--community-border)] bg-black/40 p-6 shadow-2xl shadow-black/25 backdrop-blur-xl md:p-8">
+        <section className="overflow-hidden rounded-3xl border border-[var(--community-border)] bg-[var(--community-card-soft)] p-6 shadow-2xl backdrop-blur-xl md:p-8">
           <div className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr] lg:items-end">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--community-accent)]">FRZ-R9 • community hub</p>
               <h1 className="mt-4 font-orbitron text-4xl leading-tight md:text-6xl">
                 Куда ехать с {brandName} прямо сейчас
               </h1>
-              <p className="mt-4 max-w-2xl text-base text-white/68 md:text-lg">
+              <p className="mt-4 max-w-2xl text-base text-[var(--community-muted)] md:text-lg">
                 События, партнёры и понятные городские сценарии для тех, кто открыл MapRiders и спросил: «а что мне реально делать?»
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link href={`/franchize/${crewSlug}/map-riders`} className="rounded-full bg-[var(--community-accent)] px-5 py-3 text-sm font-semibold text-black transition hover:brightness-110">
+                <Link href={`/franchize/${crewSlug}/map-riders`} className="rounded-full bg-[var(--community-accent)] px-5 py-3 text-sm font-semibold text-[var(--community-accent-text)] transition hover:brightness-110">
                   Открыть live-карту
                 </Link>
-                <a href={telegramHref} target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:border-white/40">
+                <a href={telegramHref} target="_blank" rel="noreferrer" className="rounded-full border border-[var(--community-border)] px-5 py-3 text-sm font-semibold text-[var(--community-text)] transition hover:border-[var(--community-accent)]">
                   Написать экипажу
                 </a>
               </div>
             </div>
-            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+            <div className="rounded-3xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-5">
               <div className="flex items-center gap-3 text-[var(--community-accent)]">
                 <UsersRound className="h-5 w-5" />
                 <span className="text-sm font-semibold uppercase tracking-[0.16em]">как это работает</span>
               </div>
-              <ol className="mt-4 space-y-3 text-sm text-white/70">
-                <li><span className="text-white">1.</span> Проходишь быстрый quiz на MapRiders.</li>
-                <li><span className="text-white">2.</span> Включаешь геошеринг с приватностью экипажа.</li>
-                <li><span className="text-white">3.</span> Едешь к событию или meetup-пину без хаоса.</li>
+              <ol className="mt-4 space-y-3 text-sm text-[var(--community-muted)]">
+                <li><span className="text-[var(--community-text)]">1.</span> Проходишь быстрый quiz на MapRiders.</li>
+                <li><span className="text-[var(--community-text)]">2.</span> Включаешь геошеринг с приватностью экипажа.</li>
+                <li><span className="text-[var(--community-text)]">3.</span> Едешь к событию или meetup-пину без хаоса.</li>
               </ol>
             </div>
           </div>
@@ -77,25 +84,25 @@ export default async function FranchizeCommunityPage({ params }: { params: Promi
 
         <section className="grid gap-4 md:grid-cols-3">
           {communityEvents.map((event) => (
-            <article key={event.title} className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl">
+            <article key={event.title} className="rounded-3xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-5 backdrop-blur-xl">
               <CalendarDays className="h-6 w-6 text-[var(--community-accent)]" />
-              <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-white/45">{event.time}</p>
-              <h2 className="mt-2 text-xl font-semibold text-white">{event.title}</h2>
+              <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--community-muted)] opacity-70">{event.time}</p>
+              <h2 className="mt-2 text-xl font-semibold text-[var(--community-text)]">{event.title}</h2>
               <p className="mt-1 text-sm text-[var(--community-accent)]">{event.place}</p>
-              <p className="mt-3 text-sm leading-6 text-white/62">{event.text}</p>
+              <p className="mt-3 text-sm leading-6 text-[var(--community-muted)]">{event.text}</p>
             </article>
           ))}
         </section>
 
         <section className="grid gap-4 lg:grid-cols-[0.9fr,1.1fr]">
-          <div className="rounded-3xl border border-white/10 bg-black/35 p-6">
+          <div className="rounded-3xl border border-[var(--community-border)] bg-[var(--community-base-soft)] p-6">
             <div className="flex items-center gap-3 text-[var(--community-accent)]">
               <MapPinned className="h-6 w-6" />
-              <h2 className="font-orbitron text-2xl text-white">Городской riding-гайд</h2>
+              <h2 className="font-orbitron text-2xl text-[var(--community-text)]">Городской riding-гайд</h2>
             </div>
-            <ul className="mt-5 space-y-3 text-sm text-white/68">
+            <ul className="mt-5 space-y-3 text-sm text-[var(--community-muted)]">
               {cityRiderTips.map((tip) => (
-                <li key={tip.text} className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                <li key={tip.text} className="flex gap-3 rounded-2xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-3">
                   <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[var(--community-accent)]" />
                   <span>{tip.text}</span>
                 </li>
@@ -103,19 +110,19 @@ export default async function FranchizeCommunityPage({ params }: { params: Promi
             </ul>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+          <div className="rounded-3xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-6">
             <div className="flex items-center gap-3 text-[var(--community-accent)]">
               <Handshake className="h-6 w-6" />
-              <h2 className="font-orbitron text-2xl text-white">Партнёры экипажа</h2>
+              <h2 className="font-orbitron text-2xl text-[var(--community-text)]">Партнёры экипажа</h2>
             </div>
             <div className="mt-5 grid gap-3">
               {partnerCards.map((partner) => (
-                <article key={partner.name} className="rounded-2xl border border-white/10 bg-black/25 p-4">
+                <article key={partner.name} className="rounded-2xl border border-[var(--community-border)] bg-[var(--community-base-soft)] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-semibold text-white">{partner.name}</h3>
+                    <h3 className="font-semibold text-[var(--community-text)]">{partner.name}</h3>
                     <span className="rounded-full border border-[var(--community-accent)]/35 bg-[var(--community-accent)]/10 px-3 py-1 text-xs text-[var(--community-accent)]">{partner.role}</span>
                   </div>
-                  <p className="mt-2 text-sm text-white/62">{partner.perk}</p>
+                  <p className="mt-2 text-sm text-[var(--community-muted)]">{partner.perk}</p>
                 </article>
               ))}
             </div>

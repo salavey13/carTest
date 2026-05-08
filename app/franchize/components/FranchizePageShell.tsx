@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { FranchizeTheme } from "../actions";
+import { readablePaletteTextOnColor } from "../lib/theme";
 
 type FranchizePageShellProps = {
   theme: FranchizeTheme;
@@ -20,55 +21,6 @@ type FranchizeShellVars = CSSProperties & {
   "--franchize-shell-ring": string;
 };
 
-const hexToRgb = (hex: string) => {
-  const normalized = hex.replace("#", "").trim();
-  const base =
-    normalized.length === 3
-      ? normalized
-          .split("")
-          .map((char) => `${char}${char}`)
-          .join("")
-      : normalized;
-
-  if (!/^[0-9A-Fa-f]{6}$/.test(base)) return null;
-
-  return {
-    r: Number.parseInt(base.slice(0, 2), 16),
-    g: Number.parseInt(base.slice(2, 4), 16),
-    b: Number.parseInt(base.slice(4, 6), 16),
-  };
-};
-
-const relativeLuminance = (hex: string) => {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return 0;
-
-  const channels = [rgb.r, rgb.g, rgb.b].map((channel) => {
-    const value = channel / 255;
-    return value <= 0.03928
-      ? value / 12.92
-      : ((value + 0.055) / 1.055) ** 2.4;
-  });
-
-  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
-};
-
-const contrastRatio = (foreground: string, background: string) => {
-  const foregroundLuminance = relativeLuminance(foreground);
-  const backgroundLuminance = relativeLuminance(background);
-  const lighter = Math.max(foregroundLuminance, backgroundLuminance);
-  const darker = Math.min(foregroundLuminance, backgroundLuminance);
-
-  return (lighter + 0.05) / (darker + 0.05);
-};
-
-const pickBestAccentText = (palette: FranchizeTheme["palette"]) =>
-  [palette.textPrimary, palette.bgBase, palette.bgCard].sort(
-    (left, right) =>
-      contrastRatio(right, palette.accentMain) -
-      contrastRatio(left, palette.accentMain),
-  )[0];
-
 export function FranchizePageShell({
   theme,
   children,
@@ -84,7 +36,7 @@ export function FranchizePageShell({
     "--franchize-shell-text": palette.textPrimary,
     "--franchize-shell-muted": palette.textSecondary,
     "--franchize-shell-accent": palette.accentMain,
-    "--franchize-shell-primary-contrast": pickBestAccentText(palette),
+    "--franchize-shell-primary-contrast": readablePaletteTextOnColor(palette.accentMain, palette),
     "--franchize-shell-ring": palette.accentMain,
   };
   const maxWidthClass = width === "wide" ? "max-w-6xl" : "max-w-5xl";

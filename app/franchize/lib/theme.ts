@@ -2,14 +2,15 @@ import type { FranchizeTheme } from "../actions";
 
 export type CrewPalette = FranchizeTheme["palette"];
 
-const hexToRgb = (hex: string) => {
-  const normalized = hex.replace("#", "").trim();
+type Rgb = { r: number; g: number; b: number };
+
+const parseHexToRgb = (color: string): Rgb | null => {
+  const normalized = color.replace("#", "").trim();
   const base = normalized.length === 3
     ? normalized.split("").map((char) => `${char}${char}`).join("")
     : normalized;
-  if (!/^[0-9A-Fa-f]{6}$/.test(base)) {
-    return { r: 242, g: 242, b: 243 };
-  }
+
+  if (!/^[0-9A-Fa-f]{6}$/.test(base)) return null;
 
   return {
     r: Number.parseInt(base.slice(0, 2), 16),
@@ -18,11 +19,56 @@ const hexToRgb = (hex: string) => {
   };
 };
 
-const withAlpha = (hex: string, alpha: number) => {
+export const hexToRgb = (hex: string) => parseHexToRgb(hex) ?? { r: 242, g: 242, b: 243 };
+
+export const withAlpha = (color: string, alpha: number) => {
   const safeAlpha = Math.min(1, Math.max(0, alpha));
-  const { r, g, b } = hexToRgb(hex);
-  return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
+  const rgb = parseHexToRgb(color);
+
+  if (!rgb) {
+    return `color-mix(in srgb, ${color} ${Math.round(safeAlpha * 100)}%, transparent)`;
+  }
+
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${safeAlpha})`;
 };
+
+const relativeLuminanceOrNull = (color: string) => {
+  const rgb = parseHexToRgb(color);
+  if (!rgb) return null;
+
+  const toLinear = (channel: number) => {
+    const value = channel / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+
+  return 0.2126 * toLinear(rgb.r) + 0.7152 * toLinear(rgb.g) + 0.0722 * toLinear(rgb.b);
+};
+
+export const relativeLuminance = (hex: string) => relativeLuminanceOrNull(hex) ?? 0;
+
+export const contrastRatio = (foreground: string, background: string) => {
+  const foregroundLum = relativeLuminanceOrNull(foreground);
+  const backgroundLum = relativeLuminanceOrNull(background);
+
+  if (foregroundLum === null || backgroundLum === null) return 1;
+
+  const lighter = Math.max(foregroundLum, backgroundLum);
+  const darker = Math.min(foregroundLum, backgroundLum);
+
+  return (lighter + 0.05) / (darker + 0.05);
+};
+
+export const readableTextOnColor = (background: string, candidates = ["#16130A", "#FFFFFF"]) => {
+  if (relativeLuminanceOrNull(background) === null) return candidates[0] ?? "currentColor";
+
+  return candidates
+    .filter((candidate) => relativeLuminanceOrNull(candidate) !== null)
+    .sort((left, right) => contrastRatio(right, background) - contrastRatio(left, background))[0] ?? candidates[0] ?? "currentColor";
+};
+
+export const readablePaletteTextOnColor = (background: string, palette: CrewPalette) => (
+  readableTextOnColor(background, [palette.textPrimary, palette.bgBase, palette.bgCard, palette.textSecondary])
+);
 
 export function crewPaletteForSurface(theme: FranchizeTheme) {
   const palette = theme.palette;
@@ -68,7 +114,7 @@ export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: nu
     {
       borderColor: "transparent",
       backgroundColor: palette.bgCard,
-      boxShadow: `0 0 0 1px ${withAlpha(palette.accentMain, 0.08)}, 0 12px 20px ${withAlpha("#000000", 0.4)}`,
+      boxShadow: `0 0 0 1px ${withAlpha(palette.accentMain, 0.08)}, 0 12px 20px ${withAlpha(palette.bgBase, 0.4)}`,
     },
   ] as const;
 
