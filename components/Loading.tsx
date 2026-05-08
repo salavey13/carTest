@@ -428,23 +428,23 @@ const BikeSpeedster = ({ gear }: { gear: number }) => {
               transition={{ duration: 0.18, ease: "easeOut" }}
             >
               <motion.div
-                className="absolute left-[41px] top-[63px] h-[63px] w-[63px] rounded-full border-4 border-orange-400/90"
+                className="absolute left-[52px] top-[74px] h-[58px] w-[58px] rounded-full border-4 border-orange-400/90"
                 animate={{ rotate: -360 }}
                 transition={{ duration: 0.45, repeat: Infinity, ease: "linear" }}
                 style={{ animation: "bike-loading-wheel-spin 0.45s linear infinite" }}
               >
                 {[0, 45, 90, 135].map((deg) => (
-                  <div key={deg} className="absolute left-1/2 top-1/2 h-[2px] w-[26px] -translate-x-1/2 -translate-y-1/2 bg-orange-200/90" style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
+                  <div key={deg} className="absolute left-1/2 top-1/2 h-[2px] w-[23px] -translate-x-1/2 -translate-y-1/2 bg-orange-200/90" style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
                 ))}
               </motion.div>
               <motion.div
-                className="absolute left-[157px] top-[63px] h-[63px] w-[63px] rounded-full border-4 border-orange-400/90"
+                className="absolute left-[146px] top-[74px] h-[58px] w-[58px] rounded-full border-4 border-orange-400/90"
                 animate={{ rotate: -360 }}
                 transition={{ duration: 0.45, repeat: Infinity, ease: "linear" }}
                 style={{ animation: "bike-loading-wheel-spin 0.45s linear infinite" }}
               >
                 {[0, 45, 90, 135].map((deg) => (
-                  <div key={deg} className="absolute left-1/2 top-1/2 h-[2px] w-[26px] -translate-x-1/2 -translate-y-1/2 bg-orange-200/90" style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
+                  <div key={deg} className="absolute left-1/2 top-1/2 h-[2px] w-[23px] -translate-x-1/2 -translate-y-1/2 bg-orange-200/90" style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
                 ))}
               </motion.div>
             </motion.div>
