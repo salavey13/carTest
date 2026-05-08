@@ -47,6 +47,16 @@ This root file stays intentionally compact so operators and agents can load it q
 
 ## 2) Mini execution diary
 
+### 2026-05-08 — Franchize server-rendered loading/error correction
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T00:00:00Z
+- `owner`: codex
+- `notes`: Corrected the previous client hydration fallback and then self-reviewed for loading best practice: removed the shared fallback component, kept loading markup inside the route loading files, removed Supabase/page-data fetches from `loading.tsx` so the fallback can appear immediately, and removed retry/contact/Telegram action clusters from loading/error states. Error boundaries remain client files because Next.js requires `error.tsx` to be client-side, but they render only safe fallback copy, skeleton cards, a subdued digest line, and a catalog link.
+- `next_step`: Mobile-smoke `/franchize/vip-bike` loading and a forced error state to confirm instant default shell, no action-button clutter, reduced-motion-safe shimmer, and safe digest behavior.
+- `risks`: Truly instant exact crew palette in `loading.tsx` needs an early theme source such as middleware/cookie/static slug theme manifest; fetching Supabase inside the loading boundary delays the fallback and was intentionally removed.
+
+
 ### 2026-05-07 — Franchize palette variable contrast pass
 
 - `status`: ready_for_pr
