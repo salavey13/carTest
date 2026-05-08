@@ -4,7 +4,7 @@
 1. Fork репозитория в свой GitHub.
 2. Подключение к Codex.
 3. Деплой fork в Vercel.
-4. Применить `supabase/migrations/20240101000000_init.sql`.
+4. Применить `supabase/migrations/20240101000000_init.sql`, `supabase/migrations/20260304_private_scheme.sql` и repair guard `supabase/migrations/20260508090000_repair_private_crew_secrets.sql`.
 5. Поставить env из `.env.example`.
 
 ## 2) Синхронизация с upstream (коротко)
