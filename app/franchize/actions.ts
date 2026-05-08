@@ -31,7 +31,12 @@ import {
   recordFranchizeCheckoutRecoverySnapshot as recordFranchizeCheckoutRecoverySnapshotAction,
   submitFranchizeOrderNotification as submitFranchizeOrderNotificationAction,
 } from "@/app/franchize/server-actions/orders";
-import { upsertFranchizeIntent as upsertFranchizeIntentAction } from "@/app/franchize/server-actions/intents";
+import {
+  getFranchizeCloserIntents as getFranchizeCloserIntentsAction,
+  getFranchizeOperatorDashboardAccess as getFranchizeOperatorDashboardAccessAction,
+  updateFranchizeCloserIntentStage as updateFranchizeCloserIntentStageAction,
+  upsertFranchizeIntent as upsertFranchizeIntentAction,
+} from "@/app/franchize/server-actions/intents";
 import {
   getFranchizeRentalReviewsForModeration as getFranchizeRentalReviewsForModerationAction,
   getRentalReviewContext as getRentalReviewContextAction,
@@ -144,6 +149,24 @@ export async function upsertFranchizeIntent(
   ...args: Parameters<typeof upsertFranchizeIntentAction>
 ) {
   return upsertFranchizeIntentAction(...args);
+}
+
+export async function getFranchizeOperatorDashboardAccess(
+  ...args: Parameters<typeof getFranchizeOperatorDashboardAccessAction>
+) {
+  return getFranchizeOperatorDashboardAccessAction(...args);
+}
+
+export async function getFranchizeCloserIntents(
+  ...args: Parameters<typeof getFranchizeCloserIntentsAction>
+) {
+  return getFranchizeCloserIntentsAction(...args);
+}
+
+export async function updateFranchizeCloserIntentStage(
+  ...args: Parameters<typeof updateFranchizeCloserIntentStageAction>
+) {
+  return updateFranchizeCloserIntentStageAction(...args);
 }
 
 export async function getFranchizeRentalCard(
