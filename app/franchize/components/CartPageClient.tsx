@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
+import { upsertFranchizeIntent } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { useFranchizeCart } from "../hooks/useFranchizeCart"; // Import cart state access
 import { crewPaletteForSurface } from "../lib/theme";
@@ -25,18 +26,42 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   });
   const surface = crewPaletteForSurface(crew.theme);
   const router = useRouter();
-  const { dbUser } = useAppContext();
+  const { dbUser, user } = useAppContext();
   const [isSaving, setIsSaving] = useState(false);
 
   const handleProceed = async () => {
     setIsSaving(true);
-    // Sync to DB explicitly before navigating
-    if (dbUser?.user_id) {
-        await saveUserFranchizeCartAction(dbUser.user_id, slug, cart);
-    }
-    // Navigate even if save failed (local storage might still be used by next page if hydrated client-side)
     const saleLinesCount = cartLines.filter((line) => line.saleAvailable).length;
     const flow = saleLinesCount > 0 && saleLinesCount === cartLines.length ? "sale" : saleLinesCount > 0 ? "mixed" : "rental";
+    const intentPromise = upsertFranchizeIntent({
+      slug,
+      bikeId: cartLines[0]?.item?.id ?? cartLines[0]?.itemId,
+      intentType: "checkout_start",
+      stage: "checkout_started",
+      sourceRoute: `/franchize/${slug}/cart`,
+      contactChannel: "web_cart",
+      urgencyScore: flow === "rental" ? 70 : 80,
+      telegramUserId: user?.id ? String(user.id) : dbUser?.user_id ? String(dbUser.user_id) : undefined,
+      phone: typeof (dbUser as { phone?: unknown } | null)?.phone === "string" ? (dbUser as { phone?: string } | null)?.phone : undefined,
+      metadata: {
+        flow,
+        itemCount,
+        subtotal,
+        cartLines: cartLines.map((line) => ({
+          itemId: line.item?.id ?? line.itemId,
+          qty: line.qty,
+          saleAvailable: line.saleAvailable,
+          lineTotal: line.lineTotal,
+        })),
+      },
+    }).catch((error) => console.warn("checkout intent tracking failed", error));
+    // Sync to DB explicitly before navigating; keep checkout-intent persistence in the same checkpoint.
+    if (dbUser?.user_id) {
+        await Promise.allSettled([saveUserFranchizeCartAction(dbUser.user_id, slug, cart), intentPromise]);
+    } else {
+        await intentPromise;
+    }
+    // Navigate even if save failed (local storage might still be used by next page if hydrated client-side)
     router.push(`/franchize/${slug}/order/demo-order?flow=${flow}`);
   };
 

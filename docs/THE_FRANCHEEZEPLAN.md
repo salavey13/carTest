@@ -50,6 +50,36 @@ This root file stays intentionally compact so operators and agents can load it q
 
 
 
+### 2026-05-08 — Franchize intent link review fix
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T02:22:00Z
+- `owner`: codex
+- `notes`: Addressed Codex review on the intent-link tracker: `tel:`/`mailto:` links now keep native click activation and do not wait on the tracking promise, while regular http(s) same-tab exits still get the short capped tracking wait. SupaPlan task `92bdb264-a626-450a-93b2-6eca5021711a` moved through `claimed -> running -> ready_for_pr` via `scripts/supaplan-skill.mjs`.
+- `next_step`: Merge the intent ledger PR, then let the merge automation mark the task done.
+- `risks`: External contact links still keep tracking non-blocking to protect tap latency; task status and claim-row verification were completed for the operator-specified SupaPlan task.
+
+
+### 2026-05-08 — Franchize intent ledger self-review hardening
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T02:12:00Z
+- `owner`: codex
+- `notes`: Self-reviewed the first intent-ledger slice and hardened two edge cases: metadata sanitization no longer lets non-JSON values throw during validation, and navigation-prone contact/cart/prebuy tracking now keeps the intent write at the checkpoint instead of always fire-and-forget. Also audited client modules for direct service-role imports.
+- `next_step`: Next SupaPlan money tasks can build on this ledger by reading `slug + urgency_score + updated_at` and adding recovery/operator UI without touching client-side Supabase admin paths.
+- `risks`: External contact links still cap tracking wait time to protect tap latency; this intentionally favors UX over guaranteed analytics writes for low-criticality clicks.
+
+
+### 2026-05-08 — Franchize intent ledger foundation
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T02:05:00Z
+- `owner`: codex
+- `notes`: Added the server-only `franchize_intents` ledger migration with RLS/no direct anon-auth writes, a validated server upsert action, and first signal integrations for cart checkout start, invoice hold/failure, paid franchize orders, contact/map/address clicks, test-ride reserve clicks, and prebuy add-to-cart actions.
+- `next_step`: Apply the migration in Supabase and wire operator dashboards/recovery automations to the highest-urgency `vip-bike` rows.
+- `risks`: Click tracking is fire-and-forget so conversion UX is not blocked by network/Supabase failures; production recovery depends on the migration being applied before traffic analysis.
+
+
 ### 2026-05-08 — Franchize early theme loading hint
 
 - `status`: ready_for_pr
