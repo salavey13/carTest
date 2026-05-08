@@ -40,12 +40,23 @@ For every task below, keep these fields updated:
 - Execution status board: `docs/THE_FRANCHEEZEPLAN_STATUS.MD`
 - Historical diary/archive: `docs/THE_FRANCHEEZEPLAN_HISTORY_ARCHIVE.md`
 - Visual system + implementation blueprint: `docs/THE_FRANCHEEZEPLAN_BLUEPRINT.md`
+- Money micropolish backlog: `docs/FRANCHIZE_MONEY_MICROPOLISH_PLAN.md`
 
 This root file stays intentionally compact so operators and agents can load it quickly in high-frequency loops.
 
 ---
 
 ## 2) Mini execution diary
+
+
+### 2026-05-08 — Franchize money micropolish backlog shaping
+
+- `status`: active-planning
+- `updated_at`: 2026-05-08T00:00:00Z
+- `owner`: codex
+- `notes`: Converted the operator money-printing direction into a sequenced micropolish plan and wrote seven open SupaPlan tasks (`92bdb264-a626-450a-93b2-6eca5021711a`, `558d6b85-3f4a-48b5-ad4d-98b92746991e`, `a55a75bb-2e1d-4685-b26b-53596a95b594`, `6c5623ac-4e8a-4499-9bef-b062887a9feb`, `cc5ec5ef-e6bb-446b-8d91-a12002fbb57d`, `5993dab3-dd18-49dc-8138-52862bc32edb`, `734d604d-e96f-4b56-830f-977e3d3cfa07`). Exact first-paint crew theme hints remain the loading frontier, while the revenue frontier is an intent ledger feeding ride-today availability, hold deposits, prebuy/test-ride/trade-in flows, abandoned checkout recovery, operator closing, and AI closer suggestions. Detailed plan lives in `docs/FRANCHIZE_MONEY_MICROPOLISH_PLAN.md`.
+- `next_step`: Start R1 Franchize Intent Ledger before parallelizing R2/R4/R5 UI and recovery slices.
+- `risks`: SupaPlan has existing open franchize tasks; newly shaped money tasks should be claimed one-by-one and not used to move unrelated older tasks to ready_for_pr.
 
 ### 2026-05-08 — Franchize server-rendered loading/error correction
 
