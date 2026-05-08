@@ -9,7 +9,6 @@ import type { FranchizeTheme } from '@/app/franchize/actions';
 
 const theme: FranchizeTheme = {
   mode: 'dark',
-  radius: 'xl',
   palette: {
     bgBase: '#101113',
     bgCard: '#20242a',
@@ -17,7 +16,6 @@ const theme: FranchizeTheme = {
     textSecondary: '#a1a1aa',
     borderSoft: '#3f3f46',
     accentMain: '#f97316',
-    accentSecondary: '#fed7aa',
     accentMainHover: '#ea580c',
   },
 };
@@ -121,5 +119,30 @@ describe('franchize theme helpers', () => {
   it('falls back to defaults when crew theme metadata is malformed', () => {
     expect(resolveFranchizeTheme({ theme: { mode: 42, palette: 'broken' } })).toEqual(DEFAULT_FRANCHIZE_THEME);
     expect(resolvePaletteByMode({ theme: { mode: null, palettes: ['broken'] } })).toEqual(DEFAULT_FRANCHIZE_THEME.palette);
+  });
+});
+
+describe('franchize early theme hints', () => {
+  it('returns the known vip-bike palette before page data fetches run', async () => {
+    const { getEarlyFranchizeThemeHint } = await import('@/app/franchize/lib/early-theme-hints');
+
+    expect(getEarlyFranchizeThemeHint('vip-bike')).toMatchObject({
+      mode: 'pepperolli_dark',
+      palette: {
+        bgBase: '#0B0C10',
+        bgCard: '#111217',
+        accentMain: '#D99A00',
+        accentMainHover: '#E2A812',
+        textPrimary: '#F2F2F3',
+        textSecondary: '#A7ABB4',
+        borderSoft: '#24262E',
+      },
+    });
+  });
+
+  it('lets unknown slug lookups fall back to the default theme contract', async () => {
+    const { getEarlyFranchizeThemeHint } = await import('@/app/franchize/lib/early-theme-hints');
+
+    expect(getEarlyFranchizeThemeHint('unknown-crew')).toEqual(DEFAULT_FRANCHIZE_THEME);
   });
 });

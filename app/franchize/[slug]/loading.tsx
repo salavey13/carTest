@@ -1,11 +1,14 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { DEFAULT_FRANCHIZE_THEME } from "@/lib/franchize-config";
+import { getEarlyFranchizeThemeHint } from "../lib/early-theme-hints";
 import { crewPaletteForSurface } from "../lib/theme";
 
 const crewSkeletonLabels = ["Категории", "Доступность", "Контакты"] as const;
 
 export default function FranchizeSlugLoading() {
-  const theme = DEFAULT_FRANCHIZE_THEME;
+  const earlyThemeSlug = cookies().get("franchize_slug_theme")?.value ?? "";
+  const theme = getEarlyFranchizeThemeHint(earlyThemeSlug) ?? DEFAULT_FRANCHIZE_THEME;
   const surface = crewPaletteForSurface(theme);
   const accentBackground = surface.accentPill.backgroundColor;
 
