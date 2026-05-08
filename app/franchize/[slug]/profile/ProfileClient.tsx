@@ -65,10 +65,7 @@ export function FranchizeProfileClient() {
       const [digestRes, prefillRes, operatorAccessRes] = await Promise.all([
         getFranchizeActivityDigestAction({ slug, userId: dbUser.user_id }),
         getFranchizeFormPrefillAction({ slug, userId: dbUser.user_id }),
-        getFranchizeOperatorDashboardAccess({
-          slug,
-          actorUserId: dbUser.user_id,
-        }),
+        getFranchizeOperatorDashboardAccess({ slug }),
       ]);
       if (digestRes.success && digestRes.data) setDigest(digestRes.data);
       if (prefillRes.success && prefillRes.data) setPrefill(prefillRes.data);

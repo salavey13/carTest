@@ -55,7 +55,7 @@ This root file stays intentionally compact so operators and agents can load it q
 - `updated_at`: 2026-05-08T19:30:00Z
 - `owner`: codex
 - `supaplan_task`: 5993dab3-dd18-49dc-8138-52862bc32edb
-- `notes`: Added the first operator closer dashboard slice: authorized crew owner/member/admin reads for `franchize_intents`, urgency/update-ranked lead cards in the separate `/franchize/{slug}/dashboard` page, bike/date/contact/blocker/payment/Telegram fields, copyable Telegram reply text, and stage-changing closer actions that append metadata history instead of deleting raw intent context. The existing garage admin now points operators to the dedicated dashboard instead of owning the full closer queue.
+- `notes`: Added the first operator closer dashboard slice: authorized crew owner/member/admin reads for `franchize_intents`, urgency/update-ranked lead cards in the separate `/franchize/{slug}/dashboard` page, bike/date/contact/blocker/payment/Telegram fields, copyable Telegram reply text, and stage-changing closer actions that append metadata history instead of deleting raw intent context. The existing garage admin now points operators to the dedicated dashboard instead of owning the full closer queue. Review polish removed client-supplied closer actor ids: the server derives the actor from a verified Telegram session cookie and checks active `membership_status`.
 - `next_step`: Smoke `/franchize/vip-bike/dashboard` with live intent rows and then layer automated Telegram sending in R7 or a dedicated follow-up.
 - `risks`: The first version intentionally copies replies and records action metadata only; actual Telegram send/reserve automation remains manual/future work.
 

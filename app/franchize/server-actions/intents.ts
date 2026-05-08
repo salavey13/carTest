@@ -1,8 +1,13 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { z } from "zod";
 
 import { logger } from "@/lib/logger";
+import {
+  TELEGRAM_ACTOR_COOKIE,
+  verifyTelegramActorCookieValue,
+} from "@/lib/telegram-actor-cookie";
 import { supabaseAdmin } from "@/lib/supabase-server";
 
 const franchizeIntentTypes = [
@@ -92,6 +97,31 @@ function firstString(...values: unknown[]) {
   return "";
 }
 
+async function resolveFranchizeActorFromServerSession() {
+  const actorUserId = verifyTelegramActorCookieValue(
+    cookies().get(TELEGRAM_ACTOR_COOKIE)?.value,
+  );
+  if (actorUserId) {
+    return { success: true as const, actorUserId };
+  }
+
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_USE_MOCK_USER === "true"
+  ) {
+    const mockUserId = process.env.NEXT_PUBLIC_MOCK_USER_ID || "413553377";
+    logger.warn(
+      "[franchize] using development mock actor for closer server action",
+    );
+    return { success: true as const, actorUserId: mockUserId };
+  }
+
+  return {
+    success: false as const,
+    error: "Verified Telegram session is required.",
+  };
+}
+
 async function resolveFranchizeOperatorAccess(
   actorUserId: string | undefined,
   slug: string,
@@ -134,7 +164,7 @@ async function resolveFranchizeOperatorAccess(
 
   const { data: membership, error: membershipError } = await supabaseAdmin
     .from("crew_members")
-    .select("role, status")
+    .select("role, membership_status")
     .eq("crew_id", crew.id)
     .eq("user_id", actorUserId)
     .maybeSingle();
@@ -143,9 +173,10 @@ async function resolveFranchizeOperatorAccess(
     return { allowed: false as const, reason: membershipError.message };
   }
 
-  const status =
-    readString((membership as UnknownRecord | null)?.status) || "active";
-  if (membership && status !== "pending" && status !== "rejected") {
+  const membershipStatus = readString(
+    (membership as UnknownRecord | null)?.membership_status,
+  );
+  if (membership && membershipStatus === "active") {
     return {
       allowed: true as const,
       crewId: String(crew.id),
@@ -494,7 +525,6 @@ export async function getFranchizeOperatorDashboardAccess(
   const parsed = z
     .object({
       slug: z.string().trim().min(1).max(80),
-      actorUserId: z.string().trim().min(1).max(80),
     })
     .safeParse(input);
   if (!parsed.success) {
@@ -505,8 +535,13 @@ export async function getFranchizeOperatorDashboardAccess(
     };
   }
 
+  const actor = await resolveFranchizeActorFromServerSession();
+  if (!actor.success) {
+    return { success: true, canOpen: false, error: actor.error };
+  }
+
   const access = await resolveFranchizeOperatorAccess(
-    parsed.data.actorUserId,
+    actor.actorUserId,
     parsed.data.slug,
   );
   return access.allowed
@@ -522,7 +557,6 @@ export async function getFranchizeCloserIntents(input: unknown): Promise<{
   const parsed = z
     .object({
       slug: z.string().trim().min(1).max(80),
-      actorUserId: z.string().trim().min(1).max(80),
       limit: z.coerce.number().int().min(1).max(100).default(40),
     })
     .safeParse(input);
@@ -533,10 +567,14 @@ export async function getFranchizeCloserIntents(input: unknown): Promise<{
     };
   }
 
-  const { slug, actorUserId, limit } = parsed.data;
+  const { slug, limit } = parsed.data;
   const normalizedSlug = normalizeSlug(slug);
+  const actor = await resolveFranchizeActorFromServerSession();
+  if (!actor.success) {
+    return { success: false, error: actor.error };
+  }
   const access = await resolveFranchizeOperatorAccess(
-    actorUserId,
+    actor.actorUserId,
     normalizedSlug,
   );
   if (!access.allowed) {
@@ -621,7 +659,6 @@ export async function updateFranchizeCloserIntentStage(
   const parsed = z
     .object({
       slug: z.string().trim().min(1).max(80),
-      actorUserId: z.string().trim().min(1).max(80),
       intentId: z.string().uuid(),
       action: z.enum([
         "send_offer",
@@ -640,8 +677,13 @@ export async function updateFranchizeCloserIntentStage(
     };
   }
 
-  const { slug, actorUserId, intentId, action } = parsed.data;
+  const { slug, intentId, action } = parsed.data;
   const normalizedSlug = normalizeSlug(slug);
+  const actor = await resolveFranchizeActorFromServerSession();
+  if (!actor.success) {
+    return { success: false, error: actor.error };
+  }
+  const actorUserId = actor.actorUserId;
   const access = await resolveFranchizeOperatorAccess(
     actorUserId,
     normalizedSlug,
@@ -685,7 +727,6 @@ export async function updateFranchizeCloserIntentStage(
 
   const refreshed = await getFranchizeCloserIntents({
     slug: normalizedSlug,
-    actorUserId,
     limit: 100,
   });
   return {

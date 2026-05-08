@@ -153,7 +153,7 @@ This turns the app from a catalog into sales memory: failed payments, checkout b
 - Goal: show ranked hot leads with one-click Telegram replies, manual reserve, and alternative-bike offer actions.
 - Depends on: R1, R5.
 - Acceptance: operator can sort by urgency score, see last blocker, and take one closing action without opening raw database rows.
-- 2026-05-08 update: A separate `/franchize/{slug}/dashboard` page now fetches authorized `franchize_intents` rows for the current slug, ranks them by urgency/update time, shows bike/date/contact/blocker/payment/Telegram fields, includes copyable Telegram replies, and saves closer actions by moving stage plus appending `metadata.closerActions` history; the garage admin keeps a compact handoff link.
+- 2026-05-08 update: A separate `/franchize/{slug}/dashboard` page now fetches authorized `franchize_intents` rows for the current slug, ranks them by urgency/update time, shows bike/date/contact/blocker/payment/Telegram fields, includes copyable Telegram replies, and saves closer actions by moving stage plus appending `metadata.closerActions` history; the garage admin keeps a compact handoff link. Security polish derives the closer actor from a verified server-side Telegram session cookie and reads `membership_status` for active crew members.
 
 ### R7 — AI closer assistant
 
