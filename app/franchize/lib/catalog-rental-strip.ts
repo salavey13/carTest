@@ -1,4 +1,9 @@
-import type { CatalogItemVM } from "../actions";
+type CatalogRentalStripItem = {
+  availabilityStatus?: string | null;
+  availabilityLabel?: string | null;
+  rawSpecs?: Record<string, unknown>;
+  rentPriceLabel: string;
+};
 
 const UNKNOWN_TELEGRAM_LABEL = "Уточним в Telegram";
 const PICKUP_HINT_MAX = 42;
@@ -40,12 +45,12 @@ function normalizeWorkingHours(value: string) {
   return normalized.length > 22 ? `${normalized.slice(0, 21).trim()}…` : normalized;
 }
 
-export function hasCatalogAvailabilitySignal(item: CatalogItemVM) {
-  return ["available", "busy"].includes(item.availabilityStatus) && item.availabilityLabel.trim().length > 0;
+export function hasCatalogAvailabilitySignal(item: CatalogRentalStripItem) {
+  return ["available", "busy"].includes(String(item.availabilityStatus ?? "")) && String(item.availabilityLabel ?? "").trim().length > 0;
 }
 
 export function buildCatalogRentalStrip(
-  item: CatalogItemVM,
+  item: CatalogRentalStripItem,
   crew: { contacts: { address?: string; workingHours?: string }; hqLocation?: string },
 ) {
   const hasAvailability = hasCatalogAvailabilitySignal(item);
@@ -66,7 +71,7 @@ export function buildCatalogRentalStrip(
     "handoff_window",
   ]);
   const workingWindow = normalizeWorkingHours(crew.contacts.workingHours ?? "");
-  const availabilityLabel = item.availabilityLabel.trim();
+  const availabilityLabel = String(item.availabilityLabel ?? "").trim();
 
   return {
     hasAvailability,

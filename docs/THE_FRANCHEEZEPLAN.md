@@ -50,6 +50,16 @@ This root file stays intentionally compact so operators and agents can load it q
 
 
 
+### 2026-05-08 — SupaPlan rent strip self-review polish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T14:45:00Z
+- `owner`: codex
+- `notes`: Self-reviewed task `558d6b85-3f4a-48b5-ad4d-98b92746991e`: removed a type-only dependency on the server-action barrel from the shared strip helper, made malformed/missing availability labels fall back safely, prevented duplicate `viewed` tracking for `?vehicle=` modal auto-open rerenders, and aligned sale-card CTA text with the required reserve wording.
+- `next_step`: Review PR visually in an environment with live `vip-bike` catalog rows, then merge so SupaPlan can close R2.
+- `risks`: Local visual smoke remains data-limited when Supabase fetch fails; production/preview smoke should be performed with real crew catalog data.
+
+
 ### 2026-05-08 — SupaPlan rent card strip task 558d6b85
 
 - `status`: ready_for_pr
