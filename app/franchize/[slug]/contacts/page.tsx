@@ -5,6 +5,7 @@ import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { CopyAddressButton } from "../../components/CopyAddressButton";
 import { FranchizeFloatingCart } from "../../components/FranchizeFloatingCart";
+import { FranchizeIntentLink } from "../../components/FranchizeIntentLink";
 import { FranchizeHero } from "../../components/FranchizeHero";
 import { FranchizePageShell } from "../../components/FranchizePageShell";
 import { FranchizeContactsMap } from "../../components/FranchizeContactsMap";
@@ -97,7 +98,14 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {hasTelegram ? (
-                  <a
+                  <FranchizeIntentLink
+                    slug={resolvedSlug}
+                    intentType="contact_click"
+                    stage="contacted"
+                    sourceRoute={activePath}
+                    contactChannel="telegram"
+                    urgencyScore={75}
+                    metadata={{ hasCrewTelegram: true }}
                     href={telegramHref}
                     target="_blank"
                     rel="noreferrer"
@@ -105,9 +113,16 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
                   >
                     <MessageCircle className="h-4 w-4" />
                     Написать в Telegram
-                  </a>
+                  </FranchizeIntentLink>
                 ) : (
-                  <a
+                  <FranchizeIntentLink
+                    slug={resolvedSlug}
+                    intentType="contact_click"
+                    stage="contacted"
+                    sourceRoute={activePath}
+                    contactChannel="telegram_support"
+                    urgencyScore={65}
+                    metadata={{ hasCrewTelegram: false }}
                     href={supportTelegramHref}
                     target="_blank"
                     rel="noreferrer"
@@ -115,23 +130,37 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
                   >
                     <MessageCircle className="h-4 w-4" />
                     Поддержка OneBikePls
-                  </a>
+                  </FranchizeIntentLink>
                 )}
 
                 {crew.contacts.phone && (
-                  <a
+                  <FranchizeIntentLink
+                    slug={resolvedSlug}
+                    intentType="contact_click"
+                    stage="contacted"
+                    sourceRoute={activePath}
+                    contactChannel="phone"
+                    urgencyScore={80}
+                    metadata={{ phone: crew.contacts.phone }}
                     href={phoneHref}
                     className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--crew-border)] px-4 py-2 text-sm font-semibold text-[var(--crew-text)] transition hover:border-[var(--crew-accent)] hover:text-[var(--crew-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--crew-accent)]"
                   >
                     <Phone className="h-4 w-4" />
                     Позвонить
-                  </a>
+                  </FranchizeIntentLink>
                 )}
 
-                {crew.contacts.address && <CopyAddressButton address={crew.contacts.address} />}
+                {crew.contacts.address && <CopyAddressButton address={crew.contacts.address} slug={resolvedSlug} sourceRoute={activePath} />}
 
                 {directionsHref && (
-                  <a
+                  <FranchizeIntentLink
+                    slug={resolvedSlug}
+                    intentType="map_click"
+                    stage="clicked"
+                    sourceRoute={activePath}
+                    contactChannel={hasGps ? "gps_route" : "address_route"}
+                    urgencyScore={55}
+                    metadata={{ destination: directionsTarget }}
                     href={directionsHref}
                     target="_blank"
                     rel="noreferrer"
@@ -139,7 +168,7 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
                   >
                     <Navigation className="h-4 w-4" />
                     {hasGps ? "Маршрут по GPS" : "Маршрут по адресу"}
-                  </a>
+                  </FranchizeIntentLink>
                 )}
               </div>
             </div>

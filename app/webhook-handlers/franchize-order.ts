@@ -1,6 +1,7 @@
 import { WebhookHandler } from "./types";
 import { sendComplexMessage } from "./actions/sendComplexMessage";
 import { retryFranchizeOrderNotification } from "@/app/franchize/actions";
+import { upsertFranchizeIntent } from "@/app/franchize/server-actions/intents";
 import { ensureFranchizeOrderDocDelivery } from "./franchize-order-doc";
 
 function formatMoney(value: number): string {
@@ -52,6 +53,26 @@ export const franchizeOrderHandler: WebhookHandler = {
 
     const totalRub = Number(metadata.totalAmount || metadata.subtotal || 0);
     const interestStars = Number(metadata.amountXtr || totalAmount || 0);
+
+    await upsertFranchizeIntent({
+      slug,
+      bikeId: firstItemId,
+      intentType: "payment_success",
+      stage: "payment_confirmed",
+      sourceRoute: `/franchize/${slug}/rental/${rentalId}`,
+      contactChannel: "telegram_xtr",
+      urgencyScore: 100,
+      telegramUserId: userId,
+      phone: typeof metadata.phone === "string" ? metadata.phone : undefined,
+      metadata: {
+        invoiceId: invoice.id,
+        rentalId,
+        orderId,
+        flowType: metadata.flowType || "rental",
+        totalAmount: Number(metadata.totalAmount || metadata.subtotal || 0),
+        interestStars,
+      },
+    });
 
     const { error: upsertError } = await supabase.from("rentals").upsert(
       {

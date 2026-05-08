@@ -3,8 +3,13 @@
 import { useState } from "react";
 import { Check, Copy, TriangleAlert } from "lucide-react";
 
+import { upsertFranchizeIntent } from "@/app/franchize/actions";
+import { useAppContext } from "@/contexts/AppContext";
+
 interface CopyAddressButtonProps {
   address: string;
+  slug?: string;
+  sourceRoute?: string;
 }
 
 type CopyStatus = "idle" | "copied" | "error";
@@ -25,8 +30,9 @@ function copyWithTextareaFallback(text: string) {
   }
 }
 
-export function CopyAddressButton({ address }: CopyAddressButtonProps) {
+export function CopyAddressButton({ address, slug, sourceRoute }: CopyAddressButtonProps) {
   const [status, setStatus] = useState<CopyStatus>("idle");
+  const { user, dbUser } = useAppContext();
 
   const handleCopy = async () => {
     if (!address) {
@@ -39,6 +45,20 @@ export function CopyAddressButton({ address }: CopyAddressButtonProps) {
         ? clipboard.writeText(address).then(() => true, () => copyWithTextareaFallback(address))
         : copyWithTextareaFallback(address),
     ).catch(() => false);
+
+    if (slug) {
+      void upsertFranchizeIntent({
+        slug,
+        intentType: "map_click",
+        stage: "clicked",
+        sourceRoute: sourceRoute ?? `/franchize/${slug}/contacts`,
+        contactChannel: "address_copy",
+        urgencyScore: 50,
+        telegramUserId: user?.id ? String(user.id) : dbUser?.user_id ? String(dbUser.user_id) : undefined,
+        phone: typeof (dbUser as { phone?: unknown } | null)?.phone === "string" ? (dbUser as { phone?: string } | null)?.phone : undefined,
+        metadata: { address, copied },
+      }).catch((error) => console.warn("address intent tracking failed", error));
+    }
 
     setStatus(copied ? "copied" : "error");
     window.setTimeout(() => setStatus("idle"), 1800);
