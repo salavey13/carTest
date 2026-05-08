@@ -8,7 +8,6 @@ import { Loading } from "@/components/Loading";
 import { useAppContext } from "@/contexts/AppContext";
 import { getEditableVehiclesForUser } from "@/app/rentals/actions";
 import {
-  getFranchizeBySlug,
   getFranchizeOrderNotificationFailures,
   getFranchizeRentalReviewsForModeration,
   moderateRentalReview,
@@ -19,6 +18,8 @@ import {
 import {
   crewPaletteForSurface,
   focusRingOutlineStyle,
+  readablePaletteTextOnColor,
+  withAlpha,
 } from "@/app/franchize/lib/theme";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
 import {
@@ -29,6 +30,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Database } from "@/types/database.types";
+import {
+  FranchizeOperatorLinkButton,
+  FranchizeOperatorPanel,
+  FranchizeOperatorStatCard,
+} from "./FranchizeOperatorSurface";
 
 type Vehicle = Database["public"]["Tables"]["cars"]["Row"];
 
@@ -108,14 +114,16 @@ const fallbackCrew: FranchizeCrewVM = {
 interface FranchizeAdminClientProps {
   initialSlug: string;
   editId?: string;
+  initialCrew?: FranchizeCrewVM;
 }
 
 export function FranchizeAdminClient({
   initialSlug,
   editId,
+  initialCrew,
 }: FranchizeAdminClientProps) {
   const { dbUser, isLoading } = useAppContext();
-  const [crew, setCrew] = useState<FranchizeCrewVM>(fallbackCrew);
+  const crew = initialCrew || fallbackCrew;
   const [fleet, setFleet] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [filterType, setFilterType] = useState<"all" | "bike" | "car">("all");
@@ -136,11 +144,6 @@ export function FranchizeAdminClient({
   );
 
   const slug = initialSlug?.trim() || "vip-bike";
-
-  const loadCrewTheme = useCallback(async () => {
-    const { crew: loaded } = await getFranchizeBySlug(slug);
-    setCrew(loaded || fallbackCrew);
-  }, [slug]);
 
   const loadFleet = useCallback(async () => {
     if (!dbUser?.user_id) return;
@@ -173,10 +176,6 @@ export function FranchizeAdminClient({
       }
     }
   }, [crew.id, dbUser?.user_id, editId]);
-
-  useEffect(() => {
-    loadCrewTheme();
-  }, [loadCrewTheme]);
 
   useEffect(() => {
     loadFleet();
@@ -306,15 +305,17 @@ export function FranchizeAdminClient({
 
   const surface = crewPaletteForSurface(crew.theme);
   const buttonFocus = focusRingOutlineStyle(crew.theme);
-  const accentOn = "#16130A";
+  const accentOn = readablePaletteTextOnColor(
+    crew.theme.palette.accentMain,
+    crew.theme.palette,
+  );
 
-  if (isLoading) return <Loading text="FRANCHIZE ADMIN INIT..." />;
+  if (isLoading) return <Loading text="Загружаем гараж экипажа..." />;
 
   return (
-    <section
-      className="min-h-screen overflow-x-hidden px-3 pb-10 pt-24 sm:px-4"
+    <div
+      className="space-y-4"
       style={{
-        ...surface.page,
         ["--fr-admin-accent" as string]: crew.theme.palette.accentMain,
         ["--fr-admin-accent-hover" as string]:
           crew.theme.palette.accentMainHover,
@@ -323,393 +324,313 @@ export function FranchizeAdminClient({
         ["--fr-admin-muted" as string]: crew.theme.palette.textSecondary,
       }}
     >
-      <div
-        className="mx-auto max-w-5xl overflow-hidden rounded-3xl border p-4 sm:p-6"
-        style={surface.card}
-      >
-        <p className="text-xs uppercase tracking-[0.2em] text-[var(--fr-admin-accent)]">
-          crew owner console
-        </p>
-        <h1 className="mt-2 break-words text-2xl font-semibold text-[var(--fr-admin-text)]">
-          {(crew.header.brandName || crew.name || slug).toUpperCase()} — ADMIN
-          GARAGE
-        </h1>
-        <p className="mt-2 max-w-3xl break-words text-sm leading-relaxed text-[var(--fr-admin-muted)]">
-          Переключатель экипажа:{" "}
-          <span className="font-semibold text-[var(--fr-admin-accent)]">
-            {slug}
-          </span>
-          . Редактируй bike/car карточки, добавляй VIN и формируй корректные
-          checkout документы без контрастных артефактов темы.
-        </p>
+      <p className="text-xs font-medium tracking-wide text-[var(--fr-admin-accent)]">
+        Консоль экипажа
+      </p>
+      <h1 className="mt-2 break-words text-2xl font-semibold text-[var(--fr-admin-text)]">
+        {crew.header.brandName || crew.name || slug}: гараж
+      </h1>
+      <p className="mt-2 max-w-3xl break-words text-sm leading-relaxed text-[var(--fr-admin-muted)]">
+        Переключатель экипажа:{" "}
+        <span className="font-semibold text-[var(--fr-admin-accent)]">
+          {slug}
+        </span>
+        . Редактируй технику, добавляй VIN и проверяй документы в той же
+        визуальной системе, что каталог и аренды.
+      </p>
 
-        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {[
-            { id: "all", label: `Все (${fleet.length})` },
-            {
-              id: "bike",
-              label: `Байки (${fleet.filter((v) => v.type === "bike").length})`,
-            },
-            {
-              id: "car",
-              label: `Авто (${fleet.filter((v) => v.type === "car").length})`,
-            },
-          ].map((filter) => {
-            const active = filterType === filter.id;
-            return (
-              <Button
-                key={filter.id}
-                type="button"
-                onClick={() =>
-                  setFilterType(filter.id as "all" | "bike" | "car")
-                }
-                className="h-10 border text-sm font-semibold"
-                style={{
-                  borderColor: "var(--fr-admin-border)",
-                  color: active ? accentOn : "var(--fr-admin-text)",
-                  backgroundColor: active
-                    ? "var(--fr-admin-accent)"
-                    : "transparent",
-                  ...buttonFocus,
-                }}
-              >
-                {filter.label}
-              </Button>
-            );
-          })}
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <div
-            className="min-w-0 rounded-2xl border p-3"
-            style={{
-              ...surface.subtleCard,
-              borderColor: "var(--fr-admin-border)",
-            }}
-          >
-            <p className="text-xs uppercase tracking-[0.16em] text-[var(--fr-admin-muted)]">
-              Всего в scope
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-[var(--fr-admin-text)]">
-              {fleet.length}
-            </p>
-          </div>
-          <div
-            className="min-w-0 rounded-2xl border p-3"
-            style={{
-              ...surface.subtleCard,
-              borderColor: "var(--fr-admin-border)",
-            }}
-          >
-            <p className="text-xs uppercase tracking-[0.16em] text-[var(--fr-admin-muted)]">
-              Байки
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-[var(--fr-admin-text)]">
-              {fleet.filter((v) => v.type === "bike").length}
-            </p>
-          </div>
-          <div
-            className="min-w-0 rounded-2xl border p-3"
-            style={{
-              ...surface.subtleCard,
-              borderColor: "var(--fr-admin-border)",
-            }}
-          >
-            <p className="text-xs uppercase tracking-[0.16em] text-[var(--fr-admin-muted)]">
-              Авто
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-[var(--fr-admin-text)]">
-              {fleet.filter((v) => v.type === "car").length}
-            </p>
-          </div>
-        </div>
-        <div
-          className="mt-4 rounded-2xl border p-3 text-sm leading-relaxed"
-          style={{
-            ...surface.subtleCard,
-            borderColor: "var(--fr-admin-border)",
-          }}
-        >
-          <p className="break-words text-[var(--fr-admin-text)]">
-            Для doc-шаблона используй specs: <code>vin</code>,{" "}
-            <code>plate</code>, <code>frame</code>.
-          </p>
-          <p className="mt-1 text-xs text-[var(--fr-admin-muted)]">
-            Доступно записей по фильтру:{" "}
-            <span className="font-semibold text-[var(--fr-admin-accent)]">
-              {visible.length}
-            </span>
-            .{loadingFleet ? " Обновляем список..." : ""}
-          </p>
-          <div
-            className="mt-2 rounded-xl border px-3 py-2"
-            style={{
-              borderColor: "var(--fr-admin-border)",
-              backgroundColor: "rgba(217,154,0,0.08)",
-            }}
-          >
-            <p className="text-xs text-[var(--fr-admin-text)]">
-              VIN аудит:{" "}
-              <span className="font-semibold">{vinAudit.withVin}</span> /{" "}
-              {vinAudit.total} заполнено
-            </p>
-            {vinAudit.missing.length > 0 && (
-              <p className="mt-1 text-xs text-amber-300">
-                Пустых VIN: {vinAudit.missing.length}
-              </p>
-            )}
-            {vinAudit.missing.length > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-2 h-8 text-xs"
-                onClick={() => void handleBulkFillVin()}
-                disabled={isBulkFillingVin}
-              >
-                {isBulkFillingVin ? "Заполняю VIN…" : "Bulk-fill VIN"}
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <div
-          className="mt-4 rounded-2xl border p-3"
-          style={{
-            ...surface.subtleCard,
-            borderColor: "var(--fr-admin-border)",
-          }}
-        >
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr),auto] sm:items-center">
-            <div>
-              <p className="text-sm font-semibold text-[var(--fr-admin-text)]">
-                Operator closer dashboard moved
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-[var(--fr-admin-muted)]">
-                Garage admin остаётся для техники, VIN, отзывов и документов.
-                Горячие лиды, Telegram replies и closing actions теперь живут на
-                отдельной dashboard page.
-              </p>
-            </div>
+      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {[
+          { id: "all", label: `Все (${fleet.length})` },
+          {
+            id: "bike",
+            label: `Байки (${fleet.filter((v) => v.type === "bike").length})`,
+          },
+          {
+            id: "car",
+            label: `Авто (${fleet.filter((v) => v.type === "car").length})`,
+          },
+        ].map((filter) => {
+          const active = filterType === filter.id;
+          return (
             <Button
-              asChild
-              className="h-9 text-xs font-semibold"
+              key={filter.id}
+              type="button"
+              onClick={() => setFilterType(filter.id as "all" | "bike" | "car")}
+              className="h-10 border text-sm font-semibold"
               style={{
+                borderColor: "var(--fr-admin-border)",
+                color: active ? accentOn : "var(--fr-admin-text)",
+                backgroundColor: active
+                  ? "var(--fr-admin-accent)"
+                  : "transparent",
                 ...buttonFocus,
-                backgroundColor: "var(--fr-admin-accent)",
-                color: accentOn,
               }}
             >
-              <Link href={`/franchize/${slug}/dashboard`}>
-                Open closer dashboard
-              </Link>
+              {filter.label}
             </Button>
-          </div>
-        </div>
+          );
+        })}
+      </div>
 
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <FranchizeOperatorStatCard label="Всего в зоне" value={fleet.length} />
+        <FranchizeOperatorStatCard
+          label="Байки"
+          value={fleet.filter((v) => v.type === "bike").length}
+        />
+        <FranchizeOperatorStatCard
+          label="Авто"
+          value={fleet.filter((v) => v.type === "car").length}
+        />
+      </div>
+      <FranchizeOperatorPanel className="mt-4 text-sm leading-relaxed">
+        <p className="break-words text-[var(--fr-admin-text)]">
+          Для doc-шаблона используй specs: <code>vin</code>, <code>plate</code>,{" "}
+          <code>frame</code>.
+        </p>
+        <p className="mt-1 text-xs text-[var(--fr-admin-muted)]">
+          Доступно записей по фильтру:{" "}
+          <span className="font-semibold text-[var(--fr-admin-accent)]">
+            {visible.length}
+          </span>
+          .{loadingFleet ? " Обновляем список..." : ""}
+        </p>
         <div
-          className="mt-4 rounded-2xl border p-3"
+          className="mt-2 rounded-xl border px-3 py-2"
           style={{
-            ...surface.subtleCard,
             borderColor: "var(--fr-admin-border)",
+            backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.08),
           }}
         >
-          <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr),auto]">
-            <Select
-              value={selectedVehicle?.id ?? "new"}
-              onValueChange={(value) =>
-                setSelectedVehicle(
-                  value === "new"
-                    ? null
-                    : (visible.find((vehicle) => vehicle.id === value) ?? null),
-                )
-              }
-            >
-              <SelectTrigger
-                className="w-full border text-left"
-                style={{
-                  borderColor: "var(--fr-admin-border)",
-                  color: "var(--fr-admin-text)",
-                  backgroundColor: surface.page.backgroundColor,
-                }}
-              >
-                <SelectValue placeholder="Выбери запись для редактирования" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="new">Создать новую запись</SelectItem>
-                {visible.map((vehicle) => (
-                  <SelectItem key={vehicle.id} value={vehicle.id}>
-                    {vehicle.type === "car" ? "🚗" : "🏍️"} {vehicle.make}{" "}
-                    {vehicle.model}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <p className="text-xs text-[var(--fr-admin-text)]">
+            VIN аудит: <span className="font-semibold">{vinAudit.withVin}</span>{" "}
+            / {vinAudit.total} заполнено
+          </p>
+          {vinAudit.missing.length > 0 && (
+            <p className="mt-1 text-xs text-amber-300">
+              Пустых VIN: {vinAudit.missing.length}
+            </p>
+          )}
+          {vinAudit.missing.length > 0 && (
             <Button
               type="button"
               variant="outline"
-              onClick={() => setSelectedVehicle(null)}
-              className="w-full sm:w-auto"
+              className="mt-2 h-8 text-xs"
+              onClick={() => void handleBulkFillVin()}
+              disabled={isBulkFillingVin}
             >
-              Новая запись
+              {isBulkFillingVin ? "Заполняю VIN…" : "Bulk-fill VIN"}
             </Button>
-          </div>
-          <div className="mb-3 flex flex-wrap gap-2">
-            {visible.slice(0, 8).map((vehicle) => (
-              <button
-                key={vehicle.id}
-                type="button"
-                onClick={() => setSelectedVehicle(vehicle)}
-                className="max-w-full rounded-full border px-3 py-1 text-xs font-medium transition hover:opacity-90"
-                style={{
-                  borderColor:
-                    selectedVehicle?.id === vehicle.id
-                      ? "var(--fr-admin-accent)"
-                      : "var(--fr-admin-border)",
-                  color:
-                    selectedVehicle?.id === vehicle.id
-                      ? accentOn
-                      : "var(--fr-admin-text)",
-                  backgroundColor:
-                    selectedVehicle?.id === vehicle.id
-                      ? "var(--fr-admin-accent)"
-                      : "transparent",
-                }}
-              >
-                <span className="block max-w-[220px] truncate">
-                  {vehicle.make} {vehicle.model}
-                </span>
-              </button>
-            ))}
-          </div>
-          <CarSubmissionForm
-            ownerId={dbUser?.user_id}
-            vehicleToEdit={selectedVehicle}
-            onSuccess={() => loadFleet()}
-          />
-        </div>
-
-        <div
-          className="mt-4 rounded-2xl border p-3"
-          style={{
-            ...surface.subtleCard,
-            borderColor: "var(--fr-admin-border)",
-          }}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-[var(--fr-admin-text)]">
-              Модерация отзывов аренды
-            </p>
-            <span
-              className="rounded-full border px-2 py-1 text-xs text-[var(--fr-admin-muted)]"
-              style={{ borderColor: "var(--fr-admin-border)" }}
-            >
-              {reviews.length}
-            </span>
-          </div>
-          {!reviews.length ? (
-            <p className="mt-2 text-xs text-[var(--fr-admin-muted)]">
-              Отзывов пока нет.
-            </p>
-          ) : (
-            <div className="mt-3 space-y-2">
-              {reviews.slice(0, 8).map((review) => (
-                <div
-                  key={review.id}
-                  className="rounded-xl border p-2"
-                  style={{
-                    borderColor: "var(--fr-admin-border)",
-                    opacity: review.hiddenAt ? 0.62 : 1,
-                  }}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-semibold text-[var(--fr-admin-accent)]">
-                      ★ {review.rating} / 5
-                    </p>
-                    <Button
-                      type="button"
-                      className="h-8 text-xs"
-                      variant="outline"
-                      onClick={() =>
-                        handleModerateReview(review.id, !review.hiddenAt)
-                      }
-                      disabled={moderatingReviewId === review.id}
-                    >
-                      {review.hiddenAt ? "Показать" : "Скрыть"}
-                    </Button>
-                  </div>
-                  <p className="mt-1 text-xs text-[var(--fr-admin-muted)]">
-                    байк: {review.bikeId} · пользователь: {review.userId}
-                  </p>
-                  {review.text && (
-                    <p className="mt-2 text-sm text-[var(--fr-admin-text)]">
-                      {review.text}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
           )}
         </div>
+      </FranchizeOperatorPanel>
 
-        <div
-          className="mt-4 rounded-2xl border p-3"
-          style={{
-            ...surface.subtleCard,
-            borderColor: "var(--fr-admin-border)",
-          }}
-        >
-          <p className="text-sm font-semibold text-[var(--fr-admin-text)]">
-            Failed doc notifications
-          </p>
-          {!failedNotifications.length ? (
-            <p className="mt-2 text-xs text-[var(--fr-admin-muted)]">
-              Сбоев отправки не найдено.
+      <FranchizeOperatorPanel className="mt-4">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr),auto] sm:items-center">
+          <div>
+            <p className="text-sm font-semibold text-[var(--fr-admin-text)]">
+              Панель заявок вынесена
             </p>
-          ) : (
-            <div className="mt-3 space-y-2">
-              {failedNotifications.map((item) => (
-                <div
-                  key={`${item.orderId}-${item.sendTo}-${item.createdAt}`}
-                  className="rounded-xl border p-2"
-                  style={{ borderColor: "var(--fr-admin-border)" }}
-                >
-                  <p className="text-xs text-[var(--fr-admin-text)]">
-                    Заказ #{item.orderId} → {item.sendTo || "unknown"}
-                  </p>
-                  <p className="mt-1 text-xs text-rose-300">
-                    {item.lastError || "unknown error"}
+            <p className="mt-1 text-xs leading-relaxed text-[var(--fr-admin-muted)]">
+              Гараж остаётся для техники, VIN, отзывов и документов. Горячие
+              заявки, ответы в Telegram и closing actions вынесены в отдельную
+              панель.
+            </p>
+          </div>
+          <Button
+            asChild
+            className="h-9 text-xs font-semibold"
+            style={{
+              ...buttonFocus,
+              backgroundColor: "var(--fr-admin-accent)",
+              color: accentOn,
+            }}
+          >
+            <Link href={`/franchize/${slug}/dashboard`}>Открыть заявки</Link>
+          </Button>
+        </div>
+      </FranchizeOperatorPanel>
+
+      <FranchizeOperatorPanel className="mt-4">
+        <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr),auto]">
+          <Select
+            value={selectedVehicle?.id ?? "new"}
+            onValueChange={(value) =>
+              setSelectedVehicle(
+                value === "new"
+                  ? null
+                  : (visible.find((vehicle) => vehicle.id === value) ?? null),
+              )
+            }
+          >
+            <SelectTrigger
+              className="w-full border text-left"
+              style={{
+                borderColor: "var(--fr-admin-border)",
+                color: "var(--fr-admin-text)",
+                backgroundColor: surface.page.backgroundColor,
+              }}
+            >
+              <SelectValue placeholder="Выбери запись для редактирования" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="new">Создать новую запись</SelectItem>
+              {visible.map((vehicle) => (
+                <SelectItem key={vehicle.id} value={vehicle.id}>
+                  {vehicle.type === "car" ? "🚗" : "🏍️"} {vehicle.make}{" "}
+                  {vehicle.model}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setSelectedVehicle(null)}
+            className="w-full sm:w-auto"
+          >
+            Новая запись
+          </Button>
+        </div>
+        <div className="mb-3 flex flex-wrap gap-2">
+          {visible.slice(0, 8).map((vehicle) => (
+            <button
+              key={vehicle.id}
+              type="button"
+              onClick={() => setSelectedVehicle(vehicle)}
+              className="max-w-full rounded-full border px-3 py-1 text-xs font-medium transition hover:opacity-90"
+              style={{
+                borderColor:
+                  selectedVehicle?.id === vehicle.id
+                    ? "var(--fr-admin-accent)"
+                    : "var(--fr-admin-border)",
+                color:
+                  selectedVehicle?.id === vehicle.id
+                    ? accentOn
+                    : "var(--fr-admin-text)",
+                backgroundColor:
+                  selectedVehicle?.id === vehicle.id
+                    ? "var(--fr-admin-accent)"
+                    : "transparent",
+              }}
+            >
+              <span className="block max-w-[220px] truncate">
+                {vehicle.make} {vehicle.model}
+              </span>
+            </button>
+          ))}
+        </div>
+        <CarSubmissionForm
+          ownerId={dbUser?.user_id}
+          vehicleToEdit={selectedVehicle}
+          onSuccess={() => loadFleet()}
+        />
+      </FranchizeOperatorPanel>
+
+      <FranchizeOperatorPanel className="mt-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-[var(--fr-admin-text)]">
+            Модерация отзывов аренды
+          </p>
+          <span
+            className="rounded-full border px-2 py-1 text-xs text-[var(--fr-admin-muted)]"
+            style={{ borderColor: "var(--fr-admin-border)" }}
+          >
+            {reviews.length}
+          </span>
+        </div>
+        {!reviews.length ? (
+          <p className="mt-2 text-xs text-[var(--fr-admin-muted)]">
+            Отзывов пока нет.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {reviews.slice(0, 8).map((review) => (
+              <div
+                key={review.id}
+                className="rounded-xl border p-2"
+                style={{
+                  borderColor: "var(--fr-admin-border)",
+                  opacity: review.hiddenAt ? 0.62 : 1,
+                }}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-[var(--fr-admin-accent)]">
+                    ★ {review.rating} / 5
                   </p>
                   <Button
                     type="button"
-                    className="mt-2 h-8 text-xs"
-                    onClick={() => handleRetryNotification(item.orderId)}
-                    disabled={retryingOrderId === item.orderId}
+                    className="h-8 text-xs"
+                    variant="outline"
+                    onClick={() =>
+                      handleModerateReview(review.id, !review.hiddenAt)
+                    }
+                    disabled={moderatingReviewId === review.id}
                   >
-                    {retryingOrderId === item.orderId
-                      ? "Retry..."
-                      : "Retry send"}
+                    {review.hiddenAt ? "Показать" : "Скрыть"}
                   </Button>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+                <p className="mt-1 text-xs text-[var(--fr-admin-muted)]">
+                  байк: {review.bikeId} · пользователь: {review.userId}
+                </p>
+                {review.text && (
+                  <p className="mt-2 text-sm text-[var(--fr-admin-text)]">
+                    {review.text}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </FranchizeOperatorPanel>
 
-        <div className="mt-4 flex flex-wrap gap-3 text-sm">
-          <Link
-            className="underline underline-offset-4 text-[var(--fr-admin-accent)]"
-            href="/admin"
-          >
-            ← Общий admin
-          </Link>
-          <Link
-            className="underline underline-offset-4 text-[var(--fr-admin-accent)]"
-            href={`/franchize/${slug}`}
-          >
-            Открыть storefront
-          </Link>
-        </div>
+      <FranchizeOperatorPanel className="mt-4">
+        <p className="text-sm font-semibold text-[var(--fr-admin-text)]">
+          Сбои отправки документов
+        </p>
+        {!failedNotifications.length ? (
+          <p className="mt-2 text-xs text-[var(--fr-admin-muted)]">
+            Сбоев отправки не найдено.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {failedNotifications.map((item) => (
+              <div
+                key={`${item.orderId}-${item.sendTo}-${item.createdAt}`}
+                className="rounded-xl border p-2"
+                style={{ borderColor: "var(--fr-admin-border)" }}
+              >
+                <p className="text-xs text-[var(--fr-admin-text)]">
+                  Заказ #{item.orderId} → {item.sendTo || "unknown"}
+                </p>
+                <p className="mt-1 text-xs text-rose-300">
+                  {item.lastError || "unknown error"}
+                </p>
+                <Button
+                  type="button"
+                  className="mt-2 h-8 text-xs"
+                  onClick={() => handleRetryNotification(item.orderId)}
+                  disabled={retryingOrderId === item.orderId}
+                >
+                  {retryingOrderId === item.orderId
+                    ? "Повторяем..."
+                    : "Повторить отправку"}
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </FranchizeOperatorPanel>
+
+      <div className="mt-4 flex flex-wrap gap-3 text-sm">
+        <FranchizeOperatorLinkButton href="/admin" variant="secondary">
+          ← Общий админ
+        </FranchizeOperatorLinkButton>
+        <FranchizeOperatorLinkButton href={`/franchize/${slug}`}>
+          Открыть витрину
+        </FranchizeOperatorLinkButton>
       </div>
-    </section>
+    </div>
   );
 }

@@ -49,6 +49,16 @@ This root file stays intentionally compact so operators and agents can load it q
 ## 2) Mini execution diary
 
 
+### 2026-05-08 — Issue 4 operator surface visual consistency self-review
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T13:55:00Z
+- `owner`: codex
+- `notes`: Self-reviewed the Issue 4 surface pass: removed unnecessary client-side crew refetches after server hydration, tightened the shared operator CTA to match FranchizeHero/catalog button rhythm, and kept the docs diff scoped to this diary entry.
+- `next_step`: Review with live `vip-bike` data in preview; local smoke still validates shell/routing when Supabase is unavailable.
+- `risks`: Admin/profile/dashboard runtime data remains auth/Supabase dependent; visual shell falls back safely when data fetches fail.
+
+
 ### 2026-05-08 — SEC-04 crew sensitive storage audit
 
 - `status`: ready_for_pr
