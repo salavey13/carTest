@@ -50,6 +50,36 @@ This root file stays intentionally compact so operators and agents can load it q
 
 
 
+### 2026-05-08 — SupaPlan rent strip deep-link review fix
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T14:55:00Z
+- `owner`: codex
+- `notes`: Addressed Codex review on `?vehicle=` deep-link modal initialization: rent tracking now uses a latest-callback ref, so Telegram auth/user hydration no longer recreates the effect dependency path and cannot reset in-progress modal options or double-log `viewed` for the same vehicle.
+- `next_step`: Keep the live-data mobile smoke as the final verification gate before merge.
+- `risks`: The deep-link initializer intentionally runs only from URL/items/auction option changes; user identity changes update the tracking ref but do not reinitialize the modal.
+
+
+### 2026-05-08 — SupaPlan rent strip self-review polish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T14:45:00Z
+- `owner`: codex
+- `notes`: Self-reviewed task `558d6b85-3f4a-48b5-ad4d-98b92746991e`: removed a type-only dependency on the server-action barrel from the shared strip helper, made malformed/missing availability labels fall back safely, prevented duplicate `viewed` tracking for `?vehicle=` modal auto-open rerenders, and aligned sale-card CTA text with the required reserve wording.
+- `next_step`: Review PR visually in an environment with live `vip-bike` catalog rows, then merge so SupaPlan can close R2.
+- `risks`: Local visual smoke remains data-limited when Supabase fetch fails; production/preview smoke should be performed with real crew catalog data.
+
+
+### 2026-05-08 — SupaPlan rent card strip task 558d6b85
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T14:30:00Z
+- `owner`: codex
+- `notes`: Added the rental decision strip to franchize catalog cards and item modal: today availability, nearest start window, pickup hint, deposit/price teaser, and dominant “Hold this bike / Забронировать байк” CTA. Wired `intent_type='rent'` with `viewed` and `configured` stages for modal open and CTA taps.
+- `next_step`: Apply the rent-intent constraint migration, then smoke `/franchize/vip-bike` on mobile viewport with real availability rows.
+- `risks`: The nearest window uses item specs or crew working hours when explicit rental windows are absent; unknown availability falls back to “Уточним в Telegram” rather than blocking render.
+
+
 ### 2026-05-08 — Franchize intent link review fix
 
 - `status`: ready_for_pr
