@@ -140,7 +140,7 @@ This turns the app from a catalog into sales memory: failed payments, checkout b
 - Depends on: R1, R3.
 - Acceptance: if a rider leaves after meaningful blockers, operator sees bike, dates, phone/Telegram channel when available, last blocker, and suggested next message.
 - 2026-05-08 update: Checkout now records validated rent recovery snapshots in `franchize_intents`, debounces client writes, rate-limits server writes/notifications, forces `payment_failed` snapshots for XTR failures, and sends compact admin Telegram cards only for meaningful abandonment signals.
-- 2026-05-08 self-review: Recovery intents now carry a stable `dedupeKey` so anonymous/date-only checkout snapshots stay tied to the order instead of merging by default payment channel, while write throttling is keyed by order/stage to prevent phone-typing bypasses.
+- 2026-05-08 self-review: Recovery intents now carry a stable `dedupeKey` so anonymous/date-only checkout snapshots stay tied to the order instead of merging by default payment channel, while write and notification throttling are keyed by order/stage to prevent phone-typing bypasses and repeated readiness/date changes from spamming Telegram.
 
 ### R6 — Operator closer dashboard
 
