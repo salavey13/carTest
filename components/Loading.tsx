@@ -428,7 +428,7 @@ const BikeSpeedster = ({ gear }: { gear: number }) => {
               transition={{ duration: 0.18, ease: "easeOut" }}
             >
               <motion.div
-                className="absolute left-[52px] top-[74px] h-[58px] w-[58px] rounded-full border-4 border-orange-400/90"
+                className="absolute left-[52px] top-[78px] h-[58px] w-[58px] rounded-full border-4 border-orange-400/90"
                 animate={{ rotate: -360 }}
                 transition={{ duration: 0.45, repeat: Infinity, ease: "linear" }}
                 style={{ animation: "bike-loading-wheel-spin 0.45s linear infinite" }}
@@ -438,7 +438,7 @@ const BikeSpeedster = ({ gear }: { gear: number }) => {
                 ))}
               </motion.div>
               <motion.div
-                className="absolute left-[146px] top-[74px] h-[58px] w-[58px] rounded-full border-4 border-orange-400/90"
+                className="absolute left-[146px] top-[78px] h-[58px] w-[58px] rounded-full border-4 border-orange-400/90"
                 animate={{ rotate: -360 }}
                 transition={{ duration: 0.45, repeat: Infinity, ease: "linear" }}
                 style={{ animation: "bike-loading-wheel-spin 0.45s linear infinite" }}
