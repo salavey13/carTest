@@ -50,6 +50,16 @@ This root file stays intentionally compact so operators and agents can load it q
 
 
 
+### 2026-05-08 — SupaPlan rent card strip task 558d6b85
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-08T14:30:00Z
+- `owner`: codex
+- `notes`: Added the rental decision strip to franchize catalog cards and item modal: today availability, nearest start window, pickup hint, deposit/price teaser, and dominant “Hold this bike / Забронировать байк” CTA. Wired `intent_type='rent'` with `viewed` and `configured` stages for modal open and CTA taps.
+- `next_step`: Apply the rent-intent constraint migration, then smoke `/franchize/vip-bike` on mobile viewport with real availability rows.
+- `risks`: The nearest window uses item specs or crew working hours when explicit rental windows are absent; unknown availability falls back to “Уточним в Telegram” rather than blocking render.
+
+
 ### 2026-05-08 — Franchize intent link review fix
 
 - `status`: ready_for_pr
