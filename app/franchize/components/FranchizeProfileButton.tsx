@@ -53,6 +53,20 @@ function getFirstLetter(name: string): string {
   return (name.trim()[0] || "O").toUpperCase();
 }
 
+/**
+ * Validate that a CSS colour string is safe to pass into var() + color-mix().
+ * Accepts #hex, rgb(), rgba(), hsl(), hsla(), hwb(), oklch(), named colours.
+ * Rejects bare HSL triplets like "34 92% 70%" (needs hsl() wrapper)
+ * and anything that looks like a CSS injection attempt.
+ */
+const SAFE_COLOR_RE = /^(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)|hwb\([^)]+\)|okl(ch|ab)\([^)]+\)|[a-zA-Z]+)$/;
+
+function sanitizeAccentColor(raw: string, fallback = "#f9ac67"): string {
+  const trimmed = raw.trim();
+  if (SAFE_COLOR_RE.test(trimmed)) return trimmed;
+  return fallback;
+}
+
 /* ───────────────────────────────────────────────────────────────────────────
    Spooky ghost-glow keyframes — injected once into <head>
 
@@ -168,7 +182,7 @@ function SpookyLetter({ letter, color }: { letter: string; color: string }) {
       className="flex h-full w-full items-center justify-center text-sm font-bold select-none"
       style={{
         color,
-        [SPOOKY_ACCENT_VAR]: color,
+        [SPOOKY_ACCENT_VAR]: sanitizeAccentColor(color),
         animation: "spookyPulse 3s ease-in-out infinite, spookyFlicker 5s steps(1) infinite",
       }}
     >
@@ -321,7 +335,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
                       className="absolute inset-0 z-10 flex items-center justify-center text-sm font-bold select-none"
                       style={{
                         color: textColor,
-                        [SPOOKY_ACCENT_VAR]: textColor,
+                        [SPOOKY_ACCENT_VAR]: sanitizeAccentColor(textColor),
                         animation: avatarLoaded
                           ? "ghostDissolve 0.8s ease-out forwards"
                           : "spookyPulse 3s ease-in-out infinite, spookyFlicker 5s steps(1) infinite",
