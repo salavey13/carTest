@@ -149,7 +149,7 @@ export function SpookyLetter({ letter, color, sizeClass = "text-sm" }: SpookyLet
       className={`flex h-full w-full items-center justify-center font-bold select-none ${sizeClass}`}
       style={{
         color,
-        [SPOOKY_ACCENT_VAR]: sanitizeAccentColor(color),
+        [SPOOKY_ACCENT_VAR as string]: sanitizeAccentColor(color),
         animation: "spookyPulse 3s ease-in-out infinite, spookyFlicker 5s steps(1) infinite",
       }}
     >
