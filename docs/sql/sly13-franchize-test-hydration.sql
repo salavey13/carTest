@@ -144,8 +144,7 @@ set
             jsonb_build_object(
               'title', 'СВЯЗЬ',
               'items', jsonb_build_array(
-                jsonb_build_object('type', 'external', 'label', '@SALAVEY13', 'href', 'https://t.me/SALAVEY13', 'icon', 'FaTelegram'),
-                jsonb_build_object('type', 'phone', 'label', '+7 9200-789-888', 'href', 'tel:+79200789888', 'icon', 'FaPhone')
+                jsonb_build_object('type', 'external', 'label', '@SALAVEY13', 'href', 'https://t.me/SALAVEY13', 'icon', 'FaTelegram')
               )
             )
           ),
