@@ -274,7 +274,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                       className="absolute inset-0 z-10 flex items-center justify-center text-2xl font-bold select-none"
                       style={{
                         color: accentMain,
-                        [SPOOKY_ACCENT_VAR]: sanitizeAccentColor(accentMain),
+                        [SPOOKY_ACCENT_VAR as string]: sanitizeAccentColor(accentMain),
                         animation: logoLoaded
                           ? "ghostDissolve 0.8s ease-out forwards"
                           : "spookyPulse 3s ease-in-out infinite, spookyFlicker 5s steps(1) infinite",
