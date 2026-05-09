@@ -1,3 +1,4 @@
+// /app/franchize/components/FranchizeProfileButton.tsx
 "use client";
 
 import Image from "next/image";
@@ -48,16 +49,129 @@ interface FranchizeProfileButtonProps {
   currentSlug?: string;
 }
 
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+function getFirstLetter(name: string): string {
+  return (name.trim()[0] || "O").toUpperCase();
 }
 
+/* ───────────────────────────────────────────────────────────────────────────
+   Spooky ghost-glow keyframes — injected once into <head>
+   ─────────────────────────────────────────────────────────────────────────── */
+const SPOOKY_STYLE_ID = "franchize-spooky-avatar-keyframes";
+
+function ensureSpookyKeyframes(accentColor: string) {
+  if (typeof document === "undefined" || document.getElementById(SPOOKY_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = SPOOKY_STYLE_ID;
+  style.textContent = `
+@keyframes spookyPulse {
+  0%, 100% {
+    opacity: 0.55;
+    text-shadow:
+      0 0 6px ${accentColor},
+      0 0 18px ${accentColor}44,
+      0 0 36px ${accentColor}22;
+    transform: scale(1);
+  }
+  40% {
+    opacity: 1;
+    text-shadow:
+      0 0 10px ${accentColor},
+      0 0 28px ${accentColor}88,
+      0 0 56px ${accentColor}44,
+      0 0 80px ${accentColor}22;
+    transform: scale(1.12);
+  }
+  60% {
+    opacity: 0.7;
+    text-shadow:
+      0 0 4px ${accentColor}aa,
+      0 0 14px ${accentColor}33;
+    transform: scale(0.96) rotate(-2deg);
+  }
+  80% {
+    opacity: 0.9;
+    text-shadow:
+      0 0 8px ${accentColor}cc,
+      0 0 22px ${accentColor}55,
+      0 0 44px ${accentColor}33;
+    transform: scale(1.06) rotate(1deg);
+  }
+}
+@keyframes spookyFlicker {
+  0%, 100% { opacity: 1; }
+  4% { opacity: 0.4; }
+  6% { opacity: 1; }
+  42% { opacity: 1; }
+  44% { opacity: 0.6; }
+  46% { opacity: 1; }
+  78% { opacity: 1; }
+  80% { opacity: 0.35; }
+  82% { opacity: 0.9; }
+  83% { opacity: 0.4; }
+  84% { opacity: 1; }
+}
+@keyframes ghostDissolve {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0px);
+    text-shadow:
+      0 0 10px ${accentColor},
+      0 0 28px ${accentColor}88,
+      0 0 56px ${accentColor}44;
+  }
+  35% {
+    opacity: 0.8;
+    transform: scale(1.15);
+    filter: blur(0.5px);
+    text-shadow:
+      0 0 14px ${accentColor},
+      0 0 40px ${accentColor}bb,
+      0 0 80px ${accentColor}66;
+  }
+  70% {
+    opacity: 0.3;
+    transform: scale(1.5);
+    filter: blur(3px);
+    text-shadow:
+      0 0 24px ${accentColor}cc,
+      0 0 60px ${accentColor}66;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.2);
+    filter: blur(8px);
+    text-shadow:
+      0 0 40px ${accentColor},
+      0 0 90px ${accentColor}88;
+  }
+}
+`;
+  document.head.appendChild(style);
+}
+
+/** Permanent spooky letter — used when avatar is broken (never loads) */
+function SpookyLetter({ letter, color }: { letter: string; color: string }) {
+  useEffect(() => {
+    ensureSpookyKeyframes(color);
+  }, [color]);
+
+  return (
+    <span
+      className="flex h-full w-full items-center justify-center text-sm font-bold select-none"
+      style={{
+        color,
+        animation: "spookyPulse 3s ease-in-out infinite, spookyFlicker 5s steps(1) infinite",
+      }}
+    >
+      {letter}
+    </span>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Main component
+   ─────────────────────────────────────────────────────────────────────────── */
 export function FranchizeProfileButton({ bgColor, textColor, borderColor, currentSlug }: FranchizeProfileButtonProps) {
   const { dbUser, user, userCrewInfo, isInTelegramContext } = useAppContext();
   const hasUser = Boolean(dbUser || user);
@@ -68,6 +182,25 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   const franchizeAdminHref = `/franchize/${scopeSlug}/admin`;
   const franchizeDashboardHref = `/franchize/${scopeSlug}/dashboard`;
   const franchizeProfileHref = `/franchize/${scopeSlug}/profile`;
+
+  // ── Avatar loading state machine ──
+  //   loading → (onLoad) → dissolving → (animationEnd) → revealed
+  //   loading → (onError) → broken (permanent spooky letter)
+  const [brokenAvatarUrls, setBrokenAvatarUrls] = useState<Record<string, true>>({});
+  const [avatarLoaded, setAvatarLoaded] = useState(false);
+  const [avatarDissolved, setAvatarDissolved] = useState(false);
+
+  // Reset loading/dissolve state when avatar URL changes
+  useEffect(() => {
+    setAvatarLoaded(false);
+    setAvatarDissolved(false);
+  }, [avatarUrl]);
+
+  // Inject spooky keyframes with the franchise accent color
+  useEffect(() => {
+    ensureSpookyKeyframes(textColor);
+  }, [textColor]);
+
   const [tempCartId, setTempCartId] = useState<string | null>(null);
   const [notificationPreferences, setNotificationPreferences] = useState<FranchizeNotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
   const [isNotificationSaving, setIsNotificationSaving] = useState(false);
@@ -157,12 +290,48 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             className="inline-flex h-11 items-center gap-2 rounded-xl px-2 transition hover:opacity-80"
             style={{ backgroundColor: bgColor, color: textColor }}
           >
+            {/* ── Avatar area: 4 states ── */}
             <span className="relative block h-8 w-8 overflow-hidden rounded-full border" style={{ borderColor }}>
-              {avatarUrl ? (
-                <Image src={avatarUrl} alt={displayName} fill sizes="32px" className="object-cover" />
+              {avatarUrl && !brokenAvatarUrls[avatarUrl] ? (
+                <>
+                  {/* Image layer — always rendered so it loads in background */}
+                  <Image
+                    src={avatarUrl}
+                    alt={displayName}
+                    fill
+                    sizes="32px"
+                    className="object-cover"
+                    onLoad={() => setAvatarLoaded(true)}
+                    onError={() => {
+                      if (!avatarUrl) return;
+                      setBrokenAvatarUrls((prev) => ({ ...prev, [avatarUrl]: true }));
+                    }}
+                  />
+                  {/* Spooky letter overlay — breathes while loading, dissolves on load */}
+                  {!avatarDissolved && (
+                    <span
+                      className="absolute inset-0 z-10 flex items-center justify-center text-sm font-bold select-none"
+                      style={{
+                        color: textColor,
+                        animation: avatarLoaded
+                          ? "ghostDissolve 0.8s ease-out forwards"
+                          : "spookyPulse 3s ease-in-out infinite, spookyFlicker 5s steps(1) infinite",
+                      }}
+                      onAnimationEnd={() => {
+                        if (avatarLoaded) setAvatarDissolved(true);
+                      }}
+                    >
+                      {getFirstLetter(displayName)}
+                    </span>
+                  )}
+                </>
+              ) : avatarUrl && brokenAvatarUrls[avatarUrl] ? (
+                /* Broken URL — permanent spooky letter */
+                <SpookyLetter letter={getFirstLetter(displayName)} color={textColor} />
               ) : (
-                <span className="flex h-full w-full items-center justify-center text-xs font-semibold">
-                  {getInitials(displayName)}
+                /* No avatar URL at all — plain static letter */
+                <span className="flex h-full w-full items-center justify-center text-sm font-semibold">
+                  {getFirstLetter(displayName)}
                 </span>
               )}
             </span>
