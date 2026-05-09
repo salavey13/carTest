@@ -1,8 +1,8 @@
 -- /docs/sql/sly13-franchize-hydration.sql
 -- SLY13 CYBERVIBE Franchize hydration reference payload (2026 edition)
--- Purpose: production-grade seed with rich metadata, content blocks and private.crew_secrets
--- Safe to re-run: uses ON CONFLICT + jsonb_set + private upsert
--- Updated: 2026-05-09 — full overhaul to match VIP_BIKE quality standard
+-- Purpose: production-grade personal brand seed with rich metadata + forced dark cyber theme
+-- Safe to re-run: ON CONFLICT + jsonb_set + private upsert
+-- Updated: 2026-05-09 v5 — full polish, dark cyber aesthetic 🕶️
 
 begin;
 
@@ -20,7 +20,7 @@ insert into public.crews (
   updated_at
 )
 values (
-  '6be3846b-f350-4558-a6c3-44b43b6760de',  -- replace if needed
+  '6be3846b-f350-4558-a6c3-44b43b6760de',
   'SLY13 CYBERVIBE',
   'AI-оператор, практик сервисного продакта и коуч. Помогаю запускать продукты, прокачивать навыки и думать быстрее с помощью AI.',
   'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/a7f27e4d-81ba-464a-a8e5-7a75cd0f6c00-ac3bac18-2adc-4c94-bada-2c2f0805fde4.jpg',
@@ -49,55 +49,55 @@ set
     '{franchize}',
     (
       jsonb_build_object(
-        'version', '2026-05-09-v3',
+        'version', '2026-05-09-v5-dark',
         'enabled', true,
         'slug', 'sly13',
         'branding', jsonb_build_object(
           'name', 'SLY13 CYBERVIBE',
           'shortName', 'SLY13',
           'tagline', 'AI как ко-пилот. От идеи до боевого продукта за дни, а не месяцы.',
-          'logoUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gifg',
-          'heroImageUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/46f34997-2589-4ae7-9082-a374f19419a6-c899f118-1692-45b9-b6ef-d1066a607426.jpg', -- add one
+          'logoUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif',
+          'heroImageUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/46f34997-2589-4ae7-9082-a374f19419a6-c899f118-1692-45b9-b6ef-d1066a607426.jpg',
           'centerLogoInHeader', true
         ),
         'theme', jsonb_build_object(
-          'mode', 'cyberdawn_light',
+          'mode', 'cyberdawn_dark',
           'palette', jsonb_build_object(
-            'bgBase', '#090B12',
-            'bgCard', '#101726',
-            'bgElevated', '#162136',
-            'borderSoft', '#26354F',
-            'borderCard', '#324664',
-            'accentMain', '#7CFFB2',
-            'accentMainHover', '#9CFFD0',
-            'accentDeep', '#4DD48F',
-            'accentTextOn', '#07140F',
-            'textPrimary', '#EAF2FF',
-            'textSecondary', '#9EB2D1',
-            'textMuted', '#7E92B1',
-            'textAccent', '#7CFFB2',
-            'success', '#62D88A',
-            'warning', '#F2C14E',
-            'error', '#FF6B7A'
+            'bgBase', '#0A0F1C',
+            'bgCard', '#111827',
+            'bgElevated', '#1A2338',
+            'borderSoft', '#334155',
+            'borderCard', '#475569',
+            'accentMain', '#22D3EE',
+            'accentMainHover', '#67E8F9',
+            'accentDeep', '#0891B2',
+            'accentTextOn', '#0F172A',
+            'textPrimary', '#F1F5F9',
+            'textSecondary', '#94A3B8',
+            'textMuted', '#64748B',
+            'textAccent', '#22D3EE',
+            'success', '#4ADE80',
+            'warning', '#FACC15',
+            'error', '#F87171'
           ),
           'palettes', jsonb_build_object(
             'dark', jsonb_build_object(
-              'bgBase', '#090B12',
-              'bgCard', '#101726',
-              'accentMain', '#7CFFB2',
-              'accentMainHover', '#9CFFD0',
-              'textPrimary', '#EAF2FF',
-              'textSecondary', '#9EB2D1',
-              'borderSoft', '#26354F'
+              'bgBase', '#0A0F1C',
+              'bgCard', '#111827',
+              'accentMain', '#22D3EE',
+              'accentMainHover', '#67E8F9',
+              'textPrimary', '#F1F5F9',
+              'textSecondary', '#94A3B8',
+              'borderSoft', '#334155'
             ),
             'light', jsonb_build_object(
-              'bgBase', '#F4F9FF',
+              'bgBase', '#F8FAFC',
               'bgCard', '#FFFFFF',
-              'accentMain', '#168A5C',
-              'accentMainHover', '#1FA46E',
-              'textPrimary', '#0D1B2A',
-              'textSecondary', '#36506E',
-              'borderSoft', '#C4D7EA'
+              'accentMain', '#22D3EE',
+              'accentMainHover', '#67E8F9',
+              'textPrimary', '#0F172A',
+              'textSecondary', '#475569',
+              'borderSoft', '#E2E8F0'
             )
           ),
           'radius', jsonb_build_object('card', 18, 'button', 14, 'pill', 999, 'sm', 10, 'md', 14, 'lg', 18),
@@ -124,7 +124,7 @@ set
           )
         ),
         'footer', jsonb_build_object(
-          'textColor', '#16130A',
+          'textColor', '#F1F5F9',
           'columns', jsonb_build_array(
             jsonb_build_object(
               'title', 'SLY13 CYBERVIBE',
@@ -144,7 +144,8 @@ set
             jsonb_build_object(
               'title', 'СВЯЗЬ',
               'items', jsonb_build_array(
-                jsonb_build_object('type', 'external', 'label', '@SALAVEY13', 'href', 'https://t.me/SALAVEY13', 'icon', 'FaTelegram')
+                jsonb_build_object('type', 'external', 'label', '@SALAVEY13', 'href', 'https://t.me/SALAVEY13', 'icon', 'FaTelegram'),
+                jsonb_build_object('type', 'phone', 'label', '+7 9200-789-888', 'href', 'tel:+79200789888', 'icon', 'FaPhone')
               )
             )
           ),
@@ -267,7 +268,7 @@ set
   updated_at = now()
 where c.slug = 'sly13';
 
--- 3) Legacy fields
+-- 3) Legacy top-level metadata
 update public.crews c
 set
   metadata = coalesce(c.metadata, '{}'::jsonb)
@@ -275,9 +276,10 @@ set
     || jsonb_build_object('is_provider', true)
     || jsonb_build_object('provider_type', 'ai_product_operator')
     || jsonb_build_object('rating', 5)
+    || jsonb_build_object('forceDarkMode', true)
 where c.slug = 'sly13';
 
--- 4) Private secrets
+-- 4) Private crew secrets
 insert into private.crew_secrets (
   crew_slug,
   contract_defaults,
@@ -296,6 +298,7 @@ set
 
 commit;
 
--- Verification
--- select slug, metadata->'franchize'->'branding'->>'name' as brand from public.crews where slug='sly13';
+-- Verification helpers
+-- select slug, metadata->'franchize'->'theme'->>'mode' as theme_mode from public.crews where slug='sly13';
+-- select jsonb_pretty(metadata->'franchize'->'branding') from public.crews where slug='sly13';
 -- select jsonb_pretty((select contract_defaults::jsonb from private.crew_secrets where crew_slug='sly13'));
