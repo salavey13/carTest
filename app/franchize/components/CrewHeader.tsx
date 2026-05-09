@@ -13,6 +13,13 @@ import { toCategoryId } from "../lib/navigation";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
 import { readablePaletteTextOnColor, withAlpha } from "../lib/theme";
+import {
+  ensureSpookyKeyframes,
+  getFirstLetter,
+  sanitizeAccentColor,
+  SpookyLetter,
+  SPOOKY_ACCENT_VAR,
+} from "@/app/franchize/lib/spooky-avatar";
 
 interface CrewHeaderProps {
   crew: FranchizeCrewVM;
@@ -32,6 +39,27 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   const railRef = useRef<HTMLDivElement | null>(null);
   const prevPathnameRef = useRef<string | null>(null);
   const activePillText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
+
+  // ── Logo loading state machine ──
+  //   loading → (onLoad) → dissolving → (animationEnd) → revealed
+  //   loading → (onError) → broken (permanent spooky letter)
+  const [brokenLogoUrls, setBrokenLogoUrls] = useState<Record<string, true>>({});
+  const [logoLoaded, setLogoLoaded] = useState(false);
+  const [logoDissolved, setLogoDissolved] = useState(false);
+
+  const logoUrl = crew.header.logoUrl;
+  const accentMain = crew.theme.palette.accentMain;
+
+  // Reset loading/dissolve state when logo URL changes
+  useEffect(() => {
+    setLogoLoaded(false);
+    setLogoDissolved(false);
+  }, [logoUrl]);
+
+  // Inject spooky keyframes once
+  useEffect(() => {
+    ensureSpookyKeyframes();
+  }, []);
 
   // Reset active category when navigating away from main catalog
   // Scheduling setState via setTimeout to satisfy linter
@@ -221,22 +249,52 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             <div
               className="relative h-16 w-16 overflow-hidden rounded-full border shadow-lg"
               style={{
-                borderColor: crew.theme.palette.accentMain,
+                borderColor: accentMain,
                 backgroundColor: crew.theme.palette.bgBase,
               }}
             >
-              {crew.header.logoUrl ? (
-                <Image
-                  src={crew.header.logoUrl}
-                  alt={`${crew.header.brandName} logo`}
-                  fill
-                  sizes="64px"
-                  className="object-cover"
-                />
+              {logoUrl && !brokenLogoUrls[logoUrl] ? (
+                <>
+                  {/* Image layer — always rendered so it loads in background */}
+                  <Image
+                    src={logoUrl}
+                    alt={`${crew.header.brandName} logo`}
+                    fill
+                    sizes="64px"
+                    className="object-cover"
+                    onLoad={() => setLogoLoaded(true)}
+                    onError={() => {
+                      if (!logoUrl) return;
+                      setBrokenLogoUrls((prev) => ({ ...prev, [logoUrl]: true }));
+                    }}
+                  />
+                  {/* Spooky letter overlay — breathes while loading, dissolves on load */}
+                  {!logoDissolved && (
+                    <span
+                      className="absolute inset-0 z-10 flex items-center justify-center text-2xl font-bold select-none"
+                      style={{
+                        color: accentMain,
+                        [SPOOKY_ACCENT_VAR as string]: sanitizeAccentColor(accentMain),
+                        animation: logoLoaded
+                          ? "ghostDissolve 0.8s ease-out forwards"
+                          : "spookyPulse 3s ease-in-out infinite, spookyFlicker 5s steps(1) infinite",
+                      }}
+                      onAnimationEnd={() => {
+                        if (logoLoaded) setLogoDissolved(true);
+                      }}
+                    >
+                      {getFirstLetter(crew.header.brandName)}
+                    </span>
+                  )}
+                </>
+              ) : logoUrl && brokenLogoUrls[logoUrl] ? (
+                /* Broken URL — permanent spooky letter */
+                <SpookyLetter letter={getFirstLetter(crew.header.brandName)} color={accentMain} sizeClass="text-2xl" />
               ) : (
+                /* No logo URL at all — brand name text fallback */
                 <div
                   className="flex h-full w-full items-center justify-center px-2 text-[10px] font-semibold uppercase tracking-wide"
-                  style={{ color: crew.theme.palette.accentMain }}
+                  style={{ color: accentMain }}
                 >
                   {crew.header.brandName}
                 </div>
