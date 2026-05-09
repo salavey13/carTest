@@ -197,7 +197,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
                       className="absolute inset-0 z-10 flex items-center justify-center text-sm font-bold select-none"
                       style={{
                         color: textColor,
-                        [SPOOKY_ACCENT_VAR]: sanitizeAccentColor(textColor),
+                        [SPOOKY_ACCENT_VAR as string]: sanitizeAccentColor(textColor),
                         animation: avatarLoaded
                           ? "ghostDissolve 0.8s ease-out forwards"
                           : "spookyPulse 3s ease-in-out infinite, spookyFlicker 5s steps(1) infinite",
