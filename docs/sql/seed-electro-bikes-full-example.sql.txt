@@ -41,7 +41,14 @@ INSERT INTO "public"."cars" (
     "battery": "72V 40Ah (Samsung 50S, 2 880 Wh)",
     "gallery": [
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2025/image_1.jpg",
-      "https://falcon-bike.ru/assets/images/falcon-gt.jpg"
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2025/image_2.jpg",
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2025/image_3.jpg",
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2025/image_4.jpg",
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2025/image_5.jpg",
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2025/image_6.jpg",
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2025/image_7.jpg",
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2025/image_8.jpg",
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2025/image_9.jpg"
     ],
     "features": [
       "NFC старт",
