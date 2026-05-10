@@ -450,6 +450,13 @@ export function FranchizeAdminClient({
             <Link href={`/franchize/${slug}/dashboard`}>Открыть заявки</Link>
           </Button>
         </div>
+        <div className="mt-3">
+          <Button asChild variant="outline" className="h-9 text-xs font-semibold">
+            <Link href={`/franchize/${slug}/admin/prices`}>
+              Быстрая правка цен
+            </Link>
+          </Button>
+        </div>
       </FranchizeOperatorPanel>
 
       <FranchizeOperatorPanel className="mt-4">
