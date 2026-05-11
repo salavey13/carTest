@@ -1,3 +1,8 @@
+# todo.md — Telegram Mini App back/close behavior hardening
+
+
+## Initial Brainstorm history to warm you up:
+```
 Yep — this is one of the MOST common Telegram Mini App footguns 😅
 What’s happening right now is:
 
@@ -988,5 +993,538 @@ contextual rendering
 lifecycle management
 
 That’s exactly how serious Mini Apps are built 💪
+```
+
+---
 
 
+## Goal
+
+Make Telegram Mini App navigation behave like a real mobile app:
+
+* Telegram top-left **BackButton** should navigate inside the app, not collapse it.
+* Android hardware back should also navigate inside the app first.
+* iOS / Telegram swipe gestures should not instantly close the app when internal navigation is possible.
+* Swipe-down / close gestures should show a confirmation dialog when the app is in a risky state.
+* The app should only truly close when the user is at the root and no internal back target exists.
+
+---
+
+## What is already good
+
+* `useTelegramBackButton.ts` already exists and has a good starting idea.
+* `AppContext` already exposes `tg`, `isInTelegramContext`, and auth/runtime state.
+* `ClientLayout.tsx` already acts like a runtime shell, which is the right place for global Telegram behavior.
+* `useTelegram.ts` already handles auth, viewport recovery, expansion, and Telegram SDK bootstrap.
+
+---
+
+## Files that require work
+
+### Must fix
+
+* `/hooks/useTelegramBackButton.ts`
+* `/hooks/useTelegram.ts`
+* `/contexts/AppContext.tsx`
+* `/components/layout/ClientLayout.tsx`
+* `/app/layout.tsx`
+* `/app/globals.css` or the global stylesheet that controls html/body scrolling
+
+### Add new files
+
+* `/stores/navigationStore.ts`
+* `/components/telegram/TelegramNavigationTracker.tsx`
+* `/hooks/telegram/useTelegramClosingBehavior.ts`
+* `/hooks/telegram/useTelegramViewportGuard.ts` (or fold this into an existing viewport hook)
+* `/components/telegram/TelegramRuntime.tsx`
+* `/config/routeShell.ts` or another central route-policy file
+
+---
+
+## Priority 1 — fix navigation ownership
+
+### 1) `/hooks/useTelegramBackButton.ts`
+
+Current behavior is close, but it still needs to become the single source of truth for Telegram back handling.
+
+#### Tasks
+
+* Keep the hook mounted globally only once.
+* Make sure the hook does **not** rely on native browser back as the main navigation primitive.
+* Keep internal path history in a stable structure, but prefer a shared navigation store over local `useRef` history alone.
+* Show Telegram BackButton only when there is a valid internal back target.
+* Hide Telegram BackButton at the root so the close affordance remains available.
+* On click, navigate to the previous internal route using SPA navigation.
+* Avoid `router.back()` for Telegram-specific behavior.
+* Avoid collapsing the app when an internal back target exists.
+* Add support for route suffixes and nested paths consistently.
+* Make sure the history stack does not duplicate the same pathname repeatedly.
+* Make sure query/hash are handled deliberately, not accidentally.
+
+#### Notes about swipe-right
+
+* The existing hook helps with the visible Telegram BackButton, but swipe-right / native back gestures can still bypass it unless browser history and route tracking are also wired correctly.
+* The hook should be part of a larger system, not the only piece.
+
+#### Suggested improvement
+
+* Preserve the current `fallbackPathFor()` logic, but use it only as a last-resort fallback.
+* Prefer an explicit stack of visited app paths.
+
+---
+
+### 2) `/stores/navigationStore.ts`
+
+Create a shared navigation stack store.
+
+#### Tasks
+
+* Store visited internal routes in order.
+* Expose `push(path)`, `pop()`, `peekPrevious()`, `canGoBack()`.
+* Deduplicate consecutive identical paths.
+* Limit stack size to something reasonable, for example 20–50 entries.
+* Make it client-only.
+
+#### Why this matters
+
+* Next.js App Router does not act like a mobile stack by itself.
+* Telegram back needs a predictable internal stack, not just pathname guessing.
+
+---
+
+### 3) `/components/telegram/TelegramNavigationTracker.tsx`
+
+This component should synchronize Next.js route changes into the navigation store and browser history.
+
+#### Tasks
+
+* Read `usePathname()`.
+* On each route change, push the current route into the navigation store.
+* On route change, ensure browser history state is updated in a controlled way.
+* Mount globally once.
+* Keep it lightweight and side-effect focused.
+
+#### Important
+
+* This component is what makes Android native back and swipe-right gestures behave like internal navigation instead of app collapse.
+
+---
+
+### 4) `/hooks/telegram/useTelegramClosingBehavior.ts`
+
+This hook should control the Telegram close confirmation behavior.
+
+#### Tasks
+
+* Call `tg.enableClosingConfirmation()` when the app is in a risky state.
+* Call `tg.disableClosingConfirmation()` when the risky state ends, if supported.
+* Make it configurable via props or state.
+* Treat it as a safety layer for swipe-down and accidental close behavior.
+
+#### What it should protect against
+
+* Swipe-down close.
+* Close button / collapse behavior.
+* Accidental exits during form editing, payment, lobby creation, or other destructive states.
+
+#### Important reality check
+
+* This does **not** fully disable close.
+* It only makes Telegram ask for confirmation before closing.
+* It may not fully cover every swipe-right browser-history case by itself.
+
+---
+
+### 5) `/hooks/telegram/useTelegramViewportGuard.ts`
+
+If viewport behavior is still fragmented, split it out from `useTelegram.ts`.
+
+#### Tasks
+
+* Re-apply `expand()` after visibility changes if needed.
+* Re-apply viewport recovery after route changes if Telegram shrinks the app.
+* Keep keyboard / background / orientation edge cases stable.
+* Avoid duplicated viewport logic across multiple hooks.
+
+---
+
+### 6) `/components/telegram/TelegramRuntime.tsx`
+
+Create a single global runtime component to mount Telegram-specific app shell behavior.
+
+#### Tasks
+
+* Mount back-button logic.
+* Mount close-confirmation logic.
+* Mount viewport guard logic.
+* Keep it globally mounted once from the layout shell.
+
+---
+
+## Priority 2 — strengthen layout ownership
+
+### 7) `/components/layout/ClientLayout.tsx`
+
+This is already a powerful shell, but it now needs to be the runtime host for Telegram behaviors.
+
+#### Tasks
+
+* Mount `TelegramRuntime` once here.
+* Mount `TelegramNavigationTracker` once here.
+* Keep Telegram back and close logic out of page-level components.
+* Keep auth, theme, focus tracking, analytics, and navigation concerns separated as much as practical.
+* Consider splitting the huge component into smaller runtime wrappers if the file keeps growing.
+
+#### Refactor suggestions
+
+* Extract `AppInitializers` into smaller hooks or runtime subcomponents.
+* Extract route display policy into a route config file.
+* Extract `useThemeSync()` and `useBio30ThemeFix()` into dedicated hooks files.
+
+#### Why this matters
+
+* The layout is already acting as the app kernel.
+* It should stay that way, but with cleaner responsibilities.
+
+---
+
+### 8) `/app/layout.tsx`
+
+Make the root document mobile-safe for Telegram WebView.
+
+#### Tasks
+
+* Ensure viewport meta is correct and covers mobile edge cases.
+* Add `viewport-fit=cover` if not already handled through Next metadata.
+* Verify that Telegram WebView receives no conflicting scaling rules.
+* Keep Telegram JS script loading early.
+* Make sure there is no body-level scrolling conflict with the app shell.
+
+#### Check specifically
+
+* `userScalable: false` is usually okay for Mini Apps, but confirm it matches your UX goal.
+* Verify whether the `<meta name="viewport">` produced by Next matches the Mini App needs.
+
+---
+
+### 9) Global styles file (`/app/globals.css` or equivalent)
+
+Hardening the root scroll model is important.
+
+#### Tasks
+
+* Prevent body-level scroll unless intentionally needed.
+* Reduce overscroll bounce / rubber band behavior.
+* Make sure there is a single internal scroll container rather than nested scrolling everywhere.
+* Prefer a fixed app shell with one scrollable content region.
+* Add `overscroll-behavior` rules where appropriate.
+
+#### Suggested CSS targets
+
+* `html`
+* `body`
+* `#__next` or root app container if used
+* main content scroll wrapper
+
+#### Watch for
+
+* Nested `overflow-auto` containers.
+* Unexpected body height changes during Telegram gesture navigation.
+* iOS momentum scrolling side effects.
+
+---
+
+## Priority 3 — improve Telegram auth/runtime separation
+
+### 10) `/hooks/useTelegram.ts`
+
+This hook is currently doing a lot well, but it is too broad.
+
+#### Tasks
+
+* Keep auth responsibilities here.
+* Keep Telegram SDK bootstrap / expansion / init-data logic here.
+* Move navigation behavior out of this hook.
+* Move close confirmation behavior out of this hook.
+* Move viewport guard logic into a dedicated hook if it grows further.
+* Keep this hook focused on Telegram identity, SDK readiness, and app-level session state.
+
+#### Suggested split
+
+* `useTelegramAuth`
+* `useTelegramViewport`
+* `useTelegramBackButton`
+* `useTelegramClosingBehavior`
+* `useTelegramTheme`
+
+#### Important
+
+* Avoid turning this hook into a second layout shell.
+
+---
+
+### 11) `/contexts/AppContext.tsx`
+
+The context is currently good for exposing Telegram and app runtime state, but it may need a few additions.
+
+#### Tasks
+
+* Expose any navigation-related shared helpers only if truly needed.
+* Keep `tg`, `isInTelegramContext`, and auth state available to global runtime hooks.
+* Avoid adding navigation stack ownership directly into context if a store is cleaner.
+* Consider exposing a `canCloseSafely` / `isDirty` style flag if useful for close confirmation.
+
+#### Potential additions
+
+* `hasUnsavedChanges`
+* `isCriticalFlowActive`
+* `isModalOpen`
+* `isEditingState`
+
+These can feed the close-confirmation hook.
+
+---
+
+## Route-policy cleanup
+
+### 12) Add a central route policy file
+
+Example file:
+
+* `/config/routeShell.ts`
+
+#### Tasks
+
+* Move route display decisions out of `ClientLayout.tsx`.
+* Describe per-route shell behavior in a single place.
+* Store flags such as:
+
+  * header visible
+  * footer visible
+  * bottom nav visible
+  * transparent shell
+  * immersive mode
+  * risky close state
+
+#### Why
+
+* Your current route conditions are powerful, but they will become hard to maintain as the app grows.
+* Central route policy will help with Telegram close rules too.
+
+---
+
+## Priority 4 — mobile UX hardening
+
+### 13) Handle swipe-right vs swipe-down separately in reasoning
+
+#### Tasks
+
+* Treat swipe-down as a close-prevention / confirmation problem.
+* Treat swipe-right as a history-stack / navigation problem.
+* Do not assume `enableClosingConfirmation()` solves both.
+* Ensure the app has real navigation history so swipe-right becomes internal route navigation instead of collapse.
+
+#### Rule of thumb
+
+* If there is a previous internal route, navigate inside the app.
+* If there is no previous internal route, only then allow close.
+
+---
+
+### 14) Re-check route transitions that use `replace()`
+
+#### Tasks
+
+* Audit places using `router.replace()`.
+* Use `router.push()` for actual navigational steps that should be back-navigable.
+* Reserve `replace()` for cases where history should not grow.
+
+#### Why
+
+* `replace()` can erase the stack Telegram needs for proper back behavior.
+
+---
+
+### 15) Add app-shell scroll discipline
+
+#### Tasks
+
+* Prefer one main scroll container.
+* Avoid multiple nested scroll areas where possible.
+* Keep header/footer layout stable.
+* Prevent accidental overscroll from acting like a close gesture trigger.
+
+---
+
+## Priority 5 — optional but recommended polish
+
+### 16) Make close confirmation conditional
+
+#### Tasks
+
+* Enable close confirmation only when the app is in a critical state.
+* Example critical states:
+
+  * unsaved forms
+  * checkout/payment flow
+  * lobby creation
+  * profile edits
+  * game setup
+* Disable it when the user is just browsing non-destructive pages.
+
+#### Benefit
+
+* Less annoying UX.
+* Still safer where it matters.
+
+---
+
+### 17) Add runtime logging for Telegram navigation
+
+#### Tasks
+
+* Log when BackButton is shown or hidden.
+* Log when close confirmation is enabled or disabled.
+* Log when navigation stack changes.
+* Log when a swipe-right resolves to an internal route vs close.
+
+#### Why
+
+* This will make Telegram gesture bugs much easier to debug on real devices.
+
+---
+
+### 18) Consider a tiny dev-only overlay for runtime state
+
+#### Show
+
+* current pathname
+* internal stack length
+* Telegram context status
+* close-confirmation status
+* whether BackButton is visible
+
+#### Why
+
+* Telegram mobile behavior is notoriously hard to inspect.
+
+---
+
+## Recommended implementation order
+
+### Phase 1
+
+1. Add `/stores/navigationStore.ts`
+2. Add `/components/telegram/TelegramNavigationTracker.tsx`
+3. Improve `/hooks/useTelegramBackButton.ts`
+4. Mount the tracker and runtime globally in `/components/layout/ClientLayout.tsx`
+
+### Phase 2
+
+5. Add `/hooks/telegram/useTelegramClosingBehavior.ts`
+6. Wire risky-state close confirmation
+7. Move or harden viewport recovery logic
+
+### Phase 3
+
+8. Clean up `/app/layout.tsx`
+9. Harden global scroll / overscroll behavior
+10. Extract route policy from `ClientLayout.tsx`
+
+### Phase 4
+
+11. Split `useTelegram.ts` into smaller hooks if it keeps growing
+12. Reduce layout complexity where possible
+
+---
+
+## Acceptance criteria
+
+The fix is successful when all of the following are true:
+
+* Telegram top-left BackButton goes to the previous internal route.
+* Android hardware back also goes to the previous internal route.
+* Swipe-right does not instantly collapse the app when there is a valid internal route to go back to.
+* Swipe-down / close gestures show confirmation during risky flows.
+* The app closes only when it is actually at the root and no internal route is available.
+* Navigation feels native and predictable on mobile Telegram.
+
+---
+
+## Specific note on the existing `useTelegramBackButton.ts`
+
+This file is already valuable and should not be thrown away.
+
+#### Keep
+
+* `fallbackPathFor()`
+* root awareness
+* Telegram BackButton show/hide logic
+* cleanup of `onClick`
+
+#### Improve
+
+* Share history state with a dedicated navigation store.
+* Make route stack tracking explicit and more robust.
+* Make sure swipe-right / popstate behavior is handled alongside Telegram BackButton.
+* Avoid relying on fallback path guessing when a real previous route exists.
+
+---
+
+## Specific note on close confirmation
+
+`enableClosingConfirmation()` is for protecting the app from accidental close gestures, especially swipe-down and close affordances.
+
+It should be used when:
+
+* the user has unsaved work
+* the user is in a destructive or high-friction flow
+* closing the app would be annoying or harmful
+
+It should not be treated as a replacement for proper back navigation.
+
+In other words:
+
+* **Back navigation** = stack/history problem
+* **Close confirmation** = accidental-exit problem
+
+Both are needed.
+
+---
+
+## Final architecture summary
+
+### Global shell
+
+* `/components/layout/ClientLayout.tsx`
+
+### Global Telegram runtime
+
+* `/components/telegram/TelegramRuntime.tsx`
+* `/components/telegram/TelegramNavigationTracker.tsx`
+
+### State
+
+* `/stores/navigationStore.ts`
+
+### Hooks
+
+* `/hooks/useTelegram.ts`
+* `/hooks/useTelegramBackButton.ts`
+* `/hooks/telegram/useTelegramClosingBehavior.ts`
+* `/hooks/telegram/useTelegramViewportGuard.ts`
+
+### Layout / document
+
+* `/app/layout.tsx`
+* global CSS
+
+### Optional policy layer
+
+* `/config/routeShell.ts`
+
+---
+
+## Done means
+
+The app behaves like a real mobile Telegram Mini App, not a browser page pretending to be one.
