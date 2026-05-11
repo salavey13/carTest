@@ -10,6 +10,7 @@ import {
   Sparkles,
   Star,
   Wrench,
+  CircleHelp,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -30,17 +31,6 @@ interface FranchizeAboutPageProps {
   params: Promise<{ slug: string }>;
 }
 
-type AboutCard = {
-  title: string;
-  text: string;
-  icon: LucideIcon;
-};
-
-type AboutStep = {
-  title: string;
-  text: string;
-};
-
 type TrustStripItem = {
   label: string;
   value: string;
@@ -51,6 +41,14 @@ type TrustStripItem = {
 const softCardClass = "rounded-2xl border p-4";
 const accentTextClass = "text-[var(--franchize-shell-accent)]";
 const mutedTextClass = "text-[var(--franchize-shell-muted)]";
+
+const capabilityIconMap: Record<string, LucideIcon> = {
+  bike: Bike,
+  "shopping-bag": ShoppingBag,
+  map: Map,
+  wrench: Wrench,
+};
+
 const secondaryCtaClass =
   "inline-flex min-h-11 items-center justify-center rounded-2xl border border-[var(--franchize-shell-border)] px-4 py-3 text-center text-sm font-semibold text-[var(--franchize-shell-text)] transition hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-[var(--franchize-shell-ring)]";
 
@@ -83,48 +81,6 @@ const buildCatalogTrustCopy = (activeCatalogCount: number, totalCatalogCount: nu
 
   return "Доступных позиций сейчас; полный список можно проверить в каталоге.";
 };
-
-const crewCapabilities = (brandName: string): AboutCard[] => [
-  {
-    title: "Аренды без лишнего трения",
-    text: "Помогаем быстро выбрать байк, дату и формат поездки — от короткого теста до полноценного маршрута.",
-    icon: Bike,
-  },
-  {
-    title: "Продажи и конфигуратор",
-    text: "Собираем заявку на покупку, custom/electric сценарии, trade-in и консультацию по подходящей модели.",
-    icon: ShoppingBag,
-  },
-  {
-    title: "MapRiders и комьюнити",
-    text: "Подключаем райдеров, meetup-точки и локальные маршруты, чтобы экипаж был не просто витриной, а живой сетью.",
-    icon: Map,
-  },
-  {
-    title: "Сервис и помощь",
-    text: `${brandName} держит рядом поддержку: выдача, подсказки по эксплуатации, возврат и разбор вопросов после поездки.`,
-    icon: Wrench,
-  },
-];
-
-const workSteps: AboutStep[] = [
-  {
-    title: "Выберите байк",
-    text: "Откройте каталог, сравните доступные позиции и добавьте подходящий вариант в заявку.",
-  },
-  {
-    title: "Подтвердите в Telegram",
-    text: "Оператор уточнит время, документы, оплату и важные детали прямо в привычном чате.",
-  },
-  {
-    title: "Заберите и катайтесь",
-    text: "На точке выдачи проверяем состояние, правила маршрута и передаём экипировку/инструкции.",
-  },
-  {
-    title: "Верните и оставьте отзыв",
-    text: "Закрываем поездку, фиксируем опыт и улучшаем витрину по реальным отзывам райдеров.",
-  },
-];
 
 export async function generateMetadata({
   params,
@@ -159,7 +115,8 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
     crew.ratingSummary.count > 0
       ? `${crew.ratingSummary.count} отзывов после поездок`
       : "Отзывы появятся после первых заказов";
-  const capabilities = crewCapabilities(brandName);
+  const capabilities = crew.contentBlocks.aboutCapabilities;
+  const workSteps = crew.contentBlocks.aboutWorkSteps;
   const trustStrip: TrustStripItem[] = [
     {
       label: "Рейтинг",
@@ -252,7 +209,7 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
           </div>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             {capabilities.map((capability) => {
-              const Icon = capability.icon;
+              const Icon = capability.icon ? (capabilityIconMap[capability.icon] ?? CircleHelp) : CircleHelp;
               return (
                 <article key={capability.title} className="rounded-3xl border p-5" style={surface.subtleCard}>
                   <Icon className={`h-7 w-7 ${accentTextClass}`} />
