@@ -795,7 +795,17 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       contentBlocks: readFranchizeContentBlocks(franchize),
     };
 
-    const items: CatalogItemVM[] = (cars ?? []).map((car) => {
+    const items: CatalogItemVM[] = (cars ?? [])
+      .filter((car) => {
+        const specs = (car.specs ?? {}) as UnknownRecord;
+        const hidden = readPath<unknown>(specs, ["hidden"], false);
+        return !(
+          hidden === true ||
+          hidden === 1 ||
+          ["1", "true"].includes(String(hidden).toLowerCase())
+        );
+      })
+      .map((car) => {
       const specs = (car.specs ?? {}) as UnknownRecord;
       const subtype =
         (typeof specs.subtype === "string" && specs.subtype.trim()) ||
@@ -877,7 +887,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
           .slice(0, 4)
           .map(([key, value]) => ({ label: key.replace(/_/g, " "), value: String(value) })),
       };
-    });
+      });
 
     return {
       crew: {
