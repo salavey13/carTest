@@ -105,29 +105,39 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
       }
 
       setSavingId(vehicle.id);
-      const currentSpecs = ((vehicle.specs || {}) as Record<string, unknown>) || {};
-      const response = await fetch("/api/cars", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...vehicle,
-          daily_price: nextDaily,
-          specs: {
-            ...currentSpecs,
-            sale_price: nextSale,
-            hidden: draft.hidden,
-          },
-        }),
-      });
-      setSavingId(null);
+      try {
+        const currentSpecs = ((vehicle.specs || {}) as Record<string, unknown>) || {};
+        const response = await fetch("/api/cars", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...vehicle,
+            title: `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim() || String(vehicle.model || "Без названия"),
+            daily_price: nextDaily,
+            specs: {
+              ...currentSpecs,
+              sale_price: nextSale,
+              hidden: draft.hidden,
+            },
+          }),
+        });
 
-      if (!response.ok) {
-        toast.error("Не удалось сохранить цену");
-        return;
+        if (!response.ok) {
+          toast.error("Не удалось сохранить цену");
+          return;
+        }
+
+        toast.success("Цены сохранены");
+        await loadFleet();
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? `Ошибка сохранения: ${error.message}`
+            : "Ошибка сохранения цены",
+        );
+      } finally {
+        setSavingId(null);
       }
-
-      toast.success("Цены сохранены");
-      await loadFleet();
     },
     [drafts, loadFleet],
   );
