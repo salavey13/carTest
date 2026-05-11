@@ -169,6 +169,19 @@ const gradeCheats: Record<number, CheatData[]> = {
       tag: "Russian",
       tagColor: "text-violet-300 bg-violet-900/40 border-violet-500/20",
     },
+    {
+      href: "/vpr/literature/7/cheatsheet",
+      title: "Lit_Compass",
+      subtitle: "Meaning Engine",
+      desc: "Тема, идея, средства выразительности и шаблоны развёрнутого ответа для ВПР по литературе.",
+      color: "#f43f5e",
+      glowColor: "rgba(244, 63, 94, 0.3)",
+      borderColor: "border-rose-500/30",
+      bgAccent: "bg-rose-500/5",
+      icon: "languages",
+      tag: "Literature",
+      tagColor: "text-rose-300 bg-rose-900/40 border-rose-500/20",
+    },
   ],
   6: [
     {
