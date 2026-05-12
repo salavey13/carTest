@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
-import type { CatalogItemVM } from "@/app/franchize/actions";
+import type { CatalogItemVM, FranchizeTheme } from "@/app/franchize/actions";
 import {
   DEFAULT_COLOR_OPTIONS,
   DEFAULT_CONFIG_OPTIONS,
@@ -1335,7 +1335,7 @@ function ElectroEnduroShowcase({ items, isCatalogLoading = false }: { items: Cat
   );
 }
 
-export function VipBikeRentalClient({ items }: { items: CatalogItemVM[] }) {
+export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; theme: FranchizeTheme }) {
   const { dbUser } = useAppContext();
   const { scrollYProgress } = useScroll();
   const y = useTransform(scrollYProgress, [0, 1], [0, -90]);
