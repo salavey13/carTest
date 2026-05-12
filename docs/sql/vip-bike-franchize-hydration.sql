@@ -231,6 +231,18 @@ set
             jsonb_build_object('label', 'Операции', 'text', 'выдача, возврат, сервис, админ-доступы'),
             jsonb_build_object('label', 'Продажи', 'text', 'новые/электро/б/у/trade-in лиды и тест-драйв'),
             jsonb_build_object('label', 'Комьюнити', 'text', 'MapRiders, события, партнёры и Telegram-канал')
+          ),
+          'aboutCapabilities', jsonb_build_array(
+            jsonb_build_object('title', 'Аренды без лишнего трения', 'text', 'Быстрый выбор байка, даты и формата поездки с операторским сопровождением.', 'icon', 'bike'),
+            jsonb_build_object('title', 'Продажи и конфигуратор', 'text', 'Покупка, custom/electric сценарии, trade-in и прозрачный следующий шаг.', 'icon', 'shopping-bag'),
+            jsonb_build_object('title', 'MapRiders и комьюнити', 'text', 'Живые meetup-точки и маршруты вместо хаотичных договорённостей.', 'icon', 'map'),
+            jsonb_build_object('title', 'Сервис и помощь', 'text', 'Выдача, возврат, рекомендации по эксплуатации и поддержка после поездки.', 'icon', 'wrench')
+          ),
+          'aboutWorkSteps', jsonb_build_array(
+            jsonb_build_object('title', 'Выберите байк', 'text', 'Откройте каталог и добавьте подходящую позицию в заявку.'),
+            jsonb_build_object('title', 'Подтвердите в Telegram', 'text', 'Оператор уточнит время, документы и оплату без лишних шагов.'),
+            jsonb_build_object('title', 'Заберите и катайтесь', 'text', 'На точке выдачи фиксируем состояние и передаём экипировку.'),
+            jsonb_build_object('title', 'Верните и оставьте отзыв', 'text', 'Закрываем поездку и улучшаем сервис на базе обратной связи.')
           )
         ),
         'catalog', jsonb_build_object(

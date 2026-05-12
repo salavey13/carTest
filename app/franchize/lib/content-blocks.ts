@@ -33,6 +33,18 @@ export interface OnboardingReadinessRowBlock {
   text: string;
 }
 
+
+export interface AboutCapabilityBlock {
+  title: string;
+  text: string;
+  icon?: string;
+}
+
+export interface AboutWorkStepBlock {
+  title: string;
+  text: string;
+}
+
 export interface FranchizeContentBlocks {
   communityEvents: CommunityEventBlock[];
   partnerCards: PartnerCardBlock[];
@@ -40,6 +52,8 @@ export interface FranchizeContentBlocks {
   salesVerticals: SalesVerticalCopyBlock[];
   onboardingChecklist: OnboardingChecklistBlock[];
   onboardingReadinessRows: OnboardingReadinessRowBlock[];
+  aboutCapabilities: AboutCapabilityBlock[];
+  aboutWorkSteps: AboutWorkStepBlock[];
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -136,6 +150,20 @@ export const DEFAULT_ONBOARDING_READINESS_ROWS: OnboardingReadinessRowBlock[] = 
   { label: "Комьюнити", text: "MapRiders, события, партнёры, Telegram-канал и повторные поездки" },
 ];
 
+const DEFAULT_ABOUT_CAPABILITIES: AboutCapabilityBlock[] = [
+  { title: "Аренды без лишнего трения", text: "Помогаем быстро выбрать байк, дату и формат поездки — от короткого теста до полноценного маршрута.", icon: "bike" },
+  { title: "Продажи и конфигуратор", text: "Собираем заявку на покупку, custom/electric сценарии, trade-in и консультацию по модели.", icon: "shopping-bag" },
+  { title: "MapRiders и комьюнити", text: "Подключаем райдеров, meetup-точки и локальные маршруты для живого сообщества.", icon: "map" },
+  { title: "Сервис и помощь", text: "Выдача, подсказки, возврат и сопровождение после поездки.", icon: "wrench" },
+];
+
+const DEFAULT_ABOUT_WORK_STEPS: AboutWorkStepBlock[] = [
+  { title: "Выберите байк", text: "Откройте каталог, сравните доступные позиции и добавьте вариант в заявку." },
+  { title: "Подтвердите в Telegram", text: "Оператор уточнит время, документы и оплату прямо в чате." },
+  { title: "Заберите и катайтесь", text: "На точке выдачи проверяем состояние и передаём экипировку/инструкции." },
+  { title: "Верните и оставьте отзыв", text: "Закрываем поездку и улучшаем витрину по обратной связи." },
+];
+
 export const DEFAULT_FRANCHIZE_CONTENT_BLOCKS: FranchizeContentBlocks = {
   communityEvents: DEFAULT_COMMUNITY_EVENTS,
   partnerCards: DEFAULT_PARTNER_CARDS,
@@ -143,6 +171,8 @@ export const DEFAULT_FRANCHIZE_CONTENT_BLOCKS: FranchizeContentBlocks = {
   salesVerticals: DEFAULT_SALES_VERTICALS,
   onboardingChecklist: DEFAULT_ONBOARDING_CHECKLIST,
   onboardingReadinessRows: DEFAULT_ONBOARDING_READINESS_ROWS,
+  aboutCapabilities: DEFAULT_ABOUT_CAPABILITIES,
+  aboutWorkSteps: DEFAULT_ABOUT_WORK_STEPS,
 };
 
 export function cloneFranchizeContentBlocks(blocks: FranchizeContentBlocks = DEFAULT_FRANCHIZE_CONTENT_BLOCKS): FranchizeContentBlocks {
@@ -153,6 +183,8 @@ export function cloneFranchizeContentBlocks(blocks: FranchizeContentBlocks = DEF
     salesVerticals: blocks.salesVerticals.map((item) => ({ ...item })),
     onboardingChecklist: blocks.onboardingChecklist.map((item) => ({ ...item })),
     onboardingReadinessRows: blocks.onboardingReadinessRows.map((item) => ({ ...item })),
+    aboutCapabilities: blocks.aboutCapabilities.map((item) => ({ ...item })),
+    aboutWorkSteps: blocks.aboutWorkSteps.map((item) => ({ ...item })),
   };
 }
 
@@ -284,6 +316,34 @@ const readReadinessRows = (source: UnknownRecord): OnboardingReadinessRowBlock[]
   DEFAULT_ONBOARDING_READINESS_ROWS,
 );
 
+
+const readAboutCapabilities = (source: UnknownRecord): AboutCapabilityBlock[] => nonEmpty(
+  readArray(source, [["aboutCapabilities"], ["about", "capabilities"]])
+    .map((item) => {
+      const capability = asRecord(item);
+      return {
+        title: readString(capability, ["title", "label"]),
+        text: readString(capability, ["text", "description", "pitch"]),
+        icon: readString(capability, ["icon"], ""),
+      };
+    })
+    .filter((item) => item.title && item.text),
+  DEFAULT_ABOUT_CAPABILITIES,
+);
+
+const readAboutWorkSteps = (source: UnknownRecord): AboutWorkStepBlock[] => nonEmpty(
+  readArray(source, [["aboutWorkSteps"], ["about", "workSteps"], ["about", "steps"]])
+    .map((item) => {
+      const step = asRecord(item);
+      return {
+        title: readString(step, ["title", "label"]),
+        text: readString(step, ["text", "description"]),
+      };
+    })
+    .filter((item) => item.title && item.text),
+  DEFAULT_ABOUT_WORK_STEPS,
+);
+
 export function readFranchizeContentBlocks(metadata: unknown): FranchizeContentBlocks {
   const source = readContentSource(metadata);
 
@@ -294,5 +354,7 @@ export function readFranchizeContentBlocks(metadata: unknown): FranchizeContentB
     salesVerticals: readSalesVerticals(source),
     onboardingChecklist: readOnboardingChecklist(source),
     onboardingReadinessRows: readReadinessRows(source),
+    aboutCapabilities: readAboutCapabilities(source),
+    aboutWorkSteps: readAboutWorkSteps(source),
   };
 }
