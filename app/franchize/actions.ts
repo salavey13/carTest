@@ -18,6 +18,7 @@ import {
   getFranchizeBySlug as getFranchizeBySlugAction,
   markCrewBikesAvailable as markCrewBikesAvailableAction,
 } from "@/app/franchize/server-actions/catalog";
+import { getCrewPaletteBySlug as getCrewPaletteBySlugAction } from "@/app/franchize/server-actions/palette";
 import {
   loadFranchizeConfigBySlug as loadFranchizeConfigBySlugAction,
   saveFranchizeConfig as saveFranchizeConfigAction,
@@ -179,4 +180,11 @@ export async function reconcileRentalContractVerifierAttachment(
   ...args: Parameters<typeof reconcileRentalContractVerifierAttachmentAction>
 ) {
   return reconcileRentalContractVerifierAttachmentAction(...args);
+}
+
+
+export async function getCrewPaletteBySlug(
+  ...args: Parameters<typeof getCrewPaletteBySlugAction>
+) {
+  return getCrewPaletteBySlugAction(...args);
 }

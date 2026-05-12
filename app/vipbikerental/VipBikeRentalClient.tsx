@@ -154,7 +154,7 @@ const InfoItem = ({ icon, children }: { icon: string; children: React.ReactNode 
 
 const StepItem = ({ num, title, icon, children }: { num: string; title: string; icon: string; children: React.ReactNode }) => (
   <div className="relative h-full w-full min-w-0 rounded-2xl border border-border/60 bg-card/60 p-6 text-center backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/20">
-    <div className="absolute -top-4 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full bg-[var(--vip-accent)] font-orbitron font-bold text-primary-foreground">
+    <div className="absolute -top-4 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full bg-primary font-orbitron font-bold text-primary-foreground">
       {num}
     </div>
     <VibeContentRenderer content={icon} className="mx-auto my-4 text-4xl text-primary" />
