@@ -1,14 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import React from "react";
-import { getFranchizeBySlug } from "@/app/franchize/actions";
+import { getCrewPaletteBySlug } from "@/app/franchize/actions";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 
 export default async function Sly13CyberVibeLanding() {
-  const { crew } = await getFranchizeBySlug("sly13");
-  const palette = crew.theme.palette;
+  const theme = await getCrewPaletteBySlug("sly13");
+  const palette = theme.palette;
 
   return (
     <div className="relative min-h-screen overflow-hidden" style={{ background: palette.bgBase, color: palette.textPrimary }}>
