@@ -1,27 +1,41 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { navigationStore } from "@/stores/navigationStore";
-
-const TELEGRAM_NAV_MARKER = "__tg_nav__";
 
 export function TelegramNavigationTracker() {
   const pathname = usePathname();
-  const previousPathRef = useRef<string | null>(null);
+  const searchParams = useSearchParams();
+  const previousUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!pathname || typeof window === "undefined") return;
 
-    navigationStore.push(pathname);
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    navigationStore.push(currentUrl);
 
-    const previousPath = previousPathRef.current;
-    if (previousPath && previousPath !== pathname) {
-      window.history.pushState({ [TELEGRAM_NAV_MARKER]: true, path: pathname }, "", pathname);
-    }
+    previousUrlRef.current = currentUrl;
+  }, [pathname, searchParams]);
 
-    previousPathRef.current = pathname;
-  }, [pathname]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleHashOrSearchChange = () => {
+      const nextUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (previousUrlRef.current === nextUrl) return;
+      previousUrlRef.current = nextUrl;
+      navigationStore.push(nextUrl);
+    };
+
+    window.addEventListener("hashchange", handleHashOrSearchChange);
+    window.addEventListener("popstate", handleHashOrSearchChange);
+
+    return () => {
+      window.removeEventListener("hashchange", handleHashOrSearchChange);
+      window.removeEventListener("popstate", handleHashOrSearchChange);
+    };
+  }, []);
 
   return null;
 }

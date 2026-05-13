@@ -1528,3 +1528,22 @@ Both are needed.
 ## Done means
 
 The app behaves like a real mobile Telegram Mini App, not a browser page pretending to be one.
+
+---
+
+## Execution audit (2026-05-13)
+
+Проверка по mega-плану из этого файла:
+
+- ✅ `navigationStore` есть и используется для явного стека маршрутов.
+- ✅ `TelegramNavigationTracker` смонтирован глобально через `ClientLayout` (`AppInitializers`).
+- ✅ Telegram BackButton подключен глобально через `useTelegramBackButton`.
+- ✅ Native `popstate` обработка есть в `hooks/telegram/useTelegramBackButton.ts`.
+- ✅ Убраны дублирующие `history.pushState` на каждом route change (чтобы не плодить duplicate history entries).
+- ✅ Трекер теперь учитывает **полный URL state** (`pathname + search + hash`), включая query/hash-only переходы.
+- ✅ Close-protection включается при наличии `tg` (не ждет успешной auth-валидации).
+- ✅ `useTelegramViewport` защищен от утечки listener после unmount (guard после `await safeExpand`).
+- ✅ Telegram runtime-context (`isInTelegramContext`) отделен от успеха auth: context определяется по `initData`, а провал auth больше не бросает hard-throw.
+- ✅ Добавлено самопроверочное правило: back-навигация и close-confirmation считаются разными слоями защиты, оба обязательны.
+
+Если появятся новые edge-cases (например, экраны с heavy `router.replace`), добавлять сюда отдельный пункт с repro + фикс.
