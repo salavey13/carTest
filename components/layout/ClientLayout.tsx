@@ -43,7 +43,8 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { checkAndUnlockFeatureAchievement } from "@/lib/cyberFitnessSupabase-server";
 import { useAppToast } from "@/hooks/useAppToast";
-import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
+import { useTelegramBackButton } from "@/hooks/telegram/useTelegramBackButton";
+import { TelegramNavigationTracker } from "@/components/telegram/TelegramNavigationTracker";
 import { Loading } from "@/components/Loading";
 import { cn } from "@/lib/utils";
 import { useStartParamRouter } from "@/hooks/useStartParamRouter";
@@ -154,7 +155,7 @@ function AppInitializers() {
         };
     }, [isAuthenticated, dbUser, handleScrollForAchievement]);
 
-    return null;
+    return <TelegramNavigationTracker />;
 }
 
 function useBio30ThemeFix() {
