@@ -100,10 +100,17 @@ export function useTelegramAuth() {
         if (!candidate && webApp?.initDataUnsafe?.user?.id && process.env.NODE_ENV === "development") candidate = webApp.initDataUnsafe.user;
         if (!candidate && MOCK_USER && isAllowedMockContext()) candidate = MOCK_USER;
 
-        const realTg = Boolean(initData && candidate && candidate !== MOCK_USER);
+        const realTg = Boolean(initData);
         if (can()) setIsInTelegramContext(realTg);
 
-        if (!candidate) throw new Error("No user data available for authentication.");
+        if (!candidate) {
+          if (can()) {
+            setError(new Error("Telegram authentication failed. User data is unavailable."));
+            setIsAuthenticated(false);
+          }
+          return;
+        }
+
         const persisted = await handleAuthentication(candidate);
         if (can()) {
           setUser(candidate);
