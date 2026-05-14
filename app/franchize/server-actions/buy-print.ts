@@ -69,16 +69,17 @@ const SPEC_MAX_VALUE_LINES = 2;
 const FOOTER_Y = 24;
 const FOOTER_GENERATED_X = 180;
 
-// Bottom section: stacked QR → link box (compact, full width)
-const LINK_BOX_HEIGHT = 48;
+// Bottom section: QR → link box stacked in right column only
+const LINK_BOX_HEIGHT = 46;
 const LINK_BOX_GAP_FROM_FOOTER = 14;
 const LINK_BOX_Y = FOOTER_Y + LINK_BOX_GAP_FROM_FOOTER;
-const LINK_BOX_WIDTH = PAGE_WIDTH - PAGE_PADDING * 2; // full content width
-const LINK_BOX_INNER_X = 12;
+const LINK_BOX_X = RIGHT_COL_X; // aligned with right column
+const LINK_BOX_WIDTH = RIGHT_COL_WIDTH; // right column width, NOT full page
+const LINK_BOX_INNER_X = 10;
 const LINK_BOX_LINK_LINE_HEIGHT = 9;
 const LINK_BOX_MAX_WIDTH = LINK_BOX_WIDTH - LINK_BOX_INNER_X * 2;
-const LINK_FONT_SIZE = 7.6;
-const LINK_TITLE_FONT_SIZE = 9;
+const LINK_FONT_SIZE = 7.2;
+const LINK_TITLE_FONT_SIZE = 8.4;
 
 const QR_SIZE = 110;
 const QR_GAP_FROM_LINK_BOX = 10;
@@ -416,12 +417,10 @@ function formatTimestamp(date: Date): string {
  * │  Price        │    IMAGE PANEL       │
  * │  Description  │    (9:16 graphite)   │
  * │  ─────────    │                      │
- * │  Specs table  │                      │
- * │  (bordered)   │                      │
+ * │  Specs table  │       QR CODE        │
+ * │  (bordered)   │   ──────────────     │
+ * │               │   LINK BOX (cream)   │
  * ├───────────────┴──────────────────────┤
- * │           QR CODE (centered)        │
- * │  LINK BOX (compact, cream, full-w)  │
- * ├──────────────────────────────────────┤
  * │  ID: ...        Generated: ...       │
  * └──────────────────────────────────────┘
  */
@@ -698,10 +697,10 @@ async function generateBuyPdf(input: {
     logger.warn("[franchize] failed to generate QR", error);
   }
 
-  // ── Link Box (compact, full width, below QR) ───────────────────────────
+  // ── Link Box (compact, right column, below QR) ───────────────────────────
 
   page.drawRectangle({
-    x: PAGE_PADDING,
+    x: LINK_BOX_X,
     y: LINK_BOX_Y,
     width: LINK_BOX_WIDTH,
     height: LINK_BOX_HEIGHT,
@@ -710,34 +709,31 @@ async function generateBuyPdf(input: {
     borderWidth: 1.2,
   });
 
-  // Title + link on same line: "Ссылка:" then URL
-  const linkLabel = "Ссылка: ";
-  const linkLabelWidth = font.widthOfTextAtSize(linkLabel, LINK_TITLE_FONT_SIZE);
-
-  page.drawText(linkLabel, {
-    x: PAGE_PADDING + LINK_BOX_INNER_X,
-    y: LINK_BOX_Y + LINK_BOX_HEIGHT / 2 + 1,
+  // Line 1: "Ссылка:" label
+  page.drawText("Ссылка:", {
+    x: LINK_BOX_X + LINK_BOX_INNER_X,
+    y: LINK_BOX_Y + LINK_BOX_HEIGHT - 14,
     size: LINK_TITLE_FONT_SIZE,
     font,
     color: COLORS.muted,
   });
 
-  const linkTextMaxWidth = LINK_BOX_MAX_WIDTH - linkLabelWidth;
+  // Line 2: actual URL (wrapped to fit)
   const linkLines = wrapText(
     buyLink,
     font,
     LINK_FONT_SIZE,
-    linkTextMaxWidth,
-  ).slice(0, 1);
+    LINK_BOX_MAX_WIDTH,
+  ).slice(0, 2);
 
-  linkLines.forEach((line) => {
+  linkLines.forEach((line, index) => {
     page.drawText(line, {
-      x: PAGE_PADDING + LINK_BOX_INNER_X + linkLabelWidth,
-      y: LINK_BOX_Y + LINK_BOX_HEIGHT / 2,
+      x: LINK_BOX_X + LINK_BOX_INNER_X,
+      y: LINK_BOX_Y + LINK_BOX_HEIGHT - 24 - index * LINK_BOX_LINK_LINE_HEIGHT,
       size: LINK_FONT_SIZE,
       font,
       color: COLORS.text,
-      maxWidth: linkTextMaxWidth,
+      maxWidth: LINK_BOX_MAX_WIDTH,
     });
   });
 
