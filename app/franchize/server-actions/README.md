@@ -35,12 +35,13 @@ Only **admins** (`admin`, `vpradmin`) and the **crew owner** can request a PDF. 
 ├───────────────┬──────────────────────┤
 │  Title        │                      │
 │  Price        │    IMAGE PANEL       │
-│  Description  │    (graphite bg)     │
+│  Description  │    (9:16 graphite)   │
 │  ─────────    │                      │
 │  Specs table  │                      │
 │  (bordered)   │                      │
 ├───────────────┴──────────────────────┤
-│  LINK BOX (cream bg)    │  QR CODE  │
+│           QR CODE (centered)         │
+│  LINK BOX (compact, cream, full-w)   │
 ├──────────────────────────────────────┤
 │  ID: ...        Generated: ...       │
 └──────────────────────────────────────┘
@@ -58,6 +59,9 @@ Only **admins** (`admin`, `vpradmin`) and the **crew owner** can request a PDF. 
 - **Specs section is conditionally rendered** — if `keySpecs` is empty, no orphaned "Характеристики" heading appears.
 - **Timestamp is locale-stable** — `formatTimestamp()` uses manual `DD.MM.YYYY, HH:MM:SS` formatting instead of `toLocaleString("ru-RU")` to avoid host-dependent output.
 - **Image panel uses lifted graphite** (`rgb(0.10, 0.11, 0.13)`) instead of near-black — prevents the optical illusion of the panel appearing larger than it is.
+- **Image panel is 9:16 portrait** — `height = width × 16/9 ≈ 430 px`, giving a phone-screen proportions that flatters product photography instead of the previous near-square.
+- **QR code is stacked above the link box** — centered in the right column at 110px, no longer side-by-side. The QR is the primary scan target; the link box below it is a compact fallback.
+- **Link box is compact and full-width** — 48px tall single-line layout ("Ссылка: <url>") across the full content area, instead of the previous 82px two-line box that consumed too much vertical space.
 - **Header has a 2 px gold accent line** at its bottom edge — subtle separator that elevates the card from "CRM export" to "premium product sheet".
 
 ### Things that were intentionally removed
