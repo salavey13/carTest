@@ -14,6 +14,8 @@ export interface TelegramWebApp {
     user?: WebAppUser
   }
   openLink: (url: string) => void;
+  openTelegramLink?: (url: string) => void;
+  switchInlineQuery?: (query: string, choose_chat_types?: string[]) => void;
   close: () => void;
   showPopup: (params: { title?: string; message: string; buttons?: Array<{ id?: string; type?: string; text?: string }> }) => void;
   BackButton?: {

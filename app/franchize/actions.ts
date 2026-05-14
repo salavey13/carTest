@@ -32,6 +32,7 @@ import {
   recordFranchizeCheckoutRecoverySnapshot as recordFranchizeCheckoutRecoverySnapshotAction,
   submitFranchizeOrderNotification as submitFranchizeOrderNotificationAction,
 } from "@/app/franchize/server-actions/orders";
+import { sendFranchizeBuyPrintPdf as sendFranchizeBuyPrintPdfAction } from "@/app/franchize/server-actions/buy-print";
 import {
   getFranchizeCloserIntents as getFranchizeCloserIntentsAction,
   getFranchizeOperatorDashboardAccess as getFranchizeOperatorDashboardAccessAction,
@@ -114,6 +115,12 @@ export async function recordFranchizeCheckoutRecoverySnapshot(
   ...args: Parameters<typeof recordFranchizeCheckoutRecoverySnapshotAction>
 ) {
   return recordFranchizeCheckoutRecoverySnapshotAction(...args);
+}
+
+export async function sendFranchizeBuyPrintPdf(
+  ...args: Parameters<typeof sendFranchizeBuyPrintPdfAction>
+) {
+  return sendFranchizeBuyPrintPdfAction(...args);
 }
 
 export async function getFranchizeRentalReviewsForModeration(

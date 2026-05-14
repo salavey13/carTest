@@ -7,10 +7,7 @@ import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { FranchizeFloatingCart } from "@/app/franchize/components/FranchizeFloatingCart";
 import { FranchizeHero } from "@/app/franchize/components/FranchizeHero";
 import { FranchizePageShell } from "@/app/franchize/components/FranchizePageShell";
-import {
-  getTelegramHandleHref,
-  getTelegramWebAppFallbackHref,
-} from "@/app/franchize/lib/telegram-links";
+import { getTelegramHandleHref } from "@/app/franchize/lib/telegram-links";
 import { getFranchizeRouteCtaPolicy, shouldShowFloatingCart } from "@/app/franchize/lib/route-cta-policy";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { SaleBikeLanding } from "@/app/franchize/components/SaleBikeLanding";
@@ -82,7 +79,6 @@ export default async function BuyBikePage({
   const catalogHref = `/franchize/${resolvedSlug}`;
   const profileHref = `/franchize/${resolvedSlug}/profile`;
   const telegramHref = getTelegramHandleHref(crew.contacts.telegram);
-  const telegramFallbackHref = getTelegramWebAppFallbackHref("sale", bike_id, crew.contacts.telegramBotUsername);
 
   if (!item) notFound();
   const buySectionId = buildSaleBuySectionId(item.id);
@@ -218,18 +214,6 @@ export default async function BuyBikePage({
                 }}
               >
                 Написать оператору в Telegram
-              </a>
-              <a
-                href={telegramFallbackHref}
-                target="_blank"
-                rel="noreferrer"
-                className="flex justify-center rounded-xl border px-4 py-3"
-                style={{
-                  borderColor: crew.theme.palette.borderSoft,
-                  color: crew.theme.palette.textPrimary,
-                }}
-              >
-                Открыть WebApp fallback
               </a>
               <Link
                 href={contactHref}

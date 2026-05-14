@@ -18,6 +18,7 @@ export function getTelegramWebAppFallbackHref(
   prefix: string,
   value: string,
   botUsername?: string | null,
+  separator: "-" | "_" = "-",
 ): string {
   const normalizedBot =
     sanitizeTelegramUsername(botUsername) || DEFAULT_TELEGRAM_BOT_USERNAME;
@@ -26,5 +27,5 @@ export function getTelegramWebAppFallbackHref(
   const safeValue =
     value.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 40) || "open";
 
-  return `https://t.me/${normalizedBot}/app?startapp=${safePrefix}-${safeValue}`;
+  return `https://t.me/${normalizedBot}/app?startapp=${safePrefix}${separator}${safeValue}`;
 }
