@@ -49,6 +49,16 @@ This root file stays intentionally compact so operators and agents can load it q
 ## 2) Mini execution diary
 
 
+### 2026-05-14 — Telegram buy print/share capability polish
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-14T00:00:00Z
+- `owner`: codex
+- `notes`: Executed explicit operator scope: fixed Telegram native back pending-guard reset so async auth/context visibility refreshes cannot recreate stale same-URL guards; documented Telegram and PDF/QR capabilities; added franchize buy-page `buy_<bikeId>` WebApp links, Telegram share/fallback behavior, and owner/admin-only PDF print delivery with bike info, image, and QR deep link.
+- `next_step`: Smoke `/franchize/vip-bike/market/<bike_id>/buy` in Telegram WebApp as owner/admin and in a regular browser to verify share/fallback visibility plus PDF delivery.
+- `risks`: PDF delivery depends on `TELEGRAM_BOT_TOKEN`, signed Telegram actor cookie, external image/QR fetch reachability, and live crew/catalog rows.
+
+
 ### 2026-05-08 — Issue 4 operator surface visual consistency self-review
 
 - `status`: ready_for_pr
