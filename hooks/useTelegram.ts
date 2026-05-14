@@ -23,8 +23,8 @@ export function useTelegram() {
     startParam,
   } = auth;
 
-  useTelegramViewport(auth.tg, auth.isInTelegramContext);
-  useTelegramClosingBehavior(auth.tg, auth.isInTelegramContext);
+  useTelegramViewport(auth.tg, Boolean(auth.tg));
+  useTelegramClosingBehavior(auth.tg, Boolean(auth.tg));
   const theme = useTelegramTheme(auth.tg);
 
   const safeWebAppCall = useCallback(<T extends (...args: any[]) => any>(
