@@ -239,6 +239,12 @@ export function useStartParamRouter() {
           if (lobbyId) {
             targetPath = `/strikeball/lobbies/${lobbyId}`;
           }
+        } else if (paramToProcess.startsWith("buy_")) {
+          const bikeId = paramToProcess.substring(4);
+          const franchizeSlug = searchParams.get("slug") || userCrewInfo?.slug || "vip-bike";
+          if (bikeId) {
+            targetPath = `/franchize/${franchizeSlug}/market/${bikeId}/buy`;
+          }
         } else if (paramToProcess.startsWith("rental-") || paramToProcess.startsWith("rentals-") || paramToProcess.startsWith("sale-")) {
           const rentalId = paramToProcess.split("-").at(-1);
           const franchizeSlug = searchParams.get("slug") || "vip-bike";

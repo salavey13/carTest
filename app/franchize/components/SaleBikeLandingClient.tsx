@@ -13,10 +13,12 @@ import {
   CalendarCheck,
   CreditCard,
   PhoneCall,
+  Printer,
   Repeat2,
   ShieldCheck,
   ShoppingBag,
   Sparkles,
+  Share2,
   Swords,
   Star,
   Tag,
@@ -28,6 +30,8 @@ import {
 import type { CatalogItemVM, FranchizeCrewVM } from "@/app/franchize/actions";
 import {
   createFranchizeOrderInvoice,
+  getFranchizeOperatorDashboardAccess,
+  sendFranchizeBuyPrintPdf,
   upsertFranchizeIntent,
 } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
@@ -43,6 +47,7 @@ import {
   type PrebuyIntentType,
 } from "@/app/franchize/lib/sale-config";
 import { buildCandidateImageUrls } from "@/app/franchize/lib/media";
+import { getTelegramWebAppFallbackHref } from "@/app/franchize/lib/telegram-links";
 import { useFranchizeCart } from "@/app/franchize/hooks/useFranchizeCart";
 import { useAppContext } from "@/contexts/AppContext";
 import {
@@ -106,7 +111,7 @@ export function SaleBikeLandingClient({
   otherSaleBikes = [],
 }: SaleBikeLandingClientProps) {
   const router = useRouter();
-  const { user, dbUser } = useAppContext();
+  const { user, dbUser, tg, isInTelegramContext } = useAppContext();
   const resolvedSlug = crew.slug || "vip-bike";
   const surface = crewPaletteForSurface(crew.theme);
   const gallery = useMemo(() => {
@@ -222,6 +227,8 @@ export function SaleBikeLandingClient({
   const [reservationState, setReservationState] =
     useState<SaleActionState>("idle");
   const [purchaseState, setPurchaseState] = useState<SaleActionState>("idle");
+  const [printState, setPrintState] = useState<SaleActionState>("idle");
+  const [canPrintBuySheet, setCanPrintBuySheet] = useState(false);
   const [intentActionStates, setIntentActionStates] = useState<
     Partial<Record<string, SaleActionState>>
   >({});
@@ -245,7 +252,19 @@ export function SaleBikeLandingClient({
       ? String(dbUser.user_id)
       : undefined;
   const telegramFirstContinuation = Boolean(telegramUserId);
+  const hasTelegramRuntime = Boolean(
+    isInTelegramContext ||
+      tg?.initData ||
+      tg?.initDataUnsafe?.user ||
+      (typeof window !== "undefined" && window.Telegram?.WebApp),
+  );
   const sourceRoute = `/franchize/${resolvedSlug}/market/${item.id}/buy`;
+  const buyWebAppHref = getTelegramWebAppFallbackHref(
+    "buy",
+    item.id,
+    crew.contacts.telegramBotUsername,
+    "_",
+  );
   const bikeCondition = readSpecText(
     specs,
     ["condition", "state", "bike_condition"],
@@ -267,6 +286,25 @@ export function SaleBikeLandingClient({
   const contactHint = telegramFirstContinuation
     ? "Продолжим в Telegram: оператор пришлёт подтверждение прямо в чат."
     : "Оставьте телефон или Telegram @handle — оператор продолжит без лишних шагов.";
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getFranchizeOperatorDashboardAccess({ slug: resolvedSlug })
+      .then((result) => {
+        if (cancelled) return;
+        const role = String(result.role || "").toLowerCase();
+        setCanPrintBuySheet(Boolean(result.canOpen && ["admin", "owner"].includes(role)));
+      })
+      .catch(() => {
+        if (!cancelled) setCanPrintBuySheet(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedSlug]);
+
   const monthlyPaymentEstimate = useMemo(() => {
     if (finalPrice <= 0) return 0;
     return Math.ceil((finalPrice * 1.08) / financeMonths / 100) * 100;
@@ -486,6 +524,55 @@ export function SaleBikeLandingClient({
       console.error("buy/add-to-cart failed", error);
       setPurchaseState("error");
       setCartMessage("Не удалось добавить конфигурацию. Попробуйте ещё раз.");
+    }
+  };
+
+
+  const handleShareBuyLink = () => {
+    const shareText = `Карточка ${item.title}: ${buyWebAppHref}`;
+
+    if (tg?.switchInlineQuery) {
+      tg.switchInlineQuery(shareText, ["users", "groups", "channels"]);
+      return;
+    }
+
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(buyWebAppHref)}&text=${encodeURIComponent(`Карточка ${item.title}`)}`;
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(shareUrl);
+      return;
+    }
+    if (tg?.openLink) {
+      tg.openLink(shareUrl);
+      return;
+    }
+
+    window.open(shareUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handlePrintBuySheet = async () => {
+    setPrintState("loading");
+    setCartMessage("");
+
+    try {
+      const result = await sendFranchizeBuyPrintPdf({
+        slug: resolvedSlug,
+        bikeId: item.id,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || "Не удалось отправить PDF.");
+      }
+
+      setPrintState("success");
+      setCartMessage(`PDF ${result.fileName || "карточки"} отправлен вам в Telegram.`);
+    } catch (error) {
+      console.error("buy/print-pdf failed", error);
+      setPrintState("error");
+      setCartMessage(
+        error instanceof Error
+          ? error.message
+          : "Не удалось отправить PDF в Telegram.",
+      );
     }
   };
 
@@ -737,6 +824,51 @@ export function SaleBikeLandingClient({
                   <ShieldCheck className="h-3.5 w-3.5" />
                   Официальная сделка + документы
                 </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {!hasTelegramRuntime ? (
+                    <a
+                      href={buyWebAppHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition hover:brightness-110"
+                      style={surface.subtleCard}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Открыть в Telegram
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleShareBuyLink}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition hover:brightness-110"
+                      style={surface.subtleCard}
+                    >
+                      <Share2 className="h-4 w-4" />
+                      Поделиться
+                    </button>
+                  )}
+                  {canPrintBuySheet ? (
+                    <button
+                      type="button"
+                      onClick={handlePrintBuySheet}
+                      disabled={printState === "loading"}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{
+                        ...surface.subtleCard,
+                        borderColor: crew.theme.palette.accentMain,
+                      }}
+                    >
+                      <Printer className="h-4 w-4" />
+                      {printState === "loading"
+                        ? "Готовим PDF..."
+                        : printState === "success"
+                          ? "PDF отправлен"
+                          : printState === "error"
+                            ? "Повторить печать"
+                            : "Распечатать"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               <div

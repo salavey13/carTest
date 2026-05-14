@@ -60,6 +60,7 @@ export function useTelegramBackButton() {
   const searchParams = useSearchParams();
   const backHandlerRef = useRef<() => void>(() => {});
   const isHandlingBackRef = useRef(false);
+  const previousRouteRef = useRef<string | null>(null);
 
   const currentRoute = useMemo(() => {
     const query = searchParams?.toString();
@@ -118,7 +119,13 @@ export function useTelegramBackButton() {
   };
 
   useEffect(() => {
-    isHandlingBackRef.current = false;
+    if (previousRouteRef.current !== currentRoute) {
+      previousRouteRef.current = currentRoute;
+      isHandlingBackRef.current = false;
+    }
+  }, [currentRoute]);
+
+  useEffect(() => {
     syncButtonVisibility();
   }, [currentRoute, syncButtonVisibility]);
 
