@@ -31,18 +31,18 @@ Only **admins** (`admin`, `vpradmin`) and the **crew owner** can request a PDF. 
 
 ```
 ┌──────────────────────────────────────┐
-│ HEADER (dark bg + gold accent line)  │
+│ HEADER (near-black + gold accent)    │  ← deeper than page bg
 ├───────────────┬──────────────────────┤
 │  Title        │                      │
 │  Price        │    IMAGE PANEL       │
-│  Description  │    (9:16 graphite)   │
+│  Description  │    (9:16 graphite)   │  ← same as page bg = seamless
 │  ─────────    │                      │
-│  Specs table  │       QR CODE        │
-│  (bordered)   │   ──────────────     │
-│               │   LINK BOX (cream)   │
+│  Specs table  │       QR CODE        │  ← 220×220, white-on-black
+│  (dark rows)  │   ──────────────     │
+│               │   LINK BOX (dark)    │  ← lifted dark bg + gold border
 ├───────────────┴──────────────────────┤
-│  ID: ...        Generated: ...       │
-└──────────────────────────────────────┘
+│  ID: ...        Generated: ...       │  ← muted gray on dark
+└──────────────────────────────────────┘    DARK GRAPHITE BACKGROUND
 ```
 
 ### Architecture decisions
@@ -56,11 +56,15 @@ Only **admins** (`admin`, `vpradmin`) and the **crew owner** can request a PDF. 
 - **Spec rows dynamically resize** — `rowHeight = Math.max(MIN, contentHeight + padding)`. Pathological long words wrap to 2 lines max and the row grows to fit.
 - **Specs section is conditionally rendered** — if `keySpecs` is empty, no orphaned "Характеристики" heading appears.
 - **Timestamp is locale-stable** — `formatTimestamp()` uses manual `DD.MM.YYYY, HH:MM:SS` formatting instead of `toLocaleString("ru-RU")` to avoid host-dependent output.
-- **Image panel uses lifted graphite** (`rgb(0.10, 0.11, 0.13)`) instead of near-black — prevents the optical illusion of the panel appearing larger than it is.
-- **Image panel is 9:16 portrait** — `height = width × 16/9 ≈ 430 px`, giving a phone-screen proportions that flatters product photography instead of the previous near-square.
-- **QR code is stacked above the link box** — both in the right column only. QR centered at 110px, link box below it at right-column width (242px). No overlap with the left specs column.
-- **Link box is compact and right-column-aligned** — 46px tall two-line layout ("Ссылка:" label on line 1, URL on line 2), confined to the right column width instead of spanning the full page.
-- **Header has a 2 px gold accent line** at its bottom edge — subtle separator that elevates the card from "CRM export" to "premium product sheet".
+- **Dark mode** — entire page uses a graphite background (`rgb(0.10, 0.11, 0.13)`), with near-white text (`rgb(0.92, 0.93, 0.95)`) and medium-gray labels. The image panel and page background are the same color, creating a seamless edge-to-edge product photo effect.
+- **Header is deeper than page** — `rgb(0.05, 0.06, 0.08)` creates subtle depth separation from the graphite body without a hard contrast jump.
+- **Spec table uses subtle dark borders** — `rgb(0.22, 0.23, 0.26)` lines are visible but don't fight the content.
+- **Image panel uses the same graphite as the page** — the bike photo bleeds seamlessly into the background, no visible panel boundary.
+- **Image panel is 9:16 portrait** — `height = width × 16/9 ≈ 430 px`, phone-screen proportions that flatter product photography.
+- **QR code is 220×220** — doubled from the original 110px, fills the right column below the image. White QR on black background = maximum scan reliability + dark mode aesthetic.
+- **QR code is stacked above the link box** — both in the right column only. No overlap with the left specs column.
+- **Link box is dark with gold border** — `rgb(0.14, 0.15, 0.18)` background with the same gold accent as the header separator. Two-line layout: "Ссылка:" label → URL.
+- **Header has a 2 px gold accent line** at its bottom edge — the only bright structural element, ties the header to the link box border.
 
 ### Things that were intentionally removed
 

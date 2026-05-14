@@ -69,22 +69,23 @@ const SPEC_MAX_VALUE_LINES = 2;
 const FOOTER_Y = 24;
 const FOOTER_GENERATED_X = 180;
 
-// Bottom section: QR → link box stacked in right column only
+// Bottom section: QR → link box stacked in right column
+// QR is positioned relative to image panel bottom edge
+const QR_SIZE = 220; // doubled — fills right column
+const QR_GAP_FROM_IMAGE = 8;
+const QR_Y = IMAGE_PANEL_Y - QR_GAP_FROM_IMAGE - QR_SIZE;
+const QR_X = RIGHT_COL_X + (RIGHT_COL_WIDTH - QR_SIZE) / 2; // centered in right col
+
 const LINK_BOX_HEIGHT = 46;
-const LINK_BOX_GAP_FROM_FOOTER = 14;
-const LINK_BOX_Y = FOOTER_Y + LINK_BOX_GAP_FROM_FOOTER;
+const LINK_BOX_GAP_FROM_QR = 8;
 const LINK_BOX_X = RIGHT_COL_X; // aligned with right column
-const LINK_BOX_WIDTH = RIGHT_COL_WIDTH; // right column width, NOT full page
+const LINK_BOX_WIDTH = RIGHT_COL_WIDTH; // right column width only
+const LINK_BOX_Y = QR_Y - LINK_BOX_GAP_FROM_QR - LINK_BOX_HEIGHT;
 const LINK_BOX_INNER_X = 10;
 const LINK_BOX_LINK_LINE_HEIGHT = 9;
 const LINK_BOX_MAX_WIDTH = LINK_BOX_WIDTH - LINK_BOX_INNER_X * 2;
 const LINK_FONT_SIZE = 7.2;
 const LINK_TITLE_FONT_SIZE = 8.4;
-
-const QR_SIZE = 110;
-const QR_GAP_FROM_LINK_BOX = 10;
-const QR_Y = LINK_BOX_Y + LINK_BOX_HEIGHT + QR_GAP_FROM_LINK_BOX;
-const QR_X = RIGHT_COL_X + (RIGHT_COL_WIDTH - QR_SIZE) / 2; // centered in right col
 
 // Description
 const DESC_FONT_SIZE = 10.4;
@@ -106,9 +107,10 @@ const PRICE_TO_DESC_GAP = 44;
 // Network
 const FETCH_TIMEOUT_MS = 8_000;
 
-// ─── Color Palette ──────────────────────────────────────────────────────────
+// ─── Color Palette (DARK MODE) ─────────────────────────────────────────────
 
 interface PdfColors {
+  pageBg: RGB;
   header: RGB;
   text: RGB;
   muted: RGB;
@@ -122,16 +124,17 @@ interface PdfColors {
 }
 
 const COLORS: PdfColors = {
-  header: rgb(0.07, 0.08, 0.11),
-  text: rgb(0.12, 0.13, 0.15),
-  muted: rgb(0.46, 0.48, 0.52),
-  line: rgb(0.88, 0.89, 0.91),
-  accent: rgb(0.96, 0.76, 0.22),
-  accentSubtle: rgb(0.96, 0.76, 0.22),
-  imageBg: rgb(0.10, 0.11, 0.13),
-  linkBg: rgb(0.99, 0.98, 0.94),
-  imageFallback: rgb(0.35, 0.36, 0.38),
-  white: rgb(1, 1, 1),
+  pageBg: rgb(0.10, 0.11, 0.13),       // dark graphite — same as image panel (seamless)
+  header: rgb(0.05, 0.06, 0.08),       // near-black — deeper than page
+  text: rgb(0.92, 0.93, 0.95),         // near-white — main body text
+  muted: rgb(0.58, 0.60, 0.64),        // medium gray — labels, secondary text
+  line: rgb(0.22, 0.23, 0.26),         // subtle dark — spec row borders
+  accent: rgb(0.96, 0.76, 0.22),       // gold — accent line, link border
+  accentSubtle: rgb(0.96, 0.76, 0.22), // gold (same)
+  imageBg: rgb(0.10, 0.11, 0.13),      // graphite — matches pageBg (seamless panel)
+  linkBg: rgb(0.14, 0.15, 0.18),       // lifted dark — link card background
+  imageFallback: rgb(0.50, 0.52, 0.55), // visible on dark — fallback text
+  white: rgb(1, 1, 1),                 // pure white — header brand
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -407,19 +410,20 @@ function formatTimestamp(date: Date): string {
 // ─── PDF Generation ─────────────────────────────────────────────────────────
 
 /**
- * Generates a premium product-sheet PDF for a franchize bike listing.
+ * Generates a premium DARK-MODE product-sheet PDF for a franchize bike listing.
  *
- * Layout overview (A4 portrait):
+ * Layout overview (A4 portrait, dark theme):
  * ┌──────────────────────────────────────┐
- * │ HEADER (dark bg + gold accent line)  │
+ * │ HEADER (near-black + gold accent)    │
  * ├───────────────┬──────────────────────┤
  * │  Title        │                      │
  * │  Price        │    IMAGE PANEL       │
  * │  Description  │    (9:16 graphite)   │
  * │  ─────────    │                      │
  * │  Specs table  │       QR CODE        │
- * │  (bordered)   │   ──────────────     │
- * │               │   LINK BOX (cream)   │
+ * │  (dark rows)  │       (220×220)      │
+ * │               │   ──────────────     │
+ * │               │   LINK BOX (dark)    │
  * ├───────────────┴──────────────────────┤
  * │  ID: ...        Generated: ...       │
  * └──────────────────────────────────────┘
@@ -461,6 +465,16 @@ async function generateBuyPdf(input: {
     input.botUsername,
     input.item.id,
   );
+
+  // ── Page Background (dark graphite) ─────────────────────────────────────
+
+  page.drawRectangle({
+    x: 0,
+    y: 0,
+    width: PAGE_WIDTH,
+    height: PAGE_HEIGHT,
+    color: COLORS.pageBg,
+  });
 
   // ── Header ──────────────────────────────────────────────────────────────
 
@@ -584,7 +598,7 @@ async function generateBuyPdf(input: {
         contentHeight + SPEC_ROW_CONTENT_PADDING,
       );
 
-      // Row border
+      // Row border (subtle dark line)
       page.drawRectangle({
         x: LEFT_COL_X,
         y: leftY - rowHeight + SPEC_ROW_BORDER_OFFSET,
@@ -667,7 +681,7 @@ async function generateBuyPdf(input: {
     });
   }
 
-  // ── QR Code (centered in right column) ──────────────────────────────────
+  // ── QR Code (220×220, centered in right column) ─────────────────────────
 
   try {
     const controller = new AbortController();
@@ -697,7 +711,7 @@ async function generateBuyPdf(input: {
     logger.warn("[franchize] failed to generate QR", error);
   }
 
-  // ── Link Box (compact, right column, below QR) ───────────────────────────
+  // ── Link Box (dark, right column, below QR) ────────────────────────────
 
   page.drawRectangle({
     x: LINK_BOX_X,
