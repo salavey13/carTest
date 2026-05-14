@@ -113,6 +113,55 @@ async function embedImage(pdfDoc: PDFDocument, url: string) {
   }
 }
 
+// Smart dynamic specs extractor
+function extractKeySpecs(specs: UnknownRecord) {
+  const rows: [string, string][] = [];
+
+  const priorityFields = [
+    ["Тип", "bike_subtype"],
+    ["Год", "year"],
+    ["Пиковая мощность", "power_kw", "motor_peak_kw"],
+    ["Номинальная мощность", "motor_nominal_kw"],
+    ["Крутящий момент", "torque_nm", "torque_motor_nm"],
+    ["Батарея", "battery"],
+    ["Запас хода", "range_km", "range_120ah_km", "range_100ah_km"],
+    ["Макс. скорость", "top_speed_kmh"],
+    ["Разгон 0-100", "acceleration_0_100_s"],
+    ["Вес", "weight_kg"],
+    ["Тормоза", "brake_type"],
+    ["Подвеска", "suspension_type", "suspension_front"],
+    ["Рама", "frame_type"],
+    ["Зарядка", "charge_time_h"],
+    ["Класс прав", "license_class"],
+  ];
+
+  priorityFields.forEach(([label, ...keys]) => {
+    for (const key of keys) {
+      const value = readString(specs[key]);
+      if (value && value !== "—") {
+        rows.push([label, value]);
+        break;
+      }
+    }
+  });
+
+  // Fallback generic fields
+  Object.entries(specs).forEach(([key, value]) => {
+    if (typeof value === "string" && value.length > 2 && 
+        !priorityFields.flat().includes(key) && 
+        !["gallery", "features", "buy_colors", "buy_options", "spec_labels"].includes(key)) {
+      const niceLabel = key
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, l => l.toUpperCase());
+      if (!rows.some(r => r[0] === niceLabel)) {
+        rows.push([niceLabel, value]);
+      }
+    }
+  });
+
+  return rows.slice(0, 12); // limit to prevent overflow
+}
+
 async function generateBuyPdf(input: {
   slug: string;
   brandName: string;
@@ -137,100 +186,111 @@ async function generateBuyPdf(input: {
 
   const page = pdfDoc.addPage([595.28, 841.89]);
   const { width, height } = page.getSize();
-  const dark = rgb(0.05, 0.06, 0.07);
+
+  const headerBg = rgb(0.08, 0.09, 0.12);
+  const textDark = rgb(0.12, 0.13, 0.15);
   const accent = rgb(0.95, 0.75, 0.22);
-  const muted = rgb(0.35, 0.37, 0.4);
-  const line = rgb(0.82, 0.84, 0.86);
+  const muted = rgb(0.45, 0.48, 0.52);
+  const line = rgb(0.85, 0.87, 0.89);
+
   const specs = input.item.rawSpecs || {};
   const buyLink = buildWebAppBuyLink(input.botUsername, input.item.id);
 
-  page.drawRectangle({ x: 0, y: height - 92, width, height: 92, color: dark });
-  page.drawText(input.brandName || input.slug, {
-    x: 36,
-    y: height - 42,
-    size: 20,
-    font,
-    color: rgb(1, 1, 1),
+  // HEADER
+  page.drawRectangle({ x: 0, y: height - 92, width, height: 92, color: headerBg });
+
+  page.drawText((input.brandName || input.slug).toUpperCase(), {
+    x: 36, y: height - 42, size: 22, font, color: rgb(1, 1, 1)
   });
   page.drawText("Карточка байка для печати / sale handoff", {
-    x: 36,
-    y: height - 66,
-    size: 10,
-    font,
-    color: accent,
+    x: 36, y: height - 66, size: 11, font, color: accent
   });
 
-  page.drawText(input.item.title, { x: 36, y: height - 130, size: 24, font, color: dark });
-  page.drawText(`ID: ${input.item.id}`, { x: 36, y: height - 152, size: 10, font, color: muted });
+  // LEFT COLUMN
+  let y = height - 125;
+
+  page.drawText(input.item.title, { x: 36, y, size: 26, font, color: textDark });
+  y -= 28;
+
+  page.drawText(`ID: ${input.item.id}`, { x: 36, y, size: 11, font, color: muted });
+  y -= 26;
+
   page.drawText(`Цена: ${formatRub(input.item.salePrice || Number(specs.price_rub || specs.sale_price || 0))}`, {
-    x: 36,
-    y: height - 180,
-    size: 16,
-    font,
-    color: dark,
+    x: 36, y, size: 18, font, color: textDark
   });
+  y -= 26;
+
   page.drawText(`Статус: ${input.item.availabilityLabel || "уточнить у оператора"}`, {
-    x: 36,
-    y: height - 204,
-    size: 11,
-    font,
-    color: muted,
+    x: 36, y, size: 11.5, font, color: muted
   });
+  y -= 42;
+
+  // IMAGE (9:16)
+  const imageX = 340;
+  const imageWidth = 220;
+  const imageHeight = Math.round(imageWidth * (16 / 9));
 
   const hero = await embedImage(pdfDoc, input.item.imageUrl);
   if (hero) {
-    page.drawImage(hero, { x: 330, y: height - 300, width: 220, height: 165 });
+    page.drawImage(hero, { x: imageX, y: height - 325, width: imageWidth, height: imageHeight });
   } else {
-    page.drawRectangle({ x: 330, y: height - 300, width: 220, height: 165, borderColor: line, borderWidth: 1 });
-    page.drawText("Фото недоступно", { x: 390, y: height - 220, size: 11, font, color: muted });
+    page.drawRectangle({ x: imageX, y: height - 325, width: imageWidth, height: imageHeight, borderColor: line, borderWidth: 2 });
+    page.drawText("Фото недоступно", { x: imageX + 45, y: height - 260, size: 11, font, color: muted });
   }
 
+  // DESCRIPTION
+  const desc = input.item.description || "Описание не заполнено.";
+  const wrappedDesc = desc.match(/.{1,75}(?:\s|$)/g)?.slice(0, 7) || [desc];
+
+  y = height - 355;
+  page.drawText("Описание", { x: 36, y, size: 14, font, color: textDark });
+  y -= 22;
+
+  wrappedDesc.forEach((lineText) => {
+    page.drawText(lineText.trim(), { 
+      x: 36, y, size: 10.8, font, color: muted, maxWidth: 280 
+    });
+    y -= 14.5;
+  });
+
+  // DYNAMIC CHARACTERISTICS
+  y -= 18;
+  page.drawText("Характеристики", { x: 36, y, size: 14, font, color: textDark });
+  y -= 26;
+
+  const keySpecs = extractKeySpecs(specs);
+
+  keySpecs.forEach(([label, value], index) => {
+    const rowY = y - index * 29;
+    page.drawRectangle({ 
+      x: 36, y: rowY - 9, width: 285, height: 26, 
+      borderColor: line, borderWidth: 0.8 
+    });
+    page.drawText(label, { x: 46, y: rowY, size: 9.5, font, color: muted });
+    page.drawText(value, { x: 165, y: rowY, size: 10.5, font, color: textDark });
+  });
+
+  // QR + LINK
   const qrBytes = await fetch(
-    `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(buyLink)}&color=000000&bgcolor=ffffff&margin=1`,
+    `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(buyLink)}&color=000000&bgcolor=ffffff&margin=1`
   ).then((res) => res.arrayBuffer());
   const qr = await pdfDoc.embedPng(qrBytes);
-  page.drawImage(qr, { x: 390, y: 72, width: 135, height: 135 });
-  page.drawText("Скан → Telegram WebApp", { x: 382, y: 52, size: 9, font, color: muted });
 
-  const desc = input.item.description || "Описание не заполнено.";
-  const wrappedDesc = desc.match(/.{1,78}(?:\s|$)/g)?.slice(0, 5) || [desc];
-  let y = height - 245;
-  page.drawText("Описание", { x: 36, y, size: 13, font, color: dark });
-  y -= 20;
-  wrappedDesc.forEach((lineText) => {
-    page.drawText(lineText.trim(), { x: 36, y, size: 10, font, color: muted });
-    y -= 14;
+  page.drawImage(qr, { x: 380, y: 65, width: 145, height: 145 });
+
+  page.drawRectangle({ 
+    x: 36, y: 65, width: 320, height: 88, 
+    color: rgb(0.98, 0.97, 0.92), borderColor: accent, borderWidth: 1.5 
   });
 
-  y -= 12;
-  page.drawText("Характеристики", { x: 36, y, size: 13, font, color: dark });
-  y -= 22;
-  const rows = [
-    ["Категория", readString(specs.category) || "—"],
-    ["Мощность", readString(specs.power_kw || specs.motor_peak_kw) || "—"],
-    ["Батарея", readString(specs.battery) || "—"],
-    ["Запас хода", readString(specs.range_km) ? `${specs.range_km} км` : "—"],
-    ["Вес", readString(specs.weight_kg) ? `${specs.weight_kg} кг` : "—"],
-    ["Состояние", readString(specs.condition || specs.state) || "operator_checked"],
-  ];
-  rows.forEach(([label, value], index) => {
-    const rowY = y - index * 28;
-    page.drawRectangle({ x: 36, y: rowY - 8, width: 300, height: 24, borderColor: line, borderWidth: 0.5 });
-    page.drawText(label, { x: 46, y: rowY, size: 8, font, color: muted });
-    page.drawText(String(value), { x: 150, y: rowY, size: 10, font, color: dark });
+  page.drawText("Ссылка на карточку", { x: 52, y: 130, size: 11.5, font, color: textDark });
+  page.drawText(buyLink, { x: 52, y: 112, size: 8.8, font, color: textDark, maxWidth: 290 });
+  page.drawText("Распечатайте лист и прикрепите к байку / стойке продаж.", { 
+    x: 52, y: 82, size: 9.5, font, color: muted 
   });
-
-  page.drawRectangle({ x: 36, y: 76, width: 315, height: 88, color: rgb(0.98, 0.96, 0.88), borderColor: accent, borderWidth: 1 });
-  page.drawText("Ссылка на карточку", { x: 52, y: 136, size: 11, font, color: dark });
-  page.drawText(buyLink, { x: 52, y: 116, size: 8.5, font, color: dark });
-  page.drawText("Распечатайте лист и прикрепите к байку / стойке продаж.", { x: 52, y: 94, size: 9, font, color: muted });
 
   page.drawText(`Generated: ${new Date().toLocaleString("ru-RU")}`, {
-    x: 36,
-    y: 32,
-    size: 8,
-    font,
-    color: muted,
+    x: 36, y: 32, size: 8.5, font, color: muted
   });
 
   return pdfDoc.save();
@@ -257,22 +317,24 @@ export async function sendFranchizeBuyPrintPdf(input: unknown): Promise<{
 
     const bytes = await generateBuyPdf({
       slug,
-      brandName: crew.header.brandName || crew.name,
+      brandName: crew.header?.brandName || crew.name || "VIP BIKE RENTAL",
       botUsername: crew.contacts.telegramBotUsername,
       item: {
         id: item.id,
         title: item.title,
-        description: item.description,
-        imageUrl: item.imageUrl,
+        description: item.description || "",
+        imageUrl: item.imageUrl || "",
         salePrice: item.salePrice,
-        pricePerDay: item.pricePerDay,
-        availabilityLabel: item.availabilityLabel,
+        pricePerDay: item.pricePerDay || 0,
+        availabilityLabel: item.availabilityLabel || "",
         rawSpecs: item.rawSpecs,
       },
     });
+
     const fileName = `BUY_${safeFilePart(item.title)}_${safeFilePart(item.id)}.pdf`;
     const fileBlob = new Blob([bytes], { type: "application/pdf" });
     const sendResult = await sendTelegramDocument(actorUserId, fileBlob, fileName);
+
     if (!sendResult.success) {
       return { success: false, error: sendResult.error || "Telegram sendDocument failed." };
     }
