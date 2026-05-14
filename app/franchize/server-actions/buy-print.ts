@@ -1,9 +1,10 @@
+// /app/franchize/server-actions/buy-print.ts
 "use server";
 
 import { cookies } from "next/headers";
 import fs from "fs";
 import path from "path";
-import { PDFDocument, rgb, type PDFFont } from "pdf-lib";
+import { PDFDocument, rgb, type PDFFont, type RGB } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 
 import { sendTelegramDocument } from "@/app/actions";
@@ -18,19 +19,120 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 
 type UnknownRecord = Record<string, unknown>;
 
+// ─── Global Layout Constants (A4) ──────────────────────────────────────────
+
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
 
 const PAGE_PADDING = 38;
-const HEADER_HEIGHT = 92;
 
-const LEFT_COL_X = 38;
-const LEFT_COL_W = 248;
+// Header
+const HEADER_HEIGHT = 82;
+const HEADER_BRAND_Y_OFFSET = 40; // from top of page
+const HEADER_ACCENT_HEIGHT = 2; // gold separator line under header
+
+// Columns
+const LEFT_COL_X = PAGE_PADDING;
+const LEFT_COL_WIDTH = 248;
 
 const RIGHT_COL_X = 314;
-const RIGHT_COL_W = 242;
+const RIGHT_COL_WIDTH = 242;
 
-const QR_BLOCK_HEIGHT = 165;
+const COL_GAP = RIGHT_COL_X - (LEFT_COL_X + LEFT_COL_WIDTH); // 28
+
+// Content vertical anchors (from top of page)
+const TITLE_BLOCK_TOP = PAGE_HEIGHT - 118;
+
+// Image panel (right column)
+const IMAGE_PANEL_TOP = PAGE_HEIGHT - 355;
+const IMAGE_PANEL_HEIGHT = 255;
+const IMAGE_PANEL_PADDING = 18; // inset for scaled images
+
+// Spec table
+const SPEC_VALUE_FONT_SIZE = 9.4;
+const SPEC_VALUE_MAX_WIDTH = 118;
+const SPEC_VALUE_X_OFFSET = 108;
+const SPEC_LABEL_FONT_SIZE = 9.3;
+const SPEC_LABEL_MAX_WIDTH = 82;
+const SPEC_LABEL_X_OFFSET = 12;
+const SPEC_LINE_HEIGHT = 10;
+const SPEC_ROW_MIN_HEIGHT = 30;
+const SPEC_ROW_CONTENT_PADDING = 12;
+const SPEC_ROW_BORDER_OFFSET = 6; // aligns top border with row anchor
+const SPEC_ROW_GAP = 4;
+const SPEC_MAX_ROWS = 13;
+const SPEC_MAX_VALUE_LINES = 2;
+
+// Link box (bottom section)
+const LINK_BOX_Y = 56;
+const LINK_BOX_WIDTH = 324;
+const LINK_BOX_HEIGHT = 82;
+const LINK_BOX_INNER_X = 14;
+const LINK_BOX_TITLE_Y = 112;
+const LINK_BOX_LINK_Y = 90;
+const LINK_BOX_LINK_LINE_HEIGHT = 10;
+const LINK_BOX_MAX_WIDTH = 286;
+const LINK_FONT_SIZE = 8.2;
+const LINK_TITLE_FONT_SIZE = 11.5;
+
+// QR code
+const QR_X = 390;
+const QR_Y = 52;
+const QR_SIZE = 142;
+
+// Footer
+const FOOTER_Y = 24;
+const FOOTER_GENERATED_X = 180;
+
+// Description
+const DESC_FONT_SIZE = 10.4;
+const DESC_LINE_HEIGHT = 14;
+const DESC_MAX_LINES = 8;
+const DESC_SECTION_GAP = 18;
+
+// Section headings
+const SECTION_HEADING_SIZE = 14;
+const SECTION_HEADING_GAP_AFTER = 22;
+const SECTION_HEADING_GAP_BEFORE = 24;
+
+// Title / price block
+const TITLE_FONT_SIZE = 24;
+const PRICE_FONT_SIZE = 20;
+const TITLE_TO_PRICE_GAP = 34;
+const PRICE_TO_DESC_GAP = 44;
+
+// Network
+const FETCH_TIMEOUT_MS = 8_000;
+
+// ─── Color Palette ──────────────────────────────────────────────────────────
+
+interface PdfColors {
+  header: RGB;
+  text: RGB;
+  muted: RGB;
+  line: RGB;
+  accent: RGB;
+  accentSubtle: RGB;
+  imageBg: RGB;
+  linkBg: RGB;
+  imageFallback: RGB;
+  white: RGB;
+}
+
+const COLORS: PdfColors = {
+  header: rgb(0.07, 0.08, 0.11),
+  text: rgb(0.12, 0.13, 0.15),
+  muted: rgb(0.46, 0.48, 0.52),
+  line: rgb(0.88, 0.89, 0.91),
+  accent: rgb(0.96, 0.76, 0.22),
+  accentSubtle: rgb(0.96, 0.76, 0.22),
+  imageBg: rgb(0.10, 0.11, 0.13),
+  linkBg: rgb(0.99, 0.98, 0.94),
+  imageFallback: rgb(0.35, 0.36, 0.38),
+  white: rgb(1, 1, 1),
+};
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function normalizeSlug(value: string) {
   return (value || "vip-bike").trim().toLowerCase() || "vip-bike";
@@ -47,7 +149,9 @@ async function resolveActorUserId() {
     cookies().get(TELEGRAM_ACTOR_COOKIE)?.value,
   );
 
-  if (actorUserId) return actorUserId;
+  if (actorUserId) {
+    return actorUserId;
+  }
 
   if (
     process.env.NODE_ENV !== "production" &&
@@ -115,15 +219,14 @@ function safeFilePart(value: string) {
 }
 
 function formatRub(value: number | null | undefined) {
-  return value && value > 0
-    ? `${value.toLocaleString("ru-RU")} ₽`
-    : "по запросу";
+  if (!value || value <= 0) {
+    return "по запросу";
+  }
+
+  return `${value.toLocaleString("ru-RU")} ₽`;
 }
 
-function buildWebAppBuyLink(
-  botUsername: string,
-  bikeId: string,
-) {
+function buildWebAppBuyLink(botUsername: string, bikeId: string) {
   const normalizedBot =
     botUsername
       .trim()
@@ -139,88 +242,66 @@ function buildWebAppBuyLink(
   return `https://t.me/${normalizedBot}/app?startapp=buy_${safeBikeId}`;
 }
 
-async function embedImage(
-  pdfDoc: PDFDocument,
-  url: string,
-) {
-  if (!url) return null;
+/**
+ * Fetches an image URL and embeds it into the PDF document.
+ * Returns `null` on any failure (missing URL, network error, bad response).
+ * Includes a timeout guard to prevent hanging on slow hosts.
+ */
+async function embedImage(pdfDoc: PDFDocument, url: string) {
+  if (!url) {
+    return null;
+  }
 
   try {
-    const response = await fetch(url);
-
-    if (!response.ok) return null;
-
-    const bytes = await response.arrayBuffer();
-
-    const contentType =
-      response.headers.get("content-type") || "";
-
-    return contentType.includes("png") ||
-      url.toLowerCase().includes(".png")
-      ? await pdfDoc.embedPng(bytes)
-      : await pdfDoc.embedJpg(bytes);
-  } catch (error) {
-    logger.warn(
-      "[franchize] failed to embed PDF image",
-      error,
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      FETCH_TIMEOUT_MS,
     );
 
+    const response = await fetch(url, {
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const bytes = await response.arrayBuffer();
+    const contentType = response.headers.get("content-type") || "";
+
+    if (
+      contentType.includes("png") ||
+      url.toLowerCase().includes(".png")
+    ) {
+      return await pdfDoc.embedPng(bytes);
+    }
+
+    return await pdfDoc.embedJpg(bytes);
+  } catch (error) {
+    logger.warn("[franchize] failed to embed buy PDF image", error);
     return null;
   }
 }
 
-function wrapText(
-  font: PDFFont,
-  text: string,
-  size: number,
-  maxWidth: number,
-) {
-  const words = text.split(/\s+/).filter(Boolean);
-
-  const lines: string[] = [];
-
-  let current = "";
-
-  words.forEach((word) => {
-    const candidate = current
-      ? `${current} ${word}`
-      : word;
-
-    const width =
-      font.widthOfTextAtSize(candidate, size);
-
-    if (width <= maxWidth) {
-      current = candidate;
-    } else {
-      if (current) lines.push(current);
-      current = word;
-    }
-  });
-
-  if (current) lines.push(current);
-
-  return lines;
-}
-
-function extractKeySpecs(
-  specs: UnknownRecord,
-): [string, string][] {
+function extractKeySpecs(specs: UnknownRecord) {
   const rows: [string, string][] = [];
 
-  const priorityFields: Array<
-    [string, ...string[]]
-  > = [
+  const priorityFields: Array<[string, ...string[]]> = [
     ["Тип", "bike_subtype"],
     ["Год", "year"],
     ["Пиковая мощность", "power_kw", "motor_peak_kw"],
     ["Номинальная мощность", "motor_nominal_kw"],
     ["Крутящий момент", "torque_nm", "torque_motor_nm"],
     ["Батарея", "battery"],
-    ["Запас хода", "range_km"],
+    ["Запас хода", "range_km", "range_120ah_km", "range_100ah_km"],
     ["Макс. скорость", "top_speed_kmh"],
+    ["Разгон 0-100", "acceleration_0_100_s"],
     ["Вес", "weight_kg"],
     ["Тормоза", "brake_type"],
-    ["Подвеска", "suspension_type"],
+    ["Подвеска", "suspension_type", "suspension_front"],
     ["Рама", "frame_type"],
     ["Зарядка", "charge_time_h"],
     ["Класс прав", "license_class"],
@@ -237,9 +318,111 @@ function extractKeySpecs(
     }
   });
 
-  return rows.slice(0, 14);
+  Object.entries(specs).forEach(([key, value]) => {
+    if (
+      typeof value === "string" &&
+      value.length > 2 &&
+      !priorityFields.flat().includes(key) &&
+      ![
+        "gallery",
+        "features",
+        "buy_colors",
+        "buy_options",
+        "spec_labels",
+      ].includes(key)
+    ) {
+      const niceLabel = key
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+      if (!rows.some((row) => row[0] === niceLabel)) {
+        rows.push([niceLabel, value]);
+      }
+    }
+  });
+
+  return rows.slice(0, SPEC_MAX_ROWS);
 }
 
+function wrapText(
+  text: string,
+  font: PDFFont,
+  fontSize: number,
+  maxWidth: number,
+) {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+
+  let currentLine = "";
+
+  words.forEach((word) => {
+    const testLine = currentLine
+      ? `${currentLine} ${word}`
+      : word;
+
+    const width = font.widthOfTextAtSize(testLine, fontSize);
+
+    if (width <= maxWidth) {
+      currentLine = testLine;
+    } else {
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+
+      currentLine = word;
+    }
+  });
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines;
+}
+
+/**
+ * Formats a stable timestamp string for PDF footers.
+ * Uses manual UTC-based formatting to avoid locale-dependent
+ * `toLocaleString` inconsistencies across Node.js versions and hosts.
+ */
+function formatTimestamp(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  return [
+    [
+      pad(date.getDate()),
+      pad(date.getMonth() + 1),
+      date.getFullYear(),
+    ].join("."),
+    [
+      pad(date.getHours()),
+      pad(date.getMinutes()),
+      pad(date.getSeconds()),
+    ].join(":"),
+  ].join(", ");
+}
+
+// ─── PDF Generation ─────────────────────────────────────────────────────────
+
+/**
+ * Generates a premium product-sheet PDF for a franchize bike listing.
+ *
+ * Layout overview (A4 portrait):
+ * ┌──────────────────────────────────────┐
+ * │ HEADER (dark bg + gold accent line)  │
+ * ├───────────────┬──────────────────────┤
+ * │  Title        │                      │
+ * │  Price        │    IMAGE PANEL       │
+ * │  Description  │    (graphite bg)     │
+ * │  ─────────    │                      │
+ * │  Specs table  │                      │
+ * │  (bordered)   │                      │
+ * ├───────────────┴──────────────────────┤
+ * │  LINK BOX (cream bg)    │  QR CODE  │
+ * ├──────────────────────────────────────┤
+ * │  ID: ...        Generated: ...       │
+ * └──────────────────────────────────────┘
+ */
 async function generateBuyPdf(input: {
   slug: string;
   brandName: string;
@@ -266,28 +449,11 @@ async function generateBuyPdf(input: {
   );
 
   const fontBytes = fs.readFileSync(fontPath);
-
   const font = await pdfDoc.embedFont(fontBytes);
 
-  const page = pdfDoc.addPage([
-    PAGE_WIDTH,
-    PAGE_HEIGHT,
-  ]);
-
-  const colors = {
-    header: rgb(0.07, 0.08, 0.11),
-    text: rgb(0.12, 0.13, 0.15),
-    muted: rgb(0.45, 0.48, 0.52),
-    line: rgb(0.88, 0.89, 0.91),
-    accent: rgb(0.96, 0.76, 0.22),
-    soft: rgb(0.97, 0.98, 0.99),
-    linkBg: rgb(0.99, 0.98, 0.94),
-    imageBg: rgb(0.04, 0.05, 0.08),
-    imageBorder: rgb(0.15, 0.85, 0.95),
-  };
+  const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
 
   const specs = input.item.rawSpecs || {};
-
   const keySpecs = extractKeySpecs(specs);
 
   const buyLink = buildWebAppBuyLink(
@@ -295,213 +461,178 @@ async function generateBuyPdf(input: {
     input.item.id,
   );
 
-  // HEADER
+  // ── Header ──────────────────────────────────────────────────────────────
+
   page.drawRectangle({
     x: 0,
     y: PAGE_HEIGHT - HEADER_HEIGHT,
     width: PAGE_WIDTH,
     height: HEADER_HEIGHT,
-    color: colors.header,
+    color: COLORS.header,
   });
 
   page.drawText(
     (input.brandName || input.slug).toUpperCase(),
     {
       x: PAGE_PADDING,
-      y: PAGE_HEIGHT - 42,
-      size: 23,
+      y: PAGE_HEIGHT - HEADER_BRAND_Y_OFFSET,
+      size: TITLE_FONT_SIZE,
       font,
-      color: rgb(1, 1, 1),
+      color: COLORS.white,
     },
   );
 
-  page.drawText(
-    "Карточка байка / sale handoff",
-    {
-      x: PAGE_PADDING,
-      y: PAGE_HEIGHT - 66,
-      size: 11,
-      font,
-      color: colors.accent,
-    },
-  );
-
-  // LEFT COLUMN
-  let y = PAGE_HEIGHT - 128;
-
-  // TITLE
-  const titleLines = wrapText(
-    font,
-    input.item.title,
-    25,
-    LEFT_COL_W,
-  ).slice(0, 2);
-
-  titleLines.forEach((line) => {
-    page.drawText(line, {
-      x: LEFT_COL_X,
-      y,
-      size: 25,
-      font,
-      color: colors.text,
-    });
-
-    y -= 28;
+  // Gold accent line at bottom of header
+  page.drawRectangle({
+    x: 0,
+    y: PAGE_HEIGHT - HEADER_HEIGHT,
+    width: PAGE_WIDTH,
+    height: HEADER_ACCENT_HEIGHT,
+    color: COLORS.accent,
   });
 
-  y -= 4;
+  // ── Title Block ─────────────────────────────────────────────────────────
 
-  page.drawText(`ID: ${input.item.id}`, {
+  let leftY = TITLE_BLOCK_TOP;
+
+  page.drawText(input.item.title, {
     x: LEFT_COL_X,
-    y,
-    size: 11,
+    y: leftY,
+    size: TITLE_FONT_SIZE,
     font,
-    color: colors.muted,
+    color: COLORS.text,
   });
 
-  y -= 28;
+  leftY -= TITLE_TO_PRICE_GAP;
 
   page.drawText(
     `Цена: ${formatRub(input.item.salePrice)}`,
     {
       x: LEFT_COL_X,
-      y,
-      size: 19,
+      y: leftY,
+      size: PRICE_FONT_SIZE,
       font,
-      color: colors.text,
+      color: COLORS.text,
     },
   );
 
-  y -= 30;
+  leftY -= PRICE_TO_DESC_GAP;
 
-  page.drawText(
-    `Статус: ${
-      input.item.availabilityLabel ||
-      "уточнить у оператора"
-    }`,
-    {
-      x: LEFT_COL_X,
-      y,
-      size: 11.5,
-      font,
-      color: colors.muted,
-    },
-  );
+  // ── Description ─────────────────────────────────────────────────────────
 
-  y -= 48;
-
-  // DESCRIPTION
   page.drawText("Описание", {
     x: LEFT_COL_X,
-    y,
-    size: 14,
+    y: leftY,
+    size: SECTION_HEADING_SIZE,
     font,
-    color: colors.text,
+    color: COLORS.text,
   });
 
-  y -= 22;
+  leftY -= SECTION_HEADING_GAP_AFTER;
 
   const description =
-    input.item.description?.trim() ||
-    "Описание не заполнено.";
+    input.item.description || "Описание не заполнено.";
 
   const descriptionLines = wrapText(
-    font,
     description,
-    10.4,
-    LEFT_COL_W,
-  ).slice(0, 8);
+    font,
+    DESC_FONT_SIZE,
+    LEFT_COL_WIDTH,
+  ).slice(0, DESC_MAX_LINES);
 
   descriptionLines.forEach((line) => {
     page.drawText(line, {
       x: LEFT_COL_X,
-      y,
-      size: 10.4,
+      y: leftY,
+      size: DESC_FONT_SIZE,
       font,
-      color: colors.muted,
+      color: COLORS.muted,
+      maxWidth: LEFT_COL_WIDTH,
     });
 
-    y -= 15;
+    leftY -= DESC_LINE_HEIGHT;
   });
 
-  y -= 18;
+  leftY -= DESC_SECTION_GAP;
 
-  // SPECS
-  page.drawText("Характеристики", {
-    x: LEFT_COL_X,
-    y,
-    size: 14,
-    font,
-    color: colors.text,
-  });
+  // ── Specs ───────────────────────────────────────────────────────────────
 
-  y -= 24;
-
-  // prevent overlap with QR block
-  const minY =
-    QR_BLOCK_HEIGHT + 22;
-
-  const visibleSpecs = keySpecs.filter(
-    (_, index) => {
-      const nextY =
-        y - index * 32;
-
-      return nextY > minY;
-    },
-  );
-
-  visibleSpecs.forEach(([label, value]) => {
-    page.drawRectangle({
+  if (keySpecs.length > 0) {
+    page.drawText("Характеристики", {
       x: LEFT_COL_X,
-      y: y - 10,
-      width: LEFT_COL_W,
-      height: 28,
-      borderColor: colors.line,
-      borderWidth: 0.8,
-    });
-
-    page.drawText(label, {
-      x: LEFT_COL_X + 12,
-      y: y - 8,
-      size: 9.3,
+      y: leftY,
+      size: SECTION_HEADING_SIZE,
       font,
-      color: colors.muted,
-      maxWidth: 88,
+      color: COLORS.text,
     });
 
-    page.drawText(value, {
-      x: LEFT_COL_X + 104,
-      y: y - 8,
-      size: 10.1,
-      font,
-      color: colors.text,
-      maxWidth: 130,
+    leftY -= SECTION_HEADING_GAP_AFTER;
+
+    keySpecs.forEach(([label, value]) => {
+      const wrappedValue = wrapText(
+        value,
+        font,
+        SPEC_VALUE_FONT_SIZE,
+        SPEC_VALUE_MAX_WIDTH,
+      ).slice(0, SPEC_MAX_VALUE_LINES);
+
+      const contentHeight =
+        wrappedValue.length * SPEC_LINE_HEIGHT;
+      const rowHeight = Math.max(
+        SPEC_ROW_MIN_HEIGHT,
+        contentHeight + SPEC_ROW_CONTENT_PADDING,
+      );
+
+      // Row border
+      page.drawRectangle({
+        x: LEFT_COL_X,
+        y: leftY - rowHeight + SPEC_ROW_BORDER_OFFSET,
+        width: LEFT_COL_WIDTH,
+        height: rowHeight,
+        borderColor: COLORS.line,
+        borderWidth: 0.9,
+      });
+
+      // Vertically centered label
+      const labelTextY =
+        leftY - rowHeight / 2 + SPEC_LABEL_FONT_SIZE / 2 - 1;
+
+      page.drawText(label, {
+        x: LEFT_COL_X + SPEC_LABEL_X_OFFSET,
+        y: labelTextY,
+        size: SPEC_LABEL_FONT_SIZE,
+        font,
+        color: COLORS.muted,
+        maxWidth: SPEC_LABEL_MAX_WIDTH,
+      });
+
+      // Vertically centered multiline value
+      const textBaseY =
+        leftY - rowHeight / 2 + contentHeight / 2 - 2;
+
+      wrappedValue.forEach((line, index) => {
+        page.drawText(line, {
+          x: LEFT_COL_X + SPEC_VALUE_X_OFFSET,
+          y: textBaseY - index * SPEC_LINE_HEIGHT,
+          size: SPEC_VALUE_FONT_SIZE,
+          font,
+          color: COLORS.text,
+          maxWidth: SPEC_VALUE_MAX_WIDTH,
+        });
+      });
+
+      leftY -= rowHeight + SPEC_ROW_GAP;
     });
+  }
 
-    y -= 32;
-  });
-
-  // IMAGE PANEL
-  const imagePanelY = 245;
-  const imagePanelH =
-    PAGE_HEIGHT - HEADER_HEIGHT - imagePanelY - 18;
+  // ── Image Panel (Right Column) ──────────────────────────────────────────
 
   page.drawRectangle({
     x: RIGHT_COL_X,
-    y: imagePanelY,
-    width: RIGHT_COL_W,
-    height: imagePanelH,
-    color: colors.imageBg,
-  });
-
-  page.drawRectangle({
-    x: RIGHT_COL_X,
-    y: imagePanelY,
-    width: RIGHT_COL_W,
-    height: imagePanelH,
-    borderColor: colors.imageBorder,
-    borderWidth: 1,
-    opacity: 0.35,
+    y: IMAGE_PANEL_TOP,
+    width: RIGHT_COL_WIDTH,
+    height: IMAGE_PANEL_HEIGHT,
+    color: COLORS.imageBg,
   });
 
   const hero = await embedImage(
@@ -511,125 +642,126 @@ async function generateBuyPdf(input: {
 
   if (hero) {
     const scaled = hero.scaleToFit(
-      RIGHT_COL_W - 16,
-      imagePanelH - 16,
+      RIGHT_COL_WIDTH - IMAGE_PANEL_PADDING,
+      IMAGE_PANEL_HEIGHT - IMAGE_PANEL_PADDING,
     );
 
     page.drawImage(hero, {
-      x:
-        RIGHT_COL_X +
-        (RIGHT_COL_W - scaled.width) / 2,
-      y: imagePanelY + 8,
+      x: RIGHT_COL_X + (RIGHT_COL_WIDTH - scaled.width) / 2,
+      y: IMAGE_PANEL_TOP + (IMAGE_PANEL_HEIGHT - scaled.height) / 2,
       width: scaled.width,
       height: scaled.height,
     });
   } else {
-    page.drawText("Фото недоступно", {
-      x: RIGHT_COL_X + 48,
-      y: imagePanelY + imagePanelH / 2,
-      size: 11,
+    const fallbackText = "Изображение недоступно";
+    const fallbackSize = 11;
+    const fallbackWidth = font.widthOfTextAtSize(fallbackText, fallbackSize);
+
+    page.drawText(fallbackText, {
+      x: RIGHT_COL_X + (RIGHT_COL_WIDTH - fallbackWidth) / 2,
+      y: IMAGE_PANEL_TOP + IMAGE_PANEL_HEIGHT / 2 - 4,
+      size: fallbackSize,
       font,
-      color: colors.muted,
+      color: COLORS.imageFallback,
     });
   }
 
-  // BOTTOM BLOCK
-  page.drawRectangle({
-    x: 0,
-    y: 0,
-    width: PAGE_WIDTH,
-    height: QR_BLOCK_HEIGHT,
-    color: colors.soft,
-  });
+  // ── QR Code ─────────────────────────────────────────────────────────────
 
-  // QR
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      FETCH_TIMEOUT_MS,
+    );
+
     const qrBytes = await fetch(
       `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(
         buyLink,
       )}&color=000000&bgcolor=ffffff&margin=1`,
-    ).then((res) => res.arrayBuffer());
+      { signal: controller.signal },
+    ).then((response) => response.arrayBuffer());
+
+    clearTimeout(timeout);
 
     const qr = await pdfDoc.embedPng(qrBytes);
 
     page.drawImage(qr, {
-      x: 396,
-      y: 24,
-      width: 132,
-      height: 132,
+      x: QR_X,
+      y: QR_Y,
+      width: QR_SIZE,
+      height: QR_SIZE,
     });
   } catch (error) {
-    logger.warn(
-      "[franchize] failed to generate QR",
-      error,
-    );
+    logger.warn("[franchize] failed to generate QR", error);
   }
 
-  // LINK CARD
+  // ── Link Box ────────────────────────────────────────────────────────────
+
   page.drawRectangle({
     x: PAGE_PADDING,
-    y: 38,
-    width: 322,
-    height: 98,
-    color: colors.linkBg,
-    borderColor: colors.accent,
-    borderWidth: 1.3,
+    y: LINK_BOX_Y,
+    width: LINK_BOX_WIDTH,
+    height: LINK_BOX_HEIGHT,
+    color: COLORS.linkBg,
+    borderColor: COLORS.accent,
+    borderWidth: 1.4,
   });
 
   page.drawText("Ссылка на карточку", {
-    x: 54,
-    y: 112,
-    size: 12,
+    x: PAGE_PADDING + LINK_BOX_INNER_X,
+    y: LINK_BOX_TITLE_Y,
+    size: LINK_TITLE_FONT_SIZE,
     font,
-    color: colors.text,
+    color: COLORS.text,
   });
 
   const linkLines = wrapText(
-    font,
     buyLink,
-    8.5,
-    280,
-  ).slice(0, 3);
+    font,
+    LINK_FONT_SIZE,
+    LINK_BOX_MAX_WIDTH,
+  ).slice(0, 2);
 
-  let linkY = 92;
-
-  linkLines.forEach((line) => {
+  linkLines.forEach((line, index) => {
     page.drawText(line, {
-      x: 54,
-      y: linkY,
-      size: 8.5,
+      x: PAGE_PADDING + LINK_BOX_INNER_X,
+      y: LINK_BOX_LINK_Y - index * LINK_BOX_LINK_LINE_HEIGHT,
+      size: LINK_FONT_SIZE,
       font,
-      color: colors.text,
+      color: COLORS.text,
+      maxWidth: LINK_BOX_MAX_WIDTH,
     });
-
-    linkY -= 11;
   });
 
+  // ── Footer ──────────────────────────────────────────────────────────────
+
   page.drawText(
-    "Распечатайте и прикрепите к байку / стойке продаж.",
+    `ID: ${input.item.id}`,
     {
-      x: 54,
-      y: 52,
-      size: 9.2,
+      x: PAGE_PADDING,
+      y: FOOTER_Y,
+      size: 8.3,
       font,
-      color: colors.muted,
-      maxWidth: 260,
+      color: COLORS.muted,
     },
   );
 
   page.drawText(
-    `Generated: ${new Date().toLocaleString("ru-RU")}`,
+    formatTimestamp(new Date()),
     {
-      x: PAGE_PADDING,
-      y: 16,
-      size: 8.2,
+      x: FOOTER_GENERATED_X,
+      y: FOOTER_Y,
+      size: 8.3,
       font,
-      color: colors.muted,
+      color: COLORS.muted,
     },
   );
 
   return pdfDoc.save();
 }
+
+// ─── Server Action ──────────────────────────────────────────────────────────
 
 export async function sendFranchizeBuyPrintPdf(
   input: unknown,
@@ -656,14 +788,12 @@ export async function sendFranchizeBuyPrintPdf(
     };
   }
 
-  const actorUserId =
-    await resolveActorUserId();
+  const actorUserId = await resolveActorUserId();
 
-  const access =
-    await resolvePrintAccess(
-      actorUserId,
-      slug,
-    );
+  const access = await resolvePrintAccess(
+    actorUserId,
+    slug,
+  );
 
   if (!access.allowed) {
     return {
@@ -710,9 +840,12 @@ export async function sendFranchizeBuyPrintPdf(
     const fileName =
       `BUY_${safeFilePart(item.title)}_${safeFilePart(item.id)}.pdf`;
 
-    const fileBlob = new Blob([bytes], {
-      type: "application/pdf",
-    });
+    const fileBlob = new Blob(
+      [bytes],
+      {
+        type: "application/pdf",
+      },
+    );
 
     const sendResult =
       await sendTelegramDocument(
