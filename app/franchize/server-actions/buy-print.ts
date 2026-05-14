@@ -113,7 +113,6 @@ async function embedImage(pdfDoc: PDFDocument, url: string) {
   }
 }
 
-// Smart dynamic specs extractor
 function extractKeySpecs(specs: UnknownRecord) {
   const rows: [string, string][] = [];
 
@@ -145,10 +144,10 @@ function extractKeySpecs(specs: UnknownRecord) {
     }
   });
 
-  // Fallback generic fields
+  // Fallback
   Object.entries(specs).forEach(([key, value]) => {
-    if (typeof value === "string" && value.length > 2 && 
-        !priorityFields.flat().includes(key) && 
+    if (typeof value === "string" && value.length > 2 &&
+        !priorityFields.flat().includes(key) &&
         !["gallery", "features", "buy_colors", "buy_options", "spec_labels"].includes(key)) {
       const niceLabel = key
         .replace(/_/g, " ")
@@ -159,7 +158,7 @@ function extractKeySpecs(specs: UnknownRecord) {
     }
   });
 
-  return rows.slice(0, 12); // limit to prevent overflow
+  return rows.slice(0, 14);
 }
 
 async function generateBuyPdf(input: {
@@ -206,7 +205,7 @@ async function generateBuyPdf(input: {
     x: 36, y: height - 66, size: 11, font, color: accent
   });
 
-  // LEFT COLUMN
+  // LEFT COLUMN - Title block
   let y = height - 125;
 
   page.drawText(input.item.title, { x: 36, y, size: 26, font, color: textDark });
@@ -223,24 +222,35 @@ async function generateBuyPdf(input: {
   page.drawText(`Статус: ${input.item.availabilityLabel || "уточнить у оператора"}`, {
     x: 36, y, size: 11.5, font, color: muted
   });
-  y -= 42;
+  y -= 45;
 
-  // IMAGE (9:16)
+  // IMAGE (right side, tall 9:16)
   const imageX = 340;
   const imageWidth = 220;
   const imageHeight = Math.round(imageWidth * (16 / 9));
 
   const hero = await embedImage(pdfDoc, input.item.imageUrl);
   if (hero) {
-    page.drawImage(hero, { x: imageX, y: height - 325, width: imageWidth, height: imageHeight });
+    page.drawImage(hero, { 
+      x: imageX, 
+      y: height - 325, 
+      width: imageWidth, 
+      height: imageHeight 
+    });
   } else {
-    page.drawRectangle({ x: imageX, y: height - 325, width: imageWidth, height: imageHeight, borderColor: line, borderWidth: 2 });
-    page.drawText("Фото недоступно", { x: imageX + 45, y: height - 260, size: 11, font, color: muted });
+    page.drawRectangle({ 
+      x: imageX, 
+      y: height - 325, 
+      width: imageWidth, 
+      height: imageHeight, 
+      borderColor: line, 
+      borderWidth: 2 
+    });
   }
 
-  // DESCRIPTION
+  // DESCRIPTION (left, below title)
   const desc = input.item.description || "Описание не заполнено.";
-  const wrappedDesc = desc.match(/.{1,75}(?:\s|$)/g)?.slice(0, 7) || [desc];
+  const wrappedDesc = desc.match(/.{1,78}(?:\s|$)/g)?.slice(0, 8) || [desc];
 
   y = height - 355;
   page.drawText("Описание", { x: 36, y, size: 14, font, color: textDark });
@@ -248,13 +258,18 @@ async function generateBuyPdf(input: {
 
   wrappedDesc.forEach((lineText) => {
     page.drawText(lineText.trim(), { 
-      x: 36, y, size: 10.8, font, color: muted, maxWidth: 280 
+      x: 36, 
+      y, 
+      size: 10.8, 
+      font, 
+      color: muted, 
+      maxWidth: 275 
     });
-    y -= 14.5;
+    y -= 14.8;
   });
 
-  // DYNAMIC CHARACTERISTICS
-  y -= 18;
+  // DYNAMIC SPECS (below description)
+  y -= 12;
   page.drawText("Характеристики", { x: 36, y, size: 14, font, color: textDark });
   y -= 26;
 
@@ -263,14 +278,18 @@ async function generateBuyPdf(input: {
   keySpecs.forEach(([label, value], index) => {
     const rowY = y - index * 29;
     page.drawRectangle({ 
-      x: 36, y: rowY - 9, width: 285, height: 26, 
-      borderColor: line, borderWidth: 0.8 
+      x: 36, 
+      y: rowY - 9, 
+      width: 285, 
+      height: 26, 
+      borderColor: line, 
+      borderWidth: 0.8 
     });
     page.drawText(label, { x: 46, y: rowY, size: 9.5, font, color: muted });
     page.drawText(value, { x: 165, y: rowY, size: 10.5, font, color: textDark });
   });
 
-  // QR + LINK
+  // QR + LINK BOX (bottom)
   const qrBytes = await fetch(
     `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(buyLink)}&color=000000&bgcolor=ffffff&margin=1`
   ).then((res) => res.arrayBuffer());
@@ -279,8 +298,13 @@ async function generateBuyPdf(input: {
   page.drawImage(qr, { x: 380, y: 65, width: 145, height: 145 });
 
   page.drawRectangle({ 
-    x: 36, y: 65, width: 320, height: 88, 
-    color: rgb(0.98, 0.97, 0.92), borderColor: accent, borderWidth: 1.5 
+    x: 36, 
+    y: 65, 
+    width: 320, 
+    height: 88, 
+    color: rgb(0.98, 0.97, 0.92), 
+    borderColor: accent, 
+    borderWidth: 1.5 
   });
 
   page.drawText("Ссылка на карточку", { x: 52, y: 130, size: 11.5, font, color: textDark });
