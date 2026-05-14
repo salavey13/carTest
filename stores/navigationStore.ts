@@ -46,6 +46,19 @@ export const navigationStore = {
     emit();
     return next;
   },
+  backTarget(currentPath: string) {
+    const normalizedCurrentPath = normalize(currentPath);
+    let changed = false;
+
+    while (state.stack.length > 0 && state.stack[state.stack.length - 1] === normalizedCurrentPath) {
+      state.stack.pop();
+      changed = true;
+    }
+
+    const next = state.stack[state.stack.length - 1] || null;
+    if (changed) emit();
+    return next;
+  },
   canGoBack() {
     return state.stack.length > 1;
   },
