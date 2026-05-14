@@ -1559,3 +1559,15 @@ Build-regression review after the Telegram navigation refactor:
 - ✅ `npm run build` now completes `Generating static pages (168/168)` without the missing-Suspense CSR bailout.
 
 Follow-up watch item: if future hash-only navigation becomes user-critical, validate Telegram Android event ordering for `hashchange` + `popstate` on a real device and add a tiny route-stack unit test around that sequence.
+
+## Execution audit (2026-05-14) — production Telegram BackButton polish
+
+Operator production repro: Mini App starts on `/vipbikerental`, then users route into `/franchize/vip-bike/*`; Telegram still showed only native `X` and Android back collapsed the WebApp.
+
+- ✅ Kept the mounted canonical hook as `hooks/telegram/useTelegramBackButton.ts`; the older `hooks/useTelegramBackButton.ts` is now only a compatibility re-export so future edits do not fork behavior again.
+- ✅ BackButton visibility now uses both the explicit SPA stack and route fallbacks, so `/franchize/{slug}` can show native back even after direct launch or `router.replace`-style redirects with no prior stack entry.
+- ✅ Franchize fallback ladder is explicit: `/franchize/{slug}/...` → `/franchize/{slug}` → `/vipbikerental`; `/vipbikerental` remains the close/root surface.
+- ✅ Android native back gets a same-URL guard history entry on routes with an app-level back target, letting `popstate` route inside the app instead of letting Telegram collapse immediately.
+- ✅ Back clicks use SPA `router.push`, preserving the Next.js navigation oath and avoiding hard reloads.
+
+Real-device watch item: Telegram Desktop/iOS/Android can order history events differently; smoke `/vipbikerental` → `/franchize/vip-bike` → `/franchize/vip-bike/cart` inside the production bot after deploy.
