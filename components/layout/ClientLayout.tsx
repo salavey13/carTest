@@ -306,7 +306,9 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   return (
     <ErrorOverlayProvider>
       <AppProvider>
-        <AppInitializers />
+        <Suspense fallback={null}>
+          <AppInitializers />
+        </Suspense>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <TooltipProvider>
             <ErrorBoundaryForOverlay>

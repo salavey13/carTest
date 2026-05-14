@@ -21,19 +21,27 @@ export function TelegramNavigationTracker() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const handleHashOrSearchChange = () => {
-      const nextUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const currentUrl = () => `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+    const handleHashChange = () => {
+      const nextUrl = currentUrl();
       if (previousUrlRef.current === nextUrl) return;
       previousUrlRef.current = nextUrl;
       navigationStore.push(nextUrl);
     };
 
-    window.addEventListener("hashchange", handleHashOrSearchChange);
-    window.addEventListener("popstate", handleHashOrSearchChange);
+    const handlePopState = () => {
+      // Back/forward traversal is popped by useTelegramBackButton. The tracker only
+      // refreshes its ref here so it does not re-push the route that was just popped.
+      previousUrlRef.current = currentUrl();
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+    window.addEventListener("popstate", handlePopState);
 
     return () => {
-      window.removeEventListener("hashchange", handleHashOrSearchChange);
-      window.removeEventListener("popstate", handleHashOrSearchChange);
+      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("popstate", handlePopState);
     };
   }, []);
 
