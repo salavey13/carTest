@@ -1547,3 +1547,15 @@ The app behaves like a real mobile Telegram Mini App, not a browser page pretend
 - ✅ Добавлено самопроверочное правило: back-навигация и close-confirmation считаются разными слоями защиты, оба обязательны.
 
 Если появятся новые edge-cases (например, экраны с heavy `router.replace`), добавлять сюда отдельный пункт с repro + фикс.
+
+## Execution audit (2026-05-14)
+
+Build-regression review after the Telegram navigation refactor:
+
+- ✅ Root cause confirmed: the global `TelegramNavigationTracker` uses `useSearchParams()` and was mounted through `AppInitializers` outside a Suspense boundary, so static prerendering failed globally starting at `/_not-found` (`/404` in build logs).
+- ✅ Fixed by wrapping `AppInitializers` in a null-fallback Suspense boundary inside `ClientLayout`; this keeps the Telegram runtime client-only without forcing every static page into the same CSR bailout error.
+- ✅ Reviewed the recent navigation stack implementation against this todo: explicit route stack, Telegram BackButton, native `popstate`, full URL tracking, close-confirmation, viewport unmount guard, and auth/context decoupling are present.
+- ✅ Additional review fix: `TelegramNavigationTracker` no longer re-pushes URLs during `popstate`; `useTelegramBackButton` remains the owner of stack popping, while the tracker only refreshes its internal URL ref on browser history traversal.
+- ✅ `npm run build` now completes `Generating static pages (168/168)` without the missing-Suspense CSR bailout.
+
+Follow-up watch item: if future hash-only navigation becomes user-critical, validate Telegram Android event ordering for `hashchange` + `popstate` on a real device and add a tiny route-stack unit test around that sequence.
