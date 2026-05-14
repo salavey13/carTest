@@ -6,6 +6,10 @@ type NavigationState = {
 
 type Listener = (state: NavigationState) => void;
 
+type BackTargetOptions = {
+  emit?: boolean;
+};
+
 const state: NavigationState = {
   stack: [],
 };
@@ -46,7 +50,7 @@ export const navigationStore = {
     emit();
     return next;
   },
-  backTarget(currentPath: string) {
+  backTarget(currentPath: string, options: BackTargetOptions = {}) {
     const normalizedCurrentPath = normalize(currentPath);
     let changed = false;
 
@@ -56,7 +60,7 @@ export const navigationStore = {
     }
 
     const next = state.stack[state.stack.length - 1] || null;
-    if (changed) emit();
+    if (changed && options.emit !== false) emit();
     return next;
   },
   canGoBack() {

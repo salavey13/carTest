@@ -252,11 +252,21 @@ This root file stays intentionally compact so operators and agents can load it q
 ## 3) Active ad-hoc task — `/vipbikerental` interactive landing
 
 - status: `ready_for_pr`
-- updated_at: `2026-05-07T00:00:00Z`
+- updated_at: `2026-05-14T00:00:00Z`
 - owner: `codex`
-- notes: `Polished /vipbikerental copy density, removed the duplicated partner-link audit block, improved hero-tab contrast over video, moved VIP Bike catalog hydration behind client-side skeleton cards, russified the newest loader/landing labels, brightened the MapRiders preview map, and replaced the invalid FaShieldAlt marker with FaShieldCat.`
-- next_step: `Production-smoke /vipbikerental and /franchize/vip-bike with real catalog latency; confirm skeleton-to-card transition on mobile Telegram WebApp.`
-- risks: `Catalog API still depends on server Supabase env; production QA should verify live item hydration and fallback behavior when Supabase is slow.`
+- notes: `Polished /vipbikerental copy density, removed the duplicated partner-link audit block, improved hero-tab contrast over video, moved VIP Bike catalog hydration behind client-side skeleton cards, russified the newest loader/landing labels, brightened the MapRiders preview map, replaced the invalid FaShieldAlt marker with FaShieldCat, and followed up on Telegram native BackButton visibility for the /vipbikerental → /franchize/vip-bike flow.`
+- next_step: `Production-smoke /vipbikerental → /franchize/vip-bike inside Telegram WebApp; confirm native header switches from X to BackButton and Android back returns to /vipbikerental without stale franchize bounce.`
+- risks: `Catalog API still depends on server Supabase env; Telegram BackButton visibility must be verified on a real Android/iOS client because browser/devtools cannot render the native Telegram header.`
+
+
+### 2026-05-14 — Telegram native BackButton visibility follow-up
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-14T00:00:00Z
+- `owner`: codex
+- `notes`: Addressed the automated review finding by preventing `backTarget()` from emitting while a Telegram back navigation is still pending, so the same-URL Android guard is not re-created for the old `/franchize/vip-bike` URL. Also made BackButton visibility depend on the actual Telegram WebApp BackButton runtime instead of waiting for async auth context, and added real-device visibility logs.
+- `next_step`: Deploy and smoke the production bot flow `/vipbikerental` → `/franchize/vip-bike` → native Telegram BackButton/Android back.
+- `risks`: Native Telegram chrome cannot be screenshotted from local browser QA; final proof requires Telegram Android/iOS.
 
 
 ### 2026-05-06 — SupaPlan franchize maintenance pair
