@@ -9,12 +9,17 @@ export function useTelegramViewport(tg: TelegramWebApp | null, enabled: boolean)
     if (!tg || !enabled) return;
     safeReady(tg);
     let detach: (() => void) | undefined;
+    let isActive = true;
     (async () => {
       if (tg.expand) {
         await safeExpand(tg, { attempts: 3, delayMs: 120 });
+        if (!isActive) return;
         detach = attachVisibilityExpandRecovery(tg, { attempts: 2, delayMs: 150 });
       }
     })();
-    return () => detach?.();
+    return () => {
+      isActive = false;
+      detach?.();
+    };
   }, [tg, enabled]);
 }
