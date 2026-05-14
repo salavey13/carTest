@@ -1571,3 +1571,14 @@ Operator production repro: Mini App starts on `/vipbikerental`, then users route
 - ✅ Back clicks use SPA `router.push`, preserving the Next.js navigation oath and avoiding hard reloads.
 
 Real-device watch item: Telegram Desktop/iOS/Android can order history events differently; smoke `/vipbikerental` → `/franchize/vip-bike` → `/franchize/vip-bike/cart` inside the production bot after deploy.
+
+## Execution audit (2026-05-14) — native BackButton visibility follow-up
+
+Automated review found the Android guard could be re-armed for the old `/franchize/*` URL while a back navigation was still pending. Production symptom remained: Telegram header stayed on native `X` instead of showing app BackButton.
+
+- ✅ `navigationStore.backTarget()` now supports silent stack popping so the hook can avoid emitting before `router.push(targetPath)` reaches the destination.
+- ✅ `useTelegramBackButton` suppresses same-URL guard marking during active back handling, preventing stale `/franchize/vip-bike` guard resurrection before returning to `/vipbikerental`.
+- ✅ BackButton visibility no longer waits on async `isInTelegramContext` auth state when `window.Telegram.WebApp.BackButton` is already available; delayed auth can no longer hide a valid native Telegram button.
+- ✅ Added visibility sync logging with current path, app stack, target decision, and native `isVisible` so real-device Telegram debugging can confirm whether `show()` is being called.
+
+Real-device watch item: after deploy, open the production bot at `/vipbikerental`, navigate to `/franchize/vip-bike`, verify the header switches from `X` to native back, then press Android back and confirm it lands on `/vipbikerental` without bouncing back to franchize.
