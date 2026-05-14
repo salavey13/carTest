@@ -43,9 +43,11 @@ const COL_GAP = RIGHT_COL_X - (LEFT_COL_X + LEFT_COL_WIDTH); // 28
 // Content vertical anchors (from top of page)
 const TITLE_BLOCK_TOP = PAGE_HEIGHT - 118;
 
-// Image panel (right column)
-const IMAGE_PANEL_TOP = PAGE_HEIGHT - 355;
-const IMAGE_PANEL_HEIGHT = 255;
+// Image panel (right column) — 9:16 portrait ratio
+const IMAGE_PANEL_HEIGHT = Math.round(RIGHT_COL_WIDTH * 16 / 9); // ≈ 430 (242 × 16/9)
+const IMAGE_PANEL_TOP_GAP = 4; // gap between header accent and image top edge
+// Y is the bottom-left corner in pdf-lib; panel extends from Y upward to Y + height
+const IMAGE_PANEL_Y = PAGE_HEIGHT - HEADER_HEIGHT - IMAGE_PANEL_TOP_GAP - IMAGE_PANEL_HEIGHT;
 const IMAGE_PANEL_PADDING = 18; // inset for scaled images
 
 // Spec table
@@ -63,26 +65,25 @@ const SPEC_ROW_GAP = 4;
 const SPEC_MAX_ROWS = 13;
 const SPEC_MAX_VALUE_LINES = 2;
 
-// Link box (bottom section)
-const LINK_BOX_Y = 56;
-const LINK_BOX_WIDTH = 324;
-const LINK_BOX_HEIGHT = 82;
-const LINK_BOX_INNER_X = 14;
-const LINK_BOX_TITLE_Y = 112;
-const LINK_BOX_LINK_Y = 90;
-const LINK_BOX_LINK_LINE_HEIGHT = 10;
-const LINK_BOX_MAX_WIDTH = 286;
-const LINK_FONT_SIZE = 8.2;
-const LINK_TITLE_FONT_SIZE = 11.5;
-
-// QR code
-const QR_X = 390;
-const QR_Y = 52;
-const QR_SIZE = 142;
-
 // Footer
 const FOOTER_Y = 24;
 const FOOTER_GENERATED_X = 180;
+
+// Bottom section: stacked QR → link box (compact, full width)
+const LINK_BOX_HEIGHT = 48;
+const LINK_BOX_GAP_FROM_FOOTER = 14;
+const LINK_BOX_Y = FOOTER_Y + LINK_BOX_GAP_FROM_FOOTER;
+const LINK_BOX_WIDTH = PAGE_WIDTH - PAGE_PADDING * 2; // full content width
+const LINK_BOX_INNER_X = 12;
+const LINK_BOX_LINK_LINE_HEIGHT = 9;
+const LINK_BOX_MAX_WIDTH = LINK_BOX_WIDTH - LINK_BOX_INNER_X * 2;
+const LINK_FONT_SIZE = 7.6;
+const LINK_TITLE_FONT_SIZE = 9;
+
+const QR_SIZE = 110;
+const QR_GAP_FROM_LINK_BOX = 10;
+const QR_Y = LINK_BOX_Y + LINK_BOX_HEIGHT + QR_GAP_FROM_LINK_BOX;
+const QR_X = RIGHT_COL_X + (RIGHT_COL_WIDTH - QR_SIZE) / 2; // centered in right col
 
 // Description
 const DESC_FONT_SIZE = 10.4;
@@ -413,12 +414,13 @@ function formatTimestamp(date: Date): string {
  * ├───────────────┬──────────────────────┤
  * │  Title        │                      │
  * │  Price        │    IMAGE PANEL       │
- * │  Description  │    (graphite bg)     │
+ * │  Description  │    (9:16 graphite)   │
  * │  ─────────    │                      │
  * │  Specs table  │                      │
  * │  (bordered)   │                      │
  * ├───────────────┴──────────────────────┤
- * │  LINK BOX (cream bg)    │  QR CODE  │
+ * │           QR CODE (centered)        │
+ * │  LINK BOX (compact, cream, full-w)  │
  * ├──────────────────────────────────────┤
  * │  ID: ...        Generated: ...       │
  * └──────────────────────────────────────┘
@@ -629,7 +631,7 @@ async function generateBuyPdf(input: {
 
   page.drawRectangle({
     x: RIGHT_COL_X,
-    y: IMAGE_PANEL_TOP,
+    y: IMAGE_PANEL_Y,
     width: RIGHT_COL_WIDTH,
     height: IMAGE_PANEL_HEIGHT,
     color: COLORS.imageBg,
@@ -648,7 +650,7 @@ async function generateBuyPdf(input: {
 
     page.drawImage(hero, {
       x: RIGHT_COL_X + (RIGHT_COL_WIDTH - scaled.width) / 2,
-      y: IMAGE_PANEL_TOP + (IMAGE_PANEL_HEIGHT - scaled.height) / 2,
+      y: IMAGE_PANEL_Y + (IMAGE_PANEL_HEIGHT - scaled.height) / 2,
       width: scaled.width,
       height: scaled.height,
     });
@@ -659,14 +661,14 @@ async function generateBuyPdf(input: {
 
     page.drawText(fallbackText, {
       x: RIGHT_COL_X + (RIGHT_COL_WIDTH - fallbackWidth) / 2,
-      y: IMAGE_PANEL_TOP + IMAGE_PANEL_HEIGHT / 2 - 4,
+      y: IMAGE_PANEL_Y + IMAGE_PANEL_HEIGHT / 2 - 4,
       size: fallbackSize,
       font,
       color: COLORS.imageFallback,
     });
   }
 
-  // ── QR Code ─────────────────────────────────────────────────────────────
+  // ── QR Code (centered in right column) ──────────────────────────────────
 
   try {
     const controller = new AbortController();
@@ -696,7 +698,7 @@ async function generateBuyPdf(input: {
     logger.warn("[franchize] failed to generate QR", error);
   }
 
-  // ── Link Box ────────────────────────────────────────────────────────────
+  // ── Link Box (compact, full width, below QR) ───────────────────────────
 
   page.drawRectangle({
     x: PAGE_PADDING,
@@ -705,32 +707,37 @@ async function generateBuyPdf(input: {
     height: LINK_BOX_HEIGHT,
     color: COLORS.linkBg,
     borderColor: COLORS.accent,
-    borderWidth: 1.4,
+    borderWidth: 1.2,
   });
 
-  page.drawText("Ссылка на карточку", {
+  // Title + link on same line: "Ссылка:" then URL
+  const linkLabel = "Ссылка: ";
+  const linkLabelWidth = font.widthOfTextAtSize(linkLabel, LINK_TITLE_FONT_SIZE);
+
+  page.drawText(linkLabel, {
     x: PAGE_PADDING + LINK_BOX_INNER_X,
-    y: LINK_BOX_TITLE_Y,
+    y: LINK_BOX_Y + LINK_BOX_HEIGHT / 2 + 1,
     size: LINK_TITLE_FONT_SIZE,
     font,
-    color: COLORS.text,
+    color: COLORS.muted,
   });
 
+  const linkTextMaxWidth = LINK_BOX_MAX_WIDTH - linkLabelWidth;
   const linkLines = wrapText(
     buyLink,
     font,
     LINK_FONT_SIZE,
-    LINK_BOX_MAX_WIDTH,
-  ).slice(0, 2);
+    linkTextMaxWidth,
+  ).slice(0, 1);
 
-  linkLines.forEach((line, index) => {
+  linkLines.forEach((line) => {
     page.drawText(line, {
-      x: PAGE_PADDING + LINK_BOX_INNER_X,
-      y: LINK_BOX_LINK_Y - index * LINK_BOX_LINK_LINE_HEIGHT,
+      x: PAGE_PADDING + LINK_BOX_INNER_X + linkLabelWidth,
+      y: LINK_BOX_Y + LINK_BOX_HEIGHT / 2,
       size: LINK_FONT_SIZE,
       font,
       color: COLORS.text,
-      maxWidth: LINK_BOX_MAX_WIDTH,
+      maxWidth: linkTextMaxWidth,
     });
   });
 
