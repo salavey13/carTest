@@ -451,11 +451,13 @@ This root file stays intentionally compact so operators and agents can load it q
 ### 2026-05-07 — Telegram back + VIP Bike MapRiders triage
 
 - `status`: ready_for_pr
-- `updated_at`: 2026-05-07T00:00:00Z
+- `updated_at`: 2026-05-14T00:00:00Z
 - `owner`: codex
-- `notes`: Fixed Telegram WebApp back handling to use an internal SPA history stack instead of `router.back()`, corrected Seqvens Zero code identifiers to `seqvens-zero` while intentionally preserving existing `carpix/seqvenz-zero/*` storage paths, and tightened MapRiders QA to smoke the requested `vip-bike` slug APIs with JSON success checks.
-- `next_step`: Field-test Telegram BackButton in the real bot WebApp and collect the exact MapRiders failing action if testers still report “doesn't work”.
-- `risks`: CLI smoke confirms the route/APIs are alive, but two-phone live GPS and Telegram BackButton behavior still need real Telegram WebApp device verification.
+- `notes`: Fixed Telegram WebApp back handling to use an internal SPA history stack instead of `router.back()`, corrected Seqvens Zero code identifiers to `seqvens-zero` while intentionally preserving existing `carpix/seqvenz-zero/*` storage paths, and tightened MapRiders QA to smoke the requested `vip-bike` slug APIs with JSON success checks. Follow-up production polish now forces a native BackButton target for `/franchize/vip-bike*` even when the session entered via `/vipbikerental` with no usable browser history, and adds an Android same-URL history guard before Telegram can collapse the WebApp.
+- `next_step`: After deploy, real-device smoke `/vipbikerental` → `/franchize/vip-bike` → nested franchize pages in Telegram Android/iOS and verify the header changes from `X` to native back on franchize routes.
+- `risks`: CLI smoke confirms route/API/lint shape, but Telegram native chrome and Android hardware-back behavior still require real Telegram WebApp device verification.
+
+- 2026-05-14 — Telegram native back production polish: canonicalized the duplicated back-button hooks, added franchize-aware fallback routing (`/franchize/vip-bike/*` → crew root → `/vipbikerental`), and inserted a same-URL history guard so Android hardware back emits `popstate` for app navigation instead of immediately collapsing the Mini App. Next step: production bot device smoke after deployment.
 
 ### 2026-05-07 — MapRiders lint + mobile UX hardening
 
