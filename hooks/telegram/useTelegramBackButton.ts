@@ -59,6 +59,7 @@ export function useTelegramBackButton() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const backHandlerRef = useRef<() => void>(() => {});
+  const isHandlingBackRef = useRef(false);
 
   const currentRoute = useMemo(() => {
     const query = searchParams?.toString();
@@ -68,15 +69,32 @@ export function useTelegramBackButton() {
   const syncButtonVisibility = useCallback(() => {
     if (!tg?.BackButton) return;
 
-    if (!isInTelegramContext) {
+    // The native BackButton is only exposed by Telegram's WebApp runtime.
+    // `isInTelegramContext` depends on async auth/initData validation, so do not
+    // let a delayed/failed auth pass hide an otherwise available native button.
+    const hasTelegramRuntime = Boolean(tg.initData || tg.initDataUnsafe?.user || (typeof window !== "undefined" && window.Telegram?.WebApp));
+    if (!hasTelegramRuntime) {
       tg.BackButton.hide();
       return;
     }
 
     const browserPath = currentBrowserPath();
-    if (hasAppBackTarget(browserPath)) {
+    const canShow = hasAppBackTarget(browserPath);
+
+    logger.info("[Telegram BackButton] visibility sync", {
+      browserPath,
+      canShow,
+      isInTelegramContext,
+      stack: navigationStore.getState().stack,
+      nativeVisible: tg.BackButton.isVisible,
+    });
+
+    if (canShow) {
+      tg.ready?.();
       tg.BackButton.show();
-      markTelegramBackGuard(browserPath);
+      if (!isHandlingBackRef.current) {
+        markTelegramBackGuard(browserPath);
+      }
       return;
     }
 
@@ -85,7 +103,8 @@ export function useTelegramBackButton() {
 
   backHandlerRef.current = () => {
     const currentPath = currentBrowserPath();
-    const targetPath = navigationStore.backTarget(currentPath) ?? fallbackPathFor(currentPath);
+    isHandlingBackRef.current = true;
+    const targetPath = navigationStore.backTarget(currentPath, { emit: false }) ?? fallbackPathFor(currentPath);
 
     if (targetPath && targetPath !== currentPath) {
       logger.info(`[Telegram BackButton] Navigating back to "${targetPath}" from "${currentPath}".`);
@@ -93,16 +112,18 @@ export function useTelegramBackButton() {
       return;
     }
 
+    isHandlingBackRef.current = false;
     logger.info("[Telegram BackButton] No app-level back target, closing Telegram WebApp.");
     tg?.close();
   };
 
   useEffect(() => {
+    isHandlingBackRef.current = false;
     syncButtonVisibility();
   }, [currentRoute, syncButtonVisibility]);
 
   useEffect(() => {
-    if (!isInTelegramContext || !tg?.BackButton || typeof window === "undefined") return;
+    if (!tg?.BackButton || typeof window === "undefined") return;
     const backButton = tg.BackButton;
 
     const stableClick = () => backHandlerRef.current();
@@ -122,5 +143,5 @@ export function useTelegramBackButton() {
       backButton.offClick(stableClick);
       window.removeEventListener("popstate", handlePopState);
     };
-  }, [isInTelegramContext, tg, syncButtonVisibility]);
+  }, [tg, syncButtonVisibility]);
 }
