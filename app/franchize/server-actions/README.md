@@ -37,12 +37,10 @@ Only **admins** (`admin`, `vpradmin`) and the **crew owner** can request a PDF. 
 │  Price        │    IMAGE PANEL       │
 │  Description  │    (9:16 graphite)   │
 │  ─────────    │                      │
-│  Specs table  │                      │
-│  (bordered)   │                      │
+│  Specs table  │       QR CODE        │
+│  (bordered)   │   ──────────────     │
+│               │   LINK BOX (cream)   │
 ├───────────────┴──────────────────────┤
-│           QR CODE (centered)         │
-│  LINK BOX (compact, cream, full-w)   │
-├──────────────────────────────────────┤
 │  ID: ...        Generated: ...       │
 └──────────────────────────────────────┘
 ```
@@ -60,8 +58,8 @@ Only **admins** (`admin`, `vpradmin`) and the **crew owner** can request a PDF. 
 - **Timestamp is locale-stable** — `formatTimestamp()` uses manual `DD.MM.YYYY, HH:MM:SS` formatting instead of `toLocaleString("ru-RU")` to avoid host-dependent output.
 - **Image panel uses lifted graphite** (`rgb(0.10, 0.11, 0.13)`) instead of near-black — prevents the optical illusion of the panel appearing larger than it is.
 - **Image panel is 9:16 portrait** — `height = width × 16/9 ≈ 430 px`, giving a phone-screen proportions that flatters product photography instead of the previous near-square.
-- **QR code is stacked above the link box** — centered in the right column at 110px, no longer side-by-side. The QR is the primary scan target; the link box below it is a compact fallback.
-- **Link box is compact and full-width** — 48px tall single-line layout ("Ссылка: <url>") across the full content area, instead of the previous 82px two-line box that consumed too much vertical space.
+- **QR code is stacked above the link box** — both in the right column only. QR centered at 110px, link box below it at right-column width (242px). No overlap with the left specs column.
+- **Link box is compact and right-column-aligned** — 46px tall two-line layout ("Ссылка:" label on line 1, URL on line 2), confined to the right column width instead of spanning the full page.
 - **Header has a 2 px gold accent line** at its bottom edge — subtle separator that elevates the card from "CRM export" to "premium product sheet".
 
 ### Things that were intentionally removed
