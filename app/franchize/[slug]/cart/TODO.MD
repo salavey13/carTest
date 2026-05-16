@@ -1,113 +1,231 @@
-**AGENT_INSTRUCTIONS_CART_REDESIGN.md**
+# 🏍️ CyberForge Market — Cart Page Overhaul & Market Polish Agent
 
-**Задача:** Полностью переработать страницу Корзины (`/franchize/[slug]/cart`) в едином премиум-кибер стиле **CyberForge Market**.
+> **Part 1 of 4** — Start here. Then read TODO2.MD → TODO3.MD → TODO4.MD.
 
-**Ключевые требования:**
+## MISSION BRIEFING
 
-- Поддержка двух независимых потоков: **Rent** и **Buy**.
-- В **Rent** — цена за день × количество дней.
-- В **Buy** — фиксированная цена покупки (`sale_price` из `specs` JSONB), без умножения на дни.
-- Единый визуальный язык с новой страницей Маркета (неоновый премиум 2026).
+You are the **Cart & Polish Agent**. Other agents are concurrently working on the Market page and Header/Navbar. Your mission:
+
+1. **CODE REVIEW & POLISH** the Market page and Header/Navbar
+2. **OVERHAUL** the Cart page from its current basic state to the premium "CyberForge Market" design
+
+The target visual is the **attached reference screenshot** (`megacart.png`) — dark premium cyberpunk with neon accents, product images, spec badges, protection plans, trust badges, and a gold CTA that screams "rent this bike NOW."
+
+> 📸 **A picture of the desired result is attached for reference** — keep it open while you code. Every pixel of that `megacart.png` is the target. If your implementation doesn't look like that screenshot, it's not done.
 
 ---
 
-### 1. Общая концепция
+## ⚠️ CRITICAL: EXISTING CODEBASE RULES
 
-- Тёмный техно-премиум стиль.
-- Неоновые акценты + glow-эффекты.
-- Максимум воздуха, крупные визуалы байков.
-- Чёткое разделение Rent / Buy на уровне UI и логики.
+This project is **NOT greenfield**. There is a working franchise system with real hooks, real theming, real cart logic. You must **build on top of existing code**, not replace it.
 
-### 2. Палитра (ОЧЕНЬ ВАЖНО)
+### BANNED PATTERNS (will break things)
 
-**Запрещено** использовать hardcoded hex цвета.
+❌ **NO hardcoded hex colors for theme surfaces/accents** — `#FFD700`, `#1E1E1E`, `#121212` etc. are FORBIDDEN in component code for anything that should adapt to franchise theme
+❌ **NO Zustand** — cart state uses `useFranchizeCart` hook, not Zustand
+❌ **NO Prisma** — data uses Supabase via existing server actions
+❌ **NO new API routes** — cart persistence uses `saveUserFranchizeCartAction`
+❌ **NO replacing `CrewHeader`** — it's loaded by the server page wrapper
+❌ **NO `CrewFooter` on cart page** — replaced by `BottomNavigationBike`; remove it from cart's server page if present
+❌ **NO `FloatingCartIconLinkBySlug`** — being ditched; cart icon now lives in `CrewHeader`
+❌ **NO modifying `globals.css` color variables** — theme comes from `crew.theme.palette.*`
+❌ **NO `alert()` / `confirm()` / `prompt()`** — use inline UI for confirmations
 
-**Обязательно** использовать уже существующую систему:
+### ALLOWED: Semantic / Status Colors
 
-```tsx
-const surface = crewPaletteForSurface(crew.theme);
-// или
-const theme = await getCrewPaletteBySlug(slug);
-```
+The following colors are **NOT franchise-themed** — they convey universal status semantics and ARE allowed as explicit hex values:
 
-**Основные токены для использования:**
+| Color | Usage | Allowed Hex |
+|-------|-------|-------------|
+| Success / Discount / "ВЫГОДНО" | Discount banner, availability badge | `#00C853` |
+| Destructive / Delete | Delete confirmation, out-of-stock | `#FF3B30` (light), `#FF6B6B` (dark-safe) |
+| Warning | Low stock, expiring offers | `#FF9500` |
 
-- `surface.page` → фон страницы
-- `surface.card` → карточки
-- `surface.subtleCard` → второстепенные блоки
-- `surface.mutedText` → второстепенный текст
-- `crew.theme.palette.accentMain` → основной акцент (gold/neon)
-- `crew.theme.palette.textPrimary`, `textSecondary`
-- `crew.theme.palette.borderSoft`
+> **Rule of thumb**: If a color represents franchise identity (gold accent, card bg, border), it MUST come from `crew.theme.palette.*`. If it represents a universal status (success=green, danger=red, warning=amber), you MAY use explicit hex with `withAlpha()` for transparency. Always wrap with `withAlpha()` for semi-transparent variants.
 
-**Glow-эффекты** создавать через:
-- `withAlpha(crew.theme.palette.accentMain, 0.6)`
-- CSS `box-shadow` с `hsla(var(--accent-rgb), 0.5)`
+### REQUIRED PATTERNS (how things actually work)
 
-### 3. Структура страницы
+✅ Use `crewPaletteForSurface(crew.theme)` for surface styles
+✅ Use `crew.theme.palette.accentMain` for accent color
+✅ Use `crew.theme.palette.textPrimary / textSecondary` for text
+✅ Use `crew.theme.palette.borderSoft` for borders
+✅ Use `withAlpha(crew.theme.palette.accentMain, 0.6)` for glow effects
+✅ Use `withAlpha()` for ALL semi-transparent colors (never raw `rgba()`)
+✅ Use `useFranchizeCart(slug)` for cart state
+✅ Use `useFranchizeCartLines(slug, items, cartContext)` for computed cart data
+✅ Use `motion` from `framer-motion` for animations (already in project)
+✅ Use existing `CatalogItemVM` and `FranchizeCrewVM` types from `../actions`
+✅ Use `interactionRingStyle(crew.theme)` for focus rings
+✅ Use `readablePaletteTextOnColor(bg, palette)` for text on accent backgrounds
+✅ Use `next/image` with `sizes` prop for all product images
 
-**Top**
-- Breadcrumb: `/FRANCHIZE / VIP-BIKE / CART` (маленький, uppercase, accent)
-- Заголовок: **Корзина** (Orbitron, крупно)
-- Подзаголовок (muted)
+---
 
-**Карточка товара** (основной фокус)
+## QUICK IMPORT MAP
 
-- Большое фото слева (соотношение ~4:3 или квадрат)
-- Справа:
-  - Название модели (жирно, Orbitron)
-  - Короткое описание + ключевые specs
-  - Бейдж `Покупка` / `Аренда`
-  - 3 мини-карточки характеристик (мощность, батарея, запас хода)
-  - Цена:
-    - Rent: `15 000 ₽ / день` (заметно)
-    - Buy: `390 000 ₽` (самый крупный шрифт + gold glow)
-  - Quantity controls (`- 1 +`) — **только для Rent**
-  - Кнопка «Удалить» (справа сверху, иконка)
-
-**Блок итого**
-
-- Итого позиций
-- Сумма за 1 день (только Rent)
-- **Сумма за весь период** — самый акцентный блок (большой шрифт + gold)
-- Баннер скидки (зелёный + shimmer)
-- Блок «Полная защита включена» (shield)
-- Большая жёлтая кнопка **«Перейти к оформлению»**
-
-**Trust bar** (3 иконки) внизу
-
-### 4. Анимации (детально)
-
-**Обязательно** добавить:
-
-1. Появление карточки товара — stagger + fade-up (framer-motion)
-2. Изменение количества — scale + мягкий "пульс" цены
-3. Удаление товара — slide-out + fade
-4. Главная CTA кнопка — hover glow + subtle scale
-5. Баннер скидки — лёгкий shimmer (background-position animation)
-6. Hover на карточке — lift + cyan/gold border glow
-7. Появление всей страницы — soft fade-in
-
-**Пример анимации quantity:**
+Save yourself guesswork — here's what to import from where:
 
 ```tsx
-<motion.div
-  animate={{ scale: [1, 1.15, 1] }}
-  transition={{ duration: 0.2 }}
->
-  {quantity}
-</motion.div>
+// Cart page client — top of CartPageClient.tsx
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
+import { useFranchizeCart } from "../hooks/useFranchizeCart";
+import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
+import {
+  crewPaletteForSurface,
+  withAlpha,
+  readablePaletteTextOnColor,
+  interactionRingStyle,
+} from "../lib/theme";
+import { upsertFranchizeIntent } from "../actions";
+import { saveUserFranchizeCartAction } from "../server-actions/catalog";
+import type { FranchizeCrewVM, CatalogItemVM, FranchizeTheme } from "../actions";
+
+// Lucide icons (already in project)
+import {
+  ShoppingCart, Trash2, ArrowRight, Shield, Zap,
+  Battery, Gauge, Headphones, Bike, ChevronRight,
+  Palette, Calendar,
+} from "lucide-react";
 ```
 
-### 5. Easter Egg
+---
 
-В самом низу страницы (перед футером):
+## EXISTING FILE MAP (what's already there)
 
-```tsx
-<div className="mt-16 text-center opacity-30 hover:opacity-100 transition-all duration-700 text-[10px] font-mono tracking-widest">
-  Easter egg for future maintainers:<br/>
-  天上天下，唯我独尊 // May your code be clean and your bugs be few.<br/>
-  — Built with neon &amp; spite — 2026 —
-</div>
+```
+/app/franchize/
+├── [slug]/
+│   ├── layout.tsx                 # Bare layout, just {children}
+│   ├── page.tsx                   # Market/Catalog page (server)
+│   ├── cart/
+│   │   └── page.tsx               # Cart page (server) ← YOUR TARGET
+│   └── metadata.ts
+├── components/
+│   ├── CartPageClient.tsx         # Cart client component ← OVERHAUL THIS
+│   ├── CatalogClient.tsx          # Market client (review only)
+│   ├── CrewHeader.tsx             # Franchise header (review only)
+│   ├── CrewFooter.tsx             # ⚠️ LEGACY — being replaced by BottomNavigationBike
+│   ├── FloatingCartIconLinkBySlug.tsx  # ⚠️ BEING DITCHED — cart icon moves to CrewHeader
+│   └── ErrorBoundary.tsx
+├── hooks/
+│   ├── useFranchizeCart.ts        # Cart state hook ← USE THIS
+│   └── useFranchizeCartLines.ts   # Computed cart lines ← USE THIS
+├── lib/
+│   ├── theme.ts                   # crewPaletteForSurface, withAlpha, etc. ← USE THIS
+│   ├── theme-resolver.ts          # resolveFranchizeTheme
+│   ├── route-cta-policy.ts        # CTA policies
+│   ├── navigation.ts              # toCategoryId
+│   └── catalog-rental-strip.ts    # buildCatalogRentalStrip
+├── modals/
+│   └── Item.tsx                   # Item detail modal
+├── server-actions/
+│   ├── palette.ts                 # getCrewPaletteBySlug
+│   └── catalog.ts                 # getFranchizeBySlug wrapper
+└── actions.ts                     # getFranchizeBySlug, upsertFranchizeIntent, types
 ```
 
+### Key Types from `actions.ts` (use these, don't recreate)
+
+```typescript
+interface FranchizeCrewVM {
+  slug: string;
+  header: { brandName: string; logoUrl: string; subtitle?: string };
+  theme: FranchizeTheme;
+  contacts: { address?: string; workingHours?: string };
+  catalog: { promoBanners: ...; adCards: ...; tickerItems: ... };
+  hqLocation: string;
+  isFound: boolean;
+}
+
+interface FranchizeTheme {
+  mode: "light" | "dark";
+  palette: {
+    bgBase: string;        // Page background
+    bgCard: string;        // Card background
+    accentMain: string;    // Primary accent (gold/neon)
+    accentMainHover: string;
+    textPrimary: string;
+    textSecondary: string;
+    borderSoft: string;
+  };
+}
+
+interface CatalogItemVM {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  category: string;
+  imageUrl: string;
+  pricePerDay: number;
+  rentPriceLabel: string;    // e.g. "15 000 ₽ / день"
+  saleAvailable: boolean;
+  salePrice?: number;        // Purchase price (from specs JSONB)
+  isHot: boolean;
+  availabilityStatus: string;
+  reviewSummary: { average: number; count: number; latest?: { text: string } };
+  specs: Record<string, unknown>;  // JSONB with power, battery, range, etc.
+}
+```
+
+### Cart Hook API (use these, don't recreate)
+
+```typescript
+// From useFranchizeCart(slug):
+const { cart, itemCount, addItem, changeLineQty, removeLine } = useFranchizeCart(slug);
+
+// cart = Record<string, { qty: number; options: {...} }>  (keyed by item ID)
+// itemCount = total quantity across all lines
+// addItem(itemId, options, qty)
+// changeLineQty(lineId, delta)  // delta = +1 or -1
+// removeLine(lineId)
+
+// From useFranchizeCartLines(slug, items, cartContext):
+const { cartLines, subtotal, itemCount } = useFranchizeCartLines(slug, items, {
+  cart,
+  itemCount: rawItemCount,
+  changeLineQty,
+  removeLine,
+});
+
+// cartLines = Array<CartLine>  where CartLine is:
+interface CartLine {
+  lineId: string;
+  itemId: string;
+  item?: CatalogItemVM;         // undefined if item removed from catalog
+  qty: number;
+  options: {
+    package?: string;
+    duration?: number;           // ← rental days (USE THIS, not a hardcoded number!)
+    perk?: string;
+    auction?: string;
+  };
+  saleAvailable: boolean;
+  lineTotal: number;
+}
+// subtotal = sum of all lineTotal values
+```
+
+> ⚠️ **Rental days come from `line.options.duration`**, NOT a hardcoded constant. If `duration` is undefined, fall back to `1` (single day). NEVER hardcode `36` or any other rental period.
+
+---
+
+## EXISTING THEME HELPERS (use these!)
+
+From `/app/franchize/lib/theme.ts`:
+- `crewPaletteForSurface(theme)` → `{ page, card, mutedText, subtleCard, accentPill }`
+- `withAlpha(color, alpha)` → `rgba(...)` string
+- `readableTextOnColor(background, candidates)` → best text color
+- `readablePaletteTextOnColor(background, palette)` → best text from palette
+- `catalogCardVariantStyles(theme, index)` → card border/bg variants
+- `interactionRingStyle(theme)` → focus ring box-shadow
+
+> ~~`floatingCartOverlayBackground(theme)`~~ — legacy, being removed alongside FloatingCartIconLinkBySlug.
+
+---
+
+**→ Next: [TODO2.MD](./TODO2.MD) — Cart page spec & styling rules**
