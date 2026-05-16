@@ -26,7 +26,7 @@ values (
   'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/1000033868-a2e57b7e-5ed8-4440-9304-f3f54f63cc46.jpg',
   '356282674',
   'vip-bike',
-  '56.204179, 43.798619',
+  '56.297654,43.947218',
   '{}'::jsonb,
   now(),
   now()
