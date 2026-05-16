@@ -216,6 +216,11 @@ export function useTelegramBackButton() {
   // every 200ms up to 10 times (2 seconds total).
 
   useEffect(() => {
+    // Define stableClick at the effect level so both setupBackButton and
+    // cleanup share the same reference. This is critical because Telegram's
+    // offClick compares by reference — a new anonymous fn would silently no-op.
+    const stableClick = () => backHandlerRef.current();
+
     const setupBackButton = () => {
       const webApp = getWebApp();
       const backButton = webApp?.BackButton;
@@ -228,8 +233,6 @@ export function useTelegramBackButton() {
         return false;
       }
 
-      const stableClick = () => backHandlerRef.current();
-
       backButton.offClick(stableClick); // Remove any stale handler
       backButton.onClick(stableClick);
 
@@ -241,13 +244,18 @@ export function useTelegramBackButton() {
     if (setupBackButton()) {
       isSetupRef.current = true;
     } else {
-      // Retry with exponential backoff
+      // Retry every 200ms up to 10 times (2 seconds total)
       let attempts = 0;
       const maxAttempts = 10;
       const trySetup = () => {
         attempts++;
         if (setupBackButton()) {
           isSetupRef.current = true;
+          // The first syncButtonVisibility() at the bottom of this effect
+          // returned early (no backButton). Now that we have one, sync
+          // visibility immediately — otherwise the back button stays hidden
+          // until the next route change.
+          syncButtonVisibility();
           return;
         }
         if (attempts < maxAttempts) {
@@ -271,10 +279,10 @@ export function useTelegramBackButton() {
         clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
       }
-      // Clean up click handler
+      // Clean up click handler using the SAME reference as onClick
       const backButton = getWebApp()?.BackButton;
       if (backButton) {
-        backButton.offClick(() => backHandlerRef.current());
+        backButton.offClick(stableClick);
       }
       unsubscribe();
     };
