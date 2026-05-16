@@ -109,12 +109,11 @@ const getThemeForPath = (pathname: string) => {
  * AppInitializers
  *
  * Mounts the Telegram BackButton hook and the navigation tracker.
- * These are placed inside AppProvider so they have access to the tg context.
  *
- * IMPORTANT: useTelegramBackButton is called here (not in LayoutLogicController)
- * because it needs to be inside AppProvider but doesn't need to be inside
- * ThemeProvider. The Suspense boundary wrapping this component is fine —
- * the hook will re-initialize when the Suspense resolves.
+ * NOTE: useTelegramBackButton no longer depends on `tg` from React context.
+ * It reads `window.Telegram.WebApp` directly, which is injected by the
+ * Telegram client BEFORE any JavaScript runs. This means the hook works
+ * correctly even on first mount, without waiting for async auth validation.
  */
 function AppInitializers() {
     const { dbUser, isAuthenticated } = useAppContext();
@@ -125,10 +124,11 @@ function AppInitializers() {
     // This hook handles:
     // - Showing/hiding the native Telegram BackButton based on navigation state
     // - Handling BackButton clicks to navigate in-app
-    // - Intercepting Android system back button (popstate)
     //
-    // NOTE: isInTelegramContext is intentionally NOT used here anymore.
-    // The hook now checks for the real Telegram runtime directly.
+    // NOTE: This hook does NOT use `tg` from React context at all.
+    // It reads `window.Telegram.WebApp` directly to avoid timing issues
+    // with async auth validation (which was the root cause of the
+    // BackButton not appearing on first navigation).
     useTelegramBackButton();
 
     useFocusTimeTracker({

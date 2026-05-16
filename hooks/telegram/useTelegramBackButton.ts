@@ -3,7 +3,6 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useAppContext } from "@/contexts/AppContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { navigationStore } from "@/stores/navigationStore";
 
@@ -16,13 +15,31 @@ function currentFullPath(): string {
 }
 
 /**
+ * Returns the Telegram WebApp object directly from window.Telegram.
+ * This is the RELIABLE source — it exists from the very first JS execution
+ * inside a Telegram WebView, BEFORE any React rendering or async auth.
+ *
+ * Do NOT use tg from React context for BackButton operations.
+ * The context tg depends on async auth validation and may be null/stale
+ * when the hook first mounts.
+ */
+function getWebApp() {
+  if (typeof window === "undefined") return undefined;
+  return window.Telegram?.WebApp;
+}
+
+/**
  * Determines a sensible "go back" target based purely on the URL structure.
  * This is the SAFETY NET that makes the BackButton appear even when the
  * navigationStore is empty (page refresh, deep link, etc.).
  *
- * IMPORTANT: This function MUST be kept. Removing it (as Grok proposed) is a
- * regression — without it, BackButton would never show after a page refresh
- * even when there's a clear logical parent route.
+ * IMPORTANT: This function MUST be kept. Without it, BackButton would never
+ * show after a page refresh even when there's a clear logical parent route.
+ *
+ * Examples:
+ *   /franchize/vip-bike       → /vipbikerental
+ *   /franchize/vip-bike/cart  → /franchize/vip-bike
+ *   /rent/catalog             → /rent
  */
 function fallbackPathFor(path: string): string | null {
   const [pathname] = path.split(/[?#]/);
@@ -83,23 +100,29 @@ function resolveBackTarget(currentPath: string): string | null {
  * Manages the Telegram Mini App's native BackButton visibility and click handling.
  *
  * Key design decisions:
+ * - Does NOT use `tg` from React context (AppProvider) for BackButton operations.
+ *   The context tg depends on async auth validation and may be null/stale when
+ *   the hook first mounts. Instead, we use `window.Telegram.WebApp` directly,
+ *   which is injected by the Telegram client BEFORE any JavaScript runs.
  * - Does NOT push routes to navigationStore (TelegramNavigationTracker does that)
  * - Uses fallbackPathFor() as a safety net for page refreshes / deep links
- * - Does NOT use isInTelegramContext (which depends on async auth validation)
- *   for the show/hide decision; instead checks for real Telegram runtime
  * - Does NOT create duplicate browser history entries (no pushState guards)
  * - Relies on Telegram's built-in system back interception:
  *   when BackButton.isVisible is true, pressing Android system back fires
  *   BackButton.onClick instead of closing the app
  */
 export function useTelegramBackButton() {
-  const { tg } = useAppContext();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isHandlingBackRef = useRef(false);
   const previousRouteRef = useRef<string | null>(null);
   const readyCalledRef = useRef(false);
+  // Track whether we've successfully set up the BackButton listener,
+  // so we can retry if the runtime isn't available yet.
+  const isSetupRef = useRef(false);
+  // Retry timer for when Telegram runtime isn't available yet
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentRoute = useMemo(() => {
     const query = searchParams?.toString();
@@ -107,55 +130,46 @@ export function useTelegramBackButton() {
   }, [pathname, searchParams]);
 
   // ─── Visibility Sync ────────────────────────────────────────────
+  //
+  // IMPORTANT: This callback has NO dependency on `tg` from context.
+  // We always read from `window.Telegram.WebApp` directly at call time.
+  // This avoids stale closures and timing issues with context initialization.
 
   const syncButtonVisibility = useCallback(() => {
-    // Try context tg first, then fall back to window.Telegram directly.
-    // This handles the case where AppProvider hasn't initialized yet
-    // but the Telegram runtime is already available on window.
-    const backButton = tg?.BackButton ?? (typeof window !== "undefined" ? window.Telegram?.WebApp?.BackButton : undefined);
+    const webApp = getWebApp();
+    const backButton = webApp?.BackButton;
+
+    logger.info("[Telegram BackButton] syncButtonVisibility", {
+      hasWebApp: Boolean(webApp),
+      hasBackButton: Boolean(backButton),
+      browserPath: typeof window !== "undefined" ? currentFullPath() : "SSR",
+      canGoBack: navigationStore.canGoBack(),
+      stackLength: navigationStore.getState().stack.length,
+      nativeVisible: backButton?.isVisible,
+    });
+
     if (!backButton) return;
-
-    // Check for real Telegram runtime. We do NOT depend on isInTelegramContext
-    // because that relies on async auth validation which may be delayed or fail.
-    // The native BackButton is available as soon as telegram-web-app.js loads.
-    const hasTelegramRuntime = Boolean(
-      tg?.initData ||
-      tg?.initDataUnsafe?.user ||
-      (typeof window !== "undefined" && window.Telegram?.WebApp)
-    );
-
-    if (!hasTelegramRuntime) {
-      backButton.hide();
-      return;
-    }
 
     const browserPath = currentFullPath();
     const canShow = hasAppBackTarget(browserPath);
 
-    logger.info("[Telegram BackButton] visibility sync", {
-      browserPath,
-      canShow,
-      stackLength: navigationStore.getState().stack.length,
-      nativeVisible: backButton.isVisible,
-    });
-
     if (canShow) {
-      // Ensure tg.ready() has been called at least once.
-      // Some Telegram features don't work until ready() is called.
-      if (!readyCalledRef.current && tg?.ready) {
-        tg.ready();
+      // Call WebApp.ready() at least once. This is required for some
+      // Telegram features to work, including BackButton visibility.
+      if (!readyCalledRef.current && webApp?.ready) {
+        webApp.ready();
         readyCalledRef.current = true;
       }
       backButton.show();
+      logger.info("[Telegram BackButton] → SHOWN", { browserPath });
     } else {
       backButton.hide();
+      logger.info("[Telegram BackButton] → HIDDEN", { browserPath });
     }
-  }, [tg]); // NOTE: intentionally NO isInTelegramContext here
+  }, []); // EMPTY — no dependency on tg context
 
   // ─── Back Handler ───────────────────────────────────────────────
 
-  // We store the handler in a ref so the click/popstate listeners
-  // always call the latest version without needing to re-register.
   const backHandlerRef = useRef<() => void>(() => {});
 
   backHandlerRef.current = () => {
@@ -170,11 +184,11 @@ export function useTelegramBackButton() {
       router.push(targetPath);
     } else {
       logger.info("[Telegram BackButton] No app-level back target, closing Telegram WebApp.");
-      tg?.close?.();
+      // Use the global directly — don't depend on context tg
+      getWebApp()?.close?.();
     }
 
     // Reset the guard after a short delay to allow navigation to complete.
-    // This prevents double-handling if both BackButton.onClick and popstate fire.
     setTimeout(() => {
       isHandlingBackRef.current = false;
     }, 300);
@@ -196,15 +210,62 @@ export function useTelegramBackButton() {
   }, [currentRoute, syncButtonVisibility]);
 
   // ─── Mount Telegram BackButton click handler + store subscription ─
+  //
+  // This effect also includes retry logic: if `window.Telegram.WebApp`
+  // isn't available yet (e.g., the script hasn't loaded), we retry
+  // every 200ms up to 10 times (2 seconds total).
 
   useEffect(() => {
-    const backButton = tg?.BackButton ?? (typeof window !== "undefined" ? window.Telegram?.WebApp?.BackButton : undefined);
-    if (!backButton || typeof window === "undefined") return;
-
+    // Define stableClick at the effect level so both setupBackButton and
+    // cleanup share the same reference. This is critical because Telegram's
+    // offClick compares by reference — a new anonymous fn would silently no-op.
     const stableClick = () => backHandlerRef.current();
 
-    backButton.offClick(stableClick); // Remove any stale handler first
-    backButton.onClick(stableClick);
+    const setupBackButton = () => {
+      const webApp = getWebApp();
+      const backButton = webApp?.BackButton;
+
+      if (!backButton) {
+        // Runtime not available yet — retry
+        if (!isSetupRef.current) {
+          logger.info("[Telegram BackButton] Runtime not available yet, will retry...");
+        }
+        return false;
+      }
+
+      backButton.offClick(stableClick); // Remove any stale handler
+      backButton.onClick(stableClick);
+
+      logger.info("[Telegram BackButton] Click handler mounted successfully.");
+      return true;
+    };
+
+    // Try immediately
+    if (setupBackButton()) {
+      isSetupRef.current = true;
+    } else {
+      // Retry every 200ms up to 10 times (2 seconds total)
+      let attempts = 0;
+      const maxAttempts = 10;
+      const trySetup = () => {
+        attempts++;
+        if (setupBackButton()) {
+          isSetupRef.current = true;
+          // The first syncButtonVisibility() at the bottom of this effect
+          // returned early (no backButton). Now that we have one, sync
+          // visibility immediately — otherwise the back button stays hidden
+          // until the next route change.
+          syncButtonVisibility();
+          return;
+        }
+        if (attempts < maxAttempts) {
+          retryTimerRef.current = setTimeout(trySetup, 200);
+        } else {
+          logger.warn("[Telegram BackButton] Failed to mount after 10 retries. Giving up.");
+        }
+      };
+      retryTimerRef.current = setTimeout(trySetup, 200);
+    }
 
     // Subscribe to navigation store changes so visibility updates
     // whenever TelegramNavigationTracker pushes a new route.
@@ -214,15 +275,20 @@ export function useTelegramBackButton() {
     syncButtonVisibility();
 
     return () => {
-      backButton.offClick(stableClick);
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      // Clean up click handler using the SAME reference as onClick
+      const backButton = getWebApp()?.BackButton;
+      if (backButton) {
+        backButton.offClick(stableClick);
+      }
       unsubscribe();
     };
-  }, [tg, syncButtonVisibility]);
+  }, [syncButtonVisibility]);
 
   // ─── Handle browser popstate (system back/forward navigation) ────
-  //
-  // When the user presses the Android system back button or uses browser
-  // back/forward, popstate fires AFTER the browser has navigated.
   //
   // In Telegram Mini Apps, the system back button is handled by Telegram's
   // client: when BackButton.isVisible is true, pressing system back triggers
@@ -233,28 +299,11 @@ export function useTelegramBackButton() {
   // browser-initiated navigation. It does NOT try to intercept or guard
   // history entries — that approach leads to duplicate history entries and
   // the "two presses needed" bug.
-  //
-  // WHY NO ensureHistoryGuard / pushState guard?
-  // ─────────────────────────────────────────────
-  // The guard approach pushed an extra history entry per route so the browser
-  // had something to pop before closing. But popstate gives you the state
-  // of the NEW entry (where you landed), not the OLD entry (what you left).
-  // So checking __isExtra on popstate requires TWO system back presses:
-  //
-  //   Press 1: pop __isExtra → land on __backGuard (same URL, no action)
-  //   Press 2: pop __backGuard → land on previous __isExtra (triggers handler)
-  //
-  // That's worse UX than the original bug. Instead, we rely on Telegram's
-  // built-in interception: when BackButton.isVisible is true, the Telegram
-  // client fires BackButton.onClick on system back instead of closing.
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const handlePopState = () => {
-      // After browser back/forward, reset our handling guard and sync visibility.
-      // The navigationStore will be updated by TelegramNavigationTracker's
-      // popstate handler (which updates previousUrlRef to prevent re-pushing).
       isHandlingBackRef.current = false;
       previousRouteRef.current = currentFullPath();
       syncButtonVisibility();
