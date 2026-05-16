@@ -1,3 +1,4 @@
+// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react";
@@ -104,11 +105,30 @@ const getThemeForPath = (pathname: string) => {
   return THEME_CONFIG.default;
 };
 
+/**
+ * AppInitializers
+ *
+ * Mounts the Telegram BackButton hook and the navigation tracker.
+ * These are placed inside AppProvider so they have access to the tg context.
+ *
+ * IMPORTANT: useTelegramBackButton is called here (not in LayoutLogicController)
+ * because it needs to be inside AppProvider but doesn't need to be inside
+ * ThemeProvider. The Suspense boundary wrapping this component is fine —
+ * the hook will re-initialize when the Suspense resolves.
+ */
 function AppInitializers() {
     const { dbUser, isAuthenticated } = useAppContext();
     const { success: addToast } = useAppToast();
     const scrollAchievementUnlockedRef = useRef(false);
 
+    // ─── Telegram BackButton management ────────────────────────────
+    // This hook handles:
+    // - Showing/hiding the native Telegram BackButton based on navigation state
+    // - Handling BackButton clicks to navigate in-app
+    // - Intercepting Android system back button (popstate)
+    //
+    // NOTE: isInTelegramContext is intentionally NOT used here anymore.
+    // The hook now checks for the real Telegram runtime directly.
     useTelegramBackButton();
 
     useFocusTimeTracker({
@@ -306,6 +326,11 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   return (
     <ErrorOverlayProvider>
       <AppProvider>
+        {/*
+          AppInitializers is inside AppProvider so it has access to tg context.
+          The Suspense boundary is fine — the hooks inside will re-initialize
+          when the Suspense resolves and the component remounts.
+        */}
         <Suspense fallback={null}>
           <AppInitializers />
         </Suspense>
