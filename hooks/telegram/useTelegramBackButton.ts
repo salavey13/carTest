@@ -81,15 +81,16 @@ function resolveBackTarget(currentPath: string): string | null {
  * useTelegramBackButton
  *
  * Manages the Telegram Mini App's native BackButton visibility and click handling.
- * Also intercepts the Android system back button (popstate) to navigate within
- * the app instead of closing it.
  *
  * Key design decisions:
  * - Does NOT push routes to navigationStore (TelegramNavigationTracker does that)
  * - Uses fallbackPathFor() as a safety net for page refreshes / deep links
  * - Does NOT use isInTelegramContext (which depends on async auth validation)
  *   for the show/hide decision; instead checks for real Telegram runtime
- * - Does NOT create duplicate browser history entries (no markTelegramBackGuard)
+ * - Does NOT create duplicate browser history entries (no pushState guards)
+ * - Relies on Telegram's built-in system back interception:
+ *   when BackButton.isVisible is true, pressing Android system back fires
+ *   BackButton.onClick instead of closing the app
  */
 export function useTelegramBackButton() {
   const { tg } = useAppContext();
@@ -218,69 +219,51 @@ export function useTelegramBackButton() {
     };
   }, [tg, syncButtonVisibility]);
 
-  // ─── Handle Android system back button (popstate) ───────────────
+  // ─── Handle browser popstate (system back/forward navigation) ────
   //
-  // When the user presses the system back button:
-  // 1. The browser navigates back in history (popstate fires)
-  // 2. We need to intercept this and navigate to the correct in-app target
+  // When the user presses the Android system back button or uses browser
+  // back/forward, popstate fires AFTER the browser has navigated.
   //
-  // Strategy: Before the browser processes the back navigation,
-  // we push a guard state so there's always at least one entry.
-  // Then on popstate, we figure out where we came from and
-  // navigate to the right in-app target.
+  // In Telegram Mini Apps, the system back button is handled by Telegram's
+  // client: when BackButton.isVisible is true, pressing system back triggers
+  // BackButton.onClick instead of closing the app. So the main fix for the
+  // "system back closes the app" issue is ensuring BackButton.show() is called.
   //
-  // CRITICAL: We do NOT call router.push() here because the browser
-  // has already navigated back. Instead, we detect the popstate and
-  // trigger our back handler which uses resolveBackTarget().
+  // This popstate handler is a safety net that re-syncs our state after
+  // browser-initiated navigation. It does NOT try to intercept or guard
+  // history entries — that approach leads to duplicate history entries and
+  // the "two presses needed" bug.
+  //
+  // WHY NO ensureHistoryGuard / pushState guard?
+  // ─────────────────────────────────────────────
+  // The guard approach pushed an extra history entry per route so the browser
+  // had something to pop before closing. But popstate gives you the state
+  // of the NEW entry (where you landed), not the OLD entry (what you left).
+  // So checking __isExtra on popstate requires TWO system back presses:
+  //
+  //   Press 1: pop __isExtra → land on __backGuard (same URL, no action)
+  //   Press 2: pop __backGuard → land on previous __isExtra (triggers handler)
+  //
+  // That's worse UX than the original bug. Instead, we rely on Telegram's
+  // built-in interception: when BackButton.isVisible is true, the Telegram
+  // client fires BackButton.onClick on system back instead of closing.
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Push a single guard entry so the system back button has something
-    // to pop before it would close the web app. We use replaceState to
-    // avoid creating duplicate entries (the old markTelegramBackGuard bug).
-    const ensureHistoryGuard = () => {
-      const currentPath = currentFullPath();
-      const state = window.history.state ?? {};
-      // Only add guard if we have a back target (don't block closing at root)
-      if (hasAppBackTarget(currentPath) && !state.__backGuard) {
-        window.history.replaceState(
-          { ...state, __backGuard: currentPath },
-          "",
-          currentPath
-        );
-        // Push one extra entry so the browser can "pop" without closing
-        window.history.pushState(
-          { ...state, __backGuard: currentPath, __isExtra: true },
-          "",
-          currentPath
-        );
-      }
-    };
-
     const handlePopState = () => {
-      // The browser has already gone back. Check if we should intercept.
-      const state = window.history.state;
-      if (state?.__isExtra) {
-        // We popped the extra guard entry — the browser is now at the
-        // original entry for this route. Trigger our back handler.
-        backHandlerRef.current();
-        return;
-      }
-
-      // If we popped to a different route (legitimate back navigation
-      // via Next.js router), just update our ref and sync visibility.
+      // After browser back/forward, reset our handling guard and sync visibility.
+      // The navigationStore will be updated by TelegramNavigationTracker's
+      // popstate handler (which updates previousUrlRef to prevent re-pushing).
+      isHandlingBackRef.current = false;
       previousRouteRef.current = currentFullPath();
       syncButtonVisibility();
     };
-
-    // Set up the guard on mount and route changes
-    ensureHistoryGuard();
 
     window.addEventListener("popstate", handlePopState);
 
     return () => {
       window.removeEventListener("popstate", handlePopState);
     };
-  }, [currentRoute, syncButtonVisibility, tg]);
+  }, [syncButtonVisibility]);
 }
