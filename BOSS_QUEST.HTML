@@ -661,7 +661,7 @@
   <h1>BOSS_QUEST.HTML</h1>
   <div class="subtitle">Like MD, But For Bosses</div>
   <div class="tagline">"Every click must feel like a victory, not a chore."</div>
-  <div class="version-badge">v2.2 — OVERHAULED</div>
+  <div class="version-badge">v3.0 — ULTIMATE</div>
 </div>
 
 <!-- ============================== AGENT EXECUTIVE SECTION ============================== -->
@@ -687,17 +687,26 @@ PR title <span class="result">MUST start with "⚡:"</span> — this triggers au
 Example: <span class="result">⚡: polish header reflow</span>
 Commit message: use the champion signature (e.g. "lera was here")
 
-<span class="highlight">STEP 5: SEND NOTIFICATION PART 2</span>
+<span class="highlight">STEP 5: INCLUDE supaplan_task IN PR BODY</span>
+Add <span class="result">"supaplan_task: &lt;UUID&gt;"</span> as a standalone line in the PR description.
+This is <span class="result">REQUIRED</span> for the merge workflow to promote the task status to "done".
+Without this line, the PR will merge but the SupaPlan task stays open forever.
+
+<span class="highlight">STEP 6: SEND NOTIFICATION PART 2</span>
 After PR is created, send <span class="action">notification_part2</span> from metadata
-to client's Telegram via notification skill
+to client's Telegram via notification skill:
+  node scripts/codex-notify.mjs telegram --chatId &lt;client_chat_id&gt; --text "&lt;notification_part2&gt;"
+Use <span class="action">client_chat_id</span> from the task metadata.
+Ensure REAL line breaks in the message text, never literal \n.
 
 <span class="highlight">CRITICAL RULES FOR AGENTS:</span>
 - ⚡: prefix in PR title is <span class="result">MANDATORY</span> — no exceptions
+- supaplan_task: &lt;UUID&gt; in PR body is <span class="result">MANDATORY</span> — merge automation depends on it
 - Champion signature commit is <span class="result">MANDATORY</span> — it's the client's tag on the wall
 - notification_part2 must be sent with <span class="action">real line breaks</span>, not literal \n
 - If task is still running when cheatcode arrives: respond gracefully
   "Still cooking. Come back in ~5 minutes. The cheatcode never expires."
-- Read <span class="action">/BOSS_QUEST.HTML</span> for full system context if needed</div>
+- If /BOSS_QUEST.HTML is unavailable on this branch, all protocol info is embedded in the task body</div>
 </div>
 
 <!-- ============================== UNIQUENESS MANDATE BANNER ============================== -->
@@ -935,6 +944,17 @@ Cycle repeats with next task</div>
     <span class="key">chain_order</span>: <span class="str">1</span>,                           <span class="comment">// position in chain</span>
     <span class="key">next_quest_uuid</span>: <span class="str">"be32ce57-..."</span>,      <span class="comment">// next quest, or "NONE"</span>
     <span class="key">target_task_name</span>: <span class="str">"franchize-header-reflow"</span>, <span class="comment">// Codex task English name</span>
+
+    <span class="comment">// ---- CLIENT CONTEXT ----</span>
+    <span class="key">client_chat_id</span>: <span class="str">"417553377"</span>,            <span class="comment">// Telegram chat ID for notifications</span>
+    <span class="key">commit_signature</span>: <span class="str">"lera was here"</span>,      <span class="comment">// champion tag for commit messages</span>
+    <span class="key">quest_lore</span>: <span class="str">"..."</span>,                      <span class="comment">// narrative flavor text per quest</span>
+
+    <span class="comment">// ---- AGENT PROTOCOL ----</span>
+    <span class="key">supaplan_ref_required</span>: <span class="str">"supaplan_task: &lt;UUID&gt;"</span>, <span class="comment">// MUST appear in PR body</span>
+    <span class="key">pr_title_prefix</span>: <span class="str">"⚡:"</span>,                  <span class="comment">// MUST start PR title</span>
+    <span class="key">agent_protocol_embedded</span>: <span class="str">true</span>,           <span class="comment">// body contains full agent protocol</span>
+    <span class="key">chain_finale</span>: <span class="str">false</span>,                     <span class="comment">// true for last quest in chain</span>
 
     <span class="comment">// ---- NOTIFICATION PART 1: THE HOOK ----</span>
     <span class="comment">// Sent immediately after plan creation (before tasks execute)</span>
@@ -1505,6 +1525,36 @@ SKIN_METAPHOR=<span class="str">""</span></div>
       <td>Update Boss init to set todo_path to /BOSS_QUEST.HTML. This file IS the quest chain document.</td>
       <td style="color:var(--gold);">Fixed in spec v2.1</td>
     </tr>
+    <tr>
+      <td>9</td>
+      <td>No mechanism to fire notification_part1 automatically — supaplan-skill only sends generic status updates, not cinematic quest hooks</td>
+      <td>Boss must explicitly call codex-notify.mjs telegram mode after creating each SupaPlan task, OR add a quest notification hook to the SupaPlan skill. Until then, notification_part1 must be sent manually.</td>
+      <td style="color:var(--red);">Open — needs implementation</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>Missing supaplan_task: UUID in PR body — merge workflow can't promote task to "done"</td>
+      <td>Added to Agent Executive protocol as mandatory STEP 5. Added supaplan_ref_required to metadata. Task body now includes explicit reminder.</td>
+      <td style="color:var(--gold);">Fixed in spec v3.0</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>Missing client_chat_id in task metadata — agent doesn't know where to send notification_part2</td>
+      <td>Added client_chat_id to metadata and body. Agent Executive protocol now specifies --chatId from metadata.</td>
+      <td style="color:var(--gold);">Fixed in spec v3.0</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>Final quest (Печать Промо) ends with "Next cheatcode: NONE" — anticlimactic for the grand finale</td>
+      <td>Chain finale quest gets special "CHAIN COMPLETE" celebration notification with full achievement summary, skin collection recap, and emotional payoff line "Империя построена. Lera was here."</td>
+      <td style="color:var(--gold);">Fixed in spec v3.0</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>Branches don't have BOSS_QUEST.HTML — agent has no protocol reference when executing on existing branches</td>
+      <td>Full Agent Executive Protocol now embedded directly in each task body. Self-contained — no external doc needed.</td>
+      <td style="color:var(--gold);">Fixed in spec v3.0</td>
+    </tr>
   </table>
 
   <h3>Lessons Learned</h3>
@@ -1690,6 +1740,11 @@ SKIN_METAPHOR=<span class="str">""</span></div>
       <span class="vtag">v2.2</span>
       <span class="vdate">2026-05-19</span>
       <div class="vdesc">OVERHAULED — Full CSV overhaul: all 8 SupaPlan tasks regenerated with 100% unique content per quest. 8 unique achievements (part 1), 8 unique achievements (part 2), 8 unique skins, 7 unique spoilers, 8 unique notification bodies describing what was ACTUALLY built in each quest. Expanded polish_instructions from 1 Focus line to full surgical specs with specific EDGE CASES, REFERENCE, and DONE WHEN per quest. Fixed todo_path to /BOSS_QUEST.HTML. Added Quest Chain section (04b) with chain visual and uniqueness grid table. Updated Schema example with richer notification content. Updated Real vs. Generic comparison with 3 quest examples.</div>
+    </li>
+    <li>
+      <span class="vtag">v3.0</span>
+      <span class="vdate">2026-05-19</span>
+      <div class="vdesc">ULTIMATE — Full flow code review. 6 critical blind spots found and fixed: (1) Missing supaplan_task: UUID in PR body — merge automation would silently fail. Added as mandatory Agent Executive STEP 5. (2) Missing client_chat_id in metadata — agent wouldn't know where to send notification_part2. Added to schema + metadata. (3) No mechanism to fire notification_part1 automatically — supaplan-skill only sends generic status. Documented as Bug #9 (open). (4) Final quest anticlimactic "Next: NONE" — replaced with CHAIN COMPLETE celebration. (5) Literal \n still in notifications. (6) Branches don't have BOSS_QUEST.HTML — embedded full Agent Executive Protocol in each task body (self-contained). Agent protocol expanded from 5 to 6 steps. Added quest_lore, chain_finale, supaplan_ref_required, agent_protocol_embedded fields to schema. Generated supaplan_tasks_ULTIMATE_v3.csv with all fixes applied.</div>
     </li>
   </ul>
 
