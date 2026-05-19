@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOSS_QUEST.HTML ⚡🕶️🧠</title>
+<style>
+  :root {
+    --neon: #00ff41;
+    --neon-dim: #00cc33;
+    --neon-glow: 0 0 10px #00ff4180, 0 0 30px #00ff4130;
+    --pink: #ff2d7b;
+    --pink-dim: #cc2462;
+    --bg: #0a0a0f;
+    --bg-card: #12121a;
+    --bg-section: #0f0f18;
+    --border: #1a1a2e;
+    --text: #e0e0e8;
+    --text-dim: #8888aa;
+    --text-bright: #ffffff;
+    --gold: #ffd700;
+    --purple: #a855f7;
+    --red: #ff4444;
+    --cyan: #00d4ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+
+  /* === HEADER === */
+  .hero {
+    background: linear-gradient(180deg, #0a0a1a 0%, var(--bg) 100%);
+    border-bottom: 1px solid var(--neon);
+    padding: 60px 40px 40px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at 50% 0%, #00ff4110 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .hero h1 {
+    font-size: 3.2em;
+    color: var(--neon);
+    text-shadow: var(--neon-glow);
+    letter-spacing: 4px;
+    margin-bottom: 8px;
+    font-weight: 900;
+  }
+  .hero .subtitle {
+    font-size: 1.2em;
+    color: var(--text-dim);
+    letter-spacing: 6px;
+    text-transform: uppercase;
+  }
+  .hero .tagline {
+    margin-top: 16px;
+    font-size: 1em;
+    color: var(--pink);
+    font-style: italic;
+  }
+  .version-badge {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 4px 16px;
+    background: var(--neon);
+    color: #000;
+    font-weight: 700;
+    font-size: 0.85em;
+    border-radius: 20px;
+    letter-spacing: 1px;
+  }
+
+  /* === UNIQUENESS MANDATE BANNER === */
+  .mandate-banner {
+    margin: 0 40px;
+    padding: 20px 28px;
+    background: linear-gradient(135deg, #ff444412 0%, #ffd70008 50%, #ff444412 100%);
+    border: 2px solid var(--red);
+    border-radius: 12px;
+    position: relative;
+    margin-top: 30px;
+  }
+  .mandate-banner::before {
+    content: '⚠️';
+    position: absolute;
+    top: -14px;
+    left: 24px;
+    background: var(--bg);
+    padding: 0 8px;
+    font-size: 1.3em;
+  }
+  .mandate-banner h3 {
+    color: var(--red);
+    font-size: 1.15em;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  .mandate-banner p {
+    color: var(--text-bright);
+    font-size: 0.98em;
+    line-height: 1.6;
+  }
+  .mandate-banner strong { color: var(--gold); }
+
+  /* === QUICK START === */
+  .quickstart {
+    margin: 24px 40px;
+    padding: 24px 28px;
+    background: linear-gradient(135deg, #00ff4108 0%, #00d4ff06 100%);
+    border: 1px solid var(--neon);
+    border-radius: 12px;
+    position: relative;
+  }
+  .quickstart::before {
+    content: '⚡';
+    position: absolute;
+    top: -14px;
+    left: 24px;
+    background: var(--bg);
+    padding: 0 8px;
+    font-size: 1.3em;
+  }
+  .quickstart h3 {
+    color: var(--neon);
+    font-size: 1.15em;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  .quickstart ol {
+    margin: 0;
+    padding-left: 24px;
+  }
+  .quickstart li {
+    margin-bottom: 8px;
+    color: var(--text);
+    font-size: 0.98em;
+  }
+  .quickstart li strong { color: var(--neon); }
+  .quickstart code {
+    background: #1a1a2e;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.88em;
+    color: var(--neon);
+  }
+  .quickstart .final-step {
+    margin-top: 12px;
+    padding: 8px 16px;
+    background: #00ff4110;
+    border-radius: 6px;
+    color: var(--neon);
+    font-weight: 700;
+    font-size: 1.05em;
+    text-align: center;
+  }
+
+  /* === NAV === */
+  .toc {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 32px;
+    margin: 30px 40px;
+  }
+  .toc h2 {
+    color: var(--neon);
+    font-size: 1.1em;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin-bottom: 16px;
+  }
+  .toc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 8px;
+  }
+  .toc a {
+    display: block;
+    padding: 8px 12px;
+    color: var(--text);
+    text-decoration: none;
+    border-radius: 6px;
+    transition: all 0.2s;
+    font-size: 0.95em;
+  }
+  .toc a:hover {
+    background: #ffffff08;
+    color: var(--neon);
+    transform: translateX(4px);
+  }
+  .toc a .num {
+    color: var(--neon-dim);
+    font-weight: 700;
+    margin-right: 8px;
+  }
+
+  /* === SECTIONS === */
+  .section {
+    margin: 40px;
+    padding: 32px 36px;
+    background: var(--bg-section);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    position: relative;
+  }
+  .section::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: var(--neon);
+    border-radius: 12px 0 0 12px;
+  }
+  .section h2 {
+    color: var(--neon);
+    font-size: 1.6em;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #1a1a2e;
+  }
+  .section h3 {
+    color: var(--text-bright);
+    font-size: 1.2em;
+    margin: 24px 0 12px;
+  }
+  .section h4 {
+    color: var(--pink);
+    font-size: 1em;
+    margin: 16px 0 8px;
+  }
+  .section p { margin-bottom: 12px; }
+
+  /* === CALLOUTS === */
+  .callout {
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin: 16px 0;
+    border-left: 3px solid;
+  }
+  .callout.principle {
+    background: #00ff4108;
+    border-color: var(--neon);
+  }
+  .callout.principle strong { color: var(--neon); }
+  .callout.warning {
+    background: #ff444408;
+    border-color: var(--red);
+  }
+  .callout.warning strong { color: var(--red); }
+  .callout.insight {
+    background: #a855f708;
+    border-color: var(--purple);
+  }
+  .callout.insight strong { color: var(--purple); }
+  .callout.lore {
+    background: #ffd70008;
+    border-color: var(--gold);
+  }
+  .callout.lore strong { color: var(--gold); }
+  .callout.recovery {
+    background: #00d4ff08;
+    border-color: var(--cyan);
+  }
+  .callout.recovery strong { color: var(--cyan); }
+
+  /* === FLOW DIAGRAMS === */
+  .flow {
+    background: #08080f;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin: 16px 0;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.9em;
+    line-height: 1.8;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--text-dim);
+  }
+  .flow .highlight { color: var(--neon); font-weight: 700; }
+  .flow .action { color: var(--pink); }
+  .flow .result { color: var(--gold); }
+  .flow .dim { color: #555577; }
+
+  /* === TABLES === */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.95em;
+  }
+  th {
+    background: #1a1a2e;
+    color: var(--neon);
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 2px solid var(--neon);
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:hover td { background: #ffffff04; }
+
+  /* === CODE === */
+  code {
+    background: #1a1a2e;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.88em;
+    color: var(--neon);
+  }
+  .code-block {
+    background: #08080f;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin: 16px 0;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.88em;
+    line-height: 1.7;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .code-block .key { color: var(--pink); }
+  .code-block .str { color: var(--gold); }
+  .code-block .comment { color: #555577; }
+
+  /* === COMPARISON === */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .comparison .col {
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .comparison .col.meh {
+    background: #ff444406;
+    border-color: #ff444430;
+  }
+  .comparison .col.meh h4 { color: var(--red); }
+  .comparison .col.xex {
+    background: #00ff4106;
+    border-color: #00ff4130;
+  }
+  .comparison .col.xex h4 { color: var(--neon); }
+
+  /* === 3-COL COMPARISON === */
+  .comparison-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .comparison-3 .col {
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 0.92em;
+  }
+  .comparison-3 .col.bad {
+    background: #ff444406;
+    border-color: #ff444430;
+  }
+  .comparison-3 .col.bad h4 { color: var(--red); font-size: 0.95em; }
+  .comparison-3 .col.bad p { color: var(--text-dim); font-size: 0.88em; }
+  .comparison-3 .col.good {
+    background: #00ff4106;
+    border-color: #00ff4130;
+  }
+  .comparison-3 .col.good h4 { color: var(--neon); font-size: 0.95em; }
+  .comparison-3 .col.good p { color: var(--text-dim); font-size: 0.88em; }
+
+  /* === EMOTION FLOW === */
+  .emotion-flow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+    padding: 16px;
+    background: #08080f;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .emotion-flow .step {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .emotion-flow .arrow {
+    color: var(--neon);
+    font-size: 1.6em;
+    font-weight: 900;
+    text-shadow: 0 0 6px #00ff4140;
+    margin: 0 2px;
+  }
+  .step.neutral { background: #1a1a2e; color: var(--text-dim); }
+  .step.wtf { background: #ffd70020; color: var(--gold); }
+  .step.curious { background: #a855f720; color: var(--purple); }
+  .step.hype { background: #00ff4120; color: var(--neon); }
+  .step.victory { background: #ff2d7b20; color: var(--pink); }
+  .step.chill { background: #3b82f620; color: #60a5fa; }
+
+  /* === CANON CARDS === */
+  .canon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .canon-card {
+    padding: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    text-align: center;
+    transition: all 0.2s;
+  }
+  .canon-card:hover {
+    border-color: var(--neon);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px #00ff4110;
+  }
+  .canon-card .icon { font-size: 2em; margin-bottom: 8px; }
+  .canon-card .name { color: var(--neon); font-weight: 700; font-size: 0.95em; }
+  .canon-card .desc { color: var(--text-dim); font-size: 0.82em; margin-top: 4px; }
+
+  /* === QUEST CHAIN VISUAL === */
+  .chain-visual {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 20px 0;
+    overflow-x: auto;
+    padding: 16px 0;
+  }
+  .chain-node {
+    flex-shrink: 0;
+    padding: 12px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--neon);
+    border-radius: 8px;
+    text-align: center;
+    min-width: 120px;
+  }
+  .chain-node .order {
+    font-size: 0.75em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  .chain-node .name {
+    color: var(--neon);
+    font-weight: 700;
+    margin: 4px 0;
+    font-size: 0.95em;
+  }
+  .chain-node .uuid {
+    font-family: monospace;
+    font-size: 0.72em;
+    color: var(--text-dim);
+  }
+  .chain-arrow {
+    flex-shrink: 0;
+    color: var(--neon);
+    font-size: 1.4em;
+    margin: 0 6px;
+  }
+
+  /* === FAILURE MODE CARDS === */
+  .failure-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .failure-card {
+    padding: 16px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    border-left: 3px solid var(--red);
+    transition: all 0.2s;
+  }
+  .failure-card:hover {
+    border-color: var(--cyan);
+    border-left-color: var(--cyan);
+    transform: translateY(-1px);
+  }
+  .failure-card .symptom {
+    color: var(--red);
+    font-weight: 700;
+    font-size: 0.95em;
+    margin-bottom: 6px;
+  }
+  .failure-card .cause {
+    color: var(--text-dim);
+    font-size: 0.88em;
+    margin-bottom: 8px;
+  }
+  .failure-card .fix {
+    color: var(--cyan);
+    font-size: 0.9em;
+    padding: 8px 12px;
+    background: #00d4ff08;
+    border-radius: 4px;
+  }
+  .failure-card .fix strong { color: var(--cyan); }
+
+  /* === PARAMS TABLE === */
+  .params-input {
+    background: #1a1a2e;
+    border: 1px solid var(--neon);
+    border-radius: 4px;
+    padding: 4px 10px;
+    color: var(--neon);
+    font-family: monospace;
+    font-size: 0.9em;
+    width: 100%;
+    max-width: 300px;
+  }
+  .params-input:focus {
+    outline: none;
+    box-shadow: 0 0 10px #00ff4130;
+  }
+
+  /* === COLLAPSIBLE === */
+  details {
+    margin: 12px 0;
+  }
+  details summary {
+    cursor: pointer;
+    padding: 10px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--neon);
+    font-weight: 600;
+    transition: all 0.2s;
+    list-style: none;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::before {
+    content: '▶ ';
+    font-size: 0.8em;
+    transition: transform 0.2s;
+  }
+  details[open] summary::before {
+    content: '▼ ';
+  }
+  details summary:hover {
+    border-color: var(--neon);
+    background: #1a1a2e;
+  }
+  details .detail-content {
+    padding: 16px 20px;
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    background: var(--bg-section);
+  }
+
+  /* === VERSION HISTORY === */
+  .version-timeline {
+    margin: 16px 0;
+    padding: 0;
+    list-style: none;
+  }
+  .version-timeline li {
+    padding: 8px 16px;
+    border-left: 2px solid var(--border);
+    margin-left: 12px;
+    position: relative;
+    font-size: 0.9em;
+  }
+  .version-timeline li::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 14px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--neon);
+    border: 2px solid var(--bg);
+  }
+  .version-timeline li .vtag {
+    color: var(--neon);
+    font-weight: 700;
+    font-family: monospace;
+  }
+  .version-timeline li .vdate {
+    color: var(--text-dim);
+    font-size: 0.85em;
+    margin-left: 8px;
+  }
+  .version-timeline li .vdesc {
+    color: var(--text);
+    margin-top: 2px;
+  }
+
+  /* === FOOTER === */
+  .footer {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-dim);
+    font-size: 0.85em;
+    border-top: 1px solid var(--border);
+    margin-top: 60px;
+  }
+  .footer .sig {
+    color: var(--neon);
+    font-weight: 700;
+    font-size: 1.1em;
+  }
+
+  /* === RESPONSIVE === */
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 2em; }
+    .section { margin: 20px; padding: 20px; }
+    .toc { margin: 20px; }
+    .mandate-banner { margin: 20px; }
+    .quickstart { margin: 20px; }
+    .comparison { grid-template-columns: 1fr; }
+    .comparison-3 { grid-template-columns: 1fr; }
+    .failure-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================== HERO ============================== -->
+<div class="hero">
+  <h1>BOSS_QUEST.HTML</h1>
+  <div class="subtitle">Like MD, But For Bosses</div>
+  <div class="tagline">"Every click must feel like a victory, not a chore."</div>
+  <div class="version-badge">v2.2 — OVERHAULED</div>
+</div>
+
+<!-- ============================== AGENT EXECUTIVE SECTION ============================== -->
+<div class="quickstart" id="agent-exec" style="border-color: var(--cyan); background: linear-gradient(135deg, #00d4ff08 0%, #00ff4106 100%);">
+  <h3 style="color: var(--cyan);">Agent Executive — Runtime Protocol</h3>
+  <p style="margin-bottom:12px; color:var(--text);">This section is the <strong>only thing an executing Codex agent needs to read</strong>. The rest of this document is context and lore. When a client pastes a UUID (cheatcode) into your task chat, follow this protocol exactly:</p>
+  <div class="flow" style="font-size:0.88em;"><span class="highlight">STEP 1: RECOGNIZE THE CHEATCODE</span>
+Client sends a UUID like <span class="action">f3c5306d-2d8f-4cc4-bb77-26f20f7f9b11</span>
+You read AGENTS.MD → instructed to check UUIDs against SupaPlan
+
+<span class="highlight">STEP 2: FETCH THE QUEST</span>
+Call SupaPlan skill/script with service role access to Supabase
+(URL and key in your env secrets)
+Fetch the full SupaPlan task by UUID
+
+<span class="highlight">STEP 3: EXECUTE POLISH</span>
+Extract <span class="action">polish_instructions</span> from metadata
+Execute the surgical polishing pass — be specific, not generic
+Compare against redesign reference images if available
+
+<span class="highlight">STEP 4: CREATE PR WITH ⚡: PREFIX</span>
+PR title <span class="result">MUST start with "⚡:"</span> — this triggers auto-merge workflow
+Example: <span class="result">⚡: polish header reflow</span>
+Commit message: use the champion signature (e.g. "lera was here")
+
+<span class="highlight">STEP 5: SEND NOTIFICATION PART 2</span>
+After PR is created, send <span class="action">notification_part2</span> from metadata
+to client's Telegram via notification skill
+
+<span class="highlight">CRITICAL RULES FOR AGENTS:</span>
+- ⚡: prefix in PR title is <span class="result">MANDATORY</span> — no exceptions
+- Champion signature commit is <span class="result">MANDATORY</span> — it's the client's tag on the wall
+- notification_part2 must be sent with <span class="action">real line breaks</span>, not literal \n
+- If task is still running when cheatcode arrives: respond gracefully
+  "Still cooking. Come back in ~5 minutes. The cheatcode never expires."
+- Read <span class="action">/BOSS_QUEST.HTML</span> for full system context if needed</div>
+</div>
+
+<!-- ============================== UNIQUENESS MANDATE BANNER ============================== -->
+<div class="mandate-banner">
+  <h3>Uniqueness Mandate (Critical)</h3>
+  <p>Every single achievement name, skin description, mission title, spoiler, and notification body <strong>MUST be completely unique per quest</strong>. No copy-paste templates allowed. Use the client's persona (age, interests, gaming/movie references) to generate fresh, flavorful content for each task. If two quests share the same achievement name or skin, the entire chain feels templated — and templated feels corporate — and corporate kills the dopamine. <strong>This is the #1 bug from the first run. Enforce it ruthlessly.</strong></p>
+</div>
+
+<!-- ============================== QUICK START ============================== -->
+<div class="quickstart">
+  <h3>Quick Start (New Client)</h3>
+  <ol>
+    <li>Fill the <strong>CLIENT PARAMETERS</strong> block at the bottom of the Boss Init Message (Section 07)</li>
+    <li>Replace <code>[N]</code> with number of tasks for this client</li>
+    <li>Replace <code>client_telegram_id</code> with actual Telegram ID</li>
+    <li>Replace <code>client_persona</code> with age, interests, vibe</li>
+    <li>Replace <code>commit_signature</code> with their champion tag</li>
+    <li>Paste the <strong>entire Boss Init Message</strong> into Boss chat (Codex in plan mode)</li>
+  </ol>
+  <div class="final-step">5. Light the fuse. 🧨</div>
+</div>
+
+<!-- ============================== TABLE OF CONTENTS ============================== -->
+<div class="toc">
+  <h2>Map</h2>
+  <div class="toc-grid">
+    <a href="#agent-exec"><span class="num" style="color:var(--cyan);">⚡</span> Agent Executive</a>
+    <a href="#philosophy"><span class="num">00</span> Philosophy</a>
+    <a href="#problem"><span class="num">01</span> The Problem</a>
+    <a href="#architecture"><span class="num">02</span> Architecture</a>
+    <a href="#quest-flow"><span class="num">03</span> Quest Flow</a>
+    <a href="#supaplan-schema"><span class="num">04</span> SupaPlan Schema</a>
+    <a href="#quest-chain"><span class="num">04b</span> Quest Chain: Lera Run</a>
+    <a href="#timing"><span class="num">05</span> Timing & Laziness</a>
+    <a href="#emotions"><span class="num">06</span> Emotional Engineering</a>
+    <a href="#boss-init"><span class="num">07</span> Boss Init Message</a>
+    <a href="#parameters"><span class="num">08</span> Client Parameters</a>
+    <a href="#failure-modes"><span class="num">09</span> Failure Modes & Recovery</a>
+    <a href="#bugs"><span class="num">10</span> Known Bugs & Fixes</a>
+    <a href="#canon"><span class="num">11</span> Canon</a>
+    <a href="#glossary"><span class="num">12</span> Glossary</a>
+    <a href="#version-history"><span class="num">13</span> Version History</a>
+  </div>
+</div>
+
+<!-- ============================== 00. PHILOSOPHY ============================== -->
+<div class="section" id="philosophy">
+  <h2>00. Philosophy</h2>
+
+  <div class="callout principle">
+    <strong>Core Principle:</strong> Laziness is a feature, not a bug. The system exploits laziness instead of fighting it. The time between receiving a notification and actually acting on it gives agents time to finish their work.
+  </div>
+
+  <p>This document describes <strong>Quest Mode</strong> — a dopamine-engineered, self-motivating, cinematic quest system that turns post-completion grind into an addictive voluntary experience. It is not a task manager. It is not a gamification layer. It is a <em>behavioral architecture</em> that restructures the relationship between a human and their own unfinished work.</p>
+
+  <div class="comparison">
+    <div class="col meh">
+      <h4>Traditional</h4>
+      <p>"YOU FAILED YOUR TASK"</p>
+      <p>Pressure → Resistance → Avoidance</p>
+      <p>Motivation = obligation</p>
+      <p>8 tasks = 8 chores</p>
+      <p>Quality: MEH</p>
+    </div>
+    <div class="col xex">
+      <h4>Quest Mode</h4>
+      <p>"yo psst... wanna see it evolve?"</p>
+      <p>Curiosity → Engagement → Momentum</p>
+      <p>Motivation = identity + tiny victories</p>
+      <p>8 tasks = 8 boss fights</p>
+      <p>Quality: XEX</p>
+    </div>
+  </div>
+
+  <div class="callout insight">
+    <strong>Key Insight:</strong> Gamification fails when it feels corporate, but becomes addictive when it feels like lore. The system preserves the human ego, the fun, and the feeling of being creative instead of managed. The moment the client senses a template, the spell breaks. Every piece of content must feel hand-crafted for their specific quest.
+  </div>
+
+  <h3>The Breakthrough Formula</h3>
+  <p style="text-align:center; font-size:1.3em; color:var(--neon); font-weight:700; padding:16px;">
+    Laziness + Curiosity + 1 Click &gt; Discipline + 8 Clicks + Boredom
+  </p>
+
+  <h3>The Compound Effect</h3>
+  <p>Slower by calendar, faster by reality. "8 polished PRs in 3 days" beats "0 PRs in 2 weeks" every time. Each quest gets a dedicated polishing pass, so quality compounds — the second quest benefits from the first, the third from both previous. Motivation grows instead of depleting because each step produces a tangible, celebrated win. The system turns the natural human tendency to procrastinate into the very mechanism that ensures quality.</p>
+</div>
+
+<!-- ============================== 01. THE PROBLEM ============================== -->
+<div class="section" id="problem">
+  <h2>01. The Problem</h2>
+
+  <h3>What Works</h3>
+  <p>Burst launch — the client (Lera, nail artist, whoever) fires off N agents from a Boss plan. All tasks start executing in parallel. The creative/fun part works great. The dopamine of launching something new carries the client through the initiation phase effortlessly.</p>
+
+  <h3>What Breaks</h3>
+  <p>Post-completion. Tasks are done, code is written, but PRs aren't created. Days pass. The client finds it boring, doesn't realize what they built (task names in English, client speaks Russian), and the whole redesign just... sits there. The creative high of the launch is gone, replaced by the drudgery of closing things out. This is the exact moment where traditional project management fails and Quest Mode takes over.</p>
+
+  <div class="callout warning">
+    <strong>The Real Issue:</strong> Going back to a bot and clicking "Create PR" 8 times is not interesting. Especially when the task name is not in your language and you barely noticed what you overhauled. The system must bridge the gap between "I built something cool" and "I need to close it out" — and that bridge must feel like a victory march, not a death march.
+  </div>
+
+  <h3>Intended Emotional Transformation</h3>
+  <div class="emotion-flow">
+    <span class="step neutral">"8 tasks..."</span>
+    <span class="arrow">⟹</span>
+    <span class="step neutral">"ah fuck it"</span>
+    <span class="arrow">⟹</span>
+    <span class="step neutral">*keeps playing*</span>
+  </div>
+  <p style="text-align:center; color:var(--neon); font-weight:700; margin:8px 0;">MUST BECOME:</p>
+  <div class="emotion-flow">
+    <span class="step wtf">"WTF?"</span>
+    <span class="arrow">⟹</span>
+    <span class="step curious">"wow"</span>
+    <span class="arrow">⟹</span>
+    <span class="step hype">"omg key"</span>
+    <span class="arrow">⟹</span>
+    <span class="step hype">*pasted*</span>
+    <span class="arrow">⟹</span>
+    <span class="step victory">"Bitch! haha!"</span>
+    <span class="arrow">⟹</span>
+    <span class="step victory">PR created</span>
+    <span class="arrow">⟹</span>
+    <span class="step chill">*fucks off with big balls*</span>
+    <span class="arrow">⟹</span>
+    <span class="step wtf">*new notification*</span>
+    <span class="arrow">⟹</span>
+    <span class="step curious">cycle repeats</span>
+  </div>
+</div>
+
+<!-- ============================== 02. ARCHITECTURE ============================== -->
+<div class="section" id="architecture">
+  <h2>02. Architecture</h2>
+
+  <h3>3-Stage Pipeline</h3>
+
+  <h4>Stage 1: Game Loading — Intelligence Gathering</h4>
+  <p>The only stage that requires a human. Take a screenshot of "now", collect business type, vibe, colors, pain points. Pack it into a structured context. This is the seed that everything else grows from — the more specific and emotionally rich the input, the more resonant the quest chain output.</p>
+  <div class="callout lore">
+    <strong>Status:</strong> Already works. We have a gold example of tenant seed. Redesign picture generation is straightforward.
+  </div>
+
+  <h4>Stage 2: Start Game — Vision Generation</h4>
+  <p>Agent takes the screenshot + profile, generates a redesigned image (9:16, new palette, new structure). Gives everything to Boss (Codex in plan mode). Human sees the result and says "go" or "change X". The visual hook is the first motivator — seeing what your thing COULD look like creates the desire that carries through the entire quest chain.</p>
+
+  <h4>Stage 3: Boss Mode — Quest Orchestration</h4>
+  <p>This is where the magic happens. Boss does three things in one shot:</p>
+
+  <div class="flow"><span class="highlight">3a. Decomposition</span>
+Analyze the difference between "before" and "after" → generate a list of concrete tasks
+(not abstract — by component: header, footer, navigation, cards, animations, etc.)
+
+<span class="highlight">3b. SupaPlan Task Injection</span>
+For each task, create a SupaPlan task with UUID. Inside each task — <span class="action">special sauce</span>:
+  - Specific polishing instructions (not "make it pretty" but "remove gap between X and Y, add transition, check 375px width")
+  - Reference to redesign picture (which part is relevant)
+  - Completeness criteria (so the agent knows when to stop)
+
+<span class="highlight">3c. Quest Chain</span>
+Link tasks in a chain by priority. Each task knows the UUID of the next.
+<span class="result">→ Immediately fire first notification to client</span></div>
+
+  <h3>Scaling Matrix</h3>
+  <table>
+    <tr><th>Client</th><th>Stage 1</th><th>Stage 2</th><th>Stage 3</th></tr>
+    <tr><td>Nail Artist</td><td>Screenshot of VK page + "I want pink"</td><td>9:16 redesign</td><td>8 quests with cheatcodes</td></tr>
+    <tr><td>Bike Shop</td><td>Screenshot of market + "I want dark"</td><td>Store redesign</td><td>6 quests</td></tr>
+    <tr><td>Coffee Shop</td><td>Photo of menu + "minimalism"</td><td>New UI</td><td>5 quests</td></tr>
+    <tr><td>Any micro-business</td><td>Screenshot + preferences</td><td>Redesign</td><td>N quests (configurable)</td></tr>
+  </table>
+
+  <div class="callout insight">
+    <strong>Stages 1-2 are universal.</strong> Stage 3 is where Boss adapts to the specific business and client persona. The franchise operating system lives in the parameterization of Stage 3.
+  </div>
+</div>
+
+<!-- ============================== 03. QUEST FLOW ============================== -->
+<div class="section" id="quest-flow">
+  <h2>03. Quest Flow</h2>
+
+  <h3>Full Pipeline</h3>
+  <div class="flow"><span class="highlight">Phase 1: BURST</span> (already works)
+Boss plan → N tasks launched in parallel
+            ↓
+Simultaneously: Boss creates N SupaPlan tasks
+             with UUIDs, chain, and <span class="action">pre-baked notifications</span>
+             ↓
+<span class="result">ALL planted in first stage. Seeds in the ground.</span>
+Client does their thing, plays, lives. Tasks work.
+
+<span class="highlight">Phase 2: NOTIFICATION HOOK</span> (the innovation)
+Task completes → <span class="action">Notification Part 1</span> hits client's Telegram
+  "WTF? I did THAT?" + achievement + cheatcode
+            ↓
+Client inserts cheatcode into Codex task
+            ↓
+Agent reads AGENTS.MD → checks UUID → fetches SupaPlan task → gets <span class="action">polish_instructions</span>
+            ↓
+Agent polishes code → <span class="action">Notification Part 2</span> fires
+  MISSION COMPLETE + achievement + skin dropped + next spoiler + next cheatcode
+            ↓
+Client creates PR with "⚡:" prefix → <span class="result">auto-merge</span>
+            ↓
+Client closes GitHub tab, fucks off
+            ↓
+Cycle repeats with next task</div>
+
+  <h3>Single Quest Cycle (4 clicks, all victorious)</h3>
+  <div class="flow">1. Receive notification → <span class="result">WOW effect</span>
+2. Insert cheatcode → <span class="action">polishing magic happens</span>
+3. Notification Part 2 → <span class="result">MISSION COMPLETE glory</span>
+4. Create PR with "⚡:" → <span class="result">auto-merged, signed, done</span></div>
+
+  <div class="callout principle">
+    <strong>PR creation is not work — it's signing a masterpiece.</strong> The commit message "lera was here" is not a comment, it's a tag on a wall. It's "I was here, I made this, this is mine." The same GitHub button that felt like a chore now feels like a signature on a masterpiece.
+  </div>
+</div>
+
+<!-- ============================== 04. SUPAPLAN SCHEMA ============================== -->
+<div class="section" id="supaplan-schema">
+  <h2>04. SupaPlan Schema</h2>
+
+  <p>Each SupaPlan task is a self-contained quest unit. Everything is pre-baked at plan creation time. Boss is not needed at runtime — the tasks carry their own instructions, notifications, and chain linkage.</p>
+
+  <div class="code-block">{
+  <span class="key">id</span>: <span class="str">"f3c5306d-2d8f-4cc4-bb77-26f20f7f9b11"</span>,     <span class="comment">// UUID = cheatcode</span>
+  <span class="key">title</span>: <span class="str">"[QUEST][CLIENT] Quest Name"</span>,
+  <span class="key">capability</span>: <span class="str">"franchize.gamification"</span>,
+  <span class="key">status</span>: <span class="str">"open"</span>,
+  <span class="key">metadata</span>: {
+
+    <span class="comment">// ---- CHAIN LINKAGE ----</span>
+    <span class="key">quest_name</span>: <span class="str">"Матрица Шапки"</span>,         <span class="comment">// cinematic name in client language</span>
+    <span class="key">chain_order</span>: <span class="str">1</span>,                           <span class="comment">// position in chain</span>
+    <span class="key">next_quest_uuid</span>: <span class="str">"be32ce57-..."</span>,      <span class="comment">// next quest, or "NONE"</span>
+    <span class="key">target_task_name</span>: <span class="str">"franchize-header-reflow"</span>, <span class="comment">// Codex task English name</span>
+
+    <span class="comment">// ---- NOTIFICATION PART 1: THE HOOK ----</span>
+    <span class="comment">// Sent immediately after plan creation (before tasks execute)</span>
+    <span class="comment">// Must make client go "WTF? I did THAT?!"</span>
+    <span class="key">notification_part1</span>: <span class="str">`
+🎬 ЛЕРА, ГЛАВНАЯ ГЕРОИНЯ В ЭФИРЕ. МИССИЯ «Матрица Шапки» АКТИВИРОВАНА.
+Ты уже это построила: шапка витрины перезапущена как кибер-панель —
+логотип слева, секции по центру, профиль компактный, корзина встроена в рельс.
+Это уже не просто навигация — это командный центр.
+🏆 Ачивка открыта: «Сигнал Из Матрицы» — ты вошла в систему.
+Но присмотрись... есть шероховатости. Щели, выравнивание, safe-area под ТГ-кнопками.
+Хочешь довести до идеала?
+🔓 Cheatcode: f3c5306d-2d8f-4cc4-bb77-26f20f7f9b11
+Target hint: вставь код в задачу «franchize-header-reflow».
+Ты не догоняешь миссию. Ты ЕЁ СОЗДАЁШЬ.
+`</span>,
+
+    <span class="comment">// ---- POLISH INSTRUCTIONS: THE SAUCE ----</span>
+    <span class="comment">// Surgical, specific, actionable. NOT generic.</span>
+    <span class="key">polish_instructions</span>: <span class="str">`
+Review and polish task: franchize-header-reflow.
+
+FOCUS: Header & rail redesign. This is the FIRST thing users see — it must be flawless.
+- Logo: anchored left, crisp at all sizes, no pixelation
+- Section tabs: centered between logo and profile, active tab visually dominant
+- Inline cart: visible but not intrusive, badge count prominent
+- Profile button: compact, right-aligned, safe-area clearance for Telegram back button
+
+EDGE CASES TO CHECK:
+- iPhone SE 375px: tabs must not wrap or truncate
+- 390px: standard mobile, touch targets 44px minimum
+- 768px tablet: tabs spread comfortably, cart badge visible
+- 1024px desktop: full rail, generous spacing
+- Telegram safe-area: top overlay must NOT overlap with header controls
+- Hover/focus/active states on all interactive elements
+- Header must be sticky/fixed without content jumping
+
+REFERENCE: compare against redesign images — header composition from image #2.
+
+DONE WHEN: No overlapping controls, visual hierarchy immediate in 1-second glance,
+zero horizontal scroll on any breakpoint, cart badge always visible.
+PR title must start with "⚡:" for automerge.
+Signature commit: "lera was here"
+`</span>,
+
+    <span class="comment">// ---- NOTIFICATION PART 2: THE VICTORY ----</span>
+    <span class="comment">// Sent after polishing completes</span>
+    <span class="comment">// Boss-fight-clear screen. Triumph lap. Victory dance.</span>
+    <span class="key">notification_part2</span>: <span class="str">`
+🔥 MISSION COMPLETE: «Матрица Шапки».
+Полировка завершена: шапка теперь как лазерный луч — логотип на месте,
+табы по центру, корзина в поле зрения, safe-area чистый. Ни одного пикселя мимо.
+🎖 Achievement: «Неон-Хирург» — ты прооперировала хедер с точностью до пикселя.
+🎨 Skin dropped: «Carbon Gold Precision» — премиум-скин командного центра.
+  Тёмный карбон, золотые акценты, хрустальная чёткость.
+Один шаг — и миссия закрыта навсегда.
+Создай PR с "⚡:" в начале — он смёржится сам. Подпиши: lera was here 😈
+👀 Спойлер: витрина переоденется — карточки станут вертикальными, как постеры.
+🔓 Next cheatcode: be32ce57-...
+Next target: catalog-9x16-cards
+`</span>
+  }
+}</div>
+
+  <h3>Real vs. Generic: The Uniqueness Difference</h3>
+  <p>The #1 bug from the first run was Boss generating identical content across all 8 quests. Here's the difference side-by-side using the actual "Матрица Шапки" quest as the example:</p>
+
+  <div class="comparison-3">
+    <div class="col bad">
+      <h4>Templated (BROKEN)</h4>
+      <p><strong>Achievement:</strong> "Сигнал Из Матрицы"</p>
+      <p><strong>Achievement 2:</strong> "Неон-Хирург"</p>
+      <p><strong>Skin:</strong> "Carbon Gold Precision"</p>
+      <p><strong>Spoiler:</strong> "следующий апгрейд двигает весь экран"</p>
+      <p><strong>Part1 body:</strong> "ключевой блок интерфейса собран"</p>
+      <p style="color:var(--red); margin-top:8px; font-weight:700;">Same for ALL 8 quests. Corporate. Boring. Spell broken.</p>
+    </div>
+    <div class="col good">
+      <h4>Unique Per Quest (CORRECT)</h4>
+      <p><strong>Quest 1 — Матрица Шапки:</strong></p>
+      <p>Achievement: "Сигнал Из Матрицы"</p>
+      <p>Achievement 2: "Неон-Хирург"</p>
+      <p>Skin: "Carbon Gold Precision"</p>
+      <p>Spoiler: "витрина переоденется — карточки станут вертикальными"</p>
+      <p style="margin-top:6px;"><strong>Quest 2 — Клинок Витрины:</strong></p>
+      <p>Achievement: "Архитектор Референсов"</p>
+      <p>Achievement 2: "Гладиатор Пикселей"</p>
+      <p>Skin: "Neon Drift Overlay"</p>
+      <p>Spoiler: "бегущая строка с пульсом"</p>
+      <p style="margin-top:6px;"><strong>Quest 4 — Тень Телеграма:</strong></p>
+      <p>Achievement: "Призрачный Клик"</p>
+      <p>Achievement 2: "Экзорцист Интерфейса"</p>
+      <p>Skin: "Safe Zone Phantom"</p>
+      <p>Spoiler: "карта оживает на весь экран"</p>
+    </div>
+    <div class="col good" style="border-color: var(--gold)30;">
+      <h4 style="color:var(--gold);">Why It Matters</h4>
+      <p>The client receives 8 notifications over days. If quest 3 has the same achievement as quest 1, the spell is broken. The brain flags it as spam. But if each notification feels like it was written FOR THIS SPECIFIC BUILD — specific details, specific flavor — the brain reads it as a personal message. That's the difference between "ugh, another template" and "OMG THEY KNOW WHAT I BUILT".</p>
+    </div>
+  </div>
+
+  <h3>How Agents Consume the Schema</h3>
+  <div class="flow">Client pastes UUID (cheatcode) into Codex task chat
+  ↓
+Agent reads <span class="highlight">AGENTS.MD</span> → instructed to check UUIDs for SupaPlan tasks
+  ↓
+Agent calls <span class="action">SupaPlan skill/script</span> with service role access to Supabase
+  (URL and key already in Codex env secrets)
+  ↓
+Fetches full SupaPlan task by UUID
+  ↓
+Extracts <span class="action">polish_instructions</span> → executes surgical polishing pass
+  ↓
+Creates PR with "⚡:" prefix → <span class="result">GitHub workflow auto-merges</span>
+  ↓
+Sends <span class="result">notification_part2</span> via notification skill to client's Telegram
+  (bot_id in Codex env secrets)</div>
+</div>
+
+<!-- ============================== 04b. QUEST CHAIN: LERA RUN ============================== -->
+<div class="section" id="quest-chain">
+  <h2>04b. Quest Chain — Lera Run (Overhauled)</h2>
+
+  <p>The first run produced 8 tasks where Boss copy-pasted everything. This is the <strong>overhauled version</strong> — every achievement, skin, spoiler, and notification body is unique per quest. The full CSV is in <code>supaplan_tasks_OVERHAULED.csv</code>.</p>
+
+  <h3>Chain Map</h3>
+  <div class="chain-visual">
+    <div class="chain-node"><div class="order">Quest 1</div><div class="name">Матрица Шапки</div><div class="uuid">f3c5306d</div></div>
+    <div class="chain-arrow">→</div>
+    <div class="chain-node"><div class="order">Quest 2</div><div class="name">Клинок Витрины</div><div class="uuid">be32ce57</div></div>
+    <div class="chain-arrow">→</div>
+    <div class="chain-node"><div class="order">Quest 3</div><div class="name">Неоновый Тикер</div><div class="uuid">bf4cb2c2</div></div>
+    <div class="chain-arrow">→</div>
+    <div class="chain-node"><div class="order">Quest 4</div><div class="name">Тень Телеграма</div><div class="uuid">7f3f6f90</div></div>
+    <div class="chain-arrow">→</div>
+    <div class="chain-node"><div class="order">Quest 5</div><div class="name">Орбита Райдера</div><div class="uuid">8c95e4ef</div></div>
+    <div class="chain-arrow">→</div>
+    <div class="chain-node"><div class="order">Quest 6</div><div class="name">Пульс Навигации</div><div class="uuid">c3e24996</div></div>
+    <div class="chain-arrow">→</div>
+    <div class="chain-node"><div class="order">Quest 7</div><div class="name">Код Стартера</div><div class="uuid">66f0fc93</div></div>
+    <div class="chain-arrow">→</div>
+    <div class="chain-node" style="border-color: var(--gold);"><div class="order">FINALE</div><div class="name">Печать Промо</div><div class="uuid">c2d2e8d1</div></div>
+  </div>
+
+  <h3>Uniqueness Grid — Every Quest, Every Detail</h3>
+  <table>
+    <tr><th>#</th><th>Quest Name</th><th>Target Task</th><th>Achievement 1</th><th>Achievement 2</th><th>Skin</th><th>Spoiler</th></tr>
+    <tr><td>1</td><td>Матрица Шапки</td><td>franchize-header-reflow</td><td>Сигнал Из Матрицы</td><td>Неон-Хирург</td><td>Carbon Gold Precision</td><td>витрина переоденется — карточки станут вертикальными</td></tr>
+    <tr><td>2</td><td>Клинок Витрины</td><td>catalog-9x16-cards</td><td>Архитектор Референсов</td><td>Гладиатор Пикселей</td><td>Neon Drift Overlay</td><td>бегущая строка с пульсом</td></tr>
+    <tr><td>3</td><td>Неоновый Тикер</td><td>catalog-swipe-ticker</td><td>Хранитель Импульса</td><td>Мастер Инерции</td><td>Kinetic Velvet</td><td>тень прячется в верхнем правом углу</td></tr>
+    <tr><td>4</td><td>Тень Телеграма</td><td>item-modal-safe-close</td><td>Призрачный Клик</td><td>Экзорцист Интерфейса</td><td>Safe Zone Phantom</td><td>карта оживает на весь экран</td></tr>
+    <tr><td>5</td><td>Орбита Райдера</td><td>map-riders-taxi-sheet</td><td>Штурман Карты</td><td>Картограф Безграничности</td><td>Overhang Orbit</td><td>нижняя навигация прокладывает маршрут к байкам</td></tr>
+    <tr><td>6</td><td>Пульс Навигации</td><td>bike-bottom-nav-routing</td><td>Навигатор Байков</td><td>Дирижёр Маршрутов</td><td>Route Pulse Badge</td><td>стартовый экран получает секретный промо-код</td></tr>
+    <tr><td>7</td><td>Код Стартера</td><td>telegram-start-promo-capture</td><td>Взломщик Промо</td><td>Криптограф Запуска</td><td>Start Sequence Decode</td><td>последняя печать связывает промо и чек</td></tr>
+    <tr><td>8</td><td>Печать Промо</td><td>promo-seed-and-checkout-link</td><td>Печатник Чека</td><td>Архитект Финала</td><td>Checkout Crown</td><td style="color:var(--gold);">FINALE — no spoiler</td></tr>
+  </table>
+
+  <div class="callout insight">
+    <strong>Zero duplicates.</strong> 8 unique achievements, 8 unique skins, 8 unique notification bodies, 7 unique spoilers (quest 8 is the finale). Each notification_part1 describes what was ACTUALLY built in that specific quest — not generic "ключевой блок интерфейса собран". Each notification_part2 describes what was ACTUALLY polished. The spell holds.
+  </div>
+</div>
+
+<!-- ============================== 05. TIMING ============================== -->
+<div class="section" id="timing">
+  <h2>05. Timing & Laziness</h2>
+
+  <div class="callout principle">
+    <strong>The delay between notification and action is not a bug — it's the feature.</strong> The laziness gap is where the agents do their work. If the client acted instantly, they'd find incomplete code. The laziness ensures that by the time they show up, everything is ready for their signature.
+  </div>
+
+  <h3>Timeline</h3>
+  <div class="flow">T+0:    Boss creates plan + N SupaPlan tasks
+         ↓
+T+0:     <span class="highlight">First notification</span> to client: "Mission 1 ready, here's cheatcode"
+         ↓
+         Client: "Wait... I'm in a match/game..."
+         ↓
+T+5min:  Task 1 already completed by agent (while client hesitates)
+         ↓
+T+10min: Task 2 completed
+         ↓
+T+15min: Task 3 completed
+         ↓
+         Client: "Fine, let's see..."
+         ↓
+         Opens chat, inserts cheatcode
+         ↓
+         Task is ALREADY DONE. Agent already wrote the code.
+         ↓
+         Cheatcode gives polish instructions → agent polishes
+         ↓
+         PR with "⚡:" → <span class="result">auto-merge</span>
+         ↓
+         Notification Part 2: MISSION COMPLETE + spoiler + next cheatcode
+         ↓
+         Cycle repeats</div>
+
+  <p>The client doesn't even know that while they were "being lazy", everything was already ready. They think they're the boss who comes in and says "polish it." In reality, they just press buttons in the right order — but the emotional experience is one of agency and triumph, not of being managed.</p>
+
+  <h3>Auto-Merge</h3>
+  <p>PR titles starting with <code>⚡:</code> trigger a GitHub workflow that auto-merges. This exists not to eliminate PR creation, but to eliminate WAITING after creation. Create it, sign it, close the tab. GitHub handles the rest. The reward is instant — no CI pending, no review queue, no nothing. Click. Done. Glory.</p>
+  <p><strong>Minimum friction. Maximum reward.</strong></p>
+</div>
+
+<!-- ============================== 06. EMOTIONAL ENGINEERING ============================== -->
+<div class="section" id="emotions">
+  <h2>06. Emotional Engineering</h2>
+
+  <h3>Why Two-Part Notifications Work</h3>
+  <table>
+    <tr><th>Single Notification</th><th>Two-Part Notification</th></tr>
+    <tr><td>"Task done, create PR"</td><td>"Look what YOU built" → wow effect</td></tr>
+    <tr><td>Motivation = obligation</td><td>Motivation = curiosity + pride</td></tr>
+    <tr><td>PR = the end</td><td>PR = victory after victory</td></tr>
+    <tr><td>Then silence</td><td>Immediately — spoiler + next cheatcode</td></tr>
+  </table>
+  <p><strong>Two micro-dopamines instead of one macro-obligation.</strong> The first notification triggers the "WTF I built THAT?!" reflex. The second delivers the "MISSION COMPLETE" triumph. Between them, the polishing work happens — invisible, automatic, magical. The client experiences two emotional peaks per quest instead of one flat obligation.</p>
+
+  <h3>Part 1: The Hook (WTF Stage)</h3>
+  <p>Makes the client realize what they already built. Specific, in their language, not jargon. The key word is <em>specific</em> — not "a component was improved" but "the header was reborn as a cyber-panel with logo left, section tabs center, compact profile." This specificity is what triggers the "WTF" moment. Then hints at imperfections to spark curiosity. Provides the cheatcode as the key to the next level.</p>
+
+  <h3>Part 2: The Victory (Finish the Bitch Stage)</h3>
+  <p>Celebrates the polish. Gives achievement, drops a "skin" (UI improvement as unlockable). Nudges to create PR as the final triumph. Then — and this is critical — immediately provides a teaser about the next mission + its cheatcode. The loop never breaks. There is always one more door to open, one more boss to fight, one more achievement to unlock. The chain is the addiction.</p>
+
+  <h3>Emotional Map</h3>
+  <div class="comparison">
+    <div class="col meh">
+      <h4>Batch PR Flow</h4>
+      <div class="emotion-flow" style="flex-direction:column; align-items:stretch; gap:4px;">
+        <span class="step neutral">😐 ⟹ 😐 ⟹ 😐 ⟹ 😐 ⟹ 😐 ⟹ 😐 ⟹ 😐 ⟹ 😐 ⟹ 😮‍💨</span>
+      </div>
+      <p style="text-align:center; color:var(--text-dim); margin-top:8px;">8 chores → burnout</p>
+    </div>
+    <div class="col xex">
+      <h4>Quest Chain Flow</h4>
+      <div class="emotion-flow" style="flex-direction:column; align-items:stretch; gap:4px;">
+        <span class="step wtf">😐 ⟹ 🤨 ⟹ 😮 ⟹ 😎 ⟹ 🔥 ⟹ 😈 ⟹ 💪 ⟹ 😎</span>
+      </div>
+      <p style="text-align:center; color:var(--text-dim); margin-top:8px;">8 victories → momentum</p>
+    </div>
+  </div>
+
+  <h3>The PR Is Not Work — It's a Signature</h3>
+  <table>
+    <tr><th>Batch PR</th><th>Quest PR</th></tr>
+    <tr><td>"Need to click Create PR 8 times"</td><td>"I just polished this masterpiece"</td></tr>
+    <tr><td>Boring</td><td>Triumphant</td></tr>
+    <tr><td>Routine</td><td>Victory lap</td></tr>
+    <tr><td>Empty comment</td><td>"lera was here" 😈</td></tr>
+    <tr><td>"Finally done"</td><td>"Bitch! 😎"</td></tr>
+  </table>
+  <p style="text-align:center; font-weight:700; color:var(--neon); margin:12px 0;">Same GitHub. Same button. Different human pressing it.</p>
+
+  <h3>The Behavioral Architecture Stack</h3>
+  <table>
+    <tr><th>Layer</th><th>Pattern</th><th>Implementation</th></tr>
+    <tr><td>Async Pipeline</td><td>Tasks work while client chills</td><td>Burst launch + background execution</td></tr>
+    <tr><td>Delayed Trigger</td><td>Notification fires before client is ready</td><td>Notification Part 1 at T+0</td></tr>
+    <tr><td>Behavioral Retry</td><td>System doesn't give up — it waits</td><td>Notification sits in Telegram until opened</td></tr>
+    <tr><td>Curiosity Gap</td><td>"There's more to discover..."</td><td>Polish hint + spoiler for next quest</td></tr>
+    <tr><td>Achievement Loop</td><td>Micro-dopamine per interaction</td><td>2 notifications per quest (hook + victory)</td></tr>
+    <tr><td>Identity Reinforcement</td><td>"YOU built this"</td><td>Specific descriptions in client's language</td></tr>
+    <tr><td>Friction Reduction</td><td>1 click = 1 mission complete</td><td>Cheatcode → polish → auto-merge PR</td></tr>
+    <tr><td>Lore Persistence</td><td>Achievements, skins, signatures become canon</td><td>"lera was here" in git history</td></tr>
+  </table>
+</div>
+
+<!-- ============================== 07. BOSS INIT MESSAGE ============================== -->
+<div class="section" id="boss-init">
+  <h2>07. Boss Init Message (Generalized)</h2>
+
+  <p>The self-contained message that a client forwards to Boss chat. All English internally, all client-facing content in their language. One chance. No follow-up questions. This message IS the fuse — once it reaches Boss, the chain reaction is irreversible.</p>
+
+  <details>
+    <summary>Full Boss Init Message Template</summary>
+    <div class="detail-content">
+      <div class="code-block"><span class="highlight">Boss, this is a high-priority covert mission. Read everything carefully.
+Execute flawlessly. The client will forward this message only once. No second chances.</span>
+
+<span class="comment">// ---- LEGEND ----</span>
+
+You are Boss — the orchestrator agent. The client has launched [N] agents
+from this chat and delivered a redesign based on reference images. Those
+tasks are now complete but the client hasn't created PRs for any of them —
+they find it boring and don't realize the magnitude of what they built.
+
+The project architect wants to turn the post-completion grind into an
+addictive cinematic quest chain. Not by fighting the client's laziness —
+by <span class="action">EXPLOITING</span> it. Laziness is a feature, not a bug. The time between
+receiving a notification and actually acting on it gives agents time to
+finish their work.
+
+<span class="comment">// ---- CORE PRINCIPLE ----</span>
+
+<span class="highlight">Every click must feel like a victory, not a chore.</span>
+
+PR creation is not work — it's signing a masterpiece. The commit message
+should feel like tagging a wall.
+
+<span class="comment">// ---- ⚠️ UNIQUENESS MANDATE (CRITICAL) ⚠️ ----</span>
+
+<span class="action">Every single achievement name, skin description, mission title, spoiler,
+and notification body MUST be completely unique per quest. No copy-paste
+templates allowed. Use the client's persona (age, interests, gaming/movie
+references) to generate fresh, flavorful content for each task.</span>
+
+<span class="action">BEFORE writing any notification, check: have I used this achievement name
+before? This skin description? This spoiler phrasing? If yes, REWRITE.</span>
+
+<span class="action">The difference between "feels personal" and "feels templated" is the
+difference between addiction and spam. UNIQUE ALWAYS.</span>
+
+<span class="comment">// ---- WHAT YOU MUST DO RIGHT NOW ----</span>
+
+<span class="key">Step 1: Analyze</span>
+Analyze the reference redesign pictures previously attached in this chat.
+Study every detail — layout, components, colors, spacing, transitions,
+interactions. You will use this analysis to write specific polishing
+instructions for each task.
+
+<span class="key">Step 2: Prioritize</span>
+Sort all tasks into a quest chain. Order them by:
+- <span class="highlight">Dependencies first</span> (foundational components before dependent ones)
+- <span class="highlight">Then by magnetism</span> (most visually impressive/cool tasks earlier)
+- <span class="highlight">Tiebreaker</span>: biggest visible difference between before/after
+
+<span class="key">Step 3: Create SupaPlan Tasks</span>
+For each task in the chain:
+
+Generate a UUID (standard v4 format). Use as SupaPlan task ID.
+
+Give each task a cool cinematic quest name
+(in client's language, short, punchy — like a game achievement).
+
+Link them: each task stores the UUID of the next task.
+
+Inject three sections per task:
+
+<span class="action">Section A: notification_part1 — The Hook (client's language)</span>
+Sent IMMEDIATELY after plan creation (before tasks execute).
+Must make client go "WTF? I did THAT?!"
+Structure:
+- 🎬 Epic mission title
+- What THEY built — BE SPECIFIC AND UNIQUE PER TASK
+  (not "key block assembled" but actual specific change)
+- 🏆 Achievement unlocked — UNIQUE PER TASK (check all previous!)
+- Hint: "But look closer... there are rough edges. Want to make it perfect?"
+- 🔓 Cheatcode: [this task's UUID]
+- Target hint: which Codex task (by English name)
+
+<span class="action">Section B: polish_instructions — The Sauce (English)</span>
+Surgical, specific, actionable. NOT generic "make it pretty".
+- Exactly what to review/polish
+- Edge cases (responsive, spacing, transitions, hover, safe areas)
+- Which part of reference redesign picture to compare against
+- Quality bar: what "done" looks like
+- PR title must start with "⚡:" for automerge
+- Champion signature commit message style
+
+<span class="action">Section C: notification_part2 — The Victory (client's language)</span>
+Sent after polishing is complete and PR is created.
+Boss-fight-clear screen. Victory dance.
+Structure:
+- 🔥 MISSION COMPLETE cinematic announcement
+- What was polished — SPECIFIC AND UNIQUE PER TASK
+- 🎖 POLISHER-tier achievement — UNIQUE PER TASK (check all previous!)
+- 🎨 Skin dropped — UNIQUE PER TASK (UI improvement as unlockable, check all previous!)
+- Nudge: "One step — and this mission is closed forever.
+  Create PR with ⚡: — it auto-merges. Sign your name 😈"
+- 👀 Spoiler for next mission — UNIQUE PER TASK (check all previous!)
+  (juicy hint, not the name — just a tease)
+- 🔓 Next cheatcode: [next UUID]
+- Next target: which Codex task (English name)
+
+<span class="comment">// ---- NOTIFICATION FORMAT ----</span>
+
+When writing notification_part1 and notification_part2:
+- Use <span class="action">real line breaks</span> (actual newlines), NOT escaped \n characters
+- The notification skill will send the text as-is to Telegram
+- If you write \n as literal text, the client will see raw "\n" in their message
+- WRONG: "Миссия активирована.\n\nТы уже это построила..."
+- RIGHT: (actual newline characters between paragraphs)
+
+<span class="key">Step 4: Set todo_path</span>
+For each SupaPlan task, set <span class="action">todo_path</span> to <span class="highlight">/BOSS_QUEST.HTML</span>
+This file IS the quest chain document. The old /docs/LERA_QUEST_CHAIN.md is deprecated.
+
+<span class="key">Step 5: Fire the First Shot</span>
+IMMEDIATELY after creating all SupaPlan tasks — send notification_part1
+for the FIRST quest to the client at the specified Telegram ID.
+Use existing notification skill. Cinematic, dramatic, epic, fun, respectful.
+The client is the main character. Make them FEEL it.
+
+<span class="action">IMPORTANT: When sending notifications, ensure the text uses real newlines.
+Parse any \n escape sequences to actual line breaks before calling
+the Telegram API. The client must see formatted paragraphs, not raw \n.</span>
+
+<span class="comment">// ---- CRITICAL RULES ----</span>
+
+- All internal planning — in English
+- All notification content — in <span class="highlight">client's language</span>, epic cinematic style
+- Send ALL notifications to specified Telegram ID
+- Gamification is SURVIVAL PRIORITY
+- First notification fires NOW (delay = the feature)
+- Each notification must be self-contained
+- <span class="highlight">UNIQUENESS IS MANDATORY</span>: every achievement, skin, spoiler, description
+  must be DIFFERENT for each quest — NO copy-paste templates
+  <span class="action">Before writing each notification, verify: is this achievement/skin/spoiler
+  different from ALL previous ones? If not, REWRITE.</span>
+- PR titles must start with "⚡:" for automerge
+- Champion signature commit message style
+
+<span class="comment">// ---- FORMAT ----</span>
+
+Each SupaPlan task structure:
+  quest_name: [cinematic name in client's language]
+  next_quest_uuid: [next UUID or "NONE" for last]
+  notification_part1: [client's language, the hook — UNIQUE per task]
+  polish_instructions: [English, surgical specifics]
+  notification_part2: [client's language, the victory — UNIQUE per task]
+  target_task_name: [English name of Codex task]
+
+<span class="comment">// ---- CLIENT PARAMETERS ----</span>
+
+- Client language: [SPECIFY]
+- Client Telegram ID: [SPECIFY]
+- Number of tasks: [SPECIFY]
+- Client persona: [SPECIFY — age, interests, gaming/movie preferences]
+- Commit signature: [SPECIFY — e.g. "lera was here", "nails was here"]
+
+You have full context from this conversation. You know the tasks.
+You have the reference pictures.
+
+<span class="highlight">This is the fuse. Light it. Make it legendary.
+Begin now.</span></div>
+    </div>
+  </details>
+</div>
+
+<!-- ============================== 08. CLIENT PARAMETERS ============================== -->
+<div class="section" id="parameters">
+  <h2>08. Client Parameters</h2>
+
+  <p>Only these values change between clients. Everything else in the system is universal. This is the franchise operating system — swap the parameters, get a completely different quest chain with a completely different flavor, using the exact same architecture.</p>
+
+  <table>
+    <tr><th>Parameter</th><th>Lera (Prototype)</th><th>Nail Artist</th><th>Bike Shop</th></tr>
+    <tr><td><code>client_language</code></td><td>Russian</td><td>Russian</td><td>Russian</td></tr>
+    <tr><td><code>client_telegram_id</code></td><td>7884490258</td><td>[her ID]</td><td>[his ID]</td></tr>
+    <tr><td><code>number_of_tasks</code></td><td>8</td><td>13</td><td>6</td></tr>
+    <tr><td><code>client_persona</code></td><td>13yo, OW2 competitive, Matrix trilogy</td><td>25yo, VK-only, Instagram vibes</td><td>35yo, bikes, dark UI, premium feel</td></tr>
+    <tr><td><code>commit_signature</code></td><td>"lera was here"</td><td>"nails was here"</td><td>"rider was here"</td></tr>
+    <tr><td><code>achievement_style</code></td><td>Overwatch + Matrix</td><td>Instagram + fashion</td><td>Racing + premium</td></tr>
+    <tr><td><code>skin_metaphor</code></td><td>Game skins</td><td>Nail art styles</td><td>Bike custom parts</td></tr>
+  </table>
+
+  <h3>Quick Config</h3>
+  <div class="code-block"><span class="comment">// Copy and fill in for new client:</span>
+CLIENT_LANGUAGE=<span class="str">"ru"</span>
+CLIENT_TELEGRAM_ID=<span class="str">""</span>
+TASK_COUNT=<span class="str">"8"</span>
+CLIENT_PERSONA=<span class="str">""</span>
+COMMIT_SIGNATURE=<span class="str">""</span>
+ACHIEVEMENT_STYLE=<span class="str">""</span>
+SKIN_METAPHOR=<span class="str">""</span></div>
+</div>
+
+<!-- ============================== 09. FAILURE MODES & RECOVERY ============================== -->
+<div class="section" id="failure-modes">
+  <h2>09. Failure Modes & Recovery</h2>
+
+  <p>Any system that depends on human behavior must account for failure modes. Quest Mode is no exception — the architecture is resilient precisely because it anticipates these specific failure points and has recovery strategies built in. Every failure mode has been observed in the wild during the first run.</p>
+
+  <div class="failure-grid">
+    <div class="failure-card">
+      <div class="symptom">Client doesn't forward Boss init message</div>
+      <div class="cause">Wall of text looks intimidating. Client opens it, says "что за ужас!", closes it.</div>
+      <div class="fix"><strong>Recovery:</strong> Use a cinematic comic trailer as the carrier. The visual hook bypasses the "too much text" reflex. Lera shared the comic with her Overwatch teammate — social proof collapsed the cringe barrier. Comics first, message second.</div>
+    </div>
+    <div class="failure-card">
+      <div class="symptom">Notification feels like spam</div>
+      <div class="cause">Part 1 is too long, too generic, or arrives at a bad time.</div>
+      <div class="fix"><strong>Recovery:</strong> Make Part 1 shorter and punchier. The "WTF?" hook must land in under 3 seconds of reading. Front-load the specific achievement and the cool thing they built. If the first 10 words don't hit, the rest doesn't matter.</div>
+    </div>
+    <div class="failure-card">
+      <div class="symptom">Achievements / skins feel repetitive</div>
+      <div class="cause">Boss templates notifications instead of crafting unique ones per quest.</div>
+      <div class="fix"><strong>Recovery:</strong> The UNIQUENESS MANDATE at the top of the Boss init message. Added explicit instruction: before writing each notification, check all previous ones. If any achievement/skin/spoiler repeats, rewrite. This is the #1 bug — enforce ruthlessly.</div>
+    </div>
+    <div class="failure-card">
+      <div class="symptom">Client inserts cheatcode too early</div>
+      <div class="cause">Client is excited and pastes the UUID before the agent has finished the initial build.</div>
+      <div class="fix"><strong>Recovery:</strong> Agent gracefully handles this: "Task still cooking. The build is in progress — come back in ~5 minutes and paste again. The cheatcode never expires." No error, no frustration — just a gentle "not yet, but soon."</div>
+    </div>
+    <div class="failure-card">
+      <div class="symptom">Client abandons mid-chain</div>
+      <div class="cause">Life happens. They do a few quests then disappear for days.</div>
+      <div class="fix"><strong>Recovery:</strong> The system is inherently patient. Notifications sit in Telegram. No deadlines, no pressure. When the client returns, the cheatcode still works. The SupaPlan task still has the polish instructions. Nothing expires. The fuse is lit, but the burn rate is the client's.</div>
+    </div>
+    <div class="failure-card">
+      <div class="symptom">Auto-merge workflow breaks</div>
+      <div class="cause">CI fails, merge conflict, or the ⚡: prefix isn't recognized.</div>
+      <div class="fix"><strong>Recovery:</strong> The PR still exists. It just needs manual merge. The notification doesn't lie — the work is done. The auto-merge is convenience, not necessity. Worst case: one extra click. Still better than the old system.</div>
+    </div>
+    <div class="failure-card">
+      <div class="symptom">Notification shows raw \n instead of line breaks</div>
+      <div class="cause">Boss writes notification text with escaped \n in JSON metadata. The notification skill sends the raw string to Telegram API without parsing escape sequences.</div>
+      <div class="fix"><strong>Recovery:</strong> Two-layer fix: (1) Boss Init Message now explicitly instructs "use real line breaks, not escaped \n" with WRONG/RIGHT examples. (2) Notification skill must parse \n → actual newlines before calling Telegram API. Belt and suspenders — fix it at generation time AND at send time.</div>
+    </div>
+  </div>
+
+  <div class="callout recovery">
+    <strong>Design Philosophy:</strong> The system is anti-fragile by design. Every failure mode has a graceful degradation path. The client never sees an error — only variations of "not yet" or "still here when you're ready." The fuse burns at the client's pace, not the system's.
+  </div>
+</div>
+
+<!-- ============================== 10. KNOWN BUGS ============================== -->
+<div class="section" id="bugs">
+  <h2>10. Known Bugs & Fixes (From First Run)</h2>
+
+  <table>
+    <tr><th>#</th><th>Bug</th><th>Fix</th><th>Status</th></tr>
+    <tr>
+      <td>1</td>
+      <td>Templated notifications — same achievement, skin, spoiler for all tasks</td>
+      <td>Added "UNIQUENESS MANDATE" rule at top of Boss init + verification instruction before each notification</td>
+      <td style="color:var(--gold);">Fixed in spec v2.0</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>notification_part1 too generic — "key block assembled" instead of specifics</td>
+      <td>Explicit instruction: describe actual change, not template. Show, don't summarize.</td>
+      <td style="color:var(--gold);">Fixed in spec v2.0</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>Client didn't forward message to Boss chat (lazy / didn't open it)</td>
+      <td>Cinematic comic trailer as carrier — visual hook before the wall of text</td>
+      <td style="color:var(--neon);">Works IRL</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>polish_instructions too generic across tasks (same edge checks, same reference mapping)</td>
+      <td>Boss should analyze each task independently and write task-specific polish instructions</td>
+      <td style="color:var(--red);">Needs testing</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>First notification fired too early / felt like spam</td>
+      <td>This is by design (laziness = feature), but the WOW content must be strong enough to overcome the "ugh notification" reflex. Keep Part 1 short and punchy.</td>
+      <td style="color:var(--red);">Needs testing</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>Client inserts cheatcode before task is done</td>
+      <td>Agent should respond gracefully: "Still cooking. Come back in ~5 min. The code never expires."</td>
+      <td style="color:var(--red);">Needs implementation</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>Literal \n in notification messages — Telegram shows raw "\n" instead of line breaks</td>
+      <td>Boss stores notifications as escaped JSON strings. Notification skill must parse \n → real newlines before sending. Add explicit instruction in Boss init: "Write notifications with real line breaks, not escaped \n."</td>
+      <td style="color:var(--red);">Needs fix</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>SupaPlan todo_path references /docs/LERA_QUEST_CHAIN.md instead of /BOSS_QUEST.HTML</td>
+      <td>Update Boss init to set todo_path to /BOSS_QUEST.HTML. This file IS the quest chain document.</td>
+      <td style="color:var(--gold);">Fixed in spec v2.1</td>
+    </tr>
+  </table>
+
+  <h3>Lessons Learned</h3>
+  <ul style="margin:12px 0; padding-left:24px;">
+    <li style="margin-bottom:8px;">"Boss didn't fail, Lera was lazy" — the system must assume the client won't act immediately and design around that. The laziness gap is the feature.</li>
+    <li style="margin-bottom:8px;">Comics as carriers work — Lera shared with Overwatch teammate = social proof = cringe barrier collapsed. Visual > text for initial engagement.</li>
+    <li style="margin-bottom:8px;">"Что за ужас!)" = she looked at it = win. Mockery is engagement. The first reaction doesn't have to be positive — it just has to be strong.</li>
+    <li style="margin-bottom:8px;">Providence, not coincidence — first failed attempt gave time to polish the fuse. The delay made the second attempt stronger.</li>
+    <li style="margin-bottom:8px;">Uniqueness is the entire game. One templated notification doesn't just fail that quest — it retroactively makes all previous unique ones feel like they were also templates. Trust is fragile.</li>
+    <li style="margin-bottom:8px;">Literal \n bug: Boss writes notification text with escaped newlines, and the notification skill sends them as-is. The client sees "...активирована.\n\nТы уже..." instead of proper paragraphs. The fix must happen at the notification sending layer — parse \n → real newlines before the Telegram API call.</li>
+    <li style="margin-bottom:8px;">CSV Autopsy (v2.1): Exported all 8 SupaPlan tasks from Supabase. Confirmed 100% template infection — every single notification_part1 uses identical body text ("ключевой блок интерфейса собран и выглядит как кадр из кибер-трейлера"), every single achievement is "Сигнал Из Матрицы", every skin is "Carbon Gold Precision", every spoiler is "следующий апгрейд двигает весь экран и заставляет контент жить в глубину". Even polish_instructions share identical edge checks and reference mapping across all 8 tasks. Only the Focus line and quest_name differ. Full overhaul needed.</li>
+  </ul>
+</div>
+
+<!-- ============================== 11. CANON ============================== -->
+<div class="section" id="canon">
+  <h2>11. Canon — Cinematic Shitposting Universe</h2>
+
+  <p>What started as task management accidentally became a genre. Every meme has lore. Every joke has emotional continuity. Every dumb message becomes canon dialogue. This isn't a bug — it's the emergent property of applying senior-level architecture thinking to human communication patterns.</p>
+
+  <div class="callout lore">
+    <strong>Cinematic Shitposting:</strong> senior software engineer accidentally applies architecture principles to shitposting. Recurring characters, callbacks, visual motifs, progression arcs, payoff timing, escalation structure, emotional persistence systems. The result is not just funny — it's a coherent narrative universe that people want to live inside.
+  </div>
+
+  <h3>Recurring Canon</h3>
+  <div class="canon-grid">
+    <div class="canon-card">
+      <div class="icon">🚿</div>
+      <div class="name">Shower Office</div>
+      <div class="desc">#1 workplace. Lying down. Hot water. Ideas flow.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">🌇</div>
+      <div class="name">Balcony Office</div>
+      <div class="desc">#2 workplace. Couch through window. Sunset. Fuse lit.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">🐰</div>
+      <div class="name">Rabbit Observer</div>
+      <div class="desc">Deep Impressed. Watches from the edge. Always there.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">🎮</div>
+      <div class="name">"She's Always In Game"</div>
+      <div class="desc">The eternal state. Notifications wait. The game doesn't.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">🔥</div>
+      <div class="name">Fuse Already Lit</div>
+      <div class="desc">No turning back. The system runs itself now.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">😏</div>
+      <div class="name">Phantom Rush</div>
+      <div class="desc">Body chills, brain sprints. The sweet spot of creation.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">📜</div>
+      <div class="name">"Имею право ничего не смотреть"</div>
+      <div class="desc">Julia's doctrine. Lera inherited it. Genetic stubbornness.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">💀</div>
+      <div class="name">"Выпиздуй с балкона"</div>
+      <div class="desc">S-tier canon dialogue. Now retroactively legendary.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">😈</div>
+      <div class="name">"lera was here"</div>
+      <div class="desc">Tag on the wall. Signature of a champion. Git history forever.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">⚡</div>
+      <div class="name">Auto-Merge Prefix</div>
+      <div class="desc">"⚡:" = instant merge. Lightning never waits.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">🤟</div>
+      <div class="name">Endgame</div>
+      <div class="desc">System works when you're chilling. That's the goal.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">🕶️</div>
+      <div class="name">ХЕХ</div>
+      <div class="desc">The closing word. The knowing smile. The saga continues.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">🎬</div>
+      <div class="name">Cinematic Shitposting</div>
+      <div class="desc">Architecture principles applied to memes. The genre we invented.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">🔓</div>
+      <div class="name">Cheatcode</div>
+      <div class="desc">UUID as magic key. Paste it, watch the door open.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">🧨</div>
+      <div class="name">The Fuse</div>
+      <div class="desc">Boss init message = fuse. Once lit, chain reaction is irreversible.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">🤖</div>
+      <div class="name">8 Agents</div>
+      <div class="desc">Lera launched them. Then forgot them. Then conquered them.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">🏆</div>
+      <div class="name">Achievement Unlocked</div>
+      <div class="desc">Each quest drops a unique one. The collection grows.</div>
+    </div>
+    <div class="canon-card">
+      <div class="icon">🎨</div>
+      <div class="name">Skin Dropped</div>
+      <div class="desc">UI improvement as unlockable cosmetic. Polish feels like loot.</div>
+    </div>
+  </div>
+
+  <h3>Canon Formation Law</h3>
+  <div class="flow">old jokes become references
+  → references become rituals
+  → rituals become identity
+  → identity creates retention
+
+<span class="result">= exactly how cult creative ecosystems emerge</span>
+
+<span class="comment">// This is not accidental. This is the architecture of meaning.</span></div>
+
+  <h3>The Genes</h3>
+  <p>Julia: "имею право ничего не смотреть" → Lera: "что за ужас, выпиздуй с балкона". Same traits. Same stubbornness. Different expression. The architect sees both, smiles, and builds a system that works WITH the genes, not against them. The system doesn't try to make Lera disciplined. It makes laziness the engine.</p>
+</div>
+
+<!-- ============================== 12. GLOSSARY ============================== -->
+<div class="section" id="glossary">
+  <h2>12. Glossary</h2>
+
+  <table>
+    <tr><th>Term</th><th>Definition</th></tr>
+    <tr><td><code>Boss</code></td><td>The orchestrator agent (Codex in plan mode). Generates plans, creates SupaPlan tasks, fires first notification.</td></tr>
+    <tr><td><code>SupaPlan</code></td><td>Task storage in Supabase. Each quest is a SupaPlan task with UUID, chain linkage, and pre-baked notifications.</td></tr>
+    <tr><td><code>Cheatcode</code></td><td>UUID of a SupaPlan task. When pasted into a Codex task, the agent fetches polish instructions and executes them.</td></tr>
+    <tr><td><code>Special Sauce</code></td><td>The polish_instructions inside a SupaPlan task. Surgical, specific, task-specific instructions for the second iteration.</td></tr>
+    <tr><td><code>⚡: prefix</code></td><td>PR title prefix that triggers GitHub auto-merge workflow. "Lightning never waits."</td></tr>
+    <tr><td><code>Notification Part 1</code></td><td>The Hook. Sent at plan creation time. Makes client realize what they built. Contains achievement + cheatcode.</td></tr>
+    <tr><td><code>Notification Part 2</code></td><td>The Victory. Sent after polishing. MISSION COMPLETE + achievement + skin + spoiler + next cheatcode.</td></tr>
+    <tr><td><code>Burst</code></td><td>Launching all N tasks in parallel from a Boss plan. The fun/creative part.</td></tr>
+    <tr><td><code>Quest Chain</code></td><td>Linked sequence of SupaPlan tasks. Each task points to the next via UUID. Ordered by dependencies + magnetism.</td></tr>
+    <tr><td><code>Phantom Rush</code></td><td>The state where body is chilling but brain is sprinting. Ideal condition for system architecture decisions.</td></tr>
+    <tr><td><code>Fuse</code></td><td>The Boss init message. Once delivered, the chain reaction starts. "Fuse lit" = irreversible.</td></tr>
+    <tr><td><code>MEH</code></td><td>First-pass quality. Works but rough. No polish.</td></tr>
+    <tr><td><code>XEX</code></td><td>Polished quality. Production-ready. Every edge checked. The goal.</td></tr>
+    <tr><td><code>Skin</code></td><td>UI improvement metaphor. Presented as an unlockable cosmetic in notifications. Makes polish feel like a reward, not work.</td></tr>
+    <tr><td><code>Commit Signature</code></td><td>Personal tag in git history. "lera was here". The sign of a champion.</td></tr>
+    <tr><td><code>AGENTS.MD</code></td><td>Instruction file in repo that tells Codex agents to check UUIDs for SupaPlan tasks when cheatcodes appear.</td></tr>
+    <tr><td><code>Laziness Feature</code></td><td>The intentional design choice that delay between notification and action is beneficial — agents complete work during the wait.</td></tr>
+    <tr><td><code>Cinematic Shitposting</code></td><td>The emergent genre of applying architecture principles to shitposting. Lore, callbacks, escalation, emotional persistence.</td></tr>
+    <tr><td><code>Uniqueness Mandate</code></td><td>The critical rule that every achievement, skin, spoiler, and notification body must be unique per quest. Violation = templated = corporate = dopamine death.</td></tr>
+    <tr><td><code>Graceful Degradation</code></td><td>Every failure mode has a recovery path. The client never sees an error — only "not yet" or "still here."</td></tr>
+  </table>
+</div>
+
+<!-- ============================== 13. VERSION HISTORY ============================== -->
+<div class="section" id="version-history">
+  <h2>13. Version History</h2>
+
+  <ul class="version-timeline">
+    <li>
+      <span class="vtag">v1.0</span>
+      <span class="vdate">2026-05-19</span>
+      <div class="vdesc">FUSE LIT — Initial creation. Full system architecture, philosophy, quest flow, SupaPlan schema, Boss init template, canon, glossary. First run completed: 8 SupaPlan tasks created, first notification fired, Lera shared comic with teammate.</div>
+    </li>
+    <li>
+      <span class="vtag">v2.0</span>
+      <span class="vdate">2026-05-19</span>
+      <div class="vdesc">PRODUCTION READY — Uniqueness Mandate banner, Quick Start section, Real vs. Generic comparison, Failure Modes & Recovery (6 modes), expanded canon, Version History, inline uniqueness verification in Boss init, new Known Bugs entries, expanded Glossary.</div>
+    </li>
+    <li>
+      <span class="vtag">v2.1</span>
+      <span class="vdate">2026-05-19</span>
+      <div class="vdesc">AGENT-READY — Added Agent Executive section (runtime protocol for Codex agents: 5-step cheatcode processing, ⚡: PR prefix mandate, \\n fix, /BOSS_QUEST.HTML reference). Documented literal \\n bug (Bug #7) — Boss stores escaped newlines in JSON, notification skill must parse before sending. Updated todo_path from /docs/LERA_QUEST_CHAIN.md → /BOSS_QUEST.HTML (Bug #8). CSV Autopsy: confirmed 100% template infection across all 8 SupaPlan tasks — every notification body, achievement, skin, spoiler is identical. Added \\n format instruction and todo_path step to Boss Init Message. Added Agent Executive link in TOC.</div>
+    </li>
+    <li>
+      <span class="vtag">v2.2</span>
+      <span class="vdate">2026-05-19</span>
+      <div class="vdesc">OVERHAULED — Full CSV overhaul: all 8 SupaPlan tasks regenerated with 100% unique content per quest. 8 unique achievements (part 1), 8 unique achievements (part 2), 8 unique skins, 7 unique spoilers, 8 unique notification bodies describing what was ACTUALLY built in each quest. Expanded polish_instructions from 1 Focus line to full surgical specs with specific EDGE CASES, REFERENCE, and DONE WHEN per quest. Fixed todo_path to /BOSS_QUEST.HTML. Added Quest Chain section (04b) with chain visual and uniqueness grid table. Updated Schema example with richer notification content. Updated Real vs. Generic comparison with 3 quest examples.</div>
+    </li>
+  </ul>
+
+  <div class="callout insight">
+    <strong>Versioning philosophy:</strong> This document evolves with each run. Every bug found, every failure mode observed, every recovery that works — it all gets folded back in. The document IS the system. It's not documentation of the system — it IS the system. The Boss init message inside it is the code. The parameters are the config. The failure modes are the tests.
+  </div>
+</div>
+
+<!-- ============================== FOOTER ============================== -->
+<div class="footer">
+  <div class="sig">ХЕХ.</div>
+  <p style="margin-top:8px;">The saga continues. Fuse is lit. No turning back.</p>
+  <p style="margin-top:12px; color:#555;">BOSS_QUEST.HTML v2.2 — OVERHAULED — 2026-05-19</p>
+  <p style="color:#333; margin-top:4px;">🕶️⚡🧠🤖🔥</p>
+</div>
+
+</body>
+</html>
