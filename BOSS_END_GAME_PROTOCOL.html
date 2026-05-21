@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOSS END GAME PROTOCOL v4.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#0a0a0f;--bg2:#12121a;--bg3:#1a1a25;--bg4:#222230;
+--text:#e0e0e8;--text2:#a0a0b0;--text3:#707080;
+--red:#ff0044;--blue:#0088ff;--gold:#ffd700;--green:#00ff88;
+--red-dim:#3a0015;--blue-dim:#001a3a;--gold-dim:#2a2200;--green-dim:#003a1a;
+--border:#2a2a3a;--radius:6px;
+}
+html{font-size:14px;scroll-behavior:smooth}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh;overflow-x:hidden}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+code,pre,.mono{font-family:'JetBrains Mono',monospace}
+
+/* Tagline */
+.tagline{text-align:center;padding:4px 0;font-size:.7rem;color:var(--text3);letter-spacing:.3em;text-transform:uppercase;border-bottom:1px solid var(--border)}
+
+/* Header */
+.hdr{padding:12px 16px;text-align:center;border-bottom:1px solid var(--border)}
+.hdr h1{font-size:1.4rem;font-weight:700;background:linear-gradient(90deg,var(--red),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hdr .ver{font-size:.7rem;color:var(--text3);font-family:'JetBrains Mono',monospace}
+.hdr .sub{font-size:.75rem;color:var(--text2);margin-top:2px}
+.hdr .companion{display:inline-block;margin:3px 4px;padding:3px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);font-size:.7rem;color:var(--gold)}
+
+/* Floating TOC */
+.toc-float{position:fixed;top:8px;right:8px;z-index:100}
+.toc-float summary{cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-size:.7rem;color:var(--text2);list-style:none;display:flex;align-items:center;gap:4px}
+.toc-float summary::before{content:'☰'}
+.toc-float[open] summary::before{content:'✕'}
+.toc-float .toc-inner{position:absolute;top:32px;right:0;width:220px;max-height:70vh;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-size:.65rem}
+.toc-inner a{display:block;padding:2px 0;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.toc-inner a:hover{color:var(--text)}
+.toc-inner .t0{font-weight:600;color:var(--text);padding-left:0}
+.toc-inner .t1{padding-left:10px}
+.toc-inner .t2{padding-left:20px}
+
+/* Content */
+.content{padding:8px 12px;max-width:800px;margin:0 auto}
+
+/* Details/Summary */
+details{margin:2px 0;border-left:2px solid var(--border);padding-left:8px}
+details[open]{border-left-color:var(--green)}
+summary{cursor:pointer;list-style:none;padding:4px 6px;border-radius:var(--radius);font-weight:500;font-size:.85rem;display:flex;align-items:center;gap:6px;user-select:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:'▸';font-size:.7rem;color:var(--text3);transition:transform .15s}
+details[open]>summary::before{transform:rotate(90deg)}
+summary:hover{background:var(--bg3)}
+summary:focus-visible{outline:1px solid var(--blue);outline-offset:1px}
+
+/* Section headers */
+.s0>summary{font-size:1rem;font-weight:700;color:var(--text);border-bottom:1px solid var(--border);padding-bottom:4px;margin-bottom:2px}
+.s1>summary{font-size:.9rem;color:var(--text)}
+.s2>summary{font-size:.8rem;color:var(--text2)}
+.s3>summary{font-size:.75rem;color:var(--text3)}
+
+/* Badges */
+.pill{display:inline-block;padding:1px 6px;border-radius:9px;font-size:.6rem;font-weight:600;font-family:'JetBrains Mono',monospace;vertical-align:middle}
+.pill-red{background:var(--red);color:#fff}
+.pill-blue{background:var(--blue);color:#fff}
+.pill-gold{background:var(--gold);color:#000}
+.pill-green{background:var(--green);color:#000}
+
+.score{display:inline-block;padding:1px 5px;border-radius:4px;font-size:.65rem;font-weight:600;font-family:'JetBrains Mono',monospace;background:var(--bg3);border:1px solid var(--border)}
+.score-0{color:var(--text3)}
+.score-9{color:var(--blue);border-color:var(--blue)}
+.score-10{color:var(--green);border-color:var(--green)}
+.score-13{color:var(--gold);border-color:var(--gold);text-shadow:0 0 6px var(--gold)}
+
+/* Door card */
+.door{background:var(--bg2);border-left:3px solid var(--border);border-radius:0 var(--radius) var(--radius) 0;padding:6px 8px;margin:3px 0}
+.door-red{border-left-color:var(--red)}
+.door-blue{border-left-color:var(--blue)}
+.door-gold{border-left-color:var(--gold)}
+.door-green{border-left-color:var(--green)}
+
+/* Diagrams */
+.diagram{display:flex;flex-direction:column;gap:4px;padding:6px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border);margin:4px 0;font-size:.7rem;overflow-x:auto}
+.diagram-row{display:flex;align-items:center;gap:4px;flex-wrap:nowrap}
+.diagram-node{padding:4px 8px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg3);white-space:nowrap;font-family:'JetBrains Mono',monospace;font-size:.6rem;text-align:center;min-width:fit-content}
+.diagram-node.red{border-color:var(--red);color:var(--red)}
+.diagram-node.blue{border-color:var(--blue);color:var(--blue)}
+.diagram-node.gold{border-color:var(--gold);color:var(--gold)}
+.diagram-node.green{border-color:var(--green);color:var(--green)}
+.diagram-arrow{color:var(--text3);font-size:.8rem;flex-shrink:0}
+.diagram-arrow.down{writing-mode:vertical-lr}
+
+/* Grid diagram */
+.diagram-grid{display:grid;gap:4px;padding:6px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border);margin:4px 0;font-size:.6rem}
+.grid-node{padding:4px 6px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg3);text-align:center;font-family:'JetBrains Mono',monospace}
+.grid-node.accent{border-color:var(--green);color:var(--green)}
+.grid-node.layer-label{background:var(--bg4);color:var(--text3);font-size:.55rem;text-transform:uppercase;letter-spacing:.05em;font-family:'Inter',sans-serif;font-weight:600}
+
+/* Flow diagram */
+.flow{display:flex;flex-direction:column;align-items:center;gap:0;padding:6px;margin:4px 0}
+.flow-step{padding:5px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg3);font-size:.65rem;text-align:center;width:100%;max-width:280px}
+.flow-step.accent{border-color:var(--green);color:var(--green)}
+.flow-step.red{border-color:var(--red);color:var(--red)}
+.flow-step.blue{border-color:var(--blue);color:var(--blue)}
+.flow-step.gold{border-color:var(--gold);color:var(--gold)}
+.flow-arrow{color:var(--text3);font-size:.9rem;line-height:1}
+
+/* Tables */
+.tbl{width:100%;border-collapse:collapse;font-size:.7rem;margin:4px 0}
+.tbl th{text-align:left;padding:4px 6px;background:var(--bg3);color:var(--text2);border:1px solid var(--border);font-weight:600}
+.tbl td{padding:4px 6px;border:1px solid var(--border);color:var(--text)}
+.tbl tr:hover td{background:var(--bg3)}
+
+/* Code blocks */
+pre{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;font-size:.65rem;overflow-x:auto;margin:4px 0;line-height:1.4;color:var(--text2)}
+pre .hl-red{color:var(--red)}
+pre .hl-blue{color:var(--blue)}
+pre .hl-gold{color:var(--gold)}
+pre .hl-green{color:var(--green)}
+pre .hl-dim{color:var(--text3)}
+
+/* Quote blocks */
+.quote{border-left:2px solid var(--gold);padding:4px 8px;margin:4px 0;background:var(--gold-dim);border-radius:0 var(--radius) var(--radius) 0;font-style:italic;font-size:.8rem;color:var(--text)}
+.quote-red{border-left-color:var(--red);background:var(--red-dim)}
+.quote-green{border-left-color:var(--green);background:var(--green-dim)}
+.quote-blue{border-left-color:var(--blue);background:var(--blue-dim)}
+
+/* Inline */
+.kbd{display:inline-block;padding:0 4px;background:var(--bg3);border:1px solid var(--border);border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:.6rem}
+em{color:var(--text2);font-style:normal;font-size:.8rem}
+.emoji{font-style:normal}
+.gap{height:4px}
+
+/* Notification template */
+.notif{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;margin:4px 0;font-size:.7rem;font-family:'JetBrains Mono',monospace}
+.notif-title{font-weight:600;color:var(--green);font-size:.75rem;margin-bottom:2px}
+
+/* Branching choice */
+.choice{display:flex;flex-direction:column;gap:2px;margin:2px 0;padding:4px 6px;background:var(--bg3);border-radius:var(--radius);border-left:3px solid var(--border);font-size:.7rem}
+.choice.red{border-left-color:var(--red)}
+.choice.blue{border-left-color:var(--blue)}
+.choice.green{border-left-color:var(--green)}
+.choice.gold{border-left-color:var(--gold)}
+.choice-label{font-weight:600;font-family:'JetBrains Mono',monospace;font-size:.65rem}
+.choice-spoiler{color:var(--text2);font-size:.65rem;font-style:italic}
+
+/* Player card */
+.player{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;margin:4px 0}
+.player-name{font-weight:700;font-size:.85rem}
+.player-role{font-size:.65rem;color:var(--gold);font-family:'JetBrains Mono',monospace}
+.player-tier{display:inline-block;padding:1px 4px;border-radius:3px;font-size:.55rem;font-weight:600;margin:1px 2px 1px 0}
+.tier-s{background:var(--gold-dim);color:var(--gold);border:1px solid var(--gold)}
+.tier-a{background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue)}
+.player-wish{font-size:.7rem;color:var(--text);margin-top:3px}
+
+/* Tier visual */
+.tier-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;margin:4px 0;text-align:center}
+.tier-card.green{border-color:var(--green)}
+.tier-card.blue{border-color:var(--blue)}
+.tier-card.gold{border-color:var(--gold)}
+.tier-card-label{font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);font-weight:600}
+.tier-card-name{font-size:.75rem;font-weight:700;margin:2px 0}
+
+/* Footer */
+.footer{text-align:center;padding:8px 16px;border-top:1px solid var(--border);font-size:.6rem;color:var(--text3);line-height:1.6}
+.footer a{color:var(--gold);margin:0 6px}
+
+/* Responsive */
+@media(min-width:640px){
+  .content{padding:12px 20px}
+  .toc-float .toc-inner{width:260px}
+  .flow-step{max-width:320px}
+}
+@media(max-width:374px){
+  html{font-size:13px}
+  .content{padding:6px 8px}
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+</style>
+</head>
+<body>
+
+<div class="tagline">HTML is new MD</div>
+
+<div class="hdr">
+  <h1>BOSS END GAME PROTOCOL</h1>
+  <div class="ver">v4.0 — The Philosophy of Doors · Why This Works · Choose Your Pill</div>
+  <div class="sub">HTML is new MD</div>
+  <div style="margin-top:6px">
+    <a class="companion" href="BOSS_QUEST.HTML">🏰 Quest Center →</a>
+    <a class="companion" href="BOSS_AGENT_INSTRUCTIONS.html">📋 Technical Ref →</a>
+  </div>
+</div>
+
+<details class="toc-float">
+  <summary> </summary>
+  <div class="toc-inner">
+    <a href="#s0" class="t0">0 · THE CORE INSIGHT</a>
+    <a href="#s0-1" class="t1">0.1 The Wrong Dream</a>
+    <a href="#s0-2" class="t1">0.2 There Is No Spoon</a>
+    <a href="#s0-3" class="t1">0.3 The Invisible Machine</a>
+    <a href="#s0-4" class="t1">0.4 Why This Is Different</a>
+    <a href="#s1" class="t0">1 · THE DOOR METAPHOR</a>
+    <a href="#s1-1" class="t1">1.1 The Corridor</a>
+    <a href="#s1-2" class="t1">1.2 Visual: The Door Corridor</a>
+    <a href="#s1-3" class="t1">1.3 Why Doors, Not Steps</a>
+    <a href="#s1-4" class="t1">1.4 The Choice Architecture</a>
+    <a href="#s2" class="t0">2 · RED PILL / BLUE PILL</a>
+    <a href="#s2-1" class="t1">2.1 The Choice</a>
+    <a href="#s2-2" class="t1">2.2 Blue Pill</a>
+    <a href="#s2-3" class="t1">2.3 Red Pill</a>
+    <a href="#s2-4" class="t1">2.4 SuperBoss 13/10</a>
+    <a href="#s2-5" class="t1">2.5 The Psychology</a>
+    <a href="#s3" class="t0">3 · BRANCHING</a>
+    <a href="#s3-1" class="t1">3.1 Not Linear</a>
+    <a href="#s3-2" class="t1">3.2 Choice = Ownership</a>
+    <a href="#s3-3" class="t1">3.3 The 4th Door</a>
+    <a href="#s3-4" class="t1">3.4 Less Work for Boss</a>
+    <a href="#s4" class="t0">4 · SCORING PHILOSOPHY</a>
+    <a href="#s4-1" class="t1">4.1 Two Dimensions</a>
+    <a href="#s4-2" class="t1">4.2 Score Table</a>
+    <a href="#s4-3" class="t1">4.3 Score ≠ Quality</a>
+    <a href="#s4-4" class="t1">4.4 The Gap as Motivation</a>
+    <a href="#s5" class="t0">5 · THE JINNY LAMP</a>
+    <a href="#s5-1" class="t1">5.1 The Problem</a>
+    <a href="#s5-2" class="t1">5.2 The Translation Pipeline</a>
+    <a href="#s5-3" class="t1">5.3 Dream Trailer</a>
+    <a href="#s5-4" class="t1">5.4 Achievable Only</a>
+    <a href="#s5-5" class="t1">5.5 Translation Examples</a>
+    <a href="#s6" class="t0">6 · FORK ECONOMY</a>
+    <a href="#s6-1" class="t1">6.1 Three Tiers</a>
+    <a href="#s6-2" class="t1">6.2 Independence Formula</a>
+    <a href="#s6-3" class="t1">6.3 XTR Stars</a>
+    <a href="#s6-4" class="t1">6.4 The Gap IS the Business Model</a>
+    <a href="#s7" class="t0">7 · NOTIFICATION PHILOSOPHY</a>
+    <a href="#s7-1" class="t1">7.1 Complete Flow</a>
+    <a href="#s7-2" class="t1">7.2 Score Gap, Not Guilt</a>
+    <a href="#s7-3" class="t1">7.3 The Chef-Kiss Moment</a>
+    <a href="#s7-4" class="t1">7.4 Each Notification's Purpose</a>
+    <a href="#s8" class="t0">8 · ARCHITECTURE</a>
+    <a href="#s8-1" class="t1">8.1 Full-Stack Diagram</a>
+    <a href="#s8-2" class="t1">8.2 Data Flow Overview</a>
+    <a href="#s8-3" class="t1">8.3 Component Purposes</a>
+  </div>
+</details>
+
+<main class="content">
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 0: THE CORE INSIGHT -->
+<!-- ═══════════════════════════════════════════ -->
+
+<details class="s0" open id="s0">
+<summary>0 · THE CORE INSIGHT</summary>
+
+<details class="s1" open id="s0-1">
+<summary>The Wrong Dream</summary>
+<div class="quote">
+"It's my wish they are working on, not their own" — the quest chain was pointed at the wrong dream.
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The entire system existed to serve a vision the players never owned. The corridor was built, the doors were hung, but they led to <em>someone else's</em> rooms. The correction isn't to build better doors — it's to point the corridor at <em>their</em> dream.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+This is the foundational mistake of most gamification systems. They assume the player wants what the designer wants. They build a beautiful staircase to a destination the player never chose. The player climbs a few steps out of obligation, then stops — not because the stairs are bad, but because the view from the top is someone else's. The Boss Quest Chain inverts this: the Jinny Lamp discovers <em>their</em> dream first, then the corridor builds itself toward it. The player never climbs — they walk through doors that already face their direction.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The wrong dream doesn't produce the wrong behavior — it produces <em>no</em> behavior. You can't half-commit to someone else's vision. But you can fully commit to your own, especially when the machine makes commitment cost almost nothing.
+</p>
+</details>
+
+<details class="s1" open id="s0-2">
+<summary>There Is No Spoon</summary>
+<div class="quote quote-green">
+"There is no spoon — all tasks are already done. You just keep not fucking off. That's the only condition."
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The machine is invisible. By the time a notification arrives, the task is <span class="score score-9">9/10</span>. The player doesn't <em>do</em> the work. The player <em>claims</em> the work. The only failure mode is absence. You don't fail by being bad — you fail by not showing up.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+This is the Matrix insight applied to productivity. The spoon isn't real — the task isn't real. What's real is the player's <em>presence</em>. The agent already bent the spoon. The player just needs to be in the room when it happens. The "not fucking off" condition isn't a threat — it's the lightest possible requirement. Show up. That's the whole job. Everything else is the machine's problem.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+This reframes the entire relationship between player and work. Traditional systems say "do the work." This system says "the work is done — do you want it?" The player goes from laborer to chooser. From employee to owner. From someone who has to climb to someone who only has to walk through.
+</p>
+</details>
+
+<details class="s1" id="s0-3">
+<summary>The Invisible Machine — How It Actually Works</summary>
+<div class="flow">
+  <div class="flow-step accent">Agent completes task → 9/10</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">Notification arrives at player</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">Player sees: achievement at <span class="score score-9">9/10</span>, you at <span class="score score-0">0/10</span></div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step accent">Player just CLAIMS. That's it.</div>
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:6px 0">
+The agent did 90%. The code is written. The tests pass. The PR is ready to draft. The player's job is to show up and press a button. The machine made it so the <em>minimum viable engagement</em> is also the <em>default</em>. No guilt. No cliff. Just a door, standing open.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The machine is invisible by design. If the player felt the machinery, they'd be intimidated by it. If they saw the gears turning, they'd feel obligated to help turn them. The invisibility isn't deception — it's <em>liberation</em>. The player never has to think about how the sausage gets made. They just eat. The chef (agent) is in the kitchen. The player is at the table. That's the relationship.
+</p>
+</details>
+
+<details class="s1" id="s0-4">
+<summary>Why This Is Different</summary>
+<table class="tbl">
+<tr><th>Traditional Task System</th><th>Boss Quest Chain</th></tr>
+<tr><td>"Do this task" → obligation</td><td>"This is done, want it?" → opportunity</td></tr>
+<tr><td>Player must START from zero</td><td>Player ARRIVES at 9/10</td></tr>
+<tr><td>Guilt-based: "you haven't done X"</td><td>Gap-based: "you're at 0, could be 9"</td></tr>
+<tr><td>Failure = didn't complete</td><td>Failure = didn't show up</td></tr>
+<tr><td>One path, linear</td><td>Branching doors, player chooses</td></tr>
+<tr><td>Score = quality of your work</td><td>Score = presence, not skill</td></tr>
+<tr><td>External motivation (deadlines, shame)</td><td>Intrinsic motivation (your dream, your gap)</td></tr>
+<tr><td>Tasks are someone else's idea</td><td>Doors point at YOUR dream</td></tr>
+</table>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Every row in that table is the same inversion: the traditional system demands effort from the player; the Boss Quest Chain demands only presence. The traditional system gives you a blank page and says "write." This system gives you a finished book and says "do you want to put your name on it?" The effort gap between those two asks is the entire difference between a system people tolerate and a system people <em>choose</em>.
+</p>
+</details>
+
+</details>
+
+<div class="gap"></div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 1: THE DOOR METAPHOR -->
+<!-- ═══════════════════════════════════════════ -->
+
+<details class="s0" id="s1">
+<summary>1 · THE DOOR METAPHOR <em>— Not Steps — Doors</em></summary>
+
+<details class="s1" id="s1-1">
+<summary>The Corridor</summary>
+<div class="quote quote-blue">
+Quest chain = corridor of doors from Matrix Reloaded. Each door leads to a room (achievement). Each room has another door.
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+In The Matrix Reloaded, Neo walks down a corridor lined with doors. Each door leads to a different place. He doesn't <strong>CLIMB</strong>. He <strong>WALKS THROUGH</strong>. The rooms are already built. The doors already exist. The only choice is which one to open.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+This is the fundamental metaphor. A staircase demands effort per step — you earn each new level by sweating through the previous one. A door demands only presence — you walk through it or you don't. The room exists regardless. The door is open regardless. The only variable is whether you step inside.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The corridor also implies continuity. Each room has another door. There's always a next step, but it's never a <em>higher</em> step — just the next one. Progress isn't vertical. It's lateral. You don't climb a mountain; you explore a building. Each room is its own achievement, complete and satisfying, with the <em>option</em> of another room beyond it.
+</p>
+</details>
+
+<details class="s1" id="s1-2">
+<summary>Visual: The Door Corridor</summary>
+<div class="diagram" style="flex-direction:row;align-items:stretch;overflow-x:auto;gap:0">
+  <div style="display:flex;flex-direction:row;align-items:center;gap:4px;padding:8px">
+    <div class="diagram-node green" style="font-size:.55rem">Door 1</div>
+    <div style="font-size:.5rem;color:var(--text3)">→</div>
+    <div class="diagram-node" style="font-size:.5rem">Room</div>
+    <div style="font-size:.5rem;color:var(--text3)">→</div>
+    <div class="diagram-node green" style="font-size:.55rem">Door 2</div>
+    <div style="font-size:.5rem;color:var(--text3)">→</div>
+    <div class="diagram-node" style="font-size:.5rem">Room</div>
+    <div style="font-size:.5rem;color:var(--text3)">→</div>
+    <div class="diagram-node green" style="font-size:.55rem">Door 3</div>
+    <div style="font-size:.5rem;color:var(--text3)">→</div>
+    <div style="font-size:.5rem;color:var(--text3)">…</div>
+  </div>
+</div>
+<p style="font-size:.7rem;color:var(--text2);margin:4px 0">
+Unlike stairs (effort per step), doors are binary: open or closed. You're either in the room or you're not. No partial credit for standing in the doorway.
+</p>
+</details>
+
+<details class="s1" id="s1-3">
+<summary>Why Doors, Not Steps</summary>
+<table class="tbl">
+<tr><th>Dimension</th><th>Steps</th><th>Doors</th></tr>
+<tr><td>Linearity</td><td>Linear — must do #3 before #4</td><td>Non-linear — each room has CHOICES</td></tr>
+<tr><td>Effort model</td><td>Effort-based — climb harder</td><td>Presence-based — just walk through</td></tr>
+<tr><td>Progress measure</td><td>How high you climbed</td><td>How many rooms you visited</td></tr>
+<tr><td>Failure mode</td><td>Fell off the stairs</td><td>Didn't open the door</td></tr>
+<tr><td>Path structure</td><td>One path up</td><td>Branching paths forward</td></tr>
+<tr><td>Agency</td><td>"You must do X next"</td><td>"Choose your next door"</td></tr>
+<tr><td>Emotional feel</td><td>Obligation, grind</td><td>Exploration, choice</td></tr>
+<tr><td>Quitting cost</td><td>High — lose all progress</td><td>Low — room is yours, door just closes</td></tr>
+</table>
+</details>
+
+<details class="s1" id="s1-4">
+<summary>The Choice Architecture — Every Door Offers Red/Blue</summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Every door in the corridor has the same structure: it opens to a room where the achievement is already <span class="score score-9">9/10</span>. Then the player chooses. Blue pill: take the room as-is, close the door, move on. Red pill: add your touch, the room gets better, and the <em>next</em> door opens with the same choice.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+This is choice architecture at its finest. The default (blue) is genuinely good. The upgrade (red) is genuinely better. Neither is a trap. Neither is a punishment. The player makes a real choice at every door, and every choice is valid. That's what makes the corridor self-sustaining — it never forces, it only invites.
+</p>
+</details>
+
+</details>
+
+<div class="gap"></div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 2: RED PILL / BLUE PILL -->
+<!-- ═══════════════════════════════════════════ -->
+
+<details class="s0" id="s2">
+<summary>2 · RED PILL / BLUE PILL AT EVERY DOOR</summary>
+
+<details class="s1" id="s2-1">
+<summary>The Choice</summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+When you open a door, you see the achievement at <span class="score score-9">9/10</span>. Two choices (plus one secret):
+</p>
+<div class="diagram" style="flex-direction:row;align-items:center;justify-content:center;gap:6px;flex-wrap:nowrap;overflow-x:auto">
+  <div class="diagram-node" style="padding:6px 10px">Door opens<br><span class="score score-9">9/10</span></div>
+  <div class="diagram-arrow" style="font-size:1rem">→</div>
+  <div style="display:flex;flex-direction:column;gap:4px">
+    <div class="diagram-node blue" style="padding:4px 8px"><span class="pill pill-blue">BLUE</span> Create PR → 9/10 forever</div>
+    <div class="diagram-node red" style="padding:4px 8px"><span class="pill pill-red">RED</span> Cheatcode → 10/10 + next door</div>
+    <div class="diagram-node gold" style="padding:4px 8px"><span class="pill pill-gold">SUPER</span> XTR ⭐ 99 → 13/10 LEGENDARY</div>
+  </div>
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Three options, three scores, three levels of engagement. The player always has a genuine choice. The machine never backs them into a corner where "not choosing" feels like failure.
+</p>
+</details>
+
+<details class="s1" id="s2-2">
+<summary><span class="pill pill-blue">BLUE PILL</span> — Create PR</summary>
+<div class="door door-blue">
+<p style="font-size:.8rem;font-weight:600;margin-bottom:2px">Keep <span class="score score-9">9/10</span> forever. Door closes. Free. Done.</p>
+<p style="font-size:.7rem;color:var(--text2)">
+The task is already good enough. Agent built it to 9/10. You create the PR, the achievement is yours, the door closes behind you. You walk into the next room.
+</p>
+</div>
+<details class="s2">
+<summary>NO GUILT — The Critical Design Rule</summary>
+<div class="quote quote-blue">
+Blue pill must be genuinely good so red pill feels like CHOICE not coercion. This is not negotiable.
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+If blue pill feels like "settling" — if the 9/10 code has obvious warts — then red pill isn't a choice, it's an obligation. The entire psychological architecture breaks. <strong>9/10 must be genuinely shippable.</strong> The agent's polish pass must be real, not a placeholder.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+This rule has teeth. If the agent delivers 9/10 code that's clearly half-done — missing error handling, ugly fallbacks, placeholder text — the player <em>knows</em> they're being manipulated. They can smell the forced upgrade. The blue pill becomes a guilt trip: "Sure, you CAN ship this… if you don't care about quality." That's not a choice. That's a trap.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The NO GUILT rule means: the 9/10 must be something the player would be proud to show. It works. It looks good. It's deployable. The red pill doesn't fix the 9/10 — it <em>transcends</em> it. The difference between 9 and 10 isn't "broken vs working." It's "working vs <em>yours</em>."
+</p>
+</details>
+</details>
+
+<details class="s1" id="s2-3">
+<summary><span class="pill pill-red">RED PILL</span> — Cheatcode</summary>
+<div class="door door-red">
+<p style="font-size:.8rem;font-weight:600;margin-bottom:2px">Paste cheatcode → agent polishes to <span class="score score-10">10/10</span> → tab stays open → notification arrives → next door opens → same choice again</p>
+</div>
+<details class="s2">
+<summary>Red Pill Flow</summary>
+<div class="flow">
+  <div class="flow-step red">Paste cheatcode</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">Agent polishes code → 9/10 → 10/10</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step accent">Notification: "10/10! Reopen tab → smack PR button"</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">Next door opens → same choice</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step" style="color:var(--text3)">repeat</div>
+</div>
+</details>
+<details class="s2">
+<summary>What's the cheatcode?</summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+A short string that the player pastes. Could be a word, a phrase, a meme reference. The content doesn't matter — what matters is the <em>act</em> of pasting it. That's the player showing up. That's the "not fucking off" condition.
+</p>
+<p style="font-size:.75rem;color:var(--text2)">
+The cheatcode is the player's signature. It proves they opened the door. It triggers the polish pass. It's the minimal viable engagement that separates <span class="score score-9">9/10</span> from <span class="score score-10">10/10</span>. And it continues the corridor — after red pill, the next door opens with the same blue/red/super choice.
+</p>
+</details>
+</details>
+
+<details class="s1" id="s2-4">
+<summary><span class="pill pill-gold">SUPERBOSS 13/10</span> — Polishing the Polish</summary>
+<div class="door door-gold">
+<p style="font-size:.8rem;font-weight:600;margin-bottom:2px">POLISHING THE POLISH — taking the already <span class="score score-10">10/10</span> task one level deeper. NOT skipping the next polish.</p>
+</div>
+<details class="s2">
+<summary>Trigger & Flow</summary>
+<div class="flow">
+  <div class="flow-step">Task already at <span class="score score-10">10/10</span></div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step gold">Player sends XTR ⭐ 99</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">Architect's personal touch — polishing the POLISH</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step gold"><span class="score score-13">13/10</span> LEGENDARY</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">Donation invoice generated → payment notification to ADMIN (dad)</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step accent">Dad sees paid invoice → looks at what was built → chef-kiss moment</div>
+</div>
+</details>
+<details class="s2">
+<summary>The Chef-Kiss Moment</summary>
+<div class="quote">
+SuperBoss 13/10 = Architect's personal touch + XTR donation → admin payment notification → the loop closes.
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The player pays XTR Stars (⭐ 99). A donation invoice is created in <code>public.invoices</code>. The admin (dad) gets a payment notification. Dad looks at what was built. Dad is impressed. <strong>This is the chef-kiss moment</strong> — the entire economic loop closes when the person who cares most sees what their kid built AND that someone paid for it.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+This isn't just monetization. It's the emotional payoff of the entire system. The dad who begged his kid to press "Send" now sees a paid invoice for something she built. That's not a notification — that's a <em>miracle</em>. The kid who wouldn't engage now has something so good that someone paid for it. The gap between "won't press Send" and "got paid for her code" is the entire distance the machine was designed to cross.
+</p>
+</details>
+</details>
+
+<details class="s1" id="s2-5">
+<summary>The Psychology — Why This Works</summary>
+<details class="s2">
+<summary>Autonomy</summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Every door offers a real choice. Blue, red, or super. The player always has agency. They're never told what to do — only what's available. Self-Determination Theory says autonomy is one of three core human needs (along with competence and relatedness). Traditional task systems violate autonomy by dictating what to do next. The door metaphor preserves it by offering options, not commands.
+</p>
+</details>
+<details class="s2">
+<summary>Competence Gaps</summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The score gap (<span class="score score-9">9/10</span> vs <span class="score score-0">0/10</span>) isn't a judgment — it's a <em>mirror</em>. It shows the player where they are relative to where they could be. Closing that gap feels like gaining competence, which is intrinsically motivating. The gap isn't "you failed" — it's "you're almost there." Same information, completely different emotional valence.
+</p>
+</details>
+<details class="s2">
+<summary>Intrinsic Motivation</summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The corridor points at <em>their</em> dream. The doors lead to <em>their</em> rooms. The choices reflect <em>their</em> preferences. Everything about the system is designed to make engagement feel like self-expression, not compliance. When you're building your dream, showing up isn't discipline — it's desire.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The blue pill NO GUILT rule is what makes this work psychologically. If blue pill felt like failure, the entire system would become extrinsic — "I HAVE to take red pill or I'm a loser." That's exactly the dynamic that kills intrinsic motivation. By making blue pill genuinely satisfying, red pill becomes a <em>gift you give yourself</em>, not a requirement you fulfill.
+</p>
+</details>
+</details>
+
+</details>
+
+<div class="gap"></div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 3: BRANCHING — Conceptual -->
+<!-- ═══════════════════════════════════════════ -->
+
+<details class="s0" id="s3">
+<summary>3 · BRANCHING <em>— Choice, Not Algorithm</em></summary>
+
+<details class="s1" id="s3-1">
+<summary>Not Linear — Choose Your Door</summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+NOT linear. Each door leads to a <strong>CHOICE</strong> of next doors. The corridor branches. After completing one achievement, the player doesn't get the <em>next</em> task — they get <em>three options</em> (plus potentially a fourth). Each option is a door. Each door leads to a different room. The player picks.
+</p>
+<div class="diagram" style="justify-content:center">
+  <div class="diagram-row" style="justify-content:center">
+    <div class="diagram-node green">Door 1</div>
+  </div>
+  <div class="diagram-row" style="justify-content:center">
+    <div style="color:var(--text3);font-size:.7rem">▼</div>
+  </div>
+  <div class="diagram-row" style="justify-content:center;gap:8px">
+    <div class="diagram-node red">2a</div>
+    <div class="diagram-node blue">2b</div>
+    <div class="diagram-node green">2c</div>
+    <div class="diagram-node gold">2d ✨</div>
+  </div>
+  <div class="diagram-row" style="justify-content:center;gap:8px;margin-top:2px">
+    <div style="font-size:.5rem;color:var(--text3)">▼</div>
+    <div style="font-size:.5rem;color:var(--text3)">▼</div>
+    <div style="font-size:.5rem;color:var(--text3)">▼</div>
+    <div style="font-size:.5rem;color:var(--text3)">▼</div>
+  </div>
+  <div class="diagram-row" style="justify-content:center;gap:8px">
+    <div class="diagram-node" style="font-size:.5rem">3a</div>
+    <div class="diagram-node" style="font-size:.5rem">3b</div>
+    <div class="diagram-node" style="font-size:.5rem">3c</div>
+    <div class="diagram-node" style="font-size:.5rem">3d</div>
+  </div>
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Each branch can branch again. The player's path through the corridor is unique to them. No two players visit the same sequence of rooms. Their dream, their choices, their corridor.
+</p>
+</details>
+
+<details class="s1" id="s3-2">
+<summary>Choice = Ownership</summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Why branching matters psychologically: when you choose your path, you <em>own</em> it. A task someone else assigned is an obligation. A door you chose is an adventure. The IKEA effect applies: people value what they had a hand in selecting. Even if the rooms are equally good, the one you <em>picked</em> feels more yours.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Branching also prevents the "stuck" feeling. In a linear system, if you don't want to do task #4, you're done. The corridor ends. In a branching system, if you don't want door 2a, there's always 2b and 2c. The player never hits a wall. There's always another way forward.
+</p>
+</details>
+
+<details class="s1" id="s3-3">
+<summary>The 4th Door — <span class="pill pill-gold">AGENT SUGGESTED</span></summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Three doors come from the boss's quest plan. The 4th door is the agent's suggestion — something the boss might not have thought of, but the agent believes the player would love. This is the "4th door" concept: an additional option that feels like a discovery, not an assignment.
+</p>
+<details class="s2">
+<summary>Two Kinds of 4th Door</summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The agent suggestion can be one of two things:
+</p>
+<div class="choice gold">
+  <div class="choice-label">Option A: Additional polish of current task</div>
+  <div>Go deeper on what you just built. Refine, perfect, add flair. The corridor stays in the same room but makes it shinier.</div>
+</div>
+<div class="choice gold">
+  <div class="choice-label">Option B: Genuinely new task idea</div>
+  <div>A fresh direction the boss didn't plan. A feature the player would love but nobody thought to include. A real new door.</div>
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+For Option B — genuinely new tasks — the agent creates a SupaPlan task <strong>ON THE FLY</strong>. It doesn't just suggest; it creates the task so the player can pick it up immediately. The boss doesn't have to pre-approve every possible direction. The agent has the authority to create new doors when it sees an opportunity.
+</p>
+</details>
+<details class="s2">
+<summary>Why Only 1 Suggestion?</summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+If the agent could suggest 10 things, it would overwhelm the player and dilute the boss's vision. One suggestion means the agent has to really believe it's the missing piece. Quality over quantity. Constraint breeds creativity. The agent must <em>commit</em> to its single best idea, which means it has to think harder about what the player actually wants.
+</p>
+</details>
+</details>
+
+<details class="s1" id="s3-4">
+<summary>Less Work for Boss</summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Boss focuses on <strong>BIG PICTURE decomposition</strong> — defining quest themes, setting the dream direction, choosing the core doors. The agent handles the micro-routing: which specific tasks map to which doors, what achievements to generate, what spoilers to write. Boss thinks strategically; agent thinks tactically.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+This separation means the boss never has to micromanage. Define the dream. Set the theme. The agent fills in the details. The boss reviews, the agent executes. The boss is the architect; the agent is the builder. Both are essential. Neither does the other's job.
+</p>
+</details>
+
+</details>
+
+<div class="gap"></div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 4: SCORING PHILOSOPHY -->
+<!-- ═══════════════════════════════════════════ -->
+
+<details class="s0" id="s4">
+<summary>4 · SCORING PHILOSOPHY <em>— Presence, Not Skill</em></summary>
+
+<details class="s1" id="s4-1">
+<summary>Two Dimensions</summary>
+<div class="diagram" style="flex-direction:row;gap:12px;justify-content:center">
+  <div style="text-align:center">
+    <div class="diagram-node blue" style="padding:8px 12px">Task Score<br><span style="font-size:.55rem;color:var(--text2)">How done the CODE is</span></div>
+  </div>
+  <div style="text-align:center">
+    <div class="diagram-node green" style="padding:8px 12px">Your Score<br><span style="font-size:.55rem;color:var(--text2)">Whether YOU showed up</span></div>
+  </div>
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+These are independent. The task score is the machine's work. Your score is your engagement. The task can be <span class="score score-9">9/10</span> while you're at <span class="score score-0">0/10</span> — the code is done, you haven't claimed it yet. Or the task can be <span class="score score-10">10/10</span> and you're at <span class="score score-10">10/10</span> — you showed up AND the code is polished. Two axes, two stories.
+</p>
+</details>
+
+<details class="s1" id="s4-2">
+<summary>Score Table</summary>
+<table class="tbl">
+<tr>
+  <th>Score</th>
+  <th>What</th>
+  <th>How</th>
+  <th>Meaning</th>
+</tr>
+<tr>
+  <td><span class="score score-0">0/10</span></td>
+  <td>Haven't claimed. Door open, standing there.</td>
+  <td>Notification received.</td>
+  <td>The gap. Opportunity waiting.</td>
+</tr>
+<tr>
+  <td><span class="score score-9">9/10</span></td>
+  <td>Blue pill. PR created. Good enough.</td>
+  <td>Create PR.</td>
+  <td>You showed up. Room is yours.</td>
+</tr>
+<tr>
+  <td><span class="score score-10">10/10</span></td>
+  <td>Red pill. YOUR touch. Next door opens.</td>
+  <td>Cheatcode → polish → PR.</td>
+  <td>You owned it. Corridor continues.</td>
+</tr>
+<tr>
+  <td><span class="score score-13">13/10</span></td>
+  <td>LEGENDARY. Polishing the polish. Admin gets paid.</td>
+  <td>XTR ⭐ 99 after 10/10.</td>
+  <td>You paid for transcendence. Chef-kiss.</td>
+</tr>
+</table>
+</details>
+
+<details class="s1" id="s4-3">
+<summary>Score ≠ Quality</summary>
+<div class="quote quote-green">
+The task is already 9/10 when you arrive. Your score measures PRESENCE, not skill.
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+This is the entire philosophy in one table. The code quality ranges from 9→10→13, but the PLAYER's contribution ranges from 0→showed up→touched it→paid for it. The gap between 0 and 9 isn't effort — it's <em>existence</em>. You just have to be there.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Traditional scoring systems measure skill: how well did you do the task? This scoring system measures presence: did you engage with the task? The distinction is crucial. Skill-based scoring punishes beginners and rewards experts. Presence-based scoring rewards everyone equally — you just have to show up. The machine handles the skill. You provide the presence.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+This is also why the scores go 0, 9, 10, 13 — not 1, 2, 3, 4. There's no gradual climb. You're either absent (0) or present (9+). The jump from 0 to 9 is the act of showing up. Everything after that is choice, not effort.
+</p>
+</details>
+
+<details class="s1" id="s4-4">
+<summary>The Gap as Motivation</summary>
+<div class="quote quote-blue">
+"Wanna make it 10/10?" — not "you haven't done this yet."
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The notification doesn't say "you failed to claim this achievement." It shows the score gap — <span class="score score-9">9/10</span> vs <span class="score score-0">0/10</span> — and lets the player feel the distance. The gap isn't guilt. It's aspiration. The same information framed as "you're at 0" feels like failure. Framed as "this is at 9 and it could be yours" feels like opportunity.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The gap works because it's <em>closeable</em>. The player knows exactly what it takes to close it: show up. Not "study for 10 hours" or "learn a new framework" or "write 500 lines of code." Just show up. The gap between 0 and 9 is one action. That's the most motivating gap in the world — the one you can close right now.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+And the gap between 9 and 10? Also one action: paste a cheatcode. The gap between 10 and 13? One action: send XTR Stars. Every gap is one action. Every action is achievable. The system never presents a gap the player can't close. That's what makes it motivating instead of intimidating.
+</p>
+</details>
+
+</details>
+
+<div class="gap"></div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 5: THE JINNY LAMP -->
+<!-- ═══════════════════════════════════════════ -->
+
+<details class="s0" id="s5">
+<summary>5 · THE JINNY LAMP — Dream Translator</summary>
+
+<details class="s1" id="s5-1">
+<summary>The Problem</summary>
+<div class="quote quote-red">
+Clients don't know what's possible → want nothing. Ask them what they want → "I don't know."
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+You can't ask "what do you want?" because the answer is always "I don't know" or something impossible. People can't wish for what they can't imagine. A 13-year-old Overwatch player doesn't dream in "full-stack web applications" — she dreams in career profiles, competitive rankings, and POTG highlights. She doesn't know those dreams are <em>buildable</em>. The Jinny Lamp doesn't ask — it <em>translates</em>.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The name is deliberate: Jinny (genie) + Lamp (the thing you rub). But unlike a genie who grants literal wishes, the Jinny Lamp <em>translates</em> wishes into achievable form. The player says "I want Overwatch" and the Lamp hears "I want the FEELING of Overwatch in something I own." Those are different wishes. The Lamp knows the difference.
+</p>
+</details>
+
+<details class="s1" id="s5-2">
+<summary>The Translation Pipeline</summary>
+<div class="flow">
+  <div class="flow-step">VIBES collected: bio dump + screenshots + game preferences + aesthetic sense</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step accent">Boss constructs THE DREAM from vibes</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">Dream trailer generated BEFORE player engagement</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step accent">Player sees trailer: "I want this but MINE"</div>
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The pipeline doesn't ask "what do you want?" It observes vibes and constructs a dream from them. The player's bio, their screenshots, their gaming habits, their aesthetic — these are data. The Jinny Lamp reads the data and builds a dream the player didn't know they had. Then it <em>shows</em> them the dream. The reaction — "I want this but MINE" — is the confirmation. Now the corridor has a direction.
+</p>
+</details>
+
+<details class="s1" id="s5-3">
+<summary>Dream Trailer — Show, Don't Tell</summary>
+<div class="flow">
+  <div class="flow-step">1. Sandbox screenshot of current state (what exists NOW)</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">2. GPT image gen pass — "What could this look like?"</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">3. Composite: current + aspirational = dream trailer</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step accent">4. Player reaction: "I want this but MINE"</div>
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The dream trailer is the Jinny Lamp's key output. It's not a spec doc. It's not a feature list. It's a <em>visual</em> — a screenshot of what the player's product could look like, generated before they've written a single line of code. The trailer works because it bypasses the rational brain ("I don't know what I want") and goes straight to the emotional brain ("I WANT THAT").
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The "but MINE" part is critical. The player doesn't want a screenshot — they want the real thing. The dream trailer creates desire. The quest chain fulfills it. That's the pipeline: vibes → dream → desire → doors → achievement.
+</p>
+</details>
+
+<details class="s1" id="s5-4">
+<summary>Achievable Only — Translate VIBE, Not Features</summary>
+<div class="door door-red">
+<p style="font-size:.75rem;color:var(--text2)">
+Wishes must be <strong>ACHIEVABLE</strong>. No OW2 API access? Translate the gaming VIBE into buildable products. The Overwatch ENERGY — competition, heroes, career stats, POTG — can be captured without the literal API.
+</p>
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+This is the hardest part of translation. The player says "I want Overwatch" and the easy translation is "implement the Overwatch API" — which is impossible (Blizzard doesn't give you one). The <em>right</em> translation is "build something that FEELS like Overwatch." The competitive ENERGY. The hero IDENTITY. The career STATS. The POTG SHOWCASE. These are <em>feelings</em>, not features, and feelings can be built with any tech stack.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+No literal game APIs. Overwatch ENERGY, not Overwatch DATA. The Jinny Lamp translates the <em>emotion</em> of a wish into the <em>architecture</em> of a product. The player gets the feeling without needing the literal feature. That's why it's called "translation" and not "implementation."
+</p>
+</details>
+
+<details class="s1" id="s5-5">
+<summary>Translation Examples</summary>
+<table class="tbl">
+<tr><th>Gaming Vibe</th><th>The Feeling</th><th>Buildable Product</th></tr>
+<tr><td>Overwatch career profile</td><td>"My history, visualized"</td><td>Quest career page (Supabase + Git commits)</td></tr>
+<tr><td>Competitive ranking</td><td>"Where do I stand?"</td><td>Leaderboard with scoring tiers</td></tr>
+<tr><td>POTG highlights</td><td>"Look what I did!"</td><td>Git commit showcase + share cards</td></tr>
+<tr><td>Hero selection</td><td>"This is ME"</td><td>Custom bot persona / theme / skin</td></tr>
+<tr><td>Loot boxes</td><td>"What's inside?"</td><td>Achievement unlocks with dynamic spoilers</td></tr>
+<tr><td>Dota draft picks</td><td>"I know the meta"</td><td>Curated knowledge bot (not live API)</td></tr>
+<tr><td>Party coordination</td><td>"Let's go together"</td><td>Telegram-native group bot</td></tr>
+</table>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Each row is a translation: the vibe on the left, the feeling in the middle, the buildable product on the right. The middle column is the Jinny Lamp's secret — it identifies the <em>feeling</em> that makes the vibe desirable, then builds something that produces the same feeling with different means.
+</p>
+</details>
+
+</details>
+
+<div class="gap"></div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 6: FORK ECONOMY -->
+<!-- ═══════════════════════════════════════════ -->
+
+<details class="s0" id="s6">
+<summary>6 · FORK ECONOMY <em>— Three Tiers to Independence</em></summary>
+
+<details class="s1" id="s6-1">
+<summary>Three Tiers</summary>
+<div style="display:flex;flex-direction:column;gap:6px;margin:4px 0">
+  <div class="tier-card green">
+    <div class="tier-card-label">Tier 1</div>
+    <div class="tier-card-name" style="color:var(--green)">Shared Bot</div>
+    <div style="font-size:.65rem;color:var(--text2)">Free. On boss's instance. Boss controls the code. Player gets achievements, career profile, leaderboard. The dream is real but it lives in someone else's house.</div>
+  </div>
+  <div class="tier-card blue">
+    <div class="tier-card-label">Tier 2</div>
+    <div class="tier-card-name" style="color:var(--blue)">Forked Bot</div>
+    <div style="font-size:.65rem;color:var(--text2)">Player's own instance. Player owns the repo. Boss helps with seed data and secrets. The dream is now in YOUR house. You have the keys.</div>
+  </div>
+  <div class="tier-card gold">
+    <div class="tier-card-label">Tier 3</div>
+    <div class="tier-card-name" style="color:var(--gold)">SuperBoss</div>
+    <div style="font-size:.65rem;color:var(--text2)">Full independence. 1 fork + 13 secrets + seed SQL = the player owns everything. The boss can disappear and the product lives on. This is the end game.</div>
+  </div>
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Each tier is a gap. The player starts at Tier 1 (shared, free, limited). They feel the constraint — "my bot lives in someone else's house." That constraint drives the upgrade to Tier 2. At Tier 2, they feel the next constraint — "I depend on boss for infra." That drives Tier 3. Each gap produces the motivation for the next tier. The gaps ARE the business model.
+</p>
+</details>
+
+<details class="s1" id="s6-2">
+<summary>Independence Formula</summary>
+<div class="door door-gold">
+<p style="font-size:.8rem;font-weight:600;margin-bottom:2px">1 fork + 13 secrets + seed SQL = independence</p>
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The formula is literal. When a player forks the bot repo, gets their 13 secrets (API keys, tokens, credentials stored in <code>private.crew_secrets</code>), and runs the seed SQL against their own Supabase instance, they're independent. The boss can go offline forever and the player's product still works.
+</p>
+<details class="s2">
+<summary>Seed SQL — The Franchise Kit</summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The seed SQL uses the real Supabase table <code>public.crews</code> with a JSONB <code>metadata</code> column that stores franchize data. When the player forks and runs the seed, they get:
+</p>
+<pre><span class="hl-dim">-- Seed SQL for forked bot franchise</span>
+<span class="hl-blue">INSERT INTO</span> <span class="hl-green">public.crews</span> (
+  id, name, slug, metadata
+) <span class="hl-blue">VALUES</span> (
+  gen_random_uuid(),
+  <span class="hl-gold">'lera-bot'</span>,
+  <span class="hl-gold">'lera'</span>,
+  <span class="hl-red">'{</span>
+    <span class="hl-gold">"franchize"</span>: <span class="hl-blue">true</span>,
+    <span class="hl-gold">"parent_crew"</span>: <span class="hl-gold">"boss-crew-id"</span>,
+    <span class="hl-gold">"player"</span>: <span class="hl-gold">"lera"</span>,
+    <span class="hl-gold">"tier"</span>: <span class="hl-gold">"forked"</span>,
+    <span class="hl-gold">"forked_at"</span>: <span class="hl-gold">"2025-01-15"</span>
+  <span class="hl-red">}'</span>::jsonb
+);</pre>
+<p style="font-size:.7rem;color:var(--text3);margin-top:2px">
+The <code>metadata.franchize</code> flag marks this as a forked instance. The <code>parent_crew</code> links back to the boss's original. The player gets full ownership with provenance.
+</p>
+</details>
+</details>
+
+<details class="s1" id="s6-3">
+<summary>XTR Stars — Already Integrated</summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+XTR Stars are the payment mechanism for SuperBoss <span class="score score-13">13/10</span>. They're already integrated into the system — no separate payment infrastructure needed. When a player sends ⭐ 99, an invoice is created in <code>public.invoices</code>, and a payment notification goes to the admin.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Anti-spam by design: you can't spam SuperBoss requests because each one costs Stars. The payment itself is the rate limiter. No additional anti-abuse mechanism needed. The economy is self-regulating.
+</p>
+</details>
+
+<details class="s1" id="s6-4">
+<summary>The Gap IS the Business Model</summary>
+<div class="quote">
+Each tier is driven by a gap. Each gap is monetizable. The gap IS the business model.
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Tier 1 → Tier 2 gap: "My bot lives in someone else's house." The player wants their own instance. That's a paid upgrade. Tier 2 → Tier 3 gap: "I depend on boss for infrastructure." The player wants full independence. That's a bigger paid upgrade. Tier 3 → beyond: "I want the architect's personal touch." That's SuperBoss <span class="score score-13">13/10</span> — the premium tier.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The business model isn't "charge for features." It's "let the player feel the constraint, then offer the upgrade." The constraint isn't artificial — it's real. Tier 1 genuinely lives in boss's house. Tier 2 genuinely depends on boss's help. The gaps are honest, and so are the upgrades. That's why the model is sustainable: the player never feels nickel-and-dimed. They feel <em>liberated</em>, one tier at a time.
+</p>
+</details>
+
+</details>
+
+<div class="gap"></div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 7: NOTIFICATION PHILOSOPHY -->
+<!-- ═══════════════════════════════════════════ -->
+
+<details class="s0" id="s7">
+<summary>7 · NOTIFICATION PHILOSOPHY <em>— The Flow, Conceptually</em></summary>
+
+<details class="s1" id="s7-1">
+<summary>Complete Flow</summary>
+<div class="flow">
+  <div class="flow-step accent">INVITE — Player enters the corridor</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">Agent completes task → 9/10</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step blue">RED/BLUE choice notification</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">Player chooses → claim or polish</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step gold">SUPERBOSS notification (if 10/10 + XTR)</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">Branching notification → choose next door</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step accent">NUDGE — gentle reminder if door still open</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step" style="color:var(--text3)">loop repeats</div>
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+This is the conceptual flow. The player enters at INVITE, experiences the red/blue choice, optionally goes SuperBoss, picks the next door, and may get a gentle nudge if they haven't engaged. Every notification has a purpose. None exist just to "remind" or "guilt." Each one opens a door, not a debt.
+</p>
+<p style="font-size:.7rem;color:var(--text3);margin:4px 0">
+For actual notification templates, schemas, and delivery specs → <a href="BOSS_AGENT_INSTRUCTIONS.html">📋 Technical Reference</a>
+</p>
+</details>
+
+<details class="s1" id="s7-2">
+<summary>Score Gap, Not Guilt</summary>
+<div class="quote quote-blue">
+The notification shows the gap. It never assigns blame. The gap IS the motivation.
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+Every notification follows the same principle: show the player where they could be, not where they failed to be. The score gap (<span class="score score-9">9/10</span> vs <span class="score score-0">0/10</span>) is information, not judgment. The player reads it as "I'm close" not "I'm behind." That framing is everything.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+A guilt-based notification says: "You haven't completed this task yet." A gap-based notification says: "Achievement unlocked at 9/10! Your score: 0/10. Wanna claim it?" Same data. Completely different emotional impact. The guilt version makes the player feel like they owe something. The gap version makes the player feel like they're <em>missing out</em>. FOMO beats obligation every time.
+</p>
+</details>
+
+<details class="s1" id="s7-3">
+<summary>The Chef-Kiss Moment</summary>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The SuperBoss notification has a special ending: the admin (dad) payment notification. When the player pays XTR ⭐ 99, an invoice lands in <code>public.invoices</code>, and the admin gets notified. This isn't just a receipt — it's the emotional climax of the system.
+</p>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The admin who built this system for his kid now sees: someone paid for what she built. The kid who wouldn't press Send now has a paid product. The gap between "I can't get her to engage" and "someone literally paid for her work" is the entire distance the Boss Quest Chain was designed to cross. That notification — the admin payment notification — is the proof that it worked. Chef-kiss.
+</p>
+</details>
+
+<details class="s1" id="s7-4">
+<summary>Each Notification's Purpose</summary>
+<table class="tbl">
+<tr><th>Notification</th><th>Purpose</th><th>Never</th></tr>
+<tr><td><span class="pill pill-green">INVITE</span></td><td>Welcome. Here's the corridor. First door is open.</td><td>Never pressure. Just present the opportunity.</td></tr>
+<tr><td><span class="pill pill-blue">RED/BLUE</span></td><td>Show the achievement at 9/10. Present choice.</td><td>Never imply blue pill is failure.</td></tr>
+<tr><td><span class="pill pill-red">10/10 DONE</span></td><td>Celebrate the polish. Next door opens.</td><td>Never skip the celebration. The player earned it.</td></tr>
+<tr><td><span class="pill pill-gold">SUPERBOSS</span></td><td>Transcendence available. Architect's touch. Paid tier.</td><td>Never push. SuperBoss is an invitation, not an upsell.</td></tr>
+<tr><td><span class="pill pill-green">BRANCH</span></td><td>Choose your next door. 3 options + agent suggestion.</td><td>Never railroad. The player picks.</td></tr>
+<tr><td><span class="pill pill-blue">NUDGE</span></td><td>Gentle reminder. Door still open. No rush.</td><td>Never guilt. Never "you haven't done X."</td></tr>
+</table>
+<p style="font-size:.7rem;color:var(--text3);margin:4px 0">
+For actual templates and delivery details → <a href="BOSS_AGENT_INSTRUCTIONS.html">📋 Technical Reference</a>
+</p>
+</details>
+
+</details>
+
+<div class="gap"></div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 8: ARCHITECTURE -->
+<!-- ═══════════════════════════════════════════ -->
+
+<details class="s0" id="s8">
+<summary>8 · ARCHITECTURE <em>— Overview, Not Implementation</em></summary>
+
+<details class="s1" id="s8-1">
+<summary>Full-Stack Diagram</summary>
+<div class="diagram-grid" style="grid-template-columns:1fr;gap:3px">
+  <div class="grid-node layer-label">Layer 7 — Client</div>
+  <div class="grid-node green">Telegram Bot (player interface, notifications, commands)</div>
+
+  <div class="grid-node layer-label">Layer 6 — Dream Trailer</div>
+  <div class="grid-node">GPT Image Gen + Sandbox Screenshots → visual dream</div>
+
+  <div class="grid-node layer-label">Layer 5 — Orchestration</div>
+  <div class="grid-node">Boss Agent (quest planning, branching, achievement generation)</div>
+
+  <div class="grid-node layer-label">Layer 4 — Execution</div>
+  <div class="grid-node green">Executive Agent (code, polish, PR, commits)</div>
+
+  <div class="grid-node layer-label">Layer 3 — Persistence</div>
+  <div class="grid-node blue">Supabase: public.crews · public.users · public.invoices · private.crew_secrets</div>
+
+  <div class="grid-node layer-label">Layer 2 — Economy</div>
+  <div class="grid-node gold">XTR Stars → public.invoices → admin notification</div>
+
+  <div class="grid-node layer-label">Layer 1 — Independence</div>
+  <div class="grid-node">Git repo fork + seed SQL + 13 secrets = franchise</div>
+</div>
+<p style="font-size:.7rem;color:var(--text3);margin:4px 0">
+For component details, API specs, and implementation → <a href="BOSS_AGENT_INSTRUCTIONS.html">📋 Technical Reference</a>
+</p>
+</details>
+
+<details class="s1" id="s8-2">
+<summary>Data Flow Overview</summary>
+<div class="flow">
+  <div class="flow-step accent">Boss defines dream + quest themes</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">SupaPlan stores tasks + branch options</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step green">Agent picks task → executes → 9/10</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step blue">Notification → player sees score gap</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">Player chooses: blue / red / super</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">Achievement committed to Git</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">Supabase cache updated via Genie skill</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step accent">Branch notification → next door → loop</div>
+</div>
+<p style="font-size:.75rem;color:var(--text2);margin:4px 0">
+The flow is a loop, not a pipeline. Boss defines the dream → agent builds → player claims → player chooses next door → loop. The cycle never forces — it only invites. Each iteration produces an achievement, a score, and a new choice. The player is always in control.
+</p>
+</details>
+
+<details class="s1" id="s8-3">
+<summary>Component Purposes (High-Level)</summary>
+<table class="tbl">
+<tr><th>Component</th><th>Purpose</th></tr>
+<tr><td>SupaPlan</td><td>Task storage + branch routing. The agent's todo list and the player's door map.</td></tr>
+<tr><td>Boss Agent</td><td>Strategic orchestration. Dream translation, quest planning, achievement generation.</td></tr>
+<tr><td>Executive Agent</td><td>Code execution. Build to 9/10, polish to 10/10, architect to 13/10.</td></tr>
+<tr><td>Telegram Bot</td><td>Player interface. Notifications, commands, career profile display.</td></tr>
+<tr><td>Git (GitHub)</td><td>Source of truth. Achievement blockchain. Eternal record in commit history.</td></tr>
+<tr><td>Supabase</td><td>Cache layer. <code>public.crews</code>, <code>public.users</code>, <code>public.invoices</code>, <code>private.crew_secrets</code>. Fast reads for career profile.</td></tr>
+<tr><td>Genie Skill</td><td>Sync layer. Git commits → Supabase cache → career profile display.</td></tr>
+<tr><td>XTR Stars</td><td>Economy. SuperBoss payment, anti-spam rate limiting, invoice generation.</td></tr>
+</table>
+<p style="font-size:.7rem;color:var(--text3);margin:4px 0">
+For schemas, algorithms, and implementation details → <a href="BOSS_AGENT_INSTRUCTIONS.html">📋 Technical Reference</a>
+</p>
+</details>
+
+</details>
+
+<div class="gap"></div>
+
+</main>
+
+<div class="footer">
+  HTML is new MD · Boss End Game Protocol v4.0 · The gap IS the motivation · The gap IS the business model<br>
+  <a href="BOSS_QUEST.HTML">🏰 Quest Center</a>
+  <a href="BOSS_AGENT_INSTRUCTIONS.html">📋 Technical Ref</a>
+</div>
+
+</body>
+</html>
