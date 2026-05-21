@@ -211,11 +211,9 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
     );
     if (!activeEl) return;
 
-    const trackRect = container.getBoundingClientRect();
-    const activeRect = activeEl.getBoundingClientRect();
     setIndicatorStyle({
-      width: activeRect.width,
-      left: activeRect.left - trackRect.left,
+      width: activeEl.offsetWidth,
+      left: activeEl.offsetLeft,
       opacity: 1,
     });
   }, [activePath, pathname, visibleRailLinks]);
