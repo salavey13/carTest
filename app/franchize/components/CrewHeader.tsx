@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
 import type { FranchizeCrewVM } from "../actions";
 import { HeaderMenu } from "../modals/HeaderMenu";
 import { FranchizeProfileButton } from "./FranchizeProfileButton";
+import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { toCategoryId } from "../lib/navigation";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
@@ -212,7 +213,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
           style={{
             ...FRANCHIZE_HEADER_CORNER_GUARD_STYLE,
             display: "grid",
-            gridTemplateColumns: "44px 1fr auto",
+            gridTemplateColumns: "auto auto minmax(0,1fr) auto",
             alignItems: "center",
             gap: "0.75rem",
             maxHeight: isCompact ? 0 : 112,
@@ -230,7 +231,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             aria-expanded={menuOpen}
             aria-controls="franchize-header-menu"
             onClick={() => setMenuOpen(true)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            className="inline-flex h-10 w-10 min-h-10 min-w-10 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             style={{
               backgroundColor: withAlpha(crew.theme.palette.bgBase, 0.8),
               color: crew.theme.palette.textPrimary,
@@ -247,7 +248,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             className="relative z-10 mx-auto flex flex-col items-center text-center cursor-pointer hover:opacity-90 transition-opacity pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             <div
-              className="relative h-16 w-16 overflow-hidden rounded-full border shadow-lg"
+              className="relative h-10 w-10 min-h-10 min-w-10 overflow-hidden rounded-full border shadow-lg"
               style={{
                 borderColor: accentMain,
                 backgroundColor: crew.theme.palette.bgBase,
@@ -260,7 +261,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                     src={logoUrl}
                     alt={`${crew.header.brandName} logo`}
                     fill
-                    sizes="64px"
+                    sizes="40px"
                     className="object-cover"
                     onLoad={() => setLogoLoaded(true)}
                     onError={() => {
@@ -302,44 +303,55 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             </div>
           </Link>
 
-          <FranchizeProfileButton
-            bgColor={withAlpha(crew.theme.palette.bgBase, 0.8)}
-            textColor={crew.theme.palette.textPrimary}
-            borderColor={crew.theme.palette.borderSoft}
-            currentSlug={crew.slug}
-          />
-        </div>
-      </div>
+          {visibleRailLinks.length > 0 && (
+            <div
+              ref={railRef}
+              className="relative flex w-full gap-2 overflow-x-auto no-scrollbar py-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+            >
+              {visibleRailLinks.map((link) => {
+                const isActive = link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href));
+                return (
+                  <Link
+                    key={`${link.label}-${link.href}`}
+                    href={link.href}
+                    data-category-pill={link.categoryLabel}
+                    aria-current={isActive ? "location" : undefined}
+                    aria-label={`Перейти к разделу ${link.label}`}
+                    className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-3 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] transition-all duration-300 pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                    style={{
+                      ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
+                      ["--pill-text" as string]: isActive ? activePillText : crew.theme.palette.textPrimary,
+                      transform: isActive ? "translateY(0) scale(1.02)" : "translateY(0)",
+                    }}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
 
-      {visibleRailLinks.length > 0 && (
-        <div className="-mx-4 mt-1 border-t px-4 pt-2" style={{ borderColor: crew.theme.palette.borderSoft }}>
-          {/* Добавлен класс 'relative' для корректного расчета offsetLeft дочерних элементов */}
-          <div
-            ref={railRef}
-            className="relative mx-auto flex w-full max-w-7xl gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
-          >
-            {visibleRailLinks.map((link) => {
-              const isActive = link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href));
-              return (
-                <Link
-                  key={`${link.label}-${link.href}`}
-                  href={link.href}
-                  data-category-pill={link.categoryLabel}
-                  aria-current={isActive ? "location" : undefined}
-                  aria-label={`Перейти к разделу ${link.label}`}
-                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-4 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] transition-colors pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                  style={{
-                    ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
-                    ["--pill-text" as string]: isActive ? activePillText : crew.theme.palette.textPrimary,
-                  }}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
+          <div className="flex items-center gap-2 justify-self-end">
+            <FranchizeProfileButton
+              bgColor={withAlpha(crew.theme.palette.bgBase, 0.8)}
+              textColor={crew.theme.palette.textPrimary}
+              borderColor={crew.theme.palette.borderSoft}
+              currentSlug={crew.slug}
+            />
+            <FloatingCartIconLinkBySlug
+              slug={crew.slug}
+              href={`/franchize/${crew.slug}/cart`}
+              items={undefined}
+              accentColor={crew.theme.palette.accentMain}
+              textColor={crew.theme.palette.textPrimary}
+              borderColor={crew.theme.palette.borderSoft}
+              theme={crew.theme}
+              mode="inline-icon"
+              className="relative inline-flex h-10 w-10 min-h-10 min-w-10 items-center justify-center rounded-xl"
+            />
           </div>
         </div>
-      )}
+      </div>
 
       <HeaderMenu crew={crew} activePath={activePath} open={menuOpen} onOpenChange={setMenuOpen} />
     </header>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowUp, ShoppingCart } from "lucide-react";
 
 interface FloatingCartIconLinkProps {
+  mode?: "floating" | "inline-icon";
   href: string;
   itemCount: number;
   totalPrice: number;
@@ -14,8 +15,32 @@ interface FloatingCartIconLinkProps {
   className?: string;
 }
 
-export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor, textColor, borderColor, backgroundColor, className }: FloatingCartIconLinkProps) {
+export function FloatingCartIconLink({ href, itemCount, totalPrice, accentColor, textColor, borderColor, backgroundColor, className, mode = "floating" }: FloatingCartIconLinkProps) {
   const isCartEmpty = itemCount === 0;
+
+
+  if (mode === "inline-icon") {
+    return (
+      <Link
+        href={href}
+        aria-label={`Открыть корзину: ${itemCount} позиций, ${isCartEmpty ? "0 ₽" : `${totalPrice.toLocaleString("ru-RU")} ₽`}`}
+        className={className ?? "relative inline-flex h-10 w-10 items-center justify-center rounded-xl transition active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"}
+        style={{
+          backgroundColor,
+          color: textColor,
+          border: `1px solid ${borderColor}`,
+        }}
+      >
+        <ShoppingCart className="h-4 w-4" />
+        <span
+          className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full border bg-white px-1 text-[10px] font-bold text-[#16130A]"
+          style={{ borderColor }}
+        >
+          {itemCount}
+        </span>
+      </Link>
+    );
+  }
 
   return (
     <div
