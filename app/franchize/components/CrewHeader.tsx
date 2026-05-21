@@ -196,26 +196,18 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   useEffect(() => {
     const container = railRef.current;
     if (!container) return;
-
     const activeRailLink = visibleRailLinks.find(
       (link) => link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href)),
     );
-
     if (!activeRailLink) {
       setIndicatorStyle((prev) => ({ ...prev, opacity: 0 }));
       return;
     }
-
     const activeEl = Array.from(container.querySelectorAll<HTMLElement>("[data-category-pill]")).find(
       (element) => element.dataset.categoryPill === activeRailLink.categoryLabel,
     );
     if (!activeEl) return;
-
-    setIndicatorStyle({
-      width: activeEl.offsetWidth,
-      left: activeEl.offsetLeft,
-      opacity: 1,
-    });
+    setIndicatorStyle({ width: activeEl.offsetWidth, left: activeEl.offsetLeft, opacity: 1 });
   }, [activePath, pathname, visibleRailLinks]);
 
   return (
