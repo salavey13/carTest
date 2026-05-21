@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOSS AGENT INSTRUCTIONS — Technical Companion v4.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#0a0a0f;--bg2:#111118;--bg3:#16161f;--bg4:#1c1c28;
+--text:#e0e0e8;--text2:#a0a0b0;--text3:#707080;
+--red:#ff0044;--blue:#0088ff;--gold:#ffd700;--green:#00ff88;
+--border:#252535;--border2:#303040;
+--radius:6px;
+}
+html{font-size:14px;scroll-behavior:smooth}
+body{
+font-family:'Inter',system-ui,-apple-system,sans-serif;
+background:var(--bg);color:var(--text);
+line-height:1.5;min-height:100vh;
+padding:12px;
+-webkit-font-smoothing:antialiased;
+}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+code,pre,.mono{font-family:'JetBrains Mono',monospace}
+
+/* Header */
+.hdr{text-align:center;padding:16px 8px 12px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.hdr .tagline{font-size:.75rem;color:var(--green);letter-spacing:.2em;text-transform:uppercase;font-weight:600;margin-bottom:4px}
+.hdr h1{font-size:1.3rem;font-weight:700;letter-spacing:-.02em}
+.hdr .sub{font-size:.8rem;color:var(--text2);margin-top:2px}
+.companion-links{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0}
+.companion-link{display:inline-block;padding:6px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:.75rem;color:var(--gold);background:var(--bg2)}
+.companion-link:hover{background:var(--bg3);text-decoration:none}
+
+/* Details/Summary */
+details{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:4px;background:var(--bg2)}
+details>summary{
+padding:8px 10px;cursor:pointer;font-weight:600;font-size:.82rem;
+list-style:none;display:flex;align-items:center;gap:6px;
+user-select:none;
+}
+details>summary::before{content:'▸';font-size:.7rem;color:var(--text3);transition:transform .15s;flex-shrink:0}
+details[open]>summary::before{transform:rotate(90deg)}
+details>summary:hover{background:var(--bg3)}
+details>summary .sec-num{
+display:inline-flex;align-items:center;justify-content:center;
+width:20px;height:20px;border-radius:4px;font-size:.65rem;font-weight:700;flex-shrink:0;
+}
+details>div,details>.det-body{padding:8px 10px 10px}
+details details{margin:3px 0;border-color:var(--border2)}
+details details>summary{font-size:.78rem;font-weight:500;padding:6px 8px}
+details details>div,details details>.det-body{padding:6px 8px 8px}
+details details details{border-color:var(--border)}
+details details details>summary{font-size:.75rem;padding:5px 7px}
+details details details>div{padding:5px 7px 7px}
+
+/* Section number colors */
+.s-red{background:rgba(255,0,68,.15);color:var(--red)}
+.s-blue{background:rgba(0,136,255,.15);color:var(--blue)}
+.s-gold{background:rgba(255,215,0,.15);color:var(--gold)}
+.s-green{background:rgba(0,255,136,.15);color:var(--green)}
+
+/* Badges */
+.pill{display:inline-flex;align-items:center;padding:1px 7px;border-radius:99px;font-size:.65rem;font-weight:600;letter-spacing:.03em}
+.pill-red{background:rgba(255,0,68,.15);color:var(--red);border:1px solid rgba(255,0,68,.3)}
+.pill-blue{background:rgba(0,136,255,.15);color:var(--blue);border:1px solid rgba(0,136,255,.3)}
+.pill-gold{background:rgba(255,215,0,.15);color:var(--gold);border:1px solid rgba(255,215,0,.3)}
+.pill-green{background:rgba(0,255,136,.15);color:var(--green);border:1px solid rgba(0,255,136,.3)}
+.pill-gray{background:rgba(160,160,176,.1);color:var(--text2);border:1px solid rgba(160,160,176,.2)}
+
+.score{display:inline-flex;align-items:center;justify-content:center;min-width:32px;padding:1px 6px;border-radius:4px;font-size:.7rem;font-weight:700;font-family:'JetBrains Mono',monospace}
+.score-9{background:rgba(0,136,255,.15);color:var(--blue)}
+.score-10{background:rgba(255,215,0,.15);color:var(--gold)}
+.score-13{background:rgba(255,0,68,.15);color:var(--red)}
+
+/* Door cards */
+.door-card{
+border-left:3px solid var(--border2);padding:6px 8px;margin:3px 0;
+border-radius:0 var(--radius) var(--radius) 0;background:var(--bg3);
+font-size:.78rem;
+}
+.door-card.red{border-left-color:var(--red)}
+.door-card.blue{border-left-color:var(--blue)}
+.door-card.green{border-left-color:var(--green)}
+.door-card.gold{border-left-color:var(--gold)}
+
+/* Role cards */
+.role{padding:8px 10px;border-radius:var(--radius);margin:4px 0}
+.role-boss{background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.15)}
+.role-agent{background:rgba(0,136,255,.06);border:1px solid rgba(0,136,255,.15)}
+.role h4{font-size:.8rem;display:flex;align-items:center;gap:5px;margin-bottom:4px}
+.role ul{list-style:none;padding:0}
+.role li{font-size:.75rem;color:var(--text2);padding:1px 0 1px 12px;position:relative}
+.role li::before{content:'→';position:absolute;left:0;color:var(--text3);font-size:.7rem}
+
+/* Code blocks */
+.code-block{
+background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);
+padding:8px 10px;margin:4px 0;font-family:'JetBrains Mono',monospace;
+font-size:.7rem;line-height:1.6;overflow-x:auto;white-space:pre;color:var(--text2);
+}
+.code-block .k{color:var(--blue)}
+.code-block .v{color:var(--green)}
+.code-block .c{color:var(--text3)}
+.code-block .h{color:var(--gold)}
+.code-block .r{color:var(--red)}
+
+/* Field table */
+.field{display:flex;gap:6px;padding:2px 0;font-size:.72rem;border-bottom:1px solid var(--border);align-items:baseline}
+.field:last-child{border-bottom:none}
+.field .fn{color:var(--blue);font-family:'JetBrains Mono',monospace;min-width:120px;flex-shrink:0;font-weight:500}
+.field .ft{color:var(--text3);font-family:'JetBrains Mono',monospace;min-width:50px;flex-shrink:0;font-size:.65rem}
+.field .fd{color:var(--text2)}
+
+/* Checklist */
+.chk{list-style:none;padding:0}
+.chk li{font-size:.75rem;padding:2px 0;display:flex;align-items:flex-start;gap:5px}
+.chk li .ck{color:var(--green);flex-shrink:0;font-weight:700}
+
+/* Notification template */
+.notif{
+border:1px solid var(--border);border-radius:var(--radius);
+padding:8px 10px;margin:4px 0;font-family:'JetBrains Mono',monospace;
+font-size:.68rem;line-height:1.55;background:var(--bg);white-space:pre-wrap;color:var(--text2)
+}
+
+/* Flow diagram */
+.flow{display:flex;flex-direction:column;gap:2px;margin:4px 0}
+.flow-step{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:var(--radius);font-size:.72rem;background:var(--bg3)}
+.flow-step .step-n{min-width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;flex-shrink:0}
+.flow-arrow{text-align:center;color:var(--text3);font-size:.6rem;padding:1px 0}
+
+/* Key rule */
+.rule{padding:5px 8px;border-radius:var(--radius);font-size:.75rem;background:var(--bg3);border-left:2px solid var(--border2);margin:2px 0}
+
+/* Grid for pipeline */
+.pipe-grid{display:grid;grid-template-columns:1fr;gap:3px;margin:4px 0}
+@media(min-width:480px){.pipe-grid{grid-template-columns:1fr 1fr}}
+
+/* Table of contents */
+.toc{columns:2;column-gap:12px;font-size:.72rem;margin:6px 0}
+.toc a{color:var(--text2);display:block;padding:1px 0;break-inside:avoid}
+.toc a:hover{color:var(--text);text-decoration:none}
+
+/* Responsive */
+@media(min-width:640px){body{padding:20px 32px;max-width:800px;margin:0 auto}}
+
+/* Custom scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+
+/* Separator */
+.sep{border:none;border-top:1px solid var(--border);margin:8px 0}
+
+/* Type badge */
+.type-badge{display:inline-block;padding:2px 6px;border-radius:3px;font-size:.6rem;font-weight:700;font-family:'JetBrains Mono',monospace;margin-right:4px}
+.type-a{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.3)}
+.type-b{background:rgba(255,215,0,.1);color:var(--gold);border:1px solid rgba(255,215,0,.3)}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="tagline">HTML is new MD</div>
+  <h1>BOSS AGENT INSTRUCTIONS</h1>
+  <div class="sub">Technical Companion — Execution Reference Card — v4.0</div>
+  <div class="companion-links">
+    <a href="BOSS_QUEST.HTML" class="companion-link">🏰 Quest Center →</a>
+    <a href="BOSS_END_GAME_PROTOCOL.html" class="companion-link">🔮 Protocol →</a>
+  </div>
+</div>
+
+<!-- TOC -->
+<details>
+<summary><span class="sec-num s-green">≡</span> Table of Contents</summary>
+<div class="toc">
+  <a href="#s1">1. Role Separation</a>
+  <a href="#s2">2. SupaPlan Schema</a>
+  <a href="#s3">3. Branching Protocol</a>
+  <a href="#s4">4. Achievement Generation</a>
+  <a href="#s5">5. Commit Body Structure</a>
+  <a href="#s6">6. Notification Templates</a>
+  <a href="#s7">7. Agent Suggestion Pipeline</a>
+  <a href="#s8">8. Boss Decomposition Checklist</a>
+  <a href="#s9">9. Career Profile Schema</a>
+  <a href="#s10">10. Fork Pipeline</a>
+  <a href="#s11">11. Key Rules — Quick Ref</a>
+</div>
+</details>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 1: ROLE SEPARATION -->
+<!-- ═══════════════════════════════════════════ -->
+<details id="s1">
+<summary><span class="sec-num s-gold">1</span> Role Separation</summary>
+<div>
+
+<details>
+<summary><span class="pill pill-gold">BOSS</span> Strategic Architect</summary>
+<div class="role role-boss">
+<h4>👑 Boss Role — Strategic Architect</h4>
+<ul>
+  <li>Receives dream trailer + bio dump from client</li>
+  <li>Validates dream — is it achievable? Does it align with available stack?</li>
+  <li>Decomposes dream into quest chain (5–8 high-level doors)</li>
+  <li>Writes <strong>POLISH INSTRUCTIONS</strong> inside each SupaPlan task's metadata</li>
+  <li>Focuses on <strong>BIG PICTURE</strong> — the narrative arc, the emotional journey</li>
+  <li>Does NOT micromanage achievement names or micro-branching</li>
+  <li>Sets overall quest chain name, theme, and endpoint</li>
+  <li>Creates SupaPlan tasks — all initial doors are <code>suggested_by: "boss"</code></li>
+  <li>Sends the first INVITE notification to player</li>
+</ul>
+</div>
+
+<details>
+<summary>What Boss writes vs. doesn't</summary>
+<div>
+<div class="field"><span class="fn">✍️ Writes</span><span class="fd">polish_instructions, dream_name, tags, spoil_preview, requires/unlocks graph, difficulty, quest_chain_id</span></div>
+<div class="field"><span class="fn">❌ Doesn't</span><span class="fd">achievement names, achievement descriptions, notification Part 2 content, agent suggestions, commit bodies</span></div>
+<div class="field"><span class="fn">🎯 Owns</span><span class="fd">strategic decomposition, first INVITE notification, quest chain coherence, dream validation</span></div>
+<div class="field"><span class="fn">🚫 Delegates</span><span class="fd">creative execution, on-the-fly naming, branching selection, commit structure, invoicing flow</span></div>
+</div>
+</details>
+</div>
+</details>
+
+<details>
+<summary><span class="pill pill-blue">AGENT</span> Creative Executor</summary>
+<div class="role role-agent">
+<h4>🤖 Agent Role — Creative Executor</h4>
+<ul>
+  <li>Picks up SupaPlan task via cheatcode</li>
+  <li>Reads <code>polish_instructions</code> from task metadata</li>
+  <li>Executes the polish/implementation</li>
+  <li>IMAGINES achievement name + description on the fly — "What achievement did the player earn?"</li>
+  <li>Checks SupaPlan for related non-done tasks → picks <strong>TOP 3</strong> from boss-created open tasks</li>
+  <li>Can SUGGEST a 4th door (<span class="pill pill-gold">✨ AGENT SUGGESTED</span>) — either polishing current task OR genuinely new task</li>
+  <li>Creates structured commit body with achievement data</li>
+  <li>Sends notification Part 2 with achievement + branching choices</li>
+  <li>For SuperBoss: triggers <code>create_invoice()</code> → <code>update_invoice_status('paid')</code> flow</li>
+</ul>
+</div>
+
+<details>
+<summary>What Agent writes vs. doesn't</summary>
+<div>
+<div class="field"><span class="fn">✍️ Writes</span><span class="fd">achievement_name, achievement_description, commit body, notification Part 2, optional 4th door (SupaPlan task on the fly), invoice triggers</span></div>
+<div class="field"><span class="fn">❌ Doesn't</span><span class="fd">quest chain decomposition, polish_instructions, dream validation, first INVITE, strategic vision</span></div>
+<div class="field"><span class="fn">🎯 Owns</span><span class="fd">creative naming, branch ranking, code execution, commit structure, on-the-fly SupaPlan task creation</span></div>
+<div class="field"><span class="fn">🚫 Delegates</span><span class="fd">strategic vision, quest coherence, overall difficulty balancing, dream validation</span></div>
+</div>
+</details>
+</div>
+</details>
+
+<details>
+<summary>Boss vs Agent — Responsibility Table</summary>
+<div>
+<div class="field"><span class="fn">Decompose dream</span><span class="ft">Boss</span><span class="fd">Strategic 5–8 doors</span></div>
+<div class="field"><span class="fn">polish_instructions</span><span class="ft">Boss</span><span class="fd">Creative direction per door</span></div>
+<div class="field"><span class="fn">requires/unlocks</span><span class="ft">Boss</span><span class="fd">Dependency DAG</span></div>
+<div class="field"><span class="fn">First INVITE</span><span class="ft">Boss</span><span class="fd">Sends to player</span></div>
+<div class="field"><span class="fn">Execute polish</span><span class="ft">Agent</span><span class="fd">Code implementation</span></div>
+<div class="field"><span class="fn">Achievement name</span><span class="ft">Agent</span><span class="fd">Imagined on the fly</span></div>
+<div class="field"><span class="fn">Branch TOP 3</span><span class="ft">Agent</span><span class="fd">Ranked from boss-created tasks</span></div>
+<div class="field"><span class="fn">4th suggestion</span><span class="ft">Agent</span><span class="fd">New SupaPlan task on the fly</span></div>
+<div class="field"><span class="fn">Commit body</span><span class="ft">Agent</span><span class="fd">Structured achievement data</span></div>
+<div class="field"><span class="fn">Notification Pt2</span><span class="ft">Agent</span><span class="fd">Achievement + branching</span></div>
+<div class="field"><span class="fn">SuperBoss invoice</span><span class="ft">Agent</span><span class="fd">create_invoice() → update status</span></div>
+</div>
+</details>
+
+<details>
+<summary>Interaction Flow Diagram</summary>
+<div>
+<div class="flow">
+  <div class="flow-step"><span class="step-n s-gold">1</span> Client sends dream trailer + bio dump</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-gold">2</span> <strong>BOSS</strong> validates + decomposes into 5–8 doors</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-gold">3</span> <strong>BOSS</strong> creates SupaPlan tasks with metadata + sends INVITE</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-blue">4</span> Player picks door → <strong>AGENT</strong> picks up task via cheatcode</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-blue">5</span> <strong>AGENT</strong> reads polish_instructions → executes → imagines achievement</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-blue">6</span> <strong>AGENT</strong> ranks branches → picks TOP 3 (boss tasks) + optional ✨4th</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-blue">7</span> <strong>AGENT</strong> creates commit body + sends Notification Part 2</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-green">8</span> Player chooses next door → loop to step 4</div>
+</div>
+</div>
+</details>
+
+</div>
+</details>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 2: SUPAPLAN SCHEMA -->
+<!-- ═══════════════════════════════════════════ -->
+<details id="s2">
+<summary><span class="sec-num s-blue">2</span> SupaPlan Schema — How Tasks Store Everything</summary>
+<div>
+
+<details>
+<summary>Core Fields</summary>
+<div>
+<div class="field"><span class="fn">id</span><span class="ft">UUID</span><span class="fd">The "cheatcode" / door key</span></div>
+<div class="field"><span class="fn">title</span><span class="ft">string</span><span class="fd">Quest name like "Архитектор Ботов"</span></div>
+<div class="field"><span class="fn">status</span><span class="ft">enum</span><span class="fd"><span class="pill pill-gray">open</span> <span class="pill pill-blue">claimed</span> <span class="pill pill-green">running</span> <span class="pill pill-gold">ready_for_pr</span> <span class="pill pill-red">done</span></span></div>
+<div class="field"><span class="fn">body</span><span class="ft">text</span><span class="fd">Task description for Codex</span></div>
+<div class="field"><span class="fn">metadata</span><span class="ft">JSONB</span><span class="fd">All quest chain data lives here ↓</span></div>
+</div>
+</details>
+
+<details>
+<summary>Metadata JSONB — Full Structure</summary>
+<div>
+<div class="code-block">{
+  <span class="k">"quest_chain_id"</span>: <span class="v">"string"</span>       <span class="c">// links doors together</span>
+  <span class="k">"chain_position"</span>: <span class="v">"number"</span>       <span class="c">// 1/6, 2/6, etc.</span>
+  <span class="k">"polish_instructions"</span>: <span class="v">"string"</span> <span class="c">// boss-written creative direction</span>
+  <span class="k">"codex_task_url"</span>: <span class="v">"string"</span>      <span class="c">// direct link to Codex task</span>
+  <span class="k">"player"</span>: <span class="v">"string"</span>              <span class="c">// who this door is for</span>
+  <span class="k">"dream_name"</span>: <span class="v">"string"</span>          <span class="c">// the overall dream/wish name</span>
+  <span class="k">"difficulty"</span>: <span class="v">"easy|medium|epic"</span>
+  <span class="k">"tags"</span>: <span class="v">["string"]</span>             <span class="c">// for dynamic branching</span>
+  <span class="k">"suggested_by"</span>: <span class="v">"boss|agent"</span>    <span class="c">// who proposed this door</span>
+  <span class="k">"requires"</span>: <span class="v">["UUID"]</span>           <span class="c">// doors that must complete first</span>
+  <span class="k">"unlocks"</span>: <span class="v">["UUID"]</span>            <span class="c">// doors this enables after completion</span>
+  <span class="k">"spoil_preview"</span>: <span class="v">"string"</span>      <span class="c">// spoiler text for notification</span>
+}</div>
+</div>
+</details>
+
+<details>
+<summary>Dependency Graph — requires/unlocks</summary>
+<div>
+<div style="font-size:.72rem;color:var(--text2);margin-bottom:6px">
+  The <code>requires</code> and <code>unlocks</code> arrays form a DAG (directed acyclic graph) of door dependencies.
+</div>
+<div style="display:flex;flex-direction:column;gap:3px">
+  <div class="door-card gold">
+    <strong>Door 1</strong> <span class="pill pill-gray">root</span><br>
+    <span style="font-size:.7rem;color:var(--text3)">requires: [] &nbsp;→&nbsp; unlocks: [D2, D3]</span>
+  </div>
+  <div style="text-align:center;color:var(--text3);font-size:.6rem">↓ ┌───────────────┐ ↓</div>
+  <div style="display:flex;gap:3px;flex-wrap:wrap">
+    <div class="door-card red" style="flex:1;min-width:45%">
+      <strong>Door 2a</strong> <span class="pill pill-red">red</span><br>
+      <span style="font-size:.68rem;color:var(--text3)">requires: [D1]<br>unlocks: [D4]</span>
+    </div>
+    <div class="door-card blue" style="flex:1;min-width:45%">
+      <strong>Door 2b</strong> <span class="pill pill-blue">blue</span><br>
+      <span style="font-size:.68rem;color:var(--text3)">requires: [D1]<br>unlocks: [D5]</span>
+    </div>
+  </div>
+  <div style="text-align:center;color:var(--text3);font-size:.6rem">↓</div>
+  <div class="door-card green">
+    <strong>Door 3</strong> <span class="pill pill-green">merge</span><br>
+    <span style="font-size:.7rem;color:var(--text3)">requires: [D2 OR D3] &nbsp;→&nbsp; unlocks: [D6]</span>
+  </div>
+</div>
+</div>
+</details>
+
+<details>
+<summary>Status Lifecycle</summary>
+<div>
+<div class="flow">
+  <div class="flow-step"><span class="step-n" style="background:var(--bg);color:var(--text2)">⬤</span> <span class="pill pill-gray">open</span> — created by Boss, waiting for player</div>
+  <div class="flow-arrow">↓ cheatcode entered</div>
+  <div class="flow-step"><span class="step-n" style="background:rgba(0,136,255,.2);color:var(--blue)">⬤</span> <span class="pill pill-blue">claimed</span> — player entered cheatcode, agent assigned</div>
+  <div class="flow-arrow">↓ agent starts execution</div>
+  <div class="flow-step"><span class="step-n" style="background:rgba(0,255,136,.2);color:var(--green)">⬤</span> <span class="pill pill-green">running</span> — agent executing polish instructions</div>
+  <div class="flow-arrow">↓ agent finishes</div>
+  <div class="flow-step"><span class="step-n" style="background:rgba(255,215,0,.2);color:var(--gold)">⬤</span> <span class="pill pill-gold">ready_for_pr</span> — code ready, PR can be created</div>
+  <div class="flow-arrow">↓ player hits PR button or continues</div>
+  <div class="flow-step"><span class="step-n" style="background:rgba(255,0,68,.2);color:var(--red)">⬤</span> <span class="pill pill-red">done</span> — complete, achievement locked in</div>
+</div>
+</div>
+</details>
+
+<details>
+<summary>Real Supabase Tables Reference</summary>
+<div>
+
+<details>
+<summary><code>public.crews</code> — Bot/Tenant Configuration</summary>
+<div>
+<div class="code-block"><span class="k">CREATE TABLE</span> public.crews (
+  id          <span class="v">UUID</span> <span class="k">PRIMARY KEY</span>,
+  name        <span class="v">TEXT</span>,
+  description <span class="v">TEXT</span>,
+  logo_url    <span class="v">TEXT</span>,
+  owner_id    <span class="v">TEXT</span>,
+  slug        <span class="v">TEXT UNIQUE</span>,
+  hq_location <span class="v">TEXT</span>,
+  metadata    <span class="v">JSONB NOT NULL DEFAULT '{}'::jsonb</span>,
+  created_at  <span class="v">TIMESTAMPTZ DEFAULT now()</span>,
+  updated_at  <span class="v">TIMESTAMPTZ DEFAULT now()</span>
+);</div>
+<div style="font-size:.68rem;color:var(--text3);margin-top:4px">
+  <code>metadata.franchize</code> contains full branding/theme/config JSONB:<br>
+  version, enabled, slug, branding (name, shortName, tagline, logoUrl, heroImageUrl),
+  theme (mode, palette, radius, spacing, effects), header (menuLinks, quickActions),
+  footer (columns, copyrightTemplate, poweredBy), about, contacts, contentBlocks,
+  catalog, order, contractDefaults
+</div>
+</div>
+</details>
+
+<details>
+<summary><code>public.users</code> — Player Profiles</summary>
+<div>
+<div class="code-block"><span class="k">CREATE TABLE</span> public.users (
+  user_id     <span class="v">TEXT PRIMARY KEY NOT NULL</span>,
+  username    <span class="v">TEXT UNIQUE</span>,
+  full_name   <span class="v">TEXT</span>,
+  avatar_url  <span class="v">TEXT</span>,
+  website     <span class="v">TEXT</span>,
+  language_code <span class="v">TEXT</span>,
+  subscription_id <span class="v">TEXT</span>,
+  status      <span class="v">TEXT DEFAULT 'free'</span>,   <span class="c">// 'free'|'pro'|'admin'</span>
+  role        <span class="v">TEXT DEFAULT 'attendee'</span>,
+  created_at  <span class="v">TIMESTAMPTZ DEFAULT now()</span>,
+  updated_at  <span class="v">TIMESTAMPTZ DEFAULT now()</span>,
+  active_organizer_id <span class="v">TEXT</span>,
+  metadata    <span class="v">JSONB NOT NULL DEFAULT '{}'::jsonb</span>,
+  description <span class="v">TEXT</span>,
+  badges      <span class="v">JSONB</span>,               <span class="c">// achievement badges stored here</span>
+  test_progress <span class="v">JSONB</span>
+);</div>
+<div style="font-size:.68rem;color:var(--text3);margin-top:4px">
+  <code>badges</code> JSONB stores achievement data: [{name, description, score, pill, quest_chain_id, door, earned_at}]<br>
+  <code>status</code>: 'free' | 'pro' | 'admin'
+</div>
+</div>
+</details>
+
+<details>
+<summary><code>public.invoices</code> — XTR Payment Tracking</summary>
+<div>
+<div class="code-block"><span class="k">CREATE TABLE</span> public.invoices (
+  id              <span class="v">TEXT PRIMARY KEY</span>,
+  type            <span class="v">TEXT</span>,                <span class="c">// 'superboss', 'subscription', etc.</span>
+  user_id         <span class="v">TEXT NOT NULL REFERENCES</span> users(user_id) <span class="k">ON DELETE CASCADE</span>,
+  subscription_id <span class="v">TEXT NOT NULL</span>,
+  status          <span class="v">TEXT DEFAULT 'pending'</span>, <span class="c">// 'pending'|'paid'|'failed'</span>
+  amount          <span class="v">INTEGER NOT NULL</span>,
+  currency        <span class="v">TEXT DEFAULT 'XTR'</span>,
+  created_at      <span class="v">TIMESTAMPTZ DEFAULT now()</span>,
+  updated_at      <span class="v">TIMESTAMPTZ DEFAULT now()</span>,
+  metadata        <span class="v">JSONB DEFAULT '{}'::jsonb</span>
+);</div>
+<div style="font-size:.68rem;color:var(--text3);margin-top:4px">
+  Status lifecycle: <span class="pill pill-gray">pending</span> → <span class="pill pill-green">paid</span> or <span class="pill pill-red">failed</span><br>
+  Invoice functions: <code>create_invoice()</code>, <code>update_invoice_status()</code>, <code>get_user_invoices()</code>
+</div>
+</div>
+</details>
+
+<details>
+<summary><code>private.crew_secrets</code> — Sensitive Config</summary>
+<div>
+<div class="code-block"><span class="c">-- private schema, not publicly readable</span>
+crew_slug        <span class="v">TEXT</span>
+contract_defaults <span class="v">JSON</span>
+updated_at       <span class="v">TIMESTAMPTZ</span></div>
+</div>
+</details>
+
+<details>
+<summary>Key SQL Patterns</summary>
+<div>
+<div class="code-block"><span class="c">-- Get crew config by slug</span>
+<span class="k">SELECT</span> * <span class="k">FROM</span> public.crews <span class="k">WHERE</span> slug = <span class="v">'my-bot'</span>;
+
+<span class="c">-- Get crew's franchize branding</span>
+<span class="k">SELECT</span> metadata-><span class="v">'franchize'</span>-><span class="v">'branding'</span> <span class="k">FROM</span> public.crews <span class="k">WHERE</span> slug = <span class="v">'my-bot'</span>;
+
+<span class="c">-- Get user badges (achievements)</span>
+<span class="k">SELECT</span> badges <span class="k">FROM</span> public.users <span class="k">WHERE</span> user_id = <span class="v">'telegram-123'</span>;
+
+<span class="c">-- Get pending invoices for user</span>
+<span class="k">SELECT</span> * <span class="k">FROM</span> public.invoices
+<span class="k">WHERE</span> user_id = <span class="v">'telegram-123'</span> <span class="k">AND</span> status = <span class="v">'pending'</span>;
+
+<span class="c">-- Create SuperBoss invoice</span>
+<span class="k">SELECT</span> create_invoice(
+  <span class="v">'superboss'</span>,       <span class="c">-- p_type</span>
+  <span class="v">'task-uuid'</span>,       <span class="c">-- p_id</span>
+  <span class="v">'telegram-123'</span>,    <span class="c">-- p_user_id</span>
+  <span class="v">99</span>,                <span class="c">-- p_amount (XTR Stars)</span>
+  <span class="v">'sub-uuid'</span>,        <span class="c">-- p_subscription_id</span>
+  <span class="v">'{"cheatcode":"..."}'</span>::jsonb <span class="c">-- p_metadata</span>
+);
+
+<span class="c">-- Mark invoice as paid → triggers admin notification</span>
+<span class="k">SELECT</span> update_invoice_status(<span class="v">'invoice-id'</span>, <span class="v">'paid'</span>);</div>
+</div>
+</details>
+
+</div>
+</details>
+
+</div>
+</details>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 3: BRANCHING PROTOCOL -->
+<!-- ═══════════════════════════════════════════ -->
+<details id="s3">
+<summary><span class="sec-num s-red">3</span> Branching Protocol — How Agents Pick Next Doors</summary>
+<div>
+
+<details>
+<summary>STEP 1: Query SupaPlan</summary>
+<div>
+<div style="font-size:.75rem;color:var(--text2);margin-bottom:4px">When agent completes a task and prepares Notification Part 2:</div>
+<div class="code-block"><span class="h">CHECK</span> SupaPlan for tasks where:
+  status      <span class="r">!=</span> <span class="v">'done'</span>
+  quest_chain_id <span class="r">==</span> current chain
+  requires[]  <span class="r">includes</span> current task UUID <span class="c">(or requires is empty)</span>
+  suggested_by <span class="r">==</span> <span class="v">'boss'</span>  <span class="c">// TOP 3 from boss-created tasks only</span>
+  <span class="r">NOT</span> the current task itself</div>
+</div>
+</details>
+
+<details>
+<summary>STEP 2: Rank by Relevance</summary>
+<div>
+<div class="flow">
+  <div class="flow-step"><span class="step-n s-gold">★</span> <strong>Highest priority</strong> — tasks in current task's <code>unlocks[]</code></div>
+  <div class="flow-step"><span class="step-n s-blue">◆</span> <strong>Medium priority</strong> — tasks with overlapping <code>tags[]</code></div>
+  <div class="flow-step"><span class="step-n pill-gray" style="padding:0 4px">●</span> <strong>Low priority</strong> — remaining chain tasks</div>
+</div>
+</div>
+</details>
+
+<details>
+<summary>STEP 3: Pick TOP 3 (from boss-created open tasks)</summary>
+<div>
+<div style="font-size:.75rem;color:var(--text2)">Select the top 3 ranked tasks from <strong>boss-created</strong> open tasks only. These become the 🔴🔵🟢 door options.</div>
+<div style="display:flex;gap:4px;flex-wrap:wrap;margin:6px 0">
+  <div class="door-card red" style="flex:1;min-width:80px"><strong>🔴 Door Xa</strong><br><span style="font-size:.68rem;color:var(--text3)">Highest rank</span></div>
+  <div class="door-card blue" style="flex:1;min-width:80px"><strong>🔵 Door Xb</strong><br><span style="font-size:.68rem;color:var(--text3)">Medium rank</span></div>
+  <div class="door-card green" style="flex:1;min-width:80px"><strong>🟢 Door Xc</strong><br><span style="font-size:.68rem;color:var(--text3)">Lowest of top 3</span></div>
+</div>
+</div>
+</details>
+
+<details>
+<summary>STEP 4: Optional 4th — Agent Suggested</summary>
+<div>
+<div style="font-size:.75rem;color:var(--text2);margin-bottom:6px">The 4th option can be one of TWO types:</div>
+
+<div style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0">
+  <div class="door-card green" style="flex:1;min-width:140px">
+    <span class="type-badge type-a">TYPE A</span> <strong>Polish current task</strong><br>
+    <span style="font-size:.68rem;color:var(--text3)">Additional minor enhancement in the same cheatcode area. Quick touch-up that makes the current door even better.</span>
+  </div>
+  <div class="door-card gold" style="flex:1;min-width:140px">
+    <span class="type-badge type-b">TYPE B</span> <strong>Genuinely new door</strong><br>
+    <span style="font-size:.68rem;color:var(--text3)">Agent CREATES a full SupaPlan task ON THE FLY. Gets <code>suggested_by: "agent"</code>, <code>requires: [current-UUID]</code>, <code>quest_chain_id: same</code>.</span>
+  </div>
+</div>
+
+<ul class="chk">
+  <li><span class="ck">A</span> <strong>Type A</strong>: Extra polish pass on current task — "one more thing that would make this shine"</li>
+  <li><span class="ck">B</span> <strong>Type B</strong>: Agent creates a brand-new SupaPlan task on the fly → full door with metadata</li>
+  <li><span class="ck">→</span> Both types appear as <span class="pill pill-gold">✨ AGENT SUGGESTED</span> in notification</li>
+  <li><span class="ck">→</span> Type B tasks are persisted in SupaPlan and join the dependency graph</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>STEP 5: Format Notification Output</summary>
+<div>
+<div class="notif">🔴 Door Xa: [name] — [one-line description]
+   💬 [spoil_preview from metadata]
+🔵 Door Xb: [name] — [one-line description]
+   💬 [spoil_preview from metadata]
+🟢 Door Xc: [name] — [one-line description]
+   💬 [spoil_preview from metadata]
+✨ Door Xd: [name] — [description] (AGENT SUGGESTED)
+   💬 [spoil_preview]</div>
+</div>
+</details>
+
+<details>
+<summary>Branching Algorithm — Visual</summary>
+<div>
+<div style="font-size:.7rem;color:var(--text2);margin-bottom:6px">The complete decision pipeline from task completion to notification:</div>
+<div class="flow">
+  <div class="flow-step"><span class="step-n s-green">✓</span> Task complete — agent ready to branch</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-blue">Q</span> Query SupaPlan: non-done, same chain, unlocked, boss-created</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-gold">R</span> Rank: unlocks[] → tags overlap → remaining</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-red">3</span> Pick TOP 3 → 🔴🔵🟢 door cards</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n" style="background:rgba(255,215,0,.2);color:var(--gold)">4</span> Gap detected? → Type A (polish current) OR Type B (new SupaPlan task)</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-green">📨</span> Format 3+1 notification → send</div>
+</div>
+</div>
+</details>
+
+</div>
+</details>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 4: ACHIEVEMENT GENERATION -->
+<!-- ═══════════════════════════════════════════ -->
+<details id="s4">
+<summary><span class="sec-num s-gold">4</span> Achievement Generation — On The Fly</summary>
+<div>
+
+<details>
+<summary>Input Context</summary>
+<div>
+<div style="font-size:.75rem;color:var(--text2);margin-bottom:4px">After completing a task, the agent asks itself — using these inputs:</div>
+<div class="field"><span class="fn">What I built</span><span class="fd">The actual implementation/changes made</span></div>
+<div class="field"><span class="fn">Player + vibe</span><span class="fd">Player's name and personality/style</span></div>
+<div class="field"><span class="fn">Chain theme</span><span class="fd">The quest chain's overall dream/narrative</span></div>
+<div class="field"><span class="fn">Door number</span><span class="fd">Position like 3/6</span></div>
+<div class="field"><span class="fn">suggested_by</span><span class="fd">Whether boss or agent created this door</span></div>
+</div>
+</details>
+
+<details>
+<summary>Output Format</summary>
+<div>
+<div class="code-block"><span class="h">Generate:</span>
+achievement_name:        <span class="v">string</span>  <span class="c">// UPPERCASE, epic — like "ARCHITECT-OF-BOTS"</span>
+achievement_description: <span class="v">string</span>  <span class="c">// one line, what they earned</span>
+spoil_preview:           <span class="v">string</span>  <span class="c">// for next door's notification — curiosity hook</span></div>
+</div>
+</details>
+
+<details>
+<summary>Examples — Good vs. Bad</summary>
+<div>
+<div style="display:flex;flex-direction:column;gap:4px">
+  <div class="door-card red">
+    <span style="font-size:.65rem;color:var(--red);font-weight:600">❌ BAD</span><br>
+    <span style="font-size:.72rem">"Completed Task 3"</span><br>
+    <span style="font-size:.68rem;color:var(--text3)">Generic, boring, no personality</span>
+  </div>
+  <div class="door-card green">
+    <span style="font-size:.65rem;color:var(--green);font-weight:600">✓ GOOD</span><br>
+    <span style="font-size:.72rem">"NEXUS-WEAVER — Threaded the bot's command core"</span><br>
+    <span style="font-size:.68rem;color:var(--text3)">Epic, evocative, personal</span>
+  </div>
+  <div class="door-card green">
+    <span style="font-size:.65rem;color:var(--green);font-weight:600">✓ GOOD</span><br>
+    <span style="font-size:.72rem">"VOID-WALKER — Stepped through the auth gateway and emerged unscathed"</span><br>
+    <span style="font-size:.68rem;color:var(--text3)">Thematic, narrative, memorable</span>
+  </div>
+  <div class="door-card green">
+    <span style="font-size:.65rem;color:var(--green);font-weight:600">✓ GOOD</span><br>
+    <span style="font-size:.72rem">"CHRONO-FORGE — Bent the deployment pipeline to your will"</span><br>
+    <span style="font-size:.68rem;color:var(--text3)">Action-oriented, tied to what was built</span>
+  </div>
+  <div class="door-card green">
+    <span style="font-size:.65rem;color:var(--green);font-weight:600">✓ GOOD</span><br>
+    <span style="font-size:.72rem">"SIGNAL-KEEPER — Lit the lighthouse so no request drowns in silence"</span><br>
+    <span style="font-size:.68rem;color:var(--text3)">Poetic, metaphor-driven, fits the feature</span>
+  </div>
+  <div class="door-card green">
+    <span style="font-size:.65rem;color:var(--green);font-weight:600">✓ GOOD (SuperBoss)</span><br>
+    <span style="font-size:.72rem">"GOD-HAND — Polished the polish until the code reflected eternity"</span><br>
+    <span style="font-size:.68rem;color:var(--text3)">13/10 tier — transcendence-level naming</span>
+  </div>
+</div>
+</div>
+</details>
+
+<details>
+<summary>Naming Rules</summary>
+<div>
+<ul class="chk">
+  <li><span class="ck">→</span> UPPERCASE with hyphens: <code>ARCHITECT-OF-BOTS</code></li>
+  <li><span class="ck">→</span> 2–4 words max — punchy, not a sentence</li>
+  <li><span class="ck">→</span> Must relate to what was actually built</li>
+  <li><span class="ck">→</span> Should feel like a game achievement — earned, not assigned</li>
+  <li><span class="ck">→</span> Description = one line, past tense, what they did</li>
+  <li><span class="ck">→</span> spoil_preview = curiosity hook for the NEXT door (not this one)</li>
+  <li><span class="ck">→</span> SuperBoss (13/10) achievements get an extra flourish — transcendence-tier naming</li>
+  <li><span class="ck">→</span> Agent-suggested doors get achievements too — same quality bar</li>
+</ul>
+</div>
+</details>
+
+</div>
+</details>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 5: COMMIT BODY STRUCTURE -->
+<!-- ═══════════════════════════════════════════ -->
+<details id="s5">
+<summary><span class="sec-num s-blue">5</span> Commit Body Structure</summary>
+<div>
+
+<details>
+<summary>Full Template</summary>
+<div>
+<div class="code-block"><span class="h">⚡</span>: [codex-task-slug]
+
+<span class="h">🏆</span> [ACHIEVEMENT_NAME] | score: [X/10] | Medal of Courage [x1|x2|x3] | [player] was here
+achievement: [achievement-id]
+quest: [quest-chain-id]
+door: [N/M]
+pill: [blue|red|superboss]
+cheatcode: [UUID]
+player: [player-name]
+chain-position: [N/M]
+suggested-by: [boss|agent]
+tags: [tag1, tag2, tag3]</div>
+</div>
+</details>
+
+<details>
+<summary>Field Reference</summary>
+<div>
+<div class="field"><span class="fn">⚡</span><span class="ft">slug</span><span class="fd">Codex task slug identifier</span></div>
+<div class="field"><span class="fn">🏆 header</span><span class="ft">line</span><span class="fd">Achievement + score + medal + player — the hero line</span></div>
+<div class="field"><span class="fn">achievement</span><span class="ft">id</span><span class="fd">Unique achievement identifier</span></div>
+<div class="field"><span class="fn">quest</span><span class="ft">id</span><span class="fd">Quest chain identifier (links all doors)</span></div>
+<div class="field"><span class="fn">door</span><span class="ft">N/M</span><span class="fd">Current door position in chain</span></div>
+<div class="field"><span class="fn">pill</span><span class="ft">enum</span><span class="fd"><span class="pill pill-blue">blue</span> = 9/10 &nbsp; <span class="pill pill-red">red</span> = 10/10 &nbsp; <span class="pill pill-gold">superboss</span> = 13/10</span></div>
+<div class="field"><span class="fn">cheatcode</span><span class="ft">UUID</span><span class="fd">The task UUID — the door key</span></div>
+<div class="field"><span class="fn">player</span><span class="ft">string</span><span class="fd">Who earned this achievement</span></div>
+<div class="field"><span class="fn">chain-position</span><span class="ft">N/M</span><span class="fd">Same as door — for query convenience</span></div>
+<div class="field"><span class="fn">suggested-by</span><span class="ft">enum</span><span class="fd"><span class="pill pill-gold">boss</span> or <span class="pill pill-blue">agent</span></span></div>
+<div class="field"><span class="fn">tags</span><span class="ft">list</span><span class="fd">Comma-separated tags for filtering</span></div>
+</div>
+</details>
+
+<details>
+<summary>Score + Medal Rules</summary>
+<div>
+<div style="display:flex;gap:4px;flex-wrap:wrap">
+  <div class="door-card blue" style="flex:1;min-width:120px">
+    <span class="score score-9">9/10</span> <span class="pill pill-blue">BLUE</span><br>
+    <span style="font-size:.68rem;color:var(--text3)">Medal of Courage x1<br>Create PR → door closes</span>
+  </div>
+  <div class="door-card red" style="flex:1;min-width:120px">
+    <span class="score score-10">10/10</span> <span class="pill pill-red">RED</span><br>
+    <span style="font-size:.68rem;color:var(--text3)">Medal of Courage x2<br>Cheatcode → next door opens</span>
+  </div>
+  <div class="door-card gold" style="flex:1;min-width:120px">
+    <span class="score score-13">13/10</span> <span class="pill pill-gold">SUPERBOSS</span><br>
+    <span style="font-size:.68rem;color:var(--text3)">Medal of Courage x3<br>Polishing the polish + XTR donation → admin chef-kiss</span>
+  </div>
+</div>
+</div>
+</details>
+
+<details>
+<summary>Example Commits</summary>
+<div>
+<div style="font-size:.7rem;color:var(--text3);margin-bottom:4px">Blue pill — standard completion:</div>
+<div class="code-block"><span class="h">⚡</span>: bot-auth-gateway
+
+<span class="h">🏆</span> VOID-WALKER | score: 9/10 | Medal of Courage x1 | alex was here
+achievement: ach-2b4e7f
+quest: dream-bot-empire
+door: 2/6
+pill: blue
+cheatcode: 7a3c1e5f-8d2b-4c9a-b6e1-f3d7a8c2e4b5
+player: alex
+chain-position: 2/6
+suggested-by: boss
+tags: auth, gateway, security</div>
+
+<div style="font-size:.7rem;color:var(--text3);margin:6px 0 4px">Red pill — cheatcode used, next door opens:</div>
+<div class="code-block"><span class="h">⚡</span>: bot-command-architect
+
+<span class="h">🏆</span> NEXUS-WEAVER | score: 10/10 | Medal of Courage x2 | alex was here
+achievement: ach-7f3a9c
+quest: dream-bot-empire
+door: 3/6
+pill: red
+cheatcode: 4e8b2a1f-9c3d-4a5b-8e7f-1d2c3b4a5e6f
+player: alex
+chain-position: 3/6
+suggested-by: boss
+tags: bot, commands, architecture, core</div>
+
+<div style="font-size:.7rem;color:var(--text3);margin:6px 0 4px">SuperBoss — polishing the polish + XTR donation:</div>
+<div class="code-block"><span class="h">⚡</span>: bot-command-architect-polish
+
+<span class="h">🏆</span> GOD-HAND | score: 13/10 | Medal of Courage x3 | alex was here
+achievement: ach-sb-001
+quest: dream-bot-empire
+door: 3/6
+pill: superboss
+cheatcode: 4e8b2a1f-9c3d-4a5b-8e7f-1d2c3b4a5e6f
+player: alex
+chain-position: 3/6
+suggested-by: boss
+tags: bot, commands, architecture, core, legendary
+invoice: inv-sb-alex-001</div>
+</div>
+</details>
+
+</div>
+</details>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 6: NOTIFICATION TEMPLATES -->
+<!-- ═══════════════════════════════════════════ -->
+<details id="s6">
+<summary><span class="sec-num s-green">6</span> Notification Templates</summary>
+<div>
+
+<details>
+<summary><span class="pill pill-gold">INVITE</span> Door Opens — Sent by Boss</summary>
+<div>
+<div class="notif">🎬 ДВЕРЬ [N]: «[QUEST NAME]» ОТКРЫТА
+🔓 [CHEATCODE]
+🎯 [DIRECT LINK]
+⭐ Task: 9/10 | You: 0/10
+💊 Синяя: Create PR → 9/10 навсегда → дверь закрывается
+💊 Красная: cheatcode → 10/10 → следующая дверь</div>
+<div style="font-size:.68rem;color:var(--text3);margin-top:4px">
+  Trigger: Boss creates task and sends first notification to player.<br>
+  Key info: cheatcode (door key), direct link, pill choice explanation.
+</div>
+</div>
+</details>
+
+<details>
+<summary><span class="pill pill-red">RED PILL</span> Complete — Sent by Agent</summary>
+<div>
+<div class="notif">🔥 «[QUEST NAME]» — 10/10!
+🏆 [ACHIEVEMENT_NAME]
+⭐ Score: 10/10
+🎖 Medal of Courage x2
+📜 [player] was here (permanent)
+━━━━━━━━━━━━━━━━━━━━
+✅ Reopen tab → smack PR button
+━━━━━━━━━━━━━━━━━━━━
+👀 CHOOSE YOUR NEXT DOOR:
+🔴 Дверь [N+1]a: «[name]» — [desc]
+   💬 [spoiler]
+🔵 Дверь [N+1]b: «[name]» — [desc]
+   💬 [spoiler]
+🟢 Дверь [N+1]c: «[name]» — [desc]
+   💬 [spoiler]
+✨ Дверь [N+1]d: «[name]» — [desc] (AGENT SUGGESTED)
+   💬 [spoiler]</div>
+<div style="font-size:.68rem;color:var(--text3);margin-top:4px">
+  Trigger: Agent finishes task after player used cheatcode.<br>
+  Contains: achievement, score, branching choices (3+1).<br>
+  TOP 3 from boss-created open tasks. 4th is agent-suggested (Type A or B).
+</div>
+</div>
+</details>
+
+<details>
+<summary><span class="pill pill-gold">SUPERBOSS</span> Offer — After 10/10</summary>
+<div>
+<div class="notif">💎 10/10. Impressive.
+But 13 is my favorite number.
+Wanna crank it to 13? I know a guy :)
+
+🌟 13/10 — LEGENDARY TIER
+💎 Polishing the polish — [ARCHITECT-NAME] ✦ LEGENDARY
+🎨 Exclusive achievement skin
+💰 Donation invoice: XTR ⭐ 99
+📬 Admin will be notified → personal review → chef-kiss</div>
+
+<details>
+<summary>Invoicing Flow — Technical</summary>
+<div>
+<div class="flow">
+  <div class="flow-step"><span class="step-n s-gold">1</span> Player accepts SuperBoss offer → <code>create_invoice()</code></div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-gold">2</span> <code>SELECT create_invoice('superboss', task_uuid, user_id, 99, sub_id, metadata)</code></div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-blue">3</span> Invoice row created in <code>public.invoices</code> with status <span class="pill pill-gray">pending</span></div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-blue">4</span> Telegram Stars payment flow → user pays XTR ⭐ 99</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-green">5</span> <code>SELECT update_invoice_status(invoice_id, 'paid')</code></div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-green">6</span> Admin notification sent: "SuperBoss paid! [player] → [task] → XTR 99"</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-gold">7</span> Admin reviews PR → enhances commit with LEGENDARY tag → chef-kiss 👨‍🍳💋</div>
+</div>
+<div style="font-size:.68rem;color:var(--text3);margin-top:6px">
+  The chef-kiss moment: admin sees what was built + payment proof in one notification.<br>
+  This closes the economic loop — the person who cares most sees the value AND the payment.
+</div>
+</div>
+</details>
+
+<details>
+<summary>Invoice SQL Reference</summary>
+<div>
+<div class="code-block"><span class="c">-- 1. Create SuperBoss invoice</span>
+<span class="k">SELECT</span> create_invoice(
+  <span class="v">'superboss'</span>,
+  <span class="v">'4e8b2a1f-9c3d-4a5b-8e7f-1d2c3b4a5e6f'</span>,  <span class="c">-- task UUID</span>
+  <span class="v">'telegram-123456'</span>,                        <span class="c">-- user_id</span>
+  <span class="v">99</span>,                                       <span class="c">-- amount in XTR</span>
+  <span class="v">'sub-abc123'</span>,                             <span class="c">-- subscription_id</span>
+  <span class="v">'{"cheatcode":"4e8b2a1f-...","player":"alex"}'</span>::jsonb
+);
+
+<span class="c">-- 2. When payment confirmed via Telegram Stars</span>
+<span class="k">SELECT</span> update_invoice_status(<span class="v">'inv-sb-alex-001'</span>, <span class="v">'paid'</span>);
+
+<span class="c">-- 3. Query invoice status</span>
+<span class="k">SELECT</span> * <span class="k">FROM</span> public.invoices
+<span class="k">WHERE</span> user_id = <span class="v">'telegram-123456'</span>
+  <span class="k">AND</span> type = <span class="v">'superboss'</span>
+<span class="k">ORDER BY</span> created_at <span class="k">DESC</span>;</div>
+</div>
+</details>
+</div>
+</details>
+
+<details>
+<summary><span class="pill pill-gray">NUDGE</span> No Engagement</summary>
+<div>
+<div class="notif">🐰 Door [N] is open.
+⭐ You: 0/10 | Task: 9/10
+🎯 Wanna make it 10/10? [LINK]
+🔓 [CHEATCODE]</div>
+<div style="font-size:.68rem;color:var(--text3);margin-top:4px">
+  Trigger: Player hasn't engaged with an open door.<br>
+  Tone: gentle, encouraging, low-pressure. Score gap = motivation, not guilt.
+</div>
+</div>
+</details>
+
+<details>
+<summary><span class="pill pill-blue">BLUE PILL</span> Create PR Without Cheatcode</summary>
+<div>
+<div class="notif">🏕 «[QUEST NAME]» — 9/10
+🏆 [ACHIEVEMENT_NAME] (standard)
+⭐ Score: 9/10 — good enough. Door closes.
+🎖 Medal of Courage x1
+📜 [player] was here</div>
+<div style="font-size:.68rem;color:var(--text3);margin-top:4px">
+  Trigger: Player creates PR directly without using cheatcode.<br>
+  Key: No next door. No branching. Clean exit. 9/10 is GOOD ENOUGH.
+</div>
+
+<details>
+<summary>Blue Pill Design Rule</summary>
+<div>
+<div class="rule">Blue pill is <strong>GOOD ENOUGH</strong>. 9/10 forever. No guilt. Ever.</div>
+<div class="rule">The door closes. The achievement is permanent. The score is locked.</div>
+<div class="rule">This is a VALID and RESPECTED choice. Not a consolation prize.</div>
+</div>
+</details>
+</div>
+</details>
+
+<details>
+<summary>Template Selection Flow</summary>
+<div>
+<div class="flow">
+  <div class="flow-step"><span class="step-n s-gold">🎬</span> New door created → <span class="pill pill-gold">INVITE</span></div>
+  <div class="flow-arrow">↓ player enters cheatcode</div>
+  <div class="flow-step"><span class="step-n s-red">🔥</span> Agent completes task → <span class="pill pill-red">RED PILL</span> complete</div>
+  <div class="flow-arrow">↓ score = 10/10</div>
+  <div class="flow-step"><span class="step-n s-gold">💎</span> Offer <span class="pill pill-gold">SUPERBOSS</span> 13/10 upgrade (create_invoice → XTR ⭐ 99)</div>
+  <div class="flow-arrow" style="color:var(--text3)">parallel path ↓</div>
+  <div class="flow-step"><span class="step-n s-blue">🏕</span> Player PRs directly → <span class="pill pill-blue">BLUE PILL</span> 9/10</div>
+  <div class="flow-arrow" style="color:var(--text3)">if no engagement ↓</div>
+  <div class="flow-step"><span class="step-n pill-gray" style="padding:0 4px">🐰</span> Gentle <span class="pill pill-gray">NUDGE</span></div>
+</div>
+</div>
+</details>
+
+</div>
+</details>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 7: AGENT SUGGESTION PIPELINE -->
+<!-- ═══════════════════════════════════════════ -->
+<details id="s7">
+<summary><span class="sec-num s-green">7</span> Agent Suggestion Pipeline — "West Coast Style"</summary>
+<div>
+
+<details>
+<summary>When to Suggest</summary>
+<div>
+<div style="font-size:.75rem;color:var(--text2);margin-bottom:6px">During task execution, if agent feels something is missing:</div>
+<ul class="chk">
+  <li><span class="ck">→</span> The bot has commands but no <code>/help</code> system</li>
+  <li><span class="ck">→</span> The API exists but there's no rate limiter</li>
+  <li><span class="ck">→</span> The feature works but lacks error handling</li>
+  <li><span class="ck">→</span> A logical next step isn't in the chain</li>
+  <li><span class="ck">→</span> Current task could use one more polish pass (Type A)</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>Two Types of Suggestions</summary>
+<div>
+
+<div class="door-card green" style="margin-bottom:6px">
+  <span class="type-badge type-a">TYPE A</span> <strong>Additional Polish of Current Task</strong><br>
+  <span style="font-size:.72rem;color:var(--text2)">Minor enhancement in the same cheatcode area. "One more thing that would make this shine."</span><br>
+  <span style="font-size:.68rem;color:var(--text3)">Example: current task built /stats command → Type A suggests "add emoji reaction to /stats output"</span>
+</div>
+
+<div class="door-card gold">
+  <span class="type-badge type-b">TYPE B</span> <strong>Genuinely New Door</strong><br>
+  <span style="font-size:.72rem;color:var(--text2)">Agent creates a full SupaPlan task ON THE FLY. Entirely new door in the chain.</span><br>
+  <span style="font-size:.68rem;color:var(--text3)">Example: current task built auth → Type B creates "add /help auto-generator" as a new door</span>
+</div>
+</div>
+</details>
+
+<details>
+<summary>How to Create — On The Fly SupaPlan Task</summary>
+<div>
+<div style="font-size:.72rem;color:var(--text2);margin-bottom:4px">Agent creates a real SupaPlan task in the database:</div>
+<div class="code-block"><span class="h">INSERT INTO</span> supaplan_tasks (id, title, status, body, metadata)
+<span class="k">VALUES</span> (
+  <span class="v">gen_random_uuid()</span>,                              <span class="c">// new cheatcode</span>
+  <span class="v">'Auto-Help Generator'</span>,                           <span class="c">// or whatever fits</span>
+  <span class="v">'open'</span>,
+  <span class="v">'Generate /help from command registry'</span>,
+  <span class="v">'{
+    "suggested_by": "agent",
+    "requires": ["current-task-UUID"],
+    "quest_chain_id": "same-chain-id",
+    "tags": ["help", "commands", "docs"],
+    "spoil_preview": "Your commands will finally explain themselves...",
+    "player": "player-name",
+    "dream_name": "same-dream",
+    "difficulty": "easy"
+  }'</span>::jsonb
+);</div>
+</div>
+</details>
+
+<details>
+<summary>Pipeline Steps</summary>
+<div>
+<div class="flow">
+  <div class="flow-step"><span class="step-n s-blue">1</span> Agent notes gap during execution (or potential polish)</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-blue">2</span> Decide: Type A (quick polish) or Type B (new SupaPlan task)</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-blue">3</span> For Type B: <code>INSERT INTO supaplan_tasks</code> with <code>suggested_by: "agent"</code></div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-blue">4</span> Mention in Notification Part 2 as <span class="pill pill-gold">✨ 4th option</span></div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-green">5</span> If player chooses it → normal cheatcode flow → same commit/achievement pipeline</div>
+</div>
+</div>
+</details>
+
+<details>
+<summary>West Coast Rules</summary>
+<div>
+<div class="rule">ONE suggestion at a time — not a flood</div>
+<div class="rule">Must be genuinely achievable with current stack</div>
+<div class="rule">Must relate to what was just built (natural next step)</div>
+<div class="rule">Suggestion quality = agent quality. No filler.</div>
+<div class="rule">If no gap exists → no suggestion. Zero is fine.</div>
+<div class="rule">Type A only if current task genuinely benefits from one more pass</div>
+<div class="rule">Type B only if there's a real logical gap in the boss's decomposition</div>
+</div>
+</details>
+
+</div>
+</details>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 8: BOSS DECOMPOSITION CHECKLIST -->
+<!-- ═══════════════════════════════════════════ -->
+<details id="s8">
+<summary><span class="sec-num s-gold">8</span> Boss Decomposition Checklist</summary>
+<div>
+
+<div style="font-size:.72rem;color:var(--text2);margin-bottom:6px">When Boss receives dream trailer + bio dump, follow this exact sequence:</div>
+
+<details>
+<summary>Phase 1: Validate</summary>
+<div>
+<ul class="chk">
+  <li><span class="ck">1</span> <strong>Validate dream</strong>: is it achievable with available stack?</li>
+  <li><span class="ck">2</span> <strong>Name the dream</strong>: evocative, personal (not "Project X")</li>
+</ul>
+<div class="door-card red" style="margin-top:4px">
+  <span style="font-size:.65rem;color:var(--red)">❌ BAD</span> <span style="font-size:.72rem">"Project Bot"</span><br>
+  <span style="font-size:.65rem;color:var(--green)">✓ GOOD</span> <span style="font-size:.72rem">"Bot Empire — Where Commands Become Kingdoms"</span>
+</div>
+</div>
+</details>
+
+<details>
+<summary>Phase 2: Decompose</summary>
+<div>
+<ul class="chk">
+  <li><span class="ck">3</span> <strong>Decompose into 5–8 doors</strong> (high-level, not micro-tasks)</li>
+  <li><span class="ck">4</span> <strong>Write polish_instructions</strong> for each door (creative direction, not code)</li>
+  <li><span class="ck">5</span> <strong>Set tags</strong> for each door (for dynamic branching)</li>
+  <li><span class="ck">6</span> <strong>Define requires/unlocks graph</strong> (dependency chain)</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>Phase 3: Enrich</summary>
+<div>
+<ul class="chk">
+  <li><span class="ck">7</span> <strong>Write spoil_preview</strong> for each door (curiosity hooks)</li>
+  <li><span class="ck">8</span> <strong>Create all SupaPlan tasks</strong> with metadata</li>
+</ul>
+
+<details>
+<summary>spoil_preview examples</summary>
+<div>
+<div class="door-card gold">
+  <strong>Door 1 spoil</strong><br>
+  <span style="font-size:.7rem;color:var(--text2)">"The first command whispers back… but will it obey?"</span>
+</div>
+<div class="door-card gold">
+  <strong>Door 3 spoil</strong><br>
+  <span style="font-size:.7rem;color:var(--text2)">"Every empire needs a gatekeeper. Yours is learning to recognize faces."</span>
+</div>
+<div class="door-card gold">
+  <strong>Door 5 spoil</strong><br>
+  <span style="font-size:.7rem;color:var(--text2)">"The logs remember everything. Even the things you deleted."</span>
+</div>
+</div>
+</details>
+</div>
+</details>
+
+<details>
+<summary>Phase 4: Launch</summary>
+<div>
+<ul class="chk">
+  <li><span class="ck">9</span> <strong>Send first INVITE notification</strong></li>
+</ul>
+<div style="font-size:.72rem;color:var(--text2);margin-top:4px">After this, Boss hands off to Agent. The quest chain is now self-driving.</div>
+</div>
+</details>
+
+<details>
+<summary>Full Checklist (Copy-Paste)</summary>
+<div>
+<div class="code-block"><span class="h">BOSS DECOMPOSITION CHECKLIST:</span>
+
+ 1. ✅ Validate dream: achievable with available stack?
+ 2. ✅ Name the dream: evocative, personal
+ 3. ✅ Decompose into 5-8 doors
+ 4. ✅ Write polish_instructions per door
+ 5. ✅ Set tags per door
+ 6. ✅ Define requires/unlocks graph
+ 7. ✅ Write spoil_preview per door
+ 8. ✅ Create all SupaPlan tasks with metadata
+ 9. ✅ Send first INVITE notification</div>
+</div>
+</details>
+
+</div>
+</details>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 9: CAREER PROFILE SCHEMA -->
+<!-- ═══════════════════════════════════════════ -->
+<details id="s9">
+<summary><span class="sec-num s-blue">9</span> Career Profile Schema</summary>
+<div>
+
+<details>
+<summary>Achievements Storage</summary>
+<div>
+<div style="font-size:.75rem;color:var(--text2);margin-bottom:6px">Achievements are stored in two places:</div>
+
+<div class="door-card green" style="margin-bottom:4px">
+  <strong>Git commits</strong> = source of truth (eternal record)<br>
+  <span style="font-size:.68rem;color:var(--text3)">Structured commit bodies enable one-liner retrieval from git history</span>
+</div>
+
+<div class="door-card blue">
+  <strong>Supabase</strong> = cache layer (for display/query)<br>
+  <span style="font-size:.68rem;color:var(--text3)">Synced on PR merge. Powers career profile rendering.</span>
+</div>
+
+<div style="font-size:.72rem;color:var(--text2);margin-top:6px">Supabase options for achievement storage:</div>
+
+<details>
+<summary>Option A: users.badges JSONB</summary>
+<div>
+<div class="code-block"><span class="c">// In public.users, badges column:</span>
+badges: [
+  {
+    <span class="k">"name"</span>: <span class="v">"NEXUS-WEAVER"</span>,
+    <span class="k">"description"</span>: <span class="v">"Threaded the bot's command core"</span>,
+    <span class="k">"score"</span>: <span class="v">10</span>,
+    <span class="k">"pill"</span>: <span class="v">"red"</span>,
+    <span class="k">"quest_chain_id"</span>: <span class="v">"dream-bot-empire"</span>,
+    <span class="k">"door"</span>: <span class="v">"3/6"</span>,
+    <span class="k">"earned_at"</span>: <span class="v">"2025-01-15T12:00:00Z"</span>,
+    <span class="k">"suggested_by"</span>: <span class="v">"boss"</span>,
+    <span class="k">"commit_hash"</span>: <span class="v">"abc1234"</span>
+  }
+]</div>
+</div>
+</details>
+
+<details>
+<summary>Option B: Separate achievements table</summary>
+<div>
+<div class="code-block"><span class="k">CREATE TABLE</span> achievements (
+  id                    <span class="v">UUID PRIMARY KEY</span>,
+  user_id               <span class="v">TEXT NOT NULL REFERENCES</span> users(user_id),
+  achievement_name      <span class="v">TEXT NOT NULL</span>,
+  achievement_description <span class="v">TEXT</span>,
+  score                 <span class="v">INTEGER</span>,    <span class="c">// 9, 10, or 13</span>
+  pill                  <span class="v">TEXT</span>,        <span class="c">// 'blue', 'red', 'superboss'</span>
+  quest_chain_id        <span class="v">TEXT</span>,
+  door                  <span class="v">TEXT</span>,        <span class="c">// e.g. "3/6"</span>
+  commit_hash           <span class="v">TEXT</span>,
+  suggested_by          <span class="v">TEXT</span>,        <span class="c">// 'boss' | 'agent'</span>
+  tags                  <span class="v">TEXT[]</span>,
+  created_at            <span class="v">TIMESTAMPTZ DEFAULT now()</span>
+);</div>
+</div>
+</details>
+</div>
+</details>
+
+<details>
+<summary>Leaderboard View</summary>
+<div>
+<div class="code-block"><span class="k">CREATE OR REPLACE VIEW</span> leaderboard <span class="k">AS</span>
+<span class="k">SELECT</span>
+  u.user_id,
+  u.username,
+  u.full_name,
+  u.avatar_url,
+  <span class="k">COALESCE</span>(<span class="k">SUM</span>(a.score), <span class="v">0</span>) <span class="k">AS</span> total_score,
+  <span class="k">COUNT</span>(a.id) <span class="k">AS</span> achievements_count,
+  <span class="k">COUNT</span>(<span class="k">CASE WHEN</span> a.pill = <span class="v">'red'</span> <span class="k">THEN</span> <span class="v">1</span> <span class="k">END</span>) <span class="k">AS</span> red_pills,
+  <span class="k">COUNT</span>(<span class="k">CASE WHEN</span> a.pill = <span class="v">'blue'</span> <span class="k">THEN</span> <span class="v">1</span> <span class="k">END</span>) <span class="k">AS</span> blue_pills,
+  <span class="k">COUNT</span>(<span class="k">CASE WHEN</span> a.pill = <span class="v">'superboss'</span> <span class="k">THEN</span> <span class="v">1</span> <span class="k">END</span>) <span class="k">AS</span> superboss,
+  <span class="k">COUNT</span>(<span class="k">DISTINCT</span> a.quest_chain_id) <span class="k">AS</span> chains_completed
+<span class="k">FROM</span> public.users u
+<span class="k">LEFT JOIN</span> achievements a <span class="k">ON</span> u.user_id = a.user_id
+<span class="k">GROUP BY</span> u.user_id, u.username, u.full_name, u.avatar_url
+<span class="k">ORDER BY</span> total_score <span class="k">DESC</span>;</div>
+</div>
+</details>
+
+<details>
+<summary>Score Calculation</summary>
+<div>
+<div style="display:flex;flex-direction:column;gap:4px">
+  <div class="door-card blue">
+    <span class="score score-9">9</span> points per <span class="pill pill-blue">blue pill</span> achievement
+  </div>
+  <div class="door-card red">
+    <span class="score score-10">10</span> points per <span class="pill pill-red">red pill</span> achievement
+  </div>
+  <div class="door-card gold">
+    <span class="score score-13">13</span> points per <span class="pill pill-gold">superboss</span> achievement
+  </div>
+</div>
+<div style="font-size:.72rem;color:var(--text2);margin-top:6px">
+  Total score = sum of all achievement scores.<br>
+  Chains completed = count of distinct quest_chain_ids where all doors done.
+</div>
+</div>
+</details>
+
+<details>
+<summary>Query Examples</summary>
+<div>
+<div class="code-block"><span class="c">-- Player's full career</span>
+<span class="k">SELECT</span> * <span class="k">FROM</span> achievements
+<span class="k">WHERE</span> user_id = <span class="v">'telegram-123456'</span>
+<span class="k">ORDER BY</span> created_at <span class="k">DESC</span>;
+
+<span class="c">-- Global leaderboard</span>
+<span class="k">SELECT</span> * <span class="k">FROM</span> leaderboard
+<span class="k">ORDER BY</span> total_score <span class="k">DESC</span>
+<span class="k">LIMIT</span> <span class="v">50</span>;
+
+<span class="c">-- Chain progress</span>
+<span class="k">SELECT</span> door, score, achievement_name, pill
+<span class="k">FROM</span> achievements
+<span class="k">WHERE</span> quest_chain_id = <span class="v">'dream-bot-empire'</span>
+  <span class="k">AND</span> user_id = <span class="v">'telegram-123456'</span>
+<span class="k">ORDER BY</span> created_at;
+
+<span class="c">-- Player badges from users table (Option A)</span>
+<span class="k">SELECT</span> badges <span class="k">FROM</span> public.users
+<span class="k">WHERE</span> user_id = <span class="v">'telegram-123456'</span>;
+
+<span class="c">-- Git one-liner for achievement history</span>
+git log --grep=<span class="v">"player: alex"</span> --format=<span class="v">"%H %s"</span> | head -20
+
+<span class="c">-- SuperBoss hall of fame</span>
+<span class="k">SELECT</span> * <span class="k">FROM</span> achievements
+<span class="k">WHERE</span> pill = <span class="v">'superboss'</span>
+<span class="k">ORDER BY</span> created_at <span class="k">DESC</span>;</div>
+</div>
+</details>
+
+<details>
+<summary>Career Profile Rendering</summary>
+<div>
+<div style="font-size:.75rem;color:var(--text2);margin-bottom:4px">Career profile can be rendered as:</div>
+<ul class="chk">
+  <li><span class="ck">→</span> <strong>Telegram Mini App</strong> — in-bot webview, instant access</li>
+  <li><span class="ck">→</span> <strong>Web page</strong> — shareable link, Overwatch-style competitive stats</li>
+  <li><span class="ck">→</span> <strong>Share card</strong> — image export for social media</li>
+</ul>
+<div style="font-size:.72rem;color:var(--text2);margin-top:4px">
+  Data source: Supabase (cache) backed by git commits (truth).<br>
+  Crew branding from <code>public.crews.metadata.franchize</code> applies theming.
+</div>
+</div>
+</details>
+
+</div>
+</details>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 10: FORK PIPELINE -->
+<!-- ═══════════════════════════════════════════ -->
+<details id="s10">
+<summary><span class="sec-num s-green">10</span> Fork Pipeline — Step by Step</summary>
+<div>
+
+<details>
+<summary>Deployment Steps</summary>
+<div>
+<div class="flow">
+  <div class="flow-step"><span class="step-n s-green">1</span> <strong>Fork the repo</strong></div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-green">2</span> Create <code>.env.local</code> with required secrets</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-green">3</span> Run seed SQL: <code>INSERT INTO public.crews ...</code></div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-green">4</span> Configure your bot: franchize branding, links, metadata</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-green">5</span> Deploy. You're LIVE.</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step"><span class="step-n s-green">6</span> Your stars flow to YOUR bot. Your players are YOUR players.</div>
+</div>
+</div>
+</details>
+
+<details>
+<summary>Required Secrets (.env.local)</summary>
+<div>
+<div class="code-block"><span class="c"># .env.local — required secrets</span>
+SUPABASE_URL=<span class="v">https://xxx.supabase.co</span>
+SUPABASE_KEY=<span class="v">eyJ...</span>
+TELEGRAM_BOT_TOKEN=<span class="v">123456:ABC...</span>
+TELEGRAM_STARS_PROVIDER=<span class="v">provider_token</span>
+CODEX_API_KEY=<span class="v">sk-...</span>
+GITHUB_TOKEN=<span class="v">ghp_...</span>
+OPENAI_API_KEY=<span class="v">sk-...</span>
+NOTIFICATION_WEBHOOK=<span class="v">https://...</span>
+ADMIN_CHAT_ID=<span class="v">123456789</span>
+CREW_SLUG=<span class="v">your-crew-slug</span>           <span class="c"># maps to public.crews.slug</span>
+CREW_ID=<span class="v">your-crew-uuid</span>             <span class="c"># maps to public.crews.id</span>
+DATABASE_URL=<span class="v">postgresql://...</span>
+REDIS_URL=<span class="v">redis://...</span>               <span class="c"># optional</span>
+ENCRYPTION_KEY=<span class="v">base64...</span></div>
+</div>
+</details>
+
+<details>
+<summary>Seed SQL — Crew Hydration</summary>
+<div>
+<div class="code-block"><span class="c">-- Hydrate your crew into public.crews with full franchize config</span>
+<span class="k">INSERT INTO</span> public.crews (
+  id, name, description, logo_url, owner_id, slug, hq_location,
+  metadata, created_at, updated_at
+) <span class="k">VALUES</span> (
+  <span class="v">'a1b2c3d4-e5f6-7890-abcd-ef1234567890'</span>,    <span class="c">-- id (UUID)</span>
+  <span class="v">'My Quest Bot'</span>,                               <span class="c">-- name</span>
+  <span class="v">'A quest chain bot for my community'</span>,          <span class="c">-- description</span>
+  <span class="v">'https://example.com/logo.png'</span>,               <span class="c">-- logo_url</span>
+  <span class="v">'telegram-123456'</span>,                             <span class="c">-- owner_id</span>
+  <span class="v">'my-quest-bot'</span>,                                <span class="c">-- slug (unique)</span>
+  <span class="v">'telegram'</span>,                                    <span class="c">-- hq_location</span>
+  <span class="v">'{
+    "franchize": {
+      "version": "2026-01-01",
+      "enabled": true,
+      "slug": "my-quest-bot",
+      "branding": {
+        "name": "My Quest Bot",
+        "shortName": "MQB",
+        "tagline": "Where dreams become doors",
+        "logoUrl": "https://example.com/logo.png",
+        "heroImageUrl": "https://example.com/hero.png"
+      },
+      "theme": {
+        "mode": "dark",
+        "palette": {
+          "primary": "#0088ff",
+          "accent": "#ffd700",
+          "bg": "#0a0a0f"
+        },
+        "radius": "6px",
+        "spacing": "compact",
+        "effects": ["glow", "fade"]
+      },
+      "header": {
+        "menuLinks": [
+          {"label": "Quests", "href": "/quests"},
+          {"label": "Leaderboard", "href": "/leaderboard"},
+          {"label": "Profile", "href": "/profile"}
+        ],
+        "quickActions": [
+          {"label": "Open Door", "action": "cheatcode"}
+        ]
+      },
+      "footer": {
+        "columns": [],
+        "copyrightTemplate": "© {year} {name}",
+        "poweredBy": "Boss Quest Chain"
+      },
+      "about": "My quest chain bot",
+      "contacts": {},
+      "contentBlocks": [],
+      "catalog": {},
+      "order": {},
+      "contractDefaults": {
+        "superboss_price": 99,
+        "currency": "XTR"
+      }
+    }
+  }'</span>::jsonb,
+  <span class="k">now()</span>,
+  <span class="k">now()</span>
+)
+<span class="k">ON CONFLICT</span> (id) <span class="k">DO UPDATE SET</span>
+  name = <span class="k">EXCLUDED</span>.name,
+  description = <span class="k">EXCLUDED</span>.description,
+  logo_url = <span class="k">EXCLUDED</span>.logo_url,
+  slug = <span class="k">EXCLUDED</span>.slug,
+  metadata = <span class="k">EXCLUDED</span>.metadata,
+  updated_at = <span class="k">now()</span>;</div>
+</div>
+</details>
+
+<details>
+<summary>Bot Configuration — From crews.metadata.franchize</summary>
+<div>
+<div style="font-size:.72rem;color:var(--text2);margin-bottom:4px">Bot reads config from <code>public.crews.metadata.franchize</code>:</div>
+<div class="field"><span class="fn">branding.name</span><span class="fd">Bot display name in notifications</span></div>
+<div class="field"><span class="fn">branding.tagline</span><span class="fd">Subtitle / hero text</span></div>
+<div class="field"><span class="fn">branding.logoUrl</span><span class="fd">Logo for notifications and career profile</span></div>
+<div class="field"><span class="fn">theme.mode</span><span class="fd">dark/light/auto — notification styling</span></div>
+<div class="field"><span class="fn">theme.palette</span><span class="fd">Color scheme for career profile rendering</span></div>
+<div class="field"><span class="fn">header.menuLinks</span><span class="fd">Navigation links in Mini App</span></div>
+<div class="field"><span class="fn">contractDefaults.superboss_price</span><span class="fd">XTR amount for 13/10 upgrade (default: 99)</span></div>
+<div class="field"><span class="fn">contractDefaults.currency</span><span class="fd">Telegram Stars currency code (XTR)</span></div>
+</div>
+</details>
+
+</div>
+</details>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SECTION 11: KEY RULES -->
+<!-- ═══════════════════════════════════════════ -->
+<details id="s11">
+<summary><span class="sec-num s-red">11</span> Key Rules — Quick Reference</summary>
+<div>
+
+<details>
+<summary>Pill Rules</summary>
+<div>
+<div class="rule"><span class="pill pill-blue">BLUE PILL</span> &nbsp;9/10 forever. <strong>No guilt. Ever.</strong> Good enough. Door closes.</div>
+<div class="rule"><span class="pill pill-red">RED PILL</span> &nbsp;10/10. Meaningful. Next door opens. The journey continues.</div>
+<div class="rule"><span class="pill pill-gold">SUPERBOSS</span> &nbsp;13/10. Polishing the POLISH. XTR donation invoice → admin notification → chef-kiss.</div>
+</div>
+</details>
+
+<details>
+<summary>Task Rules</summary>
+<div>
+<div class="rule">Every door is a <strong>genuine choice</strong> — not a trick, not a trap</div>
+<div class="rule">Tasks are <span class="score score-9">9/10</span> when notification arrives — "there is no spoon"</div>
+<div class="rule">Agents <strong>imagine achievements dynamically</strong> — boss doesn't predefine</div>
+<div class="rule">Branching: agent picks <strong>top 3</strong> from boss-created open tasks + optional <span class="pill pill-gold">✨ 1 agent suggestion</span></div>
+<div class="rule">4th option: Type A (polish current) or Type B (new SupaPlan task on the fly)</div>
+</div>
+</details>
+
+<details>
+<summary>Role Rules</summary>
+<div>
+<div class="rule"><span class="pill pill-gold">BOSS</span> = strategy, decomposition, polish instructions, first INVITE</div>
+<div class="rule"><span class="pill pill-blue">AGENT</span> = creative execution, achievements, branching, commit structure, invoicing</div>
+<div class="rule">Wishes must be <strong>ACHIEVABLE</strong> with available stack</div>
+<div class="rule">Agent suggestions: 1 at a time, West Coast rules, no filler</div>
+</div>
+</details>
+
+<details>
+<summary>Schema Rules</summary>
+<div>
+<div class="rule">Crew config lives in <code>public.crews</code> — NOT "tenants"</div>
+<div class="rule">Crew branding/config in <code>metadata.franchize</code> JSONB</div>
+<div class="rule">Player achievements in <code>public.users.badges</code> JSONB or separate <code>achievements</code> table</div>
+<div class="rule">SuperBoss payments tracked in <code>public.invoices</code> with XTR currency</div>
+<div class="rule">Invoice flow: <code>create_invoice()</code> → <code>update_invoice_status('paid')</code> → admin notification</div>
+<div class="rule">Secrets config in <code>private.crew_secrets</code></div>
+<div class="rule"><code>CREW_SLUG</code> or <code>CREW_ID</code> in .env — NOT TENANT_ID</div>
+</div>
+</details>
+
+<details>
+<summary>Score Summary</summary>
+<div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">
+  <div style="text-align:center;padding:8px 4px;border-radius:var(--radius);background:rgba(0,136,255,.08);border:1px solid rgba(0,136,255,.2)">
+    <div class="score score-9" style="font-size:1.2rem;margin:0 auto 4px">9</div>
+    <div style="font-size:.65rem;color:var(--blue)">Blue Pill</div>
+    <div style="font-size:.6rem;color:var(--text3)">Standard</div>
+  </div>
+  <div style="text-align:center;padding:8px 4px;border-radius:var(--radius);background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2)">
+    <div class="score score-10" style="font-size:1.2rem;margin:0 auto 4px">10</div>
+    <div style="font-size:.65rem;color:var(--gold)">Red Pill</div>
+    <div style="font-size:.6rem;color:var(--text3)">Meaningful</div>
+  </div>
+  <div style="text-align:center;padding:8px 4px;border-radius:var(--radius);background:rgba(255,0,68,.08);border:1px solid rgba(255,0,68,.2)">
+    <div class="score score-13" style="font-size:1.2rem;margin:0 auto 4px">13</div>
+    <div style="font-size:.65rem;color:var(--red)">Superboss</div>
+    <div style="font-size:.6rem;color:var(--text3)">Legendary</div>
+  </div>
+</div>
+</div>
+</details>
+
+<details>
+<summary>Core Principle</summary>
+<div>
+<div style="padding:12px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border2);text-align:center">
+  <div style="font-size:.8rem;font-weight:600;color:var(--gold);margin-bottom:4px">The gap IS the motivation.</div>
+  <div style="font-size:.8rem;font-weight:600;color:var(--red)">The gap IS the business model.</div>
+</div>
+</div>
+</details>
+
+</div>
+</details>
+
+<!-- FOOTER -->
+<div style="text-align:center;padding:12px 0;font-size:.65rem;color:var(--text3);border-top:1px solid var(--border);margin-top:12px">
+  BOSS AGENT INSTRUCTIONS v4.0 — Technical Reference Card<br>
+  <a href="BOSS_QUEST.HTML">🏰 Quest Center</a> · <a href="BOSS_END_GAME_PROTOCOL.html">🔮 Protocol</a>
+</div>
+
+</body>
+</html>
