@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>BISS QUEST Runtime Notes</title>
+</head>
+<body>
+  <h1>BISS QUEST — Runtime Guardrails</h1>
+  <h2>Notification bugfix memo (2026-05-21)</h2>
+  <ul>
+    <li>
+      Симптом: в уведомлении строка "Следующая задача" иногда отправлялась как короткий хвост id
+      (например <code>be32ce57...</code>) вместо полной URL.
+    </li>
+    <li>
+      Причина: использовался декоративный teaser-текст из старого шаблона уведомления, а не каноничный
+      <code>codex_task_url</code> из данных следующей SupaPlan-задачи.
+    </li>
+    <li>
+      Правило: для блока "Следующая задача" всегда сначала резолвить <code>next_quest_uuid</code>,
+      затем читать задачу из <code>supaplan_tasks</code> и брать реальный URL из
+      <code>metadata.codex_task_url</code> (fallback: парсить <code>codex_task_url:</code> из body).
+    </li>
+    <li>
+      Правило: branching suggestions отправлять сразу отдельным follow-up сообщением после victory message,
+      не откладывать на финальный отчёт агента.
+    </li>
+  </ul>
+</body>
+</html>
