@@ -32,6 +32,7 @@ function getAdminClient() {
 const ALLOWED_AGENT_STATUSES = new Set(['claimed', 'running', 'ready_for_pr']);
 const CLAIM_RPC_FALLBACK_CODES = new Set(['42883', 'PGRST202']);
 const SUPAPLAN_TASK_REF_REGEX = /supaplan_task\s*:\s*([0-9a-fA-F-]{36})/i;
+const UUID_V4_OR_COMPAT_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
 
 
 function normalizeError(error) {
@@ -891,6 +892,10 @@ const runners = {
 };
 
 if (!command || !runners[command]) {
+  if (command && UUID_V4_OR_COMPAT_REGEX.test(command)) {
+    console.error(`Looks like a bare UUID input: "${command}".`);
+    console.error('Tip: check whether this is a SupaPlan task id and run `node scripts/supaplan-skill.mjs task-status --taskId <uuid>`.');
+  }
   console.error('Usage: node scripts/supaplan-skill.mjs <pick-task|update-status|task-status|log-event|inspect-migrations|review-merge-workflow|smoke-flow|status|add-task|validate-plugin-contracts> [--key value] (pick-task supports --capability <name|auto> --agentId <id> --dry-run; add-task supports --title --capability [--todoPath])');
   process.exit(1);
 }

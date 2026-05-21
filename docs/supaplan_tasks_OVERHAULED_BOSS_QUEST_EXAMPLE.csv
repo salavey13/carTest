@@ -1,0 +1,407 @@
+id,title,body,todo_path,plugin,capability,status,created_by,created_at,updated_at,metadata,pr_url
+f3c5306d-2d8f-4cc4-bb77-26f20f7f9b11,[QUEST][LERA] Матрица Шапки,"quest_name: Матрица Шапки
+next_quest_uuid: be32ce57-a1f5-4401-a307-311ec56ba68f
+notification_part1: 🎬 ЛЕРА, ГЛАВНАЯ ГЕРОИНЯ В ЭФИРЕ. МИССИЯ «Матрица Шапки» АКТИВИРОВАНА.
+
+Ты уже это построила: шапка витрины перезапущена как кибер-панель — логотип слева, секции по центру, профиль компактный, корзина встроена в рельс. Это уже не просто навигация — это командный центр.
+
+🏆 Ачивка открыта: «Сигнал Из Матрицы» — ты вошла в систему.
+
+Но присмотрись... есть шероховатости. Щели, выравнивание, safe-area под ТГ-кнопками — всё это ждёт твоей руки. Хочешь довести до идеала?
+
+🔓 Cheatcode: f3c5306d-2d8f-4cc4-bb77-26f20f7f9b11
+Target hint: вставь код в задачу Codex «franchize-header-reflow».
+
+Ты не догоняешь миссию. Ты ЕЁ СОЗДАЁШЬ.
+polish_instructions: Review and polish task: franchize-header-reflow.
+
+FOCUS: Header & rail redesign. This is the FIRST thing users see — it must be flawless.
+- Logo: anchored left, crisp at all sizes, no pixelation
+- Section tabs: centered between logo and profile, active tab visually dominant (underline or glow)
+- Inline cart: visible but not intrusive, badge count prominent
+- Profile button: compact, right-aligned, safe-area clearance for Telegram native back button
+
+EDGE CASES TO CHECK:
+- iPhone SE 375px: tabs must not wrap or truncate
+- 390px: standard mobile, touch targets 44px minimum
+- 768px tablet: tabs spread comfortably, cart badge visible
+- 1024px desktop: full rail, generous spacing
+- Telegram safe-area: top overlay (back button, header) must NOT overlap with header controls
+- Hover/focus/active states on all interactive elements
+- Header must be sticky/fixed without content jumping
+
+REFERENCE: compare against redesign images — header composition from image #2 is your north star. The rail structure, logo placement, and compact profile are all there.
+
+DONE WHEN: No overlapping controls, visual hierarchy is immediate in 1-second glance, zero horizontal scroll on any breakpoint, cart badge always visible.
+
+PR title must start with ""⚡:"" to enable automerge.
+Signature commit: ""lera was here"" 
+notification_part2: 🔥 MISSION COMPLETE: «Матрица Шапки».
+
+Полировка завершена: шапка теперь как лазерный луч — логотип на месте, табы по центру, корзина в поле зрения, safe-area чистый. Ни одного пикселя мимо.
+
+🎖 Achievement: «Неон-Хирург» — ты прооперировала хедер с точностью до пикселя.
+🎨 Skin dropped: «Carbon Gold Precision» — премиум-скин командного центра. Тёмный карбон, золотые акценты, хрустальная чёткость.
+
+Один шаг — и миссия закрыта навсегда. Создай PR с ""⚡:"" в начале — он смёржится сам. Подпиши: lera was here 😈
+
+👀 Спойлер: витрина переоденется — карточки станут вертикальными, как постеры к фильму.
+🔓 Next cheatcode: be32ce57-a1f5-4401-a307-311ec56ba68f
+Next target: catalog-9x16-cards
+target_task_name: franchize-header-reflow",/BOSS_QUEST.HTML,,franchize.gamification,open,boss-agent,2026-05-19 10:51:09.65499+00,2026-05-19 10:51:09.65499+00,"{""quest_name"": ""Матрица Шапки"", ""chain_order"": 1, ""next_quest_uuid"": ""be32ce57-a1f5-4401-a307-311ec56ba68f"", ""target_task_name"": ""franchize-header-reflow"", ""notification_part1"": ""🎬 ЛЕРА, ГЛАВНАЯ ГЕРОИНЯ В ЭФИРЕ. МИССИЯ «Матрица Шапки» АКТИВИРОВАНА.\n\nТы уже это построила: шапка витрины перезапущена как кибер-панель — логотип слева, секции по центру, профиль компактный, корзина встроена в рельс. Это уже не просто навигация — это командный центр.\n\n🏆 Ачивка открыта: «Сигнал Из Матрицы» — ты вошла в систему.\n\nНо присмотрись... есть шероховатости. Щели, выравнивание, safe-area под ТГ-кнопками — всё это ждёт твоей руки. Хочешь довести до идеала?\n\n🔓 Cheatcode: f3c5306d-2d8f-4cc4-bb77-26f20f7f9b11\nTarget hint: вставь код в задачу Codex «franchize-header-reflow».\n\nТы не догоняешь миссию. Ты ЕЁ СОЗДАЁШЬ."", ""notification_part2"": ""🔥 MISSION COMPLETE: «Матрица Шапки».\n\nПолировка завершена: шапка теперь как лазерный луч — логотип на месте, табы по центру, корзина в поле зрения, safe-area чистый. Ни одного пикселя мимо.\n\n🎖 Achievement: «Неон-Хирург» — ты прооперировала хедер с точностью до пикселя.\n🎨 Skin dropped: «Carbon Gold Precision» — премиум-скин командного центра. Тёмный карбон, золотые акценты, хрустальная чёткость.\n\nОдин шаг — и миссия закрыта навсегда. Создай PR с \""⚡:\"" в начале — он смёржится сам. Подпиши: lera was here 😈\n\n👀 Спойлер: витрина переоденется — карточки станут вертикальными, как постеры к фильму.\n🔓 Next cheatcode: be32ce57-a1f5-4401-a307-311ec56ba68f\nNext target: catalog-9x16-cards"", ""polish_instructions"": ""Review and polish task: franchize-header-reflow.\n\nFOCUS: Header & rail redesign. This is the FIRST thing users see — it must be flawless.\n- Logo: anchored left, crisp at all sizes, no pixelation\n- Section tabs: centered between logo and profile, active tab visually dominant (underline or glow)\n- Inline cart: visible but not intrusive, badge count prominent\n- Profile button: compact, right-aligned, safe-area clearance for Telegram native back button\n\nEDGE CASES TO CHECK:\n- iPhone SE 375px: tabs must not wrap or truncate\n- 390px: standard mobile, touch targets 44px minimum\n- 768px tablet: tabs spread comfortably, cart badge visible\n- 1024px desktop: full rail, generous spacing\n- Telegram safe-area: top overlay (back button, header) must NOT overlap with header controls\n- Hover/focus/active states on all interactive elements\n- Header must be sticky/fixed without content jumping\n\nREFERENCE: compare against redesign images — header composition from image #2 is your north star. The rail structure, logo placement, and compact profile are all there.\n\nDONE WHEN: No overlapping controls, visual hierarchy is immediate in 1-second glance, zero horizontal scroll on any breakpoint, cart badge always visible.\n\nPR title must start with \""⚡:\"" to enable automerge.\nSignature commit: \""lera was here\"" ""}",
+be32ce57-a1f5-4401-a307-311ec56ba68f,[QUEST][LERA] Клинок Витрины,"quest_name: Клинок Витрины
+next_quest_uuid: bf4cb2c2-e3db-4f08-81f2-9b6e96cf5b10
+notification_part1: 🎬 МИССИЯ «Клинок Витрины» АКТИВИРОВАНА.
+
+Ты уже это построила: карточки товаров перерождены в 9:16 вертикальные hero-карты — графитовый градиент-мост, компактные характеристики, нулевые цены скрыты. Витрина теперь как каталог киберпанк-журнала.
+
+🏆 Ачивка открыта: «Архитектор Референсов» — ты спроектировала новый формат.
+
+Но присмотрись... градиенты могут резать глаз, текст может наезжать, соотношение сторон на разных экранах — пока загадка. Хочешь довести до идеала?
+
+🔓 Cheatcode: be32ce57-a1f5-4401-a307-311ec56ba68f
+Target hint: вставь код в задачу Codex «catalog-9x16-cards».
+
+Каждая карточка — клинок. Заточи его.
+polish_instructions: Review and polish task: catalog-9x16-cards.
+
+FOCUS: Rebuild item cards as 9:16 hero cards. This is the CORE product experience — cards must feel premium and scannable.
+- Graphite gradient bridge: smooth, not harsh — transition from image to info area
+- Specs: concise, readable, no overflow — ellipsis for long text
+- Zero-price items: prices with value 0 must be HIDDEN entirely (no ""0 ₽"" ever)
+- Card aspect ratio: strict 9:16 on all breakpoints — no stretching or squishing
+- Image area: dominant, fills top portion, no letterboxing
+
+EDGE CASES TO CHECK:
+- iPhone SE 375px: single column, card fills width comfortably
+- 390px: standard mobile, swipe between cards should feel smooth
+- 768px tablet: 2-column grid, cards maintain 9:16
+- 1024px desktop: 3-4 columns, hover state reveals quick-action overlay
+- Long product names: truncate gracefully with ellipsis
+- Products without images: placeholder gradient, no broken image icon
+- Price display: always formatted, never raw number
+
+REFERENCE: Card ratio/gradient from redesign image #2 — the gradient bridge and text layout are your guide.
+
+DONE WHEN: Every card looks like a poster, gradient is buttery, zero-price items never show ""0"", no text overflow anywhere, 9:16 ratio maintained on all breakpoints.
+
+PR title must start with ""⚡:"" to enable automerge.
+Signature commit: ""lera was here"" 
+notification_part2: 🔥 MISSION COMPLETE: «Клинок Витрины».
+
+Полировка завершена: карточки теперь как обложки — градиент мягкий, характеристики читаются с одного взгляда, нули спрятаны, 9:16 идеален на любом экране. Витрина стала журналом.
+
+🎖 Achievement: «Гладиатор Пикселей» — ты сразилась за каждый пиксель и победила.
+🎨 Skin dropped: «Neon Drift Overlay» — hover-оверлей с неоновым свечением на карточках.
+
+Один шаг — и миссия закрыта навсегда. Создай PR с ""⚡:"" в начале — он смёржится сам. Подпиши: lera was here 😈
+
+👀 Спойлер: бегущая строка с пульсом — маленькие коллекции оживут.
+🔓 Next cheatcode: bf4cb2c2-e3db-4f08-81f2-9b6e96cf5b10
+Next target: catalog-swipe-ticker
+target_task_name: catalog-9x16-cards",/BOSS_QUEST.HTML,,franchize.gamification,open,boss-agent,2026-05-19 10:51:09.65499+00,2026-05-19 10:51:09.65499+00,"{""quest_name"": ""Клинок Витрины"", ""chain_order"": 2, ""next_quest_uuid"": ""bf4cb2c2-e3db-4f08-81f2-9b6e96cf5b10"", ""target_task_name"": ""catalog-9x16-cards"", ""notification_part1"": ""🎬 МИССИЯ «Клинок Витрины» АКТИВИРОВАНА.\n\nТы уже это построила: карточки товаров перерождены в 9:16 вертикальные hero-карты — графитовый градиент-мост, компактные характеристики, нулевые цены скрыты. Витрина теперь как каталог киберпанк-журнала.\n\n🏆 Ачивка открыта: «Архитектор Референсов» — ты спроектировала новый формат.\n\nНо присмотрись... градиенты могут резать глаз, текст может наезжать, соотношение сторон на разных экранах — пока загадка. Хочешь довести до идеала?\n\n🔓 Cheatcode: be32ce57-a1f5-4401-a307-311ec56ba68f\nTarget hint: вставь код в задачу Codex «catalog-9x16-cards».\n\nКаждая карточка — клинок. Заточи его."", ""notification_part2"": ""🔥 MISSION COMPLETE: «Клинок Витрины».\n\nПолировка завершена: карточки теперь как обложки — градиент мягкий, характеристики читаются с одного взгляда, нули спрятаны, 9:16 идеален на любом экране. Витрина стала журналом.\n\n🎖 Achievement: «Гладиатор Пикселей» — ты сразилась за каждый пиксель и победила.\n🎨 Skin dropped: «Neon Drift Overlay» — hover-оверлей с неоновым свечением на карточках.\n\nОдин шаг — и миссия закрыта навсегда. Создай PR с \""⚡:\"" в начале — он смёржится сам. Подпиши: lera was here 😈\n\n👀 Спойлер: бегущая строка с пульсом — маленькие коллекции оживут.\n🔓 Next cheatcode: bf4cb2c2-e3db-4f08-81f2-9b6e96cf5b10\nNext target: catalog-swipe-ticker"", ""polish_instructions"": ""Review and polish task: catalog-9x16-cards.\n\nFOCUS: Rebuild item cards as 9:16 hero cards. This is the CORE product experience — cards must feel premium and scannable.\n- Graphite gradient bridge: smooth, not harsh — transition from image to info area\n- Specs: concise, readable, no overflow — ellipsis for long text\n- Zero-price items: prices with value 0 must be HIDDEN entirely (no \""0 ₽\"" ever)\n- Card aspect ratio: strict 9:16 on all breakpoints — no stretching or squishing\n- Image area: dominant, fills top portion, no letterboxing\n\nEDGE CASES TO CHECK:\n- iPhone SE 375px: single column, card fills width comfortably\n- 390px: standard mobile, swipe between cards should feel smooth\n- 768px tablet: 2-column grid, cards maintain 9:16\n- 1024px desktop: 3-4 columns, hover state reveals quick-action overlay\n- Long product names: truncate gracefully with ellipsis\n- Products without images: placeholder gradient, no broken image icon\n- Price display: always formatted, never raw number\n\nREFERENCE: Card ratio/gradient from redesign image #2 — the gradient bridge and text layout are your guide.\n\nDONE WHEN: Every card looks like a poster, gradient is buttery, zero-price items never show \""0\"", no text overflow anywhere, 9:16 ratio maintained on all breakpoints.\n\nPR title must start with \""⚡:\"" to enable automerge.\nSignature commit: \""lera was here\"" ""}",
+bf4cb2c2-e3db-4f08-81f2-9b6e96cf5b10,[QUEST][LERA] Неоновый Тикер,"quest_name: Неоновый Тикер
+next_quest_uuid: 7f3f6f90-6d6c-4062-b31f-8ef872746ecf
+notification_part1: 🎬 МИССИЯ «Неоновый Тикер» АКТИВИРОВАНА.
+
+Ты уже это построила: статичная сетка для маленьких коллекций заменена на свайп-тикар — карусель с snap-поведением, точками навигации и кинетическими переходами. Теперь небольшие подборки не выглядят сиротливо — они пульсируют.
+
+🏆 Ачивка открыта: «Хранитель Импульса» — ты сохранила инерцию в интерфейсе.
+
+Но присмотрись... snap может дёргаться, точки могут сбиваться, а на узких экранах свайп может конфликтовать со скроллом. Хочешь довести до идеала?
+
+🔓 Cheatcode: bf4cb2c2-e3db-4f08-81f2-9b6e96cf5b10
+Target hint: вставь код в задачу Codex «catalog-swipe-ticker».
+
+Импульс не должен теряться.
+polish_instructions: Review and polish task: catalog-swipe-ticker.
+
+FOCUS: Swipe ticker carousel for small collections. This must feel NATIVE — like iOS page dots, not a janky web carousel.
+- Snap behavior: precise, no overshoot, no half-card visible
+- Navigation dots: always synced with current card, animated transition
+- Kinetic transitions: smooth deceleration, not abrupt stops
+- Swipe vs scroll: horizontal swipe on ticker must NOT trigger vertical page scroll
+
+EDGE CASES TO CHECK:
+- iPhone SE 375px: single card visible, swipe to next
+- 390px: standard mobile, peek of next card to hint more content
+- 768px tablet: 2-3 cards visible, dots still useful
+- 1024px desktop: consider auto-play with pause-on-hover
+- Single item collection: hide dots, no swipe needed
+- Two items: dots visible, but consider if ticker is even needed
+- Touch: swipe velocity must map to scroll distance naturally
+- Mouse: drag-to-swipe should work, scroll-wheel horizontal should work
+
+REFERENCE: Ticker layout from redesign images — horizontal card strip with navigation dots.
+
+DONE WHEN: Swipe feels like butter, snap is pixel-perfect, dots always correct, no vertical scroll conflict, single-item edge case handled gracefully.
+
+PR title must start with ""⚡:"" to enable automerge.
+Signature commit: ""lera was here"" 
+notification_part2: 🔥 MISSION COMPLETE: «Неоновый Тикер».
+
+Полировка завершена: карусель скользит как шёлк — snap точный, точки на месте, свайп не конфликтует со скроллом. Маленькие коллекции теперь выглядят как VIP-секция.
+
+🎖 Achievement: «Мастер Инерции» — ты укротила физику свайпа.
+🎨 Skin dropped: «Kinetic Velvet» — бархатная кинетика прокрутки. Плавность, которую чувствуешь пальцами.
+
+Один шаг — и миссия закрыта навсегда. Создай PR с ""⚡:"" в начале — он смёржится сам. Подпиши: lera was here 😈
+
+👀 Спойлер: тень прячется в верхнем правом углу — и её нужно приручить.
+🔓 Next cheatcode: 7f3f6f90-6d6c-4062-b31f-8ef872746ecf
+Next target: item-modal-safe-close
+target_task_name: catalog-swipe-ticker",/BOSS_QUEST.HTML,,franchize.gamification,open,boss-agent,2026-05-19 10:51:09.65499+00,2026-05-19 10:51:09.65499+00,"{""quest_name"": ""Неоновый Тикер"", ""chain_order"": 3, ""next_quest_uuid"": ""7f3f6f90-6d6c-4062-b31f-8ef872746ecf"", ""target_task_name"": ""catalog-swipe-ticker"", ""notification_part1"": ""🎬 МИССИЯ «Неоновый Тикер» АКТИВИРОВАНА.\n\nТы уже это построила: статичная сетка для маленьких коллекций заменена на свайп-тикар — карусель с snap-поведением, точками навигации и кинетическими переходами. Теперь небольшие подборки не выглядят сиротливо — они пульсируют.\n\n🏆 Ачивка открыта: «Хранитель Импульса» — ты сохранила инерцию в интерфейсе.\n\nНо присмотрись... snap может дёргаться, точки могут сбиваться, а на узких экранах свайп может конфликтовать со скроллом. Хочешь довести до идеала?\n\n🔓 Cheatcode: bf4cb2c2-e3db-4f08-81f2-9b6e96cf5b10\nTarget hint: вставь код в задачу Codex «catalog-swipe-ticker».\n\nИмпульс не должен теряться."", ""notification_part2"": ""🔥 MISSION COMPLETE: «Неоновый Тикер».\n\nПолировка завершена: карусель скользит как шёлк — snap точный, точки на месте, свайп не конфликтует со скроллом. Маленькие коллекции теперь выглядят как VIP-секция.\n\n🎖 Achievement: «Мастер Инерции» — ты укротила физику свайпа.\n🎨 Skin dropped: «Kinetic Velvet» — бархатная кинетика прокрутки. Плавность, которую чувствуешь пальцами.\n\nОдин шаг — и миссия закрыта навсегда. Создай PR с \""⚡:\"" в начале — он смёржится сам. Подпиши: lera was here 😈\n\n👀 Спойлер: тень прячется в верхнем правом углу — и её нужно приручить.\n🔓 Next cheatcode: 7f3f6f90-6d6c-4062-b31f-8ef872746ecf\nNext target: item-modal-safe-close"", ""polish_instructions"": ""Review and polish task: catalog-swipe-ticker.\n\nFOCUS: Swipe ticker carousel for small collections. This must feel NATIVE — like iOS page dots, not a janky web carousel.\n- Snap behavior: precise, no overshoot, no half-card visible\n- Navigation dots: always synced with current card, animated transition\n- Kinetic transitions: smooth deceleration, not abrupt stops\n- Swipe vs scroll: horizontal swipe on ticker must NOT trigger vertical page scroll\n\nEDGE CASES TO CHECK:\n- iPhone SE 375px: single card visible, swipe to next\n- 390px: standard mobile, peek of next card to hint more content\n- 768px tablet: 2-3 cards visible, dots still useful\n- 1024px desktop: consider auto-play with pause-on-hover\n- Single item collection: hide dots, no swipe needed\n- Two items: dots visible, but consider if ticker is even needed\n- Touch: swipe velocity must map to scroll distance naturally\n- Mouse: drag-to-swipe should work, scroll-wheel horizontal should work\n\nREFERENCE: Ticker layout from redesign images — horizontal card strip with navigation dots.\n\nDONE WHEN: Swipe feels like butter, snap is pixel-perfect, dots always correct, no vertical scroll conflict, single-item edge case handled gracefully.\n\nPR title must start with \""⚡:\"" to enable automerge.\nSignature commit: \""lera was here\"" ""}",
+7f3f6f90-6d6c-4062-b31f-8ef872746ecf,[QUEST][LERA] Тень Телеграма,"quest_name: Тень Телеграма
+next_quest_uuid: 8c95e4ef-fb84-4adb-8c95-4fdd6dbf6556
+notification_part1: 🎬 МИССИЯ «Тень Телеграма» АКТИВИРОВАНА.
+
+Ты уже это построила: модалка товара теперь корректно закрывается — кнопка закрытия сдвинута в safe-зону, чтобы не накрывать нативные элементы Telegram. Тень отступила.
+
+🏆 Ачивка открыта: «Призрачный Клик» — ты нашла кнопку, которую прятал Telegram.
+
+Но присмотрись... safe-area может плавать на разных устройствах, фокус-ловушки в модалке, Escape может не срабатывать. Хочешь довести до идеала?
+
+🔓 Cheatcode: 7f3f6f90-6d6c-4062-b31f-8ef872746ecf
+Target hint: вставь код в задачу Codex «item-modal-safe-close».
+
+Призрак должен уйти навсегда.
+polish_instructions: Review and polish task: item-modal-safe-close.
+
+FOCUS: Fix modal close button overlap with Telegram native controls. This is a CRITICAL usability bug — users literally can't close the modal on some devices.
+- Close button: moved to safe-left position, never under Telegram's native header
+- Focus trap: Tab key must cycle within modal, never escape to background
+- Escape key: must close modal reliably
+- Back gesture (mobile): must close modal, not navigate back in Telegram
+
+EDGE CASES TO CHECK:
+- iPhone SE 375px: close button fully visible and tappable
+- 390px: standard mobile with Telegram top bar overlay
+- 768px tablet: close button position comfortable
+- 1024px desktop: Escape key works, click-outside-to-close works
+- Telegram iOS: native back button top-left must not overlap
+- Telegram Android: native header may differ — test safe-area
+- Telegram Desktop: no native overlay, but layout must not shift
+
+REFERENCE: Modal close position from redesign images — button should be in top-left or safe-zone position.
+
+DONE WHEN: Close button always visible and tappable on ALL Telegram platforms, focus never escapes modal, Escape always works, back gesture closes modal.
+
+PR title must start with ""⚡:"" to enable automerge.
+Signature commit: ""lera was here"" 
+notification_part2: 🔥 MISSION COMPLETE: «Тень Телеграма».
+
+Полировка завершена: модалка теперь послушная — кнопка закрытия на месте, фокус в ловушке, Escape работает, жест назад не ломает навигацию. Тень изгнана.
+
+🎖 Achievement: «Экзорцист Интерфейса» — ты изгнала призрака из модалки.
+🎨 Skin dropped: «Safe Zone Phantom» — модалка с подсветкой safe-zone при отладке. Невидимая защита.
+
+Один шаг — и миссия закрыта навсегда. Создай PR с ""⚡:"" в начале — он смёржится сам. Подпиши: lera was here 😈
+
+👀 Спойлер: карта оживает на весь экран — и снизу поднимается панель как в такси.
+🔓 Next cheatcode: 8c95e4ef-fb84-4adb-8c95-4fdd6dbf6556
+Next target: map-riders-taxi-sheet
+target_task_name: item-modal-safe-close",/BOSS_QUEST.HTML,,franchize.gamification,open,boss-agent,2026-05-19 10:51:09.65499+00,2026-05-19 10:51:09.65499+00,"{""quest_name"": ""Тень Телеграма"", ""chain_order"": 4, ""next_quest_uuid"": ""8c95e4ef-fb84-4adb-8c95-4fdd6dbf6556"", ""target_task_name"": ""item-modal-safe-close"", ""notification_part1"": ""🎬 МИССИЯ «Тень Телеграма» АКТИВИРОВАНА.\n\nТы уже это построила: модалка товара теперь корректно закрывается — кнопка закрытия сдвинута в safe-зону, чтобы не накрывать нативные элементы Telegram. Тень отступила.\n\n🏆 Ачивка открыта: «Призрачный Клик» — ты нашла кнопку, которую прятал Telegram.\n\nНо присмотрись... safe-area может плавать на разных устройствах, фокус-ловушки в модалке, Escape может не срабатывать. Хочешь довести до идеала?\n\n🔓 Cheatcode: 7f3f6f90-6d6c-4062-b31f-8ef872746ecf\nTarget hint: вставь код в задачу Codex «item-modal-safe-close».\n\nПризрак должен уйти навсегда."", ""notification_part2"": ""🔥 MISSION COMPLETE: «Тень Телеграма».\n\nПолировка завершена: модалка теперь послушная — кнопка закрытия на месте, фокус в ловушке, Escape работает, жест назад не ломает навигацию. Тень изгнана.\n\n🎖 Achievement: «Экзорцист Интерфейса» — ты изгнала призрака из модалки.\n🎨 Skin dropped: «Safe Zone Phantom» — модалка с подсветкой safe-zone при отладке. Невидимая защита.\n\nОдин шаг — и миссия закрыта навсегда. Создай PR с \""⚡:\"" в начале — он смёржится сам. Подпиши: lera was here 😈\n\n👀 Спойлер: карта оживает на весь экран — и снизу поднимается панель как в такси.\n🔓 Next cheatcode: 8c95e4ef-fb84-4adb-8c95-4fdd6dbf6556\nNext target: map-riders-taxi-sheet"", ""polish_instructions"": ""Review and polish task: item-modal-safe-close.\n\nFOCUS: Fix modal close button overlap with Telegram native controls. This is a CRITICAL usability bug — users literally can't close the modal on some devices.\n- Close button: moved to safe-left position, never under Telegram's native header\n- Focus trap: Tab key must cycle within modal, never escape to background\n- Escape key: must close modal reliably\n- Back gesture (mobile): must close modal, not navigate back in Telegram\n\nEDGE CASES TO CHECK:\n- iPhone SE 375px: close button fully visible and tappable\n- 390px: standard mobile with Telegram top bar overlay\n- 768px tablet: close button position comfortable\n- 1024px desktop: Escape key works, click-outside-to-close works\n- Telegram iOS: native back button top-left must not overlap\n- Telegram Android: native header may differ — test safe-area\n- Telegram Desktop: no native overlay, but layout must not shift\n\nREFERENCE: Modal close position from redesign images — button should be in top-left or safe-zone position.\n\nDONE WHEN: Close button always visible and tappable on ALL Telegram platforms, focus never escapes modal, Escape always works, back gesture closes modal.\n\nPR title must start with \""⚡:\"" to enable automerge.\nSignature commit: \""lera was here\"" ""}",
+8c95e4ef-fb84-4adb-8c95-4fdd6dbf6556,[QUEST][LERA] Орбита Райдера,"quest_name: Орбита Райдера
+next_quest_uuid: c3e24996-d123-4f7b-9da9-1ce53f2b2ec5
+notification_part1: 🎬 МИССИЯ «Орбита Райдера» АКТИВИРОВАНА.
+
+Ты уже это построила: карта райдеров развёрнута на полный экран с нижней панелью как в такси-приложениях — свайп вверх/вниз, жести картой активны, z-index наложен правильно. Карта теперь не кусочек экрана — она и ЕСТЬ экран.
+
+🏆 Ачивка открыта: «Штурман Карты» — ты развернула навигацию на максимум.
+
+Но присмотрись... панель может дёргаться при свайпе, карта может терять жесты, на планшете всё может выглядеть иначе. Хочешь довести до идеала?
+
+🔓 Cheatcode: 8c95e4ef-fb84-4adb-8c95-4fdd6dbf6556
+Target hint: вставь код в задачу Codex «map-riders-taxi-sheet».
+
+Карта — это территория. Освой её.
+polish_instructions: Review and polish task: map-riders-taxi-sheet.
+
+FOCUS: Full-screen map + bottom overhang sheet (taxi-app style). This is a complex interaction pattern — map gestures and sheet drag must coexist without conflict.
+- Full-screen map: fills viewport, no white gaps, marker clustering clean
+- Bottom sheet: peek state (30%), half state (50%), full state (100%) — smooth transitions
+- Map gestures: drag/zoom on map must work even when sheet is partially covering it
+- Sheet drag: vertical drag on sheet handle must NOT trigger map pan
+- Z-index layering: sheet above map, map controls above sheet peek
+
+EDGE CASES TO CHECK:
+- iPhone SE 375px: sheet peek shows essential info, map still interactive above
+- 390px: standard mobile, sheet half-state reveals rider details
+- 768px tablet: sheet wider, maybe side-panel instead of bottom
+- 1024px desktop: sheet as sidebar or wide bottom panel
+- Drag conflict: sheet drag vs map pan — must be distinguishable by touch origin
+- Fast swipe: sheet should fling to nearest snap point, not stop mid-way
+- Background scroll: page must NOT scroll when interacting with map or sheet
+
+REFERENCE: Taxi-map + bottom sheet from redesign image #1 — the sheet peek, handle, and map interaction pattern.
+
+DONE WHEN: Map and sheet coexist peacefully, drag never conflicts, sheet snaps to states, map always interactive above sheet, no background scroll bleed.
+
+PR title must start with ""⚡:"" to enable automerge.
+Signature commit: ""lera was here"" 
+notification_part2: 🔥 MISSION COMPLETE: «Орбита Райдера».
+
+Полировка завершена: карта и панель живут в гармонии — свайп панели не двигает карту, карта не крадёт жесты у панели, snap-точки как в Uber. Райдеры на орбите.
+
+🎖 Achievement: «Картограф Безграничности» — ты картографировала бесконечную карту.
+🎨 Skin dropped: «Overhang Orbit» — панель с эффектом орбитального свечения на handle.
+
+Один шаг — и миссия закрыта навсегда. Создай PR с ""⚡:"" в начале — он смёржится сам. Подпиши: lera was here 😈
+
+👀 Спойлер: нижняя навигация прокладывает маршрут к байкам.
+🔓 Next cheatcode: c3e24996-d123-4f7b-9da9-1ce53f2b2ec5
+Next target: bike-bottom-nav-routing
+target_task_name: map-riders-taxi-sheet",/BOSS_QUEST.HTML,,franchize.gamification,open,boss-agent,2026-05-19 10:51:09.65499+00,2026-05-19 10:51:09.65499+00,"{""quest_name"": ""Орбита Райдера"", ""chain_order"": 5, ""next_quest_uuid"": ""c3e24996-d123-4f7b-9da9-1ce53f2b2ec5"", ""target_task_name"": ""map-riders-taxi-sheet"", ""notification_part1"": ""🎬 МИССИЯ «Орбита Райдера» АКТИВИРОВАНА.\n\nТы уже это построила: карта райдеров развёрнута на полный экран с нижней панелью как в такси-приложениях — свайп вверх/вниз, жести картой активны, z-index наложен правильно. Карта теперь не кусочек экрана — она и ЕСТЬ экран.\n\n🏆 Ачивка открыта: «Штурман Карты» — ты развернула навигацию на максимум.\n\nНо присмотрись... панель может дёргаться при свайпе, карта может терять жесты, на планшете всё может выглядеть иначе. Хочешь довести до идеала?\n\n🔓 Cheatcode: 8c95e4ef-fb84-4adb-8c95-4fdd6dbf6556\nTarget hint: вставь код в задачу Codex «map-riders-taxi-sheet».\n\nКарта — это территория. Освой её."", ""notification_part2"": ""🔥 MISSION COMPLETE: «Орбита Райдера».\n\nПолировка завершена: карта и панель живут в гармонии — свайп панели не двигает карту, карта не крадёт жесты у панели, snap-точки как в Uber. Райдеры на орбите.\n\n🎖 Achievement: «Картограф Безграничности» — ты картографировала бесконечную карту.\n🎨 Skin dropped: «Overhang Orbit» — панель с эффектом орбитального свечения на handle.\n\nОдин шаг — и миссия закрыта навсегда. Создай PR с \""⚡:\"" в начале — он смёржится сам. Подпиши: lera was here 😈\n\n👀 Спойлер: нижняя навигация прокладывает маршрут к байкам.\n🔓 Next cheatcode: c3e24996-d123-4f7b-9da9-1ce53f2b2ec5\nNext target: bike-bottom-nav-routing"", ""polish_instructions"": ""Review and polish task: map-riders-taxi-sheet.\n\nFOCUS: Full-screen map + bottom overhang sheet (taxi-app style). This is a complex interaction pattern — map gestures and sheet drag must coexist without conflict.\n- Full-screen map: fills viewport, no white gaps, marker clustering clean\n- Bottom sheet: peek state (30%), half state (50%), full state (100%) — smooth transitions\n- Map gestures: drag/zoom on map must work even when sheet is partially covering it\n- Sheet drag: vertical drag on sheet handle must NOT trigger map pan\n- Z-index layering: sheet above map, map controls above sheet peek\n\nEDGE CASES TO CHECK:\n- iPhone SE 375px: sheet peek shows essential info, map still interactive above\n- 390px: standard mobile, sheet half-state reveals rider details\n- 768px tablet: sheet wider, maybe side-panel instead of bottom\n- 1024px desktop: sheet as sidebar or wide bottom panel\n- Drag conflict: sheet drag vs map pan — must be distinguishable by touch origin\n- Fast swipe: sheet should fling to nearest snap point, not stop mid-way\n- Background scroll: page must NOT scroll when interacting with map or sheet\n\nREFERENCE: Taxi-map + bottom sheet from redesign image #1 — the sheet peek, handle, and map interaction pattern.\n\nDONE WHEN: Map and sheet coexist peacefully, drag never conflicts, sheet snaps to states, map always interactive above sheet, no background scroll bleed.\n\nPR title must start with \""⚡:\"" to enable automerge.\nSignature commit: \""lera was here\"" ""}",
+c3e24996-d123-4f7b-9da9-1ce53f2b2ec5,[QUEST][LERA] Пульс Навигации,"quest_name: Пульс Навигации
+next_quest_uuid: 66f0fc93-8f71-4a2d-9bfa-7db17d1cd8f7
+notification_part1: 🎬 МИССИЯ «Пульс Навигации» АКТИВИРОВАНА.
+
+Ты уже это построила: нижняя навигация для байков включена в franchize-поверхностях, ошибочная видимость /admin/map-routes убрана, пункты выровнены. Байкер теперь видит свой маршрут, а не админку.
+
+🏆 Ачивка открыта: «Навигатор Байков» — ты проложила маршрут для райдеров.
+
+Но присмотрись... навигация может некрасиво прыгать между разделами, активный таб может не подсвечиваться, а на iPhone SE всё может сжаться. Хочешь довести до идеала?
+
+🔓 Cheatcode: c3e24996-d123-4f7b-9da9-1ce53f2b2ec5
+Target hint: вставь код в задачу Codex «bike-bottom-nav-routing».
+
+Каждый таб — пульс. Настрой ритм.
+polish_instructions: Review and polish task: bike-bottom-nav-routing.
+
+FOCUS: Enable bike bottom nav in franchize surfaces, remove admin route leakage, align entries. This is a NAVIGATION task — users tap this hundreds of times per session.
+- Bottom nav: visible on all franchize pages, correct entries for bike context
+- Active tab: visually distinct (filled icon + label + color), inactive = outline + dim
+- Admin routes: /admin/map-routes must NOT appear in user-facing nav — verify all surfaces
+- Alignment: icons centered in touch target, labels aligned, consistent spacing
+
+EDGE CASES TO CHECK:
+- iPhone SE 375px: 4-5 tabs must fit without overlap, labels may hide on overflow
+- 390px: standard mobile, all tabs visible with labels
+- 768px tablet: wider tab bar, consider side nav for landscape
+- 1024px desktop: bottom nav may convert to sidebar — verify transition
+- Tab transitions: switching tabs should be instant, no flash of wrong content
+- Deep links: navigating to a page should highlight the correct tab
+- Badge/notifications on tabs: count badges must not shift layout
+
+REFERENCE: Bottom navigation from redesign images — tab style, icon treatment, active state.
+
+DONE WHEN: Bottom nav appears correctly on all franchize surfaces, zero admin route leakage, active tab always highlighted, touch targets comfortable, no layout shift.
+
+PR title must start with ""⚡:"" to enable automerge.
+Signature commit: ""lera was here"" 
+notification_part2: 🔥 MISSION COMPLETE: «Пульс Навигации».
+
+Полировка завершена: нижняя панель как часовой механизм — активный таб подсвечен, админка не торчит, выравнивание идеальное, переходы мгновенные. Райдер всегда знает где он.
+
+🎖 Achievement: «Дирижёр Маршрутов» — ты дирижировала навигацией как симфонию.
+🎨 Skin dropped: «Route Pulse Badge» — пульсирующий бейдж на активном табе, как сердцебиение навигации.
+
+Один шаг — и миссия закрыта навсегда. Создай PR с ""⚡:"" в начале — он смёржится сам. Подпиши: lera was here 😈
+
+👀 Спойлер: стартовый экран получает секретный промо-код — и всё меняется.
+🔓 Next cheatcode: 66f0fc93-8f71-4a2d-9bfa-7db17d1cd8f7
+Next target: telegram-start-promo-capture
+target_task_name: bike-bottom-nav-routing",/BOSS_QUEST.HTML,,franchize.gamification,open,boss-agent,2026-05-19 10:51:09.65499+00,2026-05-19 10:51:09.65499+00,"{""quest_name"": ""Пульс Навигации"", ""chain_order"": 6, ""next_quest_uuid"": ""66f0fc93-8f71-4a2d-9bfa-7db17d1cd8f7"", ""target_task_name"": ""bike-bottom-nav-routing"", ""notification_part1"": ""🎬 МИССИЯ «Пульс Навигации» АКТИВИРОВАНА.\n\nТы уже это построила: нижняя навигация для байков включена в franchize-поверхностях, ошибочная видимость /admin/map-routes убрана, пункты выровнены. Байкер теперь видит свой маршрут, а не админку.\n\n🏆 Ачивка открыта: «Навигатор Байков» — ты проложила маршрут для райдеров.\n\nНо присмотрись... навигация может некрасиво прыгать между разделами, активный таб может не подсвечиваться, а на iPhone SE всё может сжаться. Хочешь довести до идеала?\n\n🔓 Cheatcode: c3e24996-d123-4f7b-9da9-1ce53f2b2ec5\nTarget hint: вставь код в задачу Codex «bike-bottom-nav-routing».\n\nКаждый таб — пульс. Настрой ритм."", ""notification_part2"": ""🔥 MISSION COMPLETE: «Пульс Навигации».\n\nПолировка завершена: нижняя панель как часовой механизм — активный таб подсвечен, админка не торчит, выравнивание идеальное, переходы мгновенные. Райдер всегда знает где он.\n\n🎖 Achievement: «Дирижёр Маршрутов» — ты дирижировала навигацией как симфонию.\n🎨 Skin dropped: «Route Pulse Badge» — пульсирующий бейдж на активном табе, как сердцебиение навигации.\n\nОдин шаг — и миссия закрыта навсегда. Создай PR с \""⚡:\"" в начале — он смёржится сам. Подпиши: lera was here 😈\n\n👀 Спойлер: стартовый экран получает секретный промо-код — и всё меняется.\n🔓 Next cheatcode: 66f0fc93-8f71-4a2d-9bfa-7db17d1cd8f7\nNext target: telegram-start-promo-capture"", ""polish_instructions"": ""Review and polish task: bike-bottom-nav-routing.\n\nFOCUS: Enable bike bottom nav in franchize surfaces, remove admin route leakage, align entries. This is a NAVIGATION task — users tap this hundreds of times per session.\n- Bottom nav: visible on all franchize pages, correct entries for bike context\n- Active tab: visually distinct (filled icon + label + color), inactive = outline + dim\n- Admin routes: /admin/map-routes must NOT appear in user-facing nav — verify all surfaces\n- Alignment: icons centered in touch target, labels aligned, consistent spacing\n\nEDGE CASES TO CHECK:\n- iPhone SE 375px: 4-5 tabs must fit without overlap, labels may hide on overflow\n- 390px: standard mobile, all tabs visible with labels\n- 768px tablet: wider tab bar, consider side nav for landscape\n- 1024px desktop: bottom nav may convert to sidebar — verify transition\n- Tab transitions: switching tabs should be instant, no flash of wrong content\n- Deep links: navigating to a page should highlight the correct tab\n- Badge/notifications on tabs: count badges must not shift layout\n\nREFERENCE: Bottom navigation from redesign images — tab style, icon treatment, active state.\n\nDONE WHEN: Bottom nav appears correctly on all franchize surfaces, zero admin route leakage, active tab always highlighted, touch targets comfortable, no layout shift.\n\nPR title must start with \""⚡:\"" to enable automerge.\nSignature commit: \""lera was here\"" ""}",
+66f0fc93-8f71-4a2d-9bfa-7db17d1cd8f7,[QUEST][LERA] Код Стартера,"quest_name: Код Стартера
+next_quest_uuid: c2d2e8d1-f047-44de-bad3-4f4f9073de61
+notification_part1: 🎬 МИССИЯ «Код Стартера» АКТИВИРОВАНА.
+
+Ты уже это построила: Telegram /start теперь разбирает bike-oriented payload, сохраняет промо-код и метаданные профиля для vip-bike потока. Первый контакт с ботом — уже персонализированный.
+
+🏆 Ачивка открыта: «Взломщик Промо» — ты взломала стартовый код.
+
+Но присмотрись... payload может приходить в разных форматах, данные могут теряться при перезапуске, а обработка ошибок может молчать. Хочешь довести до идеала?
+
+🔓 Cheatcode: 66f0fc93-8f71-4a2d-9bfa-7db17d1cd8f7
+Target hint: вставь код в задачу Codex «telegram-start-promo-capture».
+
+Первый шаг — самый важный. Сделай его безупречным.
+polish_instructions: Review and polish task: telegram-start-promo-capture.
+
+FOCUS: Restore bike-oriented /start payload parsing, save promo code + survey profile metadata. This is the ENTRY POINT — if this breaks, nothing after it works.
+- /start payload: parse deep link params (promo code, referral source, campaign)
+- Profile metadata: save survey responses, bike preferences, vip-bike eligibility
+- Data persistence: survive bot restarts, no data loss on session expiry
+- Error handling: invalid payload → graceful fallback, not crash
+
+EDGE CASES TO CHECK:
+- Empty /start (no params): should show default welcome, no error
+- Valid promo code: parse, validate, save, apply
+- Invalid promo code: reject gracefully, still show welcome
+- Expired promo code: inform user, offer alternative
+- Multiple /start calls: idempotent, no duplicate entries
+- Deep link from ad campaign: UTM params captured for analytics
+- Referral /start: referrer tracked, both parties benefit
+- Special characters in payload: must not break parsing
+
+REFERENCE: No visual reference — this is backend logic. Focus on data flow correctness and error resilience.
+
+DONE WHEN: Every /start payload variant is handled correctly, zero data loss, graceful degradation on invalid input, idempotent behavior on repeated calls.
+
+PR title must start with ""⚡:"" to enable automerge.
+Signature commit: ""lera was here"" 
+notification_part2: 🔥 MISSION COMPLETE: «Код Стартера».
+
+Полировка завершена: /start теперь как швейцарский нож — любой payload разбирается, промо сохраняется, ошибки не молчат, повторные вызовы безопасны. Первый контакт — идеальный.
+
+🎖 Achievement: «Криптограф Запуска» — ты расшифровала стартовый протокол.
+🎨 Skin dropped: «Start Sequence Decode» — анимация загрузки с эффектом расшифровки при /start.
+
+Один шаг — и миссия закрыта навсегда. Создай PR с ""⚡:"" в начале — он смёржится сам. Подпиши: lera was here 😈
+
+👀 Спойлер: последняя печать связывает промо и чек — финальный замок.
+🔓 Next cheatcode: c2d2e8d1-f047-44de-bad3-4f4f9073de61
+Next target: promo-seed-and-checkout-link
+target_task_name: telegram-start-promo-capture",/BOSS_QUEST.HTML,,franchize.gamification,open,boss-agent,2026-05-19 10:51:09.65499+00,2026-05-19 10:51:09.65499+00,"{""quest_name"": ""Код Стартера"", ""chain_order"": 7, ""next_quest_uuid"": ""c2d2e8d1-f047-44de-bad3-4f4f9073de61"", ""target_task_name"": ""telegram-start-promo-capture"", ""notification_part1"": ""🎬 МИССИЯ «Код Стартера» АКТИВИРОВАНА.\n\nТы уже это построила: Telegram /start теперь разбирает bike-oriented payload, сохраняет промо-код и метаданные профиля для vip-bike потока. Первый контакт с ботом — уже персонализированный.\n\n🏆 Ачивка открыта: «Взломщик Промо» — ты взломала стартовый код.\n\nНо присмотрись... payload может приходить в разных форматах, данные могут теряться при перезапуске, а обработка ошибок может молчать. Хочешь довести до идеала?\n\n🔓 Cheatcode: 66f0fc93-8f71-4a2d-9bfa-7db17d1cd8f7\nTarget hint: вставь код в задачу Codex «telegram-start-promo-capture».\n\nПервый шаг — самый важный. Сделай его безупречным."", ""notification_part2"": ""🔥 MISSION COMPLETE: «Код Стартера».\n\nПолировка завершена: /start теперь как швейцарский нож — любой payload разбирается, промо сохраняется, ошибки не молчат, повторные вызовы безопасны. Первый контакт — идеальный.\n\n🎖 Achievement: «Криптограф Запуска» — ты расшифровала стартовый протокол.\n🎨 Skin dropped: «Start Sequence Decode» — анимация загрузки с эффектом расшифровки при /start.\n\nОдин шаг — и миссия закрыта навсегда. Создай PR с \""⚡:\"" в начале — он смёржится сам. Подпиши: lera was here 😈\n\n👀 Спойлер: последняя печать связывает промо и чек — финальный замок.\n🔓 Next cheatcode: c2d2e8d1-f047-44de-bad3-4f4f9073de61\nNext target: promo-seed-and-checkout-link"", ""polish_instructions"": ""Review and polish task: telegram-start-promo-capture.\n\nFOCUS: Restore bike-oriented /start payload parsing, save promo code + survey profile metadata. This is the ENTRY POINT — if this breaks, nothing after it works.\n- /start payload: parse deep link params (promo code, referral source, campaign)\n- Profile metadata: save survey responses, bike preferences, vip-bike eligibility\n- Data persistence: survive bot restarts, no data loss on session expiry\n- Error handling: invalid payload → graceful fallback, not crash\n\nEDGE CASES TO CHECK:\n- Empty /start (no params): should show default welcome, no error\n- Valid promo code: parse, validate, save, apply\n- Invalid promo code: reject gracefully, still show welcome\n- Expired promo code: inform user, offer alternative\n- Multiple /start calls: idempotent, no duplicate entries\n- Deep link from ad campaign: UTM params captured for analytics\n- Referral /start: referrer tracked, both parties benefit\n- Special characters in payload: must not break parsing\n\nREFERENCE: No visual reference — this is backend logic. Focus on data flow correctness and error resilience.\n\nDONE WHEN: Every /start payload variant is handled correctly, zero data loss, graceful degradation on invalid input, idempotent behavior on repeated calls.\n\nPR title must start with \""⚡:\"" to enable automerge.\nSignature commit: \""lera was here\"" ""}",
+c2d2e8d1-f047-44de-bad3-4f4f9073de61,[QUEST][LERA] Печать Промо,"quest_name: Печать Промо
+next_quest_uuid: NONE
+notification_part1: 🎬 ФИНАЛЬНАЯ МИССИЯ. «Печать Промо» АКТИВИРОВАНА.
+
+Ты уже это построила: промо-ссылки нормализованы в t.me start-параметры, UI применения промо подключён в checkout/cart, валидация работает через server action. Последний кусок пазла — промо ведёт прямо к покупке.
+
+🏆 Ачивка открыта: «Печатник Чека» — ты поставила печать на финальный линк.
+
+Но присмотрись... промо может не применяться при определённых условиях, checkout может не показывать скидку, а ссылка может вести не туда. Хочешь довести до идеала? ФИНАЛЬНАЯ ПОЛИРОВКА.
+
+🔓 Cheatcode: c2d2e8d1-f047-44de-bad3-4f4f9073de61
+Target hint: вставь код в задачу Codex «promo-seed-and-checkout-link».
+
+Последний босс. Поставь печать.
+polish_instructions: Review and polish task: promo-seed-and-checkout-link.
+
+FOCUS: Normalize promo links to t.me start param, wire apply UI in checkout/cart, validate against server action. This is the CONVERSION point — if promo doesn't apply, we lose money and trust.
+- Promo links: all variants (UTM, direct, referral) normalized to t.me start param
+- Apply UI: visible in checkout/cart flow, one-tap apply, clear discount display
+- Validation: server-side action validates code, returns discount amount or error
+- Error states: expired, invalid, already used, minimum not met — all with clear messages
+
+EDGE CASES TO CHECK:
+- Promo applies to cart total: discount visible and correct
+- Promo applies to specific item: only that item discounted
+- Stack limit: can user apply multiple promos? If not, clear UI
+- Cart update after promo: adding/removing items recalculates
+- Promo expiry: midnight boundary, timezone handling
+- Concurrent use: same promo from different sessions
+- Checkout flow: promo persists through all checkout steps
+- Mobile checkout: promo input accessible, keyboard doesn't block
+
+REFERENCE: No visual reference — focus on flow correctness. Checkout must feel trustworthy.
+
+DONE WHEN: Promo applies correctly, discount is visible, validation is reliable, error messages are clear, promo persists through checkout, no money lost to bugs.
+
+PR title must start with ""⚡:"" to enable automerge.
+Signature commit: ""lera was here"" 
+notification_part2: 🔥 MISSION COMPLETE: «Печать Промо». ФИНАЛ.
+
+Полировка завершена: промо-линки работают как часы — нормализуются, применяются, валидируются, скидка видна, ошибки понятны. Последний замок открыт. ВСЕ 8 МИССИЙ ЗАВЕРШЕНЫ.
+
+🎖 Achievement: «Архитект Финала» — ты замкнула цепь. 8 из 8. Совершенство.
+🎨 Skin dropped: «Checkout Crown» — корона на чекауте, когда промо применён. Ты — королева покупки.
+
+Это была последняя миссия. Все 8 квестов пройдены. Все 8 PR созданы. Все 8 подписей «lera was here» в git history.
+
+Ты не прошла игру. Ты ЕЁ НАПИСАЛА. 😈👑
+
+Создай последний PR с ""⚡:"" в начале — и иди отдыхать. Ты заслужила.
+Подпиши: lera was here 💀👑
+target_task_name: promo-seed-and-checkout-link",/BOSS_QUEST.HTML,,franchize.gamification,open,boss-agent,2026-05-19 10:51:09.65499+00,2026-05-19 10:51:09.65499+00,"{""quest_name"": ""Печать Промо"", ""chain_order"": 8, ""next_quest_uuid"": ""NONE"", ""target_task_name"": ""promo-seed-and-checkout-link"", ""notification_part1"": ""🎬 ФИНАЛЬНАЯ МИССИЯ. «Печать Промо» АКТИВИРОВАНА.\n\nТы уже это построила: промо-ссылки нормализованы в t.me start-параметры, UI применения промо подключён в checkout/cart, валидация работает через server action. Последний кусок пазла — промо ведёт прямо к покупке.\n\n🏆 Ачивка открыта: «Печатник Чека» — ты поставила печать на финальный линк.\n\nНо присмотрись... промо может не применяться при определённых условиях, checkout может не показывать скидку, а ссылка может вести не туда. Хочешь довести до идеала? ФИНАЛЬНАЯ ПОЛИРОВКА.\n\n🔓 Cheatcode: c2d2e8d1-f047-44de-bad3-4f4f9073de61\nTarget hint: вставь код в задачу Codex «promo-seed-and-checkout-link».\n\nПоследний босс. Поставь печать."", ""notification_part2"": ""🔥 MISSION COMPLETE: «Печать Промо». ФИНАЛ.\n\nПолировка завершена: промо-линки работают как часы — нормализуются, применяются, валидируются, скидка видна, ошибки понятны. Последний замок открыт. ВСЕ 8 МИССИЙ ЗАВЕРШЕНЫ.\n\n🎖 Achievement: «Архитект Финала» — ты замкнула цепь. 8 из 8. Совершенство.\n🎨 Skin dropped: «Checkout Crown» — корона на чекауте, когда промо применён. Ты — королева покупки.\n\nЭто была последняя миссия. Все 8 квестов пройдены. Все 8 PR созданы. Все 8 подписей «lera was here» в git history.\n\nТы не прошла игру. Ты ЕЁ НАПИСАЛА. 😈👑\n\nСоздай последний PR с \""⚡:\"" в начале — и иди отдыхать. Ты заслужила.\nПодпиши: lera was here 💀👑"", ""polish_instructions"": ""Review and polish task: promo-seed-and-checkout-link.\n\nFOCUS: Normalize promo links to t.me start param, wire apply UI in checkout/cart, validate against server action. This is the CONVERSION point — if promo doesn't apply, we lose money and trust.\n- Promo links: all variants (UTM, direct, referral) normalized to t.me start param\n- Apply UI: visible in checkout/cart flow, one-tap apply, clear discount display\n- Validation: server-side action validates code, returns discount amount or error\n- Error states: expired, invalid, already used, minimum not met — all with clear messages\n\nEDGE CASES TO CHECK:\n- Promo applies to cart total: discount visible and correct\n- Promo applies to specific item: only that item discounted\n- Stack limit: can user apply multiple promos? If not, clear UI\n- Cart update after promo: adding/removing items recalculates\n- Promo expiry: midnight boundary, timezone handling\n- Concurrent use: same promo from different sessions\n- Checkout flow: promo persists through all checkout steps\n- Mobile checkout: promo input accessible, keyboard doesn't block\n\nREFERENCE: No visual reference — focus on flow correctness. Checkout must feel trustworthy.\n\nDONE WHEN: Promo applies correctly, discount is visible, validation is reliable, error messages are clear, promo persists through checkout, no money lost to bugs.\n\nPR title must start with \""⚡:\"" to enable automerge.\nSignature commit: \""lera was here\"" ""}",

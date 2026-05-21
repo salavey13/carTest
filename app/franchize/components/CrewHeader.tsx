@@ -3,13 +3,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Menu } from "lucide-react";
+import { Menu, ShoppingCart } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { FranchizeCrewVM } from "../actions";
 import { HeaderMenu } from "../modals/HeaderMenu";
 import { FranchizeProfileButton } from "./FranchizeProfileButton";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
+import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { toCategoryId } from "../lib/navigation";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
@@ -39,7 +40,9 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   const headerLogoHref = crew.header.logoHref || mainCatalogPath;
   const railRef = useRef<HTMLDivElement | null>(null);
   const prevPathnameRef = useRef<string | null>(null);
+  const [indicatorStyle, setIndicatorStyle] = useState<{ width: number; left: number; opacity: number }>({ width: 0, left: 0, opacity: 0 });
   const activePillText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
+  const { itemCount } = useFranchizeCart(crew.slug);
 
   // ── Logo loading state machine ──
   //   loading → (onLoad) → dissolving → (animationEnd) → revealed
@@ -191,10 +194,26 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
     }
   }, [activePath, pathname, visibleRailLinks]);
   // ------------------------------------------------------------------
+  useEffect(() => {
+    const container = railRef.current;
+    if (!container) return;
+    const activeRailLink = visibleRailLinks.find(
+      (link) => link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href)),
+    );
+    if (!activeRailLink) {
+      setIndicatorStyle((prev) => ({ ...prev, opacity: 0 }));
+      return;
+    }
+    const activeEl = Array.from(container.querySelectorAll<HTMLElement>("[data-category-pill]")).find(
+      (element) => element.dataset.categoryPill === activeRailLink.categoryLabel,
+    );
+    if (!activeEl) return;
+    setIndicatorStyle({ width: activeEl.offsetWidth, left: activeEl.offsetLeft, opacity: 1 });
+  }, [activePath, pathname, visibleRailLinks]);
 
   return (
     <header
-      className="sticky top-0 z-50 border-b pb-2 backdrop-blur-2xl"
+      className="sticky top-0 z-50 border-b pb-2 pt-[max(env(safe-area-inset-top),0.15rem)] backdrop-blur-2xl"
       style={{
         ...FRANCHIZE_HEADER_SAFE_AREA_STYLE,
         borderColor: crew.theme.palette.borderSoft,
@@ -331,6 +350,11 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             ref={railRef}
             className="relative mx-auto flex w-full max-w-7xl gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
           >
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute bottom-1 h-0.5 rounded-full bg-[var(--crew-header-accent)] transition-all duration-300 ease-out"
+              style={{ width: `${indicatorStyle.width}px`, transform: `translateX(${indicatorStyle.left}px)`, opacity: indicatorStyle.opacity }}
+            />
             {visibleRailLinks.map((link) => {
               const isActive = link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href));
               return (
