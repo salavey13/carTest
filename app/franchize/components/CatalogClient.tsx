@@ -315,7 +315,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
 
   useEffect(() => {
     const observers: IntersectionObserver[] = [];
-    const rafIds: number[] = [];
+    const rafByCategory: Record<string, number | undefined> = {};
     const cleanupByCategory: Array<() => void> = [];
 
     itemsByCategory.forEach((group) => {
@@ -341,12 +341,15 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       observers.push(observer);
 
       const onScroll = () => {
-        const rafId = window.requestAnimationFrame(() => {
+        if (rafByCategory[group.category]) {
+          window.cancelAnimationFrame(rafByCategory[group.category] as number);
+        }
+        rafByCategory[group.category] = window.requestAnimationFrame(() => {
           const slotWidth = cards[0]?.offsetWidth || 1;
           const nextIndex = Math.round(root.scrollLeft / slotWidth);
           setCarouselActiveByCategory((prev) => (prev[group.category] === nextIndex ? prev : { ...prev, [group.category]: nextIndex }));
+          rafByCategory[group.category] = undefined;
         });
-        rafIds.push(rafId);
       };
 
       root.addEventListener("scroll", onScroll, { passive: true });
@@ -355,7 +358,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
 
     return () => {
       observers.forEach((observer) => observer.disconnect());
-      rafIds.forEach((id) => window.cancelAnimationFrame(id));
+      Object.values(rafByCategory).forEach((id) => {
+        if (id) window.cancelAnimationFrame(id);
+      });
       cleanupByCategory.forEach((cleanup) => cleanup());
     };
   }, [itemsByCategory]);
