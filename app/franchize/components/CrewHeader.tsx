@@ -303,34 +303,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             </div>
           </Link>
 
-          {visibleRailLinks.length > 0 && (
-            <div
-              ref={railRef}
-              className="relative flex w-full gap-2 overflow-x-auto no-scrollbar py-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
-            >
-              {visibleRailLinks.map((link) => {
-                const isActive = link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href));
-                return (
-                  <Link
-                    key={`${link.label}-${link.href}`}
-                    href={link.href}
-                    data-category-pill={link.categoryLabel}
-                    aria-current={isActive ? "location" : undefined}
-                    aria-label={`Перейти к разделу ${link.label}`}
-                    className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-3 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] transition-all duration-300 pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                    style={{
-                      ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
-                      ["--pill-text" as string]: isActive ? activePillText : crew.theme.palette.textPrimary,
-                      transform: isActive ? "translateY(0) scale(1.02)" : "translateY(0)",
-                    }}
-                  >
-                    {link.label}
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-
           <div className="flex items-center gap-2 justify-self-end">
             <FranchizeProfileButton
               bgColor={withAlpha(crew.theme.palette.bgBase, 0.8)}
@@ -352,6 +324,36 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
           </div>
         </div>
       </div>
+
+      {visibleRailLinks.length > 0 && (
+        <div className="-mx-4 mt-1 border-t px-4 pt-2" style={{ borderColor: crew.theme.palette.borderSoft }}>
+          <div
+            ref={railRef}
+            className="relative mx-auto flex w-full max-w-7xl gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+          >
+            {visibleRailLinks.map((link) => {
+              const isActive = link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href));
+              return (
+                <Link
+                  key={`${link.label}-${link.href}`}
+                  href={link.href}
+                  data-category-pill={link.categoryLabel}
+                  aria-current={isActive ? "location" : undefined}
+                  aria-label={`Перейти к разделу ${link.label}`}
+                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-3 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] transition-all duration-300 pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  style={{
+                    ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
+                    ["--pill-text" as string]: isActive ? activePillText : crew.theme.palette.textPrimary,
+                    transform: isActive ? "translateY(0) scale(1.02)" : "translateY(0)",
+                  }}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <HeaderMenu crew={crew} activePath={activePath} open={menuOpen} onOpenChange={setMenuOpen} />
     </header>

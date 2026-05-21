@@ -2,7 +2,6 @@
 
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
-import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { floatingCartOverlayBackground } from "../lib/theme";
 import { FloatingCartIconLink } from "./FloatingCartIconLink";
 
@@ -20,7 +19,7 @@ interface FloatingCartIconLinkBySlugProps {
 
 export function FloatingCartIconLinkBySlug({ slug, href, items, accentColor, textColor, borderColor, theme, className, mode }: FloatingCartIconLinkBySlugProps) {
   const cartState = useFranchizeCart(slug);
-  const { subtotal } = useFranchizeCartLines(slug, items ?? [], cartState);
+  const subtotal = 0;
   const itemCount = cartState.itemCount;
 
   return (
