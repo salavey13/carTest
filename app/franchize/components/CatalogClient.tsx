@@ -41,11 +41,75 @@ const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
   return [...regular, ...wbItems];
 };
 
+type VisiblePriceLine = { key: "rent" | "sale"; label: string; value: string; tone: "accent" | "sale" };
+type VisibleSpecChip = { icon: string; text: string };
+
+function getVisiblePriceLines(item: CatalogItemVM): VisiblePriceLine[] {
+  const lines: VisiblePriceLine[] = [];
+
+  if (item.pricePerDay > 0) {
+    lines.push({
+      key: "rent",
+      label: "Аренда",
+      value: item.rentPriceLabel,
+      tone: "accent",
+    });
+  }
+
+  if (item.saleAvailable && item.salePrice && item.salePrice > 0) {
+    lines.push({
+      key: "sale",
+      label: "Покупка",
+      value: `${item.salePrice.toLocaleString("ru-RU")} ₽`,
+      tone: "sale",
+    });
+  }
+
+  return lines;
+}
+
+function getVisibleSpecChips(item: CatalogItemVM): VisibleSpecChip[] {
+  const preferredRules = [
+    { match: /(мощ|power|kw|вт)/i, icon: "⚡" },
+    { match: /(запас|дальн|range|km|км)/i, icon: "🛣" },
+    { match: /(батар|аккум|battery|ah|wh)/i, icon: "🔋" },
+  ] as const;
+
+  const chips: VisibleSpecChip[] = [];
+  const usedIndexes = new Set<number>();
+
+  for (const rule of preferredRules) {
+    const specIndex = item.specs.findIndex((entry, index) => {
+      if (usedIndexes.has(index)) return false;
+      return rule.match.test(`${entry.label} ${entry.value}`);
+    });
+
+    if (specIndex >= 0) {
+      const entry = item.specs[specIndex];
+      usedIndexes.add(specIndex);
+      chips.push({ icon: rule.icon, text: `${entry.label}: ${entry.value}` });
+    }
+  }
+
+  if (chips.length >= 2) return chips.slice(0, 3);
+
+  for (let index = 0; index < item.specs.length; index += 1) {
+    if (usedIndexes.has(index)) continue;
+    const entry = item.specs[index];
+    const value = `${entry.label}: ${entry.value}`.trim();
+    if (!value) continue;
+    chips.push({ icon: "•", text: value });
+    if (chips.length >= 3) break;
+  }
+
+  return chips.slice(0, 3);
+}
+
 
 function CatalogCardSkeleton({ index }: { index: number }) {
   return (
     <article className="overflow-hidden rounded-3xl border border-[var(--catalog-border)] bg-[var(--catalog-card-bg)]" aria-hidden="true">
-      <div className="relative aspect-[4/3] overflow-hidden bg-black/20 lg:aspect-square">
+      <div className="relative aspect-[9/16] overflow-hidden rounded-[inherit] bg-black/20">
         <div
           className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent"
           style={{ animationDelay: `${index * 120}ms` }}
@@ -493,11 +557,13 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                 <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
                   {group.items.map((item) => {
                     const rentalStrip = buildCatalogRentalStrip(item, crew);
+                    const visiblePrices = getVisiblePriceLines(item);
+                    const visibleSpecs = getVisibleSpecChips(item);
                     return (
                     <article
                       key={item.id}
                       data-catalog-item="true"
-                      className="group overflow-hidden rounded-2xl border"
+                      className="group overflow-hidden rounded-3xl border"
                       style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
                     >
                       <button
@@ -510,76 +576,59 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
                         style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
                       >
-                        <div className="relative aspect-[4/3] w-full lg:aspect-square">
+                        <div className="relative aspect-[9/16] w-full">
                           {item.imageUrl ? (
                             <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 1279px) 50vw, (max-width: 1535px) 33vw, 25vw" className="object-cover" />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото байка загружается — карточка уже доступна для брони</div>
                           )}
-                        </div>
-                        <div className="p-3">
-                          <div className="mb-2 flex flex-wrap gap-1.5">
-                            {item.isHot && (
-                              <span className="inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
-                                Высокий спрос
-                              </span>
-                            )}
-                            <span
-                              className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em]"
-                              style={{
-                                backgroundColor: rentalStrip.isAvailable ? "#1f7a3a3d" : "#dc262640",
-                                color: "#e6f4ea",
-                                border: rentalStrip.isAvailable ? "1px solid rgba(46, 160, 67, 0.45)" : "1px solid rgba(220, 38, 38, 0.45)",
-                              }}
-                            >
-                              {rentalStrip.availabilityLabel}
-                            </span>
-                            {item.saleAvailable && (
-                              <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-amber-100">
-                                Доступен к покупке
-                              </span>
-                            )}
-                          </div>
-                          {item.reviewSummary.count > 0 && (
-                            <span className="inline-flex rounded-full border border-yellow-300/60 bg-yellow-400/20 px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-yellow-100">
-                              ★ {item.reviewSummary.average.toFixed(1)} · {item.reviewSummary.count}
-                            </span>
-                          )}
-                          <h3 className="mt-1 text-sm font-semibold leading-5">{item.title}</h3>
-                          <p className="text-xs" style={surface.mutedText}>{item.description || item.subtitle}</p>
-                          <div
-                            className="mt-2 rounded-2xl border border-white/10 bg-black/15 p-2 text-[10px] leading-4"
-                            aria-label={`Аренда ${item.title}: ${rentalStrip.todayLabel}`}
-                          >
-                            <div className="flex items-center justify-between gap-2 font-semibold text-[var(--catalog-text)]">
-                              <span>Слот: {rentalStrip.todayLabel}</span>
-                              <span className={rentalStrip.isAvailable ? "text-emerald-200" : "text-amber-100"}>
-                                {rentalStrip.nearestStartWindow}
+                          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[62%] bg-gradient-to-t from-[color:color-mix(in_srgb,var(--catalog-card-bg)_92%,#000)] via-[color:color-mix(in_srgb,var(--catalog-card-bg)_72%,transparent)] to-transparent" />
+                          <div className="absolute inset-x-0 bottom-0 p-2.5 pb-3 sm:p-3">
+                            <div className="mb-1.5 flex flex-wrap gap-1.5">
+                              {item.isHot && (
+                                <span className="inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
+                                  Высокий спрос
+                                </span>
+                              )}
+                              <span
+                                className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em]"
+                                style={{
+                                  backgroundColor: rentalStrip.isAvailable ? "#1f7a3a3d" : "#dc262640",
+                                  color: "#e6f4ea",
+                                  border: rentalStrip.isAvailable ? "1px solid rgba(46, 160, 67, 0.45)" : "1px solid rgba(220, 38, 38, 0.45)",
+                                }}
+                              >
+                                {rentalStrip.availabilityLabel}
                               </span>
                             </div>
-                            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5" style={surface.mutedText}>
-                              <span>Точка: {rentalStrip.pickupHint}</span>
-                              <span>{rentalStrip.priceTeaser}</span>
+                            <h3 className="text-sm font-semibold leading-5 text-white">{item.title}</h3>
+                            <p className="line-clamp-2 text-[11px] text-white/85">{item.description || item.subtitle}</p>
+                            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-white/75">
+                              {visibleSpecs.map((spec, index) => (
+                                <span key={`${item.id}-spec-${index}`}>{spec.icon} {spec.text}</span>
+                              ))}
                             </div>
-                          </div>
-                          {item.reviewSummary.latest?.text && (
-                            <p className="mt-2 rounded-xl border border-white/10 px-2 py-1.5 text-[11px] leading-4" style={surface.mutedText}>
-                              “{item.reviewSummary.latest.text}”
-                            </p>
-                          )}
-                          <p className="mt-2 text-base font-bold text-[var(--catalog-accent)]">
-                            {item.rentPriceLabel}
-                          </p>
-                          {item.saleAvailable && item.salePrice ? (
-                            <p className="mt-1 text-xs font-semibold text-amber-200">
-                              Цена покупки: {item.salePrice.toLocaleString("ru-RU")} ₽
-                            </p>
-                          ) : null}
-                          <div className="mt-2 flex gap-2">
-                            <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95">
-                              <ShoppingCart className="h-4 w-4" />
-                              {item.saleAvailable ? "Закрепить байк" : "Забронировать выезд"}
-                            </span>
+                            <div className="mt-2 space-y-0.5">
+                              {visiblePrices.map((line) => (
+                                <p
+                                  key={line.key}
+                                  className={line.tone === "accent" ? "text-sm font-bold text-[var(--catalog-accent)]" : "text-[11px] font-semibold text-amber-200"}
+                                >
+                                  {line.label}: {line.value}
+                                </p>
+                              ))}
+                              {visiblePrices.length === 0 ? (
+                                <p className="text-[11px] font-medium text-white/80">
+                                  Цена по запросу
+                                </p>
+                              ) : null}
+                            </div>
+                            <div className="mt-2">
+                              <span className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95">
+                                <ShoppingCart className="h-4 w-4" />
+                                {item.saleAvailable ? "Закрепить" : "Бронь"}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </button>
