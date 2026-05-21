@@ -42,6 +42,7 @@ const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
 };
 
 type VisiblePriceLine = { key: "rent" | "sale"; label: string; value: string; tone: "accent" | "sale" };
+type VisibleSpecChip = { icon: string; text: string };
 
 function getVisiblePriceLines(item: CatalogItemVM): VisiblePriceLine[] {
   const lines: VisiblePriceLine[] = [];
@@ -65,6 +66,43 @@ function getVisiblePriceLines(item: CatalogItemVM): VisiblePriceLine[] {
   }
 
   return lines;
+}
+
+function getVisibleSpecChips(item: CatalogItemVM): VisibleSpecChip[] {
+  const preferredRules = [
+    { match: /(мощ|power|kw|вт)/i, icon: "⚡" },
+    { match: /(запас|дальн|range|km|км)/i, icon: "🛣" },
+    { match: /(батар|аккум|battery|ah|wh)/i, icon: "🔋" },
+  ] as const;
+
+  const chips: VisibleSpecChip[] = [];
+  const usedIndexes = new Set<number>();
+
+  for (const rule of preferredRules) {
+    const specIndex = item.specs.findIndex((entry, index) => {
+      if (usedIndexes.has(index)) return false;
+      return rule.match.test(`${entry.label} ${entry.value}`);
+    });
+
+    if (specIndex >= 0) {
+      const entry = item.specs[specIndex];
+      usedIndexes.add(specIndex);
+      chips.push({ icon: rule.icon, text: `${entry.label}: ${entry.value}` });
+    }
+  }
+
+  if (chips.length >= 2) return chips.slice(0, 3);
+
+  for (let index = 0; index < item.specs.length; index += 1) {
+    if (usedIndexes.has(index)) continue;
+    const entry = item.specs[index];
+    const value = `${entry.label}: ${entry.value}`.trim();
+    if (!value) continue;
+    chips.push({ icon: "•", text: value });
+    if (chips.length >= 3) break;
+  }
+
+  return chips.slice(0, 3);
 }
 
 
@@ -520,6 +558,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                   {group.items.map((item) => {
                     const rentalStrip = buildCatalogRentalStrip(item, crew);
                     const visiblePrices = getVisiblePriceLines(item);
+                    const visibleSpecs = getVisibleSpecChips(item);
                     return (
                     <article
                       key={item.id}
@@ -565,9 +604,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             <h3 className="text-sm font-semibold leading-5 text-white">{item.title}</h3>
                             <p className="line-clamp-2 text-[11px] text-white/85">{item.description || item.subtitle}</p>
                             <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-white/75">
-                              {item.specs.power && <span>⚡ {item.specs.power}</span>}
-                              {item.specs.range && <span>🛣 {item.specs.range}</span>}
-                              {item.specs.battery && <span>🔋 {item.specs.battery}</span>}
+                              {visibleSpecs.map((spec, index) => (
+                                <span key={`${item.id}-spec-${index}`}>{spec.icon} {spec.text}</span>
+                              ))}
                             </div>
                             <div className="mt-2 space-y-0.5">
                               {visiblePrices.map((line) => (
