@@ -51,3 +51,9 @@ Open archive only for deep forensics on:
 - Root cause: HMAC data-check-string incorrectly omitted `signature`; client also depended only on `window.Telegram.WebApp.initData`, missing raw `tgWebAppData` URL-hash fallback when WebApp bootstrap was unavailable or late.
 - Fix/workaround: include every initData field except `hash` for bot-token HMAC validation, parse `tgWebAppData`/`tgWebAppStartParam` from launch URL fallback, and keep handled start params guarded while stale URL params remain.
 - Verification command: `npm test -- tests/franchize/telegram-webapp-auth.spec.ts && npm run lint && git diff --check`.
+
+### 2026-05-21
+- Symptom: operator inputs can sometimes be a raw UUID only, which may silently look like an invalid CLI command in SupaPlan tooling.
+- Root cause: `scripts/supaplan-skill.mjs` previously treated unknown command values uniformly and did not hint that a bare UUID is likely a task id lookup intent.
+- Fix/workaround: added UUID-shaped command detection in CLI entrypoint and a direct hint to run `task-status --taskId <uuid>` to verify SupaPlan task context first.
+- Verification command: `node scripts/supaplan-skill.mjs f3c5306d-2d8f-4cc4-bb77-26f20f7f9b11`.
