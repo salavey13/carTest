@@ -41,11 +41,13 @@ const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
   return [...regular, ...wbItems];
 };
 
+const hasRentPrice = (item: CatalogItemVM) => item.pricePerDay > 0;
+const hasSalePrice = (item: CatalogItemVM) => item.saleAvailable && Boolean(item.salePrice && item.salePrice > 0);
 
 function CatalogCardSkeleton({ index }: { index: number }) {
   return (
     <article className="overflow-hidden rounded-3xl border border-[var(--catalog-border)] bg-[var(--catalog-card-bg)]" aria-hidden="true">
-      <div className="relative aspect-[4/3] overflow-hidden bg-black/20 lg:aspect-square">
+      <div className="relative aspect-[9/16] overflow-hidden bg-black/20">
         <div
           className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent"
           style={{ animationDelay: `${index * 120}ms` }}
@@ -73,6 +75,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilterKey>("all");
   const [campaignIndex, setCampaignIndex] = useState(0);
+  const [carouselActiveByCategory, setCarouselActiveByCategory] = useState<Record<string, number>>({});
   const searchParams = useSearchParams();
   const { user, dbUser } = useAppContext();
   const lastQueryViewedVehicleRef = useRef<string>("");
@@ -81,6 +84,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   >();
   const resolvedSlug = crew.slug || slug;
   const showFloatingCart = ctaPolicy ? shouldShowFloatingCart(ctaPolicy, { cartRelevant: true }) : true;
+  const carouselRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const promoModules = useMemo(() => {
     const now = Date.now();
@@ -307,6 +311,53 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     }
   }, [auctionTickOptions, items, searchParams]);
 
+  useEffect(() => {
+    const observers: IntersectionObserver[] = [];
+    const rafIds: number[] = [];
+    const cleanupByCategory: Array<() => void> = [];
+
+    itemsByCategory.forEach((group) => {
+      if (group.items.length > 8) return;
+      const root = carouselRefs.current[group.category];
+      if (!root) return;
+      const cards = Array.from(root.querySelectorAll<HTMLElement>("[data-carousel-card='true']"));
+      if (cards.length === 0) return;
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const visible = entries
+            .filter((entry) => entry.isIntersecting)
+            .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+          if (!visible) return;
+          const nextIndex = Number((visible.target as HTMLElement).dataset.carouselIndex ?? "0");
+          setCarouselActiveByCategory((prev) => (prev[group.category] === nextIndex ? prev : { ...prev, [group.category]: nextIndex }));
+        },
+        { root, threshold: [0.55, 0.75] },
+      );
+
+      cards.forEach((card) => observer.observe(card));
+      observers.push(observer);
+
+      const onScroll = () => {
+        const rafId = window.requestAnimationFrame(() => {
+          const slotWidth = cards[0]?.offsetWidth || 1;
+          const nextIndex = Math.round(root.scrollLeft / slotWidth);
+          setCarouselActiveByCategory((prev) => (prev[group.category] === nextIndex ? prev : { ...prev, [group.category]: nextIndex }));
+        });
+        rafIds.push(rafId);
+      };
+
+      root.addEventListener("scroll", onScroll, { passive: true });
+      cleanupByCategory.push(() => root.removeEventListener("scroll", onScroll));
+    });
+
+    return () => {
+      observers.forEach((observer) => observer.disconnect());
+      rafIds.forEach((id) => window.cancelAnimationFrame(id));
+      cleanupByCategory.forEach((cleanup) => cleanup());
+    };
+  }, [itemsByCategory]);
+
   return (
     <>
       <section
@@ -490,14 +541,33 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                     {group.items.length} шт.
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
-                  {group.items.map((item) => {
-                    const rentalStrip = buildCatalogRentalStrip(item, crew);
-                    return (
+                {group.items.length <= 8 ? (
+                  <>
+                    <div
+                      ref={(node) => {
+                        carouselRefs.current[group.category] = node;
+                      }}
+                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      tabIndex={0}
+                      role="region"
+                      aria-label={`Карусель категории ${group.category}`}
+                      onKeyDown={(event) => {
+                        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+                        const root = carouselRefs.current[group.category];
+                        if (!root) return;
+                        const step = root.clientWidth * 0.9;
+                        root.scrollBy({ left: event.key === "ArrowRight" ? step : -step, behavior: "smooth" });
+                      }}
+                    >
+                      {group.items.map((item, index) => {
+                        const rentalStrip = buildCatalogRentalStrip(item, crew);
+                        return (
                     <article
                       key={item.id}
                       data-catalog-item="true"
-                      className="group overflow-hidden rounded-2xl border"
+                      data-carousel-card="true"
+                      data-carousel-index={index}
+                      className="group w-[78vw] max-w-[340px] shrink-0 snap-start overflow-hidden rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)] sm:w-[320px]"
                       style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
                     >
                       <button
@@ -510,7 +580,85 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
                         style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
                       >
-                        <div className="relative aspect-[4/3] w-full lg:aspect-square">
+                        <div className="relative aspect-[9/16] w-full">
+                          {item.imageUrl ? (
+                            <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 1279px) 78vw, 320px" className="object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото байка загружается — карточка уже доступна для брони</div>
+                          )}
+                        </div>
+                        <div className="p-3">
+                          <div className="mb-2 flex flex-wrap gap-1.5">
+                            {item.isHot && (
+                              <span className="inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
+                                Высокий спрос
+                              </span>
+                            )}
+                            <span className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em]" style={{ backgroundColor: rentalStrip.isAvailable ? "#1f7a3a3d" : "#dc262640", color: "#e6f4ea", border: rentalStrip.isAvailable ? "1px solid rgba(46, 160, 67, 0.45)" : "1px solid rgba(220, 38, 38, 0.45)" }}>{rentalStrip.availabilityLabel}</span>
+                            {item.saleAvailable && <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-amber-100">Доступен к покупке</span>}
+                          </div>
+                          {item.reviewSummary.count > 0 && <span className="inline-flex rounded-full border border-yellow-300/60 bg-yellow-400/20 px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-yellow-100">★ {item.reviewSummary.average.toFixed(1)} · {item.reviewSummary.count}</span>}
+                          <h3 className="mt-1 text-sm font-semibold leading-5">{item.title}</h3>
+                          <p className="text-xs" style={surface.mutedText}>{item.description || item.subtitle}</p>
+                          <div className="mt-2 rounded-2xl border border-white/10 bg-black/15 p-2 text-[10px] leading-4" aria-label={`Аренда ${item.title}: ${rentalStrip.todayLabel}`}>
+                            <div className="flex items-center justify-between gap-2 font-semibold text-[var(--catalog-text)]"><span>Слот: {rentalStrip.todayLabel}</span><span className={rentalStrip.isAvailable ? "text-emerald-200" : "text-amber-100"}>{rentalStrip.nearestStartWindow}</span></div>
+                            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5" style={surface.mutedText}><span>Точка: {rentalStrip.pickupHint}</span><span>{rentalStrip.priceTeaser}</span></div>
+                          </div>
+                          {item.reviewSummary.latest?.text && <p className="mt-2 rounded-xl border border-white/10 px-2 py-1.5 text-[11px] leading-4" style={surface.mutedText}>“{item.reviewSummary.latest.text}”</p>}
+                          {hasRentPrice(item) ? <p className="mt-2 text-base font-bold text-[var(--catalog-accent)]">{item.rentPriceLabel}</p> : null}
+                          {hasSalePrice(item) ? <p className="mt-1 text-xs font-semibold text-amber-200">Цена покупки: {item.salePrice?.toLocaleString("ru-RU")} ₽</p> : null}
+                          {!hasRentPrice(item) && !hasSalePrice(item) ? <p className="mt-2 text-xs font-medium text-white/80">Цена по запросу</p> : null}
+                          <div className="mt-2 flex gap-2"><span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95"><ShoppingCart className="h-4 w-4" />{item.saleAvailable ? "Закрепить байк" : "Забронировать выезд"}</span></div>
+                        </div>
+                      </button>
+                    </article>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2 flex items-center justify-center gap-2" aria-label={`Пагинация карусели ${group.category}`}>
+                      {group.items.map((item, index) => {
+                        const isActive = (carouselActiveByCategory[group.category] ?? 0) === index;
+                        return (
+                          <button
+                            key={`${item.id}-dot`}
+                            type="button"
+                            aria-label={`Показать карточку ${index + 1}`}
+                            aria-current={isActive ? "true" : undefined}
+                            className="h-2.5 w-2.5 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
+                            style={{ backgroundColor: isActive ? crew.theme.palette.accentMain : `${crew.theme.palette.borderSoft}AA`, transform: isActive ? "scale(1.1)" : "scale(1)" }}
+                            onClick={() => {
+                              const root = carouselRefs.current[group.category];
+                              if (!root) return;
+                              const slotWidth = root.querySelector<HTMLElement>("[data-carousel-card='true']")?.offsetWidth || root.clientWidth;
+                              root.scrollTo({ left: slotWidth * index, behavior: "smooth" });
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
+                  {group.items.map((item) => {
+                    const rentalStrip = buildCatalogRentalStrip(item, crew);
+                    return (
+                    <article
+                      key={item.id}
+                      data-catalog-item="true"
+                      className="group overflow-hidden rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)]"
+                      style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
+                    >
+                      <button
+                        type="button"
+                        aria-label={`Открыть карточку ${item.title}: ${item.rentPriceLabel}`}
+                        data-catalog-item-button="true"
+                        className="block w-full text-left"
+                        onClick={() => openItem(item)}
+                        onFocus={() => setFocusedItemId(item.id)}
+                        onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
+                        style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
+                      >
+                        <div className="relative aspect-[9/16] w-full">
                           {item.imageUrl ? (
                             <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 1279px) 50vw, (max-width: 1535px) 33vw, 25vw" className="object-cover" />
                           ) : (
@@ -567,14 +715,15 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               “{item.reviewSummary.latest.text}”
                             </p>
                           )}
-                          <p className="mt-2 text-base font-bold text-[var(--catalog-accent)]">
-                            {item.rentPriceLabel}
-                          </p>
-                          {item.saleAvailable && item.salePrice ? (
+                          {hasRentPrice(item) ? (
+                            <p className="mt-2 text-base font-bold text-[var(--catalog-accent)]">{item.rentPriceLabel}</p>
+                          ) : null}
+                          {hasSalePrice(item) ? (
                             <p className="mt-1 text-xs font-semibold text-amber-200">
-                              Цена покупки: {item.salePrice.toLocaleString("ru-RU")} ₽
+                              Цена покупки: {item.salePrice?.toLocaleString("ru-RU")} ₽
                             </p>
                           ) : null}
+                          {!hasRentPrice(item) && !hasSalePrice(item) ? <p className="mt-2 text-xs font-medium text-white/80">Цена по запросу</p> : null}
                           <div className="mt-2 flex gap-2">
                             <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95">
                               <ShoppingCart className="h-4 w-4" />
@@ -587,6 +736,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                     );
                   })}
                 </div>
+                )}
               </section>
             ))}
           </div>
