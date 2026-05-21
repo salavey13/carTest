@@ -76,6 +76,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const [quickFilter, setQuickFilter] = useState<QuickFilterKey>("all");
   const [campaignIndex, setCampaignIndex] = useState(0);
   const [carouselActiveByCategory, setCarouselActiveByCategory] = useState<Record<string, number>>({});
+  const [carouselParallaxByItem, setCarouselParallaxByItem] = useState<Record<string, { x: number; y: number }>>({});
+  const [carouselLoadedByItem, setCarouselLoadedByItem] = useState<Record<string, true>>({});
   const searchParams = useSearchParams();
   const { user, dbUser } = useAppContext();
   const lastQueryViewedVehicleRef = useRef<string>("");
@@ -561,6 +563,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                     >
                       {group.items.map((item, index) => {
                         const rentalStrip = buildCatalogRentalStrip(item, crew);
+                        const parallax = carouselParallaxByItem[item.id] ?? { x: 0, y: 0 };
                         return (
                     <article
                       key={item.id}
@@ -579,10 +582,32 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         onFocus={() => setFocusedItemId(item.id)}
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
                         style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
+                        onPointerMove={(event) => {
+                          const rect = event.currentTarget.getBoundingClientRect();
+                          const dx = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
+                          const dy = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
+                          setCarouselParallaxByItem((prev) => ({ ...prev, [item.id]: { x: dx, y: dy } }));
+                        }}
+                        onPointerLeave={() => {
+                          setCarouselParallaxByItem((prev) => ({ ...prev, [item.id]: { x: 0, y: 0 } }));
+                        }}
                       >
                         <div className="relative aspect-[9/16] w-full">
+                          {item.imageUrl && !carouselLoadedByItem[item.id] && (
+                            <div className="absolute inset-0 overflow-hidden bg-black/30">
+                              <div className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+                            </div>
+                          )}
                           {item.imageUrl ? (
-                            <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 1279px) 78vw, 320px" className="object-cover" />
+                            <Image
+                              src={item.imageUrl}
+                              alt={item.title}
+                              fill
+                              sizes="(max-width: 1279px) 78vw, 320px"
+                              className="object-cover transition-transform duration-300 ease-out"
+                              style={{ transform: `scale(1.06) translate3d(${parallax.x * 8}px, ${parallax.y * 8}px, 0)` }}
+                              onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
+                            />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото байка загружается — карточка уже доступна для брони</div>
                           )}
