@@ -1,6 +1,7 @@
 // /components/map-riders/MapRidersClientRefactored.tsx
 // Refactored orchestrator — ~120 lines, no business logic.
 // All state lives in MapRidersProvider/useMapRiders.
+// Layout: fullscreen map + vaul bottom sheet (taxi-style).
 
 "use client";
 
@@ -44,6 +45,11 @@ const DEFAULT_BOUNDS = { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 };
 const HOME_BASE: [number, number] = [56.204245, 43.798905];
 const MEETUP_ACTION_DEBOUNCE_MS = 2000;
 
+// Snap labels for the 3-button control (matching vaul snapPoints)
+const SNAP_POINTS = [0.2, 0.48, 0.86] as const;
+type SnapLabel = "Мини" | "Средне" | "Макс";
+const SNAP_LABELS: Record<number, SnapLabel> = { 0.2: "Мини", 0.48: "Средне", 0.86: "Макс" };
+
 // ── Inner component (uses context) ──
 function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   const { dbUser } = useAppContext();
@@ -51,6 +57,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   const isAdmin = useIsAdmin();
   const [isQuickMeetupSaving, setIsQuickMeetupSaving] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(true);
+  const [activeSnap, setActiveSnap] = useState<number>(0.48);
   const [selectedMeetupId, setSelectedMeetupId] = useState<string | null>(null);
   const [isMeetupDeleting, setIsMeetupDeleting] = useState(false);
   const [isPromptOpen, setIsPromptOpen] = useState(false);
@@ -85,6 +92,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     [state.meetups.length, state.recentCompleted.length],
   );
 
+  // ── Inject crew theme CSS vars for FranchizeMapBottomNav ──
   useEffect(() => {
     const root = document.documentElement;
     const prevAccent = root.style.getPropertyValue("--fr-map-nav-accent");
@@ -377,7 +385,6 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             </div>
           )}
           <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-black/30 via-transparent to-black/30" />
-          <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 h-5 bg-[var(--mr-card)]/95 backdrop-blur-sm" />
           <MapRidersDebugPanel
             activeRiders={state.liveRiders.size}
             sessionCount={state.sessions.length}
@@ -387,8 +394,8 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
           />
         </div>
 
-        {/* Floating badges */}
-        <div className="pointer-events-none relative z-30 flex min-h-[100dvh] flex-col justify-between p-3 md:p-6">
+        {/* Floating badges (absolute top, no viewport-height flex) */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 p-3 md:p-6">
           <div className="flex flex-wrap gap-2">
             <Badge className="border bg-black/55 text-white backdrop-blur-md">{useLeafletMap ? `Leaflet${isUsingTelegram ? " + Telegram GPS" : " + Browser GPS"}` : "VibeMap"}</Badge>
             <Badge className="border border-emerald-300/45 bg-emerald-500/20 text-emerald-100">live {riderStatusCounts.live}</Badge>
@@ -399,7 +406,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               <Badge className="border border-emerald-300/40 bg-emerald-500/20 text-emerald-100">Демо-режим</Badge>
             ) : null}
           </div>
-          <div className="flex justify-end">
+          <div className="mt-2 flex justify-end">
             <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-2xl border border-white/30 bg-black/60 px-3 py-2 text-xs text-white shadow-2xl shadow-black/30 backdrop-blur-md">
               <span className="min-w-0">
                 <span className="block font-medium text-white">
@@ -431,17 +438,37 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         </div>
       </section>
 
-      {/* ── DRAGGABLE TAXI-STYLE BOTTOM SHEET ── */}
+      {/* ── DRAGGABLE TAXI-STYLE BOTTOM SHEET (vaul) ── */}
       <Drawer.Root
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        snapPoints={[0.2, 0.48, 0.86]}
+        snapPoints={SNAP_POINTS}
+        activeSnapPoint={activeSnap}
+        setActiveSnapPoint={setActiveSnap}
         dismissible={false}
         modal={false}
       >
         <Drawer.Portal>
           <Drawer.Content className="fixed inset-x-0 bottom-0 z-40 rounded-t-[1.4rem] border border-white/15 bg-[var(--mr-card)]/96 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
-            <Drawer.Handle className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-white/35" />
+            <Drawer.Handle className="mx-auto mb-2 h-1.5 w-14 rounded-full bg-white/35" />
+            {/* Snap control buttons */}
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="font-orbitron text-sm text-white/90">Панель райдера</h3>
+              <div className="pointer-events-auto flex gap-1.5">
+                {SNAP_POINTS.map((snap) => (
+                  <Button
+                    key={snap}
+                    type="button"
+                    size="sm"
+                    variant={activeSnap === snap ? "default" : "outline"}
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setActiveSnap(snap)}
+                  >
+                    {SNAP_LABELS[snap]}
+                  </Button>
+                ))}
+              </div>
+            </div>
             <div className="mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-20">
               <div className="grid gap-3 lg:grid-cols-[1.35fr,1fr]">
         {/* Stats card */}
