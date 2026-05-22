@@ -29,13 +29,15 @@ interface NavItemConfig {
   isActuallyCentral?: boolean;
 }
 
-// Конфигурация с новыми семантическими цветами
+// Global bike platform navigation items.
+// NOTE: Franchise-scoped routes (e.g. /franchize/vip-bike/map-routes) are NOT
+// here — they belong to FranchizeMapBottomNav, not the global bike nav.
 const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
-  { href: "/leaderboard", icon: "FaRankingStar", label: "Leaderboard", color: "text-accent-text" }, // gold
-  { href: "/crews", icon: "FaUsers", label: "Crews", color: "text-brand-green" }, // оставлен зеленый для разнообразия
-  { href: "/paddock", icon: "FaWarehouse", label: "Paddock", color: "text-brand-cyan", adminOnly: true }, // оставлен голубой
-  { href: "/admin", icon: "FaCirclePlus", label: "Admin", color: "text-secondary" }, // indigo
-  { href: "/franchize/vip-bike", icon: "FaMotorcycle", label: "Rent", isCentralCandidate: true, centralColor: "from-primary to-accent" }, // red-orange to gold
+  { href: "/leaderboard", icon: "FaRankingStar", label: "Leaderboard", color: "text-accent-text" },
+  { href: "/crews", icon: "FaUsers", label: "Crews", color: "text-brand-green" },
+  { href: "/paddock", icon: "FaWarehouse", label: "Paddock", color: "text-brand-cyan", adminOnly: true },
+  { href: "/admin", icon: "FaCirclePlus", label: "Admin", color: "text-secondary" },
+  { href: "/franchize/vip-bike", icon: "FaMotorcycle", label: "Rent", isCentralCandidate: true, centralColor: "from-primary to-accent" },
 ];
 
 const navTranslations: Record<string, Record<string, string>> = {
