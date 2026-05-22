@@ -46,8 +46,8 @@ export function StatusOverlay() {
   const showSpeedLegend = Boolean(state.sessionDetail?.points?.length);
 
   return (
-    <div className="pointer-events-none fixed left-1/2 top-4 z-50 -translate-x-1/2 space-y-2 md:top-6">
-      <div className="flex items-center gap-3 rounded-2xl border border-white/20 bg-black/60 px-4 py-2 text-white backdrop-blur-xl">
+    <div className="pointer-events-none fixed left-1/2 top-3 z-30 -translate-x-1/2 space-y-1.5 md:top-5">
+      <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-black/60 px-3 py-1.5 text-white backdrop-blur-xl">
         <div className="flex items-center gap-1.5">
           <span className="relative flex h-2.5 w-2.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
@@ -57,19 +57,19 @@ export function StatusOverlay() {
         </div>
         <div className="h-4 w-px bg-white/20" />
         <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-400">Время</div>
-          <div className="font-mono text-sm font-semibold">{elapsed}</div>
+          <div className="text-[9px] uppercase tracking-wider text-zinc-400">Время</div>
+          <div className="font-mono text-xs font-semibold">{elapsed}</div>
         </div>
         <div className="h-4 w-px bg-white/20" />
         <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-400">Дист.</div>
-          <div className="font-mono text-sm font-semibold">{distance}</div>
+          <div className="text-[9px] uppercase tracking-wider text-zinc-400">Дист.</div>
+          <div className="font-mono text-xs font-semibold">{distance}</div>
           {!hasDistance ? <div className="text-[10px] text-zinc-400">Жми, чтобы увидеть статистику 🏎</div> : null}
         </div>
         <div className="h-4 w-px bg-white/20" />
         <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-400">Скор.</div>
-          <div className={`font-mono text-sm font-semibold ${hasSpeed ? "" : "animate-pulse"}`}>{speed}</div>
+          <div className="text-[9px] uppercase tracking-wider text-zinc-400">Скор.</div>
+          <div className={`font-mono text-xs font-semibold ${hasSpeed ? "" : "animate-pulse"}`}>{speed}</div>
         </div>
       </div>
       {showSpeedLegend ? (

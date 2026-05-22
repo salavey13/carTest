@@ -15,6 +15,7 @@ import BottomNavigation from "@/components/layout/BottomNavigation";
 import BikeHeader from "@/components/BikeHeader";
 import BikeFooter from "@/components/BikeFooter";
 import BottomNavigationBike from "@/components/layout/BottomNavigationBike";
+import FranchizeMapBottomNav from "@/components/layout/FranchizeMapBottomNav";
 
 // --- Theme: Sauna ---
 import SaunaHeader from "@/components/SaunaHeader";
@@ -266,6 +267,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
     pathname?.startsWith(p)
   );
+  const showFranchizeMapBottomNav = /^\/franchize\/[^/]+\/map-riders(?:\/.*)?$/.test(pathname || "");
 
   useEffect(() => {
     setShowHeaderAndFooter(
@@ -305,7 +307,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       
       <main className={cn(
         "flex-1", 
-        showBottomNav ? "pb-20 sm:pb-0" : "", 
+        showBottomNav || showFranchizeMapBottomNav ? "pb-20 sm:pb-0" : "", 
         // GHOST-VIS: Apply hard high-contrast blackout style during active operations
         isTacticalMode ? "bg-[#000000] text-white selection:bg-red-900" : (!isTransparentPage && "bg-background")
       )}>
@@ -313,6 +315,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       </main>
       
       {(showBottomNav || isStrikeballTheme) && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
+      {showFranchizeMapBottomNav && <FranchizeMapBottomNav pathname={pathname} />}
       
       <Suspense fallback={null}>
         <StickyChatButton />
