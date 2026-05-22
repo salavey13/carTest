@@ -44,6 +44,37 @@ const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
 const hasRentPrice = (item: CatalogItemVM) => item.pricePerDay > 0;
 const hasSalePrice = (item: CatalogItemVM) => item.saleAvailable && Boolean(item.salePrice && item.salePrice > 0);
 
+// ── RESTORED: Helper functions deleted by agent but still referenced in grid path ──
+
+function getVisiblePriceLines(item: CatalogItemVM) {
+  const lines: Array<{ key: string; tone: string; label: string; value: string }> = [];
+  if (item.pricePerDay > 0) {
+    lines.push({
+      key: "rent",
+      tone: "accent",
+      label: "Аренда",
+      value: item.rentPriceLabel,
+    });
+  }
+  if (item.saleAvailable && item.salePrice && item.salePrice > 0) {
+    lines.push({
+      key: "sale",
+      tone: "sale",
+      label: "Покупка",
+      value: `${item.salePrice.toLocaleString("ru-RU")} ₽`,
+    });
+  }
+  return lines;
+}
+
+function getVisibleSpecChips(item: CatalogItemVM) {
+  const chips = (item as CatalogItemVM & { specChips?: Array<{ icon: string; text: string }> }).specChips;
+  if (!Array.isArray(chips)) return [];
+  return chips.slice(0, 3);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────────
+
 function CatalogCardSkeleton({ index }: { index: number }) {
   return (
     <article className="overflow-hidden rounded-3xl border border-[var(--catalog-border)] bg-[var(--catalog-card-bg)]" aria-hidden="true">
@@ -550,6 +581,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                 </div>
                 {group.items.length <= 8 ? (
                   <>
+                    {/* ── CAROUSEL MODE (≤8 items) ── Cards aligned with reference design:
+                        Image → Badges → Title → Specs (icon+text) → Price (large bold) → CTA */}
                     <div
                       ref={(node) => {
                         carouselRefs.current[group.category] = node;
@@ -569,13 +602,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       {group.items.map((item, index) => {
                         const rentalStrip = buildCatalogRentalStrip(item, crew);
                         const parallax = carouselParallaxByItem[item.id] ?? { x: 0, y: 0 };
+                        const specChips = getVisibleSpecChips(item);
                         return (
                     <article
                       key={item.id}
                       data-catalog-item="true"
                       data-carousel-card="true"
                       data-carousel-index={index}
-                      className="group w-[78vw] max-w-[340px] shrink-0 snap-start overflow-hidden rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)] sm:w-[320px]"
+                      className="group w-[65vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)] sm:w-[260px]"
                       style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
                     >
                       <button
@@ -608,7 +642,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               src={item.imageUrl}
                               alt={item.title}
                               fill
-                              sizes="(max-width: 1279px) 78vw, 320px"
+                              sizes="(max-width: 1279px) 65vw, 260px"
                               className="object-cover transition-transform duration-300 ease-out"
                               style={{ transform: `scale(1.06) translate3d(${parallax.x * 8}px, ${parallax.y * 8}px, 0)` }}
                               onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
@@ -618,6 +652,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           )}
                         </div>
                         <div className="p-3">
+                          {/* Badges */}
                           <div className="mb-2 flex flex-wrap gap-1.5">
                             {item.isHot && (
                               <span className="inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
@@ -627,17 +662,36 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             <span className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em]" style={{ backgroundColor: rentalStrip.isAvailable ? "#1f7a3a3d" : "#dc262640", color: "#e6f4ea", border: rentalStrip.isAvailable ? "1px solid rgba(46, 160, 67, 0.45)" : "1px solid rgba(220, 38, 38, 0.45)" }}>{rentalStrip.availabilityLabel}</span>
                             {item.saleAvailable && <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-amber-100">Доступен к покупке</span>}
                           </div>
-                          {item.reviewSummary.count > 0 && <span className="inline-flex rounded-full border border-yellow-300/60 bg-yellow-400/20 px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-yellow-100">★ {item.reviewSummary.average.toFixed(1)} · {item.reviewSummary.count}</span>}
-                          <h3 className="mt-1 text-sm font-semibold leading-5">{item.title}</h3>
-                          <p className="text-xs" style={surface.mutedText}>{item.description || item.subtitle}</p>
-                          <div className="mt-2 rounded-2xl border border-white/10 bg-black/15 p-2 text-[10px] leading-4" aria-label={`Аренда ${item.title}: ${rentalStrip.todayLabel}`}>
-                            <div className="flex items-center justify-between gap-2 font-semibold text-[var(--catalog-text)]"><span>Слот: {rentalStrip.todayLabel}</span><span className={rentalStrip.isAvailable ? "text-emerald-200" : "text-amber-100"}>{rentalStrip.nearestStartWindow}</span></div>
-                            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5" style={surface.mutedText}><span>Точка: {rentalStrip.pickupHint}</span><span>{rentalStrip.priceTeaser}</span></div>
+
+                          {/* Title */}
+                          <h3 className="text-sm font-semibold leading-5">{item.title}</h3>
+
+                          {/* Specs — icon + text rows (reference design) */}
+                          {specChips.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--catalog-muted)]">
+                              {specChips.map((spec, si) => (
+                                <span key={`${item.id}-spec-${si}`}>{spec.icon} {spec.text}</span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Price — reference layout: large bold main price, rent/day subtext */}
+                          <div className="mt-2">
+                            {hasSalePrice(item) ? (
+                              <>
+                                <p className="text-lg font-bold text-[var(--catalog-accent)]">{item.salePrice?.toLocaleString("ru-RU")} ₽</p>
+                                {hasRentPrice(item) && (
+                                  <p className="text-[11px] text-white/60">{item.rentPriceLabel}</p>
+                                )}
+                              </>
+                            ) : hasRentPrice(item) ? (
+                              <p className="text-lg font-bold text-[var(--catalog-accent)]">{item.rentPriceLabel}</p>
+                            ) : (
+                              <p className="text-xs font-medium text-white/80">Цена по запросу</p>
+                            )}
                           </div>
-                          {item.reviewSummary.latest?.text && <p className="mt-2 rounded-xl border border-white/10 px-2 py-1.5 text-[11px] leading-4" style={surface.mutedText}>“{item.reviewSummary.latest.text}”</p>}
-                          {hasRentPrice(item) ? <p className="mt-2 text-base font-bold text-[var(--catalog-accent)]">{item.rentPriceLabel}</p> : null}
-                          {hasSalePrice(item) ? <p className="mt-1 text-xs font-semibold text-amber-200">Цена покупки: {item.salePrice?.toLocaleString("ru-RU")} ₽</p> : null}
-                          {!hasRentPrice(item) && !hasSalePrice(item) ? <p className="mt-2 text-xs font-medium text-white/80">Цена по запросу</p> : null}
+
+                          {/* CTA */}
                           <div className="mt-2 flex gap-2"><span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95"><ShoppingCart className="h-4 w-4" />{item.saleAvailable ? "Закрепить байк" : "Забронировать выезд"}</span></div>
                         </div>
                       </button>
@@ -668,6 +722,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                     </div>
                   </>
                 ) : (
+                {/* ── GRID MODE (>8 items) ── Overlay-style cards with restored helper functions */}
                 <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
                   {group.items.map((item) => {
                     const rentalStrip = buildCatalogRentalStrip(item, crew);
@@ -716,7 +771,6 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               </span>
                             </div>
                             <h3 className="text-sm font-semibold leading-5 text-white">{item.title}</h3>
-                            <p className="line-clamp-2 text-[11px] text-white/85">{item.description || item.subtitle}</p>
                             <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-white/75">
                               {visibleSpecs.map((spec, index) => (
                                 <span key={`${item.id}-spec-${index}`}>{spec.icon} {spec.text}</span>
