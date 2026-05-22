@@ -43,6 +43,10 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   const activePillText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
   const { itemCount } = useFranchizeCart(crew.slug);
 
+  // Track whether user is manually scrolling the rail (to prevent auto-scroll from fighting it)
+  const isUserScrollingRef = useRef(false);
+  const userScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // ── Logo loading state machine ──
   //   loading → (onLoad) → dissolving → (animationEnd) → revealed
   //   loading → (onError) → broken (permanent spooky letter)
@@ -171,7 +175,18 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   }, [mainCatalogPath, pathname]);
 
   // --- Плавный скролл активного бейджа (pill) в центр экрана ---
+  // FIX: Only auto-scroll when pathname/activePath changes (navigation), NOT on every
+  // activeCategory change (which happens from IntersectionObserver during manual scroll).
+  // This prevents the auto-scroll from fighting the user's manual scroll position.
+  const prevPathForAutoScroll = useRef<string | null>(null);
   useEffect(() => {
+    // Only auto-scroll on navigation changes, not on scroll-driven activeCategory changes
+    if (prevPathForAutoScroll.current === pathname && !activePath) return;
+    prevPathForAutoScroll.current = pathname;
+
+    // Don't auto-scroll while user is manually scrolling the rail
+    if (isUserScrollingRef.current) return;
+
     const activeRailLink = visibleRailLinks.find(
       (link) => link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href)),
     );
@@ -183,7 +198,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
 
     if (activeEl) {
       const container = railRef.current;
-      // Вычисляем нужный сдвиг (позиция элемента относительно контейнера - половина контейнера + половина элемента)
       const scrollLeft = activeEl.offsetLeft - container.clientWidth / 2 + activeEl.clientWidth / 2;
 
       container.scrollTo({
@@ -191,7 +205,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
         behavior: "smooth",
       });
     }
-  }, [activePath, pathname, visibleRailLinks]);
+  }, [activePath, pathname]); // removed visibleRailLinks from deps — prevents scroll fight
   // ------------------------------------------------------------------
   useEffect(() => {
     const container = railRef.current;
@@ -364,6 +378,14 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             ref={railRef}
             className="relative mx-auto flex w-full max-w-7xl gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
             style={{ pointerEvents: "auto" }}
+            onScroll={() => {
+              // Mark that user is scrolling the rail — prevents auto-scroll override
+              isUserScrollingRef.current = true;
+              if (userScrollTimerRef.current) clearTimeout(userScrollTimerRef.current);
+              userScrollTimerRef.current = setTimeout(() => {
+                isUserScrollingRef.current = false;
+              }, 1500);
+            }}
           >
             <span
               aria-hidden="true"
@@ -379,11 +401,17 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                   data-category-pill={link.categoryLabel}
                   aria-current={isActive ? "location" : undefined}
                   aria-label={`Перейти к разделу ${link.label}`}
-                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-3 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] transition-all duration-300 pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-3 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] no-underline transition-all duration-300 pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
                     ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
                     ["--pill-text" as string]: isActive ? activePillText : crew.theme.palette.textPrimary,
                     transform: isActive ? "translateY(0) scale(1.02)" : "translateY(0)",
+                    textDecoration: "none",
+                  }}
+                  onClick={() => {
+                    // FIX: Immediately set active category on click so pill selection updates
+                    // even when IntersectionObserver hasn't fired yet (e.g., section already in view)
+                    setActiveCategory(link.categoryLabel);
                   }}
                 >
                   {link.label}
