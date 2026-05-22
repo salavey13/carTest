@@ -1,38 +1,47 @@
 "use client";
 
 import Head from "next/head";
+import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SupportForm from "@/components/SupportForm";
 
-const cvHighlights = [
-  "AI Product Engineer: превращаю запрос в рабочий продуктовый контур без затяжного waterfall.",
-  "Telegram-first delivery: UX и операции изначально проектируются под мобильный ритм и быстрые касания.",
-  "Next.js + Supabase + AI workflows: от архитектуры до прод-ready execution и сопровождения.",
-  "Продуктовый режим: сначала ценность на живом контуре, потом масштаб и полировка.",
+const coreBlocks = [
+  {
+    title: "Кто я",
+    text: "13+ лет в разработке (C++/Java/TS), сегодня — AI Product Engineer. Моя зона силы: быстро превращать бизнес-запрос в рабочий веб-контур с понятной приёмкой и дальнейшим ростом.",
+  },
+  {
+    title: "Что даю клиенту",
+    text: "Не просто ‘страницу’, а работающий продуктовый ритм: архитектура, интеграции, операционный UX, быстрые итерации и контроль качества по живым результатам.",
+  },
+  {
+    title: "Как работаю",
+    text: "BOSS-mode delivery: intake запроса → декомпозиция → быстрый выкат рабочих слайсов → полировка под реальный контекст команды и продаж.",
+  },
 ];
 
-const flagshipCases = [
+const flagship = [
   {
-    title: "Franchize / VIP Bike Rental",
-    subtitle: "Полноценный бизнес-контур из одного hydration SQL",
-    desc: "Собрал механику, где новый франшизный веб-контур поднимается из single SQL seed + market/items конфигурации. /vipbikerental — демонстрация того, как быстро развернуть рабочую модель, а не просто лендинг.",
+    name: "Franchize + VIP Bike",
+    proof: "Полноценный запуск через hydration SQL",
+    details:
+      "Модель, где новый бизнес-контур собирается из single SQL seed + market/items. /vipbikerental показывает, как быстро запустить не мокап, а живую систему.",
     href: "/vipbikerental",
-    cta: "Открыть живой пример",
   },
   {
-    title: "WBlanding",
-    subtitle: "Коммерческий лендинг как операционный центр",
-    desc: "Это не витрина, а рабочее место: action-слои, crew flow, audit, referral, invoicing, воронка и исполнение в одном ритме. Сайт живёт как инструмент команды и продаж.",
+    name: "WBlanding",
+    proof: "Лендинг как операционная панель",
+    details:
+      "Action-слои, crew, audit, referral, invoicing и коммерческая логика в одном пространстве. Это интерфейс для действий, а не ‘декоративная обложка’.",
     href: "/wblanding",
-    cta: "Открыть WBlanding",
   },
   {
-    title: "BOSS_QUEST.HTML",
-    subtitle: "Главный клиентский протокол (актуальная версия)",
-    desc: "Мой текущий фрейм: клиент даёт запрос + пару картинок, я раскладываю это в управляемый квест-план, где BOSS исполняет delivery end-to-end. Клиент фокусируется на приёмке и polishing, а не на хаосе процесса.",
+    name: "BOSS_QUEST.HTML",
+    proof: "Последний и главный протокол взаимодействия",
+    details:
+      "Один запрос + пару изображений превращаю в исполнимый квест-план: BOSS ведёт delivery end-to-end, клиент концентрируется на acceptance и polishing.",
     href: "https://github.com/salavey13/carTest/blob/main/BOSS_QUEST.HTML",
-    cta: "Читать BOSS_QUEST",
   },
 ];
 
@@ -40,82 +49,68 @@ export default function AboutPage() {
   return (
     <>
       <Head>
-        <title>Павел Соловьёв — CV / AI Product Engineer</title>
-        <meta
-          name="description"
-          content="CV-страница Павла Соловьёва: Franchize/VIP Bike hydration SQL, WBlanding, BOSS_QUEST.HTML и AI-first delivery для запуска микро-бизнес веб-продуктов."
-        />
+        <title>Павел Соловьёв — About / CV</title>
+        <meta name="description" content="CV-страница Павла Соловьёва: опыт, flagship-кейсы Franchize/VIP Bike, WBlanding, BOSS_QUEST и формат BOSS-mode delivery." />
       </Head>
 
-      <main className="min-h-screen bg-[#050507] text-zinc-100">
-        <div className="mx-auto max-w-6xl px-4 pb-14 pt-16 md:pt-24 space-y-8">
-          <div className="flex justify-between items-center gap-3">
-            <p className="text-xs md:text-sm tracking-[0.16em] text-zinc-400 uppercase">about / cv-mode</p>
-            <Link href="/about_en" className="rounded-md border border-cyan-400/40 px-3 py-1.5 text-xs md:text-sm text-cyan-300 hover:bg-cyan-300 hover:text-black transition-colors">EN Portfolio</Link>
+      <main className="min-h-screen bg-[#06070b] text-zinc-100">
+        <div className="mx-auto max-w-6xl px-4 pb-16 pt-20 md:pt-28 space-y-8">
+          <div className="flex items-center justify-between">
+            <p className="text-xs tracking-[0.2em] uppercase text-zinc-400">about / ru</p>
+            <Link href="/about_en" className="rounded-lg border border-emerald-400/40 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-300 hover:text-black transition-colors">about_en (RU portfolio)</Link>
           </div>
 
-          <Card className="border-emerald-400/30 bg-zinc-950/90">
-            <CardHeader>
-              <CardTitle className="text-3xl md:text-5xl text-emerald-300 leading-tight">Павел Соловьёв — AI Product Engineer</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <p className="text-base md:text-lg text-zinc-200">Делаю продукты, которые продают и работают: от идеи и контекста клиента до живого веб-контура с понятной приёмкой.</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-zinc-300">
-                <p>📍 Нижний Новгород / remote-first</p><p>📬 Telegram: @salavey13</p>
-                <p>💻 GitHub: github.com/salavey13</p><p>⚙️ Stack: Next.js, TypeScript, Supabase, AI, Telegram</p>
+          <Card className="border-emerald-400/35 bg-zinc-950/90">
+            <CardContent className="grid gap-6 p-6 md:grid-cols-[220px_1fr] md:p-8">
+              <div>
+                <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix//135398606.png" alt="Павел Соловьёв" width={700} height={900} className="h-full w-full rounded-2xl border border-emerald-300/40 object-cover" unoptimized />
               </div>
-              <ul className="space-y-2 text-sm md:text-base text-zinc-200">
-                {cvHighlights.map((item) => <li key={item} className="border-l-2 border-emerald-400/40 pl-3">{item}</li>)}
-              </ul>
+              <div className="space-y-4">
+                <h1 className="text-3xl md:text-5xl font-semibold text-emerald-300">Павел Соловьёв</h1>
+                <p className="text-base md:text-lg text-zinc-200">AI Product Engineer · Telegram-first builder · архитектура + скорость + бизнес-результат</p>
+                <div className="grid grid-cols-1 gap-2 text-sm text-zinc-300 md:grid-cols-2">
+                  <p>📍 Нижний Новгород / remote</p><p>📬 Telegram: @salavey13</p>
+                  <p>💻 github.com/salavey13</p><p>⚙️ Next.js · Supabase · AI workflows</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <section className="grid gap-6 lg:grid-cols-3">
-            <Card className="lg:col-span-2 border-violet-400/30 bg-zinc-950/90">
-              <CardHeader><CardTitle className="text-2xl text-violet-300">Julia — mysterious partner</CardTitle></CardHeader>
-              <CardContent className="space-y-3 text-zinc-200 text-sm md:text-base">
-                <p>Julia — партнёр-персона бренда: отвечает за атмосферу, тон и цельный характер презентации. Это отдельный образ, не подмена моей личности.</p>
-                <p>В клиентских сценариях Julia усиливает упаковку и эмоциональный контур, пока я держу архитектуру, delivery и бизнес-результат.</p>
-              </CardContent>
-            </Card>
-            <Card className="border-violet-400/30 bg-zinc-950/90">
-              <CardHeader><CardTitle className="text-xl text-violet-300">Avatar signal</CardTitle></CardHeader>
-              <CardContent>
-                <div className="aspect-square rounded-xl border border-violet-300/40 bg-[radial-gradient(circle_at_30%_20%,#8b5cf655,#0a0a0f_55%),linear-gradient(140deg,#111827,#3f3f46)] p-4 flex items-end">
-                  <p className="text-xs text-violet-200/90 tracking-[0.2em] uppercase">JULIA / SIGNAL</p>
-                </div>
-              </CardContent>
-            </Card>
+          <section className="grid gap-4 md:grid-cols-3">
+            {coreBlocks.map((b) => (
+              <Card key={b.title} className="border-cyan-400/25 bg-zinc-950/90">
+                <CardHeader><CardTitle className="text-xl text-cyan-300">{b.title}</CardTitle></CardHeader>
+                <CardContent className="text-sm text-zinc-300">{b.text}</CardContent>
+              </Card>
+            ))}
           </section>
 
           <Card className="border-fuchsia-400/30 bg-zinc-950/90">
-            <CardHeader><CardTitle className="text-2xl text-fuchsia-300">Флагманские интеграции и демо</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-2xl text-fuchsia-300">Ключевые интеграции и демо</CardTitle></CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-3">
-              {flagshipCases.map((item) => (
-                <article key={item.title} className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4">
-                  <h3 className="text-lg font-semibold text-white">{item.title}</h3>
-                  <p className="mt-1 text-xs text-fuchsia-200">{item.subtitle}</p>
-                  <p className="mt-3 text-sm text-zinc-300">{item.desc}</p>
-                  <Link href={item.href} target={item.href.startsWith("http") ? "_blank" : undefined} className="mt-3 inline-block text-sm text-emerald-300 underline hover:text-emerald-200">{item.cta}</Link>
+              {flagship.map((item) => (
+                <article key={item.name} className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4">
+                  <h3 className="text-lg font-semibold text-white">{item.name}</h3>
+                  <p className="mt-1 text-xs text-fuchsia-200">{item.proof}</p>
+                  <p className="mt-3 text-sm text-zinc-300">{item.details}</p>
+                  <Link href={item.href} target={item.href.startsWith("http") ? "_blank" : undefined} className="mt-3 inline-block text-sm text-emerald-300 underline">Открыть</Link>
                 </article>
               ))}
             </CardContent>
           </Card>
 
-          <Card className="border-amber-400/30 bg-zinc-950/90">
-            <CardHeader><CardTitle className="text-2xl text-amber-300">BOSS-mode: как я веду клиента</CardTitle></CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-4 text-sm text-zinc-200">
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4"><p className="font-semibold text-white">01 · Intake</p><p className="mt-2">Запрос, цель, пара визуальных ориентиров.</p></div>
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4"><p className="font-semibold text-white">02 · Decompose</p><p className="mt-2">Разбор на работающие product-слайсы и операционный план.</p></div>
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4"><p className="font-semibold text-white">03 · Deliver</p><p className="mt-2">Быстрый выкат контуров, где клиент уже может щупать ценность.</p></div>
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4"><p className="font-semibold text-white">04 · Polish</p><p className="mt-2">Точечная полировка до уровня «готово к бою».</p></div>
+          <Card className="border-violet-400/30 bg-zinc-950/90">
+            <CardHeader><CardTitle className="text-2xl text-violet-300">Julia — mysterious partner</CardTitle></CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-[1.3fr_0.7fr]">
+              <p className="text-sm md:text-base text-zinc-300">Julia — отдельный бренд-персонаж и партнёр по подаче: атмосфера, эмоциональный контур и цельный стиль коммуникации. Это дополнительный слой бренда рядом с моим основным инженерным и продуктовым контуром.</p>
+              <div className="rounded-xl border border-violet-300/40 bg-[radial-gradient(circle_at_30%_20%,#8b5cf666,#09090b_65%)] p-4 text-xs uppercase tracking-[0.22em] text-violet-200">Julia / signal</div>
             </CardContent>
           </Card>
 
-          <Card className="border-emerald-400/30 bg-zinc-950/90">
-            <CardHeader><CardTitle className="text-2xl text-emerald-300">Support / старт диалога</CardTitle></CardHeader>
+          <Card className="border-amber-400/35 bg-zinc-950/90">
+            <CardHeader><CardTitle className="text-2xl text-amber-300">SupportForm / быстрый старт</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-zinc-300">Если нужен запуск под ключ или адаптация BOSS-модели под ваш кейс — напишите здесь, соберём execution-путь.</p>
+              <p className="text-sm text-zinc-300">Нужен запуск или перезапуск продукта, BOSS-mode, franchize hydration или жёсткая полировка действующего контура — напишите детали, я соберу конкретный execution-план.</p>
               <SupportForm />
             </CardContent>
           </Card>
