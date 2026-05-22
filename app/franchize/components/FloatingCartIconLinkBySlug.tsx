@@ -19,7 +19,7 @@ interface FloatingCartIconLinkBySlugProps {
 
 export function FloatingCartIconLinkBySlug({ slug, href, items, accentColor, textColor, borderColor, theme, className, mode }: FloatingCartIconLinkBySlugProps) {
   const cartState = useFranchizeCart(slug);
-  const subtotal = 0;
+  const subtotal = cartState.subtotal ?? 0;
   const itemCount = cartState.itemCount;
 
   return (
