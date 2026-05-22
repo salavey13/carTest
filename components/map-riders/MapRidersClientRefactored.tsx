@@ -419,36 +419,36 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       {/* ── DRAGGABLE TAXI-STYLE BOTTOM SHEET ── */}
       <Drawer.Root open={sheetOpen} onOpenChange={setSheetOpen} snapPoints={[0.2, 0.48, 0.86]} dismissible={false}>
         <Drawer.Portal>
-          <Drawer.Content className="fixed inset-x-0 bottom-0 z-40 rounded-t-[2rem] border border-white/15 bg-[var(--mr-card)]/95 p-4 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
+          <Drawer.Content className="fixed inset-x-0 bottom-0 z-40 rounded-t-[1.4rem] border border-white/15 bg-[var(--mr-card)]/96 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
             <Drawer.Handle className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-white/35" />
             <div className="mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-20">
-              <div className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
+              <div className="grid gap-3 lg:grid-cols-[1.35fr,1fr]">
         {/* Stats card */}
-        <div className="rounded-2xl border p-6 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
+        <div className="rounded-2xl border p-4 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
           <Badge className="mb-3 w-fit border" style={{ borderColor: `${crew.theme.palette.accentMain}55`, backgroundColor: `${crew.theme.palette.accentMain}18`, color: crew.theme.palette.accentMain }}>
             {(crew.header.brandName || crew.name || "VIP BIKE").toUpperCase()} • MAPRIDERS
           </Badge>
-          <h2 className="mt-3 font-orbitron text-3xl" style={{ color: crew.theme.palette.textPrimary }}>
+          <h2 className="mt-2 font-orbitron text-2xl" style={{ color: crew.theme.palette.textPrimary }}>
             Карта райдеров в реальном времени
           </h2>
-          <p className="mt-2 max-w-2xl text-base" style={{ color: crew.theme.palette.textSecondary }}>
+          <p className="mt-1 max-w-2xl text-sm" style={{ color: crew.theme.palette.textSecondary }}>
             Один тап — и экипаж видит твой маршрут, скорость и meetup-пины.
           </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
             {heroStats.map((stat) => (
-              <div key={stat.label} className="rounded-2xl border p-4" style={{ borderColor: `${crew.theme.palette.borderSoft}aa`, backgroundColor: `${crew.theme.palette.bgBase}66` }}>
+              <div key={stat.label} className="rounded-xl border p-3" style={{ borderColor: `${crew.theme.palette.borderSoft}aa`, backgroundColor: `${crew.theme.palette.bgBase}66` }}>
                 <div className="mb-2" style={{ color: crew.theme.palette.accentMain }}>
                   <VibeContentRenderer content={stat.icon} />
                 </div>
-                <div className="text-2xl font-semibold" style={{ color: crew.theme.palette.textPrimary }}>{stat.value}</div>
-                <div className="text-sm" style={{ color: crew.theme.palette.textSecondary }}>{stat.label}</div>
+                <div className="text-xl font-semibold" style={{ color: crew.theme.palette.textPrimary }}>{stat.value}</div>
+                <div className="text-xs" style={{ color: crew.theme.palette.textSecondary }}>{stat.label}</div>
               </div>
             ))}
           </div>
         </div>
 
         {/* Rider control panel */}
-        <div className="rounded-2xl border p-6 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
+        <div className="rounded-2xl border p-4 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
           <h3 className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Пульт райдера</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             {state.shareEnabled ? "Ты сейчас в эфире на карте" : "Геошеринг выключен"}
