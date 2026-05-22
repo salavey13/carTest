@@ -260,12 +260,20 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/admin",
     "/paddock",
     "/rentals",
+    "/franchize/",
+    "/franchize",
     //"/vipbikerental",
     "/strikeball", 
   ];
-  const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
-    pathname?.startsWith(p)
-  );
+  const isFranchizeMapRidersRoute =
+    pathname?.startsWith("/franchize/") && pathname?.includes("/map-riders");
+  const isFranchizeProductRoute = pathname?.startsWith("/franchize/");
+  const isAdminMapRoutesPage = pathname === "/admin/map-routes";
+  const showBottomNav =
+    !isAdminMapRoutesPage &&
+    (pathsToShowBottomNavForStartsWith.some((p) => pathname?.startsWith(p)) ||
+      isFranchizeMapRidersRoute ||
+      isFranchizeProductRoute);
 
   useEffect(() => {
     setShowHeaderAndFooter(
@@ -282,8 +290,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname === "/blogger" ||
         pathname?.startsWith("/optimapipe") ||
         pathname?.startsWith("/rules") ||
-        pathname === "/" ||
-        pathname === "/admin/map-routes"
+        pathname === "/"
       )
     );
   }, [pathname]);

@@ -33,6 +33,7 @@ interface NavItemConfig {
 const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
   { href: "/leaderboard", icon: "FaRankingStar", label: "Leaderboard", color: "text-accent-text" }, // gold
   { href: "/crews", icon: "FaUsers", label: "Crews", color: "text-brand-green" }, // оставлен зеленый для разнообразия
+  { href: "/franchize/vip-bike/map-routes", icon: "FaMapLocationDot", label: "Map Routes", color: "text-brand-cyan" },
   { href: "/paddock", icon: "FaWarehouse", label: "Paddock", color: "text-brand-cyan", adminOnly: true }, // оставлен голубой
   { href: "/admin", icon: "FaCirclePlus", label: "Admin", color: "text-secondary" }, // indigo
   { href: "/franchize/vip-bike", icon: "FaMotorcycle", label: "Rent", isCentralCandidate: true, centralColor: "from-primary to-accent" }, // red-orange to gold
@@ -40,10 +41,10 @@ const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
 
 const navTranslations: Record<string, Record<string, string>> = {
   en: {
-    "Leaderboard": "Leaders", "Crews": "Crews", "Rent": "Rent", "Paddock": "Paddock", "Admin": "Admin",
+    "Leaderboard": "Leaders", "Crews": "Crews", "Map Routes": "Routes", "Rent": "Rent", "Paddock": "Paddock", "Admin": "Admin",
   },
   ru: {
-    "Leaderboard": "Лидеры", "Crews": "Команды", "Rent": "Аренда", "Paddock": "Паддок", "Admin": "Админ",
+    "Leaderboard": "Лидеры", "Crews": "Команды", "Map Routes": "Маршруты", "Rent": "Аренда", "Paddock": "Паддок", "Admin": "Админ",
   }
 };
 
