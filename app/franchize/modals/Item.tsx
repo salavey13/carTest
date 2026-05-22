@@ -17,6 +17,7 @@ import {
 import { ItemGallery } from "../components/ItemGallery";
 import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 import { crewPaletteForSurface } from "../lib/theme";
+import { FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 
 interface ItemModalProps {
   item: CatalogItemVM | null;
@@ -286,6 +287,17 @@ export function ItemModal({
         style={surface.card}
       >
         <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
+          {/* Quick Close Button */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+            style={FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE}
+            aria-label="Закрыть"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
           {/* Gallery Component */}
           <ItemGallery
             images={gallery}
@@ -299,17 +311,6 @@ export function ItemModal({
             mainAspectRatio="16/11"
             disableKeyboardNav={false}
           />
-
-          {/* Quick Close Button */}
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-            style={{ right: "max(0.5rem, calc(env(safe-area-inset-right, 0px) + 3.5rem))" }}
-            aria-label="Закрыть"
-          >
-            <X className="h-4 w-4" />
-          </button>
 
           {/* Content */}
           <div className="space-y-4 p-4 sm:p-5">
