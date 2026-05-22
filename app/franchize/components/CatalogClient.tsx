@@ -67,10 +67,56 @@ function getVisiblePriceLines(item: CatalogItemVM) {
   return lines;
 }
 
-function getVisibleSpecChips(item: CatalogItemVM) {
-  const chips = (item as CatalogItemVM & { specChips?: Array<{ icon: string; text: string }> }).specChips;
-  if (!Array.isArray(chips)) return [];
-  return chips.slice(0, 3);
+// Map common spec keys to emoji icons for card display
+function specIconForKey(key: string): string {
+  const k = key.toLowerCase();
+  if (k.includes("мощ") || k.includes("power") || k.includes("квт") || k.includes("kw")) return "⚡";
+  if (k.includes("бат") || k.includes("bat") || k.includes("ач") || k.includes("ah") || k.includes("v ") || k.includes("v,")) return "🔋";
+  if (k.includes("запас") || k.includes("ход") || k.includes("range") || k.includes("км")) return "📍";
+  if (k.includes("скор") || k.includes("speed") || k.includes("км/ч")) return "🚀";
+  if (k.includes("вес") || k.includes("weight") || k.includes("кг")) return "⚖️";
+  if (k.includes("двиг") || k.includes("motor")) return "🔧";
+  if (k.includes("торм") || k.includes("brake")) return "🛑";
+  return "⚙️";
+}
+
+function getVisibleSpecChips(item: CatalogItemVM): Array<{ icon: string; text: string }> {
+  type ItemWithSpecs = CatalogItemVM & {
+    specs?: Array<{ key?: string; label?: string; value?: string; icon?: string }>;
+    rawSpecs?: Record<string, string>;
+    specChips?: Array<{ icon: string; text: string }>;
+  };
+
+  const withSpecs = item as ItemWithSpecs;
+
+  // 1. Pre-formatted specChips (if pipeline ever provides them)
+  if (Array.isArray(withSpecs.specChips) && withSpecs.specChips.length > 0) {
+    return withSpecs.specChips.slice(0, 3);
+  }
+
+  // 2. Structured specs array — build chips from key/label + value
+  if (Array.isArray(withSpecs.specs) && withSpecs.specs.length > 0) {
+    return withSpecs.specs
+      .filter((s) => s.value || s.label)
+      .slice(0, 3)
+      .map((s) => ({
+        icon: s.icon ?? specIconForKey(s.key ?? s.label ?? ""),
+        text: s.value ?? s.label ?? "",
+      }));
+  }
+
+  // 3. rawSpecs key-value map — map keys to icons
+  if (withSpecs.rawSpecs && typeof withSpecs.rawSpecs === "object" && Object.keys(withSpecs.rawSpecs).length > 0) {
+    return Object.entries(withSpecs.rawSpecs)
+      .filter(([, v]) => Boolean(v))
+      .slice(0, 3)
+      .map(([key, value]) => ({
+        icon: specIconForKey(key),
+        text: value,
+      }));
+  }
+
+  return [];
 }
 
 // ──────────────────────────────────────────────────────────────────────────────────
@@ -581,7 +627,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                 </div>
                 {group.items.length <= 8 ? (
                   <>
-                    
+                    {/* ── CAROUSEL MODE (≤8 items) ── Cards aligned with reference design:
+                        Image → Badges → Title → Specs (icon+text) → Price (large bold) → CTA */}
                     <div
                       ref={(node) => {
                         carouselRefs.current[group.category] = node;
@@ -721,7 +768,6 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                     </div>
                   </>
                 ) : (
-                
                 <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
                   {group.items.map((item) => {
                     const rentalStrip = buildCatalogRentalStrip(item, crew);
