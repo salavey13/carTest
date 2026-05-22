@@ -236,7 +236,7 @@ set
           'showTwoColumnsMobile', true,
           'useModalDetails', true,
           'promoBanners', jsonb_build_array(
-            jsonb_build_object('id', 'summer-2026', 'title', 'Промокод ЭНДУРО2026 для оффроуд маршрута по лесным тропам и карьеру', 'subtitle', '-10% на первую аренду', 'code', 'ЭНДУРО2026', 'activeFrom', '2026-04-01', 'activeTo', '2026-10-31', 'priority', 90, 'ctaLabel', 'Забрать скидку')
+            jsonb_build_object('id', 'summer-2026', 'title', 'Промокод ЭНДУРО2026 для оффроуд маршрута по лесным тропам и карьеру', 'subtitle', '-10% на первую аренду', 'code', 'ЭНДУРО2026', 'activeFrom', '2026-04-01', 'activeTo', '2026-10-31', 'priority', 90, 'href', 'https://t.me/oneBikePlsBot?start=ЭНДУРО2026', 'ctaLabel', 'Забрать скидку')
           ),
           'adCards', jsonb_build_array(
             jsonb_build_object('id', 'cross-equipment', 'title', 'PRO эндуро экипировка', 'subtitle', 'Добавь комплект защиты к аренде', 'href', '', 'imageUrl', '', 'badge', 'Safety', 'activeFrom', '2026-04-01', 'activeTo', '2026-10-31', 'priority', 70, 'ctaLabel', 'Смотреть детали'),

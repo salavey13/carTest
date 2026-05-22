@@ -20,6 +20,7 @@ interface OrderPageClientProps {
   slug: string;
   orderId: string;
   items: CatalogItemVM[];
+  initialPromoCode?: string;
 }
 
 const payments = [
@@ -124,7 +125,7 @@ function normalizePromoCode(value: string): string {
   return value.trim().replace(/\s+/g, "").toUpperCase();
 }
 
-export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientProps) {
+export function OrderPageClient({ crew, slug, orderId, items, initialPromoCode }: OrderPageClientProps) {
   const { user, dbUser } = useAppContext();
   const { cartLines, subtotal } = useFranchizeCartLines(slug, items);
   const [isSubmitting, startSubmitTransition] = useTransition();
@@ -149,7 +150,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       comment: "",
       rentalStartDate: "",
       signatureName: "",
-      promo: "",
+      promo: (initialPromoCode ?? "").trim().toUpperCase(),
       selectedExtras: [],
       payment: payments[0].id,
       deliveryMode: "pickup",

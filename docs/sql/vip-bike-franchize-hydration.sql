@@ -266,6 +266,7 @@ set
               'activeFrom', '2026-03-01',
               'activeTo', '2026-05-31',
               'priority', 95,
+              'href', 'https://t.me/oneBikePlsBot?start=NEURO2026',
               'ctaLabel', 'Забрать нейро-скидку'
             )
           ),

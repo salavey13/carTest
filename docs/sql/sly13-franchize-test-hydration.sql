@@ -234,6 +234,7 @@ set
               'activeFrom', '2026-01-01',
               'activeTo', '2026-12-31',
               'priority', 90,
+              'href', 'https://t.me/oneBikePlsBot?start=FOCUS13',
               'ctaLabel', 'Забрать'
             )
           ),

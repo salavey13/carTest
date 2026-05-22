@@ -9,6 +9,7 @@ import { buildFranchizeSectionMetadata } from "../../metadata";
 
 interface FranchizeOrderPageProps {
   params: Promise<{ slug: string; id: string }>;
+  searchParams?: Promise<{ promo?: string }>;
 }
 
 
@@ -21,8 +22,9 @@ export async function generateMetadata({ params }: FranchizeOrderPageProps): Pro
   });
 }
 
-export default async function FranchizeOrderPage({ params }: FranchizeOrderPageProps) {
+export default async function FranchizeOrderPage({ params, searchParams }: FranchizeOrderPageProps) {
   const { slug, id } = await params;
+  const { promo } = (await searchParams) ?? {};
   const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteForSurface(crew.theme);
   const ctaPolicy = getFranchizeRouteCtaPolicy("order");
@@ -30,7 +32,7 @@ export default async function FranchizeOrderPage({ params }: FranchizeOrderPageP
   return (
     <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/order/${id}`} groupLinks={items.map((item) => item.category)} />
-      <OrderPageClient crew={crew} slug={crew.slug || slug} orderId={id} items={items} />
+      <OrderPageClient crew={crew} slug={crew.slug || slug} orderId={id} items={items} initialPromoCode={promo} />
       <CrewFooter crew={crew} />
     </main>
   );

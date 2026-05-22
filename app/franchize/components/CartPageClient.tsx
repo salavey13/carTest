@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
-import { upsertFranchizeIntent } from "../actions";
+import { upsertFranchizeIntent, validateFranchizePromoCode } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { useFranchizeCart } from "../hooks/useFranchizeCart"; // Import cart state access
 import { crewPaletteForSurface } from "../lib/theme";
@@ -28,6 +28,34 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const router = useRouter();
   const { dbUser, user } = useAppContext();
   const [isSaving, setIsSaving] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoMessage, setPromoMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [isPromoChecking, setIsPromoChecking] = useState(false);
+
+  const normalizePromoCode = (value: string) => value.trim().toUpperCase();
+
+  const handleApplyPromo = async () => {
+    const normalized = normalizePromoCode(promoCode);
+    if (!normalized) {
+      setPromoMessage({ tone: "error", text: "Введите промокод перед проверкой." });
+      return;
+    }
+
+    setIsPromoChecking(true);
+    try {
+      const result = await validateFranchizePromoCode({ slug, code: normalized, baseAmount: subtotal });
+      if (!result.success) {
+        setPromoMessage({ tone: "error", text: result.error });
+        return;
+      }
+      setPromoCode(result.code);
+      setPromoMessage({ tone: "success", text: `${result.title}: скидка ${result.discountAmount.toLocaleString("ru-RU")} ₽` });
+    } catch {
+      setPromoMessage({ tone: "error", text: "Не удалось проверить промокод. Попробуйте ещё раз." });
+    } finally {
+      setIsPromoChecking(false);
+    }
+  };
 
   const handleProceed = async () => {
     setIsSaving(true);
@@ -62,7 +90,10 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
         await intentPromise;
     }
     // Navigate even if save failed (local storage might still be used by next page if hydrated client-side)
-    router.push(`/franchize/${slug}/order/demo-order?flow=${flow}`);
+    const normalizedPromo = normalizePromoCode(promoCode);
+    const params = new URLSearchParams({ flow });
+    if (normalizedPromo) params.set("promo", normalizedPromo);
+    router.push(`/franchize/${slug}/order/demo-order?${params.toString()}`);
   };
 
   return (
@@ -146,6 +177,31 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
             <p className="text-2xl font-semibold text-[var(--cart-accent)]">
               {subtotal.toLocaleString("ru-RU")} ₽
             </p>
+            <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "var(--cart-border)" }}>
+              <p className="text-xs" style={surface.mutedText}>Промокод (проверим перед переходом к checkout)</p>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={promoCode}
+                  onChange={(e) => {
+                    setPromoCode(e.target.value);
+                    setPromoMessage(null);
+                  }}
+                  placeholder={crew.catalog.promoBanners.length > 0 ? crew.catalog.promoPlaceholder || "Введите промокод" : "Промокодов нет"}
+                  className="h-10 w-full rounded-lg border px-3 text-sm"
+                  style={{ borderColor: "var(--cart-border)", background: "transparent" }}
+                />
+                <button
+                  type="button"
+                  onClick={handleApplyPromo}
+                  disabled={!promoCode.trim() || isPromoChecking}
+                  className="rounded-lg border px-3 text-xs font-medium disabled:opacity-60"
+                  style={{ borderColor: "var(--cart-border)" }}
+                >
+                  {isPromoChecking ? "Проверка..." : "Применить"}
+                </button>
+              </div>
+              {promoMessage ? <p className={`mt-2 text-xs ${promoMessage.tone === "error" ? "text-rose-300" : "text-emerald-300"}`}>{promoMessage.text}</p> : null}
+            </div>
             <button
               type="button"
               disabled={isSaving}
