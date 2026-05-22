@@ -51,6 +51,11 @@ export const FRANCHIZE_HEADER_CORNER_GUARD_STYLE = {
   paddingInline: "clamp(0.25rem, max(env(safe-area-inset-left), env(safe-area-inset-right)), 1.25rem)",
 } as const;
 
+export const FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE = {
+  top: "calc(max(env(safe-area-inset-top), 0px) + 4.2rem)",
+  right: "calc(max(env(safe-area-inset-right), 0px) + 0.75rem)",
+} as const;
+
 export const FRANCHIZE_FLOATING_CART_SAFE_AREA_CLASS =
   "fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-[60] flex items-center gap-3";
 
