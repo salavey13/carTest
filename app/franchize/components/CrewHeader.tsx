@@ -175,15 +175,12 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   }, [mainCatalogPath, pathname]);
 
   // --- Плавный скролл активного бейджа (pill) в центр экрана ---
-  // FIX: Only auto-scroll when pathname/activePath changes (navigation), NOT on every
-  // activeCategory change (which happens from IntersectionObserver during manual scroll).
-  // This prevents the auto-scroll from fighting the user's manual scroll position.
-  const prevPathForAutoScroll = useRef<string | null>(null);
+  // Auto-scroll on navigation + activeCategory changes (pill clicks, IntersectionObserver).
+  // The isUserScrollingRef guard prevents snap-back when the user is manually scrolling the rail.
+  // Pill click → isUserScrollingRef=false → auto-scroll centers the pill ✅
+  // Page scroll → IntersectionObserver fires → isUserScrollingRef=false → auto-scroll ✅
+  // Manual rail scroll → isUserScrollingRef=true → auto-scroll blocked ✅
   useEffect(() => {
-    // Only auto-scroll on navigation changes, not on scroll-driven activeCategory changes
-    if (prevPathForAutoScroll.current === pathname && !activePath) return;
-    prevPathForAutoScroll.current = pathname;
-
     // Don't auto-scroll while user is manually scrolling the rail
     if (isUserScrollingRef.current) return;
 
@@ -205,7 +202,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
         behavior: "smooth",
       });
     }
-  }, [activePath, pathname]); // removed visibleRailLinks from deps — prevents scroll fight
+  }, [activePath, pathname, activeCategory, visibleRailLinks]); // re-added activeCategory + visibleRailLinks; isUserScrollingRef guard prevents snap-back
   // ------------------------------------------------------------------
   useEffect(() => {
     const container = railRef.current;
