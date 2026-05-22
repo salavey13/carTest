@@ -6,7 +6,35 @@ import { logger } from "@/lib/logger";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { grantFranchizeAchievementAction } from "@/app/franchize/profile-actions";
 // CHANGED IMPORT: Now using warehouse questions
-import { surveyQuestions, answerTexts } from "./content/start_survey_questions_warehouse";
+import { surveyQuestions, answerTexts } from "./content/start_survey_questions_bike";
+
+
+const parseStartPayload = (text?: string) => {
+  if (!text) return { command: "/start", payload: "" };
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('/start')) return { command: trimmed, payload: "" };
+
+  const [command, ...rest] = trimmed.split(/\s+/);
+  return { command, payload: rest.join(' ').trim() };
+};
+
+const extractPromoCode = (payload: string): string | null => {
+  if (!payload) return null;
+
+  const decodedPayload = decodeURIComponent(payload);
+  const token = decodedPayload
+    .split(/[^a-zA-Z0-9_-]+/)
+    .map((part) => part.trim())
+    .find((part) => /^(promo|ref|invite|code)[:=_-]?/i.test(part)) || decodedPayload;
+
+  const normalized = token
+    .replace(/^(promo|ref|invite|code)[:=_-]?/i, '')
+    .trim()
+    .toUpperCase();
+
+  if (!normalized) return null;
+  return normalized.slice(0, 64);
+};
 
 interface SurveyState {
   user_id: string;
@@ -34,12 +62,12 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, userna
     userId: user_id,
     achievementId: "onboarding_survey_completed",
     source: "telegram:/start",
-    context: { survey: "warehouse", via: "start_command" },
+    context: { survey: "bike", via: "start_command" },
     incrementCounters: { onboardingCompletions: 1 },
   });
 
   // Admin Notification (Warehouse Style)
-  let adminSummary = `🏭 *Новый Оператор в Системе!*\n- *User:* @${username || user_id} (${user_id})\n`;
+  let adminSummary = `🚲 *Новый Райдер в Системе!*\n- *User:* @${username || user_id} (${user_id})\n`;
   for (const key in answers) {
     adminSummary += `- *${answerTexts[key] || key}:* ${answers[key] || '—'}\n`;
   }
@@ -48,7 +76,7 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, userna
   const botUrl = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
   
   // User Summary (Warehouse Style)
-  let summary = `✅ *Профиль настроен.*\nМы зафиксировали параметры твоего склада:\n`;
+  let summary = `✅ *Профиль настроен.*\nМы зафиксировали параметры твоей вело-анкеты:\n`;
   for (const key in answers) {
     summary += `- *${answerTexts[key] || key}:* ${answers[key] || '—'}\n`;
   }
@@ -58,12 +86,17 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, userna
 
   // Send summary with a direct button to the App
   await sendComplexMessage(chatId, summary, [
-      [{ text: "🚀 Открыть Склад (Web App)", url: botUrl }]
+      [{ text: "🚀 Открыть VIP Bike (Web App)", url: botUrl }]
   ], { removeKeyboard: true });
 };
 
 export async function startCommand(chatId: number, userId: number, from_user: any, text?: string) {
-  logger.info(`[StartCommand Warehouse] User: ${userId}, Text: "${text}"`);
+  const { command, payload } = parseStartPayload(text);
+  const promoCode = extractPromoCode(payload);
+  const onboardingBranch = payload ? "start_with_payload:bicycle" : "plain_start:bicycle";
+
+  logger.info(`[StartCommand Bike] User: ${userId}, Text: "${text}"`);
+  logger.info(`[StartCommand Audit] user=${userId} promo=${promoCode ?? "none"} onboarding_branch=${onboardingBranch}`);
   const userIdStr = String(userId);
   const username = from_user.username;
 
@@ -81,7 +114,17 @@ export async function startCommand(chatId: number, userId: number, from_user: an
     return;
   }
 
-  if (text === '/start') {
+  if (command === '/start') {
+    if (promoCode) {
+      const promoUpdate = await updateUserSettings(userIdStr, {
+        onboarding_promo_code: promoCode,
+        onboarding_start_payload: payload,
+      });
+
+      if (!promoUpdate.success) {
+        logger.warn(`[StartCommand] Failed to persist promo token for ${userIdStr}: ${promoUpdate.error ?? "unknown"}`);
+      }
+    }
     // Reset previous state
     await supabaseAnon.from("user_survey_state").delete().eq('user_id', userIdStr);
     await supabaseAnon.from("user_surveys").delete().eq('user_id', userIdStr);
@@ -107,7 +150,7 @@ export async function startCommand(chatId: number, userId: number, from_user: an
 
     if (!currentState) {
       // User sent text without an active survey -> redirect to app or restart
-      if (text !== '/start') {
+      if (command !== '/start') {
          await sendComplexMessage(chatId, "Система в режиме ожидания. Нажми /start, чтобы начать заново, или открой меню.", [], { removeKeyboard: true });
       }
       return;
