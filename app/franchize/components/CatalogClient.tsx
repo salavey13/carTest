@@ -72,16 +72,30 @@ function getVisiblePriceLines(item: CatalogItemVM) {
 // when no pattern matches — avoids showing meaningless gear icons on every spec
 function specIconForKey(key: string): string {
   const k = key.toLowerCase();
-  // Power / motor
+
+  // ── Specific matches FIRST (avoid short substrings that match too broadly) ──
+
+  // Power / horsepower
   if (k.includes("мощ") || k.includes("power") || k.includes("квт") || k.includes("kw") || k.includes("л.с") || k.includes("hp")) return "⚡";
-  // Battery / voltage / capacity
-  if (k.includes("бат") || k.includes("bat") || k.includes("ач") || k.includes("ah") || k.includes("в") || k.includes("v") || k.includes("ёмкост") || k.includes("capacity")) return "🔋";
+  // Weight — MUST come before battery so "вес"/"weight" never mislabels as 🔋
+  if (k.includes("вес") || k.includes("weight") || k.includes("масс")) return "⚖️";
+  // Battery / capacity — specific tokens only; bare "в"/"v" removed (matched "вес", "velocity", etc.)
+  if (
+    k.includes("бат") || k.includes("bat") ||
+    k.includes("ач") || k.includes("ah") ||
+    k.includes("ёмкост") || k.includes("capacity") ||
+    /\d\s*в\b/.test(k) ||           // "48В", "48 В" (digit + optional space + В at word boundary)
+    /\d\s*v\b/.test(k) ||           // "48V", "48 V"
+    k.includes("вольт") || k.includes("volt") ||
+    k.endsWith(" в") || k.endsWith(",в") || k.endsWith(", в") ||  // trailing "в" with separator
+    k.endsWith(" v") || k.endsWith(",v") || k.endsWith(", v")     // trailing "v" with separator
+  ) return "🔋";
   // Range / distance
   if (k.includes("запас") || k.includes("ход") || k.includes("range") || k.includes("км") || k.includes("km") || k.includes("дальн")) return "📍";
   // Speed
   if (k.includes("скор") || k.includes("speed") || k.includes("км/ч") || k.includes("km/h")) return "🚀";
-  // Weight
-  if (k.includes("вес") || k.includes("weight") || k.includes("кг") || k.includes("kg") || k.includes("масс")) return "⚖️";
+  // Mass units alone (e.g. "кг", "kg" not already caught by weight check above)
+  if (k.includes("кг") || k.includes("kg")) return "⚖️";
   // Motor / engine
   if (k.includes("двиг") || k.includes("motor") || k.includes("engine") || k.includes("мотор")) return "🔧";
   // Brakes
