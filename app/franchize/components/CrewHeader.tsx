@@ -419,6 +419,8 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                         if (target) {
                           event.preventDefault();
                           target.scrollIntoView({ behavior: "smooth", block: "start" });
+                          // Keep URL hash in sync without adding history entry
+                          window.history.replaceState(null, "", `#${hash}`);
                         }
                       }
                     }
