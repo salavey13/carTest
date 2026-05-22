@@ -2,7 +2,8 @@
 
 import { X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FranchizeCrewVM } from "../actions";
 import { crewPaletteForSurface } from "../lib/theme";
@@ -28,6 +29,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const surface = crewPaletteForSurface(crew.theme);
+  const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
@@ -120,7 +122,22 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
               <Link
                 key={`${link.href}-${link.label}`}
                 href={link.href}
-                onClick={() => onOpenChange(false)}
+                onClick={(e) => {
+                  // FIX: Close menu first, then navigate via router.push().
+                  // The old code called onOpenChange(false) synchronously, which unmounted
+                  // the HeaderMenu portal (returns null) BEFORE Next.js Link's internal
+                  // router.push() could fire — silently dropping the navigation.
+                  e.preventDefault();
+                  onOpenChange(false);
+                  if (link.href.startsWith("#")) {
+                    // Hash link — scroll to section on current page
+                    const target = document.querySelector(link.href);
+                    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  } else {
+                    // Full navigation — use Next.js router for SPA transition
+                    router.push(link.href);
+                  }
+                }}
                 aria-current={isActive ? "page" : undefined}
                 className={`w-full text-left block rounded-xl border px-4 py-3 text-sm transition cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--header-menu-accent)] ${
                   isActive
