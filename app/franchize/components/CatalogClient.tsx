@@ -581,8 +581,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                 </div>
                 {group.items.length <= 8 ? (
                   <>
-                    {/* ── CAROUSEL MODE (≤8 items) ── Cards aligned with reference design:
-                        Image → Badges → Title → Specs (icon+text) → Price (large bold) → CTA */}
+                    
                     <div
                       ref={(node) => {
                         carouselRefs.current[group.category] = node;
@@ -722,7 +721,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                     </div>
                   </>
                 ) : (
-                {/* ── GRID MODE (>8 items) ── Overlay-style cards with restored helper functions */}
+                
                 <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
                   {group.items.map((item) => {
                     const rentalStrip = buildCatalogRentalStrip(item, crew);
