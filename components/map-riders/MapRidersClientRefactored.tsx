@@ -432,7 +432,13 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       </section>
 
       {/* ── DRAGGABLE TAXI-STYLE BOTTOM SHEET ── */}
-      <Drawer.Root open={sheetOpen} onOpenChange={setSheetOpen} snapPoints={[0.2, 0.48, 0.86]} dismissible={false}>
+      <Drawer.Root
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        snapPoints={[0.2, 0.48, 0.86]}
+        dismissible={false}
+        modal={false}
+      >
         <Drawer.Portal>
           <Drawer.Content className="fixed inset-x-0 bottom-0 z-40 rounded-t-[1.4rem] border border-white/15 bg-[var(--mr-card)]/96 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
             <Drawer.Handle className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-white/35" />
