@@ -42,6 +42,12 @@ const RacingMap = dynamic(() => import("@/components/maps/RacingMap").then((mod)
 const DEFAULT_BOUNDS = { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 };
 const HOME_BASE: [number, number] = [56.204245, 43.798905];
 const MEETUP_ACTION_DEBOUNCE_MS = 2000;
+type SheetSnap = "collapsed" | "mid" | "expanded";
+const SHEET_SNAP_CLASS: Record<SheetSnap, string> = {
+  collapsed: "translate-y-[calc(100%-88px)]",
+  mid: "translate-y-[42%]",
+  expanded: "translate-y-[8%]",
+};
 
 // ── Inner component (uses context) ──
 function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
@@ -54,6 +60,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   const [isPromptOpen, setIsPromptOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [promptValue, setPromptValue] = useState("Точка встречи");
+  const [sheetSnap, setSheetSnap] = useState<SheetSnap>("mid");
   const lastMeetupActionAtRef = useRef(0);
   const surface = crewPaletteForSurface(crew.theme);
   const mapEngine = process.env.NEXT_PUBLIC_MAP_ENGINE || "leaflet";
@@ -325,14 +332,14 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     >
       <BeginnerRiderOnboardingQuiz crew={crew} />
 
-      {/* ── MAP (fullscreen hero) ── */}
-      <section className="relative -mx-4 overflow-hidden border md:mx-0 md:rounded-3xl" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
+      {/* ── MAP + OVERLAY + SHEET (layered layout) ── */}
+      <section className="relative -mx-4 min-h-[76vh] overflow-hidden border md:mx-0 md:min-h-[80vh] md:rounded-3xl" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
         <div className="absolute inset-0 z-0">
           {useLeafletMap ? (
             <RacingMap
               points={mapPoints}
               bounds={mapData?.bounds || mapBounds || DEFAULT_BOUNDS}
-              className="h-full min-h-[62vh] w-full md:min-h-[74vh]"
+              className="h-full min-h-[76vh] w-full md:min-h-[80vh]"
               tileLayer={mapData?.meta.tileLayer || "cartodb-dark"}
               onMapClick={(coords) => {
                 setSelectedMeetupId(null);
@@ -355,12 +362,11 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               <RiderMarkerLayer />
             </RacingMap>
           ) : (
-            <div className="flex h-full min-h-[62vh] items-center justify-center text-muted-foreground md:min-h-[74vh]">
+            <div className="flex h-full min-h-[76vh] items-center justify-center text-muted-foreground md:min-h-[80vh]">
               Режим VibeMap (резерв) — установи NEXT_PUBLIC_MAP_ENGINE=leaflet
             </div>
           )}
           <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-black/30 via-transparent to-black/30" />
-          <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 h-5 bg-[var(--mr-card)]/95 backdrop-blur-sm" />
           <MapRidersDebugPanel
             activeRiders={state.liveRiders.size}
             sessionCount={state.sessions.length}
@@ -371,7 +377,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         </div>
 
         {/* Floating badges */}
-        <div className="pointer-events-none relative z-30 flex min-h-[62vh] flex-col justify-between p-3 md:min-h-[74vh] md:p-6">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 p-3 md:p-6">
           <div className="flex flex-wrap gap-2">
             <Badge className="border bg-black/55 text-white backdrop-blur-md">{useLeafletMap ? `Leaflet${isUsingTelegram ? " + Telegram GPS" : " + Browser GPS"}` : "VibeMap"}</Badge>
             <Badge className="border border-emerald-300/45 bg-emerald-500/20 text-emerald-100">live {riderStatusCounts.live}</Badge>
@@ -382,7 +388,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               <Badge className="border border-emerald-300/40 bg-emerald-500/20 text-emerald-100">Демо-режим</Badge>
             ) : null}
           </div>
-          <div className="flex justify-end">
+          <div className="mt-2 flex justify-end">
             <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-2xl border border-white/30 bg-black/60 px-3 py-2 text-xs text-white shadow-2xl shadow-black/30 backdrop-blur-md">
               <span className="min-w-0">
                 <span className="block font-medium text-white">
@@ -412,11 +418,25 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             </div>
           </div>
         </div>
-      </section>
 
-      {/* ── STATS + CONTROL (below map) ── */}
-      <section className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
-        {/* Stats card */}
+        <div className={`absolute inset-x-0 bottom-0 z-30 transform-gpu transition-transform duration-300 ease-out ${SHEET_SNAP_CLASS[sheetSnap]}`}>
+          <div className="pointer-events-auto rounded-t-3xl border-t border-white/15 bg-black/70 px-4 pb-5 pt-2 backdrop-blur-xl">
+            <button
+              type="button"
+              className="mx-auto mb-2 block h-1.5 w-12 rounded-full bg-white/40"
+              onClick={() => setSheetSnap((snap) => (snap === "collapsed" ? "mid" : snap === "mid" ? "expanded" : "collapsed"))}
+              aria-label="Переключить высоту панели"
+            />
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="font-orbitron text-sm text-white/90">Панель райдера</h3>
+              <div className="pointer-events-auto flex gap-2">
+                <Button type="button" size="sm" variant={sheetSnap === "collapsed" ? "default" : "outline"} className="h-7 px-2 text-xs" onClick={() => setSheetSnap("collapsed")}>Мини</Button>
+                <Button type="button" size="sm" variant={sheetSnap === "mid" ? "default" : "outline"} className="h-7 px-2 text-xs" onClick={() => setSheetSnap("mid")}>Средне</Button>
+                <Button type="button" size="sm" variant={sheetSnap === "expanded" ? "default" : "outline"} className="h-7 px-2 text-xs" onClick={() => setSheetSnap("expanded")}>Макс</Button>
+              </div>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto pr-1">
+              <section className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
         <div className="rounded-2xl border p-6 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
           <Badge className="mb-3 w-fit border" style={{ borderColor: `${crew.theme.palette.accentMain}55`, backgroundColor: `${crew.theme.palette.accentMain}18`, color: crew.theme.palette.accentMain }}>
             {(crew.header.brandName || crew.name || "VIP BIKE").toUpperCase()} • MAPRIDERS
@@ -567,6 +587,10 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             <Button asChild variant="outline" className="w-full">
               <Link href={`/franchize/${crewSlug}/community`}>События и партнёры</Link>
             </Button>
+          </div>
+        </div>
+        </section>
+            </div>
           </div>
         </div>
       </section>
