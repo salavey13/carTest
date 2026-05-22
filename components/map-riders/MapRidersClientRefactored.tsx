@@ -7,6 +7,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { Drawer } from "vaul";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +50,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
   const isAdmin = useIsAdmin();
   const [isQuickMeetupSaving, setIsQuickMeetupSaving] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(true);
   const [selectedMeetupId, setSelectedMeetupId] = useState<string | null>(null);
   const [isMeetupDeleting, setIsMeetupDeleting] = useState(false);
   const [isPromptOpen, setIsPromptOpen] = useState(false);
@@ -313,7 +315,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
 
   return (
     <div
-      className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-20 md:pt-24"
+      className="relative min-h-[100dvh] w-full pb-24 pt-16 md:pt-20"
       style={{
         ["--mr-accent" as string]: crew.theme.palette.accentMain,
         ["--mr-accent-hover" as string]: crew.theme.palette.accentMainHover,
@@ -325,14 +327,14 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     >
       <BeginnerRiderOnboardingQuiz crew={crew} />
 
-      {/* ── MAP (fullscreen hero) ── */}
-      <section className="relative -mx-4 overflow-hidden border md:mx-0 md:rounded-3xl" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
+      {/* ── MAP (fullscreen background) ── */}
+      <section className="fixed inset-0 overflow-hidden" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
         <div className="absolute inset-0 z-0">
           {useLeafletMap ? (
             <RacingMap
               points={mapPoints}
               bounds={mapData?.bounds || mapBounds || DEFAULT_BOUNDS}
-              className="h-full min-h-[62vh] w-full md:min-h-[74vh]"
+              className="h-full min-h-[100dvh] w-full"
               tileLayer={mapData?.meta.tileLayer || "cartodb-dark"}
               onMapClick={(coords) => {
                 setSelectedMeetupId(null);
@@ -355,7 +357,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               <RiderMarkerLayer />
             </RacingMap>
           ) : (
-            <div className="flex h-full min-h-[62vh] items-center justify-center text-muted-foreground md:min-h-[74vh]">
+            <div className="flex h-full min-h-[100dvh] items-center justify-center text-muted-foreground">
               Режим VibeMap (резерв) — установи NEXT_PUBLIC_MAP_ENGINE=leaflet
             </div>
           )}
@@ -371,7 +373,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         </div>
 
         {/* Floating badges */}
-        <div className="pointer-events-none relative z-30 flex min-h-[62vh] flex-col justify-between p-3 md:min-h-[74vh] md:p-6">
+        <div className="pointer-events-none relative z-30 flex min-h-[100dvh] flex-col justify-between p-3 md:p-6">
           <div className="flex flex-wrap gap-2">
             <Badge className="border bg-black/55 text-white backdrop-blur-md">{useLeafletMap ? `Leaflet${isUsingTelegram ? " + Telegram GPS" : " + Browser GPS"}` : "VibeMap"}</Badge>
             <Badge className="border border-emerald-300/45 bg-emerald-500/20 text-emerald-100">live {riderStatusCounts.live}</Badge>
@@ -414,8 +416,13 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         </div>
       </section>
 
-      {/* ── STATS + CONTROL (below map) ── */}
-      <section className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
+      {/* ── DRAGGABLE TAXI-STYLE BOTTOM SHEET ── */}
+      <Drawer.Root open={sheetOpen} onOpenChange={setSheetOpen} snapPoints={[0.2, 0.48, 0.86]} dismissible={false}>
+        <Drawer.Portal>
+          <Drawer.Content className="fixed inset-x-0 bottom-0 z-40 rounded-t-[2rem] border border-white/15 bg-[var(--mr-card)]/95 p-4 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
+            <Drawer.Handle className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-white/35" />
+            <div className="mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-20">
+              <div className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
         {/* Stats card */}
         <div className="rounded-2xl border p-6 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
           <Badge className="mb-3 w-fit border" style={{ borderColor: `${crew.theme.palette.accentMain}55`, backgroundColor: `${crew.theme.palette.accentMain}18`, color: crew.theme.palette.accentMain }}>
@@ -569,10 +576,14 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             </Button>
           </div>
         </div>
-      </section>
-
-      {/* ── LEADERBOARD (simplified, loads separately) ── */}
-      <LeaderboardSection crew={crew} crewSlug={crewSlug} />
+              </div>
+              <div className="mt-4">
+                <LeaderboardSection crew={crew} crewSlug={crewSlug} />
+              </div>
+            </div>
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
       {state.isLoading ? <MapRidersSkeleton /> : null}
       <StatusOverlay />
       <RiderFAB />
