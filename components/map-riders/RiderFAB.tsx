@@ -16,7 +16,7 @@ export function RiderFAB() {
       onClick={toggleSession}
       disabled={isSubmitting}
       className={`
-        fixed bottom-24 right-3 z-30 flex h-12 w-12 items-center justify-center
+        fixed bottom-24 right-3 z-50 flex h-12 w-12 items-center justify-center
         rounded-full shadow-2xl transition-all duration-300
         md:bottom-8 md:right-8
         ${isRecording ? "bg-red-500 animate-pulse shadow-red-500/50" : "bg-amber-400 shadow-amber-400/50 hover:bg-amber-300"}

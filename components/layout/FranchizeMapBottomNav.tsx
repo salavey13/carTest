@@ -12,7 +12,7 @@ export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNa
   const slug = slugMatch?.[1] || "vip-bike";
 
   const items = [
-    { key: "leaderboard", label: "Топ", href: "/leaderboard", icon: Trophy },
+    { key: "leaderboard", label: "Топ", href: `/franchize/${slug}/leaderboard`, icon: Trophy },
     { key: "map", label: "Карта", href: `/franchize/${slug}/map-riders`, icon: MapPin },
     { key: "crew", label: "Экипаж", href: `/franchize/${slug}/community`, icon: Users },
     { key: "profile", label: "Профиль", href: `/franchize/${slug}/profile`, icon: User },
