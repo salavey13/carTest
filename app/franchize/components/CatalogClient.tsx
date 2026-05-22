@@ -27,11 +27,11 @@ interface CatalogClientProps {
 
 type QuickFilterKey = "all" | "budget" | "premium" | "newbie" | "topRated";
 
-const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string }> = [
+const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string; compactLabel?: string }> = [
   { key: "all", label: "Все" },
   { key: "budget", label: "До 5000" },
   { key: "premium", label: "Премиум 7000+" },
-  { key: "newbie", label: "Для новичка" },
+  { key: "newbie", label: "Для новичка", compactLabel: "Для новичков" },
   { key: "topRated", label: "Лучшие отзывы" },
 ];
 
@@ -561,7 +561,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           </button>
         </div>
 
-        {promoModules.length > 0 && (
+        {promoModules.length > 0 && mode !== "electro" && (
           <div className="mb-5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
             {visiblePromoModules.map((module, index) => {
               const isExternal = /^(https?:|mailto:|tel:)/.test(module.href);
@@ -615,7 +615,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                   ["--quick-pill-text" as string]: active ? "#000000" : crew.theme.palette.textPrimary,
                 }}
               >
-                {filter.label} · {quickFilterCounts[filter.key]}
+                {(filter.compactLabel ?? filter.label)} · {quickFilterCounts[filter.key]}
               </button>
             );
           })}
@@ -669,7 +669,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       ref={(node) => {
                         carouselRefs.current[group.category] = node;
                       }}
-                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 touch-pan-x [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                       tabIndex={0}
                       role="region"
                       aria-label={`Карусель категории ${group.category}`}
@@ -691,14 +691,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       data-catalog-item="true"
                       data-carousel-card="true"
                       data-carousel-index={index}
-                      className="group w-[65vw] max-w-[280px] shrink-0 snap-start rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)] sm:w-[260px]"
+                      className="group w-[65vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)] sm:w-[260px]"
                       style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
                     >
                       <button
                         type="button"
                         aria-label={`Открыть карточку ${item.title}: ${item.rentPriceLabel}`}
                         data-catalog-item-button="true"
-                        className="block w-full text-left"
+                        className="block w-full overflow-hidden text-left"
                         onClick={() => openItem(item)}
                         onFocus={() => setFocusedItemId(item.id)}
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
@@ -713,7 +713,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           setCarouselParallaxByItem((prev) => ({ ...prev, [item.id]: { x: 0, y: 0 } }));
                         }}
                       >
-                        <div className="relative aspect-[9/16] w-full">
+                        <div className="relative aspect-[9/16] w-full overflow-hidden">
                           {item.imageUrl && !carouselLoadedByItem[item.id] && (
                             <div className="absolute inset-0 overflow-hidden bg-black/30">
                               <div className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent" />
@@ -726,7 +726,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               fill
                               sizes="(max-width: 1279px) 65vw, 260px"
                               className="object-cover transition-transform duration-300 ease-out"
-                              style={{ transform: `scale(1.06) translate3d(${parallax.x * 8}px, ${parallax.y * 8}px, 0)` }}
+                              style={{ transform: `scale(1.04) translate3d(${parallax.x * 4}px, ${parallax.y * 4}px, 0)` }}
                               onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
                             />
                           ) : (
