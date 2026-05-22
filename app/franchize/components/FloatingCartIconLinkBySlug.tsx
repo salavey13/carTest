@@ -19,8 +19,18 @@ interface FloatingCartIconLinkBySlugProps {
 
 export function FloatingCartIconLinkBySlug({ slug, href, items, accentColor, textColor, borderColor, theme, className, mode }: FloatingCartIconLinkBySlugProps) {
   const cartState = useFranchizeCart(slug);
-  const subtotal = 0;
   const itemCount = cartState.itemCount;
+
+  // Derive subtotal from cart lines — useFranchizeCart does not expose .subtotal directly.
+  // The hook returns a lines/items array with per-line price and quantity info.
+  const cartLines: Array<{ price?: number; total?: number; quantity?: number }> =
+    (cartState as Record<string, unknown>).lines ?? (cartState as Record<string, unknown>).items ?? [];
+  const subtotal = Array.isArray(cartLines)
+    ? cartLines.reduce((sum: number, line) => {
+        const lineTotal = line.total ?? (line.price ?? 0) * (line.quantity ?? 1);
+        return sum + lineTotal;
+      }, 0)
+    : 0;
 
   return (
     <FloatingCartIconLink

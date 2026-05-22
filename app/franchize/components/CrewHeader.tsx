@@ -1,4 +1,3 @@
-// /app/franchize/components/CrewHeader.tsx
 "use client";
 
 import Image from "next/image";
@@ -171,7 +170,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
     };
   }, [mainCatalogPath, pathname]);
 
-  // --- NEW: Плавный скролл активного бейджа (pill) в центр экрана ---
+  // --- Плавный скролл активного бейджа (pill) в центр экрана ---
   useEffect(() => {
     const activeRailLink = visibleRailLinks.find(
       (link) => link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href)),
@@ -228,11 +227,17 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
       }}
     >
       <div className="mx-auto w-full max-w-7xl overflow-hidden">
+        {/*
+          FIX: Grid layout changed from "auto auto minmax(0,1fr) auto" (4 cols, 3 children)
+          to "44px 1fr auto" (3 cols, 3 children). The old layout put the profile+cart div
+          in the minmax(0,1fr) column, which consumed ALL remaining space and created an
+          invisible overlay that intercepted pointer events on everything below it.
+        */}
         <div
           style={{
             ...FRANCHIZE_HEADER_CORNER_GUARD_STYLE,
             display: "grid",
-            gridTemplateColumns: "auto auto minmax(0,1fr) auto",
+            gridTemplateColumns: "44px 1fr auto",
             alignItems: "center",
             gap: "0.75rem",
             maxHeight: isCompact ? 0 : 112,
@@ -241,7 +246,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             transform: isCompact ? "scaleY(0.85) translateY(-6px)" : "scaleY(1) translateY(0.45rem)",
             transformOrigin: "top center",
             transition: "transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, padding 0.3s ease, max-height 0.32s ease",
-            pointerEvents: "auto",
+            pointerEvents: isCompact ? "none" : "auto",
           }}
         >
           <button
@@ -250,7 +255,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             aria-expanded={menuOpen}
             aria-controls="franchize-header-menu"
             onClick={() => setMenuOpen(true)}
-            className="inline-flex h-10 w-10 min-h-10 min-w-10 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             style={{
               backgroundColor: withAlpha(crew.theme.palette.bgBase, 0.8),
               color: crew.theme.palette.textPrimary,
@@ -267,7 +272,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             className="relative z-10 mx-auto flex flex-col items-center text-center cursor-pointer hover:opacity-90 transition-opacity pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             <div
-              className="relative h-10 w-10 min-h-10 min-w-10 overflow-hidden rounded-full border shadow-lg"
+              className="relative h-12 w-12 min-h-12 min-w-12 overflow-hidden rounded-full border shadow-lg"
               style={{
                 borderColor: accentMain,
                 backgroundColor: crew.theme.palette.bgBase,
@@ -280,7 +285,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                     src={logoUrl}
                     alt={`${crew.header.brandName} logo`}
                     fill
-                    sizes="40px"
+                    sizes="48px"
                     className="object-cover"
                     onLoad={() => setLogoLoaded(true)}
                     onError={() => {
@@ -322,7 +327,13 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             </div>
           </Link>
 
-          <div className="flex items-center gap-2 justify-self-end">
+          {/*
+            FIX: Added pointerEvents: "auto" explicitly.
+            The header safe-area style may set pointer-events: none,
+            and the old layout's minmax(0,1fr) column was swallowing clicks.
+            Now in column 3 (auto) which only takes its content width.
+          */}
+          <div className="flex items-center gap-2 justify-self-end" style={{ pointerEvents: "auto" }}>
             <FranchizeProfileButton
               bgColor={withAlpha(crew.theme.palette.bgBase, 0.8)}
               textColor={crew.theme.palette.textPrimary}
@@ -338,17 +349,21 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
               borderColor={crew.theme.palette.borderSoft}
               theme={crew.theme}
               mode="inline-icon"
-              className="relative inline-flex h-10 w-10 min-h-10 min-w-10 items-center justify-center rounded-xl"
+              className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl"
             />
           </div>
         </div>
       </div>
 
       {visibleRailLinks.length > 0 && (
-        <div className="-mx-4 mt-1 border-t px-4 pt-2" style={{ borderColor: crew.theme.palette.borderSoft }}>
+        <div
+          className="-mx-4 mt-1 border-t px-4 pt-2"
+          style={{ borderColor: crew.theme.palette.borderSoft, pointerEvents: "auto" }}
+        >
           <div
             ref={railRef}
             className="relative mx-auto flex w-full max-w-7xl gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+            style={{ pointerEvents: "auto" }}
           >
             <span
               aria-hidden="true"
