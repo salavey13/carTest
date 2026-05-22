@@ -46,7 +46,7 @@ export function StatusOverlay() {
   const showSpeedLegend = Boolean(state.sessionDetail?.points?.length);
 
   return (
-    <div className="pointer-events-none fixed left-1/2 top-3 z-30 -translate-x-1/2 space-y-1.5 md:top-5">
+    <div className="pointer-events-none fixed left-1/2 top-3 z-[60] -translate-x-1/2 space-y-1.5 md:top-5">
       <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-black/60 px-3 py-1.5 text-white backdrop-blur-xl">
         <div className="flex items-center gap-1.5">
           <span className="relative flex h-2.5 w-2.5">
