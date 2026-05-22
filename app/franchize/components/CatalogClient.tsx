@@ -68,16 +68,38 @@ function getVisiblePriceLines(item: CatalogItemVM) {
 }
 
 // Map common spec keys to emoji icons for card display
+// FIX: Expanded pattern matching + return empty string instead of default ⚙️
+// when no pattern matches — avoids showing meaningless gear icons on every spec
 function specIconForKey(key: string): string {
   const k = key.toLowerCase();
-  if (k.includes("мощ") || k.includes("power") || k.includes("квт") || k.includes("kw")) return "⚡";
-  if (k.includes("бат") || k.includes("bat") || k.includes("ач") || k.includes("ah") || k.includes("v ") || k.includes("v,")) return "🔋";
-  if (k.includes("запас") || k.includes("ход") || k.includes("range") || k.includes("км")) return "📍";
-  if (k.includes("скор") || k.includes("speed") || k.includes("км/ч")) return "🚀";
-  if (k.includes("вес") || k.includes("weight") || k.includes("кг")) return "⚖️";
-  if (k.includes("двиг") || k.includes("motor")) return "🔧";
-  if (k.includes("торм") || k.includes("brake")) return "🛑";
-  return "⚙️";
+  // Power / motor
+  if (k.includes("мощ") || k.includes("power") || k.includes("квт") || k.includes("kw") || k.includes("л.с") || k.includes("hp")) return "⚡";
+  // Battery / voltage / capacity
+  if (k.includes("бат") || k.includes("bat") || k.includes("ач") || k.includes("ah") || k.includes("в") || k.includes("v") || k.includes("ёмкост") || k.includes("capacity")) return "🔋";
+  // Range / distance
+  if (k.includes("запас") || k.includes("ход") || k.includes("range") || k.includes("км") || k.includes("km") || k.includes("дальн")) return "📍";
+  // Speed
+  if (k.includes("скор") || k.includes("speed") || k.includes("км/ч") || k.includes("km/h")) return "🚀";
+  // Weight
+  if (k.includes("вес") || k.includes("weight") || k.includes("кг") || k.includes("kg") || k.includes("масс")) return "⚖️";
+  // Motor / engine
+  if (k.includes("двиг") || k.includes("motor") || k.includes("engine") || k.includes("мотор")) return "🔧";
+  // Brakes
+  if (k.includes("торм") || k.includes("brake") || k.includes("диск")) return "🛑";
+  // Transmission / gear
+  if (k.includes("короб") || k.includes("transm") || k.includes("передач") || k.includes("gear")) return "🔩";
+  // Suspension
+  if (k.includes("подвес") || k.includes("susp") || k.includes("аморт")) return "🛞";
+  // Frame / chassis
+  if (k.includes("рам") || k.includes("frame") || k.includes("шасси")) return "🏗️";
+  // Wheel / tire
+  if (k.includes("колес") || k.includes("wheel") || k.includes("шин") || k.includes("tire")) return "🛞";
+  // Display / screen
+  if (k.includes("экран") || k.includes("display") || k.includes("дисплей")) return "📱";
+  // Charge / connector
+  if (k.includes("заряд") || k.includes("charge") || k.includes("разъём") || k.includes("порт")) return "🔌";
+  // No match — return empty string (no icon) instead of default ⚙️
+  return "";
 }
 
 function getVisibleSpecChips(item: CatalogItemVM): Array<{ icon: string; text: string }> {
@@ -655,7 +677,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       data-catalog-item="true"
                       data-carousel-card="true"
                       data-carousel-index={index}
-                      className="group w-[65vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)] sm:w-[260px]"
+                      className="group w-[65vw] max-w-[280px] shrink-0 snap-start rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)] sm:w-[260px]"
                       style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
                     >
                       <button
@@ -699,9 +721,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         </div>
                         <div className="p-3">
                           {/* Badges */}
-                          <div className="mb-2 flex flex-wrap gap-1.5">
+                          <div className="mb-1.5 flex flex-wrap gap-1">
                             {item.isHot && (
-                              <span className="inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
+                              <span className="inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
                                 Высокий спрос
                               </span>
                             )}
@@ -716,7 +738,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           {specChips.length > 0 && (
                             <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--catalog-muted)]">
                               {specChips.map((spec, si) => (
-                                <span key={`${item.id}-spec-${si}`}>{spec.icon} {spec.text}</span>
+                                <span key={`${item.id}-spec-${si}`}>{spec.icon ? `${spec.icon} ` : ""}{spec.text}</span>
                               ))}
                             </div>
                           )}
@@ -777,7 +799,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                     <article
                       key={item.id}
                       data-catalog-item="true"
-                      className="group overflow-hidden rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)]"
+                      className="group rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)]"
                       style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
                     >
                       <button
@@ -798,14 +820,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           )}
                           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[62%] bg-gradient-to-t from-[color:color-mix(in_srgb,var(--catalog-card-bg)_92%,#000)] via-[color:color-mix(in_srgb,var(--catalog-card-bg)_72%,transparent)] to-transparent" />
                           <div className="absolute inset-x-0 bottom-0 p-2.5 pb-3 sm:p-3">
-                            <div className="mb-1.5 flex flex-wrap gap-1.5">
+                            <div className="mb-1 flex flex-wrap gap-1">
                               {item.isHot && (
-                                <span className="inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
+                                <span className="inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
                                   Высокий спрос
                                 </span>
                               )}
                               <span
-                                className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em]"
+                                className="inline-flex rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em]"
                                 style={{
                                   backgroundColor: rentalStrip.isAvailable ? "#1f7a3a3d" : "#dc262640",
                                   color: "#e6f4ea",
@@ -814,11 +836,12 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               >
                                 {rentalStrip.availabilityLabel}
                               </span>
+                              {item.saleAvailable && <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-amber-100">Продажа</span>}
                             </div>
                             <h3 className="text-sm font-semibold leading-5 text-white">{item.title}</h3>
                             <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-white/75">
                               {visibleSpecs.map((spec, index) => (
-                                <span key={`${item.id}-spec-${index}`}>{spec.icon} {spec.text}</span>
+                                <span key={`${item.id}-spec-${index}`}>{spec.icon ? `${spec.icon} ` : ""}{spec.text}</span>
                               ))}
                             </div>
                             <div className="mt-2 space-y-0.5">
