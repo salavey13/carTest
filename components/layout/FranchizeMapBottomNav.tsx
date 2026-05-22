@@ -1,5 +1,10 @@
 "use client";
 
+// /components/layout/FranchizeMapBottomNav.tsx
+// Franchise-scoped bottom tab navigation for map-riders routes.
+// z-30 sits behind the vaul Drawer (z-40), so it's visible
+// when the drawer is collapsed but hidden when expanded.
+
 import Link from "next/link";
 import { MapPin, Trophy, Users, User } from "lucide-react";
 
@@ -20,7 +25,7 @@ export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNa
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t px-4 pb-[max(env(safe-area-inset-bottom),0.7rem)] pt-2 backdrop-blur-xl md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t px-4 pb-[max(env(safe-area-inset-bottom),0.7rem)] pt-2 backdrop-blur-xl md:hidden"
       style={{
         borderColor: "color-mix(in srgb, var(--fr-map-nav-accent, #facc15) 28%, transparent)",
         backgroundColor: "color-mix(in srgb, var(--fr-map-nav-bg, #030712) 82%, black)",
