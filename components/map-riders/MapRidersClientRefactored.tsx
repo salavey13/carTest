@@ -1,12 +1,14 @@
 // /components/map-riders/MapRidersClientRefactored.tsx
 // Refactored orchestrator — ~120 lines, no business logic.
 // All state lives in MapRidersProvider/useMapRiders.
+// Layout: fullscreen map + vaul bottom sheet (taxi-style).
 
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { Drawer } from "vaul";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,12 +44,11 @@ const RacingMap = dynamic(() => import("@/components/maps/RacingMap").then((mod)
 const DEFAULT_BOUNDS = { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 };
 const HOME_BASE: [number, number] = [56.204245, 43.798905];
 const MEETUP_ACTION_DEBOUNCE_MS = 2000;
-type SheetSnap = "collapsed" | "mid" | "expanded";
-const SHEET_SNAP_CLASS: Record<SheetSnap, string> = {
-  collapsed: "translate-y-[calc(100%-88px)]",
-  mid: "translate-y-[42%]",
-  expanded: "translate-y-[8%]",
-};
+
+// Snap labels for the 3-button control (matching vaul snapPoints)
+const SNAP_POINTS = [0.2, 0.48, 0.86] as const;
+type SnapLabel = "Мини" | "Средне" | "Макс";
+const SNAP_LABELS: Record<number, SnapLabel> = { 0.2: "Мини", 0.48: "Средне", 0.86: "Макс" };
 
 // ── Inner component (uses context) ──
 function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
@@ -55,12 +56,13 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
   const isAdmin = useIsAdmin();
   const [isQuickMeetupSaving, setIsQuickMeetupSaving] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(true);
+  const [activeSnap, setActiveSnap] = useState<number>(0.48);
   const [selectedMeetupId, setSelectedMeetupId] = useState<string | null>(null);
   const [isMeetupDeleting, setIsMeetupDeleting] = useState(false);
   const [isPromptOpen, setIsPromptOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [promptValue, setPromptValue] = useState("Точка встречи");
-  const [sheetSnap, setSheetSnap] = useState<SheetSnap>("mid");
   const lastMeetupActionAtRef = useRef(0);
   const surface = crewPaletteForSurface(crew.theme);
   const mapEngine = process.env.NEXT_PUBLIC_MAP_ENGINE || "leaflet";
@@ -89,6 +91,22 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     }),
     [state.meetups.length, state.recentCompleted.length],
   );
+
+  // ── Inject crew theme CSS vars for FranchizeMapBottomNav ──
+  useEffect(() => {
+    const root = document.documentElement;
+    const prevAccent = root.style.getPropertyValue("--fr-map-nav-accent");
+    const prevText = root.style.getPropertyValue("--fr-map-nav-text");
+    const prevBg = root.style.getPropertyValue("--fr-map-nav-bg");
+    root.style.setProperty("--fr-map-nav-accent", crew.theme.palette.accentMain);
+    root.style.setProperty("--fr-map-nav-text", crew.theme.palette.textPrimary);
+    root.style.setProperty("--fr-map-nav-bg", crew.theme.palette.bgBase);
+    return () => {
+      if (prevAccent) root.style.setProperty("--fr-map-nav-accent", prevAccent); else root.style.removeProperty("--fr-map-nav-accent");
+      if (prevText) root.style.setProperty("--fr-map-nav-text", prevText); else root.style.removeProperty("--fr-map-nav-text");
+      if (prevBg) root.style.setProperty("--fr-map-nav-bg", prevBg); else root.style.removeProperty("--fr-map-nav-bg");
+    };
+  }, [crew.theme.palette.accentMain, crew.theme.palette.bgBase, crew.theme.palette.textPrimary]);
 
   // ── GPS tracking hook ──
   const { isUsingTelegram, lastBroadcastAt, queuedPoints } = useLiveRiders({
@@ -320,7 +338,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
 
   return (
     <div
-      className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-20 md:pt-24"
+      className="relative min-h-[100dvh] w-full pb-24 pt-16 md:pt-20"
       style={{
         ["--mr-accent" as string]: crew.theme.palette.accentMain,
         ["--mr-accent-hover" as string]: crew.theme.palette.accentMainHover,
@@ -332,14 +350,14 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     >
       <BeginnerRiderOnboardingQuiz crew={crew} />
 
-      {/* ── MAP + OVERLAY + SHEET (layered layout) ── */}
-      <section className="relative -mx-4 min-h-[76vh] overflow-hidden border md:mx-0 md:min-h-[80vh] md:rounded-3xl" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
+      {/* ── MAP (fullscreen background) ── */}
+      <section className="fixed inset-0 overflow-hidden" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
         <div className="absolute inset-0 z-0">
           {useLeafletMap ? (
             <RacingMap
               points={mapPoints}
               bounds={mapData?.bounds || mapBounds || DEFAULT_BOUNDS}
-              className="h-full min-h-[76vh] w-full md:min-h-[80vh]"
+              className="h-full min-h-[100dvh] w-full"
               tileLayer={mapData?.meta.tileLayer || "cartodb-dark"}
               onMapClick={(coords) => {
                 setSelectedMeetupId(null);
@@ -362,7 +380,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               <RiderMarkerLayer />
             </RacingMap>
           ) : (
-            <div className="flex h-full min-h-[76vh] items-center justify-center text-muted-foreground md:min-h-[80vh]">
+            <div className="flex h-full min-h-[100dvh] items-center justify-center text-muted-foreground">
               Режим VibeMap (резерв) — установи NEXT_PUBLIC_MAP_ENGINE=leaflet
             </div>
           )}
@@ -376,7 +394,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
           />
         </div>
 
-        {/* Floating badges */}
+        {/* Floating badges (absolute top, no viewport-height flex) */}
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 p-3 md:p-6">
           <div className="flex flex-wrap gap-2">
             <Badge className="border bg-black/55 text-white backdrop-blur-md">{useLeafletMap ? `Leaflet${isUsingTelegram ? " + Telegram GPS" : " + Browser GPS"}` : "VibeMap"}</Badge>
@@ -418,50 +436,67 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             </div>
           </div>
         </div>
+      </section>
 
-        <div className={`absolute inset-x-0 bottom-0 z-30 transform-gpu transition-transform duration-300 ease-out ${SHEET_SNAP_CLASS[sheetSnap]}`}>
-          <div className="pointer-events-auto rounded-t-3xl border-t border-white/15 bg-black/70 px-4 pb-5 pt-2 backdrop-blur-xl">
-            <button
-              type="button"
-              className="mx-auto mb-2 block h-1.5 w-12 rounded-full bg-white/40"
-              onClick={() => setSheetSnap((snap) => (snap === "collapsed" ? "mid" : snap === "mid" ? "expanded" : "collapsed"))}
-              aria-label="Переключить высоту панели"
-            />
+      {/* ── DRAGGABLE TAXI-STYLE BOTTOM SHEET (vaul) ── */}
+      <Drawer.Root
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        snapPoints={SNAP_POINTS}
+        activeSnapPoint={activeSnap}
+        setActiveSnapPoint={setActiveSnap}
+        dismissible={false}
+        modal={false}
+      >
+        <Drawer.Portal>
+          <Drawer.Content className="fixed inset-x-0 bottom-0 z-40 rounded-t-[1.4rem] border border-white/15 bg-[var(--mr-card)]/96 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
+            <Drawer.Handle className="mx-auto mb-2 h-1.5 w-14 rounded-full bg-white/35" />
+            {/* Snap control buttons */}
             <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="font-orbitron text-sm text-white/90">Панель райдера</h3>
-              <div className="pointer-events-auto flex gap-2">
-                <Button type="button" size="sm" variant={sheetSnap === "collapsed" ? "default" : "outline"} className="h-7 px-2 text-xs" onClick={() => setSheetSnap("collapsed")}>Мини</Button>
-                <Button type="button" size="sm" variant={sheetSnap === "mid" ? "default" : "outline"} className="h-7 px-2 text-xs" onClick={() => setSheetSnap("mid")}>Средне</Button>
-                <Button type="button" size="sm" variant={sheetSnap === "expanded" ? "default" : "outline"} className="h-7 px-2 text-xs" onClick={() => setSheetSnap("expanded")}>Макс</Button>
+              <div className="pointer-events-auto flex gap-1.5">
+                {SNAP_POINTS.map((snap) => (
+                  <Button
+                    key={snap}
+                    type="button"
+                    size="sm"
+                    variant={activeSnap === snap ? "default" : "outline"}
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setActiveSnap(snap)}
+                  >
+                    {SNAP_LABELS[snap]}
+                  </Button>
+                ))}
               </div>
             </div>
-            <div className="max-h-[60vh] overflow-y-auto pr-1">
-              <section className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
-        <div className="rounded-2xl border p-6 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
+            <div className="mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-20">
+              <div className="grid gap-3 lg:grid-cols-[1.35fr,1fr]">
+        {/* Stats card */}
+        <div className="rounded-2xl border p-4 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
           <Badge className="mb-3 w-fit border" style={{ borderColor: `${crew.theme.palette.accentMain}55`, backgroundColor: `${crew.theme.palette.accentMain}18`, color: crew.theme.palette.accentMain }}>
             {(crew.header.brandName || crew.name || "VIP BIKE").toUpperCase()} • MAPRIDERS
           </Badge>
-          <h2 className="mt-3 font-orbitron text-3xl" style={{ color: crew.theme.palette.textPrimary }}>
+          <h2 className="mt-2 font-orbitron text-2xl" style={{ color: crew.theme.palette.textPrimary }}>
             Карта райдеров в реальном времени
           </h2>
-          <p className="mt-2 max-w-2xl text-base" style={{ color: crew.theme.palette.textSecondary }}>
+          <p className="mt-1 max-w-2xl text-sm" style={{ color: crew.theme.palette.textSecondary }}>
             Один тап — и экипаж видит твой маршрут, скорость и meetup-пины.
           </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
             {heroStats.map((stat) => (
-              <div key={stat.label} className="rounded-2xl border p-4" style={{ borderColor: `${crew.theme.palette.borderSoft}aa`, backgroundColor: `${crew.theme.palette.bgBase}66` }}>
+              <div key={stat.label} className="rounded-xl border p-3" style={{ borderColor: `${crew.theme.palette.borderSoft}aa`, backgroundColor: `${crew.theme.palette.bgBase}66` }}>
                 <div className="mb-2" style={{ color: crew.theme.palette.accentMain }}>
                   <VibeContentRenderer content={stat.icon} />
                 </div>
-                <div className="text-2xl font-semibold" style={{ color: crew.theme.palette.textPrimary }}>{stat.value}</div>
-                <div className="text-sm" style={{ color: crew.theme.palette.textSecondary }}>{stat.label}</div>
+                <div className="text-xl font-semibold" style={{ color: crew.theme.palette.textPrimary }}>{stat.value}</div>
+                <div className="text-xs" style={{ color: crew.theme.palette.textSecondary }}>{stat.label}</div>
               </div>
             ))}
           </div>
         </div>
 
         {/* Rider control panel */}
-        <div className="rounded-2xl border p-6 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
+        <div className="rounded-2xl border p-4 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
           <h3 className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Пульт райдера</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             {state.shareEnabled ? "Ты сейчас в эфире на карте" : "Геошеринг выключен"}
@@ -589,14 +624,14 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             </Button>
           </div>
         </div>
-        </section>
+              </div>
+              <div className="mt-4">
+                <LeaderboardSection crew={crew} crewSlug={crewSlug} />
+              </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── LEADERBOARD (simplified, loads separately) ── */}
-      <LeaderboardSection crew={crew} crewSlug={crewSlug} />
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
       {state.isLoading ? <MapRidersSkeleton /> : null}
       <StatusOverlay />
       <RiderFAB />
