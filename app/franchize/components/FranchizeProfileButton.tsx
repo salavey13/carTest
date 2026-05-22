@@ -46,7 +46,11 @@ const NOTIFICATION_OPTIONS: Array<{ key: keyof FranchizeNotificationPreferences;
 ];
 
 function normalizeSlug(slug: string | undefined): string {
-  return (slug || "vip-bike").trim().toLowerCase() || "vip-bike";
+  // FIX: Also handle empty-string slugs — previously "" || "vip-bike" worked
+  // but trim().toLowerCase() on an empty string returns "", then the || fallback
+  // catches it. However, we should also guard against whitespace-only slugs.
+  const normalized = (slug || "").trim().toLowerCase();
+  return normalized || "vip-bike";
 }
 
 interface FranchizeProfileButtonProps {
@@ -63,9 +67,13 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = useIsAdmin();
   const scopeSlug = normalizeSlug(currentSlug || userCrewInfo?.slug);
-  const franchizeAdminHref = `/franchize/${scopeSlug}/admin`;
-  const franchizeDashboardHref = `/franchize/${scopeSlug}/dashboard`;
-  const franchizeProfileHref = `/franchize/${scopeSlug}/profile`;
+  // FIX: If currentSlug was explicitly provided (from CrewHeader), prefer it over
+  // the fallback "vip-bike". This prevents navigating to /franchize/vip-bike/profile
+  // when the user is on /franchize/sly13 and the slug is somehow empty.
+  const effectiveSlug = currentSlug?.trim() ? currentSlug.trim().toLowerCase() : scopeSlug;
+  const franchizeAdminHref = `/franchize/${effectiveSlug}/admin`;
+  const franchizeDashboardHref = `/franchize/${effectiveSlug}/dashboard`;
+  const franchizeProfileHref = `/franchize/${effectiveSlug}/profile`;
 
   // ── Avatar loading state machine ──
   //   loading → (onLoad) → dissolving → (animationEnd) → revealed
