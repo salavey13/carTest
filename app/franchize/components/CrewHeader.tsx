@@ -87,7 +87,12 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
 
   const visibleRailLinks = useMemo(() => {
     if (pathname === mainCatalogPath && catalogLinks.length > 0) {
-      return catalogLinks.map((label) => ({ label, href: `#${toCategoryId(label)}`, active: activeCategory === label, categoryLabel: label }));
+      return catalogLinks.map((label) => ({
+        label,
+        href: `${mainCatalogPath}#${toCategoryId(label)}`,
+        active: activeCategory === label,
+        categoryLabel: label,
+      }));
     }
 
     if (pathname !== mainCatalogPath && sectionLinks.length > 0) {
@@ -398,17 +403,25 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                   data-category-pill={link.categoryLabel}
                   aria-current={isActive ? "location" : undefined}
                   aria-label={`Перейти к разделу ${link.label}`}
-                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-3 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] no-underline transition-all duration-300 pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-3 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] !no-underline transition-all duration-300 pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
                     ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
                     ["--pill-text" as string]: isActive ? activePillText : crew.theme.palette.textPrimary,
                     transform: isActive ? "translateY(0) scale(1.02)" : "translateY(0)",
                     textDecoration: "none",
                   }}
-                  onClick={() => {
-                    // FIX: Immediately set active category on click so pill selection updates
-                    // even when IntersectionObserver hasn't fired yet (e.g., section already in view)
+                  onClick={(event) => {
                     setActiveCategory(link.categoryLabel);
+                    if (link.href.includes("#")) {
+                      const hash = link.href.split("#")[1];
+                      if (hash) {
+                        const target = document.getElementById(hash);
+                        if (target) {
+                          event.preventDefault();
+                          target.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }
+                      }
+                    }
                   }}
                 >
                   {link.label}

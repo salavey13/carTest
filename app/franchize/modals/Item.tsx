@@ -304,8 +304,8 @@ export function ItemModal({
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-            style={{ right: "max(0.75rem, calc(env(safe-area-inset-right, 0px) + 2.75rem))" }}
+            className="absolute top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+            style={{ right: "max(0.5rem, calc(env(safe-area-inset-right, 0px) + 3.5rem))" }}
             aria-label="Закрыть"
           >
             <X className="h-4 w-4" />
