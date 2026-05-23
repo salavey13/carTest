@@ -15,7 +15,6 @@ import BottomNavigation from "@/components/layout/BottomNavigation";
 import BikeHeader from "@/components/BikeHeader";
 import BikeFooter from "@/components/BikeFooter";
 import BottomNavigationBike from "@/components/layout/BottomNavigationBike";
-import FranchizeMapBottomNav from "@/components/layout/FranchizeMapBottomNav";
 
 // --- Theme: Sauna ---
 import SaunaHeader from "@/components/SaunaHeader";
@@ -30,6 +29,9 @@ import Bio30Footer from "@/app/bio30/components/Footer";
 import StrikeballHeader from "@/app/strikeball/components/StrikeballHeader";
 import StrikeballBottomNav from "@/app/strikeball/components/StrikeballBottomNav";
 import { StrikeballBackground } from "@/app/strikeball/components/StrikeballBackground";
+
+// --- Theme: Franchize ---
+import FranchizeMapBottomNav from "@/components/layout/FranchizeMapBottomNav";
 
 import StickyChatButton from "@/components/StickyChatButton";
 import { AppProvider, useAppContext, useStrikeballLobbyContext } from "@/contexts/AppContext";
@@ -52,13 +54,16 @@ import { cn } from "@/lib/utils";
 import { useStartParamRouter } from "@/hooks/useStartParamRouter";
 
 // --- THEME ENGINE ---
+// Franchize routes are their own product: CrewHeader + CrewFooter + optional
+// FranchizeMapBottomNav. They must NOT inherit the legacy BikeHeader/BikeFooter
+// or BottomNavigationBike — those belong to the global bike platform.
 const THEME_CONFIG = {
   strikeball: {
     paths: ["/strikeball"],
     Header: StrikeballHeader,
-    Footer: null, // No footer for immersive view
-    BottomNav: StrikeballBottomNav, // Custom tactical nav
-    isTransparent: true, // Allows background component to be visible
+    Footer: null,
+    BottomNav: StrikeballBottomNav,
+    isTransparent: true,
   },
   bike: {
     paths: ["/rent/", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals"],
@@ -81,16 +86,26 @@ const THEME_CONFIG = {
     BottomNav: null,
     isTransparent: false,
   },
+  franchize: {
+    paths: ["/franchize/"],
+    Header: null,           // Franchize pages render their own CrewHeader
+    Footer: null,           // Franchize pages render their own CrewFooter
+    BottomNav: null,        // Handled separately via FranchizeMapBottomNav (map-riders & leaderboard)
+    isTransparent: false,
+  },
   default: {
     paths: [],
     Header: Header,
     Footer: Footer,
-    BottomNav: BottomNavigationBike, // Default fallback
+    BottomNav: BottomNavigation,
     isTransparent: false,
   },
 };
 
 const getThemeForPath = (pathname: string) => {
+  if (pathname.startsWith("/franchize/")) {
+    return THEME_CONFIG.franchize;
+  }
   if (THEME_CONFIG.strikeball.paths.some((p) => pathname.startsWith(p))) {
     return THEME_CONFIG.strikeball;
   }
@@ -105,6 +120,9 @@ const getThemeForPath = (pathname: string) => {
   }
   return THEME_CONFIG.default;
 };
+
+// FranchizeMapBottomNav shows on map-riders routes (and sub-routes like /leaderboard)
+const FRANCHIZE_MAP_BOTTOM_NAV_RE = /^\/franchize\/[^/]+\/(map-riders|leaderboard)(?:\/.*)?$/;
 
 /**
  * AppInitializers
@@ -122,14 +140,6 @@ function AppInitializers() {
     const scrollAchievementUnlockedRef = useRef(false);
 
     // ─── Telegram BackButton management ────────────────────────────
-    // This hook handles:
-    // - Showing/hiding the native Telegram BackButton based on navigation state
-    // - Handling BackButton clicks to navigate in-app
-    //
-    // NOTE: This hook does NOT use `tg` from React context at all.
-    // It reads `window.Telegram.WebApp` directly to avoid timing issues
-    // with async auth validation (which was the root cause of the
-    // BackButton not appearing on first navigation).
     useTelegramBackButton();
 
     useFocusTimeTracker({
@@ -139,7 +149,7 @@ function AppInitializers() {
     });
 
     const handleScrollForAchievement = useCallback(async () => {
-        if (
+      if (
         window.scrollY > 1000 &&
         isAuthenticated &&
         dbUser?.user_id &&
@@ -228,7 +238,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const {
     startParamPayload,
   } = useAppContext();
-  const { activeLobby } = useStrikeballLobbyContext(); // GHOST-VIS: Global Active Combat State
+  const { activeLobby } = useStrikeballLobbyContext();
   
   const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
   const theme = useMemo(() => getThemeForPath(pathname), [pathname]);
@@ -238,15 +248,16 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
 
   // --- GHOST-VIS PREDICTIVE LOGIC ---
   const isStrikeballTheme = theme === THEME_CONFIG.strikeball;
-  // Activate Tactical Blackout if:
-  // 1. We are in the Strikeball module AND
-  // 2. A game is confirmed active OR we are currently parsing a lobby joining link
   const isTacticalMode = isStrikeballTheme && (!!activeLobby || startParamPayload?.startsWith('lobby_'));
+
+  // --- Franchize-specific bottom nav ---
+  const isFranchizeMapBottomNavRoute = FRANCHIZE_MAP_BOTTOM_NAV_RE.test(pathname || "");
 
   useBio30ThemeFix();
   useThemeSync(); 
   useStartParamRouter();
 
+  // These paths show the legacy bottom nav (NOT franchize — franchize handles its own)
   const pathsToShowBottomNavForStartsWith = [
     "/selfdev/gamified",
     "/p-plan",
@@ -261,13 +272,13 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/admin",
     "/paddock",
     "/rentals",
-    //"/vipbikerental",
-    "/strikeball", 
+    "/strikeball",
   ];
-  const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
-    pathname?.startsWith(p)
-  );
-  const showFranchizeMapBottomNav = /^\/franchize\/[^/]+\/map-riders(?:\/.*)?$/.test(pathname || "");
+  // NOTE: /franchize/ is NOT here. Franchize pages use CrewHeader for
+  // navigation and optionally FranchizeMapBottomNav on map-riders routes.
+
+  const showBottomNav =
+    pathsToShowBottomNavForStartsWith.some((p) => pathname?.startsWith(p));
 
   useEffect(() => {
     setShowHeaderAndFooter(
@@ -303,19 +314,21 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       */}
       {isStrikeballTheme && !isTacticalMode && <StrikeballBackground />}
 
-      {showHeaderAndFooter && !pathname?.startsWith("/franchize") && CurrentHeader && <CurrentHeader />}
+      {showHeaderAndFooter && CurrentHeader && <CurrentHeader />}
       
       <main className={cn(
         "flex-1", 
-        showBottomNav || showFranchizeMapBottomNav ? "pb-20 sm:pb-0" : "", 
-        // GHOST-VIS: Apply hard high-contrast blackout style during active operations
+        showBottomNav || isFranchizeMapBottomNavRoute ? "pb-20 sm:pb-0" : "", 
         isTacticalMode ? "bg-[#000000] text-white selection:bg-red-900" : (!isTransparentPage && "bg-background")
       )}>
         {children}
       </main>
       
+      {/* Legacy theme bottom navs (bike, sauna, strikeball) */}
       {(showBottomNav || isStrikeballTheme) && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
-      {showFranchizeMapBottomNav && <FranchizeMapBottomNav pathname={pathname} />}
+
+      {/* Franchize-scoped bottom nav — only on map-riders / leaderboard routes */}
+      {isFranchizeMapBottomNavRoute && <FranchizeMapBottomNav pathname={pathname || ""} />}
       
       <Suspense fallback={null}>
         <StickyChatButton />
