@@ -1,23 +1,23 @@
 -- ============================================================================
--- СварПрофи-НН Seed Products (golden demo — from real project photos)
+-- СварПрофи-НН Seed Products (golden demo — 2 items)
 -- ============================================================================
--- Inserts 4 metal structure products into public.cars table
+-- Inserts 2 metal structure products into public.cars table
 -- All products use type = 'metal_stuff' and crew_id of СварПрофи-НН
 --
 -- POLICY: unverified parameters are left NULL, not hallucinated.
 -- Prices, exact dimensions, weights, and specs will be filled
 -- when verified data is provided by the franchise owner.
 --
--- IMAGE CONVENTION:
+-- IMAGE CONVENTION (gold standard):
 --   Bucket: svarprofi
 --   Product images: {bucket}/{product-slug}/image_N.jpg
 --   image_1.jpg = main image (dedicated image_url + first in gallery)
 --   image_2.jpg, image_3.jpg = additional gallery images
+--   gallery[0] MUST equal image_url
 --
 -- PHOTO SOURCES (user-uploaded):
 --   IMG_20260523_225516_671.jpg → orange truss installation → karkas-prom/image_1
 --   IMG_20260523_225516_763.jpg → steel framework + blue sky → karkas-prom/image_2
---   IMG_20260523_225520_302.jpg → polycarbonate roof frame → naves-polykarb/image_1
 --   IMG_20260523_225520_343.jpg → workshop interior + mezzanine → karkas-prom/image_3
 --   IMG_20260523_225520_446.jpg → space truss + crane runway → karkas-kran/image_1
 -- ============================================================================
@@ -72,7 +72,6 @@ insert into public.cars (
     'price_rub', NULL,
     'price_per_sqm_rub', NULL,
     'sale_price', NULL,
-    'sale', false,
     'production_days', NULL,
     'delivery_available', true,
     'delivery_region', 'Нижний Новгород, НО, ЦФО',
@@ -111,92 +110,7 @@ set make = excluded.make,
     quantity = excluded.quantity;
 
 -- ============================================================================
--- 2. Навес из поликарбоната на металлическом каркасе
---    (Polycarbonate Canopy on Steel Frame)
---    Source photo: steel frame with translucent polycarbonate roof
--- ============================================================================
-insert into public.cars (
-  id, make, model, description, embedding, daily_price, image_url, rent_link,
-  is_test_result, specs, owner_id, type, crew_id, availability_rules, quantity
-) values (
-  'b1c2d3e4-f5a6-7b8c-9d0e-naves0000001'::uuid,
-  'СварПрофи-НН',
-  'Навес поликарбонатный',
-  'Навес из сотового поликарбоната на металлическом каркасе. Стойки и обвязка из квадратной трубы. Кровля — поликарбонат с интегрированными световыми панелями. Подходит для автостоянок, террас, входных групп, складских площадок. На фото — каркас с поликарбонатной кровлей крупного пролёта.',
-  NULL,
-  '0',
-  'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/naves-polykarb/image_1.jpg',
-  '/order?product=naves-polykarb',
-  false,
-  jsonb_build_object(
-    'sale', false,
-    'type', 'Навес',
-    'subtype', 'Поликарбонатный',
-    'year', NULL,
-    'manufacturer', 'СварПрофи-НН',
-    'model', 'Навес поликарбонатный',
-    'sku', NULL,
-    'length_mm', NULL,
-    'width_mm', NULL,
-    'height_mm', NULL,
-    'wall_thickness_mm', NULL,
-    'span_mm', NULL,
-    'step_mm', NULL,
-    'steel_grade', NULL,
-    'profile_type', 'Квадратная труба',
-    'coating_type', NULL,
-    'coating_color_ral', NULL,
-    'strength_class', NULL,
-    'gost', NULL,
-    'weight_kg', NULL,
-    'weight_per_sqm_kg', NULL,
-    'weld_type', 'МАГ',
-    'anticorrosion', NULL,
-    'certification', NULL,
-    'drawing_available', NULL,
-    'assembly_type', 'Комбинированная',
-    'price_rub', NULL,
-    'price_per_sqm_rub', NULL,
-    'sale_price', NULL,
-    'sale', false,
-    'production_days', NULL,
-    'delivery_available', true,
-    'delivery_region', 'Нижний Новгород, НО',
-    'installation_available', true,
-    'installation_days', NULL,
-    'rating', NULL,
-    'sold_count', NULL,
-    'recommend_percent', NULL,
-    'features', jsonb_build_array(
-      'Каркас из квадратной трубы',
-      'Кровля — сотовый поликарбонат',
-      'Интегрированные световые панели',
-      'Крупный пролёт'
-    ),
-    'gallery', jsonb_build_array(
-      'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/naves-polykarb/image_1.jpg'
-    ),
-    'buy_options', NULL,
-    'buy_colors', NULL
-  ),
-  '100000001',
-  'metal_stuff',
-  'a1b2c3d4-e5f6-7a8b-9c0d-svarprofi01'::uuid,
-  '{}'::jsonb,
-  '1'
-)
-on conflict (id) do update
-set make = excluded.make,
-    model = excluded.model,
-    description = excluded.description,
-    image_url = excluded.image_url,
-    specs = excluded.specs,
-    type = excluded.type,
-    crew_id = excluded.crew_id,
-    quantity = excluded.quantity;
-
--- ============================================================================
--- 3. Каркас с кран-балкой (пространственная ферма)
+-- 2. Каркас с кран-балкой (пространственная ферма)
 --    (Space Truss Framework with Overhead Crane Runway)
 --    Source photo: large space truss with yellow crane-support columns
 -- ============================================================================
@@ -243,7 +157,6 @@ insert into public.cars (
     'price_rub', NULL,
     'price_per_sqm_rub', NULL,
     'sale_price', NULL,
-    'sale', false,
     'production_days', NULL,
     'delivery_available', true,
     'delivery_region', 'Нижний Новгород, НО, ЦФО',
@@ -267,90 +180,6 @@ insert into public.cars (
       jsonb_build_object('name', 'Серый (фермы)', 'ral', 'RAL 7035', 'swatch', '#C6C8CC'),
       jsonb_build_object('name', 'Жёлтый (колонны)', 'ral', 'RAL 1023', 'swatch', '#F0CA00')
     )
-  ),
-  '100000001',
-  'metal_stuff',
-  'a1b2c3d4-e5f6-7a8b-9c0d-svarprofi01'::uuid,
-  '{}'::jsonb,
-  '1'
-)
-on conflict (id) do update
-set make = excluded.make,
-    model = excluded.model,
-    description = excluded.description,
-    image_url = excluded.image_url,
-    specs = excluded.specs,
-    type = excluded.type,
-    crew_id = excluded.crew_id,
-    quantity = excluded.quantity;
-
--- ============================================================================
--- 4. Межэтажная площадка с лестницей
---    (Mezzanine Platform with Staircase)
---    Source photo: workshop interior showing stacked beams, mezzanine, staircase
--- ============================================================================
-insert into public.cars (
-  id, make, model, description, embedding, daily_price, image_url, rent_link,
-  is_test_result, specs, owner_id, type, crew_id, availability_rules, quantity
-) values (
-  'b1c2d3e4-f5a6-7b8c-9d0e-lestnit000001'::uuid,
-  'СварПрофи-НН',
-  'Площадка с лестницей',
-  'Металлическая межэтажная площадка с маршевой лестницей и ограждением. Косоуры из швеллера, ступени из рифлёного листа. Ограждение из круглой трубы. Подходит для промышленных зданий, складов, цехов с кран-балками. На фото — установленная площадка с лестницей в производственном цехе.',
-  NULL,
-  '0',
-  'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/lm-01/image_1.jpg',
-  '/order?product=mezzanine-staircase',
-  false,
-  jsonb_build_object(
-    'sale', false,
-    'type', 'Лестница',
-    'subtype', 'Маршевая с площадкой',
-    'year', NULL,
-    'manufacturer', 'СварПрофи-НН',
-    'model', 'Площадка с лестницей',
-    'sku', NULL,
-    'length_mm', NULL,
-    'width_mm', NULL,
-    'height_mm', NULL,
-    'wall_thickness_mm', NULL,
-    'span_mm', NULL,
-    'steel_grade', NULL,
-    'profile_type', 'Швеллер',
-    'coating_type', NULL,
-    'coating_color_ral', NULL,
-    'strength_class', NULL,
-    'gost', NULL,
-    'weight_kg', NULL,
-    'weight_per_meter_kg', NULL,
-    'weld_type', 'МАГ',
-    'anticorrosion', NULL,
-    'certification', NULL,
-    'drawing_available', NULL,
-    'assembly_type', 'Сварная',
-    'price_rub', NULL,
-    'price_per_meter_rub', NULL,
-    'sale_price', NULL,
-    'sale', false,
-    'production_days', NULL,
-    'delivery_available', true,
-    'delivery_region', 'Нижний Новгород, НО',
-    'installation_available', true,
-    'installation_days', NULL,
-    'rating', NULL,
-    'sold_count', NULL,
-    'recommend_percent', NULL,
-    'features', jsonb_build_array(
-      'Косоуры из швеллера',
-      'Ступени из рифлёного листа',
-      'Ограждение из круглой трубы',
-      'Межэтажная площадка'
-    ),
-    'gallery', jsonb_build_array(
-      'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/lm-01/image_1.jpg'
-    ),
-    'buy_options', NULL,
-    'buy_colors', NULL
   ),
   '100000001',
   'metal_stuff',
