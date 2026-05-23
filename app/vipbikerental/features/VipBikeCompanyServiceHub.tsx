@@ -2,6 +2,9 @@
  * VipBikeCompanyServiceHub.tsx
  * =============================
  * Company hub section — services, info, and community entry points.
+ *
+ * FIX: Tailwind v4 grid arbitrary value — comma replaced with underscore.
+ * lg:grid-cols-[0.9fr,1.1fr] → lg:grid-cols-[0.9fr_1.1fr]
  */
 "use client";
 
@@ -24,7 +27,7 @@ const companyFacts = [
 export function VipBikeCompanyServiceHub() {
   return (
     <section className="overflow-hidden rounded-[2rem] border border-primary/20 bg-card/50 p-5 shadow-2xl shadow-primary/10 sm:p-7">
-      <div className="grid gap-6 lg:grid-cols-[0.9fr,1.1fr]">
+      <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-3xl border border-white/10 bg-black/35 p-5 text-white">
           <p className="text-xs uppercase tracking-[0.24em] text-primary">company hub</p>
           <h2 className="mt-3 font-orbitron text-3xl sm:text-4xl">VIP BIKE — не только прокат, а база райдера</h2>
