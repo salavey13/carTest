@@ -12,7 +12,7 @@
  *   - Community users see map/social flow
  *   - Renters see availability/scheduling flow
  *
- * FIVE INNOVATIONS vs v1:
+ * SIX INNOVATIONS vs v1:
  *
  *   1. SECTION CAPABILITIES: Sections self-describe what they help with.
  *      Instead of hardcoding "if beginner -> gearSection early", sections
@@ -27,6 +27,7 @@
  *   3. COMBINE PRESETS: Instead of a single if/else chain that grows
  *      into 1500 lines, the resolver composes multiple small presets
  *      and merges them. This prevents resolver entropy.
+ *      NOW ACTUALLY USED in the resolution path.
  *
  *   4. ANTI-THRASHING: Behavioral signals change rapidly (view electro,
  *      view retro, view map, view electro). Without stabilization,
@@ -36,6 +37,11 @@
  *   5. RESOLVER VERSIONING: Every resolver output includes its version
  *      for observability. NOT used for logic — always runs latest code.
  *      Used for: analytics, A/B testing, debugging.
+ *
+ *   6. NO HARDCODED RULES: All section ordering is driven by
+ *      SECTION_CAPABILITIES scoring + preset composition.
+ *      No imperative splice/filter in resolveSectionPriority.
+ *      Visibility rules (hideIfNotSurveyed) are declarative.
  *
  * MODULAR ARCHITECTURE:
  *   resolveVipBikeExperience(profile)
@@ -49,6 +55,7 @@
  *
  * CRITICAL: This function is PURE. No side effects, no I/O.
  * It should be called inside useMemo in the component.
+ * Experience lock writeback is the COMPONENT's responsibility.
  */
 
 import type {
@@ -56,6 +63,7 @@ import type {
   VipBikeExperienceConfig,
   VipBikeSegment,
   VipBikeIntent,
+  VipBikeExperience,
   HeroDisplayMode,
   SectionId,
   SectionCapabilities,
@@ -76,8 +84,7 @@ import type {
  *   - A/B testing: enable new resolver for a subset, compare conversion
  *
  * When you change section ordering logic, preset definitions, or CTA resolution,
- * bump this version. The version is included in the experience config so
- * downstream systems (analytics, logging) can attribute UX decisions.
+ * bump this version.
  */
 export const EXPERIENCE_RESOLVER_VERSION = "exp-v1" as const;
 
@@ -97,12 +104,16 @@ export const SECTION_CAPABILITIES: Record<SectionId, SectionCapabilities> = {
   hero: {
     relevantSegments: [],
     relevantIntents: [],
+    complexity: "low",
+    emotionalTone: "energetic",
     tags: ["universal", "entry"],
     weight: 100, // Always first
   },
   bikeShowcase: {
     relevantSegments: ["sport", "touring"],
     relevantIntents: ["explore", "rent"],
+    complexity: "medium",
+    emotionalTone: "energetic",
     tags: ["discovery", "catalog"],
     weight: 60,
   },
@@ -110,60 +121,83 @@ export const SECTION_CAPABILITIES: Record<SectionId, SectionCapabilities> = {
     relevantSegments: [],
     relevantIntents: ["buy", "rent"],
     relevantExperience: ["beginner"],
+    complexity: "low",
+    emotionalTone: "playful",
     tags: ["decision", "funnel"],
     weight: 80,
   },
   electroShowcase: {
     relevantSegments: ["electro"],
     relevantIntents: ["explore", "buy"],
+    complexity: "medium",
+    emotionalTone: "premium",
     tags: ["electro", "featured", "catalog"],
     weight: 85,
   },
   mapPreview: {
     relevantSegments: ["mixed", "urban"],
     relevantIntents: ["community"],
+    complexity: "low",
+    emotionalTone: "playful",
     tags: ["social", "map", "live"],
     weight: 75,
   },
   gearSection: {
     relevantExperience: ["beginner"],
+    complexity: "low",
+    emotionalTone: "calm",
     tags: ["safety", "equipment", "beginner"],
     weight: 50,
   },
   stepsProgress: {
     relevantExperience: ["beginner"],
     relevantIntents: ["rent"],
+    complexity: "low",
+    emotionalTone: "calm",
     tags: ["onboarding", "steps", "beginner"],
     weight: 40,
   },
   rentalQuickActions: {
     relevantIntents: ["rent"],
     relevantExperience: ["intermediate", "advanced"],
+    complexity: "low",
+    emotionalTone: "energetic",
     tags: ["rental", "quick-action", "availability"],
     weight: 70,
   },
   companyServiceHub: {
+    complexity: "medium",
+    emotionalTone: "informational",
     tags: ["info", "services"],
     weight: 30,
   },
   serviceCards: {
     relevantIntents: ["buy", "rent"],
+    complexity: "medium",
+    emotionalTone: "informational",
     tags: ["pricing", "requirements", "trust"],
     weight: 45,
   },
   howItWorks: {
     relevantExperience: ["beginner"],
     relevantIntents: ["rent", "buy"],
+    complexity: "low",
+    emotionalTone: "calm",
     tags: ["process", "steps"],
     weight: 35,
   },
   investSection: {
     relevantIntents: ["buy"],
     relevantExperience: ["advanced"],
+    complexity: "high",
+    emotionalTone: "premium",
+    hideIfNotSurveyed: true,
     tags: ["invest", "premium", "monetization"],
     weight: 25,
   },
   faq: {
+    complexity: "low",
+    emotionalTone: "informational",
     tags: ["info", "support"],
     weight: 20,
   },
@@ -301,6 +335,46 @@ const PRESETS: ExperiencePreset[] = [
     },
   },
   {
+    name: "urbanCommuter",
+    segment: "urban",
+    intent: "rent",
+    heroMode: "rent",
+    sectionOrder: [
+      "hero", "rentalQuickActions", "bikeShowcase", "conversionPilot",
+      "mapPreview", "electroShowcase", "serviceCards", "gearSection",
+      "stepsProgress", "howItWorks", "companyServiceHub", "investSection", "faq",
+    ],
+    featuredSections: ["rentalQuickActions", "mapPreview"],
+    featuredCategory: "all",
+    copyTone: "friendly",
+    primaryCTA: {
+      label: "Выбрать аренду",
+      href: "/franchize/vip-bike",
+      isExternal: false,
+      variant: "accent",
+    },
+  },
+  {
+    name: "touringExplorer",
+    segment: "touring",
+    intent: "explore",
+    heroMode: "rent",
+    sectionOrder: [
+      "hero", "bikeShowcase", "mapPreview", "electroShowcase", "conversionPilot",
+      "serviceCards", "gearSection", "rentalQuickActions", "howItWorks",
+      "stepsProgress", "companyServiceHub", "investSection", "faq",
+    ],
+    featuredSections: ["bikeShowcase", "mapPreview"],
+    featuredCategory: "all",
+    copyTone: "premium",
+    primaryCTA: {
+      label: "Смотреть подборку",
+      href: "/franchize/vip-bike",
+      isExternal: false,
+      variant: "outline",
+    },
+  },
+  {
     name: "universal",
     segment: "mixed",
     intent: "explore",
@@ -323,7 +397,7 @@ const PRESETS: ExperiencePreset[] = [
 ];
 
 // ─────────────────────────────────────────────────────
-// 3. Preset composition
+// 3. Preset composition (ACTUALLY USED in resolution)
 // ─────────────────────────────────────────────────────
 
 /**
@@ -405,6 +479,32 @@ function findBestPreset(profile: VipBikeUserProfile): ExperiencePreset {
   return PRESETS.find((p) => p.name === "universal")!;
 }
 
+/**
+ * Finds supplementary presets to compose with the primary preset.
+ * This is where combinePresets actually gets used.
+ *
+ * Rules:
+ *   - Beginner experience → compose with safeBeginner (promotes gearSection, stepsProgress)
+ *   - Low confidence → compose with universal (ensures all sections present)
+ *   - Only one supplementary preset composed at a time to avoid over-complexity
+ */
+function findSupplementaryPreset(profile: VipBikeUserProfile): ExperiencePreset | null {
+  // Beginners always get the safe beginner composition
+  if (profile.experience === "beginner" && profile.onboardingCompleted) {
+    const beginner = PRESETS.find((p) => p.name === "safeBeginner")!;
+    // Don't compose safeBeginner with itself
+    if (findBestPreset(profile).name === "safeBeginner") return null;
+    return beginner;
+  }
+
+  // Low confidence users get universal composition to avoid missing sections
+  if (profile.confidence < 0.5 && profile.confidence >= 0.3) {
+    return PRESETS.find((p) => p.name === "universal")!;
+  }
+
+  return null;
+}
+
 // ─────────────────────────────────────────────────────
 // 5. Modular resolvers — each independently testable
 // ─────────────────────────────────────────────────────
@@ -426,7 +526,7 @@ export function resolveHero(profile: VipBikeUserProfile): HeroDisplayMode {
   if (profile.intent === "buy") return "buy";
   if (profile.intent === "community") return "map";
 
-  // Segment-specific hero for explore intent
+  // Segment-specific hero for explore/rent intent
   if (profile.segment === "electro") return "electro-enduro";
 
   // Default
@@ -438,55 +538,54 @@ export function resolveHero(profile: VipBikeUserProfile): HeroDisplayMode {
  * This is the scoring engine — sections self-describe capabilities,
  * and this function ranks them against the profile.
  *
- * Separated from the main resolver for:
- *   - Independent testing
- *   - Experimentation with different scoring algorithms
- *   - AI-driven ranking later (swap this function, nothing else changes)
+ * NO HARDCODED RULES: All ordering is driven by:
+ *   1. Preset composition (combinePresets with primary + supplementary)
+ *   2. Capability scoring (scoreSection)
+ *   3. Declarative visibility (hideIfNotSurveyed)
+ *
+ * No imperative splice/filter for specific sections.
  */
 export function resolveSectionPriority(profile: VipBikeUserProfile): SectionId[] {
-  // Low confidence → universal order
+  // Low confidence → universal order (no personalization)
   if (profile.confidence < 0.3) {
-    return PRESETS.find((p) => p.name === "universal")!.sectionOrder;
+    const universal = PRESETS.find((p) => p.name === "universal")!;
+    return applyVisibilityRules(universal.sectionOrder, profile);
   }
 
-  // Find best preset and refine with capability scoring
-  const preset = findBestPreset(profile);
-  let sectionOrder = refineSectionOrder(preset.sectionOrder, profile);
+  // Find primary preset and optional supplementary preset
+  const primaryPreset = findBestPreset(profile);
+  const supplementaryPreset = findSupplementaryPreset(profile);
 
-  // ── Special rules (these would become preset compositions later) ──
+  // Compose presets — THIS IS WHERE combinePresets IS ACTUALLY USED
+  let sectionOrder = supplementaryPreset
+    ? combinePresets([primaryPreset, supplementaryPreset])
+    : primaryPreset.sectionOrder;
 
-  // Electro segment: ALWAYS show electro showcase early
-  if (profile.segment === "electro") {
-    const electroIndex = sectionOrder.indexOf("electroShowcase");
-    if (electroIndex > 1) {
-      sectionOrder = [
-        sectionOrder[0], // hero
-        "electroShowcase",
-        ...sectionOrder.slice(1, electroIndex),
-        ...sectionOrder.slice(electroIndex + 1),
-      ];
-    }
-  }
+  // Refine with capability scoring
+  sectionOrder = refineSectionOrder(sectionOrder, profile);
 
-  // Beginners: ensure gearSection is prominent
-  if (profile.experience === "beginner" && profile.onboardingCompleted) {
-    const gearIndex = sectionOrder.indexOf("gearSection");
-    if (gearIndex > 4) {
-      sectionOrder = [
-        ...sectionOrder.slice(0, 4),
-        "gearSection",
-        ...sectionOrder.slice(4, gearIndex),
-        ...sectionOrder.slice(gearIndex + 1),
-      ];
-    }
-  }
-
-  // Non-surveyed users: hide invest section
-  if (!profile.onboardingCompleted) {
-    sectionOrder = sectionOrder.filter((s) => s !== "investSection");
-  }
+  // Apply declarative visibility rules
+  sectionOrder = applyVisibilityRules(sectionOrder, profile);
 
   return sectionOrder;
+}
+
+/**
+ * Applies declarative visibility rules from SECTION_CAPABILITIES.
+ * Replaces the old imperative "if (!profile.onboardingCompleted) filter(investSection)".
+ */
+function applyVisibilityRules(sectionOrder: SectionId[], profile: VipBikeUserProfile): SectionId[] {
+  return sectionOrder.filter((id) => {
+    const caps = SECTION_CAPABILITIES[id];
+    if (!caps) return true;
+
+    // Hide sections marked as requiring survey completion
+    if (caps.hideIfNotSurveyed && !profile.onboardingCompleted) {
+      return false;
+    }
+
+    return true;
+  });
 }
 
 /**
@@ -494,7 +593,7 @@ export function resolveSectionPriority(profile: VipBikeUserProfile): SectionId[]
  * "Intent routing, not theme routing" — the CTA drives BEHAVIOR.
  *
  * Behavioral signals can override survey-derived CTA:
- *   - If user has 5+ buy clicks but survey says "rent" → show buy CTA
+ *   - If user has 3+ recent buy clicks but survey says "rent" → show buy CTA
  *
  * Separated from the main resolver for:
  *   - Independent testing
@@ -553,6 +652,15 @@ export function resolveCTA(profile: VipBikeUserProfile): PrimaryCTA {
  * the specific profile (not just segment/intent, but also
  * experience level and behavioral signals).
  *
+ * Scoring breakdown:
+ *   Base: caps.weight (20-100)
+ *   + Segment match: +20
+ *   + Intent match: +25
+ *   + Experience match: +15
+ *   + Complexity penalty for beginners: -10 for "high" complexity
+ *   + Behavioral reinforcement: +10-15
+ *   + Emotional tone match: +5
+ *
  * FUTURE: This is where AI-driven ranking plugs in.
  * Replace this scoring function with an ML model,
  * and nothing else in the architecture changes.
@@ -581,6 +689,17 @@ function scoreSection(
     score += 15;
   }
 
+  // Complexity penalty for beginners — they don't want high-complexity sections
+  if (profile.experience === "beginner" && caps.complexity === "high") {
+    score -= 10;
+  }
+
+  // Emotional tone match bonus
+  const preferredTone = derivePreferredTone(profile);
+  if (caps.emotionalTone === preferredTone) {
+    score += 5;
+  }
+
   // Behavioral reinforcement bonus
   if (profile.behaviorSignals) {
     const b = profile.behaviorSignals;
@@ -590,6 +709,18 @@ function scoreSection(
   }
 
   return score;
+}
+
+/**
+ * Derives the preferred emotional tone from the profile.
+ * Used to match section emotionalTone against user preferences.
+ */
+function derivePreferredTone(profile: VipBikeUserProfile): string {
+  if (profile.segment === "electro" || profile.segment === "retro") return "premium";
+  if (profile.intent === "buy") return "energetic";
+  if (profile.intent === "community") return "playful";
+  if (profile.experience === "beginner") return "calm";
+  return "informational";
 }
 
 /**
@@ -678,6 +809,19 @@ export function resolveFeaturedSections(profile: VipBikeUserProfile): SectionId[
 // ─────────────────────────────────────────────────────
 
 /**
+ * Shape of the experience_lock stored in metadata.
+ * Extracted as a proper interface (replaces the hacky conditional type).
+ * Uses RAW profile signals for stability comparison, not derived preset names.
+ */
+export interface ExperienceLockState {
+  lastChangedAt?: string;
+  lastResolvedSegment?: VipBikeSegment;
+  lastResolvedIntent?: VipBikeIntent;
+  lastResolvedExperience?: VipBikeExperience;
+  stabilityCount?: number;
+}
+
+/**
  * Default anti-thrashing configuration.
  *
  * Problem: Behavioral signals change frequently (view electro, view retro,
@@ -686,48 +830,52 @@ export function resolveFeaturedSections(profile: VipBikeUserProfile): SectionId[
  *
  * Solution: Lock the experience for a minimum duration after it changes.
  * Netflix/Spotify/YouTube all do variants of this.
- *
- * Configuration:
- *   - MINIMUM_DURATION_MS: How long before the experience can change (4 hours)
- *   - STABILITY_THRESHOLD: How many consecutive same-presets before we're "confident"
  */
 const ANTI_THRASHING_DEFAULTS = {
   /** Minimum 4 hours before experience can change */
   MINIMUM_DURATION_MS: 4 * 60 * 60 * 1000,
-  /** 3 consecutive same-presets = stable */
+  /** 3 consecutive same-profiles = stable */
   STABILITY_THRESHOLD: 3,
 } as const;
 
 /**
+ * Checks if the current profile matches the locked profile.
+ * Compares raw profile signals, NOT derived preset names.
+ * This is the fix for M6: no derived state in the lock.
+ */
+function isProfileSameAsLock(
+  profile: VipBikeUserProfile,
+  lock: ExperienceLockState,
+): boolean {
+  return (
+    profile.segment === lock.lastResolvedSegment &&
+    profile.intent === lock.lastResolvedIntent &&
+    profile.experience === lock.lastResolvedExperience
+  );
+}
+
+/**
  * Computes anti-thrashing metadata for an experience config.
- *
- * @param presetName - The preset that was resolved
- * @param experienceLock - The persisted lock state from metadata (if any)
- * @returns Anti-thrashing metadata to include in the experience config
+ * Uses proper type (no hacky conditional type).
+ * Compares raw profile signals for stability detection.
  */
 function computeAntiThrashing(
-  presetName: string,
-  experienceLock?: VipBikeUserProfile["behaviorSignals"] extends any ? {
-    lastChangedAt?: string;
-    lastPresetName?: string;
-    stabilityCount?: number;
-  } : never,
+  profile: VipBikeUserProfile,
+  experienceLock?: ExperienceLockState,
 ): VipBikeExperienceConfig["antiThrashing"] {
   const now = new Date();
-  const lock = experienceLock as {
-    lastChangedAt?: string;
-    lastPresetName?: string;
-    stabilityCount?: number;
-  } | undefined;
+  const lock = experienceLock;
 
-  // Compute stability count
+  // Compute stability by comparing current profile vs locked profile
+  const sameProfile = lock ? isProfileSameAsLock(profile, lock) : false;
   const previousStability = lock?.stabilityCount ?? 0;
-  const samePresetAsBefore = lock?.lastPresetName === presetName;
-  const stabilityCount = samePresetAsBefore ? previousStability + 1 : 1;
+  const stabilityCount = sameProfile ? previousStability + 1 : 1;
 
-  // Check if we should lock (i.e., if the experience just changed)
-  const justChanged = !samePresetAsBefore || !lock?.lastChangedAt;
-  const lastChangedAt = justChanged ? now.toISOString() : lock!.lastChangedAt!;
+  // Check if the experience just changed (profile is different from lock)
+  const justChanged = !sameProfile || !lock?.lastChangedAt;
+  const lastChangedAt = justChanged
+    ? now.toISOString()
+    : lock!.lastChangedAt!;
   const lockedUntil = new Date(
     new Date(lastChangedAt).getTime() + ANTI_THRASHING_DEFAULTS.MINIMUM_DURATION_MS,
   ).toISOString();
@@ -759,6 +907,38 @@ export function isExperienceLocked(
   return now.getTime() < lockedUntil;
 }
 
+/**
+ * Computes the updated experience_lock that should be persisted
+ * to metadata after a new experience is resolved.
+ *
+ * The COMPONENT calls this and persists it. The resolver itself is pure.
+ *
+ * @param profile - The profile that produced this experience
+ * @param experience - The newly resolved experience config
+ * @param previousLock - The previous lock state (if any)
+ * @returns Updated lock state to persist in metadata.experience_lock
+ */
+export function computeExperienceLockUpdate(
+  profile: VipBikeUserProfile,
+  experience: VipBikeExperienceConfig,
+  previousLock?: ExperienceLockState,
+): ExperienceLockState {
+  const sameProfile = previousLock
+    ? isProfileSameAsLock(profile, previousLock)
+    : false;
+  const justChanged = !sameProfile || !previousLock?.lastChangedAt;
+
+  return {
+    lastChangedAt: justChanged
+      ? new Date().toISOString()
+      : previousLock!.lastChangedAt!,
+    lastResolvedSegment: profile.segment,
+    lastResolvedIntent: profile.intent,
+    lastResolvedExperience: profile.experience,
+    stabilityCount: experience.antiThrashing?.stabilityCount ?? 1,
+  };
+}
+
 // ─────────────────────────────────────────────────────
 // PUBLIC API
 // ─────────────────────────────────────────────────────
@@ -782,6 +962,11 @@ export function isExperienceLocked(
  * and keeping the old experience. This resolver always computes
  * the LATEST experience — the lock check happens at the call site.
  *
+ * EXPERIENCE LOCK WRITEBACK: After resolving, the component should
+ * call computeExperienceLockUpdate() and persist the result to
+ * metadata.experience_lock. This resolver is pure and does NOT
+ * write to the database.
+ *
  * @param profile - The resolved user profile (from resolve-profile.ts)
  * @param experienceLock - Persisted lock state from metadata (for anti-thrashing)
  * @returns Complete experience configuration
@@ -794,18 +979,16 @@ export function isExperienceLocked(
  *   if (isExperienceLocked(currentExperience)) {
  *     return currentExperience; // keep old
  *   }
- *   return newExperience;
  *
- *   // In the render:
- *   experience.sectionOrder.map(renderSection)
+ *   // Persist lock update (component responsibility, not resolver's)
+ *   const lockUpdate = computeExperienceLockUpdate(profile, newExperience, dbUser.metadata?.experience_lock);
+ *   await updateUserSettings(userId, { experience_lock: lockUpdate });
+ *
+ *   return newExperience;
  */
 export function resolveVipBikeExperience(
   profile: VipBikeUserProfile,
-  experienceLock?: {
-    lastChangedAt?: string;
-    lastPresetName?: string;
-    stabilityCount?: number;
-  },
+  experienceLock?: ExperienceLockState,
 ): VipBikeExperienceConfig {
   // ── Low confidence: show universal layout ──
   if (profile.confidence < 0.3) {
@@ -813,7 +996,7 @@ export function resolveVipBikeExperience(
     return {
       heroMode: resolveHero(profile),
       primaryCTA: resolveCTA(profile),
-      sectionOrder: universal.sectionOrder,
+      sectionOrder: applyVisibilityRules(universal.sectionOrder, profile),
       featuredSections: [],
       featuredCategory: "all",
       onboardingVariant: "not_surveyed",
@@ -821,7 +1004,7 @@ export function resolveVipBikeExperience(
       showOnboardingCTA: true,
       showPromoChip: !!profile.source?.promoCode,
       presetName: "universal",
-      antiThrashing: computeAntiThrashing("universal", experienceLock),
+      antiThrashing: computeAntiThrashing(profile, experienceLock),
       experienceResolverVersion: EXPERIENCE_RESOLVER_VERSION,
     };
   }
@@ -853,7 +1036,7 @@ export function resolveVipBikeExperience(
     showOnboardingCTA: !profile.onboardingCompleted,
     showPromoChip: !!profile.source?.promoCode,
     presetName: preset.name,
-    antiThrashing: computeAntiThrashing(preset.name, experienceLock),
+    antiThrashing: computeAntiThrashing(profile, experienceLock),
     experienceResolverVersion: EXPERIENCE_RESOLVER_VERSION,
   };
 }

@@ -104,10 +104,13 @@ const handleSurveyCompletion = async (
   //
   // Resolver versions are persisted for OBSERVABILITY only.
   // They do NOT control logic — the client always runs latest code.
+  //
+  // behavior_signals: FULL initialization with all counters at 0.
+  // This ensures a consistent data shape (fix for C3 type lie).
+  // The client resolver uses ?? 0 everywhere, but consistency matters.
   await updateUserSettings(user_id, {
     survey_results: answers,
     onboarding_context: onboardingContext,
-    // Initialize behavior_signals with zero counts
     behavior_signals: {
       viewedElectroCount: 0,
       viewedSportCount: 0,
@@ -115,14 +118,21 @@ const handleSurveyCompletion = async (
       openedMapCount: 0,
       buyIntentClickCount: 0,
       rentIntentClickCount: 0,
+      lastMapInteractionAt: undefined,
+      lastBuyInteractionAt: undefined,
+      lastRentInteractionAt: undefined,
       scannedQrModels: [],
       investSectionViewSeconds: 0,
       lastActiveAt: new Date().toISOString(),
     } satisfies BehaviorSignals,
-    // Initialize experience_lock for anti-thrashing
+    // Initialize experience_lock for anti-thrashing.
+    // Stores RAW profile signals (not derived preset name).
+    // The client updates this after resolving the experience.
     experience_lock: {
       lastChangedAt: new Date().toISOString(),
-      lastPresetName: undefined, // will be set on first client-side experience resolution
+      lastResolvedSegment: profile.segment,
+      lastResolvedIntent: profile.intent,
+      lastResolvedExperience: profile.experience,
       stabilityCount: 0,
     },
   });
@@ -233,13 +243,21 @@ export async function startCommand(chatId: number, userId: number, from_user: an
     earlyMetadata.onboarding_start_payload = parsed.raw;
   }
 
-  // Initialize behavior_signals if they don't exist yet
-  // (so the client resolver has something to work with)
+  // Initialize behavior_signals with consistent shape (fix for C3).
+  // Only set when there's early metadata to persist.
+  // This ensures the client resolver sees a consistent BehaviorSignals shape.
   if (Object.keys(earlyMetadata).length > 0) {
-    // Don't overwrite existing behavior_signals
     earlyMetadata.behavior_signals = {
+      viewedElectroCount: 0,
+      viewedSportCount: 0,
+      viewedRetroCount: 0,
+      openedMapCount: 0,
+      buyIntentClickCount: 0,
+      rentIntentClickCount: 0,
+      scannedQrModels: [],
+      investSectionViewSeconds: 0,
       lastActiveAt: new Date().toISOString(),
-    } satisfies Partial<BehaviorSignals> as BehaviorSignals;
+    } satisfies BehaviorSignals;
 
     const updateResult = await updateUserSettings(userIdStr, earlyMetadata);
     if (!updateResult.success) {
@@ -247,7 +265,14 @@ export async function startCommand(chatId: number, userId: number, from_user: an
     }
   }
 
-  if (parsed.command === "/start" || (parsed.type === "bare" && !parsed.code)) {
+  // ── Route based on parsed payload ──
+  // FIX for C1: Use parsed.command (now properly typed) instead of
+  // non-existent parsed.command from before.
+  // parsed.command === "/start" means user typed /start (with or without payload).
+  // parsed.type === "bare" && !parsed.code means plain /start with no payload.
+  const isPlainStart = parsed.command === "/start" && parsed.type === "bare" && !parsed.code;
+
+  if (isPlainStart) {
     // Reset previous survey state (re-onboarding)
     await supabaseAnon.from("user_survey_state").delete().eq("user_id", userIdStr);
     await supabaseAnon.from("user_surveys").delete().eq("user_id", userIdStr);
@@ -270,7 +295,7 @@ export async function startCommand(chatId: number, userId: number, from_user: an
       keyboardType: question.answers ? "reply" : "remove",
     });
   } else {
-    // Handle Answer
+    // Handle Answer (user is in the middle of a survey)
     const { data: currentState } = await supabaseAnon
       .from("user_survey_state")
       .select("*")
@@ -278,7 +303,9 @@ export async function startCommand(chatId: number, userId: number, from_user: an
       .maybeSingle();
 
     if (!currentState) {
-      if (parsed.command !== "/start") {
+      // No active survey — if user sent text that's not a /start command,
+      // redirect them to /start
+      if (!parsed.command) {
         await sendComplexMessage(
           chatId,
           "Система в режиме ожидания. Нажми /start, чтобы начать заново, или открой меню.",
