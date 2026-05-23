@@ -25,11 +25,9 @@
 --  9.  https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/karkas-prom/image_1.jpg
 -- 10.  https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/karkas-prom/image_2.jpg
 -- 11.  https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/karkas-prom/image_3.jpg
--- 12.  https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/naves-polykarb/image_1.jpg
--- 13.  https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/karkas-kran/image_1.jpg
--- 14.  https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/lm-01/image_1.jpg
+-- 12.  https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/karkas-kran/image_1.jpg
 --
--- TOTAL: 14 images (8 branding/UI + 6 product)
+-- TOTAL: 12 images (8 branding/UI + 4 product)
 -- ============================================================================
 
 begin;
@@ -152,7 +150,6 @@ set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
       { "label": "Заказ", "href": "/order" }
     ],
     "quickActions": [
-      { "label": "Рассчитать стоимость", "href": "/order", "icon": "calculator" },
       { "label": "Позвонить", "href": "tel:+79040600644", "icon": "phone" }
     ]
   },
