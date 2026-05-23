@@ -90,7 +90,7 @@ const THEME_CONFIG = {
     paths: ["/franchize/"],
     Header: null,           // Franchize pages render their own CrewHeader
     Footer: null,           // Franchize pages render their own CrewFooter
-    BottomNav: null,        // Handled separately via FranchizeMapBottomNav (map-riders only)
+    BottomNav: null,        // Handled separately via FranchizeMapBottomNav (map-riders & leaderboard)
     isTransparent: false,
   },
   default: {
@@ -295,7 +295,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname === "/blogger" ||
         pathname?.startsWith("/optimapipe") ||
         pathname?.startsWith("/rules") ||
-        pathname === "/"
+        pathname === "/" ||
+        pathname === "/admin/map-routes"
       )
     );
   }, [pathname]);
