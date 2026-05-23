@@ -3,6 +3,10 @@
  * =========================
  * Quick actions hub with tabs: status, riders, chooser.
  * VIP Bike franchise feature — СварПрофи-НН would have different action hub.
+ *
+ * FIX: Removed unnecessary `as any` type casts on rawSpecs access.
+ * Both CatalogItemVM and ElectroPreviewItem have rawSpecs?: Record<string, unknown>,
+ * so item.rawSpecs?.sale works directly with isEnabled(unknown).
  */
 "use client";
 
@@ -115,7 +119,7 @@ export function RentalQuickActionHub({ items, overview, isCatalogLoading = false
               <div className="grid gap-4 md:grid-cols-3">
                 {chooserItems.map((item) => {
                   const imageUrl = getBikeGallery(item)[0];
-                  const buyHref = item.saleAvailable || isEnabled((item as any).rawSpecs?.sale) ? `/franchize/vip-bike/market/${item.id}/buy` : `/franchize/vip-bike?vehicle=${item.id}`;
+                  const buyHref = item.saleAvailable || isEnabled(item.rawSpecs?.sale) ? `/franchize/vip-bike/market/${item.id}/buy` : `/franchize/vip-bike?vehicle=${item.id}`;
                   return (
                     <article key={item.id} className="overflow-hidden rounded-2xl border border-border/70 bg-card/55">
                       <div className="relative h-44 bg-black/35">
@@ -126,7 +130,7 @@ export function RentalQuickActionHub({ items, overview, isCatalogLoading = false
                         <div><h4 className="font-orbitron text-lg">{item.title}</h4><p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{item.subtitle || item.description}</p></div>
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div className="rounded-xl border border-border/60 bg-background/45 p-3"><p className="text-muted-foreground">Аренда</p><p className="mt-1 font-medium">{item.rentPriceLabel || `${item.pricePerDay.toLocaleString("ru-RU")} ₽ / день`}</p></div>
-                          <div className="rounded-xl border border-border/60 bg-background/45 p-3"><p className="text-muted-foreground">Покупка</p><p className="mt-1 font-medium">{item.saleAvailable || isEnabled((item as any).rawSpecs?.sale) ? getSalePriceLabel(item) : "тест-драйв"}</p></div>
+                          <div className="rounded-xl border border-border/60 bg-background/45 p-3"><p className="text-muted-foreground">Покупка</p><p className="mt-1 font-medium">{item.saleAvailable || isEnabled(item.rawSpecs?.sale) ? getSalePriceLabel(item) : "тест-драйв"}</p></div>
                         </div>
                         <div className="flex flex-col gap-2">
                           <Button asChild size="sm"><Link href={`/franchize/vip-bike?vehicle=${item.id}`}>Арендовать</Link></Button>

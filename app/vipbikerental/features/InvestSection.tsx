@@ -3,10 +3,15 @@
  * ==================
  * VIP Invest V2 section — investor-focused monetization block.
  * VIP Bike franchise feature — СварПрофи-НН would have different monetization.
+ *
+ * FIX: onDwellTime now actually fires — tracks viewport enter/exit and
+ * reports dwell time. Previously the prop was accepted but never called.
  */
 "use client";
 
 import Link from "next/link";
+import { motion } from "framer-motion";
+import { useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 
@@ -30,8 +35,26 @@ const trustItems = [
 ];
 
 export function InvestSection({ onDwellTime }: { onDwellTime?: (seconds: number) => void }) {
+  const enterTimeRef = useRef<number | null>(null);
+
+  const handleViewportEnter = useCallback(() => {
+    enterTimeRef.current = Date.now();
+  }, []);
+
+  const handleViewportLeave = useCallback(() => {
+    if (enterTimeRef.current != null && onDwellTime) {
+      const dwellSeconds = (Date.now() - enterTimeRef.current) / 1000;
+      onDwellTime(dwellSeconds);
+      enterTimeRef.current = null;
+    }
+  }, [onDwellTime]);
+
   return (
-    <section className="relative mt-24 overflow-hidden rounded-3xl border border-primary/30 bg-black/70 backdrop-blur-xl">
+    <motion.section
+      onViewportEnter={handleViewportEnter}
+      onViewportLeave={handleViewportLeave}
+      className="relative mt-24 overflow-hidden rounded-3xl border border-primary/30 bg-black/70 backdrop-blur-xl"
+    >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,120,0,0.25),transparent_55%)]" />
       <div className="relative z-10 px-6 py-16 md:px-12">
         <div className="mx-auto max-w-3xl text-center">
@@ -71,6 +94,6 @@ export function InvestSection({ onDwellTime }: { onDwellTime?: (seconds: number)
         </div>
         <p className="mt-3 text-xs text-white/50 text-center">Сначала изучи условия или сразу обсуди — как удобнее</p>
       </div>
-    </section>
+    </motion.section>
   );
 }
