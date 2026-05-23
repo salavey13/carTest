@@ -1,7 +1,7 @@
 /**
  * experience-types.ts
  * ===================
- * Canonical type definitions for the VipBike adaptive onboarding → landing pipeline.
+ * Canonical type definitions for the VipBike adaptive storefront runtime.
  *
  * ARCHITECTURE CONTRACT:
  *   Telegram /start → survey → raw signals in metadata → resolve-profile → resolve-experience → UI
@@ -22,12 +22,12 @@
  *
  * These types are the ONLY shared contract between:
  *   - start.ts (server: writes raw signals to metadata)
- *   - survey-normalizer.ts (shared: interprets survey answers)
+ *   - survey-normalizer.ts (shared: interprets survey signals)
  *   - resolve-profile.ts (client: builds runtime profile from raw signals)
  *   - resolve-experience.ts (client: derives UI composition)
  *   - VipBikeRentalClient.tsx (client: renders sections)
  *
- * RULE: Components NEVER read raw survey answers directly.
+ * RULE: Components NEVER read raw survey signals directly.
  *       They always go through VipBikeUserProfile → VipBikeExperienceConfig.
  */
 
@@ -38,7 +38,7 @@
 
 /**
  * Segment: WHAT kind of rider are they?
- * Derived primarily from bike_style + purpose survey answers.
+ * Derived primarily from bike_style + purpose survey signals.
  * This is NOT a theme — it's a behavioral segment that drives
  * section ordering, copy tone, and CTA priority.
  */
@@ -52,7 +52,7 @@ export type VipBikeSegment =
 
 /**
  * Intent: WHY are they here?
- * Derived from purpose + priority survey answers + behavioral signals.
+ * Derived from purpose + priority survey signals + behavioral signals.
  * This is MORE important than segment for CTA and flow design.
  * "Intent routing, not theme routing."
  */
@@ -64,7 +64,7 @@ export type VipBikeIntent =
 
 /**
  * Experience level: HOW comfortable are they?
- * Derived from the experience survey answer.
+ * Derived from the experience survey signal.
  * Affects copy tone, safety emphasis, and first-ride guidance.
  */
 export type VipBikeExperience =
@@ -81,7 +81,7 @@ export type VipBikeExperience =
  *
  * The profile includes a confidence score because some users:
  *   - skip parts of the survey
- *   - give conflicting answers (e.g., "beginner" + "sport")
+ *   - give conflicting signals (e.g., "beginner" + "sport")
  *   - change behavior over time
  * The resolver can use confidence to decide whether to show
  * a strong personalized experience or a softer universal one.
@@ -105,7 +105,7 @@ export interface VipBikeUserProfile {
 
   /**
    * Confidence score 0-1.
-   * 1.0 = full survey completed recently, consistent answers, reinforced by behavior.
+   * 1.0 = full survey completed recently, consistent signals, reinforced by behavior.
    * 0.5 = partial survey or conflicting signals.
    * 0.0 = no survey data at all (anonymous/new user).
    *
@@ -199,19 +199,25 @@ export interface BehaviorSignals {
   buyIntentClickCount?: number;
   /** How many times user clicked rent on an item */
   rentIntentClickCount?: number;
-  /** ISO timestamp of last map interaction */
+  /** ISO timestamp of last map interaction (for per-intent decay) */
   lastMapInteractionAt?: string;
-  /** ISO timestamp of last buy-flow interaction */
+  /** ISO timestamp of last buy-flow interaction (for per-intent decay) */
   lastBuyInteractionAt?: string;
-  /** ISO timestamp of last rent-flow interaction */
+  /** ISO timestamp of last rent-flow interaction (for per-intent decay) */
   lastRentInteractionAt?: string;
-  /** Models scanned via QR code (from physical world → digital) */
+  /**
+   * Models scanned via QR code (from physical world → digital).
+   * CAPPED at 20 entries — oldest dropped first.
+   */
   scannedQrModels?: string[];
   /** Seconds spent on investment section (proxy for investor interest) */
   investSectionViewSeconds?: number;
   /** ISO timestamp of last activity (for decay calculation) */
   lastActiveAt?: string;
 }
+
+/** Maximum entries in scannedQrModels before FIFO eviction */
+export const SCANNED_QR_MODELS_CAP = 20;
 
 // ─────────────────────────────────────────────────────
 // 2. EXPERIENCE CONFIG — What the UI should show
@@ -247,6 +253,20 @@ export type SectionId =
   | "faq";               // Accordion FAQ
 
 /**
+ * Section complexity — how much cognitive load this section presents.
+ * Used to order sections by complexity for different experience levels.
+ * Beginners see low-complexity sections first.
+ */
+export type SectionComplexity = "low" | "medium" | "high";
+
+/**
+ * Emotional tone a section conveys — used for tone matching.
+ * Sections that match the user's preferred emotional tone are
+ * promoted in the ordering.
+ */
+export type EmotionalTone = "energetic" | "calm" | "premium" | "playful" | "informational";
+
+/**
  * Section capability tags — sections self-describe what they help with.
  *
  * Instead of hardcoding logic like:
@@ -271,10 +291,20 @@ export interface SectionCapabilities {
   relevantIntents?: VipBikeIntent[];
   /** Which experience levels benefit most */
   relevantExperience?: VipBikeExperience[];
+  /** Cognitive complexity of this section */
+  complexity?: SectionComplexity;
+  /** Emotional tone this section conveys */
+  emotionalTone?: EmotionalTone;
   /** Free-form tags for custom matching */
   tags?: string[];
   /** Priority weight (higher = more important for its target audience) */
   weight?: number;
+  /**
+   * Whether this section should be hidden for non-surveyed users.
+   * Sections like investSection are irrelevant for users who haven't
+   * completed onboarding — they'd just add noise.
+   */
+  hideIfNotSurveyed?: boolean;
 }
 
 /**
@@ -413,9 +443,17 @@ export interface ParsedPayload {
   raw: string;
 
   /**
+   * The /start command if present in the original text.
+   * Used by start.ts to distinguish "user typed /start with no payload"
+   * from "user typed a survey answer while in active survey".
+   * Undefined when payload was parsed without a /start prefix.
+   */
+  command?: "/start";
+
+  /**
    * A hint for the survey normalizer.
    * If the payload contains intent info (e.g., "buy.surron"),
-   * the normalizer can use this as a prior even before survey answers arrive.
+   * the normalizer can use this as a prior even before survey signals arrive.
    */
   intentHint?: VipBikeIntent;
 
@@ -428,11 +466,11 @@ export interface ParsedPayload {
 }
 
 // ─────────────────────────────────────────────────────
-// 4. SURVEY ANSWER TYPES — Raw survey data shape
+// 4. SURVEY SIGNAL TYPES — Raw survey data shape
 // ─────────────────────────────────────────────────────
 
 /**
- * The shape of survey answers as stored in metadata.survey_results.
+ * The shape of survey signals as stored in metadata.survey_results.
  * Keys match the survey question keys from start_survey_questions_bike.ts.
  *
  * IMPORTANT: Components should NEVER read these directly.
@@ -478,7 +516,7 @@ export interface BikeSurveyAnswers {
  * Persist raw signals. Derive profile at runtime.
  */
 export interface VipBikeUserMetadata {
-  /** Raw survey answers — the normalizer reads these */
+  /** Raw survey signals — the normalizer reads these */
   survey_results?: BikeSurveyAnswers;
 
   /** Promo code captured at /start time */
@@ -517,28 +555,41 @@ export interface VipBikeUserMetadata {
   /**
    * Anti-thrashing state — persisted so experience stability
    * survives across page navigations and refreshes.
-   * This is raw metadata about WHEN the experience last changed,
-   * NOT derived profile state.
+   * This stores RAW profile signals (segment/intent/experience) at the
+   * time of the last experience change, NOT derived preset names.
+   * The resolver compares current profile vs stored profile to
+   * determine stability, re-deriving the preset at runtime.
    */
   experience_lock?: {
     /** ISO timestamp of when the experience was last changed */
     lastChangedAt?: string;
-    /** The preset name that was active when the lock was set */
-    lastPresetName?: string;
-    /** Consecutive stability count — how many times the same preset was resolved */
+    /**
+     * Raw profile signals at time of last experience resolution.
+     * These are NOT derived — they're the same raw signals that
+     * the profile resolver would use. By storing them here, the
+     * anti-thrashing system can detect profile changes without
+     * persisting a derived preset name.
+     */
+    lastResolvedSegment?: VipBikeSegment;
+    lastResolvedIntent?: VipBikeIntent;
+    lastResolvedExperience?: VipBikeExperience;
+    /** Consecutive stability count — how many times the same profile resolved */
     stabilityCount?: number;
   };
 
   // ═══════════════════════════════════════════════════
   // ⚠️  DO NOT ADD DERIVED FIELDS HERE.
   //
-  // NO ui_profile, NO landing_mode, NO segment_cache.
+  // NO ui_profile, NO landing_mode, NO segment_cache,
+  // NO lastPresetName (that's a derived classification).
   // The profile is ALWAYS derived at runtime from raw signals.
   // If you need to cache, cache in React state / useMemo,
   // never in the database.
   //
-  // Exception: experience_lock is raw timing metadata,
-  // not derived profile state. It records WHEN things
-  // happened, not WHAT the profile is.
+  // Exception: experience_lock stores raw profile signals
+  // (segment/intent/experience) that happen to also exist in
+  // the derived profile. These are raw timing + comparison
+  // metadata, not derived state — they record WHAT the profile
+  // WAS at a point in time, not what the resolver DID with it.
   // ═══════════════════════════════════════════════════
 }

@@ -35,6 +35,7 @@
  * The normalizer also implements INTENT DECAY:
  *   - Survey completed 6 months ago with no behavioral signals → confidence decays
  *   - Recent behavioral signals → confidence reinforced
+ *   - Per-intent decay: buy clicks from 6 months ago decay separately
  *   - This prevents permanently locking users into outdated intent
  */
 
@@ -70,6 +71,13 @@ const REINFORCEMENT_THRESHOLD = 3;
  */
 const MAX_SURVEY_AGE_DAYS = 365;
 
+/**
+ * How quickly per-intent behavioral signals decay.
+ * After this many days, a behavioral click's weight is halved.
+ * This prevents old buy clicks from permanently overriding survey signals.
+ */
+const BEHAVIOR_DECAY_HALF_LIFE_DAYS = 60;
+
 // ─────────────────────────────────────────────────────
 // Answer → Category mapping tables
 // ─────────────────────────────────────────────────────
@@ -89,24 +97,54 @@ const BIKE_STYLE_TO_SEGMENT: Array<{ keywords: string[]; segment: VipBikeSegment
 /**
  * Maps purpose survey signal → VipBikeIntent.
  * This is the PRIMARY intent driver.
+ *
+ * IMPORTANT: Purpose maps to intent ONLY when the purpose
+ * explicitly implies buying/renting/community. General riding
+ * style (track, city) is a SEGMENT signal, not an intent signal.
  */
 const PURPOSE_TO_INTENT: Array<{ keywords: string[]; intent: VipBikeIntent }> = [
-  { keywords: ["город", "между рядами", "комфорт"], intent: "rent" },
-  { keywords: ["трек", "гоночн", "прокат", "аренд"], intent: "rent" },
-  { keywords: ["дальн", "покупк", "купить", "сво"], intent: "buy" },
+  // Explicit purchase signals
+  { keywords: ["покупк", "купить", "сво"], intent: "buy" },
+  // Explicit rental/try signals
+  { keywords: ["прокат", "аренд"], intent: "rent" },
+  // Community signals
   { keywords: ["групп", "карт", "вместе", "компани", "друз"], intent: "community" },
+  // Exploration signals
   { keywords: ["загород", "извилист", "маршрут"], intent: "explore" },
 ];
 
 /**
- * Maps priority survey signal → VipBikeIntent (secondary signal).
+ * Maps purpose survey signal → VipBikeSegment (secondary segment signal).
+ * Riding LOCATION drives WHAT kind of bike, not WHY they're here.
+ */
+const PURPOSE_TO_SEGMENT: Array<{ keywords: string[]; segment: VipBikeSegment }> = [
+  { keywords: ["город", "между рядами"], segment: "urban" },
+  { keywords: ["трек", "гоночн"], segment: "sport" },
+  { keywords: ["дальн", "загород"], segment: "touring" },
+  { keywords: ["групп", "карт"], segment: "mixed" },
+];
+
+/**
+ * Maps priority survey signal → VipBikeSegment (NOT intent!).
+ *
+ * FIX: Priority is a STYLE preference, not an intent signal.
+ * "Бешеное ускорение" = sport segment, NOT rent intent.
+ * "Внешний вид" = retro segment, NOT explore intent.
+ * Only explicit purchase/rent keywords should drive intent from priority.
+ */
+const PRIORITY_TO_SEGMENT: Array<{ keywords: string[]; segment: VipBikeSegment }> = [
+  { keywords: ["ускорен", "адреналин", "скорость"], segment: "sport" },
+  { keywords: ["управля", "маневр", "остр"], segment: "sport" },
+  { keywords: ["внешн", "вниман", "стиль", "дорог"], segment: "retro" },
+  { keywords: ["удобств", "технолог", "комфорт"], segment: "touring" },
+];
+
+/**
+ * Maps priority survey signal → VipBikeIntent (only for explicit purchase signals).
+ * Most priority answers are STYLE signals and should NOT drive intent.
  */
 const PRIORITY_TO_INTENT: Array<{ keywords: string[]; intent: VipBikeIntent }> = [
-  { keywords: ["ускорен", "адреналин", "скорость"], intent: "rent" },
-  { keywords: ["управля", "маневр", "остр"], intent: "rent" },
-  { keywords: ["внешн", "вниман", "стиль", "дорог"], intent: "explore" },
   { keywords: ["покупк", "купить"], intent: "buy" },
-  { keywords: ["удобств", "технолог", "комфорт"], intent: "explore" },
 ];
 
 /**
@@ -118,15 +156,50 @@ const EXPERIENCE_MAP: Array<{ keywords: string[]; level: VipBikeExperience }> = 
   { keywords: ["профи", "3+ лет", "3 лет", "эксперт"], level: "advanced" },
 ];
 
+// ─────────────────────────────────────────────────────
+// Per-intent decay (decayByAge)
+// ─────────────────────────────────────────────────────
+
 /**
- * Maps purpose survey signal → VipBikeSegment (secondary signal).
+ * Computes a decay multiplier for a behavioral signal based on its age.
+ *
+ * A buy click from yesterday has full weight.
+ * A buy click from 60 days ago has half weight.
+ * A buy click from 120 days ago has quarter weight.
+ *
+ * This prevents old behavioral signals from permanently overriding
+ * more recent survey or behavioral data.
+ *
+ * @param lastInteractionAt - ISO timestamp of the last interaction of this type
+ * @returns Multiplier 0-1 that scales the signal's weight
  */
-const PURPOSE_TO_SEGMENT: Array<{ keywords: string[]; segment: VipBikeSegment }> = [
-  { keywords: ["город", "между рядами"], segment: "urban" },
-  { keywords: ["трек", "гоночн"], segment: "sport" },
-  { keywords: ["дальн", "загород"], segment: "touring" },
-  { keywords: ["групп", "карт"], segment: "mixed" },
-];
+export function decayByAge(lastInteractionAt: string | undefined): number {
+  if (!lastInteractionAt) return 1.0; // No timestamp = don't decay (backward compat)
+
+  const now = Date.now();
+  const interactionMs = new Date(lastInteractionAt).getTime();
+  const ageDays = (now - interactionMs) / (1000 * 60 * 60 * 24);
+
+  if (ageDays < 0) return 1.0; // Future timestamp (clock skew) → don't decay
+
+  return Math.pow(0.5, ageDays / BEHAVIOR_DECAY_HALF_LIFE_DAYS);
+}
+
+/**
+ * Computes decayed effective counts for each intent type.
+ * This is the core of per-intent decay: old signals weigh less.
+ */
+function computeEffectiveBehaviorCounts(behavior: BehaviorSignals): {
+  effectiveBuyClicks: number;
+  effectiveRentClicks: number;
+  effectiveMapOpens: number;
+} {
+  return {
+    effectiveBuyClicks: (behavior.buyIntentClickCount ?? 0) * decayByAge(behavior.lastBuyInteractionAt),
+    effectiveRentClicks: (behavior.rentIntentClickCount ?? 0) * decayByAge(behavior.lastRentInteractionAt),
+    effectiveMapOpens: (behavior.openedMapCount ?? 0) * decayByAge(behavior.lastMapInteractionAt),
+  };
+}
 
 // ─────────────────────────────────────────────────────
 // Behavioral signal interpretation
@@ -160,29 +233,30 @@ function deriveSegmentFromBehavior(behavior: BehaviorSignals | undefined): VipBi
 }
 
 /**
- * Derives intent from behavioral signals.
+ * Derives intent from behavioral signals using DECAYED counts.
  * Behavioral signals are a STRONGER signal than survey signals for intent
  * because they show what users ACTUALLY do, not what they SAY.
+ * But old behavioral signals decay — a buy click from 6 months ago
+ * should not permanently override a recent survey.
  */
 function deriveIntentFromBehavior(behavior: BehaviorSignals | undefined): VipBikeIntent | null {
   if (!behavior) return null;
 
-  const buyClicks = behavior.buyIntentClickCount ?? 0;
-  const rentClicks = behavior.rentIntentClickCount ?? 0;
-  const mapOpens = behavior.openedMapCount ?? 0;
+  const { effectiveBuyClicks, effectiveRentClicks, effectiveMapOpens } =
+    computeEffectiveBehaviorCounts(behavior);
 
   // Map interactions → community intent
-  if (mapOpens >= REINFORCEMENT_THRESHOLD && mapOpens > buyClicks && mapOpens > rentClicks) {
+  if (effectiveMapOpens >= REINFORCEMENT_THRESHOLD && effectiveMapOpens > effectiveBuyClicks && effectiveMapOpens > effectiveRentClicks) {
     return "community";
   }
 
   // Buy clicks → buy intent
-  if (buyClicks >= REINFORCEMENT_THRESHOLD && buyClicks > rentClicks) {
+  if (effectiveBuyClicks >= REINFORCEMENT_THRESHOLD && effectiveBuyClicks > effectiveRentClicks) {
     return "buy";
   }
 
   // Rent clicks → rent intent
-  if (rentClicks >= REINFORCEMENT_THRESHOLD) {
+  if (effectiveRentClicks >= REINFORCEMENT_THRESHOLD) {
     return "rent";
   }
 
@@ -191,24 +265,28 @@ function deriveIntentFromBehavior(behavior: BehaviorSignals | undefined): VipBik
 
 /**
  * Checks if behavioral signals are strong enough to override survey signals.
- * Returns true if behavior has enough data points to be authoritative.
+ * Uses DECAYED counts — old signals don't count as much.
+ * Returns true if behavior has enough recent data points to be authoritative.
  */
 function shouldBehaviorOverride(behavior: BehaviorSignals | undefined): boolean {
   if (!behavior) return false;
 
-  const totalInteractions =
+  const { effectiveBuyClicks, effectiveRentClicks, effectiveMapOpens } =
+    computeEffectiveBehaviorCounts(behavior);
+
+  const effectiveTotal =
     (behavior.viewedElectroCount ?? 0) +
     (behavior.viewedSportCount ?? 0) +
     (behavior.viewedRetroCount ?? 0) +
-    (behavior.buyIntentClickCount ?? 0) +
-    (behavior.rentIntentClickCount ?? 0) +
-    (behavior.openedMapCount ?? 0);
+    effectiveBuyClicks +
+    effectiveRentClicks +
+    effectiveMapOpens;
 
-  return totalInteractions >= REINFORCEMENT_THRESHOLD * 2; // 6+ interactions to override
+  return effectiveTotal >= REINFORCEMENT_THRESHOLD * 2; // 6+ effective interactions to override
 }
 
 // ─────────────────────────────────────────────────────
-// Intent decay
+// Intent decay (survey-level)
 // ─────────────────────────────────────────────────────
 
 /**
@@ -326,11 +404,14 @@ function computeSurveyConfidence(answers: BikeSurveyAnswers): number {
 
 /**
  * Checks if two segments are contradictory.
+ * Expanded list covering more realistic contradictions.
  */
 function areContradictory(a: VipBikeSegment, b: VipBikeSegment): boolean {
   const contradictions: Array<[VipBikeSegment, VipBikeSegment]> = [
-    ["sport", "retro"],
-    ["electro", "sport"],
+    ["sport", "retro"],       // Speed vs style
+    ["electro", "sport"],     // Quiet tech vs raw power
+    ["touring", "sport"],     // Comfort vs adrenaline
+    ["urban", "touring"],     // Short trips vs long distance
   ];
   return contradictions.some(
     ([x, y]) => (a === x && b === y) || (a === y && b === x),
@@ -388,7 +469,7 @@ function mergeIntent(
  * This is the ONLY function that should interpret raw signals.
  * All personalization logic flows from the returned profile object.
  *
- * @param answers - Raw survey answers from metadata.survey_results
+ * @param answers - Raw survey signals from metadata.survey_results
  * @param behavior - Behavioral signals from metadata.behavior_signals
  * @param payload - Optional parsed /start payload (provides pre-survey hints)
  * @param onboardingCompleted - Whether the user finished the survey
@@ -415,12 +496,16 @@ export function normalizeSurveyToProfile(
   // ── Derive segment from survey ──
   const styleMatch = matchKeywords(answers.bike_style, BIKE_STYLE_TO_SEGMENT);
   const purposeSegMatch = matchKeywords(answers.purpose, PURPOSE_TO_SEGMENT);
+  const prioritySegMatch = matchKeywords(answers.priority, PRIORITY_TO_SEGMENT);
 
   let surveySegment: VipBikeSegment | null = null;
   if (styleMatch) {
     surveySegment = styleMatch.segment;
   } else if (purposeSegMatch) {
     surveySegment = purposeSegMatch.segment;
+  } else if (prioritySegMatch) {
+    // Priority is a segment signal (style preference), not intent
+    surveySegment = prioritySegMatch.segment;
   }
 
   // ── Derive intent from survey ──

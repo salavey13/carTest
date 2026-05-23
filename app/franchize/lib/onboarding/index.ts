@@ -21,6 +21,8 @@ export type {
   VipBikeExperience,
   HeroDisplayMode,
   SectionId,
+  SectionComplexity,
+  EmotionalTone,
   SectionCapabilities,
   PrimaryCTA,
   ParsedPayload,
@@ -29,6 +31,9 @@ export type {
   BehaviorSignals,
   VipBikeUserMetadata,
 } from "./experience-types";
+
+// Constants
+export { SCANNED_QR_MODELS_CAP } from "./experience-types";
 
 // Payload parser
 export {
@@ -43,6 +48,7 @@ export {
 export {
   normalizeSurveyToProfile,
   createDefaultProfile,
+  decayByAge,
 } from "./survey-normalizer";
 
 // Profile resolver (THE entry point for components)
@@ -58,11 +64,18 @@ export {
   isExperienceLocked,
   combinePresets,
   getAvailablePresets,
+  computeExperienceLockUpdate,
   EXPERIENCE_RESOLVER_VERSION,
 } from "./resolve-experience";
+
+// Experience lock type (for persisting anti-thrashing state)
+export type { ExperienceLockState } from "./resolve-experience";
 
 // Section capability registry (for extending section metadata)
 export { SECTION_CAPABILITIES } from "./resolve-experience";
 
 // Experience preset type (for debugging/analytics)
 export type { ExperiencePreset } from "./resolve-experience";
+
+// Behavior tracker hook (for progressive enrichment + lock writeback)
+export { useBehaviorTracker } from "./track-behavior";

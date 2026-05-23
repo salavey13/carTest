@@ -40,6 +40,13 @@ import type { ParsedPayload, PayloadType, VipBikeIntent, VipBikeSegment } from "
 // Structured payload prefix → (type, intent, segment) mapping
 // ─────────────────────────────────────────────────────
 
+/**
+ * Maps structured prefixes to their payload type and profile hints.
+ *
+ * IMPORTANT: segmentHint drives WHAT (bike type), intentHint drives WHY.
+ * Don't conflate them — "sport" segment doesn't mean "rent" intent.
+ * A sport rider could want to buy, rent, or explore.
+ */
 const STRUCTURED_PREFIX_MAP: Record<
   string,
   { type: PayloadType; intentHint?: VipBikeIntent; segmentHint?: VipBikeSegment }
@@ -47,12 +54,12 @@ const STRUCTURED_PREFIX_MAP: Record<
   // Entry points — campaign-specific onboarding
   entry:   { type: "entry",  intentHint: "explore",   segmentHint: undefined },
   electro: { type: "entry",  intentHint: "explore",   segmentHint: "electro"  },
-  sport:   { type: "entry",  intentHint: "rent",      segmentHint: "sport"    },
+  sport:   { type: "entry",  intentHint: "explore",   segmentHint: "sport"    },
   retro:   { type: "entry",  intentHint: "explore",   segmentHint: "retro"    },
   touring: { type: "entry",  intentHint: "explore",   segmentHint: "touring"  },
-  urban:   { type: "entry",  intentHint: "rent",      segmentHint: "urban"    },
+  urban:   { type: "entry",  intentHint: "explore",   segmentHint: "urban"    },
 
-  // Intent-specific entries
+  // Intent-specific entries — the payload explicitly declares WHY they're here
   buy:     { type: "buy",    intentHint: "buy",       segmentHint: undefined },
   map:     { type: "map",    intentHint: "community", segmentHint: undefined },
   rent:    { type: "entry",  intentHint: "rent",      segmentHint: undefined },
@@ -69,11 +76,11 @@ const LEGACY_PREFIX_RE = /^(promo|ref|invite|code)[:=_-](.+)$/i;
  * Parses the raw text from a Telegram /start message into a structured payload.
  *
  * Examples:
- *   "/start"               → { type: "bare", code: "", raw: "" }
- *   "/start entry.electro" → { type: "entry", code: "ELECTRO", raw: "entry.electro", segmentHint: "electro", intentHint: "explore" }
- *   "/start promo.NEON26"  → { type: "promo", code: "NEON26", raw: "promo.NEON26", intentHint: undefined }
- *   "/start ref_ALEX26"    → { type: "ref", code: "ALEX26", raw: "ref_ALEX26" }
- *   "/start VIPSTART"      → { type: "bare", code: "VIPSTART", raw: "VIPSTART" }
+ *   "/start"               → { type: "bare", code: "", raw: "", command: "/start" }
+ *   "/start entry.electro" → { type: "entry", code: "ELECTRO", raw: "entry.electro", command: "/start", segmentHint: "electro", intentHint: "explore" }
+ *   "/start promo.NEON26"  → { type: "promo", code: "NEON26", raw: "promo.NEON26", command: "/start" }
+ *   "/start ref_ALEX26"    → { type: "ref", code: "ALEX26", raw: "ref_ALEX26", command: "/start" }
+ *   "/start VIPSTART"      → { type: "bare", code: "VIPSTART", raw: "VIPSTART", command: "/start" }
  */
 export function parseStartPayload(text?: string): ParsedPayload {
   if (!text) return { type: "bare", code: "", raw: "" };
@@ -84,9 +91,10 @@ export function parseStartPayload(text?: string): ParsedPayload {
   const [_cmd, ...rest] = trimmed.split(/\s+/);
   const payload = rest.join(" ").trim();
 
-  if (!payload) return { type: "bare", code: "", raw: "" };
+  if (!payload) return { type: "bare", code: "", raw: "", command: "/start" };
 
-  return parsePayload(payload);
+  const parsed = parsePayload(payload);
+  return { ...parsed, command: "/start" };
 }
 
 /**
