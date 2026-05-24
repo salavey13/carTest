@@ -7,7 +7,8 @@ import { MARKET_ROUTE } from './SvarProfiClient'
 
 // ─────────────────────────────────────────────────────
 // SvarProfi Categories — product category cards
-// Each card links to /franchize/svarprofi/catalog?group={id}
+// Each card links to /franchize/svarprofi?vehicle=<slug>
+// (not /catalog?group= — that pattern is for bike rental)
 // ─────────────────────────────────────────────────────
 
 export function SvarProfiCategories() {
@@ -22,7 +23,7 @@ export function SvarProfiCategories() {
         {CATEGORIES.map((cat) => {
           const Icon = cat.icon
           return (
-            <Link key={cat.id} href={`${MARKET_ROUTE}/catalog?group=${cat.id}`}>
+            <Link key={cat.id} href={`${MARKET_ROUTE}?vehicle=${cat.vehicleSlug}`}>
               <Card className="group h-full overflow-hidden border-[#3A4250] bg-[#242830] transition-all duration-300 hover:border-[#2E7DBF]/50 hover:shadow-lg hover:shadow-[#2E7DBF]/10 cursor-pointer">
                 <div className="relative h-48 overflow-hidden">
                   <img

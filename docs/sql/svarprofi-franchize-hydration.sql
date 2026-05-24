@@ -2,7 +2,7 @@
 -- СварПрофи-НН Franchise Hydration SQL
 -- ============================================================================
 -- Franchise: СварПрофи-НН — производство строительных металлических конструкций
--- Location:  Нижний Новгород, Россия
+-- Location:  Москва, Россия (registered in НН, operates from Moscow)
 -- Slug:      svarprofi
 -- Type:      metal_stuff
 -- Source:    rusprofile.ru (ИНН 5258146959, ОГРН 1195275055491)
@@ -28,6 +28,13 @@
 -- 12.  https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/karkas-kran/image_1.jpg
 --
 -- TOTAL: 12 images (8 branding/UI + 4 product)
+--
+-- CHANGELOG (v2):
+--  - City: НН → Москва (company operates from Moscow)
+--  - Removed hallucinated telegram link (https://t.me/svarprofi_nn)
+--  - Header menuLinks: NO map-riders (N/A for metal_stuff)
+--  - All links use ?vehicle=<slug> pattern (not /catalog?group=)
+--  - Footer/contacts: Москва, no telegram
 -- ============================================================================
 
 begin;
@@ -50,11 +57,11 @@ insert into public.crews (
 values (
   'a1b2c3d4-e5f6-7a8b-9c0d-012345678901',
   'СварПрофи-НН',
-  'СварПрофи-НН — производство строительных металлических конструкций в Нижнем Новгороде. Сварные конструкции, каркасы, ограждения, навесы и индивидуальные проекты.',
+  'СварПрофи-НН — производство строительных металлических конструкций в Москве. Сварные конструкции, каркасы, ограждения, навесы и индивидуальные проекты.',
   'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/logo.png',
   '413553377',
   'svarprofi',
-  '56.2965,43.9472',
+  '55.7558,37.6173',
   '{}'::jsonb,
   now(),
   now()
@@ -141,13 +148,14 @@ set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
   "header": {
     "showBackButton": false,
     "title": "СварПрофи-НН",
-    "subtitle": "Металлоконструкции в Нижнем Новгороде",
-    "logoHref": "/",
+    "subtitle": "Металлоконструкции в Москве",
+    "logoHref": "/franchize/svarprofi",
     "menuLinks": [
-      { "label": "Каталог", "href": "/catalog" },
-      { "label": "О компании", "href": "/about" },
-      { "label": "Контакты", "href": "/contacts" },
-      { "label": "Заказ", "href": "/order" }
+      { "label": "Каталог", "href": "/franchize/svarprofi" },
+      { "label": "Каркасы", "href": "/franchize/svarprofi?vehicle=karkas-prom" },
+      { "label": "О компании", "href": "/svarprofi#features" },
+      { "label": "FAQ", "href": "/svarprofi#faq" },
+      { "label": "Заказ", "href": "/svarprofi#order" }
     ],
     "quickActions": [
       { "label": "Позвонить", "href": "tel:+79040600644", "icon": "phone" }
@@ -160,27 +168,25 @@ set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
       {
         "title": "Продукция",
         "links": [
-          { "label": "Каркасы", "href": "/catalog?group=karkasy" },
-          { "label": "Навесы", "href": "/catalog?group=navesy" },
-          { "label": "Ограждения", "href": "/catalog?group=ograzhdeniya" },
-          { "label": "Лестницы", "href": "/catalog?group=lestnitsy" },
-          { "label": "Индивидуальные проекты", "href": "/catalog?group=individual" }
+          { "label": "Каркасы", "href": "/franchize/svarprofi?vehicle=karkas-prom" },
+          { "label": "Навесы", "href": "/franchize/svarprofi?vehicle=karkas-prom" },
+          { "label": "Ограждения", "href": "/franchize/svarprofi?vehicle=karkas-kran" },
+          { "label": "Все конструкции", "href": "/franchize/svarprofi" }
         ]
       },
       {
         "title": "Компания",
         "links": [
-          { "label": "О нас", "href": "/about" },
-          { "label": "Сертификаты", "href": "/about#certificates" },
-          { "label": "Отзывы", "href": "/about#reviews" }
+          { "label": "О нас", "href": "/svarprofi#features" },
+          { "label": "Сертификаты", "href": "/svarprofi#features" },
+          { "label": "FAQ", "href": "/svarprofi#faq" }
         ]
       },
       {
         "title": "Контакты",
         "links": [
           { "label": "+7 (904) 060-06-44", "href": "tel:+79040600644" },
-          { "label": "Telegram", "href": "https://t.me/svarprofi_nn" },
-          { "label": "Нижний Новгород", "href": "/contacts" }
+          { "label": "Москва", "href": "/svarprofi#contacts" }
         ]
       }
     ],
@@ -190,7 +196,7 @@ set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
 
   "about": {
     "heroTitle": "Надёжные металлоконструкции от производителя",
-    "heroSubtitle": "Проектируем, производим и монтируем сварные конструкции для промышленных и гражданских объектов в Нижнем Новгороде и Нижегородской области",
+    "heroSubtitle": "Проектируем, производим и монтируем сварные конструкции для промышленных и гражданских объектов в Москве и ЦФО",
     "heroImage": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/about-hero.jpg",
     "features": [
       {
@@ -206,7 +212,7 @@ set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
       {
         "icon": "truck",
         "title": "Доставка и монтаж",
-        "description": "Доставка по Нижнему Новгороду, МО и ЦФО. Профессиональный монтаж бригадой опытных сварщиков."
+        "description": "Доставка по Москве, МО и ЦФО. Профессиональный монтаж бригадой опытных сварщиков."
       },
       {
         "icon": "clock",
@@ -243,21 +249,21 @@ set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
       },
       {
         "question": "Возможен ли выезд замерщика?",
-        "answer": "Да, выезд замерщика по Нижнему Новгороду — бесплатно. По области — по договорённости."
+        "answer": "Да, выезд замерщика по Москве — бесплатно. По области — по договорённости."
       }
     ]
   },
 
   "contacts": {
-    "address": "603032, Нижегородская область, г. Нижний Новгород",
+    "address": "Москва, Россия",
     "phone": "+7 (904) 060-06-44",
     "email": null,
-    "telegram": "https://t.me/svarprofi_nn",
+    "telegram": null,
     "telegramBotUsername": null,
     "workingHours": null,
     "map": {
-      "lat": 56.2965,
-      "lng": 43.9472,
+      "lat": 55.7558,
+      "lng": 37.6173,
       "zoom": 12
     }
   },
@@ -269,26 +275,29 @@ set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
         "title": "Каркасы",
         "description": "Металлические каркасы для промышленных и гражданских зданий",
         "image": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/promo-karkasy.jpg",
-        "href": "/catalog?group=karkasy"
+        "vehicleSlug": "karkas-prom",
+        "href": "/franchize/svarprofi?vehicle=karkas-prom"
       },
       {
         "id": "navesy",
         "title": "Навесы",
         "description": "Навесы из профнастила и поликарбоната для автостоянок и террас",
         "image": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/promo-navesy.jpg",
-        "href": "/catalog?group=navesy"
+        "vehicleSlug": "karkas-prom",
+        "href": "/franchize/svarprofi?vehicle=karkas-prom"
       },
       {
         "id": "ograzhdeniya",
         "title": "Ограждения",
         "description": "Сварные секционные ограждения для территорий и объектов",
         "image": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/promo-ograzhdeniya.jpg",
-        "href": "/catalog?group=ograzhdeniya"
+        "vehicleSlug": "karkas-kran",
+        "href": "/franchize/svarprofi?vehicle=karkas-kran"
       }
     ],
     "orderProcess": [
       { "step": 1, "title": "Заявка", "description": "Оставьте заявку на сайте или позвоните" },
-      { "step": 2, "title": "Замер", "description": "Выезд замерщика (бесплатно по Н.Новгороду)" },
+      { "step": 2, "title": "Замер", "description": "Выезд замерщика (бесплатно по Москве)" },
       { "step": 3, "title": "Проект", "description": "Разработка чертежей и согласование" },
       { "step": 4, "title": "Производство", "description": "Изготовление конструкции на нашем производстве" },
       { "step": 5, "title": "Доставка", "description": "Доставка на объект" },
@@ -323,13 +332,12 @@ set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
       "individual": "Индивидуальные проекты"
     },
     "quickLinks": [
-      { "label": "Каркасы зданий", "href": "/catalog?group=karkasy", "icon": "building" },
-      { "label": "Навесы", "href": "/catalog?group=navesy", "icon": "shed" },
-      { "label": "Ограждения", "href": "/catalog?group=ograzhdeniya", "icon": "fence" },
-      { "label": "Лестницы", "href": "/catalog?group=lestnitsy", "icon": "stairs" }
+      { "label": "Каркасы зданий", "href": "/franchize/svarprofi?vehicle=karkas-prom", "icon": "building" },
+      { "label": "Навесы", "href": "/franchize/svarprofi?vehicle=karkas-prom", "icon": "shed" },
+      { "label": "Ограждения", "href": "/franchize/svarprofi?vehicle=karkas-kran", "icon": "fence" }
     ],
     "tickerItems": [
-      "Бесплатный выезд замерщика по Нижнему Новгороду",
+      "Бесплатный выезд замерщика по Москве",
       "Доставка по ЦФО",
       "Гарантия на все конструкции от 5 лет"
     ],
@@ -340,19 +348,19 @@ set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
         "title": "Каркасы промышленных зданий",
         "subtitle": "От проекта до монтажа",
         "image": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/promo-karkasy.jpg",
-        "href": "/catalog?group=karkasy"
+        "href": "/franchize/svarprofi?vehicle=karkas-prom"
       },
       {
         "title": "Навесы под ключ",
         "subtitle": "Профнастил и поликарбонат",
         "image": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/promo-navesy.jpg",
-        "href": "/catalog?group=navesy"
+        "href": "/franchize/svarprofi?vehicle=karkas-prom"
       },
       {
         "title": "Ограждения сварные",
         "subtitle": "Секционные ограждения для территорий",
         "image": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/promo-ograzhdeniya.jpg",
-        "href": "/catalog?group=ograzhdeniya"
+        "href": "/franchize/svarprofi?vehicle=karkas-kran"
       }
     ],
     "adCards": [
@@ -451,10 +459,10 @@ where c.id = 'a1b2c3d4-e5f6-7a8b-9c0d-012345678901';
 update public.crews c
 set metadata = jsonb_set(c.metadata, '{contacts}', $$
 {
-  "address": "603032, Нижегородская область, г. Нижний Новгород",
+  "address": "Москва, Россия",
   "phone": "+7 (904) 060-06-44",
   "email": null,
-  "telegram": "https://t.me/svarprofi_nn",
+  "telegram": null,
   "workingHours": null
 }
 $$::jsonb)

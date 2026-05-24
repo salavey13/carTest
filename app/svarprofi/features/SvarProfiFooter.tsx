@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { Separator } from '@/components/ui/separator'
 import {
   Phone,
-  MessageCircle,
   Building2,
 } from 'lucide-react'
 import { BRAND, CATEGORIES } from './shared/constants'
@@ -12,7 +11,8 @@ import { MARKET_ROUTE } from './SvarProfiClient'
 
 // ─────────────────────────────────────────────────────
 // SvarProfi Footer — contact info & links
-// Category links go to /franchize/svarprofi/catalog?group={id}
+// Category links go to /franchize/svarprofi?vehicle=<slug>
+// NOTE: No telegram — contact info not yet confirmed
 // ─────────────────────────────────────────────────────
 
 export function SvarProfiFooter() {
@@ -20,14 +20,14 @@ export function SvarProfiFooter() {
     <footer className="border-t border-[#3A4250]/50 bg-[#14161A]">
       <div className="container mx-auto max-w-7xl px-4 py-12">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Products → market links */}
+          {/* Products → market links with vehicle slug */}
           <div>
             <h3 className="mb-4 font-bold">Продукция</h3>
             <ul className="space-y-2">
               {CATEGORIES.map((c) => (
                 <li key={c.id}>
                   <Link
-                    href={`${MARKET_ROUTE}/catalog?group=${c.id}`}
+                    href={`${MARKET_ROUTE}?vehicle=${c.vehicleSlug}`}
                     className="text-sm text-[#8A92A0] transition-colors hover:text-[#2E7DBF]"
                   >
                     {c.title}
@@ -36,18 +36,10 @@ export function SvarProfiFooter() {
               ))}
               <li>
                 <Link
-                  href={`${MARKET_ROUTE}/catalog?group=lestnitsy`}
+                  href={MARKET_ROUTE}
                   className="text-sm text-[#8A92A0] transition-colors hover:text-[#2E7DBF]"
                 >
-                  Лестницы
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={`${MARKET_ROUTE}/catalog?group=individual`}
-                  className="text-sm text-[#8A92A0] transition-colors hover:text-[#2E7DBF]"
-                >
-                  Индивидуальные проекты
+                  Все конструкции
                 </Link>
               </li>
             </ul>
@@ -71,11 +63,6 @@ export function SvarProfiFooter() {
               <li>
                 <a href={BRAND.phoneHref} className="flex items-center gap-2 text-sm text-[#8A92A0] hover:text-[#2E7DBF]">
                   <Phone className="h-3.5 w-3.5" /> {BRAND.phone}
-                </a>
-              </li>
-              <li>
-                <a href={BRAND.telegram} target="_blank" className="flex items-center gap-2 text-sm text-[#8A92A0] hover:text-[#2E7DBF]">
-                  <MessageCircle className="h-3.5 w-3.5" /> Telegram
                 </a>
               </li>
               <li>
