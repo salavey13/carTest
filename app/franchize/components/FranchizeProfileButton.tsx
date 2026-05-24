@@ -1,10 +1,9 @@
-// /app/franchize/components/FranchizeProfileButton.tsx
 "use client";
 
 import Image from "next/image";
 import Link from "next/link";
 import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, User, IdCard, MessageCircle, Send } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Component, useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { isMockUserModeEnabled } from "@/lib/mockUserMode";
@@ -46,11 +45,67 @@ const NOTIFICATION_OPTIONS: Array<{ key: keyof FranchizeNotificationPreferences;
 ];
 
 function normalizeSlug(slug: string | undefined): string {
-  // FIX: Also handle empty-string slugs — previously "" || "vip-bike" worked
-  // but trim().toLowerCase() on an empty string returns "", then the || fallback
-  // catches it. However, we should also guard against whitespace-only slugs.
   const normalized = (slug || "").trim().toLowerCase();
   return normalized || "vip-bike";
+}
+
+// ─────────────────────────────────────────────────────────
+// FIX: Local error boundary to prevent "crew recovery" full-page crash.
+// ─────────────────────────────────────────────────────────
+// When the DropdownMenu or any of its children throw during rendering
+// (e.g., due to missing AppContext during SPA navigation, useIsAdmin
+// throwing, or Radix portal failures), the error bubbles up to the
+// nearest error boundary. Without this local boundary, the error reaches
+// the page-level "crew recovery" boundary, replacing the ENTIRE page
+// with the fallback screen. This local boundary catches the error
+// gracefully and renders a simple fallback button instead.
+//
+// NOTE: This boundary can only catch errors in the non-portal portion
+// of the render tree. Radix DropdownMenu renders its content via a
+// portal (outside this boundary's DOM), so portal errors bypass it.
+// The v2 fix (early return for !hasUser) prevents portal errors for
+// guests entirely. This boundary remains as a safety net for
+// authenticated-user render errors.
+// ─────────────────────────────────────────────────────────
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+export class CrewButtonErrorBoundary extends Component<
+  { bgColor: string; textColor: string; borderColor: string; children: React.ReactNode },
+  ErrorBoundaryState
+> {
+  constructor(props: { bgColor: string; textColor: string; borderColor: string; children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown, info: unknown) {
+    console.warn("[FranchizeProfileButton] caught render error:", error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <a
+          href={TELEGRAM_WEB_APP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Открыть Telegram WebApp"
+          className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          style={{ backgroundColor: this.props.bgColor, color: this.props.textColor, borderColor: this.props.borderColor }}
+        >
+          <Send className="h-4 w-4" />
+          <span className="hidden sm:inline">WebApp</span>
+        </a>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 interface FranchizeProfileButtonProps {
@@ -67,28 +122,21 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = useIsAdmin();
   const scopeSlug = normalizeSlug(currentSlug || userCrewInfo?.slug);
-  // FIX: If currentSlug was explicitly provided (from CrewHeader), prefer it over
-  // the fallback "vip-bike". This prevents navigating to /franchize/vip-bike/profile
-  // when the user is on /franchize/sly13 and the slug is somehow empty.
   const effectiveSlug = currentSlug?.trim() ? currentSlug.trim().toLowerCase() : scopeSlug;
   const franchizeAdminHref = `/franchize/${effectiveSlug}/admin`;
   const franchizeDashboardHref = `/franchize/${effectiveSlug}/dashboard`;
   const franchizeProfileHref = `/franchize/${effectiveSlug}/profile`;
 
   // ── Avatar loading state machine ──
-  //   loading → (onLoad) → dissolving → (animationEnd) → revealed
-  //   loading → (onError) → broken (permanent spooky letter)
   const [brokenAvatarUrls, setBrokenAvatarUrls] = useState<Record<string, true>>({});
   const [avatarLoaded, setAvatarLoaded] = useState(false);
   const [avatarDissolved, setAvatarDissolved] = useState(false);
 
-  // Reset loading/dissolve state when avatar URL changes
   useEffect(() => {
     setAvatarLoaded(false);
     setAvatarDissolved(false);
   }, [avatarUrl]);
 
-  // Inject spooky keyframes once (static CSS — no dynamic colour interpolation)
   useEffect(() => {
     ensureSpookyKeyframes();
   }, []);
@@ -156,23 +204,47 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
     return `https://t.me/oneBikePlsBot/app?startapp=cart_id_${encodeURIComponent(tempCartId)}`;
   }, [tempCartId]);
 
+  // ─────────────────────────────────────────────────────────
+  // FIX v3: "Profile icon routes to abyss" + "crew recovery" regression
+  // ─────────────────────────────────────────────────────────
+  // v1 fix: Rendered DropdownMenu even for guests (!hasUser). This caused
+  // a regression: Radix DropdownMenu uses a portal that renders OUTSIDE
+  // the CrewButtonErrorBoundary's DOM tree. When the portal content throws
+  // (e.g., during SPA navigation with stale context, or when Radix tries
+  // to compute position against a detached node), the error bypasses the
+  // local error boundary and reaches the page-level Next.js error boundary
+  // (franchize/[slug]/error.tsx), which shows the fullscreen "crew recovery"
+  // fallback ("Экипаж временно недоступен").
+  //
+  // v2 fix: For guests (!hasUser), render a simple <a> tag linking to
+  // Telegram WebApp — no portal, no DropdownMenu, no crash risk. This
+  // avoids the Radix portal crash entirely while still providing a useful
+  // CTA ("Login via Telegram"). Authenticated users keep the full dropdown.
+  //
+  // v3 fix: Additionally, the call site in CrewHeader now wraps
+  // FranchizeProfileButton in a local CrewButtonErrorBoundary. This
+  // catches ALL errors (including hook errors during SPA transitions)
+  // before they can reach the page-level error.tsx. The boundary renders
+  // a Telegram link fallback instead of the full-screen crash.
+  // ─────────────────────────────────────────────────────────
+
   if (!hasUser) {
     return (
       <a
         href={TELEGRAM_WEB_APP_URL}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Открыть Telegram WebApp"
+        aria-label="Войти через Telegram"
         className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
         style={{ backgroundColor: bgColor, color: textColor, borderColor }}
       >
         <Send className="h-4 w-4" />
-        <span className="hidden sm:inline">WebApp</span>
+        <span className="hidden sm:inline">Войти</span>
       </a>
     );
   }
 
-  return (
+  const inner = (
     <div style={{ isolation: "isolate" }}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -186,7 +258,6 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             <span className="relative block h-8 w-8 overflow-hidden rounded-full border" style={{ borderColor }}>
               {avatarUrl && !brokenAvatarUrls[avatarUrl] ? (
                 <>
-                  {/* Image layer — always rendered so it loads in background */}
                   <Image
                     src={avatarUrl}
                     alt={displayName}
@@ -199,7 +270,6 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
                       setBrokenAvatarUrls((prev) => ({ ...prev, [avatarUrl]: true }));
                     }}
                   />
-                  {/* Spooky letter overlay — breathes while loading, dissolves on load */}
                   {!avatarDissolved && (
                     <span
                       className="absolute inset-0 z-10 flex items-center justify-center text-sm font-bold select-none"
@@ -219,10 +289,8 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
                   )}
                 </>
               ) : avatarUrl && brokenAvatarUrls[avatarUrl] ? (
-                /* Broken URL — permanent spooky letter */
                 <SpookyLetter letter={getFirstLetter(displayName)} color={textColor} sizeClass="text-sm" />
               ) : (
-                /* No avatar URL at all — plain static letter */
                 <span className="flex h-full w-full items-center justify-center text-sm font-semibold">
                   {getFirstLetter(displayName)}
                 </span>
@@ -343,5 +411,13 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
+  );
+
+  // FIX: Wrap in local error boundary so a DropdownMenu crash doesn't
+  // take down the entire page (replacing it with "crew recovery" fallback).
+  return (
+    <CrewButtonErrorBoundary bgColor={bgColor} textColor={textColor} borderColor={borderColor}>
+      {inner}
+    </CrewButtonErrorBoundary>
   );
 }
