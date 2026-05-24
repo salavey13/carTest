@@ -123,19 +123,27 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
                 key={`${link.href}-${link.label}`}
                 href={link.href}
                 onClick={(e) => {
-                  // FIX: Close menu first, then navigate via router.push().
-                  // The old code called onOpenChange(false) synchronously, which unmounted
-                  // the HeaderMenu portal (returns null) BEFORE Next.js Link's internal
-                  // router.push() could fire — silently dropping the navigation.
+                  // FIX v2: Navigate FIRST, close menu SECOND.
+                  // The v1 fix (onOpenChange(false) BEFORE router.push) still dropped
+                  // navigation because onOpenChange(false) → setMenuOpen(false) batches
+                  // into the same React render that unmounts the HeaderMenu portal.
+                  // In Next.js App Router, router.push() is asynchronous — it schedules
+                  // a transition that fires after the current microtask. If the portal
+                  // unmounts in the same render batch, the transition can be lost.
+                  // By deferring onOpenChange to the next tick, we ensure:
+                  //   1. router.push() fires first (schedules the transition)
+                  //   2. The portal stays mounted during the same render
+                  //   3. Menu closes on next tick after navigation is underway
                   e.preventDefault();
-                  onOpenChange(false);
                   if (link.href.startsWith("#")) {
-                    // Hash link — scroll to section on current page
+                    // Hash link — scroll to section on current page, close immediately
                     const target = document.querySelector(link.href);
                     target?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    onOpenChange(false);
                   } else {
-                    // Full navigation — use Next.js router for SPA transition
+                    // Full navigation — schedule transition FIRST, close menu AFTER
                     router.push(link.href);
+                    setTimeout(() => onOpenChange(false), 0);
                   }
                 }}
                 aria-current={isActive ? "page" : undefined}

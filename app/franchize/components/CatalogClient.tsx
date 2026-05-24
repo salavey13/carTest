@@ -27,11 +27,11 @@ interface CatalogClientProps {
 
 type QuickFilterKey = "all" | "budget" | "premium" | "newbie" | "topRated";
 
-const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string; compactLabel?: string }> = [
+const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string }> = [
   { key: "all", label: "Все" },
   { key: "budget", label: "До 5000" },
   { key: "premium", label: "Премиум 7000+" },
-  { key: "newbie", label: "Для новичка", compactLabel: "Для новичков" },
+  { key: "newbie", label: "Для новичка" },
   { key: "topRated", label: "Лучшие отзывы" },
 ];
 
@@ -561,7 +561,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           </button>
         </div>
 
-        {promoModules.length > 0 && mode !== "electro" && (
+        {promoModules.length > 0 && (
           <div className="mb-5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
             {visiblePromoModules.map((module, index) => {
               const isExternal = /^(https?:|mailto:|tel:)/.test(module.href);
@@ -615,7 +615,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                   ["--quick-pill-text" as string]: active ? "#000000" : crew.theme.palette.textPrimary,
                 }}
               >
-                {(filter.compactLabel ?? filter.label)} · {quickFilterCounts[filter.key]}
+                {filter.label} · {quickFilterCounts[filter.key]}
               </button>
             );
           })}
@@ -669,7 +669,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       ref={(node) => {
                         carouselRefs.current[group.category] = node;
                       }}
-                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 touch-pan-x [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                       tabIndex={0}
                       role="region"
                       aria-label={`Карусель категории ${group.category}`}
@@ -692,28 +692,45 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       data-carousel-card="true"
                       data-carousel-index={index}
                       className="group w-[65vw] max-w-[280px] shrink-0 snap-start rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)] sm:w-[260px]"
-                      style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
+                      style={{
+                        ...catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)),
+                        // FIX: touch-action: manipulation allows both horizontal carousel
+                        // scrolling AND vertical page scrolling on mobile. The old
+                        // touch-pan-x on the carousel container ONLY allowed horizontal
+                        // panning, which prevented vertical page scrolling when the user's
+                        // finger started on a card image. manipulation also disables
+                        // double-tap zoom (preventing 300ms delay) while keeping pan+pinch.
+                        touchAction: "manipulation",
+                      }}
                     >
                       <button
                         type="button"
                         aria-label={`Открыть карточку ${item.title}: ${item.rentPriceLabel}`}
                         data-catalog-item-button="true"
-                        className="block w-full overflow-hidden text-left"
+                        className="block w-full text-left"
                         onClick={() => openItem(item)}
                         onFocus={() => setFocusedItemId(item.id)}
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
                         style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
                         onPointerMove={(event) => {
+                          // FIX: Only compute parallax for mouse/pen pointers.
+                          // On touch devices, pointermove fires on every finger drag,
+                          // which causes React state updates that fight the browser's
+                          // native scroll gesture — preventing vertical page scrolling
+                          // when the user's finger starts on a card image.
+                          if (event.pointerType === 'touch') return;
                           const rect = event.currentTarget.getBoundingClientRect();
                           const dx = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
                           const dy = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
                           setCarouselParallaxByItem((prev) => ({ ...prev, [item.id]: { x: dx, y: dy } }));
                         }}
-                        onPointerLeave={() => {
+                        onPointerLeave={(event) => {
+                          // Only reset parallax on non-touch pointers
+                          if (event.pointerType === 'touch') return;
                           setCarouselParallaxByItem((prev) => ({ ...prev, [item.id]: { x: 0, y: 0 } }));
                         }}
                       >
-                        <div className="relative aspect-[9/16] w-full overflow-hidden">
+                        <div className="relative aspect-[9/16] w-full">
                           {item.imageUrl && !carouselLoadedByItem[item.id] && (
                             <div className="absolute inset-0 overflow-hidden bg-black/30">
                               <div className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent" />
@@ -726,7 +743,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               fill
                               sizes="(max-width: 1279px) 65vw, 260px"
                               className="object-cover transition-transform duration-300 ease-out"
-                              style={{ transform: `scale(1.04) translate3d(${parallax.x * 4}px, ${parallax.y * 4}px, 0)` }}
+                              style={{ transform: `scale(1.06) translate3d(${parallax.x * 8}px, ${parallax.y * 8}px, 0)` }}
                               onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
                             />
                           ) : (
