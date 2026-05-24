@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { FranchizeCrewVM } from "../actions";
 import { HeaderMenu } from "../modals/HeaderMenu";
-import { FranchizeProfileButton } from "./FranchizeProfileButton";
+import { FranchizeProfileButton, CrewButtonErrorBoundary } from "./FranchizeProfileButton";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { toCategoryId } from "../lib/navigation";
@@ -402,13 +402,27 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             correct z-ordering if any edge case causes visual overlap (e.g., during
             CSS transitions or on unusual viewports).
           */}
+          {/* FIX v3: Wrap FranchizeProfileButton in CrewButtonErrorBoundary
+              at the CALL SITE. The boundary inside FranchizeProfileButton only
+              wraps the JSX return (DropdownMenu), NOT the hooks. If a hook
+              throws (e.g., useAppContext during SPA transition), the inner
+              boundary cannot catch it, and the error reaches the page-level
+              error.tsx → fullscreen "Экипаж временно недоступен". Wrapping
+              at the call site catches ALL errors (hooks + JSX) and renders
+              a small Telegram link fallback instead of crashing the page. */}
           <div className="flex items-center gap-2 justify-self-end relative z-[2]">
-            <FranchizeProfileButton
+            <CrewButtonErrorBoundary
               bgColor={withAlpha(crew.theme.palette.bgBase, 0.8)}
               textColor={crew.theme.palette.textPrimary}
               borderColor={crew.theme.palette.borderSoft}
-              currentSlug={crew.slug}
-            />
+            >
+              <FranchizeProfileButton
+                bgColor={withAlpha(crew.theme.palette.bgBase, 0.8)}
+                textColor={crew.theme.palette.textPrimary}
+                borderColor={crew.theme.palette.borderSoft}
+                currentSlug={crew.slug}
+              />
+            </CrewButtonErrorBoundary>
             <FloatingCartIconLinkBySlug
               slug={crew.slug}
               href={`/franchize/${crew.slug}/cart`}
