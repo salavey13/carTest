@@ -18,7 +18,8 @@ import { MARKET_ROUTE } from './SvarProfiClient'
 
 // ─────────────────────────────────────────────────────
 // SvarProfi Products Showcase — product cards with gallery
-// "Подробнее" links to /franchise/svarprofi for full details
+// "Подробнее" links to /franchize/svarprofi?vehicle=<slug>
+// (same pattern as VipBike: ?vehicle=<id>)
 // ─────────────────────────────────────────────────────
 
 export function SvarProfiProductsShowcase({
@@ -28,7 +29,7 @@ export function SvarProfiProductsShowcase({
 }: {
   items: MetalProduct[]
   onGalleryOpen: (id: string) => void
-  onOrderClick: () => void
+  onOrderClick: (slug?: string) => void
 }) {
   if (items.length === 0) return null
 
@@ -130,15 +131,15 @@ export function SvarProfiProductsShowcase({
                 )}
               </div>
 
-              {/* Action buttons: order + market details */}
+              {/* Action buttons: order + market details with vehicle slug */}
               <div className="flex gap-2">
                 <Button
                   className="flex-1 bg-[#2E7DBF] text-white hover:bg-[#2563A0]"
-                  onClick={onOrderClick}
+                  onClick={() => onOrderClick(item.slug)}
                 >
                   Запросить расчёт <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
-                <Link href={MARKET_ROUTE}>
+                <Link href={`${MARKET_ROUTE}?vehicle=${item.slug}`}>
                   <Button
                     variant="outline"
                     className="border-[#3A4250] text-[#8A92A0] hover:bg-[#242830] hover:text-[#E8ECF1]"

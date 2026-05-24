@@ -30,9 +30,10 @@ import { SvarProfiGalleryLightbox } from './SvarProfiGalleryLightbox'
 //   → Features → OrderProcess → Materials → AdCards
 //   → FAQ → Footer
 //
-// Overlays: OrderSheet + GalleryLightbox
+// Overlays: OrderSheet (ORDERX) + GalleryLightbox
 //
 // Market route: /franchize/svarprofi
+// Product links: /franchize/svarprofi?vehicle=<slug>
 // ─────────────────────────────────────────────────────
 
 /** Canonical route to the SvarProfi franchise market */
@@ -43,6 +44,7 @@ export function SvarProfiClient({ items: initialItems }: { items?: MetalProduct[
   const [orderOpen, setOrderOpen] = useState(false)
   const [orderSubmitted, setOrderSubmitted] = useState(false)
   const [galleryOpen, setGalleryOpen] = useState<string | null>(null)
+  const [vehicleSlug, setVehicleSlug] = useState<string | undefined>(undefined)
 
   // Guard against infinite re-fetch when API returns empty
   const fetchAttemptedRef = useRef(false)
@@ -67,6 +69,12 @@ export function SvarProfiClient({ items: initialItems }: { items?: MetalProduct[
     return DEMO_ITEMS as MetalProduct[]
   }, [catalogItems])
 
+  // Open order sheet with optional vehicle slug context
+  const openOrder = (slug?: string) => {
+    setVehicleSlug(slug)
+    setOrderOpen(true)
+  }
+
   return (
     <div className="relative min-h-screen bg-[#1A1D23] text-[#E8ECF1]">
       {/* Background gradient */}
@@ -79,13 +87,13 @@ export function SvarProfiClient({ items: initialItems }: { items?: MetalProduct[
 
       <div className="relative z-10">
         <SvarProfiHeader />
-        <SvarProfiHero onOrderClick={() => setOrderOpen(true)} />
+        <SvarProfiHero onOrderClick={() => openOrder()} />
         <SvarProfiTicker />
         <SvarProfiCategories />
         <SvarProfiProductsShowcase
           items={displayItems}
           onGalleryOpen={setGalleryOpen}
-          onOrderClick={() => setOrderOpen(true)}
+          onOrderClick={(slug?: string) => openOrder(slug)}
         />
         <SvarProfiFeatures />
         <SvarProfiOrderProcess />
@@ -101,6 +109,7 @@ export function SvarProfiClient({ items: initialItems }: { items?: MetalProduct[
         onOpenChange={setOrderOpen}
         submitted={orderSubmitted}
         onSubmitted={setOrderSubmitted}
+        vehicleSlug={vehicleSlug}
       />
 
       {galleryOpen && (

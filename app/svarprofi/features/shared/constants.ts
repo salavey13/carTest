@@ -20,7 +20,6 @@ export const BRAND = {
   tagline: 'Металлические конструкции любой сложности — от чертежа до монтажа',
   phone: '+7 (904) 060-06-44',
   phoneHref: 'tel:+79040600644',
-  telegram: 'https://t.me/svarprofi_nn',
   city: 'Москва',
 }
 
@@ -42,6 +41,8 @@ export const CATEGORIES = [
     description: 'Металлические каркасы для промышленных и гражданских зданий',
     image: IMAGES.promoKarkasy,
     icon: Building2,
+    /** Slug of the first demo item in this category — used for ?vehicle= link */
+    vehicleSlug: 'karkas-prom',
   },
   {
     id: 'navesy',
@@ -49,6 +50,7 @@ export const CATEGORIES = [
     description: 'Навесы из профнастила и поликарбоната для автостоянок и террас',
     image: IMAGES.promoNavesy,
     icon: Columns3,
+    vehicleSlug: 'karkas-prom',
   },
   {
     id: 'ograzhdeniya',
@@ -56,6 +58,7 @@ export const CATEGORIES = [
     description: 'Сварные секционные ограждения для территорий и объектов',
     image: IMAGES.promoOgrazhdeniya,
     icon: Wrench,
+    vehicleSlug: 'karkas-kran',
   },
 ]
 
@@ -100,6 +103,7 @@ export const TICKER_ITEMS = [
 export const DEMO_ITEMS = [
   {
     id: 'b1c2d3e4-f5a6-7b8c-9d0e-012345678902',
+    slug: 'karkas-prom',
     make: 'СварПрофи-НН',
     model: 'Каркас промышленный',
     description: 'Металлический каркас промышленного здания с фермами покрытия. Двутавровые колонны и фермы из прокатных профилей. Антикоррозийная обработка. Болтовые монтажные соединения.',
@@ -129,6 +133,7 @@ export const DEMO_ITEMS = [
   },
   {
     id: 'b1c2d3e4-f5a6-7b8c-9d0e-012345678903',
+    slug: 'karkas-kran',
     make: 'СварПрофи-НН',
     model: 'Каркас с кран-балкой',
     description: 'Пространственная стропильная ферма с подкрановыми путями. Опорные колонны и подкрановые балки — жёлтого цвета (безопасность). Основные фермы — светло-серые.',

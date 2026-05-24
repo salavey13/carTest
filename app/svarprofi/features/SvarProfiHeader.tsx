@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/sheet'
 import {
   Phone,
-  MessageCircle,
   Menu,
 } from 'lucide-react'
 import { BRAND, IMAGES } from './shared/constants'
@@ -23,6 +22,8 @@ import { MARKET_ROUTE } from './SvarProfiClient'
 // ─────────────────────────────────────────────────────
 // SvarProfi Header — sticky with scroll compact mode
 // Links to /franchize/svarprofi for full market
+// NOTE: No map-riders — N/A for metal_stuff franchise
+// NOTE: No telegram link — contact info not yet confirmed
 // ─────────────────────────────────────────────────────
 
 export function SvarProfiHeader() {
@@ -95,9 +96,6 @@ export function SvarProfiHeader() {
               <Separator className="bg-[#3A4250]" />
               <a href={BRAND.phoneHref} className="flex items-center gap-2 text-base text-[#2E7DBF]">
                 <Phone className="h-4 w-4" /> {BRAND.phone}
-              </a>
-              <a href={BRAND.telegram} target="_blank" className="flex items-center gap-2 text-base text-[#2E7DBF]">
-                <MessageCircle className="h-4 w-4" /> Telegram
               </a>
             </nav>
           </SheetContent>

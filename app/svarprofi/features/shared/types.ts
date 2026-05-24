@@ -4,6 +4,8 @@
 
 export interface MetalProduct {
   id: string
+  /** URL-safe slug for routing: /franchize/svarprofi?vehicle=<slug> */
+  slug: string
   make: string
   model: string
   description: string

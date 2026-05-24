@@ -20,6 +20,11 @@
 --   IMG_20260523_225516_763.jpg → steel framework + blue sky → karkas-prom/image_2
 --   IMG_20260523_225520_343.jpg → workshop interior + mezzanine → karkas-prom/image_3
 --   IMG_20260523_225520_446.jpg → space truss + crane runway → karkas-kran/image_1
+--
+-- CHANGELOG (v2):
+--  - City: НН → Москва (company operates from Moscow)
+--  - delivery_region: Москва, МО, ЦФО
+--  - rent_link: ?vehicle=<slug> pattern (not /order?product=)
 -- ============================================================================
 
 begin;
@@ -40,7 +45,7 @@ insert into public.cars (
   NULL,
   '0',
   'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/karkas-prom/image_1.jpg',
-  '/order?product=karkas-prom',
+  '/franchize/svarprofi?vehicle=karkas-prom',
   false,
   jsonb_build_object(
     'sale', false,
@@ -74,7 +79,7 @@ insert into public.cars (
     'sale_price', NULL,
     'production_days', NULL,
     'delivery_available', true,
-    'delivery_region', 'Нижний Новгород, НО, ЦФО',
+    'delivery_region', 'Москва, МО, ЦФО',
     'installation_available', true,
     'installation_days', NULL,
     'rating', NULL,
@@ -104,6 +109,7 @@ set make = excluded.make,
     model = excluded.model,
     description = excluded.description,
     image_url = excluded.image_url,
+    rent_link = excluded.rent_link,
     specs = excluded.specs,
     type = excluded.type,
     crew_id = excluded.crew_id,
@@ -125,7 +131,7 @@ insert into public.cars (
   NULL,
   '0',
   'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/karkas-kran/image_1.jpg',
-  '/order?product=karkas-kran',
+  '/franchize/svarprofi?vehicle=karkas-kran',
   false,
   jsonb_build_object(
     'sale', false,
@@ -159,7 +165,7 @@ insert into public.cars (
     'sale_price', NULL,
     'production_days', NULL,
     'delivery_available', true,
-    'delivery_region', 'Нижний Новгород, НО, ЦФО',
+    'delivery_region', 'Москва, МО, ЦФО',
     'installation_available', true,
     'installation_days', NULL,
     'rating', NULL,
@@ -192,6 +198,7 @@ set make = excluded.make,
     model = excluded.model,
     description = excluded.description,
     image_url = excluded.image_url,
+    rent_link = excluded.rent_link,
     specs = excluded.specs,
     type = excluded.type,
     crew_id = excluded.crew_id,
