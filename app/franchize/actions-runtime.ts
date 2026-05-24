@@ -606,7 +606,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       return { crew: emptyCrew(safeSlug), items: [] };
     }
 
-    const catalogTypes = ["bike", "accessories", "gear", "wbitem"];
+    const catalogTypes = ["bike", "accessories", "gear", "wbitem", "metal_stuff"];
     const { data: cars, error: carsError } = await supabaseAdmin
       .from("cars")
       .select("id, make, model, description, image_url, daily_price, type, specs, availability_rules")
