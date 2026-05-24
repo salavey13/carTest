@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, User, IdCard, MessageCircle, Send } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Component, useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { isMockUserModeEnabled } from "@/lib/mockUserMode";
@@ -50,6 +50,61 @@ function normalizeSlug(slug: string | undefined): string {
   // catches it. However, we should also guard against whitespace-only slugs.
   const normalized = (slug || "").trim().toLowerCase();
   return normalized || "vip-bike";
+}
+
+// ─────────────────────────────────────────────────────────
+// FIX: Local error boundary to prevent "crew recovery" full-page crash.
+// ─────────────────────────────────────────────────────────
+// When the DropdownMenu or any of its children throw during rendering
+// (e.g., due to missing AppContext during SPA navigation, useIsAdmin
+// throwing, or Radix portal failures), the error bubbles up to the
+// nearest error boundary. Without this local boundary, the error reaches
+// the page-level "crew recovery" boundary, replacing the ENTIRE page
+// with the fallback screen. This local boundary catches the error
+// gracefully and renders a simple fallback button instead.
+// ─────────────────────────────────────────────────────────
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+class CrewButtonErrorBoundary extends Component<
+  { bgColor: string; textColor: string; borderColor: string; children: React.ReactNode },
+  ErrorBoundaryState
+> {
+  constructor(props: { bgColor: string; textColor: string; borderColor: string; children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown, info: unknown) {
+    // Log to console for debugging — NOT to the user
+    console.warn("[FranchizeProfileButton] caught render error:", error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // Minimal fallback: just show the avatar letter button without the dropdown.
+      // Clicking it navigates to Telegram WebApp (same as the old !hasUser behavior).
+      return (
+        <a
+          href={TELEGRAM_WEB_APP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Открыть Telegram WebApp"
+          className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          style={{ backgroundColor: this.props.bgColor, color: this.props.textColor, borderColor: this.props.borderColor }}
+        >
+          <Send className="h-4 w-4" />
+          <span className="hidden sm:inline">WebApp</span>
+        </a>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 interface FranchizeProfileButtonProps {
@@ -168,7 +223,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   // opens a dropdown (consistent UX) and never navigates away unexpectedly.
   // ─────────────────────────────────────────────────────────
 
-  return (
+  const inner = (
     <div style={{ isolation: "isolate" }}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -359,5 +414,13 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
+  );
+
+  // FIX: Wrap in local error boundary so a DropdownMenu crash doesn't
+  // take down the entire page (replacing it with "crew recovery" fallback).
+  return (
+    <CrewButtonErrorBoundary bgColor={bgColor} textColor={textColor} borderColor={borderColor}>
+      {inner}
+    </CrewButtonErrorBoundary>
   );
 }
