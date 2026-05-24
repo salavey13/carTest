@@ -18,7 +18,30 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
 
   return (
     <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}`} groupLinks={items.map((item) => item.category)} />
+      {/*
+        FIX: Wrap CrewHeader in FranchizeErrorBoundary so that any runtime
+        error inside the header (including FranchizeProfileButton's Radix
+        DropdownMenu portal errors that escape the local
+        CrewButtonErrorBoundary) is caught by a LOCAL boundary instead of
+        bubbling up to the page-level error.tsx which shows the full-screen
+        "Экипаж временно недоступен" fallback.
+
+        Without this wrapper, a portal crash in FranchizeProfileButton's
+        DropdownMenu bypasses the local CrewButtonErrorBoundary (because
+        Radix renders the portal content outside that boundary's DOM tree)
+        and reaches the page-level error boundary, replacing the ENTIRE
+        page with the "crew recovery" screen. This FranchizeErrorBoundary
+        renders a small inline fallback widget instead, so the catalog
+        remains visible even if the header breaks.
+      */}
+      <FranchizeErrorBoundary
+        resetKey={slug}
+        fallbackTitle="Шапка недоступна"
+        fallbackHref={`/franchize/${crew.slug || slug}`}
+        fallbackLinkLabel="Обновить страницу экипажа"
+      >
+        <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}`} groupLinks={items.map((item) => item.category)} />
+      </FranchizeErrorBoundary>
       <FranchizeErrorBoundary
         resetKey={slug}
         fallbackTitle="Каталог недоступен"

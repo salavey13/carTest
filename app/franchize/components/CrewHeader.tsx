@@ -80,6 +80,20 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
     }
   }, [pathname, mainCatalogPath]);
 
+  // ── FIX: Close menu on route change (safety net for HeaderMenu navigation) ──
+  // When the user clicks a menu item in HeaderMenu, the menu closes via
+  // onOpenChange(false) and navigation starts via router.push() in a
+  // setTimeout. If the menu somehow stays open (e.g., router.push fails
+  // or the user navigates via browser back/forward), this effect closes
+  // the menu when the pathname changes. This is a safety net, not the
+  // primary close mechanism.
+  useEffect(() => {
+    if (menuOpen) {
+      setMenuOpen(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
   const defaultGroupLinks = useMemo(
     () => Array.from(new Set([...crew.catalog.showcaseGroups.map((group) => group.label), ...crew.catalog.categories, ...groupLinks].filter(Boolean))),
     [crew.catalog.categories, crew.catalog.showcaseGroups, groupLinks],
