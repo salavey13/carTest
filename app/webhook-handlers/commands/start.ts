@@ -27,7 +27,7 @@ import { supabaseAnon, createOrUpdateUser } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { grantFranchizeAchievementAction } from "@/app/franchize/profile-actions";
-import { surveyQuestions, answerTexts } from "./content/start_survey_questions_bike";
+import { surveyQuestions, answerTexts } from "./content/start_survey_questions_sportbike";
 
 // ── Import from onboarding pipeline ──
 import { parseStartPayload, extractPromoCode } from "@/app/franchize/lib/onboarding/payload-parser";
