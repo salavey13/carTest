@@ -128,7 +128,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
         return prev;
       });
     };
-    
+
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
