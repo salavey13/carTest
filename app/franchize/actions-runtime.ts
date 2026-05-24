@@ -680,13 +680,14 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       label: readPath(link, ["label"], "Ссылка"),
       href: withSlug(readPath(link, ["href"], `/franchize/${crew.slug ?? safeSlug}`), crew.slug ?? safeSlug),
     }));
-    const menuLinks = menuLinksRaw.some((link) => link.href === `/franchize/${crew.slug ?? safeSlug}/map-riders`)
+    // map-riders link is not forced
+    const menuLinks = menuLinksRaw/*.some((link) => link.href === `/franchize/${crew.slug ?? safeSlug}/map-riders`)
       ? menuLinksRaw
       : [
           ...menuLinksRaw.slice(0, 1),
           { label: "Карта райдеров", href: `/franchize/${crew.slug ?? safeSlug}/map-riders` },
           ...menuLinksRaw.slice(1),
-        ];
+        ];*/
 
     const metadataShowcaseGroups = readArrayPath<UnknownRecord>(franchize, ["catalog", "showcaseGroups"]);
     const showcaseGroups = (metadataShowcaseGroups.length > 0
