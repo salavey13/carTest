@@ -23,7 +23,11 @@ export function SvarProfiGalleryLightbox({
 
   if (!item) return null
 
-  const gallery = item.specs.gallery.length > 0 ? item.specs.gallery : [item.image_url]
+  // FIX: Defensive access — specs.gallery may be undefined if this component
+  // receives data from an un-normalized source (e.g., DEMO_ITEMS fallback or
+  // a race condition before normalizeProduct runs). The old code crashed with
+  // "Cannot read properties of undefined (reading 'length')" on mobile.
+  const gallery = item.specs?.gallery?.length ? item.specs.gallery : [item.image_url]
 
   return (
     <div
