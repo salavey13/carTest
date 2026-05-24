@@ -2,7 +2,6 @@
 
 import { X } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FranchizeCrewVM } from "../actions";
@@ -29,7 +28,6 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const surface = crewPaletteForSurface(crew.theme);
-  const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
@@ -123,7 +121,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
                 key={`${link.href}-${link.label}`}
                 href={link.href}
                 onClick={(e) => {
-                  // ── FIX v4: Reliable menu item navigation ──
+                  // ── FIX v5: Reliable menu item navigation ──
                   // v1: onOpenChange(false) before router.push() — dropped navigation.
                   //     The menu close state update cancelled the startTransition-based
                   //     SPA navigation because React discarded the low-priority transition.
@@ -134,25 +132,25 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
                   //     after 50ms. Still unreliable because the portal unmount (menu
                   //     close) can interrupt the pending startTransition navigation.
                   // v4: Close menu FIRST (visual feedback), then navigate via
-                  //     router.push() in a setTimeout(50ms). This ensures:
-                  //     1. Menu close re-render completes in the current render cycle
-                  //     2. router.push() starts in a SEPARATE microtask, after the
-                  //        portal has unmounted and the render is committed
-                  //     3. The navigation is independent of the component tree —
-                  //        router.push() works even after the portal unmounts
-                  //     The pathname-based close effect in CrewHeader (see useEffect)
-                  //     serves as a safety net in case the menu somehow stays open.
+                  //     router.push() in a setTimeout(50ms). The router.push in a
+                  //     setTimeout is OUTSIDE the click event's interaction context,
+                  //     making it easy for React to discard the low-priority transition
+                  //     when the menu close re-render unmounts the portal.
+                  // v5: For hash links, handle locally + close menu. For regular links,
+                  //     DON'T prevent default and DON'T close menu in this handler.
+                  //     Let the Next.js <Link> component handle navigation natively
+                  //     (its internal router.push is tied to the click event context).
+                  //     The pathname change effect in CrewHeader closes the menu when
+                  //     navigation completes. This ensures the navigation happens in
+                  //     the same interaction as the click, so React keeps the transition.
                   if (link.href.startsWith("#")) {
                     e.preventDefault();
                     const target = document.querySelector(link.href);
                     target?.scrollIntoView({ behavior: "smooth", block: "start" });
                     onOpenChange(false);
-                  } else {
-                    e.preventDefault();
-                    onOpenChange(false);
-                    // Navigate after menu close re-render completes
-                    setTimeout(() => router.push(link.href), 50);
                   }
+                  // For regular links: do nothing extra.
+                  // Link navigates → pathname changes → CrewHeader closes menu.
                 }}
                 aria-current={isActive ? "page" : undefined}
                 className={`w-full text-left block rounded-xl border px-4 py-3 text-sm transition cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--header-menu-accent)] ${

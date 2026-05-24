@@ -714,13 +714,16 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       className="group w-[65vw] max-w-[280px] shrink-0 snap-start rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)] sm:w-[260px]"
                       style={{
                         ...catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)),
-                        // touch-action: manipulation allows both horizontal carousel
-                        // scrolling AND vertical page scrolling on mobile. Also
-                        // disables double-tap zoom (preventing 300ms delay).
-                        // This is the per-card touch-action; the carousel container
-                        // also sets manipulation, so the effective intersection is
-                        // manipulation (pan-x + pan-y + pinch-zoom).
-                        touchAction: "manipulation",
+                        // FIX v3: Removed touchAction: "manipulation" from per-card style.
+                        // The carousel container already sets touchAction: "manipulation",
+                        // which is the effective touch-action for all children. Setting
+                        // it again on individual cards created an unnecessary override
+                        // that could bias the browser's gesture-direction detection
+                        // toward horizontal (carousel scroll) when the user starts a
+                        // vertical gesture on a card. By removing the per-card override,
+                        // the browser relies on the container's touch-action +
+                        // overflow-y-hidden to correctly route vertical gestures to
+                        // the page scroll.
                       }}
                     >
                       <button
@@ -763,7 +766,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               fill
                               sizes="(max-width: 1279px) 65vw, 260px"
                               className="object-cover transition-transform duration-300 ease-out"
-                              style={{ transform: `scale(1.06) translate3d(${parallax.x * 8}px, ${parallax.y * 8}px, 0)` }}
+                              // FIX v3: Only apply scale(1.06) + translate3d transform
+                              // when parallax is actually active (non-zero). The always-on
+                              // scale(1.06) created a compositing layer on EVERY card image,
+                              // which on mobile can interfere with touch hit-testing and
+                              // gesture direction detection in the browser's compositor.
+                              // When parallax is idle (x=0, y=0), no transform is needed —
+                              // the image fills the container via object-cover alone.
+                              style={{ transform: (parallax.x !== 0 || parallax.y !== 0) ? `scale(1.06) translate3d(${parallax.x * 8}px, ${parallax.y * 8}px, 0)` : undefined }}
                               onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
                             />
                           ) : (
