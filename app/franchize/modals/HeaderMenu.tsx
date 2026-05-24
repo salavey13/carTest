@@ -3,7 +3,7 @@
 import { X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FranchizeCrewVM } from "../actions";
 import { crewPaletteForSurface } from "../lib/theme";
@@ -123,27 +123,35 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
                 key={`${link.href}-${link.label}`}
                 href={link.href}
                 onClick={(e) => {
-                  // FIX v2: Navigate FIRST, close menu SECOND.
-                  // The v1 fix (onOpenChange(false) BEFORE router.push) still dropped
-                  // navigation because onOpenChange(false) → setMenuOpen(false) batches
-                  // into the same React render that unmounts the HeaderMenu portal.
-                  // In Next.js App Router, router.push() is asynchronous — it schedules
-                  // a transition that fires after the current microtask. If the portal
-                  // unmounts in the same render batch, the transition can be lost.
-                  // By deferring onOpenChange to the next tick, we ensure:
-                  //   1. router.push() fires first (schedules the transition)
-                  //   2. The portal stays mounted during the same render
-                  //   3. Menu closes on next tick after navigation is underway
-                  e.preventDefault();
+                  // ── FIX v4: Reliable menu item navigation ──
+                  // v1: onOpenChange(false) before router.push() — dropped navigation.
+                  //     The menu close state update cancelled the startTransition-based
+                  //     SPA navigation because React discarded the low-priority transition.
+                  // v2: e.preventDefault() + router.push() + setTimeout — still unreliable
+                  //     because the portal unmounts in the same render batch as the
+                  //     navigation, and startTransition can be lost.
+                  // v3: Don't prevent default — let Link navigate natively + close menu
+                  //     after 50ms. Still unreliable because the portal unmount (menu
+                  //     close) can interrupt the pending startTransition navigation.
+                  // v4: Close menu FIRST (visual feedback), then navigate via
+                  //     router.push() in a setTimeout(50ms). This ensures:
+                  //     1. Menu close re-render completes in the current render cycle
+                  //     2. router.push() starts in a SEPARATE microtask, after the
+                  //        portal has unmounted and the render is committed
+                  //     3. The navigation is independent of the component tree —
+                  //        router.push() works even after the portal unmounts
+                  //     The pathname-based close effect in CrewHeader (see useEffect)
+                  //     serves as a safety net in case the menu somehow stays open.
                   if (link.href.startsWith("#")) {
-                    // Hash link — scroll to section on current page, close immediately
+                    e.preventDefault();
                     const target = document.querySelector(link.href);
                     target?.scrollIntoView({ behavior: "smooth", block: "start" });
                     onOpenChange(false);
                   } else {
-                    // Full navigation — schedule transition FIRST, close menu AFTER
-                    router.push(link.href);
-                    setTimeout(() => onOpenChange(false), 0);
+                    e.preventDefault();
+                    onOpenChange(false);
+                    // Navigate after menu close re-render completes
+                    setTimeout(() => router.push(link.href), 50);
                   }
                 }}
                 aria-current={isActive ? "page" : undefined}

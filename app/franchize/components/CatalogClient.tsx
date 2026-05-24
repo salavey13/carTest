@@ -669,10 +669,30 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       ref={(node) => {
                         carouselRefs.current[group.category] = node;
                       }}
-                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                       tabIndex={0}
                       role="region"
                       aria-label={`Карусель категории ${group.category}`}
+                      style={{
+                        // FIX v2: touch-action: manipulation allows BOTH horizontal
+                        // carousel scrolling AND vertical page scrolling on mobile.
+                        // The old touch-action: pan-y only allowed vertical panning,
+                        // which prevented horizontal carousel scrolling on touch devices.
+                        // manipulation = pan-x + pan-y + pinch-zoom — the browser
+                        // decides the gesture direction based on the initial movement.
+                        //
+                        // Combined with overflow-y-hidden (added to className above),
+                        // the carousel container is no longer a vertical scroll container.
+                        // Before this fix, overflow-x-auto caused the CSS spec to compute
+                        // overflow-y as auto (not visible), making the container a
+                        // bidirectional scroll container. This caused vertical touch
+                        // gestures to be consumed by the container (which had nothing
+                        // to scroll vertically) instead of chaining to the parent page.
+                        // overflow-y-hidden explicitly tells the browser the container
+                        // is NOT a vertical scroll context, so vertical touches propagate
+                        // to the page, restoring natural vertical scrolling on mobile.
+                        touchAction: "manipulation",
+                      }}
                       onKeyDown={(event) => {
                         if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
                         const root = carouselRefs.current[group.category];
@@ -694,12 +714,12 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       className="group w-[65vw] max-w-[280px] shrink-0 snap-start rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)] sm:w-[260px]"
                       style={{
                         ...catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)),
-                        // FIX: touch-action: manipulation allows both horizontal carousel
-                        // scrolling AND vertical page scrolling on mobile. The old
-                        // touch-pan-x on the carousel container ONLY allowed horizontal
-                        // panning, which prevented vertical page scrolling when the user's
-                        // finger started on a card image. manipulation also disables
-                        // double-tap zoom (preventing 300ms delay) while keeping pan+pinch.
+                        // touch-action: manipulation allows both horizontal carousel
+                        // scrolling AND vertical page scrolling on mobile. Also
+                        // disables double-tap zoom (preventing 300ms delay).
+                        // This is the per-card touch-action; the carousel container
+                        // also sets manipulation, so the effective intersection is
+                        // manipulation (pan-x + pan-y + pinch-zoom).
                         touchAction: "manipulation",
                       }}
                     >
