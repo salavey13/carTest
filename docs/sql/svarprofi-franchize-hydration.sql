@@ -48,11 +48,11 @@ insert into public.crews (
   updated_at
 )
 values (
-  'a1b2c3d4-e5f6-7a8b-9c0d-svarprofi01'::uuid,
+  'a1b2c3d4-e5f6-7a8b-9c0d-012345678901',
   'СварПрофи-НН',
   'СварПрофи-НН — производство строительных металлических конструкций в Нижнем Новгороде. Сварные конструкции, каркасы, ограждения, навесы и индивидуальные проекты.',
   'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/logo.png',
-  '100000001',
+  '413553377',
   'svarprofi',
   '56.2965,43.9472',
   '{}'::jsonb,
@@ -427,26 +427,26 @@ set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
   }
 }
 $$::jsonb)
-where c.id = 'a1b2c3d4-e5f6-7a8b-9c0d-svarprofi01'::uuid;
+where c.id = 'a1b2c3d4-e5f6-7a8b-9c0d-012345678901';
 
 -- ============================================================================
 -- 3. UPDATE TOP-LEVEL METADATA
 -- ============================================================================
 update public.crews c
 set metadata = jsonb_set(c.metadata, '{slug}', '"svarprofi"'::jsonb)
-where c.id = 'a1b2c3d4-e5f6-7a8b-9c0d-svarprofi01'::uuid;
+where c.id = 'a1b2c3d4-e5f6-7a8b-9c0d-012345678901';
 
 update public.crews c
 set metadata = jsonb_set(c.metadata, '{is_provider}', 'true'::jsonb)
-where c.id = 'a1b2c3d4-e5f6-7a8b-9c0d-svarprofi01'::uuid;
+where c.id = 'a1b2c3d4-e5f6-7a8b-9c0d-012345678901';
 
 update public.crews c
 set metadata = jsonb_set(c.metadata, '{provider_type}', '"metal_stuff"'::jsonb)
-where c.id = 'a1b2c3d4-e5f6-7a8b-9c0d-svarprofi01'::uuid;
+where c.id = 'a1b2c3d4-e5f6-7a8b-9c0d-012345678901';
 
 update public.crews c
 set metadata = jsonb_set(c.metadata, '{rating}', '4.8'::jsonb)
-where c.id = 'a1b2c3d4-e5f6-7a8b-9c0d-svarprofi01'::uuid;
+where c.id = 'a1b2c3d4-e5f6-7a8b-9c0d-012345678901';
 
 update public.crews c
 set metadata = jsonb_set(c.metadata, '{contacts}', $$
@@ -458,7 +458,7 @@ set metadata = jsonb_set(c.metadata, '{contacts}', $$
   "workingHours": null
 }
 $$::jsonb)
-where c.id = 'a1b2c3d4-e5f6-7a8b-9c0d-svarprofi01'::uuid;
+where c.id = 'a1b2c3d4-e5f6-7a8b-9c0d-012345678901';
 
 -- ============================================================================
 -- 4. CREW SECRETS (contract defaults)

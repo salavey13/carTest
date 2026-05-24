@@ -33,7 +33,7 @@ insert into public.cars (
   id, make, model, description, embedding, daily_price, image_url, rent_link,
   is_test_result, specs, owner_id, type, crew_id, availability_rules, quantity
 ) values (
-  'b1c2d3e4-f5a6-7b8c-9d0e-karkas000001'::uuid,
+  'b1c2d3e4-f5a6-7b8c-9d0e-012345678902',
   'СварПрофи-НН',
   'Каркас промышленный',
   'Металлический каркас промышленного здания с фермами покрытия. Двутавровые колонны и фермы из прокатных профилей. Антикоррозийная обработка. Болтовые монтажные соединения. Подходит для складов, цехов и производственных помещений. На фото — монтаж каркаса с оранжевым покрытием на объекте заказчика.',
@@ -93,9 +93,9 @@ insert into public.cars (
     'buy_options', NULL,
     'buy_colors', NULL
   ),
-  '100000001',
+  '413553377',
   'metal_stuff',
-  'a1b2c3d4-e5f6-7a8b-9c0d-svarprofi01'::uuid,
+  'a1b2c3d4-e5f6-7a8b-9c0d-012345678901',
   '{}'::jsonb,
   '1'
 )
@@ -118,7 +118,7 @@ insert into public.cars (
   id, make, model, description, embedding, daily_price, image_url, rent_link,
   is_test_result, specs, owner_id, type, crew_id, availability_rules, quantity
 ) values (
-  'b1c2d3e4-f5a6-7b8c-9d0e-karkr0000001'::uuid,
+  'b1c2d3e4-f5a6-7b8c-9d0e-012345678903',
   'СварПрофи-НН',
   'Каркас с кран-балкой',
   'Пространственная стропильная ферма с подкрановыми путями. Опорные колонны и подкрановые балки — жёлтого цвета (безопасность). Основные фермы — светло-серые. Предназначена для промышленных зданий с мостовыми кранами. На фото — смонтированная конструкция с кран-балкой в производственном цехе.',
@@ -181,9 +181,9 @@ insert into public.cars (
       jsonb_build_object('name', 'Жёлтый (колонны)', 'ral', 'RAL 1023', 'swatch', '#F0CA00')
     )
   ),
-  '100000001',
+  '413553377',
   'metal_stuff',
-  'a1b2c3d4-e5f6-7a8b-9c0d-svarprofi01'::uuid,
+  'a1b2c3d4-e5f6-7a8b-9c0d-012345678901',
   '{}'::jsonb,
   '1'
 )
