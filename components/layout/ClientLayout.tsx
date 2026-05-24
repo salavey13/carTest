@@ -57,6 +57,10 @@ import { useStartParamRouter } from "@/hooks/useStartParamRouter";
 // Franchize routes are their own product: CrewHeader + CrewFooter + optional
 // FranchizeMapBottomNav. They must NOT inherit the legacy BikeHeader/BikeFooter
 // or BottomNavigationBike — those belong to the global bike platform.
+//
+// SvarProfi is a standalone landing at /svarprofi with its own Header/Footer.
+// It renders its own SvarProfiHeader + SvarProfiFooter, so global ones
+// must be suppressed — same pattern as /vipbikerental.
 const THEME_CONFIG = {
   strikeball: {
     paths: ["/strikeball"],
@@ -86,6 +90,15 @@ const THEME_CONFIG = {
     BottomNav: null,
     isTransparent: false,
   },
+  // PATCH: svarprofi theme — standalone landing at /svarprofi
+  // Renders its own SvarProfiHeader + SvarProfiFooter internally.
+  svarprofi: {
+    paths: ["/svarprofi"],
+    Header: null,           // SvarProfi renders its own header
+    Footer: null,           // SvarProfi renders its own footer
+    BottomNav: null,        // No bottom nav for metal_stuff landing
+    isTransparent: true,
+  },
   franchize: {
     paths: ["/franchize/"],
     Header: null,           // Franchize pages render their own CrewHeader
@@ -103,6 +116,10 @@ const THEME_CONFIG = {
 };
 
 const getThemeForPath = (pathname: string) => {
+  // PATCH: svarprofi — check BEFORE franchize (more specific)
+  if (pathname.startsWith("/svarprofi")) {
+    return THEME_CONFIG.svarprofi;
+  }
   if (pathname.startsWith("/franchize/")) {
     return THEME_CONFIG.franchize;
   }
@@ -276,6 +293,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   ];
   // NOTE: /franchize/ is NOT here. Franchize pages use CrewHeader for
   // navigation and optionally FranchizeMapBottomNav on map-riders routes.
+  // NOTE: /svarprofi is NOT here. SvarProfi landing handles its own navigation.
 
   const showBottomNav =
     pathsToShowBottomNavForStartsWith.some((p) => pathname?.startsWith(p));
@@ -295,6 +313,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname === "/blogger" ||
         pathname?.startsWith("/optimapipe") ||
         pathname?.startsWith("/rules") ||
+        pathname?.startsWith("/svarprofi") ||   // PATCH: svarprofi has own header/footer
         pathname === "/" ||
         pathname === "/admin/map-routes"
       )
