@@ -376,7 +376,7 @@ function buildFranchizeReservationHold(franchize: UnknownRecord, fallbackAddress
   const amountXtr = Math.max(1, Math.round(readNumberPath(config, [["amountXtr"], ["amount_xtr"], ["stars"], ["depositXtr"], ["deposit_xtr"]], amountRub)));
   const percentRaw = readNumberPath(config, [["percent"], ["depositPercent"], ["deposit_percent"]], 0);
   const percent = percentRaw > 0 ? percentRaw : null;
-  const requiredDocs = readArrayPath<string>(config, ["requiredDocs"], ["Паспорт", "Водительское удостоверение A/A1/M", "Электронная подпись договора"]);
+  const requiredDocs = readArrayPath<string>(config, ["requiredDocs"], ["Паспорт", "Документ, удостоверяющий личность", "Электронная подпись договора"]);
   const pickupAddress = readPath(config, ["pickupAddress"], readPath(franchize, ["contacts", "address"], fallbackAddress || "адрес выдачи подтвердит оператор"));
   const label = readPath(config, ["label"], `Забронировать за ${amountRub.toLocaleString("ru-RU")}₽ / ${amountXtr.toLocaleString("ru-RU")} XTR`);
 
@@ -385,7 +385,7 @@ function buildFranchizeReservationHold(franchize: UnknownRecord, fallbackAddress
     amountXtr,
     percent,
     label,
-    invoiceLabel: readPath(config, ["invoiceLabel"], `Бронь байка: ${amountXtr.toLocaleString("ru-RU")} XTR`),
+    invoiceLabel: readPath(config, ["invoiceLabel"], `Бронь: ${amountXtr.toLocaleString("ru-RU")} XTR`),
     pickupAddress,
     requiredDocs,
   };
@@ -554,7 +554,7 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     email: "",
     address: "",
     telegram: "",
-    telegramBotUsername: "oneBikePlsBot",
+    telegramBotUsername: "",
     workingHours: "",
     map: {
       gps: "",
@@ -713,7 +713,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       theme: resolvedTheme,
       header: {
         brandName: readPath(franchize, ["branding", "name"], crew.name ?? "Franchize"),
-        tagline: readPath(franchize, ["branding", "tagline"], "Ride the vibe"),
+        tagline: readPath(franchize, ["branding", "tagline"], "Витрина экипажа"),
         logoUrl: readPath(franchize, ["branding", "logoUrl"], crew.logo_url ?? ""),
         logoHref: readPath(franchize, ["header", "logoHref"], `/franchize/${crew.slug ?? safeSlug}`),
         menuLinks,
@@ -727,7 +727,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
           readPath(franchize, ["footer", "address"], crew.hq_location ?? ""),
         ),
         telegram: readPath(franchize, ["contacts", "telegram"], ""),
-        telegramBotUsername: readPath(franchize, ["contacts", "telegramBotUsername"], "oneBikePlsBot"),
+        telegramBotUsername: readPath(franchize, ["contacts", "telegramBotUsername"], ""),
         workingHours: readPath(franchize, ["contacts", "workingHours"], ""),
         map: {
           gps: readPath(franchize, ["contacts", "map", "gps"], ""),
@@ -853,7 +853,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       return {
         id: car.id,
         title: `${car.make} ${car.model}`.trim(),
-        subtitle: (typeof specs.subtitle === "string" ? specs.subtitle : "Готов к выезду") as string,
+        subtitle: (typeof specs.subtitle === "string" ? specs.subtitle : "Доступно") as string,
         description: car.description ?? (typeof specs.description === "string" ? specs.description : "Подробности откроются в карточке"),
         imageUrl: mediaUrls[0] ?? "",
         mediaUrls,
@@ -2732,7 +2732,7 @@ async function createFranchizeOrderInvoiceInternal(
     amountXtr = holdConfig.percent
       ? Math.max(1, Math.ceil(effectiveTotal * (holdConfig.percent / 100)))
       : holdConfig.amountXtr;
-    invoiceTitle = "Franchize: Бронь байка";
+    invoiceTitle = "Franchize: Бронь";
     invoiceDescriptionPrefix = "Бронь аренды";
     invoiceProofLabel = holdConfig.invoiceLabel;
   }
@@ -2759,7 +2759,9 @@ async function createFranchizeOrderInvoiceInternal(
   const rentalId = randomUUID();
   const startParamPrefix = flowType === "rental" ? "rental" : "sale";
   const startParam = `${startParamPrefix}-${rentalId}`;
-  const telegramWebappLink = `https://t.me/oneBikePlsBot/app?startapp=${startParam}`;
+  // TODO: Pass crew bot username through checkout flow instead of hardcoding fallback
+  const crewBotUsername = "";
+  const telegramWebappLink = `https://t.me/${crewBotUsername || "oneBikePlsBot"}/app?startapp=${startParam}`;
   const siteBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
   const franchizeRentalLink = `${siteBaseUrl}/franchize/${payload.slug}/rental/${rentalId}`;
 
@@ -3020,7 +3022,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     return {
       found: false,
       rentalId: safeRentalId || "-",
-      slug: safeSlug || "vip-bike",
+      slug: safeSlug || "",
       status: "pending_confirmation",
       paymentStatus: "interest_paid",
       totalCost: 0,
@@ -3034,6 +3036,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       docVerifierRecordId: "",
       contractSourceScope: "",
       contractOriginalSha256: "",
+      // TODO: Resolve crew bot username from slug for rental deep links
       telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${safeRentalId}`,
     };
   }
@@ -3062,6 +3065,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       docVerifierRecordId: "",
       contractSourceScope: "",
       contractOriginalSha256: "",
+      // TODO: Resolve crew bot username from slug for rental deep links
       telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${safeRentalId}`,
     };
   }
@@ -3098,6 +3102,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     docVerifierRecordId: typeof verifier?.docVerifierRecordId === "string" ? verifier.docVerifierRecordId : "",
     contractSourceScope: typeof verifier?.sourceScope === "string" ? verifier.sourceScope : "",
     contractOriginalSha256: typeof verifier?.originalSha256 === "string" ? verifier.originalSha256 : "",
+    // TODO: Resolve crew bot username from slug for rental deep links
     telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${data.rental_id}`,
   };
 }
