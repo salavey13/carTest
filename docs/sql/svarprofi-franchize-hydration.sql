@@ -117,11 +117,11 @@ set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
     "showBackButton": false,
     "title": "СварПрофи-НН",
     "subtitle": "Металлоконструкции в Москве",
-    "logoHref": "/franchize/svarprofi",
+    "logoHref": "/svarprofi",
     "menuLinks": [
       { "label": "Каталог", "href": "/franchize/svarprofi" },
       { "label": "Каркасы", "href": "/franchize/svarprofi?vehicle=karkas-prom" },
-      { "label": "О компании", "href": "/svarprofi#features" },
+      { "label": "О компании", "href": "/franchize/svarprofi/about" },
       { "label": "FAQ", "href": "/svarprofi#faq" },
       { "label": "Заказ", "href": "/svarprofi#order" }
     ],
