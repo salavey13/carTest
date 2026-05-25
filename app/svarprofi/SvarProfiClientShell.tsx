@@ -48,7 +48,7 @@ class SvarProfiErrorBoundary extends Component<
             </div>
             <h2 className="text-xl font-bold mb-2">Что-то пошло не так</h2>
             <p className="text-sm text-[#8A92A0] mb-1">
-              Перзагрузите страницу или откройте через Telegram
+              Перезагрузите страницу или откройте через Telegram
             </p>
             {this.state.error && (
               <p className="text-xs text-[#8A92A0]/60 mt-2 break-all">
