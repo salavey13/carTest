@@ -27,11 +27,11 @@ interface CatalogClientProps {
 
 type QuickFilterKey = "all" | "budget" | "premium" | "newbie" | "topRated";
 
-const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string }> = [
+const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string; compactLabel?: string }> = [
   { key: "all", label: "Все" },
   { key: "budget", label: "До 5000" },
   { key: "premium", label: "Премиум 7000+" },
-  { key: "newbie", label: "Для новичка" },
+  { key: "newbie", label: "Для новичка", compactLabel: "Для новичков" },
   { key: "topRated", label: "Лучшие отзывы" },
 ];
 
@@ -361,7 +361,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       .filter((group) => group.items.length > 0);
 
     const saleGroup = sortedFilteredItems.filter((item) => item.saleAvailable);
-    const saleCategory = mode === "electro" ? "Электроэндуро в продаже" : "Байки на продажу";
+    const saleCategory = mode === "electro" ? "Электроэндуро в продаже" : "В продаже";
     const baseGroups = grouped.filter((group) => group.category !== saleCategory);
     const normalized = sortWbItemLast(baseGroups);
     if (saleGroup.length === 0) return normalized;
@@ -499,14 +499,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           </p>
         )}
 
-        <div id="catalog-search" className="relative mb-5" role="search" aria-label="Поиск по каталогу байков">
+        <div id="catalog-search" className="relative mb-5" role="search" aria-label="Поиск по каталогу">
           <label htmlFor="catalog-search-input" className="sr-only">
-            Поиск по каталогу байков
+            Поиск по каталогу
           </label>
           <input
             id="catalog-search-input"
             type="text"
-            placeholder="Найдите байк по модели или сценарию"
+            placeholder="Найдите по названию или сценарию"
             autoComplete="off"
             aria-describedby="catalog-results-status"
             value={searchQuery}
@@ -542,7 +542,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           )}
           <button
             type="button"
-            aria-label="Перейти к первому найденному байку"
+            aria-label="Перейти к первой найденной позиции"
             onClick={() => {
               const firstResult = document.querySelector("[data-catalog-item-button='true']") as HTMLButtonElement | null;
               firstResult?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -561,7 +561,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           </button>
         </div>
 
-        {promoModules.length > 0 && (
+        {promoModules.length > 0 && mode !== "electro" && (
           <div className="mb-5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
             {visiblePromoModules.map((module, index) => {
               const isExternal = /^(https?:|mailto:|tel:)/.test(module.href);
@@ -615,7 +615,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                   ["--quick-pill-text" as string]: active ? "#000000" : crew.theme.palette.textPrimary,
                 }}
               >
-                {filter.label} · {quickFilterCounts[filter.key]}
+                {(filter.compactLabel ?? filter.label)} · {quickFilterCounts[filter.key]}
               </button>
             );
           })}
@@ -669,30 +669,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       ref={(node) => {
                         carouselRefs.current[group.category] = node;
                       }}
-                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 touch-pan-x [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                       tabIndex={0}
                       role="region"
                       aria-label={`Карусель категории ${group.category}`}
-                      style={{
-                        // FIX v2: touch-action: manipulation allows BOTH horizontal
-                        // carousel scrolling AND vertical page scrolling on mobile.
-                        // The old touch-action: pan-y only allowed vertical panning,
-                        // which prevented horizontal carousel scrolling on touch devices.
-                        // manipulation = pan-x + pan-y + pinch-zoom — the browser
-                        // decides the gesture direction based on the initial movement.
-                        //
-                        // Combined with overflow-y-hidden (added to className above),
-                        // the carousel container is no longer a vertical scroll container.
-                        // Before this fix, overflow-x-auto caused the CSS spec to compute
-                        // overflow-y as auto (not visible), making the container a
-                        // bidirectional scroll container. This caused vertical touch
-                        // gestures to be consumed by the container (which had nothing
-                        // to scroll vertically) instead of chaining to the parent page.
-                        // overflow-y-hidden explicitly tells the browser the container
-                        // is NOT a vertical scroll context, so vertical touches propagate
-                        // to the page, restoring natural vertical scrolling on mobile.
-                        touchAction: "manipulation",
-                      }}
                       onKeyDown={(event) => {
                         if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
                         const root = carouselRefs.current[group.category];
@@ -712,48 +692,28 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       data-carousel-card="true"
                       data-carousel-index={index}
                       className="group w-[65vw] max-w-[280px] shrink-0 snap-start rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)] sm:w-[260px]"
-                      style={{
-                        ...catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)),
-                        // FIX v3: Removed touchAction: "manipulation" from per-card style.
-                        // The carousel container already sets touchAction: "manipulation",
-                        // which is the effective touch-action for all children. Setting
-                        // it again on individual cards created an unnecessary override
-                        // that could bias the browser's gesture-direction detection
-                        // toward horizontal (carousel scroll) when the user starts a
-                        // vertical gesture on a card. By removing the per-card override,
-                        // the browser relies on the container's touch-action +
-                        // overflow-y-hidden to correctly route vertical gestures to
-                        // the page scroll.
-                      }}
+                      style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
                     >
                       <button
                         type="button"
                         aria-label={`Открыть карточку ${item.title}: ${item.rentPriceLabel}`}
                         data-catalog-item-button="true"
-                        className="block w-full text-left"
+                        className="block w-full overflow-hidden text-left"
                         onClick={() => openItem(item)}
                         onFocus={() => setFocusedItemId(item.id)}
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
                         style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
                         onPointerMove={(event) => {
-                          // FIX: Only compute parallax for mouse/pen pointers.
-                          // On touch devices, pointermove fires on every finger drag,
-                          // which causes React state updates that fight the browser's
-                          // native scroll gesture — preventing vertical page scrolling
-                          // when the user's finger starts on a card image.
-                          if (event.pointerType === 'touch') return;
                           const rect = event.currentTarget.getBoundingClientRect();
                           const dx = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
                           const dy = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
                           setCarouselParallaxByItem((prev) => ({ ...prev, [item.id]: { x: dx, y: dy } }));
                         }}
-                        onPointerLeave={(event) => {
-                          // Only reset parallax on non-touch pointers
-                          if (event.pointerType === 'touch') return;
+                        onPointerLeave={() => {
                           setCarouselParallaxByItem((prev) => ({ ...prev, [item.id]: { x: 0, y: 0 } }));
                         }}
                       >
-                        <div className="relative aspect-[9/16] w-full">
+                        <div className="relative aspect-[9/16] w-full overflow-hidden">
                           {item.imageUrl && !carouselLoadedByItem[item.id] && (
                             <div className="absolute inset-0 overflow-hidden bg-black/30">
                               <div className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent" />
@@ -766,18 +726,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               fill
                               sizes="(max-width: 1279px) 65vw, 260px"
                               className="object-cover transition-transform duration-300 ease-out"
-                              // FIX v3: Only apply scale(1.06) + translate3d transform
-                              // when parallax is actually active (non-zero). The always-on
-                              // scale(1.06) created a compositing layer on EVERY card image,
-                              // which on mobile can interfere with touch hit-testing and
-                              // gesture direction detection in the browser's compositor.
-                              // When parallax is idle (x=0, y=0), no transform is needed —
-                              // the image fills the container via object-cover alone.
-                              style={{ transform: (parallax.x !== 0 || parallax.y !== 0) ? `scale(1.06) translate3d(${parallax.x * 8}px, ${parallax.y * 8}px, 0)` : undefined }}
+                              style={{ transform: `scale(1.04) translate3d(${parallax.x * 4}px, ${parallax.y * 4}px, 0)` }}
                               onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
                             />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото байка загружается — карточка уже доступна для брони</div>
+                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается — карточка уже доступна</div>
                           )}
                         </div>
                         <div className="p-3">
@@ -821,7 +774,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           </div>
 
                           {/* CTA */}
-                          <div className="mt-2 flex gap-2"><span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95"><ShoppingCart className="h-4 w-4" />{item.saleAvailable ? "Закрепить байк" : "Забронировать выезд"}</span></div>
+                          <div className="mt-2 flex gap-2"><span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95"><ShoppingCart className="h-4 w-4" />{item.saleAvailable ? "Закрепить" : "Забронировать выезд"}</span></div>
                         </div>
                       </button>
                     </article>
@@ -877,7 +830,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           {item.imageUrl ? (
                             <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 1279px) 50vw, (max-width: 1535px) 33vw, 25vw" className="object-cover" />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото байка загружается — карточка уже доступна для брони</div>
+                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается — карточка уже доступна</div>
                           )}
                           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[62%] bg-gradient-to-t from-[color:color-mix(in_srgb,var(--catalog-card-bg)_92%,#000)] via-[color:color-mix(in_srgb,var(--catalog-card-bg)_72%,transparent)] to-transparent" />
                           <div className="absolute inset-x-0 bottom-0 p-2.5 pb-3 sm:p-3">
