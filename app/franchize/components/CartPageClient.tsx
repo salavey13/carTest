@@ -29,10 +29,15 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const { dbUser, user } = useAppContext();
   const [isSaving, setIsSaving] = useState(false);
 
+  // FIX: Determine cart flow type for dynamic text
+  const saleLinesCount = cartLines.filter((line) => line.saleAvailable).length;
+  const isAllSale = saleLinesCount > 0 && saleLinesCount === cartLines.length;
+  const isMixed = saleLinesCount > 0 && !isAllSale;
+  const cartFlowLabel = isAllSale ? "sale" : isMixed ? "mixed" : "rental";
+
   const handleProceed = async () => {
     setIsSaving(true);
-    const saleLinesCount = cartLines.filter((line) => line.saleAvailable).length;
-    const flow = saleLinesCount > 0 && saleLinesCount === cartLines.length ? "sale" : saleLinesCount > 0 ? "mixed" : "rental";
+    const flow = cartFlowLabel === "sale" ? "sale" : cartFlowLabel === "mixed" ? "mixed" : "rental";
     const intentPromise = upsertFranchizeIntent({
       slug,
       bikeId: cartLines[0]?.item?.id ?? cartLines[0]?.itemId,
@@ -65,6 +70,13 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
     router.push(`/franchize/${slug}/order/demo-order?flow=${flow}`);
   };
 
+  // FIX: Dynamic subtotal label based on cart content
+  const subtotalLabel = isAllSale
+    ? "Сумма покупки"
+    : isMixed
+      ? "Итого (аренда + покупка)"
+      : "Сумма за 1 день аренды";
+
   return (
     <section
       className="mx-auto w-full max-w-5xl px-4 py-6"
@@ -81,7 +93,8 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
 
       {cartLines.length === 0 && rawItemCount === 0 ? (
         <div className="mt-6 rounded-2xl border border-dashed p-6 text-sm" style={surface.subtleCard}>
-          Корзина пока пустая. Добавьте байк из каталога, чтобы перейти к оформлению.
+          {/* FIX: Replaced bike-specific "Добавьте байк" with generic "Добавьте позицию" */}
+          Корзина пока пустая. Добавьте позицию из каталога, чтобы перейти к оформлению.
           <div className="mt-4">
              {/* Using standard anchor/button for back link to be safe */}
              <button
@@ -112,10 +125,18 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
                       {line.item?.subtitle ?? "Этот товар был удалён или временно недоступен в каталоге."}
                     <span className="mt-1 block text-[11px]" style={surface.mutedText}>{line.options.package} · {line.options.duration} · {line.options.perk} · {line.options.auction}</span>
                     </p>
+                    {/* FIX: Show both rent and sale prices when applicable */}
                     {line.item ? (
-                      <p className="mt-1 text-sm font-medium text-[var(--cart-accent)]">
-                        {line.item.rentPriceLabel}
-                      </p>
+                      <div className="mt-1">
+                        <p className="text-sm font-medium text-[var(--cart-accent)]">
+                          {line.item.rentPriceLabel}
+                        </p>
+                        {line.saleAvailable && line.item.salePrice ? (
+                          <p className="mt-0.5 text-xs font-medium text-amber-400">
+                            Покупка: {line.item.salePrice.toLocaleString("ru-RU")} ₽
+                          </p>
+                        ) : null}
+                      </div>
                     ) : (
                       <p className="mt-1 text-xs" style={surface.mutedText}>Недоступные позиции не участвуют в расчёте суммы.</p>
                     )}
@@ -154,7 +175,8 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
           <aside className="h-fit rounded-3xl border p-4 md:sticky md:top-24 md:p-5" style={surface.card}>
             <p className="text-sm" style={surface.mutedText}>Итого позиций</p>
             <p className="text-3xl font-semibold">{itemCount}</p>
-            <p className="mt-3 text-sm" style={surface.mutedText}>Сумма за 1 день аренды</p>
+            {/* FIX: Dynamic label — "Сумма покупки" for all-sale, "Итого (аренда + покупка)" for mixed, "Сумма за 1 день аренды" for rental */}
+            <p className="mt-3 text-sm" style={surface.mutedText}>{subtotalLabel}</p>
             <p className="text-4xl font-semibold text-[var(--cart-accent)]">
               {subtotal.toLocaleString("ru-RU")} ₽
             </p>
