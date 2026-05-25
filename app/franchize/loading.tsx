@@ -2,7 +2,8 @@ import Link from "next/link";
 import { DEFAULT_FRANCHIZE_THEME } from "@/lib/franchize-config";
 import { crewPaletteForSurface } from "./lib/theme";
 
-const catalogSkeletonCards = ["Витрины", "Экипажи", "Мотопарк"] as const;
+// FIX: Replaced bike-specific "Мотопарк" with generic "Каталог"
+const catalogSkeletonCards = ["Витрины", "Экипажи", "Каталог"] as const;
 
 export default function FranchizeLoading() {
   const surface = crewPaletteForSurface(DEFAULT_FRANCHIZE_THEME);
@@ -19,8 +20,9 @@ export default function FranchizeLoading() {
             franchize catalog
           </p>
           <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Загрузка каталога...</h1>
+          {/* FIX: Removed bike-specific "мотопарк" — now generic "каталог" */}
           <p className="mt-3 max-w-2xl text-sm leading-6" style={surface.mutedText} role="status">
-            Готовим список экипажей, витрины и быстрый переход в мотопарк.
+            Готовим список экипажей, витрины и быстрый переход в каталог.
           </p>
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             {catalogSkeletonCards.map((label) => (

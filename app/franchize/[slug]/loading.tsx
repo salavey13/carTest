@@ -22,16 +22,24 @@ export default function FranchizeSlugLoading() {
           <p className="text-xs font-semibold uppercase tracking-[0.24em]" style={surface.mutedText}>
             crew storefront
           </p>
-          <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Загрузка VIP BIKE...</h1>
+          {/* FIX: Removed hardcoded "VIP BIKE" — now generic for all tenants */}
+          <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Загрузка витрины...</h1>
+          {/* FIX: Removed bike-specific "мотопарк" — now generic "каталог" */}
           <p className="mt-3 max-w-2xl text-sm leading-6" style={surface.mutedText} role="status">
-            Подготавливаем мотопарк, цены, доступность и витрину экипажа.
+            Подготавливаем каталог, цены, доступность и витрину экипажа.
           </p>
           <div className="mt-6 grid gap-3 sm:grid-cols-[1.2fr_0.8fr]">
+            {/* FIX: Replaced bike skeleton (two wheels + frame) with generic content skeleton */}
             <div className="rounded-3xl border p-4" style={surface.card}>
               <div className="relative h-28 overflow-hidden rounded-2xl" style={{ backgroundColor: accentBackground }}>
-                <div className="absolute bottom-7 left-8 h-10 w-10 rounded-full border-4" style={{ borderColor: theme.palette.accentMain }} />
-                <div className="absolute bottom-7 right-8 h-10 w-10 rounded-full border-4" style={{ borderColor: theme.palette.accentMain }} />
-                <div className="absolute bottom-12 left-[30%] h-4 w-[38%] -skew-x-12 rounded-full" style={{ backgroundColor: theme.palette.accentMain }} />
+                {/* Generic grid pattern instead of bike wheels/frame */}
+                <div className="absolute inset-4 grid grid-cols-3 gap-2">
+                  <div className="rounded-lg opacity-30" style={{ backgroundColor: theme.palette.accentMain }} />
+                  <div className="rounded-lg opacity-20" style={{ backgroundColor: theme.palette.accentMain }} />
+                  <div className="rounded-lg opacity-25" style={{ backgroundColor: theme.palette.accentMain }} />
+                  <div className="col-span-2 rounded-lg opacity-15" style={{ backgroundColor: theme.palette.accentMain }} />
+                  <div className="rounded-lg opacity-20" style={{ backgroundColor: theme.palette.accentMain }} />
+                </div>
               </div>
               <div className="mt-4 h-3 w-2/3 animate-pulse rounded-full motion-reduce:animate-none" style={{ backgroundColor: accentBackground }} />
               <div className="mt-2 h-3 w-1/2 animate-pulse rounded-full opacity-70 motion-reduce:animate-none" style={{ backgroundColor: accentBackground }} />
