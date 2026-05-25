@@ -88,17 +88,73 @@ export function useTelegramAuth() {
     const can = () => mounted.current;
     (async () => {
       try {
+        // ── FIX: Safari safety — wrap window.Telegram access in try-catch ──
+        // Safari's ITP (Intelligent Tracking Prevention) can block or delay
+        // the TG WebApp SDK. On WKWebView (Telegram's in-app browser on iOS),
+        // the SDK might load partially: window.Telegram exists but
+        // .WebApp.initDataUnsafe throws when accessed (getter on a Proxy that
+        // hasn't fully initialized). Chrome's V8 handles this gracefully;
+        // Safari's JavaScriptCore may throw.
         const launchParams = getTelegramLaunchParamsFromWindow();
-        const webApp = typeof window !== "undefined" ? (window as any).Telegram?.WebApp ?? null : null;
-        const initData = webApp?.initData || launchParams.initData || "";
+
+        let webApp: TelegramWebApp | null = null;
+        try {
+          webApp = typeof window !== "undefined"
+            ? (window as any).Telegram?.WebApp ?? null
+            : null;
+        } catch (sdkAccessError) {
+          globalLogger.warn(
+            "[useTelegramAuth] window.Telegram.WebApp access threw (Safari/ITP?):",
+            sdkAccessError
+          );
+        }
+
+        // ── FIX: Safely read initDataUnsafe — Safari may throw on getter ──
+        let initData: string = "";
+        let startParamValue: string | null = null;
+
+        try {
+          initData = webApp?.initData || launchParams.initData || "";
+        } catch (e) {
+          globalLogger.warn("[useTelegramAuth] webApp.initData access threw:", e);
+          initData = launchParams.initData || "";
+        }
+
+        try {
+          startParamValue = webApp?.initDataUnsafe?.start_param || launchParams.startParam || null;
+        } catch (e) {
+          globalLogger.warn("[useTelegramAuth] webApp.initDataUnsafe.start_param access threw:", e);
+          startParamValue = launchParams.startParam || null;
+        }
+
         if (can()) {
           setTg(webApp);
-          setStartParam(webApp?.initDataUnsafe?.start_param || launchParams.startParam || null);
+          setStartParam(startParamValue);
+        }
+
+        // ── FIX: Safely read initDataUnsafe.user.id — Safari may throw ──
+        let tgUserId: number | undefined;
+        try {
+          tgUserId = webApp?.initDataUnsafe?.user?.id;
+        } catch (e) {
+          globalLogger.warn("[useTelegramAuth] webApp.initDataUnsafe.user.id access threw:", e);
         }
 
         let candidate = await validateTelegramAuthWithApi(initData);
-        if (!candidate && webApp?.initDataUnsafe?.user?.id && process.env.NODE_ENV === "development") candidate = webApp.initDataUnsafe.user;
-        if (!candidate && MOCK_USER && isAllowedMockContext()) candidate = MOCK_USER;
+
+        // Fallback 1: Use client-side user object in development
+        if (!candidate && tgUserId && process.env.NODE_ENV === "development") {
+          try {
+            candidate = webApp!.initDataUnsafe.user!;
+          } catch (e) {
+            globalLogger.warn("[useTelegramAuth] Fallback 1 — initDataUnsafe.user threw:", e);
+          }
+        }
+
+        // Fallback 2: Mock user for local dev
+        if (!candidate && MOCK_USER && isAllowedMockContext()) {
+          candidate = MOCK_USER;
+        }
 
         const realTg = Boolean(initData);
         if (can()) setIsInTelegramContext(realTg);
@@ -119,7 +175,14 @@ export function useTelegramAuth() {
           setError(null);
         }
       } catch (e) {
-        if (can()) setError(e instanceof Error ? e : new Error("Telegram auth init failed."));
+        if (can()) {
+          setError(e instanceof Error ? e : new Error("Telegram auth init failed."));
+          // ── FIX: Ensure isAuthenticated is explicitly false on error ──
+          // Previously, if handleAuthentication threw, isAuthenticated stayed
+          // false (correct, since it was never set to true). But being
+          // explicit prevents any future regression.
+          setIsAuthenticated(false);
+        }
       } finally {
         if (can()) {
           setIsAuthenticating(false);

@@ -28,18 +28,26 @@ import { submitSvarProfiOrder, type SvarProfiOrderPayload } from './actions'
 //   - dbUser: Database["public"]["Tables"]["users"]["Row"]
 //     Fields: user_id, name, first_name, telegram_username, status, role, metadata
 //   - isAuthenticated: boolean
+//   - user: Telegram WebApp user object (id, username, first_name, etc.)
+//
+// Auth detection:
+//   Primary: dbUser.user_id (always populated when auth succeeds)
+//   Fallback: user.id from TG WebApp (available even if dbUser
+//   hasn't synced yet — prevents the race condition where
+//   isAuthenticated=true but dbUser=null for one render)
+//
+// The old check `isAuthenticated && !!telegramNickname` was too
+// strict — many TG users don't have a public @username, and
+// their Supabase row has telegram_username=NULL.
 //
 // Authenticated path:
-//   - Identity auto-filled from dbUser
-//   - Request sent as "from @nickname, authenticated"
+//   - Identity auto-filled from dbUser (name, user_id)
+//   - Request sent as "from @nickname or Name, authenticated"
 //   - Admin can reply via TG using user_id
 //
 // Anonymous path:
 //   - Contact field appears (TG / phone / email)
 //   - Admin can reach back via provided contact_method
-//
-// Server action uses sendMessage() from /gateway/telegram/sendMessage.ts
-// to notify franchise admin via TG bot.
 // ─────────────────────────────────────────────────────
 
 interface OrderSheetProps {
@@ -58,16 +66,29 @@ export function SvarProfiOrderSheet({
   onSubmitted,
   vehicleSlug,
 }: OrderSheetProps) {
-  const { dbUser, isAuthenticated } = useAppContext()
+  const { dbUser, user, isAuthenticated } = useAppContext()
 
-  // Extract user identity from dbUser
+  // ── Auth detection ──
+  // Primary: dbUser.user_id (canonical DB identity)
+  // Fallback: user.id from TG WebApp (covers race condition
+  //   where isAuthenticated=true but dbUser hasn't synced yet)
+  const telegramUserId = dbUser?.user_id ?? (user?.id ? String(user.id) : '')
+  const isAuth = isAuthenticated && !!telegramUserId
+
+  // Build display name from best available source:
+  //   1. dbUser.name (if set)
+  //   2. dbUser.first_name (from TG init data)
+  //   3. user.first_name (TG WebApp user object)
+  //   4. @telegram_username (if available)
+  //   5. Fallback: "авторизованный пользователь"
   const telegramNickname = dbUser?.telegram_username ?? ''
-  const telegramUserId = dbUser?.user_id ?? ''
-  const displayName = dbUser?.name || dbUser?.first_name || ''
-  const userStatus = dbUser?.status ?? ''
-  const userRole = dbUser?.role ?? ''
+  const displayName = dbUser?.name || dbUser?.first_name || user?.first_name || ''
 
-  const isAuth = isAuthenticated && !!telegramNickname
+  // For the "Авторизован: @nickname" display:
+  // If no @username, show display name instead
+  const authDisplayLabel = telegramNickname
+    ? `@${telegramNickname}`
+    : displayName || 'авторизованный пользователь'
 
   const [form, setForm] = useState({
     name: '',
@@ -86,9 +107,12 @@ export function SvarProfiOrderSheet({
     setIsSubmitting(true)
     setSubmitError(null)
 
+    // Build identity string from best available source
+    const identityName = displayName || (telegramNickname ? `@${telegramNickname}` : '') || 'Аноним'
+
     const payload: SvarProfiOrderPayload = {
       auth_status: isAuth ? 'authenticated' : 'anonymous',
-      name: isAuth ? displayName || `@${telegramNickname}` : form.name,
+      name: isAuth ? identityName : form.name,
       product_type: form.product_type,
       dimensions: form.dimensions || undefined,
       comment: form.comment || undefined,
@@ -96,8 +120,12 @@ export function SvarProfiOrderSheet({
     }
 
     if (isAuth) {
-      payload.telegram_nickname = telegramNickname
+      // Always send user_id for authenticated users — this is the canonical
+      // identity link. telegram_nickname is optional (many users lack one).
       payload.telegram_user_id = telegramUserId
+      if (telegramNickname) {
+        payload.telegram_nickname = telegramNickname
+      }
     } else {
       payload.phone = form.phone || undefined
       payload.email = form.email || undefined
@@ -118,7 +146,9 @@ export function SvarProfiOrderSheet({
         setSubmitError(result.error || 'Ошибка отправки')
       }
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Неизвестная ошибка')
+      // Safari on failed auth may throw — catch gracefully
+      const message = err instanceof Error ? err.message : 'Неизвестная ошибка'
+      setSubmitError(message)
     } finally {
       setIsSubmitting(false)
     }
@@ -154,10 +184,10 @@ export function SvarProfiOrderSheet({
                 <UserCheck className="h-4 w-4 shrink-0 text-[#43A047]" />
                 <div>
                   <p className="text-sm font-medium text-[#43A047]">
-                    Авторизован: @{telegramNickname}
+                    Авторизован: {authDisplayLabel}
                   </p>
                   <p className="text-xs text-[#8A92A0]">
-                    Заявка отправлена от вашего имени{userStatus ? ` (${userStatus})` : ''}
+                    Заявка отправлена от вашего имени
                   </p>
                 </div>
               </div>
