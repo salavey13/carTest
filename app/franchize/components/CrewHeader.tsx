@@ -206,9 +206,14 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
 
   return (
     <header
-      className="sticky top-0 z-50 border-b pb-2 pt-[max(env(safe-area-inset-top),0.15rem)] backdrop-blur-2xl"
+      // FIX: Increased top padding to accommodate Telegram MiniApp native buttons
+      // (back/settings button bar ~44px). The old 0.15rem minimum was too thin.
+      // calc(env(safe-area-inset-top) + 2.25rem) adds 36px on top of safe-area,
+      // with a minimum of 2.75rem (~44px) when safe-area is 0.
+      className="sticky top-0 z-50 border-b pb-2 backdrop-blur-2xl"
       style={{
         ...FRANCHIZE_HEADER_SAFE_AREA_STYLE,
+        paddingTop: "max(calc(env(safe-area-inset-top) + 2.25rem), 2.75rem)",
         // FIX 6: isolation creates a proper stacking context for the entire header.
         isolation: "isolate",
         borderColor: crew.theme.palette.borderSoft,
@@ -326,12 +331,20 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
 
           {/*
             FIX: Wrap FranchizeProfileButton in CrewButtonErrorBoundary
-            at the CALL SITE with resetKey=pathhame for recovery.
+            at the CALL SITE with resetKey=pathname for recovery.
             v4 of FranchizeProfileButton always renders DropdownMenu
             (no more !hasUser early return), so this boundary is just
             a safety net for unexpected runtime errors.
+
+            FIX: pointerEvents conditional on isCompact.
+            When compact, the entire grid row is hidden (opacity 0, maxHeight 0)
+            and pointerEvents: "none" on the parent. But this child div
+            previously had pointerEvents: "auto" which overrode the parent's
+            "none" — causing rail pills that overlap the profile icon area
+            to click through to the invisible profile button.
+            Now it respects the compact state.
           */}
-          <div className="flex items-center gap-2 justify-self-end relative z-[2]" style={{ pointerEvents: "auto" }}>
+          <div className="flex items-center gap-2 justify-self-end relative z-[2]" style={{ pointerEvents: isCompact ? "none" : "auto" }}>
             <CrewButtonErrorBoundary
               bgColor={withAlpha(crew.theme.palette.bgBase, 0.8)}
               textColor={crew.theme.palette.textPrimary}
@@ -376,13 +389,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
               }, 1500);
             }}
           >
-            {/*
-              FIX: Removed the sliding indicator <span>.
-              The indicator was a thin accent-colored bar under the active pill.
-              Since the active pill already has a distinct highlighted background
-              (accentMain), the indicator was redundant and visually ugly — it
-              looked like an unwanted underscore. Removed it entirely.
-            */}
             {visibleRailLinks.map((link) => {
               const isActive = link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href));
               return (

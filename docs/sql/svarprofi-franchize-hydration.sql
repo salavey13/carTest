@@ -1,46 +1,20 @@
 -- ============================================================================
--- СварПрофи-НН Franchise Hydration SQL
+-- СварПрофи-НН Franchise Hydration SQL — v3 (palette key fix)
 -- ============================================================================
--- Franchise: СварПрофи-НН — производство строительных металлических конструкций
--- Location:  Москва, Россия (registered in НН, operates from Moscow)
--- Slug:      svarprofi
--- Type:      metal_stuff
--- Source:    rusprofile.ru (ИНН 5258146959, ОГРН 1195275055491)
--- ============================================================================
+-- FIX: The original v2 SQL used shadcn-style palette keys ("background",
+-- "foreground", "card", "primary", "accent") but theme-resolver.ts reads
+-- FranchizeTheme keys ("bgBase", "bgCard", "accentMain", "textPrimary",
+-- "textSecondary", "borderSoft", "accentMainHover"). Because the keys didn't
+-- match, the resolver fell back to DEFAULT_FRANCHIZE_THEME for ALL palette
+-- values — making svarprofi look identical to vip-bike!
 --
--- IMAGE URLS THAT NEED TO BE UPLOADED:
--- (bucket: svarprofi)
---
--- Branding / UI images (root level):
---  1. https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/logo.png
---  2. https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/hero.jpg
---  3. https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/about-hero.jpg
---  4. https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/promo-karkasy.jpg
---  5. https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/promo-navesy.jpg
---  6. https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/promo-ograzhdeniya.jpg
---  7. https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/ad-certified.jpg
---  8. https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/ad-delivery.jpg
---
--- Product images (in subfolders by product slug, named image_N.jpg):
---  9.  https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/karkas-prom/image_1.jpg
--- 10.  https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/karkas-prom/image_2.jpg
--- 11.  https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/karkas-prom/image_3.jpg
--- 12.  https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/svarprofi/karkas-kran/image_1.jpg
---
--- TOTAL: 12 images (8 branding/UI + 4 product)
---
--- CHANGELOG (v2):
---  - City: НН → Москва (company operates from Moscow)
---  - Removed hallucinated telegram link (https://t.me/svarprofi_nn)
---  - Header menuLinks: NO map-riders (N/A for metal_stuff)
---  - All links use ?vehicle=<slug> pattern (not /catalog?group=)
---  - Footer/contacts: Москва, no telegram
+-- This v3 SQL fixes the palette to use the correct key names.
 -- ============================================================================
 
 begin;
 
 -- ============================================================================
--- 1. UPSERT CREW
+-- 1. UPSERT CREW (unchanged from v2)
 -- ============================================================================
 insert into public.crews (
   id,
@@ -77,12 +51,12 @@ set
   updated_at = now();
 
 -- ============================================================================
--- 2. SET FULL FRANCHISE METADATA
+-- 2. SET FULL FRANCHISE METADATA — with FIXED palette keys
 -- ============================================================================
 update public.crews c
 set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
 {
-  "version": 2,
+  "version": 3,
   "enabled": true,
   "slug": "svarprofi",
 
@@ -98,38 +72,32 @@ set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
   "theme": {
     "mode": "dark",
     "palette": {
-      "background": "#1A1D23",
-      "foreground": "#E8ECF1",
-      "card": "#242830",
-      "cardForeground": "#E8ECF1",
-      "primary": "#2E7DBF",
-      "primaryForeground": "#FFFFFF",
-      "secondary": "#3A4250",
-      "secondaryForeground": "#C8CDD5",
-      "muted": "#2A2E36",
-      "mutedForeground": "#8A92A0",
-      "accent": "#D4740E",
-      "accentForeground": "#FFFFFF",
-      "destructive": "#C0392B",
-      "destructiveForeground": "#FFFFFF",
-      "border": "#3A4250",
-      "input": "#3A4250",
-      "ring": "#2E7DBF"
+      "bgBase": "#1A1D23",
+      "bgCard": "#242830",
+      "accentMain": "#2E7DBF",
+      "accentMainHover": "#3A94D6",
+      "textPrimary": "#E8ECF1",
+      "textSecondary": "#8A92A0",
+      "borderSoft": "#3A4250"
     },
     "palettes": {
       "dark": {
-        "background": "#1A1D23",
-        "foreground": "#E8ECF1",
-        "card": "#242830",
-        "primary": "#2E7DBF",
-        "accent": "#D4740E"
+        "bgBase": "#1A1D23",
+        "bgCard": "#242830",
+        "accentMain": "#2E7DBF",
+        "accentMainHover": "#3A94D6",
+        "textPrimary": "#E8ECF1",
+        "textSecondary": "#8A92A0",
+        "borderSoft": "#3A4250"
       },
       "light": {
-        "background": "#F0F2F5",
-        "foreground": "#1A1D23",
-        "card": "#FFFFFF",
-        "primary": "#1B5A8C",
-        "accent": "#B8640A"
+        "bgBase": "#F0F2F5",
+        "bgCard": "#FFFFFF",
+        "accentMain": "#1B5A8C",
+        "accentMainHover": "#2E7DBF",
+        "textPrimary": "#1A1D23",
+        "textSecondary": "#4B5160",
+        "borderSoft": "#D4D8E1"
       }
     },
     "radius": "0.5rem",
@@ -398,6 +366,13 @@ set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
     ]
   },
 
+  "reservationHold": {
+    "label": "Отправить заявку",
+    "invoiceLabel": "Заявка: запрос расчёта",
+    "pickupAddress": "Москва, Россия",
+    "requiredDocs": ["Паспорт", "Доверенность (для юрлиц)"]
+  },
+
   "contractDefaults": {
     "issuer": {
       "name": "ООО «СварПрофи-НН»",
@@ -438,7 +413,7 @@ $$::jsonb)
 where c.id = 'a1b2c3d4-e5f6-7a8b-9c0d-012345678901';
 
 -- ============================================================================
--- 3. UPDATE TOP-LEVEL METADATA
+-- 3. UPDATE TOP-LEVEL METADATA (unchanged from v2)
 -- ============================================================================
 update public.crews c
 set metadata = jsonb_set(c.metadata, '{slug}', '"svarprofi"'::jsonb)
