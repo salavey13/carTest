@@ -48,8 +48,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   const userScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Logo loading state machine ──
-  //   loading → (onLoad) → dissolving → (animationEnd) → revealed
-  //   loading → (onError) → broken (permanent spooky letter)
   const [brokenLogoUrls, setBrokenLogoUrls] = useState<Record<string, true>>({});
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [logoDissolved, setLogoDissolved] = useState(false);
@@ -69,7 +67,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   }, []);
 
   // Reset active category when navigating away from main catalog
-  // Scheduling setState via setTimeout to satisfy linter
   useEffect(() => {
     const prev = prevPathnameRef.current;
     prevPathnameRef.current = pathname;
@@ -80,13 +77,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
     }
   }, [pathname, mainCatalogPath]);
 
-  // ── FIX: Close menu on route change (safety net for HeaderMenu navigation) ──
-  // When the user clicks a menu item in HeaderMenu, the menu closes via
-  // onOpenChange(false) and navigation starts via router.push() in a
-  // setTimeout. If the menu somehow stays open (e.g., router.push fails
-  // or the user navigates via browser back/forward), this effect closes
-  // the menu when the pathname changes. This is a safety net, not the
-  // primary close mechanism.
+  // ── Close menu on route change (safety net) ──
   useEffect(() => {
     if (menuOpen) {
       setMenuOpen(false);
@@ -130,15 +121,12 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
     const onScroll = () => {
       setIsCompact((prev) => {
         const scrollY = window.scrollY;
-        // If the header is full-size, wait until we scroll well PAST the threshold (60px) to collapse it
         if (!prev && scrollY > 90) {
           return true;
         }
-        // If the header is collapsed, wait until we scroll well ABOVE the threshold (20px) to expand it
         if (prev && scrollY < 13) {
           return false;
         }
-        // If we are in the "dead zone" between 20 and 60, change nothing. (Breaks the loop!)
         return prev;
       });
     };
@@ -147,7 +135,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-  // -----------------------------------------
 
   useEffect(() => {
     if (pathname !== mainCatalogPath) {
@@ -194,13 +181,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   }, [mainCatalogPath, pathname]);
 
   // --- Плавный скролл активного бейджа (pill) в центр экрана ---
-  // Auto-scroll on navigation + activeCategory changes (pill clicks, IntersectionObserver).
-  // The isUserScrollingRef guard prevents snap-back when the user is manually scrolling the rail.
-  // Pill click → isUserScrollingRef=false → auto-scroll centers the pill ✅
-  // Page scroll → IntersectionObserver fires → isUserScrollingRef=false → auto-scroll ✅
-  // Manual rail scroll → isUserScrollingRef=true → auto-scroll blocked ✅
   useEffect(() => {
-    // Don't auto-scroll while user is manually scrolling the rail
     if (isUserScrollingRef.current) return;
 
     const activeRailLink = visibleRailLinks.find(
@@ -221,24 +202,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
         behavior: "smooth",
       });
     }
-  }, [activePath, pathname, activeCategory, visibleRailLinks]); // re-added activeCategory + visibleRailLinks; isUserScrollingRef guard prevents snap-back
-  // ------------------------------------------------------------------
-  useEffect(() => {
-    const container = railRef.current;
-    if (!container) return;
-    const activeRailLink = visibleRailLinks.find(
-      (link) => link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href)),
-    );
-    if (!activeRailLink) {
-      setIndicatorStyle((prev) => ({ ...prev, opacity: 0 }));
-      return;
-    }
-    const activeEl = Array.from(container.querySelectorAll<HTMLElement>("[data-category-pill]")).find(
-      (element) => element.dataset.categoryPill === activeRailLink.categoryLabel,
-    );
-    if (!activeEl) return;
-    setIndicatorStyle({ width: activeEl.offsetWidth, left: activeEl.offsetLeft, opacity: 1 });
-  }, [activePath, pathname, visibleRailLinks]);
+  }, [activePath, pathname, activeCategory, visibleRailLinks]);
 
   return (
     <header
@@ -246,10 +210,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
       style={{
         ...FRANCHIZE_HEADER_SAFE_AREA_STYLE,
         // FIX 6: isolation creates a proper stacking context for the entire header.
-        // Without this, backdrop-blur-2xl + position:sticky creates a compositing
-        // layer that can interfere with pointer-event hit-testing in Chromium/mobile
-        // WebViews. isolation:isolate ensures the header's stacking context is
-        // well-defined and doesn't leak to parent layers.
         isolation: "isolate",
         borderColor: crew.theme.palette.borderSoft,
         backgroundColor: withAlpha(crew.theme.palette.bgCard, 0.94),
@@ -264,28 +224,12 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
     >
       {/*
         FIX 2: Removed overflow-hidden from this wrapper.
-        The old overflow-hidden + translateY(0.45rem) on the grid child created a
-        Chromium/mobile-WebView hit-testing boundary: pointer events stopped
-        propagating correctly to the transformed child. The grid's visual content
-        was shifted down 7.2px by the transform, but overflow-hidden clipped the
-        wrapper at the un-shifted boundary — so the bottom 7.2px of interactive
-        elements (profile button, cart icon) were both visually clipped AND
-        removed from the hit-testing region. The 3-column grid layout already
-        constrains horizontal overflow, so overflow-hidden was unnecessary.
+        The old overflow-hidden + translateY created a hit-testing boundary.
       */}
       <div className="mx-auto w-full max-w-7xl">
         {/*
-          FIX 1: Grid layout changed from "auto auto minmax(0,1fr) auto" (4 cols, 3 children)
-          to "44px 1fr auto" (3 cols, 3 children). The old layout put the profile+cart div
-          in the minmax(0,1fr) column, which consumed ALL remaining space and created an
-          invisible overlay that intercepted pointer events on everything below it.
-        */}
-        {/*
+          FIX 1: Grid layout "44px 1fr auto" (3 cols, 3 children).
           FIX 3: Removed translateY(0.45rem) from non-compact transform.
-          The old translateY(0.45rem) shifted the grid's visual content down by 7.2px,
-          causing it to overflow the wrapper div. Combined with overflow-hidden on the
-          wrapper, this clipped the bottom portion of the header and created hit-testing
-          boundary issues in mobile WebViews. Set to translateY(0) instead.
         */}
         <div
           style={{
@@ -321,18 +265,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
           {/* HEADER LOGO — PURE SPA LINK */}
           {/*
             FIX 4: Removed z-10 from logo Link className.
-            The old z-10 created an elevated stacking context within the grid
-            that could interfere with pointer events on the profile+cart div
-            in column 3. The inner spooky letter span still has z-10 within
-            the logo's own stacking context (provided by `relative`), so the
-            overlay animation continues to work correctly.
-
-            FIX 5: Added justify-self-center to constrain the Link's clickable
-            area to the logo itself. Without this, the Link (a flex container)
-            stretches to fill the entire 1fr grid cell, creating a wide invisible
-            clickable area spanning hundreds of pixels. While this didn't block
-            clicks on adjacent cells (grid items don't overlap by default), it
-            caused accidental navigations when users clicked near the logo.
+            FIX 5: Added justify-self-center to constrain clickable area.
           */}
           <Link
             href={headerLogoHref}
@@ -348,7 +281,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             >
               {logoUrl && !brokenLogoUrls[logoUrl] ? (
                 <>
-                  {/* Image layer — always rendered so it loads in background */}
                   <Image
                     src={logoUrl}
                     alt={`${crew.header.brandName} logo`}
@@ -361,7 +293,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                       setBrokenLogoUrls((prev) => ({ ...prev, [logoUrl]: true }));
                     }}
                   />
-                  {/* Spooky letter overlay — breathes while loading, dissolves on load */}
                   {!logoDissolved && (
                     <span
                       className="absolute inset-0 z-10 flex items-center justify-center text-2xl font-bold select-none"
@@ -381,10 +312,8 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                   )}
                 </>
               ) : logoUrl && brokenLogoUrls[logoUrl] ? (
-                /* Broken URL — permanent spooky letter */
                 <SpookyLetter letter={getFirstLetter(crew.header.brandName)} color={accentMain} sizeClass="text-2xl" />
               ) : (
-                /* No logo URL at all — brand name text fallback */
                 <div
                   className="flex h-full w-full items-center justify-center px-2 text-[10px] font-semibold uppercase tracking-wide"
                   style={{ color: accentMain }}
@@ -396,25 +325,18 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
           </Link>
 
           {/*
-            FIX 5 (companion): Added relative z-[2] to ensure the profile+cart
-            div is above the logo Link in the grid's stacking order. Even though
-            grid items in different cells don't overlap by default, this guarantees
-            correct z-ordering if any edge case causes visual overlap (e.g., during
-            CSS transitions or on unusual viewports).
+            FIX: Wrap FranchizeProfileButton in CrewButtonErrorBoundary
+            at the CALL SITE with resetKey=pathhame for recovery.
+            v4 of FranchizeProfileButton always renders DropdownMenu
+            (no more !hasUser early return), so this boundary is just
+            a safety net for unexpected runtime errors.
           */}
-          {/* FIX v3: Wrap FranchizeProfileButton in CrewButtonErrorBoundary
-              at the CALL SITE. The boundary inside FranchizeProfileButton only
-              wraps the JSX return (DropdownMenu), NOT the hooks. If a hook
-              throws (e.g., useAppContext during SPA transition), the inner
-              boundary cannot catch it, and the error reaches the page-level
-              error.tsx → fullscreen "Экипаж временно недоступен". Wrapping
-              at the call site catches ALL errors (hooks + JSX) and renders
-              a small Telegram link fallback instead of crashing the page. */}
-          <div className="flex items-center gap-2 justify-self-end relative z-[2]">
+          <div className="flex items-center gap-2 justify-self-end relative z-[2]" style={{ pointerEvents: "auto" }}>
             <CrewButtonErrorBoundary
               bgColor={withAlpha(crew.theme.palette.bgBase, 0.8)}
               textColor={crew.theme.palette.textPrimary}
               borderColor={crew.theme.palette.borderSoft}
+              resetKey={pathname}
             >
               <FranchizeProfileButton
                 bgColor={withAlpha(crew.theme.palette.bgBase, 0.8)}
@@ -432,7 +354,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
               borderColor={crew.theme.palette.borderSoft}
               theme={crew.theme}
               mode="inline-icon"
-              className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl"
+              className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl no-underline"
             />
           </div>
         </div>
@@ -447,7 +369,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             ref={railRef}
             className="relative mx-auto flex w-full max-w-7xl gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
             onScroll={() => {
-              // Mark that user is scrolling the rail — prevents auto-scroll override
               isUserScrollingRef.current = true;
               if (userScrollTimerRef.current) clearTimeout(userScrollTimerRef.current);
               userScrollTimerRef.current = setTimeout(() => {
@@ -455,11 +376,13 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
               }, 1500);
             }}
           >
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute bottom-1 h-0.5 rounded-full bg-[var(--crew-header-accent)] transition-all duration-300 ease-out"
-              style={{ width: `${indicatorStyle.width}px`, transform: `translateX(${indicatorStyle.left}px)`, opacity: indicatorStyle.opacity }}
-            />
+            {/*
+              FIX: Removed the sliding indicator <span>.
+              The indicator was a thin accent-colored bar under the active pill.
+              Since the active pill already has a distinct highlighted background
+              (accentMain), the indicator was redundant and visually ugly — it
+              looked like an unwanted underscore. Removed it entirely.
+            */}
             {visibleRailLinks.map((link) => {
               const isActive = link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href));
               return (
@@ -469,11 +392,10 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                   data-category-pill={link.categoryLabel}
                   aria-current={isActive ? "location" : undefined}
                   aria-label={`Перейти к разделу ${link.label}`}
-                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-3 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] !no-underline transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-3 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] no-underline transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
                     ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
                     ["--pill-text" as string]: isActive ? activePillText : crew.theme.palette.textPrimary,
-                    transform: isActive ? "translateY(0) scale(1.02)" : "translateY(0)",
                     textDecoration: "none",
                   }}
                   onClick={(event) => {
@@ -485,7 +407,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                         if (target) {
                           event.preventDefault();
                           target.scrollIntoView({ behavior: "smooth", block: "start" });
-                          // Keep URL hash in sync without adding history entry
                           window.history.replaceState(null, "", `#${hash}`);
                         }
                       }

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, User, IdCard, MessageCircle, Send } from "lucide-react";
+import { Bell, ChevronDown, LayoutDashboard, LogIn, Palette, Settings, Shield, User, IdCard, MessageCircle, Send } from "lucide-react";
 import { Component, useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
@@ -50,32 +50,25 @@ function normalizeSlug(slug: string | undefined): string {
 }
 
 // ─────────────────────────────────────────────────────────
-// FIX: Local error boundary to prevent "crew recovery" full-page crash.
-// ─────────────────────────────────────────────────────────
-// When the DropdownMenu or any of its children throw during rendering
-// (e.g., due to missing AppContext during SPA navigation, useIsAdmin
-// throwing, or Radix portal failures), the error bubbles up to the
-// nearest error boundary. Without this local boundary, the error reaches
-// the page-level "crew recovery" boundary, replacing the ENTIRE page
-// with the fallback screen. This local boundary catches the error
-// gracefully and renders a simple fallback button instead.
+// CrewButtonErrorBoundary — local error boundary for the
+// profile button area in CrewHeader.
 //
-// NOTE: This boundary can only catch errors in the non-portal portion
-// of the render tree. Radix DropdownMenu renders its content via a
-// portal (outside this boundary's DOM), so portal errors bypass it.
-// The v2 fix (early return for !hasUser) prevents portal errors for
-// guests entirely. This boundary remains as a safety net for
-// authenticated-user render errors.
+// v4: Added resetKey prop. When resetKey changes (e.g.,
+// pathname change from navigation), the boundary resets
+// from error state and attempts to re-render children.
+// Previous versions had no reset — once hasError=true the
+// boundary permanently showed the fallback, even if the
+// error was transient (e.g., during SPA navigation).
 // ─────────────────────────────────────────────────────────
 interface ErrorBoundaryState {
   hasError: boolean;
 }
 
 export class CrewButtonErrorBoundary extends Component<
-  { bgColor: string; textColor: string; borderColor: string; children: React.ReactNode },
+  { bgColor: string; textColor: string; borderColor: string; resetKey?: string; children: React.ReactNode },
   ErrorBoundaryState
 > {
-  constructor(props: { bgColor: string; textColor: string; borderColor: string; children: React.ReactNode }) {
+  constructor(props: { bgColor: string; textColor: string; borderColor: string; resetKey?: string; children: React.ReactNode }) {
     super(props);
     this.state = { hasError: false };
   }
@@ -88,6 +81,13 @@ export class CrewButtonErrorBoundary extends Component<
     console.warn("[FranchizeProfileButton] caught render error:", error, info);
   }
 
+  componentDidUpdate(prevProps: { resetKey?: string }) {
+    // Reset error state when resetKey changes (e.g., on navigation)
+    if (this.props.resetKey !== prevProps.resetKey && this.state.hasError) {
+      this.setState({ hasError: false });
+    }
+  }
+
   render() {
     if (this.state.hasError) {
       return (
@@ -96,8 +96,8 @@ export class CrewButtonErrorBoundary extends Component<
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Открыть Telegram WebApp"
-          className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-          style={{ backgroundColor: this.props.bgColor, color: this.props.textColor, borderColor: this.props.borderColor }}
+          className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold no-underline transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          style={{ backgroundColor: this.props.bgColor, color: this.props.textColor, borderColor: this.props.borderColor, textDecoration: "none" }}
         >
           <Send className="h-4 w-4" />
           <span className="hidden sm:inline">WebApp</span>
@@ -118,7 +118,7 @@ interface FranchizeProfileButtonProps {
 export function FranchizeProfileButton({ bgColor, textColor, borderColor, currentSlug }: FranchizeProfileButtonProps) {
   const { dbUser, user, userCrewInfo, isInTelegramContext } = useAppContext();
   const hasUser = Boolean(dbUser || user);
-  const displayName = dbUser?.username || dbUser?.full_name || user?.username || user?.first_name || "Operator";
+  const displayName = dbUser?.username || dbUser?.full_name || user?.username || user?.first_name || "Гость";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = useIsAdmin();
   const scopeSlug = normalizeSlug(currentSlug || userCrewInfo?.slug);
@@ -205,46 +205,38 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   }, [tempCartId]);
 
   // ─────────────────────────────────────────────────────────
-  // FIX v3: "Profile icon routes to abyss" + "crew recovery" regression
+  // FIX v4: Always render DropdownMenu — never switch to a
+  // completely different UI element based on auth state.
   // ─────────────────────────────────────────────────────────
-  // v1 fix: Rendered DropdownMenu even for guests (!hasUser). This caused
-  // a regression: Radix DropdownMenu uses a portal that renders OUTSIDE
-  // the CrewButtonErrorBoundary's DOM tree. When the portal content throws
-  // (e.g., during SPA navigation with stale context, or when Radix tries
-  // to compute position against a detached node), the error bypasses the
-  // local error boundary and reaches the page-level Next.js error boundary
-  // (franchize/[slug]/error.tsx), which shows the fullscreen "crew recovery"
-  // fallback ("Экипаж временно недоступен").
+  // Previous versions had an early return for !hasUser that
+  // rendered a plain <a> tag instead of the DropdownMenu.
+  // This caused two problems:
   //
-  // v2 fix: For guests (!hasUser), render a simple <a> tag linking to
-  // Telegram WebApp — no portal, no DropdownMenu, no crash risk. This
-  // avoids the Radix portal crash entirely while still providing a useful
-  // CTA ("Login via Telegram"). Authenticated users keep the full dropdown.
+  // 1. When hasUser flipped (e.g., context re-hydration or
+  //    SPA navigation), the entire component tree changed
+  //    from <a> to <DropdownMenu> or vice versa. React
+  //    reconciled this as a full replacement, causing visual
+  //    glitches (button "changes" on click).
   //
-  // v3 fix: Additionally, the call site in CrewHeader now wraps
-  // FranchizeProfileButton in a local CrewButtonErrorBoundary. This
-  // catches ALL errors (including hook errors during SPA transitions)
-  // before they can reach the page-level error.tsx. The boundary renders
-  // a Telegram link fallback instead of the full-screen crash.
+  // 2. The inner CrewButtonErrorBoundary (v3) wrapped only
+  //    the DropdownMenu branch. If it caught an error, it
+  //    permanently switched to a Telegram link fallback with
+  //    NO reset mechanism. The user saw the profile button
+  //    irreversibly turn into a "WebApp" link.
+  //
+  // v4 fix: Always render the same DropdownMenu structure.
+  // For guests (!hasUser), show a "Login via Telegram"
+  // dropdown item. For authenticated users, show the full
+  // profile menu. This means:
+  // - Clicking always opens a dropdown (consistent UX)
+  // - No component tree switching (no visual glitches)
+  // - No need for an inner error boundary that can permanently
+  //   break the UI
+  // - The outer CrewButtonErrorBoundary in CrewHeader is the
+  //   only safety net (with resetKey for recovery)
   // ─────────────────────────────────────────────────────────
 
-  if (!hasUser) {
-    return (
-      <a
-        href={TELEGRAM_WEB_APP_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Войти через Telegram"
-        className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-        style={{ backgroundColor: bgColor, color: textColor, borderColor }}
-      >
-        <Send className="h-4 w-4" />
-        <span className="hidden sm:inline">Войти</span>
-      </a>
-    );
-  }
-
-  const inner = (
+  return (
     <div style={{ isolation: "isolate" }}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -304,120 +296,147 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem asChild>
-            <Link href="/profile" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-              <User className="mr-2 h-4 w-4" />
-              <span className="truncate">Профиль</span>
-            </Link>
-          </DropdownMenuItem>
-
-          <DropdownMenuItem asChild>
-            <Link href="/settings" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-              <Settings className="mr-2 h-4 w-4" />
-              <span className="truncate">Настройки</span>
-            </Link>
-          </DropdownMenuItem>
-
-          <DropdownMenuItem asChild>
-            <Link href="/franchize/create" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-              <Palette className="mr-2 h-4 w-4 shrink-0" />
-              <span className="truncate">Оформление экипажа</span>
-            </Link>
-          </DropdownMenuItem>
-
-          {userIsAdmin ? (
-            <DropdownMenuItem asChild>
-              <Link href={franchizeAdminHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-                <Shield className="mr-2 h-4 w-4 shrink-0" />
-                <span className="truncate">Админка франшизы</span>
-              </Link>
-            </DropdownMenuItem>
-          ) : null}
-
-          <DropdownMenuItem asChild>
-            <Link href={franchizeDashboardHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-              <LayoutDashboard className="mr-2 h-4 w-4 shrink-0" />
-              <span className="truncate">Дашборд франшизы</span>
-            </Link>
-          </DropdownMenuItem>
-
-          <DropdownMenuItem asChild>
-            <Link href={franchizeProfileHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-              <IdCard className="mr-2 h-4 w-4 shrink-0" />
-              <span className="truncate">Профиль франшизы</span>
-            </Link>
-          </DropdownMenuItem>
-
-          {canShowTelegramCartCta && telegramCartHref ? (
+          {!hasUser ? (
+            // ── Guest menu: login CTA + optional cart transfer ──
             <>
-              <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <a href={telegramCartHref} target="_blank" rel="noreferrer" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-                  <MessageCircle className="mr-2 h-4 w-4 shrink-0" />
-                  <span className="truncate">Перейти в Telegram — корзина сохранится</span>
+                <a
+                  href={TELEGRAM_WEB_APP_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="cursor-pointer flex min-w-0 items-center gap-2 w-full font-semibold"
+                >
+                  <LogIn className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">Войти через Telegram</span>
                 </a>
               </DropdownMenuItem>
-              <DropdownMenuLabel className="pt-0 text-[11px] font-normal text-muted-foreground">
-                Добавленные позиции уже сохранены
-              </DropdownMenuLabel>
+
+              {canShowTelegramCartCta && telegramCartHref ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <a href={telegramCartHref} target="_blank" rel="noreferrer" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                      <MessageCircle className="mr-2 h-4 w-4 shrink-0" />
+                      <span className="truncate">Перейти в Telegram — корзина сохранится</span>
+                    </a>
+                  </DropdownMenuItem>
+                  <DropdownMenuLabel className="pt-0 text-[11px] font-normal text-muted-foreground">
+                    Добавленные позиции уже сохранены
+                  </DropdownMenuLabel>
+                </>
+              ) : null}
             </>
-          ) : null}
-
-          {dbUser?.user_id ? (
+          ) : (
+            // ── Authenticated menu: full profile + admin ──
             <>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                <Bell className="h-3.5 w-3.5" />
-                Уведомления
-              </DropdownMenuLabel>
-              {NOTIFICATION_OPTIONS.map((option) => (
-                <DropdownMenuCheckboxItem
-                  key={option.key}
-                  checked={notificationPreferences[option.key]}
-                  disabled={isNotificationSaving}
-                  onCheckedChange={(checked) => handleNotificationPreferenceChange(option.key, Boolean(checked))}
-                  onSelect={(event) => event.preventDefault()}
-                  className="cursor-pointer items-start gap-2 py-2"
-                >
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm">{option.label}</span>
-                    <span className="text-[11px] text-muted-foreground">{option.helper}</span>
-                  </span>
-                </DropdownMenuCheckboxItem>
-              ))}
-            </>
-          ) : null}
-
-          {userCrewInfo?.slug && (
-            <DropdownMenuItem asChild>
-              <Link href={`/crews/${userCrewInfo.slug}`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-                <Palette className="mr-2 h-4 w-4" />
-                <span className="truncate">Мой экипаж</span>
-              </Link>
-            </DropdownMenuItem>
-          )}
-
-          {userIsAdmin && (
-            <>
-              <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/admin" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-                  <Shield className="mr-2 h-4 w-4" />
-                  <span className="truncate">Админка</span>
+                <Link href="/profile" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                  <User className="mr-2 h-4 w-4" />
+                  <span className="truncate">Профиль</span>
                 </Link>
               </DropdownMenuItem>
+
+              <DropdownMenuItem asChild>
+                <Link href="/settings" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span className="truncate">Настройки</span>
+                </Link>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem asChild>
+                <Link href="/franchize/create" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                  <Palette className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">Оформление экипажа</span>
+                </Link>
+              </DropdownMenuItem>
+
+              {userIsAdmin ? (
+                <DropdownMenuItem asChild>
+                  <Link href={franchizeAdminHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                    <Shield className="mr-2 h-4 w-4 shrink-0" />
+                    <span className="truncate">Админка франшизы</span>
+                  </Link>
+                </DropdownMenuItem>
+              ) : null}
+
+              <DropdownMenuItem asChild>
+                <Link href={franchizeDashboardHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                  <LayoutDashboard className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">Дашборд франшизы</span>
+                </Link>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem asChild>
+                <Link href={franchizeProfileHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                  <IdCard className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">Профиль франшизы</span>
+                </Link>
+              </DropdownMenuItem>
+
+              {canShowTelegramCartCta && telegramCartHref ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <a href={telegramCartHref} target="_blank" rel="noreferrer" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                      <MessageCircle className="mr-2 h-4 w-4 shrink-0" />
+                      <span className="truncate">Перейти в Telegram — корзина сохранится</span>
+                    </a>
+                  </DropdownMenuItem>
+                  <DropdownMenuLabel className="pt-0 text-[11px] font-normal text-muted-foreground">
+                    Добавленные позиции уже сохранены
+                  </DropdownMenuLabel>
+                </>
+              ) : null}
+
+              {dbUser?.user_id ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                    <Bell className="h-3.5 w-3.5" />
+                    Уведомления
+                  </DropdownMenuLabel>
+                  {NOTIFICATION_OPTIONS.map((option) => (
+                    <DropdownMenuCheckboxItem
+                      key={option.key}
+                      checked={notificationPreferences[option.key]}
+                      disabled={isNotificationSaving}
+                      onCheckedChange={(checked) => handleNotificationPreferenceChange(option.key, Boolean(checked))}
+                      onSelect={(event) => event.preventDefault()}
+                      className="cursor-pointer items-start gap-2 py-2"
+                    >
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate text-sm">{option.label}</span>
+                        <span className="text-[11px] text-muted-foreground">{option.helper}</span>
+                      </span>
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </>
+              ) : null}
+
+              {userCrewInfo?.slug && (
+                <DropdownMenuItem asChild>
+                  <Link href={`/crews/${userCrewInfo.slug}`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                    <Palette className="mr-2 h-4 w-4" />
+                    <span className="truncate">Мой экипаж</span>
+                  </Link>
+                </DropdownMenuItem>
+              )}
+
+              {userIsAdmin && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                      <Shield className="mr-2 h-4 w-4" />
+                      <span className="truncate">Админка</span>
+                    </Link>
+                  </DropdownMenuItem>
+                </>
+              )}
             </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-  );
-
-  // FIX: Wrap in local error boundary so a DropdownMenu crash doesn't
-  // take down the entire page (replacing it with "crew recovery" fallback).
-  return (
-    <CrewButtonErrorBoundary bgColor={bgColor} textColor={textColor} borderColor={borderColor}>
-      {inner}
-    </CrewButtonErrorBoundary>
   );
 }
