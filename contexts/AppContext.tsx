@@ -66,18 +66,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const telegramHookData = useTelegram();
   const { user, dbUser: initialDbUser, isLoading: isTelegramLoading, isAuthenticating: isTelegramAuthenticating, error: telegramError, ...restTelegramData } = telegramHookData;
 
-  // --- Auth boundary ---
-  const [dbUser, setDbUserInternal] = useState<Database["public"]["Tables"]["users"]["Row"] | null>(initialDbUser);
-  const hasUserRef = useRef(!!initialDbUser);
+  // ── FIX: Race condition eliminated ──
+  // Old code used useState(initialDbUser) + useEffect to sync. This created
+  // a one-render gap where isAuthenticated=true but dbUser=null (the effect
+  // hadn't run yet). On Safari/WKWebView (slower JS engine), this gap was
+  // wide enough for SvarProfiOrderSheet to read isAuth=false even when the
+  // user was properly authenticated.
+  //
+  // New approach: derive dbUser from initialDbUser directly, with an override
+  // slot for refreshDbUser. No useEffect sync = no race condition.
+  const [dbUserOverride, setDbUserOverride] = useState<Database["public"]["Tables"]["users"]["Row"] | null>(null);
 
-  useEffect(() => {
-    if (initialDbUser) {
-      setDbUserInternal(initialDbUser);
-      hasUserRef.current = true;
-    } else if (!hasUserRef.current) {
-      setDbUserInternal(null);
-    }
-  }, [initialDbUser]);
+  // dbUser is always in sync with initialDbUser unless refreshDbUser
+  // has provided a newer version via dbUserOverride.
+  const dbUser = dbUserOverride ?? initialDbUser;
 
   const refreshDbUser = useCallback(async () => {
     const userId = user?.id || dbUser?.user_id;
@@ -86,8 +88,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const freshDbUser = await refreshDbUserAction(String(userId));
       if (freshDbUser) {
-        setDbUserInternal(freshDbUser);
-        hasUserRef.current = true;
+        setDbUserOverride(freshDbUser);
       }
     } catch (err) {
       debugLogger.error(`[AppContext] Refresh failed:`, err);
@@ -107,10 +108,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const fetchRuntimeSnapshot = async () => {
       if (!dbUser?.user_id) {
-        if (!hasUserRef.current) {
-          setUserCrewInfo(null);
-          setUserMetadataSlices({ cyberFitness: null, strikeball: null, franchizeProfiles: null });
-        }
+        setUserCrewInfo(null);
+        setUserMetadataSlices({ cyberFitness: null, strikeball: null, franchizeProfiles: null });
         return;
       }
       const snapshot = await fetchUserRuntimeSnapshotAction(dbUser.user_id);
@@ -210,6 +209,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [isTelegramLoading, isTelegramAuthenticating, telegramError, dbUser, appToast]);
 
+  // ── FIX: Ensure isAdmin is always a callable function ──
+  // The old `safeAuth` guard checked `typeof auth.isAdmin !== "function"`,
+  // but since useTelegram() always returns isAdmin as () => boolean,
+  // the guard never triggered (dead code). Now we explicitly ensure
+  // isAdmin is a function regardless of auth state.
+  const isAdminFn = useCallback((): boolean => {
+    if (!dbUser) return false;
+    return dbUser.status === "admin" || dbUser.role === "vprAdmin" || dbUser.role === "admin";
+  }, [dbUser]);
+
   const authValue = useMemo<AppAuthContextData>(() => ({
     ...restTelegramData,
     user,
@@ -217,8 +226,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isLoading: isTelegramLoading,
     isAuthenticating: isTelegramAuthenticating,
     error: telegramError,
+    isAdmin: isAdminFn,
     refreshDbUser,
-  }), [restTelegramData, user, dbUser, isTelegramLoading, isTelegramAuthenticating, telegramError, refreshDbUser]);
+  }), [restTelegramData, user, dbUser, isTelegramLoading, isTelegramAuthenticating, telegramError, isAdminFn, refreshDbUser]);
 
   const runtimeValue = useMemo<AppRuntimeContextData>(() => ({
     startParamPayload,
@@ -260,6 +270,7 @@ export const useAppContext = (): AppContextData => {
 
   const defaultRefreshDbUser = useCallback(async () => {}, []);
   const defaultClearStartParam = useCallback(() => {}, []);
+  const defaultIsAdmin = useCallback(() => false, []);
 
   if (!auth) {
     return {
@@ -271,7 +282,7 @@ export const useAppContext = (): AppContextData => {
       isLoading: true,
       isAuthenticating: true,
       error: null,
-      isAdmin: () => false,
+      isAdmin: defaultIsAdmin,
       openLink: () => {},
       close: () => {},
       showPopup: () => {},
@@ -295,21 +306,14 @@ export const useAppContext = (): AppContextData => {
     } as unknown as AppContextData;
   }
 
-  const safeAuth =
-    auth.isLoading === false && typeof auth.isAdmin !== "function"
-      ? {
-          ...auth,
-          isAdmin: () => {
-            if (!auth.dbUser) return false;
-            const statusIsAdmin = auth.dbUser.status === "admin";
-            const roleIsAdmin = auth.dbUser.role === "vprAdmin" || auth.dbUser.role === "admin";
-            return statusIsAdmin || roleIsAdmin;
-          },
-        }
-      : auth;
+  // ── FIX: No more safeAuth guard — isAdmin is guaranteed to be a function ──
+  // The old code had a dead-code guard:
+  //   const safeAuth = auth.isLoading === false && typeof auth.isAdmin !== "function" ? ... : auth;
+  // Since auth.isAdmin is always a function (set by the provider), this never
+  // triggered. Removed the guard entirely — if auth is non-null, it's valid.
 
   return {
-    ...safeAuth,
+    ...auth,
     ...(runtime ?? {
       startParamPayload: null,
       clearStartParam: defaultClearStartParam,

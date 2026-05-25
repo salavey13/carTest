@@ -1,10 +1,13 @@
 import type { Metadata } from 'next'
+import { SvarProfiClientShell } from './SvarProfiClientShell'
 
 // ─────────────────────────────────────────────────────
 // SvarProfi Layout
 // ─────────────────────────────────────────────────────
-// Minimal layout — no Toaster (root layout already has one).
-// Just wraps children with dark bg + Russian lang.
+// Server component with metadata. Wraps children in
+// SvarProfiClientShell which provides:
+//   - Error boundary (catches Safari/WKWebView crashes)
+//   - Dark background container
 // ─────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
@@ -17,9 +20,5 @@ export default function SvarProfiLayout({
 }: {
   children: React.ReactNode
 }) {
-  return (
-    <div className="min-h-screen bg-[#1A1D23] text-[#E8ECF1]">
-      {children}
-    </div>
-  )
+  return <SvarProfiClientShell>{children}</SvarProfiClientShell>
 }
