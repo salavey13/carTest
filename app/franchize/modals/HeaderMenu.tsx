@@ -121,43 +121,36 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
                 key={`${link.href}-${link.label}`}
                 href={link.href}
                 onClick={(e) => {
-                  // ── FIX v5: Reliable menu item navigation ──
-                  // v1: onOpenChange(false) before router.push() — dropped navigation.
-                  //     The menu close state update cancelled the startTransition-based
-                  //     SPA navigation because React discarded the low-priority transition.
-                  // v2: e.preventDefault() + router.push() + setTimeout — still unreliable
-                  //     because the portal unmounts in the same render batch as the
-                  //     navigation, and startTransition can be lost.
-                  // v3: Don't prevent default — let Link navigate natively + close menu
-                  //     after 50ms. Still unreliable because the portal unmount (menu
-                  //     close) can interrupt the pending startTransition navigation.
-                  // v4: Close menu FIRST (visual feedback), then navigate via
-                  //     router.push() in a setTimeout(50ms). The router.push in a
-                  //     setTimeout is OUTSIDE the click event's interaction context,
-                  //     making it easy for React to discard the low-priority transition
-                  //     when the menu close re-render unmounts the portal.
-                  // v5: For hash links, handle locally + close menu. For regular links,
-                  //     DON'T prevent default and DON'T close menu in this handler.
-                  //     Let the Next.js <Link> component handle navigation natively
-                  //     (its internal router.push is tied to the click event context).
-                  //     The pathname change effect in CrewHeader closes the menu when
-                  //     navigation completes. This ensures the navigation happens in
-                  //     the same interaction as the click, so React keeps the transition.
+                  // ── FIX v6: Always close menu + let Link navigate ──
+                  // v5 tried: "don't close menu for regular links, let pathname
+                  // change effect close it." This failed because:
+                  // a) If the Link navigates to the same page, pathname doesn't
+                  //    change, and the menu stays open (appears broken).
+                  // b) If navigation is slow, the menu stays open too long.
+                  //
+                  // v6 approach: Always close the menu immediately for clear
+                  // user feedback. Don't call e.preventDefault() for regular
+                  // links so the Next.js <Link> component handles navigation
+                  // via its own internal onClick (which calls router.push
+                  // wrapped in startTransition). The menu close (setState)
+                  // and the Link's navigation both fire in the same React
+                  // batch, so they don't conflict.
+                  //
+                  // For hash links, prevent default and scroll manually.
                   if (link.href.startsWith("#")) {
                     e.preventDefault();
                     const target = document.querySelector(link.href);
                     target?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    onOpenChange(false);
                   }
-                  // For regular links: do nothing extra.
-                  // Link navigates → pathname changes → CrewHeader closes menu.
+                  onOpenChange(false);
                 }}
                 aria-current={isActive ? "page" : undefined}
-                className={`w-full text-left block rounded-xl border px-4 py-3 text-sm transition cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--header-menu-accent)] ${
+                className={`w-full text-left block rounded-xl border px-4 py-3 text-sm no-underline transition cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--header-menu-accent)] ${
                   isActive
                     ? "border-[var(--header-menu-accent)] text-[var(--header-menu-accent)]"
                     : "border-[var(--header-menu-border)] text-[var(--header-menu-text)]"
                 }`}
+                style={{ textDecoration: "none" }}
               >
                 {link.label}
               </Link>
