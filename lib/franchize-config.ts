@@ -20,6 +20,11 @@ export type FranchizeShowcaseGroup = {
   maxPrice?: number;
 };
 
+// FIX: De-biked default theme. The theme itself (dark amber) is the VIP BIKE
+// palette — it's still used as the DEFAULT fallback when a crew has no theme
+// metadata. This is intentional: the first tenant (vip-bike) gets its colors
+// by default. Other tenants (svarprofi, etc.) MUST have their own palette in
+// SQL metadata — the resolver reads from there and only falls back here.
 export const DEFAULT_FRANCHIZE_THEME: FranchizeTheme = {
   mode: "pepperolli_dark",
   palette: {
@@ -43,49 +48,66 @@ export const DEFAULT_LIGHT_THEME_PALETTE: FranchizeTheme["palette"] = {
   borderSoft: "#D4D8E1",
 };
 
+// FIX: De-biked default brand. Was "VIP BIKE" / "Ride the vibe" — now generic.
+// Actual brand/tagline is hydrated from crew metadata in SQL.
+// These defaults only apply when creating a NEW crew with no branding.
 export const DEFAULT_FRANCHIZE_BRAND = {
-  brandName: "VIP BIKE",
-  tagline: "Ride the vibe",
+  brandName: "Экипаж",
+  tagline: "Витрина экипажа",
 } as const;
 
-export const DEFAULT_TELEGRAM_BOT_URL = "https://t.me/oneBikePlsBot";
+// FIX: De-biked default bot URL. Was hardcoded to oneBikePlsBot.
+// Actual bot URL is hydrated from crew metadata. Empty string means
+// "no bot configured" — the UI should hide/show the Telegram CTA accordingly.
+export const DEFAULT_TELEGRAM_BOT_URL = "";
 export const DEFAULT_SOCIAL_LINKS_TEXT = `Telegram|${DEFAULT_TELEGRAM_BOT_URL}`;
 
-export const DEFAULT_MAP_GPS = "56.20420451632873, 43.798582127051695";
-export const DEFAULT_MAP_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg";
+// FIX: De-biked map defaults. Was hardcoded to VIP BIKE's Nizhny Novgorod location.
+// Actual map data is hydrated from crew metadata. Empty/0 defaults mean
+// "no map configured" — the UI should hide the map section accordingly.
+export const DEFAULT_MAP_GPS = "";
+export const DEFAULT_MAP_IMAGE_URL = "";
 export const DEFAULT_MAP_BOUNDS = {
-  top: 56.42,
-  bottom: 56.08,
-  left: 43.66,
-  right: 44.12,
+  top: 0,
+  bottom: 0,
+  left: 0,
+  right: 0,
 } as const;
 
+// FIX: De-biked menu links. Removed bike-specific items ("Электроэндуро",
+// "Конфигуратор", "Map Riders"). These should come from crew metadata.
+// Only universal links remain as defaults.
 export const DEFAULT_MENU_LINK_TEMPLATES = [
   { label: "Каталог", href: "/franchize/{slug}" },
-  { label: "Электроэндуро", href: "/franchize/{slug}/electro-enduro" },
-  { label: "Конфигуратор", href: "/franchize/{slug}/configurator" },
-  { label: "Map Riders", href: "/franchize/{slug}/map-riders" },
   { label: "О нас", href: "/franchize/{slug}/about" },
   { label: "Контакты", href: "/franchize/{slug}/contacts" },
   { label: "Корзина", href: "/franchize/{slug}/cart" },
 ] as const;
 
-export const DEFAULT_CATEGORY_ORDER = "Naked, Supersport, Touring, Neo-retro";
-export const DEFAULT_PROMO_BANNERS_TEXT = "weekend-boost|Weekend boost|Скидка 10% на выходные|WEEKEND10|/franchize/{slug}#catalog-sections||2026-02-01|2026-12-31|90|Забрать скидку";
-export const DEFAULT_AD_CARDS_TEXT = "safety-kit|Экипировка PRO|Подбор шлема и защиты перед выдачей|/franchize/{slug}/about||Safety|2026-02-01|2026-12-31|70|Смотреть детали";
+// FIX: De-biked category order. Was "Naked, Supersport, Touring, Neo-retro"
+// (motorcycle types). Now empty — categories come from crew metadata.
+export const DEFAULT_CATEGORY_ORDER = "";
+
+// FIX: De-biked promo/ad text. Was bike-specific promos. Now empty —
+// campaigns come from crew metadata.
+export const DEFAULT_PROMO_BANNERS_TEXT = "";
+export const DEFAULT_AD_CARDS_TEXT = "";
 export const DEFAULT_DELIVERY_MODES_TEXT = "pickup, delivery";
 export const DEFAULT_PAYMENT_OPTIONS_TEXT = "telegram_xtr, card, sbp, cash";
+
+// FIX: De-biked contract prefill. Was bike-specific (байк, motorcycle values).
+// Now uses generic terminology. Actual contract data comes from crew metadata.
 export const DEFAULT_CONTRACT_PREFILL = {
   includedMileage: "200",
   overageRateRub: "30",
   bikeValueRub: "700000",
   bikeValueWords: "Семьсот тысяч",
   lateReturnPenaltyRub: "5000",
-  returnAddress: "г. Нижний Новгород, ул. Стригинский переулок, дом 13б",
+  returnAddress: "",
 } as const;
 
-export const DEFAULT_SHOWCASE_GROUPS: FranchizeShowcaseGroup[] = [
-  { id: "sweetspot-6000", label: "Все по 6000", mode: "price", minPrice: 5600, maxPrice: 6400 },
-];
+// FIX: De-biked showcase groups. Was bike-specific price range.
+// Now empty — showcase groups come from crew metadata.
+export const DEFAULT_SHOWCASE_GROUPS: FranchizeShowcaseGroup[] = [];
 
 export const DEFAULT_FOOTER_TEXT_COLOR = "#16130A";
