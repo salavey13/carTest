@@ -187,7 +187,7 @@ export function SvarProfiOrderSheet({
                     Авторизован: {authDisplayLabel}
                   </p>
                   <p className="text-xs text-[#8A92A0]">
-                    Заявка отправлена от вашего имени
+                    Заявка будет отправлена от вашего имени
                   </p>
                 </div>
               </div>
