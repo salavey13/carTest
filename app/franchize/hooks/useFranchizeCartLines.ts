@@ -58,6 +58,8 @@ function parseDurationDays(rawDuration: string): number {
   return days;
 }
 
+export type CartFlowType = "rental" | "sale";
+
 export type FranchizeCartLineVM = {
   lineId: string;
   itemId: string;
@@ -67,6 +69,12 @@ export type FranchizeCartLineVM = {
   lineTotal: number;
   rentalDays: number;
   saleAvailable: boolean;
+  /** Resolved sale price from rawSpecs — null if item has no sale price or item is null */
+  salePrice: number | null;
+  /** Per-line flow type: "sale" when in buy flow with valid sale price, "rental" otherwise */
+  flowType: CartFlowType;
+  /** Human-readable price label for display: rental → "X ₽ / день", sale → "Покупка: X ₽" */
+  displayPriceLabel: string;
   options: {
     package: string;
     duration: string;
@@ -96,11 +104,12 @@ export function useFranchizeCartLines(
       .map(([lineId, line]) => {
         const item = itemById.get(line.itemId) ?? null;
         const inBuyFlow = isBuyFlow(line.options);
-        const salePrice = resolveSalePrice(item);
+        const resolvedSalePrice = resolveSalePrice(item);
+        const hasSalePrice = inBuyFlow && resolvedSalePrice > 0;
 
-        if (inBuyFlow && salePrice > 0) {
+        if (hasSalePrice) {
           const buyDelta = Math.max(0, line.options.buyPriceDelta ?? 0);
-          const effectiveSalePrice = salePrice + buyDelta;
+          const effectiveSalePrice = resolvedSalePrice + buyDelta;
           return {
             lineId,
             itemId: line.itemId,
@@ -110,6 +119,9 @@ export function useFranchizeCartLines(
             lineTotal: effectiveSalePrice * line.qty,
             rentalDays: 1,
             saleAvailable: Boolean(item?.saleAvailable),
+            salePrice: effectiveSalePrice,
+            flowType: "sale" as const,
+            displayPriceLabel: `Покупка: ${effectiveSalePrice.toLocaleString("ru-RU")} ₽`,
             options: line.options,
           };
         }
@@ -132,6 +144,9 @@ export function useFranchizeCartLines(
           lineTotal: discountedLineBase * line.qty,
           rentalDays,
           saleAvailable: Boolean(item?.saleAvailable),
+          salePrice: null,
+          flowType: "rental" as const,
+          displayPriceLabel: item?.rentPriceLabel ?? `${effectiveUnitPrice.toLocaleString("ru-RU")} ₽ / день`,
           options: line.options,
         };
       });
