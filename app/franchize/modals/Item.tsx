@@ -19,6 +19,20 @@ import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 import { crewPaletteForSurface } from "../lib/theme";
 import { FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 
+// ─────────────────────────────────────────────────────
+// Item Modal — generalized for rental & order flows
+// ─────────────────────────────────────────────────────
+// flowType controls which sections appear:
+//   "rental" → full rental UI (packages, duration, perks, auction,
+//              rental strip, deposit/tariff info, "Забронировать" CTA)
+//   "order"  → order-only UI (no rental options, simple "Выбрать" CTA,
+//              no rental strip, no deposit info)
+//
+// Default is "rental" for backward compatibility with vip-bike.
+// ─────────────────────────────────────────────────────
+
+export type FlowType = "rental" | "order";
+
 interface ItemModalProps {
   item: CatalogItemVM | null;
   items: CatalogItemVM[];
@@ -26,6 +40,8 @@ interface ItemModalProps {
   theme: FranchizeTheme;
   pickupAddress?: string;
   workingHours?: string;
+  /** Crew business flow type — "rental" shows rental options, "order" hides them */
+  flowType?: FlowType;
   options: {
     package: string;
     duration: string;
@@ -109,12 +125,14 @@ export function ItemModal({
   theme,
   pickupAddress = "",
   workingHours = "",
+  flowType = "rental",
   options,
   auctionOptions,
   onChangeOption,
   onClose,
   onAddToCart,
 }: ItemModalProps) {
+  const isRental = flowType === "rental";
   const modalRef = useRef<HTMLDivElement>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
@@ -132,11 +150,12 @@ export function ItemModal({
   }, [item]);
 
   const descriptionText = useMemo(() => {
-    return (
-      item?.description ||
-      "Этот байк уже подготовлен к аренде: технический чек выполнен, документы готовы, выдача без очереди."
-    );
-  }, [item?.description]);
+    if (item?.description) return item.description;
+    // Generalized fallback — no bike-specific language
+    return isRental
+      ? "Позиция готова к аренде: технический чек выполнен, документы готовы, выдача без очереди."
+      : "Позиция доступна для заказа. Оставьте заявку, и менеджер свяжется с вами для уточнения деталей.";
+  }, [item?.description, isRental]);
 
   const surface = useMemo(() => crewPaletteForSurface(theme), [theme]);
   const themeVars = useMemo(() => getModalThemeVars(theme), [theme]);
@@ -234,12 +253,12 @@ export function ItemModal({
   const propulsionLabel = getCatalogPropulsionLabel(propulsionSegment);
 
   const rentalStrip = useMemo(() => {
-    if (!item) return null;
+    if (!item || !isRental) return null;
     return buildCatalogRentalStrip(item, {
       hqLocation: pickupAddress,
       contacts: { address: pickupAddress, workingHours },
     });
-  }, [item, pickupAddress, workingHours]);
+  }, [item, isRental, pickupAddress, workingHours]);
 
   const comparableBikes = useMemo(() => {
     if (!item) return [];
@@ -255,21 +274,44 @@ export function ItemModal({
 
   if (!item) return null;
 
-  const fallbackSpecs = [
-    { label: "Категория", value: item.category },
-    { label: "Тариф аренды", value: item.rentPriceLabel },
-    ...(item.saleAvailable && item.salePrice
-      ? [
-          {
-            label: "Цена покупки",
-            value: `${item.salePrice.toLocaleString("ru-RU")} ₽`,
-          },
-        ]
-      : []),
-    { label: "Статус", value: "Готов к выдаче" },
-  ];
+  // Generalized fallback specs — rental vs order
+  const fallbackSpecs = isRental
+    ? [
+        { label: "Категория", value: item.category },
+        { label: "Тариф аренды", value: item.rentPriceLabel },
+        ...(item.saleAvailable && item.salePrice
+          ? [
+              {
+                label: "Цена покупки",
+                value: `${item.salePrice.toLocaleString("ru-RU")} ₽`,
+              },
+            ]
+          : []),
+        { label: "Статус", value: "Готов к выдаче" },
+      ]
+    : [
+        { label: "Категория", value: item.category },
+        ...(item.salePrice
+          ? [
+              {
+                label: "Цена",
+                value: `${item.salePrice.toLocaleString("ru-RU")} ₽`,
+              },
+            ]
+          : []),
+        { label: "Статус", value: "Доступно для заказа" },
+      ];
 
   const normalizedSpecs = item.specs.length > 0 ? item.specs : fallbackSpecs;
+
+  // Generalized CTA label
+  const ctaLabel = isAdding
+    ? "Добавляем..."
+    : item.saleAvailable
+      ? "Купить"
+      : isRental
+        ? "Забронировать"
+        : "Выбрать";
 
   return (
     <div
@@ -325,22 +367,28 @@ export function ItemModal({
                 {item.subtitle}
               </p>
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                {/* Availability badge — generalized */}
                 <span
                   className={`inline-flex rounded-full border px-2.5 py-1 font-semibold ${
-                    rentalStrip?.isAvailable
+                    rentalStrip?.isAvailable ?? item.availabilityStatus === "available"
                       ? "border-emerald-300/50 bg-emerald-400/15 text-emerald-100"
                       : "border-amber-300/50 bg-amber-400/15 text-amber-100"
                   }`}
                 >
-                  Сегодня: {rentalStrip?.todayLabel ?? "Уточним в Telegram"}
+                  {isRental
+                    ? `Сегодня: ${rentalStrip?.todayLabel ?? "Уточним в Telegram"}`
+                    : item.availabilityStatus === "available"
+                      ? "Доступно для заказа"
+                      : "Уточните наличие"}
                 </span>
                 {item.saleAvailable && (
                   <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/20 px-2.5 py-1 font-semibold text-amber-100">
-                    Аренда + покупка
+                    {isRental ? "Аренда + покупка" : "Доступно к покупке"}
                   </span>
                 )}
               </div>
-              {rentalStrip ? (
+              {/* Rental strip — only for rental flow */}
+              {isRental && rentalStrip ? (
                 <div
                   className="mt-3 grid gap-2 rounded-2xl border border-white/10 bg-black/15 p-3 text-xs sm:grid-cols-3"
                   aria-label={`Быстрая аренда ${item.title}`}
@@ -384,7 +432,7 @@ export function ItemModal({
               style={surface.subtleCard}
             >
               <p className="inline-flex items-center gap-1 font-medium text-[var(--item-accent)]">
-                <Info className="h-3.5 w-3.5" /> Характеристики и условия
+                <Info className="h-3.5 w-3.5" /> Характеристики{isRental ? " и условия" : ""}
               </p>
               <div
                 className="mt-2 grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-2"
@@ -410,10 +458,10 @@ export function ItemModal({
               <section
                 className="rounded-2xl border p-3"
                 style={surface.subtleCard}
-                aria-label="Отзывы арендаторов"
+                aria-label={isRental ? "Отзывы арендаторов" : "Отзывы"}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-[var(--item-text)]">Отзывы друзей</p>
+                  <p className="text-sm font-semibold text-[var(--item-text)]">Отзывы</p>
                   <span className="rounded-full bg-[var(--item-accent)] px-2.5 py-1 text-xs font-bold text-[var(--item-accent-contrast)]">
                     ★ {item.reviewSummary.average.toFixed(1)} · {item.reviewSummary.count}
                   </span>
@@ -440,30 +488,35 @@ export function ItemModal({
               </Link>
             )}
 
-            <OptionChips
-              title="Пакет"
-              options={packageOptions}
-              selected={options.package}
-              onSelect={(v) => onChangeOption("package", v)}
-            />
-            <OptionChips
-              title="Срок"
-              options={durationOptions}
-              selected={options.duration}
-              onSelect={(v) => onChangeOption("duration", v)}
-            />
-            <OptionChips
-              title="Комплект"
-              options={perkOptions}
-              selected={options.perk}
-              onSelect={(v) => onChangeOption("perk", v)}
-            />
-            <OptionChips
-              title="Аукцион / тик"
-              options={auctionOptions}
-              selected={options.auction}
-              onSelect={(v) => onChangeOption("auction", v)}
-            />
+            {/* ── Rental-only options (hidden for order flow) ── */}
+            {isRental && (
+              <>
+                <OptionChips
+                  title="Пакет"
+                  options={packageOptions}
+                  selected={options.package}
+                  onSelect={(v) => onChangeOption("package", v)}
+                />
+                <OptionChips
+                  title="Срок"
+                  options={durationOptions}
+                  selected={options.duration}
+                  onSelect={(v) => onChangeOption("duration", v)}
+                />
+                <OptionChips
+                  title="Комплект"
+                  options={perkOptions}
+                  selected={options.perk}
+                  onSelect={(v) => onChangeOption("perk", v)}
+                />
+                <OptionChips
+                  title="Аукцион / тик"
+                  options={auctionOptions}
+                  selected={options.auction}
+                  onSelect={(v) => onChangeOption("auction", v)}
+                />
+              </>
+            )}
 
             {comparableBikes.length ? (
               <details
@@ -553,11 +606,7 @@ export function ItemModal({
               aria-busy={isAdding}
               className="rounded-xl bg-[var(--item-accent)] px-3 py-2 text-sm font-semibold text-[var(--item-accent-contrast)] transition hover:brightness-105 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
             >
-              {isAdding
-                ? "Добавляем..."
-                : item.saleAvailable
-                  ? `Hold this bike • Забронировать байк`
-                  : `Забронировать байк • Hold this bike`}
+              {ctaLabel}
             </button>
           </div>
         </div>
