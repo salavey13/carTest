@@ -13,7 +13,7 @@ import { catalogCardVariantStyles, crewPaletteForSurface, interactionRingStyle }
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { upsertFranchizeIntent } from "../actions";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
-import { ItemModal } from "../modals/Item";
+import { ItemModal, type FlowType } from "../modals/Item";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 
@@ -43,6 +43,23 @@ const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
 
 const hasRentPrice = (item: CatalogItemVM) => item.pricePerDay > 0;
 const hasSalePrice = (item: CatalogItemVM) => item.saleAvailable && Boolean(item.salePrice && item.salePrice > 0);
+
+// Derive flow type per-item from pricing — no need for drilled "mode" prop
+// Items with rental pricing → "rental" (shows 1/3/7 days, packages, auction)
+// Items without → "order" (simple select/purchase flow, no rental UI)
+function getItemFlowType(item: CatalogItemVM): FlowType {
+  return item.pricePerDay > 0 ? "rental" : "order";
+}
+
+// Derive CTA label per-item from pricing + saleAvailable
+function getItemCtaLabel(item: CatalogItemVM): string {
+  // Sale item that also has rental → "Купить" (buy option on rental context)
+  if (item.saleAvailable && item.pricePerDay > 0) return "Купить";
+  // Pure rental → "Забронировать"
+  if (item.pricePerDay > 0) return "Забронировать";
+  // Sale-only or order-only (svarprofi etc.) → "Выбрать"
+  return "Выбрать";
+}
 
 // ── RESTORED: Helper functions deleted by agent but still referenced in grid path ──
 
@@ -562,7 +579,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         </div>
 
         {promoModules.length > 0 && mode !== "electro" && (
-          <div className="mb-5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
+          <div className="mb-5 flex gap-2 overflow-x-auto [overflow-y:clip] touch-pan-x overscroll-behavior-x-contain pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
             {visiblePromoModules.map((module, index) => {
               const isExternal = /^(https?:|mailto:|tel:)/.test(module.href);
               return (
@@ -600,7 +617,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           Найдено позиций: {filteredItems.length}
         </p>
 
-        <div className="mb-5 flex gap-2 overflow-x-auto pb-1 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Быстрые фильтры каталога">
+        <div className="mb-5 flex gap-2 overflow-x-auto [overflow-y:clip] touch-pan-x overscroll-behavior-x-contain pb-1 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Быстрые фильтры каталога">
           {QUICK_FILTERS.map((filter) => {
             const active = quickFilter === filter.key;
             return (
@@ -669,7 +686,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       ref={(node) => {
                         carouselRefs.current[group.category] = node;
                       }}
-                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 touch-pan-x [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto [overflow-y:clip] pt-1 pb-2 touch-pan-x overscroll-behavior-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                       tabIndex={0}
                       role="region"
                       aria-label={`Карусель категории ${group.category}`}
@@ -691,19 +708,22 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       data-catalog-item="true"
                       data-carousel-card="true"
                       data-carousel-index={index}
-                      className="group w-[65vw] max-w-[280px] shrink-0 snap-start rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)] sm:w-[260px]"
+                      className="group w-[46vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)] sm:w-[260px]"
                       style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
                     >
                       <button
                         type="button"
                         aria-label={`Открыть карточку ${item.title}: ${item.rentPriceLabel}`}
                         data-catalog-item-button="true"
-                        className="block w-full overflow-hidden text-left"
+                        className="block w-full rounded-2xl overflow-hidden text-left"
                         onClick={() => openItem(item)}
                         onFocus={() => setFocusedItemId(item.id)}
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
                         style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
                         onPointerMove={(event) => {
+                          // Skip parallax on touch — setState re-renders mid-scroll
+                          // confuse iOS Safari's scroll gesture decider
+                          if (event.pointerType === 'touch') return;
                           const rect = event.currentTarget.getBoundingClientRect();
                           const dx = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
                           const dy = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
@@ -724,7 +744,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               src={item.imageUrl}
                               alt={item.title}
                               fill
-                              sizes="(max-width: 1279px) 65vw, 260px"
+                              sizes="(max-width: 1279px) 46vw, 260px"
                               className="object-cover transition-transform duration-300 ease-out"
                               style={{ transform: `scale(1.04) translate3d(${parallax.x * 4}px, ${parallax.y * 4}px, 0)` }}
                               onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
@@ -732,49 +752,52 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           ) : (
                             <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается — карточка уже доступна</div>
                           )}
-                        </div>
-                        <div className="p-3">
-                          {/* Badges */}
-                          <div className="mb-1.5 flex flex-wrap gap-1">
-                            {item.isHot && (
-                              <span className="inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
-                                Высокий спрос
-                              </span>
-                            )}
-                            <span className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em]" style={{ backgroundColor: rentalStrip.isAvailable ? "#1f7a3a3d" : "#dc262640", color: "#e6f4ea", border: rentalStrip.isAvailable ? "1px solid rgba(46, 160, 67, 0.45)" : "1px solid rgba(220, 38, 38, 0.45)" }}>{rentalStrip.availabilityLabel}</span>
-                            {item.saleAvailable && <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-amber-100">Доступен к покупке</span>}
-                          </div>
-
-                          {/* Title */}
-                          <h3 className="text-sm font-semibold leading-5">{item.title}</h3>
-
-                          {/* Specs — icon + text rows (reference design) */}
-                          {specChips.length > 0 && (
-                            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--catalog-muted)]">
-                              {specChips.map((spec, si) => (
-                                <span key={`${item.id}-spec-${si}`}>{spec.icon ? `${spec.icon} ` : ""}{spec.text}</span>
-                              ))}
-                            </div>
+                          {/* Gradient overlay — smooth transition from image to details */}
+                          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-[color:color-mix(in_srgb,var(--catalog-card-bg)_92%,#000)] via-[color:color-mix(in_srgb,var(--catalog-card-bg)_65%,transparent)] to-transparent" />
+                          {/* Card content overlaid on image bottom */}
+                          <div className="absolute inset-x-0 bottom-0 p-3">
+                        {/* Badges */}
+                        <div className="mb-1.5 flex flex-wrap gap-1">
+                          {item.isHot && (
+                            <span className="inline-flex rounded-full bg-[color:color-mix(in_srgb,var(--catalog-accent)_86%,transparent)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)]">
+                              Высокий спрос
+                            </span>
                           )}
+                          <span className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em]" style={{ backgroundColor: rentalStrip.isAvailable ? "#1f7a3a3d" : "#dc262640", color: "#e6f4ea", border: rentalStrip.isAvailable ? "1px solid rgba(46, 160, 67, 0.45)" : "1px solid rgba(220, 38, 38, 0.45)" }}>{rentalStrip.availabilityLabel}</span>
+                          {item.saleAvailable && <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-amber-100">Доступен к покупке</span>}
+                        </div>
 
-                          {/* Price — reference layout: large bold main price, rent/day subtext */}
-                          <div className="mt-2">
-                            {hasSalePrice(item) ? (
-                              <>
-                                <p className="text-lg font-bold text-[var(--catalog-accent)]">{item.salePrice?.toLocaleString("ru-RU")} ₽</p>
-                                {hasRentPrice(item) && (
-                                  <p className="text-[11px] text-white/60">{item.rentPriceLabel}</p>
-                                )}
-                              </>
-                            ) : hasRentPrice(item) ? (
-                              <p className="text-lg font-bold text-[var(--catalog-accent)]">{item.rentPriceLabel}</p>
-                            ) : (
-                              <p className="text-xs font-medium text-white/80">Цена по запросу</p>
-                            )}
+                        {/* Title */}
+                        <h3 className="text-sm font-semibold leading-5 text-white">{item.title}</h3>
+
+                        {/* Specs — icon + text in vertical rows (reference design) */}
+                        {specChips.length > 0 && (
+                          <div className="mt-1.5 space-y-0.5 text-[10px] text-white/75">
+                            {specChips.map((spec, si) => (
+                              <span key={`${item.id}-spec-${si}`} className="block">{spec.icon ? `${spec.icon} ` : ""}{spec.text}</span>
+                            ))}
                           </div>
+                        )}
 
-                          {/* CTA */}
-                          <div className="mt-2 flex gap-2"><span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95"><ShoppingCart className="h-4 w-4" />{item.saleAvailable ? "Закрепить" : "Забронировать выезд"}</span></div>
+                        {/* Price */}
+                        <div className="mt-2">
+                          {hasSalePrice(item) ? (
+                            <>
+                              <p className="text-lg font-bold text-[var(--catalog-accent)]">{item.salePrice?.toLocaleString("ru-RU")} ₽</p>
+                              {hasRentPrice(item) && (
+                                <p className="text-[11px] text-white/60">{item.rentPriceLabel}</p>
+                              )}
+                            </>
+                          ) : hasRentPrice(item) ? (
+                            <p className="text-lg font-bold text-[var(--catalog-accent)]">{item.rentPriceLabel}</p>
+                          ) : (
+                            <p className="text-xs font-medium text-white/80">Цена по запросу</p>
+                          )}
+                        </div>
+
+                        {/* CTA — generalized per flow type */}
+                        <div className="mt-2 flex gap-2"><span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95"><ShoppingCart className="h-4 w-4" />{getItemCtaLabel(item)}</span></div>
+                          </div>
                         </div>
                       </button>
                     </article>
@@ -813,7 +836,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                     <article
                       key={item.id}
                       data-catalog-item="true"
-                      className="group rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)]"
+                      className="group overflow-hidden rounded-2xl border transition-shadow hover:shadow-[0_0_0_1px_var(--catalog-accent),0_0_28px_color-mix(in_srgb,var(--catalog-accent)_35%,transparent)]"
                       style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
                     >
                       <button
@@ -853,9 +876,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               {item.saleAvailable && <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-amber-100">Продажа</span>}
                             </div>
                             <h3 className="text-sm font-semibold leading-5 text-white">{item.title}</h3>
-                            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-white/75">
+                            <div className="mt-1.5 space-y-0.5 text-[10px] text-white/75">
                               {visibleSpecs.map((spec, index) => (
-                                <span key={`${item.id}-spec-${index}`}>{spec.icon ? `${spec.icon} ` : ""}{spec.text}</span>
+                                <span key={`${item.id}-spec-${index}`} className="block">{spec.icon ? `${spec.icon} ` : ""}{spec.text}</span>
                               ))}
                             </div>
                             <div className="mt-2 space-y-0.5">
@@ -876,7 +899,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             <div className="mt-2">
                               <span className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--catalog-accent)] px-2 py-2 text-xs font-bold text-[var(--catalog-accent-contrast)] transition-transform active:scale-95">
                                 <ShoppingCart className="h-4 w-4" />
-                                {item.saleAvailable ? "Закрепить" : "Бронь"}
+                                {getItemCtaLabel(item)}
                               </span>
                             </div>
                           </div>
@@ -914,6 +937,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         theme={crew.theme}
         pickupAddress={crew.contacts.address || crew.hqLocation}
         workingHours={crew.contacts.workingHours}
+        flowType={selectedItem ? getItemFlowType(selectedItem) : "order"}
         options={selectedOptions}
         auctionOptions={auctionTickOptions}
         onChangeOption={(key, value) => setSelectedOptions((prev) => ({ ...prev, [key]: value }))}
