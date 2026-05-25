@@ -48,7 +48,7 @@ insert into public.cars (
   '/franchize/svarprofi?vehicle=karkas-prom',
   false,
   jsonb_build_object(
-    'sale', false,
+    'sale', 1,
     'type', 'Каркас',
     'subtype', 'Промышленный',
     'year', NULL,
@@ -134,7 +134,7 @@ insert into public.cars (
   '/franchize/svarprofi?vehicle=karkas-kran',
   false,
   jsonb_build_object(
-    'sale', false,
+    'sale', 1,
     'type', 'Каркас',
     'subtype', 'С подкрановыми путями',
     'year', NULL,
