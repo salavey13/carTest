@@ -47,6 +47,7 @@ const MEETUP_ACTION_DEBOUNCE_MS = 2000;
 
 // Snap labels for the 3-button control (matching vaul snapPoints)
 const SNAP_POINTS = [0.2, 0.48, 0.86] as const;
+const DRAWER_SNAP_POINTS: number[] = [...SNAP_POINTS];
 type SnapLabel = "Мини" | "Средне" | "Макс";
 const SNAP_LABELS: Record<number, SnapLabel> = { 0.2: "Мини", 0.48: "Средне", 0.86: "Макс" };
 
@@ -107,6 +108,24 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       if (prevBg) root.style.setProperty("--fr-map-nav-bg", prevBg); else root.style.removeProperty("--fr-map-nav-bg");
     };
   }, [crew.theme.palette.accentMain, crew.theme.palette.bgBase, crew.theme.palette.textPrimary]);
+
+  useEffect(() => {
+    const { documentElement, body } = document;
+    const prevHtmlOverscroll = documentElement.style.overscrollBehavior;
+    const prevBodyOverscroll = body.style.overscrollBehavior;
+    const prevBodyOverflow = body.style.overflow;
+
+    // Telegram WebView can route gesture intent to page scroll unless we lock overscroll.
+    documentElement.style.overscrollBehavior = "none";
+    body.style.overscrollBehavior = "none";
+    body.style.overflow = "hidden";
+
+    return () => {
+      documentElement.style.overscrollBehavior = prevHtmlOverscroll;
+      body.style.overscrollBehavior = prevBodyOverscroll;
+      body.style.overflow = prevBodyOverflow;
+    };
+  }, []);
 
   // ── GPS tracking hook ──
   const { isUsingTelegram, lastBroadcastAt, queuedPoints } = useLiveRiders({
@@ -351,7 +370,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       <BeginnerRiderOnboardingQuiz crew={crew} />
 
       {/* ── MAP (fullscreen background) ── */}
-      <section className="fixed inset-0 overflow-hidden" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
+      <section className="fixed inset-0 overflow-hidden [touch-action:none]" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
         <div className="absolute inset-0 z-0">
           {useLeafletMap ? (
             <RacingMap
@@ -442,9 +461,11 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       <Drawer.Root
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        snapPoints={SNAP_POINTS}
+        snapPoints={DRAWER_SNAP_POINTS}
         activeSnapPoint={activeSnap}
-        setActiveSnapPoint={setActiveSnap}
+        setActiveSnapPoint={(snapPoint) => {
+          if (typeof snapPoint === "number") setActiveSnap(snapPoint);
+        }}
         dismissible={false}
         modal={false}
       >
@@ -469,7 +490,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
                 ))}
               </div>
             </div>
-            <div className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`}>
+            <div className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))] [touch-action:pan-y] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`}>
               <div className="grid gap-3 lg:grid-cols-[1.35fr,1fr]">
         {/* Stats card */}
         <div className="rounded-2xl border p-4 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
