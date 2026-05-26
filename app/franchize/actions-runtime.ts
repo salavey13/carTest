@@ -1818,18 +1818,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
     const recipientSet = new Set<string>([adminChatId, payload.telegramUserId]);
     const { data: crewRow } = await supabaseAdmin.from("crews").select("owner_id").eq("slug", payload.slug).maybeSingle();
-    const ownerId = typeof crewRow?.owner_id === "string" ? crewRow.owner_id : "";
-    if (ownerId) {
-      const { data: ownerUser } = await supabaseAdmin
-        .from("users")
-        .select("metadata")
-        .eq("user_id", ownerId)
-        .maybeSingle();
-      const ownerMeta = (ownerUser?.metadata ?? {}) as Record<string, unknown>;
-      const ownerTelegramId = String(ownerMeta.telegram_id ?? ownerMeta.telegramId ?? "").trim();
-      if (ownerTelegramId) {
-        recipientSet.add(ownerTelegramId);
-      }
+    // owner_id IS the Telegram chat ID (user_id === telegram chat_id)
+    if (crewRow?.owner_id) {
+      recipientSet.add(String(crewRow.owner_id));
     }
 
     for (const recipientId of recipientSet) {
