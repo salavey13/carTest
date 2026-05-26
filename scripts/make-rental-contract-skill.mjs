@@ -1,11 +1,56 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { createClient } from '@supabase/supabase-js';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 
 function arg(name, fallback = '') { const i = process.argv.indexOf(`--${name}`); return i>=0 ? (process.argv[i+1]||'') : fallback; }
+
+function formatRuDate(d) {
+  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+}
+
+function parseRuTime(raw) {
+  const m = String(raw).match(/(\d{1,2})(?:[:.]?(\d{2}))?/);
+  if (!m) return null;
+  const hh = Number(m[1]);
+  const mm = Number(m[2] || '00');
+  if (hh > 23 || mm > 59) return null;
+  return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+}
+
+function extractScheduleFromPhrase(rawPhrase) {
+  const text = String(rawPhrase || '').toLowerCase();
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+
+  const start = text.match(/с\s*(сегодня|завтра|\d{1,2}\.\d{1,2}(?:\.\d{2,4})?)\s*(?:в)?\s*(\d{1,2}(?:[:.]\d{2})?)/i);
+  const end = text.match(/до\s*(завтра|сегодня|\d{1,2}\.\d{1,2}(?:\.\d{2,4})?)\s*(?:до|в)?\s*(\d{1,2}(?:[:.]\d{2})?)/i);
+
+  const parseDateToken = (token) => {
+    const t = String(token || '').toLowerCase();
+    if (t === 'сегодня') return formatRuDate(today);
+    if (t === 'завтра') return formatRuDate(tomorrow);
+    const parts = t.split('.').map(v=>v.trim()).filter(Boolean);
+    if (parts.length < 2) return null;
+    let [d,m,y] = parts;
+    if (!y) y = String(today.getFullYear());
+    if (y.length === 2) y = `20${y}`;
+    return `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${y}`;
+  };
+
+  return {
+    startDate: start ? parseDateToken(start[1]) : null,
+    startTime: start ? parseRuTime(start[2]) : null,
+    endDate: end ? parseDateToken(end[1]) : null,
+    endTime: end ? parseRuTime(end[2]) : null,
+  };
+}
+
 const phrase = arg('phrase');
-const bikeId = (phrase.match(/(?:сделай\s+договор|создай\s+документ)\s+(.+)$/i)?.[1] || arg('bikeId')).trim();
+const bikePhraseRaw = (phrase.match(/(?:сделай\s+договор|создай\s+документ)\s+(.+)$/i)?.[1] || arg('bikeId')).trim();
+const bikeId = bikePhraseRaw.split(/\s+с\s+(?:сегодня|завтра|\d{1,2}\.\d{1,2}(?:\.\d{2,4})?)/i)[0].trim();
 if (!bikeId) throw new Error('Use --phrase "создай документ <bike_id>" (or "сделай договор <bike_id>") or --bikeId <bike_id>');
 
 const passportJson = JSON.parse(readFileSync(arg('passportJson'),'utf8'));
@@ -13,6 +58,25 @@ const licenseJson = JSON.parse(readFileSync(arg('licenseJson'),'utf8'));
 const telegramChatId = arg('telegramChatId', process.env.ADMIN_CHAT_ID || '');
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+const supabaseRestSelect = (from, to) => {
+  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!baseUrl || !serviceKey) {
+    throw new Error('Supabase env is missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+  }
+
+  const url = `${baseUrl}/rest/v1/cars?select=id,make,model,specs,type&type=in.(bike,ebike)&offset=${from}&limit=${to - from + 1}`;
+  const curl = spawnSync('curl', ['-sS', url, '-H', `apikey: ${serviceKey}`, '-H', `Authorization: Bearer ${serviceKey}`], {
+    encoding: 'utf8',
+  });
+
+  if (curl.status !== 0) {
+    throw new Error(`Supabase REST fallback failed: ${curl.stderr || curl.stdout}`);
+  }
+
+  return JSON.parse(curl.stdout || '[]');
+};
 
 
 const norm = (v='') => String(v).toLowerCase().replace(/[^a-zа-я0-9]+/gi,' ').trim();
@@ -32,9 +96,48 @@ const scoreBike = (q, bike) => {
   return score;
 };
 
-const { data: bikes, error } = await supabase.from('cars').select('id,make,model,specs').limit(1000);
-if (error) throw error;
-if (!bikes?.length) throw new Error('No bikes found in cars table');
+const fetchAllBikeCandidates = async () => {
+  const pageSize = 1000;
+  let from = 0;
+  const all = [];
+
+  while (true) {
+    const to = from + pageSize - 1;
+    let data = null;
+    let error = null;
+
+    try {
+      const response = await supabase
+        .from('cars')
+        .select('id,make,model,specs,type')
+        .in('type', ['bike', 'ebike'])
+        .range(from, to);
+      data = response.data;
+      error = response.error;
+    } catch (networkError) {
+      data = supabaseRestSelect(from, to);
+    }
+
+    if (error) {
+      const errorText = String(error?.message || error);
+      if (/fetch failed/i.test(errorText)) {
+        data = supabaseRestSelect(from, to);
+      } else {
+        throw error;
+      }
+    }
+    if (!data?.length) break;
+
+    all.push(...data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return all;
+};
+
+const bikes = await fetchAllBikeCandidates();
+if (!bikes.length) throw new Error('No bike/ebike candidates found in cars table');
 const ranked = bikes.map(b => ({ bike: b, score: scoreBike(bikeId, b) })).sort((a,b)=>b.score-a.score);
 const top = ranked[0];
 if (!top || top.score <= 0) throw new Error(`No matching bike for input: ${bikeId}`);
@@ -42,6 +145,8 @@ const bike = top.bike;
 
 const template = readFileSync('docs/RENTAL_DEAL_TEMPLATE_DEMO.md','utf8');
 const now = new Date();
+const phraseSchedule = extractScheduleFromPhrase(phrase);
+
 const vars = {
   contract_number: `${now.getDate()}.${now.getMonth()+1}/${bike.id}`,
   day: String(now.getDate()).padStart(2,'0'),
@@ -62,8 +167,8 @@ const vars = {
   bike_year: bike.specs?.year || bike.specs?.production_year || 'уточняется',
   bike_engine_cc: bike.specs?.engine_cc || bike.specs?.displacement_cc || '0',
   bike_power_hp: bike.specs?.power_hp || bike.specs?.max_power_hp || '0',
-  rent_start_time: arg('startTime','18:00'), rent_start_date: arg('startDate', now.toLocaleDateString('ru-RU')),
-  rent_end_time: arg('endTime','10:00'), rent_end_date: arg('endDate', now.toLocaleDateString('ru-RU')),
+  rent_start_time: arg('startTime', phraseSchedule.startTime || '18:00'), rent_start_date: arg('startDate', phraseSchedule.startDate || now.toLocaleDateString('ru-RU')),
+  rent_end_time: arg('endTime', phraseSchedule.endTime || '10:00'), rent_end_date: arg('endDate', phraseSchedule.endDate || now.toLocaleDateString('ru-RU')),
   daily_price_rub: arg('dailyPrice','10000'), subtotal_rub: arg('subtotal','20000'), deposit_rub: arg('deposit','20000'),
   included_mileage:'200', overage_rate:'35', included_km_per_day:'200', extra_km_fee_rub:'35', late_return_penalty_rub:'10000', late_return_penalty_max_days:'90', bike_value_rub:'850000', bike_value_words:'Восемьсот пятьдесят тысяч',
   return_address:'г. Нижний Новгород, пл. Комсомольская 2', issuer_name:'Воробьев Р.В.', issuer_signatory:'Менеджер Мотосалона', issuer_representative:'ИП Воробьев Р.В.', signature_timestamp: now.toLocaleString('ru-RU'), signature_fingerprint:'offline-skill', renter_signature:'согласие через Telegram', bike_mileage: String(bike.specs?.mileage||''), equipment:'ключ(и) 1 шт.; шлем 1', damage_notes_at_delivery:'от даты начала аренды', damage_notes_at_return:'от даты возврата тс', battery_level_start:'100 %', battery_level_end:'____ %', media_links:'телефон', renter_passport_issue_date: passportJson.issueDate || '', renter_registration: passportJson.registration || '', damage_price_list:'мотоцикл в сборе / царапина на пластике / прочее по расчету', document_key:`rental-${bike.id}-${Date.now()}`
@@ -72,11 +177,21 @@ let rendered = template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_,k)=> String(var
 const doc = new Document({sections:[{children: rendered.split('\n').map(line=>new Paragraph({children:[new TextRun(line)]}))}]});
 const buf = await Packer.toBuffer(doc);
 
-const form = new FormData();
-form.append('chat_id', telegramChatId);
-form.append('document', new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), `rental-contract-${bikeId}.docx`);
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const res = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {method:'POST', body: form});
-const json = await res.json();
+const telegramUrl = `https://api.telegram.org/bot${token}/sendDocument`;
+let json;
+try {
+  const form = new FormData();
+  form.append('chat_id', telegramChatId);
+  form.append('document', new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), `rental-contract-${bikeId}.docx`);
+  const res = await fetch(telegramUrl, {method:'POST', body: form});
+  json = await res.json();
+} catch (networkError) {
+  const tmpFile = `/tmp/rental-contract-${Date.now()}.docx`;
+  await import('node:fs/promises').then(fs => fs.writeFile(tmpFile, buf));
+  const curl = spawnSync('curl', ['-sS', '-X', 'POST', telegramUrl, '-F', `chat_id=${telegramChatId}`, '-F', `document=@${tmpFile}`], { encoding: 'utf8' });
+  if (curl.status !== 0) throw new Error(`Telegram curl send failed: ${curl.stderr || curl.stdout}`);
+  json = JSON.parse(curl.stdout || '{}');
+}
 if (!json.ok) throw new Error(`Telegram send failed: ${JSON.stringify(json)}`);
 console.log(JSON.stringify({ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id}, null, 2));
