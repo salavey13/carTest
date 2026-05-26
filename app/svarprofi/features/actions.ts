@@ -1,30 +1,31 @@
 'use server'
 
 import { sendMessage } from '@/gateway/telegram/sendMessage'
+import { supabaseAdmin } from '@/lib/supabase-server'
 
 // ─────────────────────────────────────────────────────
 // SvarProfi ORDERX — Server Action
 // ─────────────────────────────────────────────────────
-// Sends a notification to the franchise admin (owner)
-// via Telegram bot when a new order request is submitted.
+// Sends a notification to the CREW OWNER via Telegram bot
+// when a new order request is submitted.
 //
-// For authenticated users: includes their TG handle so
-// admin can reply directly via Telegram.
+// Resolution: crews.owner_id IS the Telegram chat ID
+// (user_id === telegram chat_id in this system).
 //
-// For anonymous users: includes the contact_method they
-// provided so admin can reach back.
+// Fallback: ADMIN_CHAT_ID env → hardcoded constant.
 // ─────────────────────────────────────────────────────
 
-const SVARPROFI_ADMIN_CHAT_ID = '413553377'
+const CREW_SLUG = 'svarprofi'
+const FALLBACK_CHAT_ID = process.env.ADMIN_CHAT_ID || '413553377'
 
 export interface SvarProfiOrderPayload {
   /** Auth status: 'authenticated' or 'anonymous' */
   auth_status: 'authenticated' | 'anonymous'
   /** Customer name */
   name: string
-  /** TG username (only for authenticated users) */
-  telegram_nickname?: string
-  /** TG user_id — can be used to message the user back */
+  /** TG @username — the handle for replying directly */
+  username?: string
+  /** TG user_id — internal, for reference only */
   telegram_user_id?: string
   /** Contact method provided by anonymous user */
   contact_method?: string
@@ -42,6 +43,28 @@ export interface SvarProfiOrderPayload {
   vehicle_slug?: string
 }
 
+/**
+ * Resolves crew owner's Telegram chat ID.
+ * owner_id in crews = user_id = telegram chat_id — one lookup, done.
+ */
+async function resolveCrewOwnerChatId(): Promise<string> {
+  try {
+    const { data: crewRow } = await supabaseAdmin
+      .from('crews')
+      .select('owner_id')
+      .eq('slug', CREW_SLUG)
+      .maybeSingle()
+
+    if (crewRow?.owner_id) {
+      return String(crewRow.owner_id)
+    }
+  } catch (err) {
+    console.warn('[ORDERX] Failed to resolve crew owner, using fallback:', err)
+  }
+
+  return FALLBACK_CHAT_ID
+}
+
 export async function submitSvarProfiOrder(payload: SvarProfiOrderPayload): Promise<{ ok: boolean; error?: string }> {
   try {
     const lines: string[] = []
@@ -51,7 +74,8 @@ export async function submitSvarProfiOrder(payload: SvarProfiOrderPayload): Prom
 
     // Auth status badge
     if (payload.auth_status === 'authenticated') {
-      lines.push(`👤 <b>Авторизован:</b> @${payload.telegram_nickname || 'не указан'}`)
+      const handle = payload.username ? `@${payload.username}` : 'не указан'
+      lines.push(`👤 <b>Авторизован:</b> ${handle}`)
       if (payload.telegram_user_id) {
         lines.push(`   ID: <code>${payload.telegram_user_id}</code>`)
       }
@@ -87,7 +111,9 @@ export async function submitSvarProfiOrder(payload: SvarProfiOrderPayload): Prom
 
     const text = lines.join('\n')
 
-    await sendMessage(SVARPROFI_ADMIN_CHAT_ID, text, {
+    const targetChatId = await resolveCrewOwnerChatId()
+
+    await sendMessage(targetChatId, text, {
       parse_mode: 'HTML',
       disable_web_page_preview: true,
     })
