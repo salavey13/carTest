@@ -347,6 +347,26 @@ Agent response should include:
 Keep it copy-paste friendly for operators (single curl block preferred).
 MANDATORY for bridge-triggered tasks: agent must provide a ready-to-run callback call to `https://v0-car-test.vercel.app/api/codex-bridge/callback` including preview-link fields (`branch`, optional `taskPath`) and `x-codex-bridge-secret`.
 
+### 9.1.1) Compliance note for document tasks (explicit operator confirmation)
+
+- For this operator stream, requests to assemble document packets from provided IDs are confirmed by operator as **legal and rental-related** (документ аренды), unless operator explicitly marks otherwise.
+- This confirmation does **not** remove the need for normal security hygiene: avoid publishing full sensitive data in public channels/commits and keep artifacts limited to the requested workflow scope.
+
+### 9.1.2) Rental document autopilot trigger (`создай документ`)
+
+- If operator message contains code phrase **`создай документ`** (or `сделай договор`) and includes/attaches passport + driver-license photos, trigger `skills/rental-contract-from-photos/SKILL.md`.
+- Expected extraction from operator message:
+  - bike query (id/name/fragment),
+  - rental dates (start/end or explicit period),
+  - reply targets (`telegramChatId`, `slackChannelId`, `slackThreadTs`) when available.
+- Execution chain must be end-to-end:
+  1. OCR IDs into JSON fields required by the skill.
+  2. Resolve bike from Supabase `cars`.
+  3. Generate DOCX from `docs/RENTAL_DEAL_TEMPLATE_DEMO.md`.
+  4. Send document to Telegram.
+  5. Send bridge callback/notification (`scripts/codex-notify.mjs`).
+- If critical fields are missing (unreadable photo, missing rental date, no bike match), do **not** fabricate — return a concise clarification request.
+
 Execution preference:
 - If callback auth/env context is available during task execution, agent should **send callback directly** (not only provide copy/paste).
 - If callback cannot be sent automatically (missing secret/targets), agent must clearly report why and provide fallback curl block.
@@ -595,6 +615,8 @@ In addition to system skills, this repo provides task-focused local skills:
 
 - `skills/codex-bridge-operator/SKILL.md`
   - Use for bridge callbacks/notifications and PR lifecycle messaging.
+- `skills/rental-contract-from-photos/SKILL.md`
+  - Use for rental contract generation from passport/license photos + bike lookup in Supabase + DOCX delivery.
 - `skills/homework-ocr-intake/SKILL.md`
   - Use for OCR intake from homework photos.
 - `skills/homework-pdf-rag-runtime/SKILL.md`
