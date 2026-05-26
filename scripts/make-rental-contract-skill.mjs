@@ -6,6 +6,37 @@ import { Document, Packer, Paragraph, TextRun } from 'docx';
 
 function arg(name, fallback = '') { const i = process.argv.indexOf(`--${name}`); return i>=0 ? (process.argv[i+1]||'') : fallback; }
 
+const RENTAL_DOC_TEMPLATE_MODE = String(process.env.RENTAL_DOC_TEMPLATE_MODE || 'md').trim().toLowerCase();
+const RENTAL_DOC_BASELINE_TEMPLATE_PATH = 'docs/RENTAL_DEAL_TEMPLATE.md';
+const RENTAL_DOC_HTML_TEMPLATE_PATH = 'docs/RENTAL_DEAL_TEMPLATE.html';
+
+function renderTemplateWithVars(template, vars) {
+  return template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_,k)=> String(vars[k] ?? ''));
+}
+
+function renderHtmlTemplateAdapter(htmlTemplate, vars) {
+  const renderedHtml = renderTemplateWithVars(htmlTemplate, vars);
+  const text = renderedHtml
+    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\s*\/p\s*>/gi, '\n\n')
+    .replace(/<\s*\/tr\s*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&laquo;/g, '«')
+    .replace(/&raquo;/g, '»')
+    .replace(/&ndash;/g, '–')
+    .replace(/&mdash;/g, '—')
+    .replace(/&amp;/g, '&')
+    .trim();
+
+  if (!text) {
+    throw new Error('HTML adapter produced empty output');
+  }
+
+  return text;
+}
+
 function formatRuDate(d) {
   return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
 }
@@ -143,7 +174,8 @@ const top = ranked[0];
 if (!top || top.score <= 0) throw new Error(`No matching bike for input: ${bikeId}`);
 const bike = top.bike;
 
-const template = readFileSync('docs/RENTAL_DEAL_TEMPLATE_DEMO.md','utf8');
+const mdTemplate = readFileSync(RENTAL_DOC_BASELINE_TEMPLATE_PATH, 'utf8');
+const htmlTemplate = readFileSync(RENTAL_DOC_HTML_TEMPLATE_PATH, 'utf8');
 const now = new Date();
 const phraseSchedule = extractScheduleFromPhrase(phrase);
 
@@ -173,7 +205,18 @@ const vars = {
   included_mileage:'200', overage_rate:'35', included_km_per_day:'200', extra_km_fee_rub:'35', late_return_penalty_rub:'10000', late_return_penalty_max_days:'90', bike_value_rub:'850000', bike_value_words:'Восемьсот пятьдесят тысяч',
   return_address:'г. Нижний Новгород, пл. Комсомольская 2', issuer_name:'Воробьев Р.В.', issuer_signatory:'Менеджер Мотосалона', issuer_representative:'ИП Воробьев Р.В.', signature_timestamp: now.toLocaleString('ru-RU'), signature_fingerprint:'offline-skill', renter_signature:'согласие через Telegram', bike_mileage: String(bike.specs?.mileage||''), equipment:'ключ(и) 1 шт.; шлем 1', damage_notes_at_delivery:'от даты начала аренды', damage_notes_at_return:'от даты возврата тс', battery_level_start:'100 %', battery_level_end:'____ %', media_links:'телефон', renter_passport_issue_date: passportJson.issueDate || '', renter_registration: passportJson.registration || '', damage_price_list:'мотоцикл в сборе / царапина на пластике / прочее по расчету', document_key:`rental-${bike.id}-${Date.now()}`
 };
-let rendered = template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_,k)=> String(vars[k] ?? ''));
+let rendered;
+if (RENTAL_DOC_TEMPLATE_MODE === 'html') {
+  try {
+    rendered = renderHtmlTemplateAdapter(htmlTemplate, vars);
+  } catch (error) {
+    console.warn(`[rental-doc] html render failed, fallback to md: ${String(error?.message || error)}`);
+    rendered = renderTemplateWithVars(mdTemplate, vars);
+  }
+} else {
+  rendered = renderTemplateWithVars(mdTemplate, vars);
+}
+
 const doc = new Document({sections:[{children: rendered.split('\n').map(line=>new Paragraph({children:[new TextRun(line)]}))}]});
 const buf = await Packer.toBuffer(doc);
 
