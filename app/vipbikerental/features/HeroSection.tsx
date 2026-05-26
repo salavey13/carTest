@@ -26,6 +26,7 @@ interface HeroVibeProfile {
   badge: string;
   title: string;
   note: string;
+  startCommandHref?: string;
   ctaHref: string;
   ctaLabel: string;
   hasSurvey: boolean;
@@ -66,6 +67,16 @@ export function HeroSection({
           <div className="mb-1 font-medium text-brand-yellow"><VibeContentRenderer content={vibeProfile.badge} /></div>
           <p className="font-orbitron text-lg text-white">{vibeProfile.title}</p>
           <p className="mt-1 text-white/80">{vibeProfile.note}</p>
+          {vibeProfile.startCommandHref ? (
+            <a
+              href={vibeProfile.startCommandHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex text-sm font-semibold text-brand-yellow underline underline-offset-4 hover:text-yellow-300"
+            >
+              /start в Telegram
+            </a>
+          ) : null}
         </div>
         <h1 className="font-orbitron text-5xl font-black uppercase leading-[0.9] tracking-tight text-white drop-shadow-[0_8px_22px_rgba(0,0,0,0.75)] sm:text-6xl md:text-7xl lg:text-8xl">
           <span className="block">Скорость. Контроль.</span>
