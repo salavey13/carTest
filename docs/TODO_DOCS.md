@@ -1,82 +1,97 @@
-# Rental Deal Template — TODO
+# Rental Deal Template — BOSS план внедрения
 
-## New Template Variables (need implementation in code)
+## Контекст
+Источник: `docs/TODO_DOCS.md` + `BOSS_QUEST.HTML`.
+Цель: закрыть все пункты из TODO по договору аренды в скоупе **franchize rent** и добавить рабочий поток для суперскила **«сделай документ по фото»**.
 
-The following variables were added to the template to match the original docx contract. They need to be populated in `buildFranchizeOrderDocAndNotify()` or wherever the template variables are resolved:
+---
 
-| Variable | Source | Notes |
-|---|---|---|
-| `{{renter_birth_date}}` | OCR of driver license / user profile | Required for Приложение №4 (PD consent). Format: `DD.MM.YYYY` |
-| `{{renter_phone}}` | User profile / payload | Required for Приложение №4. Format: `+7XXXXXXXXXX` |
-| `{{renter_email}}` | User profile / payload | Optional, blank if not provided. Required for Приложение №4 |
+## BOSS QUEST decomposition (как делать «по-боссовски»)
 
-### Where to wire these up
+### Door R1 — Contract variables + data contract (блокер)
+**Выход:** пайплайн умеет стабильно подставлять новые поля в шаблон договора.
 
-1. **Franchize order flow** (`actions-runtime.ts` → `buildFranchizeOrderDocAndNotify`):
-   - Add `renter_birth_date`, `renter_phone`, `renter_email` to the `variables` object
-   - Source from `userSensitive` (already fetched via `getUserSensitiveDataOrDefault`) or from `payload`
-   - The `payload` type (`FranchizeOrderNotifyPayload`) may need these fields added
+1. Обновить тип payload в `app/franchize/[slug]/.../actions-runtime.ts` (или соседний типовой модуль):
+   - добавить `renterBirthDate`, `renterPhone`, `renterEmail` (nullable/optional по факту источника).
+2. В `buildFranchizeOrderDocAndNotify()` расширить `variables`:
+   - `renter_birth_date`
+   - `renter_phone`
+   - `renter_email`
+3. Источники данных и приоритет:
+   - `payload` (если пришло явно),
+   - `userSensitive` из `getUserSensitiveDataOrDefault`,
+   - fallback: пустая строка для email и controlled-error для обязательных полей.
+4. Нормализация:
+   - birth date -> `DD.MM.YYYY`,
+   - phone -> `+7XXXXXXXXXX`.
+5. Валидация:
+   - если нет birthDate/phone — не генерировать битый договор, а вернуть понятную ошибку для оператора.
 
-2. **SvarProfi flow** (`actions.ts` → `submitSvarProfiOrder`):
-   - Not applicable (svarprofi is notification-only, no docx generation)
+### Door R2 — Template rendering strategy (MD + HTML dual mode)
+**Выход:** можно генерить docx из MD (текущий путь) и иметь фичефлаг на HTML.
 
-## New Legal Clauses Added to Template
+1. Оставить `docs/RENTAL_DEAL_TEMPLATE.md` как стабильный fallback.
+2. Добавить переключатель рендера:
+   - `RENTAL_DOC_TEMPLATE_MODE=md|html` (по умолчанию `md`).
+3. Подготовить `RENTAL_DEAL_TEMPLATE.html` как primary-candidate:
+   - одинаковые `{{variable}}` плейсхолдеры,
+   - сохранение структуры приложений №1..№4.
+4. В генераторе сделать адаптер:
+   - md-path: текущий pipeline,
+   - html-path: отдельный конвертер (если ещё не готов — graceful fallback на md с предупреждением в лог).
 
-These sections were missing from the old template but present in the original docx. Already added to `RENTAL_DEAL_TEMPLATE.md`:
+### Door R3 — Legal completeness smoke
+**Выход:** юридические блоки из TODO контролируются чек-листом до отправки.
 
-- **§3.3** — 48-hour hidden damage discovery clause
-- **§4.3** — Full deposit description with Art. 381.1 CC RF reference
-- **§4.4** — Deposit shortfall obligation (renter pays difference)
-- **§4.5** — Deposit return within 3 working days
-- **§4.6** — Late payment interest (Art. 395 CC RF)
-- **§5.3** — Extended maintenance obligations (no disassembly, no controller changes, Art. 644 CC RF)
-- **§5.5** — Anti-theft obligation
-- **§6.3** — Detailed damage cost breakdown (8 bullet items)
-- **§6.4** — Payment method choice (STO / expert / price list), 3-day payment deadline
-- **§6.5** — Loss/total destruction with market value option, criminal case independence
-- **§6.6** — Downtime damages (daily rate, 90-day max)
-- **§6.7** — Third-party harm liability
-- **§6.8** — Third-party claims handling (6 obligations)
-- **§6.9** — All fines/evacuation costs borne by renter
-- **§6.10** — Accident protocol (6-step emergency checklist)
-- **§6.11** — Transfer prohibition as essential condition (personal liability)
-- **§6.12** — Contractual penalties table (5 items × 30,000₽)
-- **§7.2** — Lessor liability limitation
-- **§8.2** — "Lack of funds ≠ force majeure"
-- **§9.2** — Early termination: rent not returned
-- **§10.1** — Extended PD processing purposes (debt collection, legal reps)
-- **§10.2** — GPS data purposes (safety, search, violations)
-- **§11.2** — Consumer protection court rules
-- **§12.1** — Electronic communication legal significance (messenger/SMS/email)
-- **Appendix 1** — Full party intro block, detailed equipment checklist, dual signature blocks
-- **Appendix 2** — "Ознакомлен" signature line
-- **Appendix 3** — Damage price table with sample entries, supplementing clause (п.5)
-- **Appendix 4** — Full 152-FZ GDPR-style consent (8 data categories, processing actions, 3rd party recipients, 5-year retention, withdrawal rights)
-- **Lessor bank details** — р/сч, bank name, к/сч
+1. Добавить статический чек-лист секций в codebase (например `legalChecklist.ts`) c пунктами §3.3, §4.3..§12.1 + приложения.
+2. Перед отправкой документа выполнить lightweight-проверку, что шаблон содержит ключевые маркеры.
+3. При отсутствии критичного блока — ошибка `template_integrity_failed` с диагностикой (какой пункт отсутствует).
 
-## HTML Template Support
+### Door R4 — Super-skill «сделай документ по фото»
+**Выход:** триггер «сделай документ / создай документ» запускает end-to-end сбор договора из фото.
 
-### Current state
-- `RENTAL_DEAL_TEMPLATE.md` — Markdown with `{{variable}}` placeholders. Used by the existing docx generation skill (markdown → docx via docx template engine).
-- `RENTAL_DEAL_TEMPLATE.html` — Same content but with full HTML formatting (Times New Roman, centered headers, tables with borders, proper signature blocks). **Not yet wired up.**
+1. В `AGENTS.md` закрепить общий триггерный протокол для фраз:
+   - `создай документ`, `сделай договор`, `сделай документ по фото`, `ты босс` (в boss-mode).
+2. Поток навыка:
+   - OCR паспорт + ВУ,
+   - извлечение renter полей (ФИО, ДР, телефон при наличии, e-mail при наличии),
+   - резолв байка из Supabase `cars`,
+   - генерация DOCX из rental template,
+   - доставка в Telegram,
+   - callback/notification через `scripts/codex-notify.mjs`.
+3. Контракт ошибок:
+   - не выдумывать значения,
+   - при отсутствии критичных полей запрашивать уточнение.
+4. Read-after-write verification:
+   - если документ/метаданные сохраняются, подтверждать фактическим read-check перед статусом `completed`.
 
-### Why HTML is better
-The original docx has formatting that Markdown cannot express:
-- Centered section headers (bold, uppercase)
-- Right-aligned appendix references
-- Proper tables with borders (Приложение №3 damage price list)
-- Two-column date/city layout
-- Signature blocks with aligned columns (АРЕНДОДАТЕЛЬ / АРЕНДАТОР)
-- Consistent indentation for sub-clauses
-- Page breaks between main contract and appendices
+### Door R5 — Bridge callback consistency
+**Выход:** любой bridge-triggered документный сценарий заканчивается корректным callback.
 
-### Implementation plan
-1. Update the docx generation skill to accept `.html` templates
-2. Use an HTML→DOCX converter (e.g., `html-to-docx` npm package or Playwright PDF → DOCX)
-3. Replace `RENTAL_DEAL_TEMPLATE.md` with `RENTAL_DEAL_TEMPLATE.html` as the primary template
-4. Keep `.md` as fallback for the current markdown-based pipeline
+1. В callback всегда передавать:
+   - `status`, `summary`, `branch`, `taskPath`, `prUrl` (если есть),
+   - reply targets: `telegramChatId`, `slackChannelId`, `slackThreadTs` (если есть).
+2. Превью-ссылка строится из реального branch (`/` -> `-`).
+3. Если callback не отправлен автоматически — вернуть fallback curl-блок и причину.
 
-### Alternative: keep both
-- `.md` template — for the existing markdown-based docx pipeline (current, working)
-- `.html` template — for a future enhanced pipeline with proper formatting
-- Both use the same `{{variable}}` syntax, so variable resolution code is shared
+---
+
+## Параллелизация (из BOSS_QUEST)
+
+- **Блокер:** R1.
+- После R1 параллелятся:
+  - R2 (шаблонный движок),
+  - R3 (чек-лист юридики),
+  - R5 (bridge callback унификация).
+- **Финальный интеграционный шаг:** R4 (super-skill), потому что он зависит от готовых данных, шаблона и callback-контракта.
+
+---
+
+## Acceptance Criteria (Definition of Done)
+
+1. Новые переменные (`renter_birth_date`, `renter_phone`, `renter_email`) реально подставляются в итоговый договор.
+2. При отсутствии обязательных полей оператор получает контролируемую ошибку, а не битый документ.
+3. Юридические секции из TODO проходят integrity-check.
+4. Триггер «сделай документ по фото» отрабатывает end-to-end по AGENTS-протоколу.
+5. Bridge callback уходит автоматически (или есть корректный fallback cURL).
+6. Ветка/PR содержит короткий summary по каждому Door (R1..R5).
