@@ -200,6 +200,11 @@ function deriveNote(profile: VipBikeUserProfile, experience: VipBikeExperienceCo
   }
 }
 
+function getStartCommandLink(profile: VipBikeUserProfile): string | undefined {
+  if (!profile.onboardingCompleted) return "https://t.me/oneBikePlsBot?start";
+  return undefined;
+}
+
 // ═══════════════════════════════════════════════════════
 // MAIN COMPONENT — thin orchestration shell
 // ═══════════════════════════════════════════════════════
@@ -262,6 +267,7 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
     badge: deriveBadge(profile),
     title: deriveTitle(profile),
     note: deriveNote(profile, experience),
+    startCommandHref: getStartCommandLink(profile),
     ctaHref: experience.primaryCTA.href,
     ctaLabel: experience.primaryCTA.label,
     hasSurvey: profile.onboardingCompleted,
