@@ -5,8 +5,8 @@ import { Document, Packer, Paragraph, TextRun } from 'docx';
 
 function arg(name, fallback = '') { const i = process.argv.indexOf(`--${name}`); return i>=0 ? (process.argv[i+1]||'') : fallback; }
 const phrase = arg('phrase');
-const bikeId = (phrase.match(/сделай\s+договор\s+(.+)$/i)?.[1] || arg('bikeId')).trim();
-if (!bikeId) throw new Error('Use --phrase "сделай договор <bike_id>" or --bikeId <bike_id>');
+const bikeId = (phrase.match(/(?:сделай\s+договор|создай\s+документ)\s+(.+)$/i)?.[1] || arg('bikeId')).trim();
+if (!bikeId) throw new Error('Use --phrase "создай документ <bike_id>" (or "сделай договор <bike_id>") or --bikeId <bike_id>');
 
 const passportJson = JSON.parse(readFileSync(arg('passportJson'),'utf8'));
 const licenseJson = JSON.parse(readFileSync(arg('licenseJson'),'utf8'));
