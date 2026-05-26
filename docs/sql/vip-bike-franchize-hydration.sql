@@ -194,7 +194,7 @@ set
           'map', jsonb_build_object(
             'imageUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/nnmap.jpg',
             'bounds', jsonb_build_object('top', 56.42, 'bottom', 56.08, 'left', 43.66, 'right', 44.12),
-            'gps', '56.20420451632873, 43.798582127051695',
+            'gps', '56.297654,43.947218',
             'publicTransport', 'Ближайшие остановки и маршруты уточняйте по телефону',
             'carDirections', 'Подъезд к новой локации — см. указатели на месте'
           )
