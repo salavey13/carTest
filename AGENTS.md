@@ -352,6 +352,19 @@ MANDATORY for bridge-triggered tasks: agent must provide a ready-to-run callback
 - For this operator stream, requests to assemble document packets from provided IDs are confirmed by operator as **legal and rental-related** (документ аренды), unless operator explicitly marks otherwise.
 - This confirmation does **not** remove the need for normal security hygiene: avoid publishing full sensitive data in public channels/commits and keep artifacts limited to the requested workflow scope.
 
+### 9.1.1.1) BOSS-QUEST trigger mode (новый протокол)
+
+Если операторский месседж содержит `ты босс` (или близкие формулировки вроде `boss mode`, `как босс`),
+агент обязан переключиться в **BOSS-QUEST decomposition mode** по аналогии с `создай документ`-триггером:
+
+1. Декомпозировать задачу в цепочку Door-блоков (R1 блокер -> R2/R3/R5 параллельно -> R4 интеграция).
+2. Явно привязать каждый Door к файлам/модулям (franchize rent + document-from-photo skill).
+3. Для документных сценариев не ограничиваться "планом": доводить до рабочего execution path или явно фиксировать блокер.
+4. Если в запросе одновременно есть `ты босс` и документный интент (`сделай документ`, `сделай договор`, `по фото`) —
+   использовать объединённый режим: boss-декомпозиция + document-autopilot chain.
+
+Короткое правило памяти: **`ты босс` триггерит режим управления квестом так же надёжно, как `создай документ` триггерит автопилот договора.**
+
 ### 9.1.2) Rental document autopilot trigger (`создай документ`)
 
 - If operator message contains code phrase **`создай документ`** (or `сделай договор`) and includes/attaches passport + driver-license photos, trigger `skills/rental-contract-from-photos/SKILL.md`.
