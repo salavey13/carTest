@@ -449,10 +449,10 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         modal={false}
       >
         <Drawer.Portal>
-          <Drawer.Content className="fixed inset-x-0 bottom-0 z-40 pointer-events-none">
-            <div className="pointer-events-auto rounded-t-[1.4rem] border border-white/15 bg-[var(--mr-card)]/96 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl"><Drawer.Handle className="mx-auto mb-2 h-1.5 w-14 rounded-full bg-white/35" />
+          <Drawer.Content className="fixed inset-x-0 bottom-0 z-20 pointer-events-none">
+            <div className={`rounded-t-[1.4rem] border border-white/15 bg-[var(--mr-card)]/96 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl ${activeSnap <= 0.2 ? "pointer-events-none" : "pointer-events-auto"}`}><Drawer.Handle className="pointer-events-auto mx-auto mb-2 h-1.5 w-14 rounded-full bg-white/35" />
             {/* Snap control buttons */}
-            <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="pointer-events-auto mb-3 flex items-center justify-between gap-2">
               <h3 className="font-orbitron text-sm text-white/90">Панель райдера</h3>
               <div className="pointer-events-auto flex gap-1.5">
                 {SNAP_POINTS.map((snap) => (
@@ -469,7 +469,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
                 ))}
               </div>
             </div>
-            <div className="mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-20">
+            <div className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`}>
               <div className="grid gap-3 lg:grid-cols-[1.35fr,1fr]">
         {/* Stats card */}
         <div className="rounded-2xl border p-4 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
