@@ -18,7 +18,7 @@ export function RiderFAB() {
       onClick={toggleSession}
       disabled={isSubmitting}
       className={`
-        fixed right-3 z-50 flex h-12 w-12 items-center justify-center
+        fixed right-3 z-[80] pointer-events-auto touch-manipulation flex h-12 w-12 items-center justify-center
         rounded-full shadow-2xl transition-all duration-300
         bottom-28
         md:bottom-8 md:right-8
