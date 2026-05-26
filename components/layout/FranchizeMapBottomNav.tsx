@@ -25,13 +25,13 @@ export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNa
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t px-4 pb-[max(env(safe-area-inset-bottom),0.7rem)] pt-2 backdrop-blur-xl md:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-30 border-t px-4 pb-[max(env(safe-area-inset-bottom),0.7rem)] pt-2 backdrop-blur-xl md:hidden"
       style={{
         borderColor: "color-mix(in srgb, var(--fr-map-nav-accent, #facc15) 28%, transparent)",
         backgroundColor: "color-mix(in srgb, var(--fr-map-nav-bg, #030712) 82%, black)",
       }}
     >
-      <div className="mx-auto grid w-full max-w-3xl grid-cols-4 gap-2">
+      <div className="pointer-events-auto mx-auto grid w-full max-w-3xl grid-cols-4 gap-2">
         {items.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
