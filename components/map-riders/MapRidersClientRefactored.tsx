@@ -370,7 +370,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       <BeginnerRiderOnboardingQuiz crew={crew} />
 
       {/* ── MAP (fullscreen background) ── */}
-      <section className="fixed inset-0 overflow-hidden [touch-action:none]" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
+      <section className="fixed inset-0 overflow-hidden [touch-action:pan-x_pan-y_pinch-zoom]" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
         <div className="absolute inset-0 z-0">
           {useLeafletMap ? (
             <RacingMap
