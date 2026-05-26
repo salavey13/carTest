@@ -449,8 +449,8 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         modal={false}
       >
         <Drawer.Portal>
-          <Drawer.Content className="fixed inset-x-0 bottom-0 z-40 rounded-t-[1.4rem] border border-white/15 bg-[var(--mr-card)]/96 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
-            <Drawer.Handle className="mx-auto mb-2 h-1.5 w-14 rounded-full bg-white/35" />
+          <Drawer.Content className="fixed inset-x-0 bottom-0 z-40 pointer-events-none">
+            <div className="pointer-events-auto rounded-t-[1.4rem] border border-white/15 bg-[var(--mr-card)]/96 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl"><Drawer.Handle className="mx-auto mb-2 h-1.5 w-14 rounded-full bg-white/35" />
             {/* Snap control buttons */}
             <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="font-orbitron text-sm text-white/90">Панель райдера</h3>
@@ -629,7 +629,8 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
                 <LeaderboardSection crew={crew} crewSlug={crewSlug} />
               </div>
             </div>
-          </Drawer.Content>
+          </div>
+        </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
       {state.isLoading ? <MapRidersSkeleton /> : null}
