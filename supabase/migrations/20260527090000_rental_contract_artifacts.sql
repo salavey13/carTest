@@ -6,8 +6,8 @@ create table if not exists public.rental_contract_artifacts (
   telegram_chat_id text,
   telegram_message_id bigint,
   renter_full_name text,
-  rent_start_date date,
-  rent_end_date date,
+  rent_start_date text,
+  rent_end_date text,
   doc_verifier_id uuid references public.doc_verifier_records(id),
   original_sha256 text,
   created_at timestamptz not null default now()
