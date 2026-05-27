@@ -108,6 +108,104 @@ function getBranchFallback() {
   }
 }
 
+
+function isValidStatus(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isValidSummary(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isValidBranch(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isValidTaskPath(value) {
+  return typeof value === 'string' && value.trim().startsWith('/');
+}
+
+function isValidPrUrl(value) {
+  if (typeof value !== 'string' || value.trim().length === 0) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function isValidTelegramId(value) {
+  if (value === undefined || value === null || value === '') return true;
+  return /^-?\d+$/.test(String(value).trim());
+}
+
+function isValidSlackChannelId(value) {
+  if (value === undefined || value === null || value === '') return true;
+  return /^[A-Z0-9]{8,15}$/.test(String(value).trim());
+}
+
+function isValidSlackThreadTs(value) {
+  if (value === undefined || value === null || value === '') return true;
+  return /^\d{10}\.\d{6}$/.test(String(value).trim());
+}
+
+function normalizeBranchSlug(branch) {
+  return String(branch || '').trim().replace(/\//g, '-').replace(/[^a-zA-Z0-9._-]/g, '-');
+}
+
+function buildPreviewUrl(branch, taskPath = '/') {
+  if (!isValidBranch(branch)) return undefined;
+  const slug = normalizeBranchSlug(branch);
+  const projectName = process.env.VERCEL_PROJECT_NAME || 'v0-car-test';
+  const suffix = process.env.VERCEL_PREVIEW_DOMAIN_SUFFIX || '-salavey13s-projects.vercel.app';
+  const normalizedSuffix = suffix.startsWith('.') || suffix.startsWith('-') ? suffix : `.${suffix}`;
+  const normalizedPath = isValidTaskPath(taskPath) ? taskPath : '/';
+  return `https://${projectName}-git-${slug}${normalizedSuffix}${normalizedPath}`;
+}
+
+function buildFallbackCurl(endpoint, secret, payload, reason) {
+  const safePayload = { ...payload, fallbackReason: reason, previewUrl: buildPreviewUrl(payload.branch, payload.taskPath) };
+  const secretValue = secret || '$CODEX_BRIDGE_CALLBACK_SECRET';
+  return [
+    `curl -X POST "${endpoint}" \\`,
+    '  -H "Content-Type: application/json" \\',
+    `  -H "x-codex-bridge-secret: ${secretValue}" \\`,
+    `  -d '${JSON.stringify(safePayload, null, 2)}'`,
+  ].join('\n');
+}
+
+function validateCallbackPayload(payload) {
+  const errors = [];
+  if (!isValidStatus(payload.status)) errors.push('status is required');
+  if (!isValidSummary(payload.summary)) errors.push('summary is required');
+  if (!isValidBranch(payload.branch)) errors.push('branch is required');
+  if (!isValidTaskPath(payload.taskPath)) errors.push('taskPath must start with /');
+  if (!isValidPrUrl(payload.prUrl)) errors.push('prUrl must be a valid http(s) url');
+  if (!isValidTelegramId(payload.telegramChatId)) errors.push('telegramChatId must be numeric');
+  if (!isValidSlackChannelId(payload.slackChannelId)) errors.push('slackChannelId has invalid format');
+  if (!isValidSlackThreadTs(payload.slackThreadTs)) errors.push('slackThreadTs must match 1234567890.123456');
+  return errors;
+}
+
+function prepareCallbackPayload() {
+  const payload = {
+    status: getArg('status', 'completed'),
+    summary: getArg('summary', 'Codex task update'),
+    branch: getArg('branch', process.env.PR_HEAD_REF || getBranchFallback()),
+    taskPath: getArg('taskPath', '/'),
+    prUrl: getArg('prUrl'),
+    telegramChatId: getArg('telegramChatId', process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID),
+    telegramUserId: getArg('telegramUserId', process.env.TELEGRAM_USER_ID),
+    slackChannelId: getArg('slackChannelId', process.env.SLACK_CODEX_CHANNEL_ID),
+    slackThreadTs: getArg('slackThreadTs', process.env.SLACK_THREAD_TS),
+    imageUrl: getArg('imageUrl') || (getArg('imagePath') ? uploadImageToSupabaseStorage(getArg('imagePath')) : undefined),
+  };
+  const errors = validateCallbackPayload(payload);
+  if (errors.length > 0) throw new Error(`Invalid callback payload: ${errors.join('; ')}`);
+  return payload;
+}
+
 async function postJson(url, body, headers = {}) {
   try {
     const res = await fetch(url, {
@@ -139,24 +237,19 @@ async function runCallbackMode() {
   const secret = process.env.CODEX_BRIDGE_CALLBACK_SECRET || getArg('secret');
   if (!secret) throw new Error('Missing CODEX_BRIDGE_CALLBACK_SECRET (or --secret)');
 
-  const branch = getArg('branch', process.env.PR_HEAD_REF || getBranchFallback());
-  const payload = {
-    status: getArg('status', 'completed'),
-    summary: getArg('summary', 'Codex task update'),
-    branch,
-    taskPath: getArg('taskPath', '/'),
-    prUrl: getArg('prUrl'),
-    telegramChatId: getArg('telegramChatId', process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID),
-    telegramUserId: getArg('telegramUserId', process.env.TELEGRAM_USER_ID),
-    slackChannelId: getArg('slackChannelId', process.env.SLACK_CODEX_CHANNEL_ID),
-    slackThreadTs: getArg('slackThreadTs', process.env.SLACK_THREAD_TS),
-    imageUrl: getArg('imageUrl') || (getArg('imagePath') ? uploadImageToSupabaseStorage(getArg('imagePath')) : undefined),
-  };
-
-  const response = await postJson(endpoint, payload, {
-    'x-codex-bridge-secret': secret,
-  });
-  console.log(response);
+  const payload = prepareCallbackPayload();
+  try {
+    const response = await postJson(endpoint, payload, {
+      'x-codex-bridge-secret': secret,
+    });
+    console.log(response);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error(`callback send failed: ${reason}`);
+    console.error('Fallback cURL:');
+    console.error(buildFallbackCurl(endpoint, secret, payload, reason));
+    throw error;
+  }
 }
 
 async function runCallbackAutoMode() {
@@ -168,23 +261,18 @@ async function runCallbackAutoMode() {
     return;
   }
 
-  const payload = {
-    status: getArg('status', 'completed'),
-    summary: getArg('summary', 'Codex task update'),
-    branch: getArg('branch', process.env.PR_HEAD_REF || getBranchFallback()),
-    taskPath: getArg('taskPath', '/'),
-    prUrl: getArg('prUrl'),
-    telegramChatId: getArg('telegramChatId', process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID),
-    telegramUserId: getArg('telegramUserId', process.env.TELEGRAM_USER_ID),
-    slackChannelId: getArg('slackChannelId', process.env.SLACK_CODEX_CHANNEL_ID),
-    slackThreadTs: getArg('slackThreadTs', process.env.SLACK_THREAD_TS),
-    imageUrl: getArg('imageUrl') || (getArg('imagePath') ? uploadImageToSupabaseStorage(getArg('imagePath')) : undefined),
-  };
-
-  const response = await postJson(endpoint, payload, {
-    'x-codex-bridge-secret': secret,
-  });
-  console.log(response);
+  const payload = prepareCallbackPayload();
+  try {
+    const response = await postJson(endpoint, payload, {
+      'x-codex-bridge-secret': secret,
+    });
+    console.log(response);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error(`callback-auto send failed: ${reason}`);
+    console.error('Fallback cURL:');
+    console.error(buildFallbackCurl(endpoint, secret, payload, reason));
+  }
 }
 
 async function runTelegramMode() {

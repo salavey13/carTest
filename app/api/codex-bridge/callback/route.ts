@@ -5,11 +5,11 @@ import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMe
 import { notifyAdmin } from "@/app/actions";
 
 type CallbackBody = {
-  branch?: string;
-  taskPath?: string;
-  prUrl?: string;
-  summary?: string;
-  status?: "done" | "failed" | "in_progress" | string;
+  branch: string;
+  taskPath: string;
+  prUrl: string;
+  summary: string;
+  status: "done" | "failed" | "in_progress" | "completed" | string;
   telegramChatId?: string | number;
   telegramUserId?: string | number;
   slackChannelId?: string;
@@ -128,26 +128,65 @@ async function sendTelegramPhotoWithCaption(chatId: string | number, text: strin
   return { target: String(chatId), ok: true, mode: "photo", sentImages };
 }
 
+function validateReplyTargets(body: CallbackBody) {
+  const errors: string[] = [];
+  if (body.telegramChatId !== undefined && !/^-?\d+$/.test(String(body.telegramChatId))) {
+    errors.push('telegramChatId must be numeric');
+  }
+  if (body.slackChannelId !== undefined && !/^[A-Z0-9]{8,15}$/.test(String(body.slackChannelId))) {
+    errors.push('slackChannelId has invalid format');
+  }
+  if (body.slackThreadTs !== undefined && !/^\d{10}\.\d{6}$/.test(String(body.slackThreadTs))) {
+    errors.push('slackThreadTs has invalid format');
+  }
+  return errors;
+}
+
+function validateRequired(body: Partial<CallbackBody>) {
+  const errors: string[] = [];
+  if (!body.status) errors.push('status is required');
+  if (!body.summary) errors.push('summary is required');
+  if (!body.branch) errors.push('branch is required');
+  if (!body.taskPath || !String(body.taskPath).startsWith('/')) errors.push('taskPath is required and must start with /');
+  if (!body.prUrl) {
+    errors.push('prUrl is required');
+  } else {
+    try {
+      const parsed = new URL(String(body.prUrl));
+      if (!['http:', 'https:'].includes(parsed.protocol)) errors.push('prUrl must be http(s)');
+    } catch {
+      errors.push('prUrl must be a valid URL');
+    }
+  }
+  return errors;
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!verifySecret(req)) {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = (await req.json()) as CallbackBody;
-    const previewUrl = buildPreviewUrl(body.branch, body.taskPath);
-    const productionTaskUrl = buildProductionTaskUrl(body.taskPath);
-    const homeworkDeepLink = buildTelegramHomeworkDeepLink(body.taskPath);
-    const imageUrls = extractImageUrls(body);
+    const body = (await req.json()) as Partial<CallbackBody>;
+    const requiredErrors = validateRequired(body);
+    const targetErrors = validateReplyTargets(body as CallbackBody);
+    if (requiredErrors.length > 0 || targetErrors.length > 0) {
+      return NextResponse.json({ ok: false, error: "Validation error", details: [...requiredErrors, ...targetErrors] }, { status: 400 });
+    }
+    const payload = body as CallbackBody;
+    const previewUrl = buildPreviewUrl(payload.branch, payload.taskPath);
+    const productionTaskUrl = buildProductionTaskUrl(payload.taskPath);
+    const homeworkDeepLink = buildTelegramHomeworkDeepLink(payload.taskPath);
+    const imageUrls = extractImageUrls(payload);
 
     const lines = [
-      `Codex update: ${body.status || "done"}`,
-      body.summary ? `Summary: ${body.summary}` : null,
-      body.branch ? `Branch: ${body.branch}` : null,
+      `Codex update: ${payload.status || "done"}`,
+      payload.summary ? `Summary: ${payload.summary}` : null,
+      payload.branch ? `Branch: ${payload.branch}` : null,
       productionTaskUrl ? `Result: ${productionTaskUrl}` : null,
       previewUrl ? `Preview: ${previewUrl}` : null,
       homeworkDeepLink ? `Open in bot app: ${homeworkDeepLink}` : null,
-      body.prUrl ? `PR: ${body.prUrl}` : null,
+      payload.prUrl ? `PR: ${payload.prUrl}` : null,
     ].filter(Boolean) as string[];
 
     const message = lines.join("\n");
@@ -161,7 +200,7 @@ export async function POST(req: NextRequest) {
     };
 
     const uniqueTelegramTargets = Array.from(
-      new Set([body.telegramChatId, body.telegramUserId].filter(Boolean).map((value) => String(value))),
+      new Set([payload.telegramChatId, payload.telegramUserId].filter(Boolean).map((value) => String(value))),
     );
 
     for (const target of uniqueTelegramTargets) {
@@ -180,7 +219,7 @@ export async function POST(req: NextRequest) {
     }
 
     const slackConfig = getSlackBridgeConfig();
-    const canSendToSlack = Boolean(body.slackChannelId || body.slackThreadTs || slackConfig.incomingWebhookUrl || slackConfig.defaultChannel);
+    const canSendToSlack = Boolean(payload.slackChannelId || payload.slackThreadTs || slackConfig.incomingWebhookUrl || slackConfig.defaultChannel);
 
     if (canSendToSlack) {
       const slackText = imageUrls.length > 0
@@ -206,13 +245,13 @@ export async function POST(req: NextRequest) {
 
       const slackResult = await postSlackMessage({
         text: slackText,
-        channel: body.slackChannelId,
-        threadTs: body.slackThreadTs,
+        channel: payload.slackChannelId,
+        threadTs: payload.slackThreadTs,
         blocks: slackBlocks,
       });
 
       imageDelivery.slack = {
-        target: body.slackChannelId || slackConfig.defaultChannel || "incoming_webhook",
+        target: payload.slackChannelId || slackConfig.defaultChannel || "incoming_webhook",
         ok: slackResult.ok,
         mode: imageUrls.length > 0 ? "photo" : "text",
         sentImages: imageUrls.length > 0 ? imageUrls.length : 0,
@@ -226,12 +265,12 @@ export async function POST(req: NextRequest) {
     if (!wasAlreadyDeliveredToAdmin) {
       await notifyAdmin([
         "🤖 Codex bridge callback received",
-        `Status: ${body.status || "done"}`,
-        body.summary ? `Summary: ${body.summary}` : null,
-        body.branch ? `Branch: ${body.branch}` : null,
-        body.prUrl ? `PR: ${body.prUrl}` : null,
-        body.telegramChatId ? `Chat: ${body.telegramChatId}` : null,
-        body.telegramUserId ? `User: ${body.telegramUserId}` : null,
+        `Status: ${payload.status || "done"}`,
+        payload.summary ? `Summary: ${payload.summary}` : null,
+        payload.branch ? `Branch: ${payload.branch}` : null,
+        payload.prUrl ? `PR: ${payload.prUrl}` : null,
+        payload.telegramChatId ? `Chat: ${payload.telegramChatId}` : null,
+        payload.telegramUserId ? `User: ${payload.telegramUserId}` : null,
         previewUrl ? `Preview: ${previewUrl}` : null,
         imageUrls.length > 0 ? `Images: ${imageUrls.length}` : null,
       ].filter(Boolean).join("\n"));
