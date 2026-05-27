@@ -113,3 +113,12 @@ Recommended resolver order:
 - Keep all privileged operations server-side only.
 - Redact secrets and sensitive identifiers in outbound notifications.
 - Make each automation idempotent and retry-safe with explicit correlation IDs.
+
+
+## Bridge callback completion contract
+
+For bridge task completion, use one unified callback payload format:
+- Required fields: `status`, `summary`, `branch`, `taskPath`, `prUrl`
+- Optional reply targets: `telegramChatId`, `slackChannelId`, `slackThreadTs`
+- Preview URL must be derived only from the actual branch (`/` replaced with `-`).
+- If auto-send fails, return a ready-to-run fallback cURL with all resolved fields and explicit failure reason.
