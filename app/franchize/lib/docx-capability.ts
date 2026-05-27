@@ -27,7 +27,7 @@ export interface BuildFranchizeDocxOutput {
 }
 
 export async function buildFranchizeDocxFromTemplate(input: BuildFranchizeDocxInput): Promise<BuildFranchizeDocxOutput> {
-  if ((input.flowType ?? "rental") === "rental") {
+  if (input.flowType === "rental") {
     const checklist = runLegalTemplateChecklist(input.template);
     if (!checklist.ok) {
       logger.error("[franchize-docx] template integrity check failed", {
