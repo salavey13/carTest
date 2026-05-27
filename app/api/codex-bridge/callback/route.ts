@@ -7,7 +7,7 @@ import { notifyAdmin } from "@/app/actions";
 type CallbackBody = {
   branch: string;
   taskPath: string;
-  prUrl: string;
+  prUrl?: string;
   summary: string;
   status: "done" | "failed" | "in_progress" | "completed" | string;
   telegramChatId?: string | number;
@@ -148,9 +148,10 @@ function validateRequired(body: Partial<CallbackBody>) {
   if (!body.summary) errors.push('summary is required');
   if (!body.branch) errors.push('branch is required');
   if (!body.taskPath || !String(body.taskPath).startsWith('/')) errors.push('taskPath is required and must start with /');
-  if (!body.prUrl) {
-    errors.push('prUrl is required');
-  } else {
+  const requiresPrUrl = ["done", "completed"].includes(String(body.status || "").toLowerCase());
+  if (requiresPrUrl && !body.prUrl) {
+    errors.push('prUrl is required when status is done/completed');
+  } else if (body.prUrl) {
     try {
       const parsed = new URL(String(body.prUrl));
       if (!['http:', 'https:'].includes(parsed.protocol)) errors.push('prUrl must be http(s)');
