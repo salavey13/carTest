@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 
@@ -20,6 +21,7 @@ function renderHtmlTemplateAdapter(htmlTemplate, vars) {
     .replace(/<\s*br\s*\/?>/gi, '\n')
     .replace(/<\s*\/p\s*>/gi, '\n\n')
     .replace(/<\s*\/tr\s*>/gi, '\n')
+    .replace(/<\s*\/t[dh]\s*>/gi, '\t')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
     .replace(/&quot;/g, '"')
@@ -181,7 +183,6 @@ if (!top || top.score <= 0) failStage('bike_resolve', 'bike_not_found', { bikeQu
 const bike = top.bike;
 
 const mdTemplate = readFileSync(RENTAL_DOC_BASELINE_TEMPLATE_PATH, 'utf8');
-const htmlTemplate = readFileSync(RENTAL_DOC_HTML_TEMPLATE_PATH, 'utf8');
 const now = new Date();
 const phraseSchedule = extractScheduleFromPhrase(phrase);
 const startDate = arg('startDate', phraseSchedule.startDate || '');
@@ -229,6 +230,7 @@ const vars = {
 let rendered;
 if (RENTAL_DOC_TEMPLATE_MODE === 'html') {
   try {
+    const htmlTemplate = readFileSync(RENTAL_DOC_HTML_TEMPLATE_PATH, 'utf8');
     rendered = renderHtmlTemplateAdapter(htmlTemplate, vars);
   } catch (error) {
     console.warn(`[rental-doc] html render failed, fallback to md: ${String(error?.message || error)}`);
@@ -240,6 +242,7 @@ if (RENTAL_DOC_TEMPLATE_MODE === 'html') {
 
 const doc = new Document({sections:[{children: rendered.split('\n').map(line=>new Paragraph({children:[new TextRun(line)]}))}]});
 const buf = await Packer.toBuffer(doc);
+const originalSha256 = createHash('sha256').update(buf).digest('hex');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const telegramUrl = `https://api.telegram.org/bot${token}/sendDocument`;
@@ -260,7 +263,7 @@ try {
 if (!json.ok) failStage('telegram_delivery', 'telegram_send_failed', { telegram: json });
 
 const result = {ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id, contractKey: vars.document_key};
-const saveMetadata = arg('saveMetadata', '1') !== '0';
+const saveMetadata = arg('saveMetadata', '0') !== '0';
 const metadataTable = arg('metadataTable', 'rental_contract_artifacts');
 if (saveMetadata) {
   const payload = {
@@ -272,6 +275,7 @@ if (saveMetadata) {
     renter_full_name: renterFullName,
     rent_start_date: startDate,
     rent_end_date: endDate,
+    original_sha256: originalSha256,
   };
   const writeRes = await supabase.from(metadataTable).insert(payload).select('contract_key').limit(1);
   if (writeRes.error) failStage('metadata_write', 'metadata_write_failed', { table: metadataTable, error: writeRes.error.message });

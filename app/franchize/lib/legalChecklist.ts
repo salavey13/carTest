@@ -48,8 +48,19 @@ function warningReason(marker: string): string {
 
 export function runLegalTemplateChecklist(template: string): LegalChecklistResult {
   const source = String(template ?? "");
+  const markerToRegex = (marker: string): RegExp => {
+    if (marker.startsWith("§")) {
+      const num = marker.slice(1).replace(".", "\\.");
+      return new RegExp(`§?\\s*${num}\\.?`, "i");
+    }
+    if (marker.startsWith("Приложение")) {
+      const num = marker.match(/\d+/)?.[0] ?? "";
+      return new RegExp(`Приложение\\s*№\\s*${num}`, "i");
+    }
+    return new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+  };
   const issues: LegalChecklistIssue[] = LEGAL_TEMPLATE_REQUIRED_MARKERS
-    .filter((marker) => !source.includes(marker))
+    .filter((marker) => !markerToRegex(marker).test(source))
     .map((marker) => {
       if (isWarningMarker(marker)) {
         return { marker, severity: "warning" as const, reason: warningReason(marker) };
