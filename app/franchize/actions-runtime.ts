@@ -1627,8 +1627,8 @@ type FranchizeOrderNotifyPayload = z.infer<typeof franchizeOrderInvoiceSchema> &
 };
 
 type FranchizeOrderDocContactField = "renterBirthDate" | "renterPhone" | "renterEmail";
-type FranchizeOrderDocRequiredField = "renterBirthDate" | "renterPhone";
-const FRANCHIZE_DOC_REQUIRED_FIELDS: FranchizeOrderDocRequiredField[] = ["renterBirthDate", "renterPhone"];
+type FranchizeOrderDocRequiredField = "renterPhone";
+const FRANCHIZE_DOC_REQUIRED_FIELDS: FranchizeOrderDocRequiredField[] = ["renterPhone"];
 
 type FranchizeOrderDocVariables = {
   renterBirthDate: string;
@@ -1685,28 +1685,31 @@ function resolveFranchizeDocField(
 
 /**
  * Payload contract for order-doc generation:
- * Required: renterBirthDate, renterPhone. Optional: renterEmail.
+ * Required: renterPhone. Optional: renterBirthDate, renterEmail.
  * Priority source is strict: payload -> userSensitive -> fallback.
  * Valid example: { renterBirthDate: "15.03.1992", renterPhone: "+79001234567", renterEmail: "rider@crew.ru" }
- * Invalid example: { renterBirthDate: "", renterPhone: "12345" } // missing birth date + invalid RU phone.
+ * Invalid example: { renterBirthDate: "", renterPhone: "12345" } // invalid RU phone.
  */
 function resolveAndValidateFranchizeDocVariables(
   payload: FranchizeOrderNotifyPayload,
   userSensitive: UnknownRecord,
 ): FranchizeOrderDocVariables {
   const birthDate = formatDateDdMmYyyy(resolveFranchizeDocField("renterBirthDate", payload, userSensitive, ""));
+  const normalizedBirthDate = birthDate || "указывается при выдаче";
   const phone = formatPhoneRu(resolveFranchizeDocField("renterPhone", payload, userSensitive, payload.phone || ""));
   const email = resolveFranchizeDocField("renterEmail", payload, userSensitive, "указывается при выдаче");
+  if (!birthDate) {
+    logger.warn("[franchize-doc] renterBirthDate missing in payload/userSensitive; using fallback placeholder");
+  }
 
   const requiredValues: Record<FranchizeOrderDocRequiredField, string> = {
-    renterBirthDate: birthDate,
     renterPhone: phone,
   };
   const missing = FRANCHIZE_DOC_REQUIRED_FIELDS.filter((field) => !requiredValues[field]);
   if (missing.length > 0) throw new FranchizeOrderDocValidationError(missing);
 
   return {
-    renterBirthDate: birthDate,
+    renterBirthDate: normalizedBirthDate,
     renterPhone: phone,
     renterEmail: email,
   };
@@ -1885,6 +1888,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       fileName: docFileName,
       template,
       variables,
+      flowType,
     });
 
     const adminChatId = process.env.ADMIN_CHAT_ID;
