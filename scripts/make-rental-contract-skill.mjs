@@ -6,6 +6,12 @@ import { Document, Packer, Paragraph, TextRun } from 'docx';
 
 function arg(name, fallback = '') { const i = process.argv.indexOf(`--${name}`); return i>=0 ? (process.argv[i+1]||'') : fallback; }
 
+function failStage(stage, reason, details = {}) {
+  const payload = { ok: false, stage, reason, details };
+  console.error(JSON.stringify(payload, null, 2));
+  process.exit(2);
+}
+
 function formatRuDate(d) {
   return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
 }
@@ -49,9 +55,9 @@ function extractScheduleFromPhrase(rawPhrase) {
 }
 
 const phrase = arg('phrase');
-const bikePhraseRaw = (phrase.match(/(?:сделай\s+договор|создай\s+документ)\s+(.+)$/i)?.[1] || arg('bikeId')).trim();
+const bikePhraseRaw = (phrase.match(/(?:сделай\s+договор(?:\s+по\s+фото)?|создай\s+документ(?:\s+по\s+фото)?)\s+(.+)$/i)?.[1] || arg('bikeId')).trim();
 const bikeId = bikePhraseRaw.split(/\s+с\s+(?:сегодня|завтра|\d{1,2}\.\d{1,2}(?:\.\d{2,4})?)/i)[0].trim();
-if (!bikeId) throw new Error('Use --phrase "создай документ <bike_id>" (or "сделай договор <bike_id>") or --bikeId <bike_id>');
+if (!bikeId) failStage('bike_resolve', 'missing_bike_query', { expected: 'Use --phrase "создай документ <bike_id>" (or "сделай договор <bike_id>") or --bikeId <bike_id>' });
 
 const passportJson = JSON.parse(readFileSync(arg('passportJson'),'utf8'));
 const licenseJson = JSON.parse(readFileSync(arg('licenseJson'),'utf8'));
@@ -137,15 +143,29 @@ const fetchAllBikeCandidates = async () => {
 };
 
 const bikes = await fetchAllBikeCandidates();
-if (!bikes.length) throw new Error('No bike/ebike candidates found in cars table');
+if (!bikes.length) failStage('bike_resolve', 'bike_catalog_empty', { table: 'cars', filter: 'type in (bike, ebike)' });
 const ranked = bikes.map(b => ({ bike: b, score: scoreBike(bikeId, b) })).sort((a,b)=>b.score-a.score);
 const top = ranked[0];
-if (!top || top.score <= 0) throw new Error(`No matching bike for input: ${bikeId}`);
+if (!top || top.score <= 0) failStage('bike_resolve', 'bike_not_found', { bikeQuery: bikeId });
 const bike = top.bike;
 
 const template = readFileSync('docs/RENTAL_DEAL_TEMPLATE_DEMO.md','utf8');
 const now = new Date();
 const phraseSchedule = extractScheduleFromPhrase(phrase);
+const startDate = arg('startDate', phraseSchedule.startDate || '');
+const endDate = arg('endDate', phraseSchedule.endDate || '');
+const renterFullName = String(passportJson.fullName || '').trim();
+const renterBirthDate = String(passportJson.birthDate || '').trim();
+const renterPassportSeries = String(passportJson.series || '').trim();
+const renterPassportNumber = String(passportJson.number || '').trim();
+const renterLicenseSeries = String(licenseJson.series || '').trim();
+const renterLicenseNumber = String(licenseJson.number || '').trim();
+
+if (!renterFullName) failStage('renter_parse', 'missing_full_name');
+if (!renterBirthDate) failStage('renter_parse', 'missing_birth_date');
+if (!renterPassportSeries || !renterPassportNumber) failStage('renter_parse', 'missing_passport_data');
+if (!renterLicenseSeries || !renterLicenseNumber) failStage('renter_parse', 'missing_driver_license_data');
+if (!startDate || !endDate) failStage('rental_dates', 'missing_rental_dates', { hint: 'Pass --startDate/--endDate or include explicit dates in phrase.' });
 
 const vars = {
   contract_number: `${now.getDate()}.${now.getMonth()+1}/${bike.id}`,
@@ -153,10 +173,11 @@ const vars = {
   month: now.toLocaleString('ru-RU',{month:'long'}),
   month_num: String(now.getMonth()+1).padStart(2,'0'),
   year: String(now.getFullYear()),
-  renter_full_name: passportJson.fullName,
+  renter_full_name: renterFullName,
+  renter_birth_date: renterBirthDate,
   renter_phone: passportJson.phone || '',
-  renter_driver_license: `${licenseJson.series||''} ${licenseJson.number||''}`.trim(),
-  renter_passport: `${passportJson.series||''} ${passportJson.number||''}`.trim(),
+  renter_driver_license: `${renterLicenseSeries} ${renterLicenseNumber}`.trim(),
+  renter_passport: `${renterPassportSeries} ${renterPassportNumber}`.trim(),
   bike_make_model: `${bike.make||''} ${bike.model||''}`.trim(),
   bike_make: bike.make || 'уточняется',
   bike_model: bike.model || 'уточняется',
@@ -167,8 +188,8 @@ const vars = {
   bike_year: bike.specs?.year || bike.specs?.production_year || 'уточняется',
   bike_engine_cc: bike.specs?.engine_cc || bike.specs?.displacement_cc || '0',
   bike_power_hp: bike.specs?.power_hp || bike.specs?.max_power_hp || '0',
-  rent_start_time: arg('startTime', phraseSchedule.startTime || '18:00'), rent_start_date: arg('startDate', phraseSchedule.startDate || now.toLocaleDateString('ru-RU')),
-  rent_end_time: arg('endTime', phraseSchedule.endTime || '10:00'), rent_end_date: arg('endDate', phraseSchedule.endDate || now.toLocaleDateString('ru-RU')),
+  rent_start_time: arg('startTime', phraseSchedule.startTime || '18:00'), rent_start_date: startDate,
+  rent_end_time: arg('endTime', phraseSchedule.endTime || '10:00'), rent_end_date: endDate,
   daily_price_rub: arg('dailyPrice','10000'), subtotal_rub: arg('subtotal','20000'), deposit_rub: arg('deposit','20000'),
   included_mileage:'200', overage_rate:'35', included_km_per_day:'200', extra_km_fee_rub:'35', late_return_penalty_rub:'10000', late_return_penalty_max_days:'90', bike_value_rub:'850000', bike_value_words:'Восемьсот пятьдесят тысяч',
   return_address:'г. Нижний Новгород, пл. Комсомольская 2', issuer_name:'Воробьев Р.В.', issuer_signatory:'Менеджер Мотосалона', issuer_representative:'ИП Воробьев Р.В.', signature_timestamp: now.toLocaleString('ru-RU'), signature_fingerprint:'offline-skill', renter_signature:'согласие через Telegram', bike_mileage: String(bike.specs?.mileage||''), equipment:'ключ(и) 1 шт.; шлем 1', damage_notes_at_delivery:'от даты начала аренды', damage_notes_at_return:'от даты возврата тс', battery_level_start:'100 %', battery_level_end:'____ %', media_links:'телефон', renter_passport_issue_date: passportJson.issueDate || '', renter_registration: passportJson.registration || '', damage_price_list:'мотоцикл в сборе / царапина на пластике / прочее по расчету', document_key:`rental-${bike.id}-${Date.now()}`
@@ -193,5 +214,30 @@ try {
   if (curl.status !== 0) throw new Error(`Telegram curl send failed: ${curl.stderr || curl.stdout}`);
   json = JSON.parse(curl.stdout || '{}');
 }
-if (!json.ok) throw new Error(`Telegram send failed: ${JSON.stringify(json)}`);
-console.log(JSON.stringify({ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id}, null, 2));
+if (!json.ok) failStage('telegram_delivery', 'telegram_send_failed', { telegram: json });
+
+const result = {ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id, contractKey: vars.document_key};
+const saveMetadata = arg('saveMetadata', '1') !== '0';
+const metadataTable = arg('metadataTable', 'rental_contract_artifacts');
+if (saveMetadata) {
+  const payload = {
+    contract_key: vars.document_key,
+    requested_bike_id: bikeId,
+    resolved_bike_id: bike.id,
+    telegram_chat_id: telegramChatId,
+    telegram_message_id: json.result?.message_id || null,
+    renter_full_name: renterFullName,
+    rent_start_date: startDate,
+    rent_end_date: endDate,
+  };
+  const writeRes = await supabase.from(metadataTable).insert(payload).select('contract_key').limit(1);
+  if (writeRes.error) failStage('metadata_write', 'metadata_write_failed', { table: metadataTable, error: writeRes.error.message });
+  const verifyRes = await supabase.from(metadataTable).select('contract_key').eq('contract_key', vars.document_key).maybeSingle();
+  if (verifyRes.error || !verifyRes.data?.contract_key) {
+    failStage('metadata_verify', 'read_after_write_verification_failed', { table: metadataTable, contractKey: vars.document_key, error: verifyRes.error?.message || null });
+  }
+  result.metadataVerified = true;
+  result.metadataTable = metadataTable;
+}
+
+console.log(JSON.stringify(result, null, 2));
