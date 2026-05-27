@@ -166,11 +166,11 @@ function buildPreviewUrl(branch, taskPath = '/') {
 
 function buildFallbackCurl(endpoint, secret, payload, reason) {
   const safePayload = { ...payload, fallbackReason: reason, previewUrl: buildPreviewUrl(payload.branch, payload.taskPath) };
-  const secretValue = secret || '$CODEX_BRIDGE_CALLBACK_SECRET';
   return [
+    '# Replace $CODEX_BRIDGE_CALLBACK_SECRET with actual value before running',
     `curl -X POST "${endpoint}" \\`,
     '  -H "Content-Type: application/json" \\',
-    `  -H "x-codex-bridge-secret: ${secretValue}" \\`,
+    '  -H "x-codex-bridge-secret: $CODEX_BRIDGE_CALLBACK_SECRET" \\',
     `  -d '${JSON.stringify(safePayload, null, 2)}'`,
   ].join('\n');
 }
@@ -181,7 +181,10 @@ function validateCallbackPayload(payload) {
   if (!isValidSummary(payload.summary)) errors.push('summary is required');
   if (!isValidBranch(payload.branch)) errors.push('branch is required');
   if (!isValidTaskPath(payload.taskPath)) errors.push('taskPath must start with /');
-  if (!isValidPrUrl(payload.prUrl)) errors.push('prUrl must be a valid http(s) url');
+  const requiresPrUrl = ['done', 'completed'].includes(String(payload.status || '').toLowerCase());
+  if (requiresPrUrl && !isValidPrUrl(payload.prUrl)) {
+    errors.push('prUrl must be a valid http(s) url when status is done/completed');
+  }
   if (!isValidTelegramId(payload.telegramChatId)) errors.push('telegramChatId must be numeric');
   if (!isValidSlackChannelId(payload.slackChannelId)) errors.push('slackChannelId has invalid format');
   if (!isValidSlackThreadTs(payload.slackThreadTs)) errors.push('slackThreadTs must match 1234567890.123456');
