@@ -1,6 +1,7 @@
 # rental-contract-from-photos (super-skill)
 
-Триггер-фраза: **`создай документ`** (а также `сделай договор`).
+Триггер-фразы: **`создай документ`**, **`сделай договор`**, **`сделай документ по фото`**,
+а также `ты босс` + document intent (boss-decomposition + document-autopilot chain).
 
 ## Назначение
 Сквозной skill для bridge-задач аренды: OCR/извлечение данных из фото паспорта+прав, поиск мотоцикла в Supabase, генерация DOCX из шаблона, отправка документа и уведомления в Telegram/bridge callback.
@@ -19,6 +20,42 @@
    - отправляет документ в Telegram.
 4. Отправляет служебное уведомление через `scripts/codex-notify.mjs` (callback/callback-auto), если есть bridge-контекст.
 
+## Этапы пайплайна: вход/выход/причины отказа
+
+1) **OCR документов**
+- Вход: читаемые фото паспорта + ВУ.
+- Выход: `passport.json`, `license.json`.
+- Типовые причины отказа: `ocr_unreadable`, `missing_passport_photo`, `missing_license_photo`.
+
+2) **Парсинг renter-полей**
+- Вход: `passport.json`, `license.json`.
+- Выход: `fullName`, `birthDate`, `passport(series,number)`, `license(series,number)`.
+- Типовые причины отказа: `missing_full_name`, `missing_birth_date`, `missing_passport_data`, `missing_driver_license_data`.
+
+3) **Резолв байка (`cars`)**
+- Вход: bike query из фразы (`id`/название/VIN-фрагмент).
+- Выход: конкретный `cars.id` + данные байка.
+- Типовые причины отказа: `missing_bike_query`, `bike_catalog_empty`, `bike_not_found`.
+
+4) **Генерация DOCX**
+- Вход: validated renter data + resolved bike + даты аренды.
+- Выход: готовый `.docx` договор.
+- Типовые причины отказа: `missing_rental_dates`, `template_render_failed`.
+
+5) **Доставка в Telegram**
+- Вход: `.docx` + `telegramChatId` + bot token.
+- Выход: `message_id` отправленного документа.
+- Типовые причины отказа: `telegram_send_failed`.
+
+6) **Callback / metadata verification**
+- Вход: delivery result + bridge context.
+- Выход: callback status + (опционально) подтверждённая запись метаданных.
+- Типовые причины отказа: `metadata_write_failed`, `read_after_write_verification_failed`, `callback_send_failed`.
+
+## Правило «не выдумывать значения»
+- Критичные поля (`birthDate`, паспортные данные, права, даты аренды, bike query) **нельзя** подставлять дефолтами.
+- Если критичных данных не хватает — этап завершается статусом clarification-needed (или fail-кодом из списка выше) и запросом уточнений.
+
 ## Обязательный входной контракт
 - Фото паспорта и водительского удостоверения (минимум по одному читаемому фото).
 - Текст команды с триггером `создай документ` и указанием байка.
@@ -32,8 +69,12 @@ node scripts/make-rental-contract-skill.mjs \
   --licenseJson /tmp/license.json \
   --telegramChatId <chat_id> \
   --startDate "27.05.2026" \
-  --endDate "29.05.2026"
+  --endDate "29.05.2026" \
+  --saveMetadata 1 \
+  --metadataTable rental_contract_artifacts
 ```
+
+`--saveMetadata 1` включает read-after-write verification: после insert в `--metadataTable` скрипт выполняет read-check по `contract_key` и только затем считает процесс завершённым.
 
 ## OCR JSON формат
 `passport.json`

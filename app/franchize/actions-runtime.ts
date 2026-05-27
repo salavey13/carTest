@@ -1626,6 +1626,92 @@ type FranchizeOrderNotifyPayload = z.infer<typeof franchizeOrderInvoiceSchema> &
   extrasTotal: number;
 };
 
+type FranchizeOrderDocContactField = "renterBirthDate" | "renterPhone" | "renterEmail";
+type FranchizeOrderDocRequiredField = "renterBirthDate" | "renterPhone";
+const FRANCHIZE_DOC_REQUIRED_FIELDS: FranchizeOrderDocRequiredField[] = ["renterBirthDate", "renterPhone"];
+
+type FranchizeOrderDocVariables = {
+  renterBirthDate: string;
+  renterPhone: string;
+  renterEmail: string;
+};
+
+class FranchizeOrderDocValidationError extends Error {
+  readonly missingFields: FranchizeOrderDocRequiredField[];
+
+  constructor(missingFields: FranchizeOrderDocRequiredField[]) {
+    super(`Для генерации договора не заполнены обязательные поля: ${missingFields.join(", ")}.`);
+    this.name = "FranchizeOrderDocValidationError";
+    this.missingFields = missingFields;
+  }
+}
+
+function formatDateDdMmYyyy(raw: string): string {
+  const value = raw.trim();
+  if (!value) return "";
+  if (/^\d{2}\.\d{2}\.\d{4}$/.test(value)) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}.${month}.${date.getFullYear()}`;
+}
+
+function formatPhoneRu(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  const tail = digits.length === 11 && (digits.startsWith("7") || digits.startsWith("8"))
+    ? digits.slice(1)
+    : digits.length === 10
+      ? digits
+      : "";
+  return tail.length === 10 ? `+7${tail}` : "";
+}
+
+function resolveFranchizeDocField(
+  field: FranchizeOrderDocContactField,
+  payload: FranchizeOrderNotifyPayload,
+  userSensitive: UnknownRecord,
+  fallbackValue: string,
+): string {
+  const payloadValue = readPath(payload as UnknownRecord, [field], "");
+  const payloadNormalized = typeof payloadValue === "string" ? payloadValue.trim() : "";
+  if (payloadNormalized) return payloadNormalized;
+  const sensitiveValue = readPath(userSensitive, [field], "");
+  const sensitiveNormalized = typeof sensitiveValue === "string" ? sensitiveValue.trim() : "";
+  if (sensitiveNormalized) return sensitiveNormalized;
+  return fallbackValue.trim();
+}
+
+/**
+ * Payload contract for order-doc generation:
+ * Required: renterBirthDate, renterPhone. Optional: renterEmail.
+ * Priority source is strict: payload -> userSensitive -> fallback.
+ * Valid example: { renterBirthDate: "15.03.1992", renterPhone: "+79001234567", renterEmail: "rider@crew.ru" }
+ * Invalid example: { renterBirthDate: "", renterPhone: "12345" } // missing birth date + invalid RU phone.
+ */
+function resolveAndValidateFranchizeDocVariables(
+  payload: FranchizeOrderNotifyPayload,
+  userSensitive: UnknownRecord,
+): FranchizeOrderDocVariables {
+  const birthDate = formatDateDdMmYyyy(resolveFranchizeDocField("renterBirthDate", payload, userSensitive, ""));
+  const phone = formatPhoneRu(resolveFranchizeDocField("renterPhone", payload, userSensitive, payload.phone || ""));
+  const email = resolveFranchizeDocField("renterEmail", payload, userSensitive, "указывается при выдаче");
+
+  const requiredValues: Record<FranchizeOrderDocRequiredField, string> = {
+    renterBirthDate: birthDate,
+    renterPhone: phone,
+  };
+  const missing = FRANCHIZE_DOC_REQUIRED_FIELDS.filter((field) => !requiredValues[field]);
+  if (missing.length > 0) throw new FranchizeOrderDocValidationError(missing);
+
+  return {
+    renterBirthDate: birthDate,
+    renterPhone: phone,
+    renterEmail: email,
+  };
+}
+
 type FranchizeOrderFlowType = "rental" | "sale" | "mixed";
 
 async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderFlowType): Promise<string> {
@@ -1743,6 +1829,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const crewSensitive = await getCrewSensitiveDataOrDefault(payload.slug, privateReadContext);
     const contractDefaults = (crewSensitive.contractDefaults ?? {}) as UnknownRecord;
     const defaults = (readPath(contractDefaults, ["defaults"], {}) ?? {}) as UnknownRecord;
+    const docIdentity = resolveAndValidateFranchizeDocVariables(payload, userSensitive);
 
     const variables = {
       contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}`,
@@ -1751,7 +1838,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       month: new Date().toLocaleString("ru-RU", { month: "long" }),
       year: new Date().getFullYear().toString(),
       renter_full_name: payload.recipient,
-      renter_phone: payload.phone,
+      renter_phone: docIdentity.renterPhone,
+      renter_birth_date: docIdentity.renterBirthDate,
+      renter_email: docIdentity.renterEmail,
       renter_driver_license: userSensitive.driverLicense || payload.renterDriverLicense || "указывается при выдаче",
       renter_passport: userSensitive.passport || payload.renterPassport || "указывается при выдаче",
       issuer_name: String(readPath(defaults, ["issuerName"], `Franchize ${payload.slug}`)),
@@ -1999,6 +2088,9 @@ const franchizeOrderInvoiceSchema = z.object({
   telegramUserId: z.string().trim().min(1),
   recipient: z.string().trim().min(2),
   phone: z.string().trim().min(6),
+  renterBirthDate: z.string().trim().optional(),
+  renterPhone: z.string().trim().optional(),
+  renterEmail: z.string().trim().optional(),
   renterDriverLicense: z.string().trim().optional(),
   renterPassport: z.string().trim().optional(),
   time: z.string().trim().min(1),
@@ -2074,6 +2166,9 @@ export async function submitFranchizeOrderNotification(input: unknown): Promise<
     return { success: true };
   } catch (error) {
     logFranchizeCheckoutFailure("submitFranchizeOrderNotification", { slug: payload.slug, orderId: payload.orderId }, error);
+    if (error instanceof FranchizeOrderDocValidationError) {
+      return { success: false, error: error.message };
+    }
     return { success: false, error: FRANCHIZE_RENTAL_DOCS_SAFE_ERROR };
   }
 }
