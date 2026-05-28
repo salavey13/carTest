@@ -23,7 +23,7 @@ function renderTemplateWithVars(template, vars) {
 function renderHtmlTemplateAdapterLegacy(htmlTemplate, vars) {
   const renderedHtml = renderTemplateWithVars(htmlTemplate, vars);
   return renderedHtml
-    .replace(/<\s*br\s*\/?\/>/gi, '\n')
+    .replace(/<\s*br\s*\/?>/gi, '\n')
     .replace(/<\s*\/p\s*>/gi, '\n\n')
     .replace(/<\s*\/div\s*>/gi, '\n')
     .replace(/<[^>]+>/g, '')
