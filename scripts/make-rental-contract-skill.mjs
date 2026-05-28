@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
+import { htmlToDocxElements } from '../lib/htmlToDocx.mjs';
 
 function arg(name, fallback = '') { const i = process.argv.indexOf(`--${name}`); return i>=0 ? (process.argv[i+1]||'') : fallback; }
 
@@ -15,7 +16,11 @@ function renderTemplateWithVars(template, vars) {
   return template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_,k)=> String(vars[k] ?? ''));
 }
 
-function renderHtmlTemplateAdapter(htmlTemplate, vars) {
+/**
+ * DEPRECATED: Old tag-stripping adapter — kept only as fallback.
+ * The proper implementation now lives in htmlToDocxElements().
+ */
+function renderHtmlTemplateAdapterLegacy(htmlTemplate, vars) {
   const renderedHtml = renderTemplateWithVars(htmlTemplate, vars);
   const text = renderedHtml
     .replace(/<\s*br\s*\/?>/gi, '\n')
@@ -25,10 +30,10 @@ function renderHtmlTemplateAdapter(htmlTemplate, vars) {
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
     .replace(/&quot;/g, '"')
-    .replace(/&laquo;/g, '«')
-    .replace(/&raquo;/g, '»')
-    .replace(/&ndash;/g, '–')
-    .replace(/&mdash;/g, '—')
+    .replace(/&laquo;/g, '\u00AB')
+    .replace(/&raquo;/g, '\u00BB')
+    .replace(/&ndash;/g, '\u2013')
+    .replace(/&mdash;/g, '\u2014')
     .replace(/&amp;/g, '&')
     .trim();
 
@@ -127,7 +132,6 @@ const scoreBike = (q, bike) => {
   const parts = qn.split(' ').filter(Boolean);
   let score = 0;
   for (const p of parts) if (hay.includes(p)) score += 20 + p.length;
-  // fuzzy subsequence bonus for compact ids like falcon gt / falcon-gt-2025
   const compactHay = hay.replace(/\s+/g, '');
   const compactQ = qn.replace(/\s+/g, '');
   let i = 0;
@@ -209,6 +213,7 @@ const vars = {
   renter_full_name: renterFullName,
   renter_birth_date: renterBirthDate,
   renter_phone: passportJson.phone || '',
+  renter_email: passportJson.email || '',
   renter_driver_license: `${renterLicenseSeries} ${renterLicenseNumber}`.trim(),
   renter_passport: `${renterPassportSeries} ${renterPassportNumber}`.trim(),
   bike_make_model: `${bike.make||''} ${bike.model||''}`.trim(),
@@ -227,20 +232,42 @@ const vars = {
   included_mileage:'200', overage_rate:'35', included_km_per_day:'200', extra_km_fee_rub:'35', late_return_penalty_rub:'10000', late_return_penalty_max_days:'90', bike_value_rub:'850000', bike_value_words:'Восемьсот пятьдесят тысяч',
   return_address:'г. Нижний Новгород, пл. Комсомольская 2', issuer_name:'Воробьев Р.В.', issuer_signatory:'Менеджер Мотосалона', issuer_representative:'ИП Воробьев Р.В.', signature_timestamp: now.toLocaleString('ru-RU'), signature_fingerprint:'offline-skill', renter_signature:'согласие через Telegram', bike_mileage: String(bike.specs?.mileage||''), equipment:'ключ(и) 1 шт.; шлем 1', damage_notes_at_delivery:'от даты начала аренды', damage_notes_at_return:'от даты возврата тс', battery_level_start:'100 %', battery_level_end:'____ %', media_links:'телефон', renter_passport_issue_date: passportJson.issueDate || '', renter_registration: passportJson.registration || '', damage_price_list:'мотоцикл в сборе / царапина на пластике / прочее по расчету', document_key:`rental-${bike.id}-${Date.now()}`
 };
-let rendered;
+
+// ── Build Document ──────────────────────────────────────────────────
+let doc;
+
 if (RENTAL_DOC_TEMPLATE_MODE === 'html') {
   try {
     const htmlTemplate = readFileSync(RENTAL_DOC_HTML_TEMPLATE_PATH, 'utf8');
-    rendered = renderHtmlTemplateAdapter(htmlTemplate, vars);
+    const renderedHtml = renderTemplateWithVars(htmlTemplate, vars);
+    const children = htmlToDocxElements(renderedHtml);
+    doc = new Document({
+      sections: [{
+        properties: {
+          page: {
+            margin: {
+              top: 1134,    // 2 cm
+              right: 1134,
+              bottom: 1134,
+              left: 1701,   // 3 cm (Russian GOST)
+            },
+          },
+        },
+        children,
+      }],
+    });
+    console.error('[rental-doc] HTML\u2192DOCX: proper cheerio-based conversion (formatting preserved)');
   } catch (error) {
     console.warn(`[rental-doc] html render failed, fallback to md: ${String(error?.message || error)}`);
-    rendered = renderTemplateWithVars(mdTemplate, vars);
+    const rendered = renderTemplateWithVars(mdTemplate, vars);
+    doc = new Document({sections:[{children: rendered.split('\n').map(line=>new Paragraph({children:[new TextRun(line)]}))}]});
   }
 } else {
-  rendered = renderTemplateWithVars(mdTemplate, vars);
+  // MD mode: plain text \u2192 simple paragraphs (unchanged)
+  const rendered = renderTemplateWithVars(mdTemplate, vars);
+  doc = new Document({sections:[{children: rendered.split('\n').map(line=>new Paragraph({children:[new TextRun(line)]}))}]});
 }
 
-const doc = new Document({sections:[{children: rendered.split('\n').map(line=>new Paragraph({children:[new TextRun(line)]}))}]});
 const buf = await Packer.toBuffer(doc);
 const originalSha256 = createHash('sha256').update(buf).digest('hex');
 
@@ -262,7 +289,7 @@ try {
 }
 if (!json.ok) failStage('telegram_delivery', 'telegram_send_failed', { telegram: json });
 
-const result = {ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id, contractKey: vars.document_key};
+const result = {ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id, contractKey: vars.document_key, templateMode: RENTAL_DOC_TEMPLATE_MODE};
 const saveMetadata = arg('saveMetadata', '0') !== '0';
 const metadataTable = arg('metadataTable', 'rental_contract_artifacts');
 if (saveMetadata) {
