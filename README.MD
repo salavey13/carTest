@@ -50,6 +50,8 @@
 - `CODEX_BRIDGE_CALLBACK_SECRET` *(опционально, для защищенного callback API)*
 - `VERCEL_PROJECT_NAME` *(опционально, по умолчанию `v0-car-test`)*
 - `VERCEL_PREVIEW_DOMAIN_SUFFIX` *(опционально, для автогенерации preview ссылок)*
+- `RENTAL_DOC_TEMPLATE_MODE=html` *(опционально, Set env var to switch to HTML mode (rental doc))*
+
 
 > Реальные секреты в Git не коммитим.
 
