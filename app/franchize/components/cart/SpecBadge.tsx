@@ -1,3 +1,4 @@
+// app/franchize/components/cart/SpecBadge.tsx
 "use client";
 
 import type { FranchizeTheme } from "../../actions";
@@ -51,7 +52,7 @@ function extractSpecs(specs: Record<string, unknown> | undefined) {
   const colorVal = specs?.color ?? specs?.цвет ?? null;
   return {
     power: String(specs?.power_kw ?? specs?.power ?? "—") + " кВт",
-    battery: String(specs?.battery_label ?? `${specs?.battery_v ?? ""}V ${specs?.battery_ah ?? ""}Ah`),
+    battery: String(specs?.battery_label ?? specs?.battery ?? `${specs?.battery_v ?? ""}V ${specs?.battery_ah ?? ""}Ah`),
     range: "до " + String(specs?.range_km ?? specs?.range ?? "—") + " км",
     color: colorVal ? String(colorVal) : null,
   };
