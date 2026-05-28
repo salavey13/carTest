@@ -13,6 +13,7 @@
 
 import * as cheerio from "cheerio";
 import {
+  Document,
   Paragraph,
   TextRun,
   Table,
@@ -21,6 +22,7 @@ import {
   AlignmentType,
   BorderStyle,
   WidthType,
+  PageBreak,
 } from "docx";
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -40,6 +42,7 @@ interface StyleMap {
 
 const CM_TO_TWIP = 567;
 const PT_TO_HALF_PT = 2;
+const DEFAULT_FONT = "Times New Roman";
 
 const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
 const THIN_BORDER = { style: BorderStyle.SINGLE, size: 1, color: "000000" };
@@ -78,7 +81,7 @@ function parseStyle(raw: string | undefined): StyleMap {
   return map;
 }
 
-function mapAlign(style: StyleMap): (typeof AlignmentType)[keyof typeof AlignmentType] | undefined {
+function mapAlign(style: StyleMap): AlignmentType | undefined {
   const v = style["text-align"];
   if (!v) return undefined;
   const s = v.toLowerCase().trim();
@@ -102,6 +105,7 @@ function decodeEntities(text: string): string {
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
+    .replace(/&#(x[0-9a-f]+);/gi, (_, code: string) => String.fromCharCode(parseInt(code.slice(1), 16)))
     .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)));
 }
 
@@ -133,7 +137,7 @@ function collectRuns($el: cheerio.Cheerio<any>, $: cheerio.CheerioAPI, ctx: RunC
       let text = decodeEntities((node as any).data || "");
       if (ctx.upperCase) text = text.toUpperCase();
       if (text) {
-        const runOpts: any = { text, font: "Times New Roman" };
+        const runOpts: any = { text, font: DEFAULT_FONT };
         if (ctx.bold) runOpts.bold = true;
         if (ctx.italic) runOpts.italics = true;
         if (ctx.fontSize) runOpts.size = ctx.fontSize;
@@ -171,7 +175,12 @@ function collectRuns($el: cheerio.Cheerio<any>, $: cheerio.CheerioAPI, ctx: RunC
 function buildTable($table: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): Table | null {
   const rows: TableRow[] = [];
 
-  $table.children("tr").each((_, trNode) => {
+  // Support both <table><tr> and <table><thead|tbody><tr>
+  const $rows = $table.children("tr").length
+    ? $table.children("tr")
+    : $table.children("thead, tbody, tfoot").children("tr");
+
+  $rows.each((_, trNode) => {
     const $tr = $(trNode);
     const rowStyle = parseStyle($tr.attr("style"));
     const cells: TableCell[] = [];
@@ -198,7 +207,7 @@ function buildTable($table: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): Table 
           cellParagraphs.push(
             new Paragraph({
               alignment: mapAlign(pStyle) || mapAlign(cellStyle),
-              children: runs.length ? runs : [new TextRun({ text: "", font: "Times New Roman" })],
+              children: runs.length ? runs : [new TextRun({ text: "", font: DEFAULT_FONT })],
             }),
           );
         });
@@ -211,7 +220,7 @@ function buildTable($table: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): Table 
         cellParagraphs.push(
           new Paragraph({
             alignment: mapAlign(cellStyle),
-            children: runs.length ? runs : [new TextRun({ text: "", font: "Times New Roman" })],
+            children: runs.length ? runs : [new TextRun({ text: "", font: DEFAULT_FONT })],
           }),
         );
       }
@@ -261,7 +270,7 @@ function buildParagraph($el: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): Parag
   if (style["text-transform"] === "uppercase") ctx.upperCase = true;
 
   const runs = collectRuns($el, $, ctx);
-  pOpts.children = runs.length ? runs : [new TextRun({ text: "", font: "Times New Roman" })];
+  pOpts.children = runs.length ? runs : [new TextRun({ text: "", font: DEFAULT_FONT })];
 
   return new Paragraph(pOpts);
 }
@@ -283,7 +292,7 @@ function processElement($el: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): DocxE
       border: {
         bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000", space: 1 },
       },
-      children: [new TextRun({ text: " ", font: "Times New Roman", size: 2 })],
+      children: [new TextRun({ text: " ", font: DEFAULT_FONT, size: 2 })],
     });
   }
 
@@ -311,7 +320,7 @@ function processElement($el: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): DocxE
         new Paragraph({
           alignment: mapAlign(style),
           indent: { left: CM_TO_TWIP },
-          children: [new TextRun({ text: "\u2022 ", font: "Times New Roman" }), ...runs],
+          children: [new TextRun({ text: "\u2022 ", font: DEFAULT_FONT }), ...runs],
         }),
       );
     });
@@ -319,7 +328,11 @@ function processElement($el: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): DocxE
   }
 
   if (tag === "div" || tag === "section" || tag === "article" || tag === "main") {
+    const style = parseStyle($el.attr("style"));
+    const hasPageBreak = style["page-break-before"] === "always"
+      || $el.hasClass("page-break");
     const inner: DocxElement[] = [];
+    if (hasPageBreak) inner.push(new Paragraph({ children: [new PageBreak()] }));
     $el.children().each((_, child) => {
       if ((child as any).type === "tag") {
         const el = processElement($(child as any), $);
@@ -348,24 +361,7 @@ export function htmlToDocxElements(html: string): DocxElement[] {
 
   $root.children().each((_, node) => {
     if ((node as any).type !== "tag") return;
-    const tag = (node as any).tagName?.toLowerCase();
-    const $el = $(node as any);
-
-    // Unwrap outer <div style="font-family:...">
-    if (tag === "div") {
-      $el.children().each((__i, child) => {
-        if ((child as any).type === "tag") {
-          const el = processElement($(child as any), $);
-          if (el) {
-            if (Array.isArray(el)) elements.push(...el);
-            else elements.push(el);
-          }
-        }
-      });
-      return;
-    }
-
-    const el = processElement($el, $);
+    const el = processElement($(node as any), $);
     if (el) {
       if (Array.isArray(el)) elements.push(...el);
       else elements.push(el);
@@ -387,7 +383,7 @@ export function htmlToDocxElements(html: string): DocxElement[] {
 
   return elements.length
     ? elements
-    : [new Paragraph({ children: [new TextRun({ text: " ", font: "Times New Roman" })] })];
+    : [new Paragraph({ children: [new TextRun({ text: " ", font: DEFAULT_FONT })] })];
 }
 
 /**
