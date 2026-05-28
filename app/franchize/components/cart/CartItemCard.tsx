@@ -151,7 +151,7 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
           </span>
 
           {/* Spec badges row */}
-          {line.item && <SpecBadges specs={line.item.rawSpecs} theme={crew.theme} />}
+          {line.item && <SpecBadges specs={line.item.rawSpecs ?? {}} theme={crew.theme} />}
 
           {/* Price section — Buy price is THE BIGGEST text on the card + gold glow */}
           <div className="mt-2">
