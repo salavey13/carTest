@@ -17,16 +17,15 @@ function renderTemplateWithVars(template, vars) {
 }
 
 /**
- * DEPRECATED: Old tag-stripping adapter — kept only as fallback.
- * The proper implementation now lives in htmlToDocxElements().
+ * Legacy fallback: strip HTML tags and decode entities → plain text.
+ * Used when the cheerio-based HTML→DOCX pipeline fails.
  */
 function renderHtmlTemplateAdapterLegacy(htmlTemplate, vars) {
   const renderedHtml = renderTemplateWithVars(htmlTemplate, vars);
-  const text = renderedHtml
-    .replace(/<\s*br\s*\/?>/gi, '\n')
+  return renderedHtml
+    .replace(/<\s*br\s*\/?\/>/gi, '\n')
     .replace(/<\s*\/p\s*>/gi, '\n\n')
-    .replace(/<\s*\/tr\s*>/gi, '\n')
-    .replace(/<\s*\/t[dh]\s*>/gi, '\t')
+    .replace(/<\s*\/div\s*>/gi, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
     .replace(/&quot;/g, '"')
@@ -36,12 +35,6 @@ function renderHtmlTemplateAdapterLegacy(htmlTemplate, vars) {
     .replace(/&mdash;/g, '\u2014')
     .replace(/&amp;/g, '&')
     .trim();
-
-  if (!text) {
-    throw new Error('HTML adapter produced empty output');
-  }
-
-  return text;
 }
 
 function failStage(stage, reason, details = {}) {
@@ -237,35 +230,55 @@ const vars = {
 let doc;
 
 if (RENTAL_DOC_TEMPLATE_MODE === 'html') {
+  let htmlTemplate;
   try {
-    const htmlTemplate = readFileSync(RENTAL_DOC_HTML_TEMPLATE_PATH, 'utf8');
-    const renderedHtml = renderTemplateWithVars(htmlTemplate, vars);
-    const children = htmlToDocxElements(renderedHtml);
-    doc = new Document({
-      sections: [{
-        properties: {
-          page: {
-            margin: {
-              top: 1134,    // 2 cm
-              right: 1134,
-              bottom: 1134,
-              left: 1701,   // 3 cm (Russian GOST)
+    htmlTemplate = readFileSync(RENTAL_DOC_HTML_TEMPLATE_PATH, 'utf8');
+  } catch (readError) {
+    console.warn(`[rental-doc] html template read failed, fallback to md: ${String(readError?.message || readError)}`);
+  }
+
+  if (!htmlTemplate) {
+    // Template file missing → MD fallback
+    const rendered = renderTemplateWithVars(mdTemplate, vars);
+    doc = new Document({sections:[{children: rendered.split('\n').map(line=>new Paragraph({children:[new TextRun({ text: line, font: 'Times New Roman' })]}))}]});
+  } else {
+    try {
+      const renderedHtml = renderTemplateWithVars(htmlTemplate, vars);
+      const children = htmlToDocxElements(renderedHtml);
+      doc = new Document({
+        sections: [{
+          properties: {
+            page: {
+              margin: {
+                top: 1134,    // 2 cm
+                right: 1134,
+                bottom: 1134,
+                left: 1701,   // 3 cm (Russian GOST)
+              },
             },
           },
-        },
-        children,
-      }],
-    });
-    console.error('[rental-doc] HTML\u2192DOCX: proper cheerio-based conversion (formatting preserved)');
-  } catch (error) {
-    console.warn(`[rental-doc] html render failed, fallback to md: ${String(error?.message || error)}`);
-    const rendered = renderTemplateWithVars(mdTemplate, vars);
-    doc = new Document({sections:[{children: rendered.split('\n').map(line=>new Paragraph({children:[new TextRun(line)]}))}]});
+          children,
+        }],
+      });
+      console.error('[rental-doc] HTML\u2192DOCX: proper cheerio-based conversion (formatting preserved)');
+    } catch (error) {
+      // Fallback 1: legacy tag-stripping adapter (better than raw MD)
+      console.warn(`[rental-doc] html\u2192docx failed, trying legacy adapter: ${String(error?.message || error)}`);
+      try {
+        const text = renderHtmlTemplateAdapterLegacy(htmlTemplate, vars);
+        doc = new Document({sections:[{children: text.split('\n').map(line=>new Paragraph({children:[new TextRun({ text: line, font: 'Times New Roman' })]}))}]});
+      } catch (e2) {
+        // Fallback 2: raw MD template
+        console.warn(`[rental-doc] legacy adapter also failed, falling back to md: ${String(e2?.message || e2)}`);
+        const rendered = renderTemplateWithVars(mdTemplate, vars);
+        doc = new Document({sections:[{children: rendered.split('\n').map(line=>new Paragraph({children:[new TextRun({ text: line, font: 'Times New Roman' })]}))}]});
+      }
+    }
   }
 } else {
-  // MD mode: plain text \u2192 simple paragraphs (unchanged)
+  // MD mode: plain text → simple paragraphs
   const rendered = renderTemplateWithVars(mdTemplate, vars);
-  doc = new Document({sections:[{children: rendered.split('\n').map(line=>new Paragraph({children:[new TextRun(line)]}))}]});
+  doc = new Document({sections:[{children: rendered.split('\n').map(line=>new Paragraph({children:[new TextRun({ text: line, font: 'Times New Roman' })]}))}]});
 }
 
 const buf = await Packer.toBuffer(doc);
