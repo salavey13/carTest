@@ -177,7 +177,8 @@ function getVisibleSpecChips(item: CatalogItemVM): Array<{ icon: string; text: s
 function CatalogCardSkeleton({ index }: { index: number }) {
   return (
     <article className="overflow-hidden rounded-3xl border border-[var(--catalog-border)] bg-[var(--catalog-card-bg)]" aria-hidden="true">
-      <div className="relative aspect-[9/16] overflow-hidden bg-black/20">
+      <div className="relative aspect-[9/21] overflow-hidden bg-black/20">
+        <div className="absolute inset-x-0 top-0 aspect-[9/16] w-full bg-black/20" />
         <div
           className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent"
           style={{ animationDelay: `${index * 120}ms` }}
@@ -733,27 +734,29 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           setCarouselParallaxByItem((prev) => ({ ...prev, [item.id]: { x: 0, y: 0 } }));
                         }}
                       >
-                        <div className="relative aspect-[9/16] w-full overflow-hidden">
+                        <div className="relative aspect-[9/21] w-full overflow-hidden">
                           {item.imageUrl && !carouselLoadedByItem[item.id] && (
-                            <div className="absolute inset-0 overflow-hidden bg-black/30">
+                            <div className="absolute inset-x-0 top-0 aspect-[9/16] w-full overflow-hidden bg-black/30">
                               <div className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent" />
                             </div>
                           )}
                           {item.imageUrl ? (
-                            <Image
-                              src={item.imageUrl}
-                              alt={item.title}
-                              fill
-                              sizes="(max-width: 1279px) 46vw, 260px"
-                              className="object-cover transition-transform duration-300 ease-out"
-                              style={{ transform: `scale(1.04) translate3d(${parallax.x * 4}px, ${parallax.y * 4}px, 0)` }}
-                              onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
-                            />
+                            <div className="absolute inset-x-0 top-0 aspect-[9/16] w-full overflow-hidden">
+                              <Image
+                                src={item.imageUrl}
+                                alt={item.title}
+                                fill
+                                sizes="(max-width: 1279px) 46vw, 260px"
+                                className="object-cover transition-transform duration-300 ease-out"
+                                style={{ transform: `scale(1.04) translate3d(${parallax.x * 4}px, ${parallax.y * 4}px, 0)` }}
+                                onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
+                              />
+                            </div>
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается — карточка уже доступна</div>
+                            <div className="absolute inset-x-0 top-0 flex aspect-[9/16] w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается — карточка уже доступна</div>
                           )}
-                          {/* Gradient overlay — smooth transition from image to details */}
-                          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-[color:color-mix(in_srgb,var(--catalog-card-bg)_92%,#000)] via-[color:color-mix(in_srgb,var(--catalog-card-bg)_65%,transparent)] to-transparent" />
+                          {/* Gradient overlay — starts from the text area and fades upward into the top 9:16 image */}
+                          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-[color:color-mix(in_srgb,var(--catalog-card-bg)_96%,#000)] via-[color:color-mix(in_srgb,var(--catalog-card-bg)_78%,transparent)] to-transparent" />
                           {/* Card content overlaid on image bottom */}
                           <div className="absolute inset-x-0 bottom-0 p-3">
                         {/* Badges */}
@@ -849,13 +852,15 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
                         style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
                       >
-                        <div className="relative aspect-[9/16] w-full">
+                        <div className="relative aspect-[9/21] w-full overflow-hidden">
                           {item.imageUrl ? (
-                            <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 1279px) 50vw, (max-width: 1535px) 33vw, 25vw" className="object-cover" />
+                            <div className="absolute inset-x-0 top-0 aspect-[9/16] w-full overflow-hidden">
+                              <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 1279px) 50vw, (max-width: 1535px) 33vw, 25vw" className="object-cover" />
+                            </div>
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается — карточка уже доступна</div>
+                            <div className="absolute inset-x-0 top-0 flex aspect-[9/16] w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается — карточка уже доступна</div>
                           )}
-                          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[62%] bg-gradient-to-t from-[color:color-mix(in_srgb,var(--catalog-card-bg)_92%,#000)] via-[color:color-mix(in_srgb,var(--catalog-card-bg)_72%,transparent)] to-transparent" />
+                          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[52%] bg-gradient-to-t from-[color:color-mix(in_srgb,var(--catalog-card-bg)_96%,#000)] via-[color:color-mix(in_srgb,var(--catalog-card-bg)_78%,transparent)] to-transparent" />
                           <div className="absolute inset-x-0 bottom-0 p-2.5 pb-3 sm:p-3">
                             <div className="mb-1 flex flex-wrap gap-1">
                               {item.isHot && (
