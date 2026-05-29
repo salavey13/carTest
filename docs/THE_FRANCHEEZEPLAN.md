@@ -49,6 +49,16 @@ This root file stays intentionally compact so operators and agents can load it q
 ## 2) Mini execution diary
 
 
+### 2026-05-29 — VIPBikeRental Bike Showcase full-bleed restore
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-29T00:00:00Z
+- `owner`: codex
+- `notes`: Executed explicit operator scope: restored the dynamic VIPBikeRental `bikeShowcase` section to viewport-width rendering, removed featured-section ring/rounded chrome for that block, and let the showcase opt out of its own divider border when embedded edge-to-edge.
+- `next_step`: Smoke `/vipbikerental` and `/franchize/vip-bike` on a narrow mobile viewport to confirm the showcase touches both screen edges and CTA remains tappable.
+- `risks`: Visual verification still depends on local Next runtime and Supabase-backed catalog hydration; the static showcase images remain external Supabase Storage URLs.
+
+
 ### 2026-05-14 — Telegram buy print/share capability polish
 
 - `status`: ready_for_pr
