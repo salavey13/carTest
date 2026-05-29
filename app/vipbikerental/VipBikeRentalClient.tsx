@@ -1,3 +1,4 @@
+"use client";
 /**
  * VipBikeRentalClient.tsx
  * ========================
@@ -23,20 +24,34 @@
  *     4. The same pipeline (profile → experience → sections) applies
  *     5. The same anti-thrashing and behavior tracking applies
  *
- * WHAT CHANGED vs previous refactor:
- *   - FIXED: onViewportEnter now uses motion.div (was plain div — tracking was dead)
- *   - FIXED: Hero double-render uses id filter instead of fragile index filter
- *   - EXTRACTED: Hero section into HeroSection.tsx feature component
- *   - REMOVED: Unused PipelineMapRidersOverview import
- *   - CLEANER: sectionMap no longer contains 80+ lines of inline hero JSX
+ * WHAT CHANGED vs old VipBikeRentalClient:
+ *   - REMOVED: 60-line vibeProfile memo that read raw survey signals → replaced by deriveBadge/Title/Note
+ *   - REMOVED: deriveHeroModeFromSurvey() → replaced by resolve-experience.ts
+ *   - REMOVED: TELEGRAM_BOT_START_LINK constant → replaced by START_LINKS.onboard
+ *   - REMOVED: surveyResults useMemo → replaced by resolveVipBikeProfile()
+ *   - REMOVED: Hardcoded section order → replaced by experience.sectionOrder
+ *   - ADDED: resolveVipBikeProfile + resolveVipBikeExperience pipeline
+ *   - ADDED: useBehaviorTracker for progressive enrichment
+ *   - ADDED: Anti-thrashing with isExperienceLocked + persistExperienceLock
+ *   - ADDED: Declarative section rendering via sectionMap + experience.sectionOrder
+ *   - ADDED: Featured section highlighting
+ *   - EXTRACTED: Feature components into ./features/ directory
+ *
+ * WHAT DIDN'T CHANGE:
+ *   - All existing section component visual designs
+ *   - The hero video + tab system
+ *   - The data fetching logic (catalog, map overview)
+ *   - All helper components (InfoItem, StepItem, ServiceCard)
  */
 
-"use client";
-
+import Image from "next/image";
+import Link from "next/link";
 import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BikeShowcase } from "@/components/BikeShowcase";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeTheme } from "@/app/franchize/actions";
@@ -44,16 +59,17 @@ import type { CatalogItemVM, FranchizeTheme } from "@/app/franchize/actions";
 // ── Pipeline imports ──
 import { resolveVipBikeProfile } from "@/app/franchize/lib/onboarding/resolve-profile";
 import { resolveVipBikeExperience, isExperienceLocked } from "@/app/franchize/lib/onboarding/resolve-experience";
+import { START_LINKS } from "@/app/franchize/lib/onboarding/payload-parser";
 import { useBehaviorTracker } from "@/app/franchize/lib/onboarding/track-behavior";
 import type {
   SectionId,
   HeroDisplayMode,
   VipBikeExperienceConfig,
   VipBikeUserProfile,
+  MapRidersOverview as PipelineMapRidersOverview,
 } from "@/app/franchize/lib/onboarding/experience-types";
 
 // ── Feature component imports ──
-import { HeroSection } from "./features/HeroSection";
 import { ConversionPilot } from "./features/ConversionPilot";
 import { ElectroEnduroShowcase } from "./features/ElectroEnduroShowcase";
 import { MapRidersLivePreview } from "./features/MapRidersLivePreview";
@@ -73,9 +89,29 @@ import {
   getSalePriceLabel,
   getBikeGallery,
   formatCompactNumber,
+  getRussianRiderLabel,
   fallbackElectroItems,
   fallbackMapLocations,
+  heroMetrics,
 } from "./features/shared/constants";
+
+// ─────────────────────────────────────────────────────
+// Flagship bike selector — prioritizes electro-enduro models
+// ─────────────────────────────────────────────────────
+
+const ELECTRO_KEYWORDS = /electro|электро|enduro|эндуро|e-moto|emoto/i;
+const FLAGSHIP_BIKE_ID = "sequence-zero"; // preferred flagship for hero
+
+function selectFlagshipBike(items: CatalogItemVM[]): CatalogItemVM | undefined {
+  // 1. Try exact flagship ID first
+  const flagship = items.find((item) => item.id === FLAGSHIP_BIKE_ID && item.availabilityStatus === "available");
+  if (flagship) return flagship;
+  // 2. Then any available electro-enduro
+  const electro = items.find((item) => item.availabilityStatus === "available" && ELECTRO_KEYWORDS.test(`${item.title} ${item.subtitle} ${item.category} ${item.rawSpecs?.bike_subtype ?? ""}`));
+  if (electro) return electro;
+  // 3. Fallback to first available with price
+  return items.find((item) => item.availabilityStatus === "available" && item.pricePerDay > 0);
+}
 
 // ─────────────────────────────────────────────────────
 // Hero panel data (stays here — tightly coupled to hero state)
@@ -87,7 +123,7 @@ const fallbackHeroPanels: Record<string, HeroPanel> = {
     label: "Аренда",
     icon: "::FaMotorcycle::",
     eyebrow: "Премиальная бронь сегодня",
-    title: "VIP Bike Electro-Enduro S1",
+    title: "Sequence Zero",
     description: "Контролируемый первый выезд: подготовленный электроэндуро, защитный комплект и сопровождение до уверенного возвращения.",
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_bg-cf31dc2b-291b-440b-953b-6e1b4a838e4e.jpg",
     href: "/franchize/vip-bike",
@@ -136,7 +172,7 @@ const fallbackHeroPanels: Record<string, HeroPanel> = {
     eyebrow: "Личный контроль",
     title: "Контролируйте активные аренды",
     description: "Статусы, подтверждения, фото до/после и возврат собраны в одном центре, чтобы сделка не зависала в чатах.",
-    href: "/rentals",
+    href: "/franchize/vip-bike/rentals",
     cta: "Мои аренды",
     meta: [
       { label: "сценарий", value: "бронь → возврат" },
@@ -149,15 +185,15 @@ const fallbackHeroPanels: Record<string, HeroPanel> = {
     label: "Электро",
     icon: "::FaBolt::",
     eyebrow: "Тихая мощь нового поколения",
-    title: "Electro-Enduro S1",
-    description: "Электрический эндуро для города и бездорожья. Тишина, моментальный крутящий момент, нулевые выбросы.",
-    imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_bg-cf31dc2b-291b-440b-953b-6e1b4a838e4e.jpg",
-    href: "/franchize/vip-bike?category=electro",
+    title: "Sequence Zero",
+    description: "Премиальный электромотоцикл: центральный двигатель 30 кВт, разгон 0–100 за 2.8 секунды, запас хода до 300 км. Тихая мощь нового поколения.",
+    imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sequence-zero/image_1.jpg",
+    href: "/franchize/vip-bike/electro-enduro",
     cta: "Изучить электро",
     meta: [
-      { label: "тип", value: "Electro-Enduro" },
-      { label: "запас хода", value: "до 120 км" },
-      { label: "зарядка", value: "2.5 часа" },
+      { label: "тип", value: "Electric Sport" },
+      { label: "запас хода", value: "до 300 км" },
+      { label: "разгон", value: "0–100 за 2.8 с" },
     ],
   },
 };
@@ -192,17 +228,12 @@ function deriveTitle(profile: VipBikeUserProfile): string {
 function deriveNote(profile: VipBikeUserProfile, experience: VipBikeExperienceConfig): string {
   if (!profile.onboardingCompleted) return "Пройди /start в Telegram, чтобы открыть персональные рекомендации на этой странице.";
   switch (experience.copyTone) {
-    case "aggressive": return "Рекомендуем Supersport и быстрые слоты выдачи — система уже подобрала варианты.";
+    case "aggressive": return "Рекомендуем Электроспорт и быстрые слоты выдачи — система уже подобрала варианты.";
     case "premium": return "Для вас выделили подборку с маршрутами, которые выглядят хорошо и в поездке, и на фото.";
     case "friendly": return profile.experience === "beginner" ? "Рекомендуем начать с контролируемого первого выезда — экип и сопровождение включены." : "Персональный фильтр: меньше случайных карточек, быстрее уверенное решение.";
     case "discovery": return "Загляните в каталог — система настроила фильтры под ваши интересы.";
     default: return "Персональный фильтр: меньше случайных карточек, быстрее уверенное решение.";
   }
-}
-
-function getStartCommandLink(profile: VipBikeUserProfile): string | undefined {
-  if (!profile.onboardingCompleted) return "https://t.me/oneBikePlsBot?start";
-  return undefined;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -248,6 +279,7 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
   // ══════════════════════════════════════════════════════
   const [heroMode, setHeroMode] = useState<HeroDisplayMode>(experience.heroMode);
   const hasManualHeroChoice = useRef(false);
+  const heroContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!hasManualHeroChoice.current) {
@@ -258,6 +290,10 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
   const handleHeroModeChange = useCallback((mode: HeroDisplayMode) => {
     hasManualHeroChoice.current = true;
     setHeroMode(mode);
+    // Smooth scroll to hero content panel so user sees the changed content
+    requestAnimationFrame(() => {
+      heroContentRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
   }, []);
 
   // ══════════════════════════════════════════════════════
@@ -267,7 +303,6 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
     badge: deriveBadge(profile),
     title: deriveTitle(profile),
     note: deriveNote(profile, experience),
-    startCommandHref: getStartCommandLink(profile),
     ctaHref: experience.primaryCTA.href,
     ctaLabel: experience.primaryCTA.label,
     hasSurvey: profile.onboardingCompleted,
@@ -311,7 +346,7 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
   // HERO PANELS: Catalog-driven overrides
   // ══════════════════════════════════════════════════════
   const heroPanels = useMemo<Record<string, HeroPanel>>(() => {
-    const rentItem = catalogItems.find((item) => item.availabilityStatus === "available" && item.pricePerDay > 0) ?? catalogItems.find((item) => item.pricePerDay > 0);
+    const rentItem = selectFlagshipBike(catalogItems) ?? catalogItems.find((item) => item.pricePerDay > 0);
     const saleItem = catalogItems.find((item) => item.saleAvailable || isEnabled(item.rawSpecs?.sale));
     return {
       ...fallbackHeroPanels,
@@ -354,31 +389,92 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
 
   // ══════════════════════════════════════════════════════
   // SECTION MAP: SectionId → JSX with behavior tracking
-  //
-  // FIX: onViewportEnter requires motion.div (was plain div)
-  // FIX: Hero is excluded — rendered separately above container
   // ══════════════════════════════════════════════════════
   const sectionMap = useMemo<Record<SectionId, React.ReactNode>>(() => ({
     hero: (
-      <HeroSection
-        vibeProfile={vibeProfile}
-        heroPanels={heroPanels}
-        activeHeroPanel={activeHeroPanel}
-        heroMode={heroMode}
-        onHeroModeChange={handleHeroModeChange}
-      />
+      <section className="relative flex min-h-[760px] items-center justify-center overflow-hidden px-4 pb-14 pt-28 text-white sm:pt-32">
+        <div className="absolute inset-0 z-0">
+          <video autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover brightness-[0.5] saturate-125">
+            <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/2_5219998213838247718.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-black/55" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_23%,rgba(255,106,0,0.25),transparent_42%)]" />
+        </div>
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center text-center">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/45 px-4 py-2 text-sm text-white/90 backdrop-blur-sm">
+            <VibeContentRenderer content="::FaBolt::" className="text-brand-yellow" />
+            <span>VIP BIKE · ПРЕМИАЛЬНЫЙ ПРОКАТ И МАРШРУТЫ</span>
+          </div>
+          <div className="mb-5 w-full max-w-2xl rounded-2xl border border-white/20 bg-black/40 p-4 text-left text-sm text-white/90 backdrop-blur-sm">
+            <div className="mb-1 font-medium text-brand-yellow"><VibeContentRenderer content={vibeProfile.badge} /></div>
+            <p className="font-orbitron text-lg text-white">{vibeProfile.title}</p>
+            <p className="mt-1 text-white/80">{vibeProfile.note}</p>
+          </div>
+          <h1 className="font-orbitron text-5xl font-black uppercase leading-[0.9] tracking-tight text-white drop-shadow-[0_8px_22px_rgba(0,0,0,0.75)] sm:text-6xl md:text-7xl lg:text-8xl">
+            <span className="block">Скорость. Контроль.</span>
+            <span className="block text-brand-yellow">Ваш выезд организован заранее.</span>
+          </h1>
+          <p className="mx-auto mt-6 max-w-3xl text-base font-light text-white/90 sm:text-lg md:text-xl">
+            Премиальный прокат в Нижнем Новгороде: от выбора модели до возврата — единый управляемый поток, где клиент понимает цену, слот, защиту и следующий шаг.
+          </p>
+          <div className="mt-9 w-full max-w-5xl rounded-3xl border border-white/20 bg-black/45 p-3 text-left shadow-2xl shadow-black/40 backdrop-blur-md sm:p-4">
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" role="tablist" aria-label="VIP Bike quick scenario selector">
+              {(Object.values(heroPanels) as HeroPanel[]).map((panel) => {
+                const isActive = heroMode === panel.mode;
+                return (
+                  <button key={panel.mode} type="button" role="tab" aria-selected={isActive} onClick={() => handleHeroModeChange(panel.mode as HeroDisplayMode)} className={cn("rounded-2xl border px-3 py-3 text-left transition-all duration-300", isActive ? "border-brand-yellow bg-brand-yellow/20 text-white shadow-lg shadow-brand-yellow/25 ring-1 ring-brand-yellow/40" : "border-white/15 bg-white/5 text-white/75 hover:border-white/40 hover:bg-white/10 hover:text-white")}>
+                    <span className="mb-1 flex items-center gap-2 text-xs uppercase tracking-[0.22em]"><VibeContentRenderer content={panel.icon} />{panel.label}</span>
+                    <span className="block font-orbitron text-sm sm:text-base">{panel.cta}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <AnimatePresence mode="wait">
+              <motion.div ref={heroContentRef} key={activeHeroPanel.mode} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.24 }} className="mt-4 grid gap-4 overflow-hidden rounded-2xl border border-white/15 bg-white/[0.06] p-4 sm:grid-cols-[1.1fr_0.9fr] sm:p-5">
+                <div className="flex min-h-[260px] flex-col justify-between gap-5">
+                  <div>
+                    <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/30 px-3 py-1 text-xs uppercase tracking-[0.22em] text-brand-yellow"><VibeContentRenderer content={activeHeroPanel.icon} />{activeHeroPanel.eyebrow}</div>
+                    <h2 className="font-orbitron text-2xl font-bold text-white sm:text-3xl">{activeHeroPanel.title}</h2>
+                    <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/78 sm:text-base">{activeHeroPanel.description}</p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    {activeHeroPanel.meta.map((item) => (
+                      <div key={`${activeHeroPanel.mode}-${item.label}`} className="rounded-xl border border-white/15 bg-black/25 p-3">
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-white/45">{item.label}</p>
+                        <p className="mt-1 font-orbitron text-sm text-white">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <Button asChild size="lg" variant={activeHeroPanel.mode === "rent" ? "accent" : "outline"} className="w-full font-orbitron sm:w-fit">
+                    <Link href={activeHeroPanel.href} className="inline-flex items-center gap-2"><VibeContentRenderer content={activeHeroPanel.icon} />{activeHeroPanel.cta}</Link>
+                  </Button>
+                </div>
+                <div className="relative min-h-[260px] overflow-hidden rounded-2xl border border-white/15 bg-black/35">
+                  {activeHeroPanel.imageUrl ? <Image src={activeHeroPanel.imageUrl} alt={activeHeroPanel.title} fill className="object-cover opacity-80" /> : <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,210,80,0.30),transparent_32%),radial-gradient(circle_at_70%_65%,rgba(64,255,190,0.18),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.01))]" />}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+          <div className="mt-8 grid w-full max-w-4xl grid-cols-1 gap-3 text-left sm:grid-cols-2 lg:grid-cols-4">
+            {heroMetrics.map((chip) => (
+              <div key={chip} className="rounded-xl border border-white/20 bg-black/35 px-3 py-2 text-sm text-white/90 backdrop-blur-sm"><VibeContentRenderer content={chip} /></div>
+            ))}
+          </div>
+        </motion.div>
+      </section>
     ),
     bikeShowcase: <motion.section style={{ y }} className="relative"><BikeShowcase /></motion.section>,
     conversionPilot: <ConversionPilot items={catalogItems} overview={mapOverview} isCatalogLoading={isCatalogLoading} />,
     electroShowcase: (
-      <motion.div onViewportEnter={() => tracker.trackViewCategory("electro")}>
+      <div onViewportEnter={() => tracker.trackViewCategory("electro")}>
         <ElectroEnduroShowcase items={catalogItems} isCatalogLoading={isCatalogLoading} />
-      </motion.div>
+      </div>
     ),
     mapPreview: (
-      <motion.div onViewportEnter={() => tracker.trackMapOpen()}>
+      <div onViewportEnter={() => tracker.trackMapOpen()}>
         <MapRidersLivePreview overview={mapOverview} />
-      </motion.div>
+      </div>
     ),
     gearSection: <GearSection />,
     stepsProgress: <StepsProgress items={catalogItems} />,
@@ -388,16 +484,15 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
     howItWorks: <HowItWorksSection />,
     investSection: <InvestSection onDwellTime={(seconds) => tracker.trackSectionDwell("investSection", seconds)} />,
     faq: <FaqSection />,
-  }), [catalogItems, mapOverview, isCatalogLoading, vibeProfile, tracker, y, handleHeroModeChange, heroPanels, activeHeroPanel, heroMode]);
+  }), [catalogItems, mapOverview, isCatalogLoading, heroMode, vibeProfile, tracker, y, handleHeroModeChange, heroPanels]);
 
   // ══════════════════════════════════════════════════════
   // DECLARATIVE SECTION RENDERING
-  //
-  // FIX: Hero excluded from dynamic sections (was fragile index filter)
   // ══════════════════════════════════════════════════════
   const renderedSections = useMemo(() => {
     return experience.sectionOrder
-      .filter((id) => id !== "hero" && sectionMap[id] !== undefined)
+      .filter((id) => id !== "hero")          // hero rendered separately above
+      .filter((id) => sectionMap[id] !== undefined)
       .map((id) => {
         const isFeatured = experience.featuredSections.includes(id);
         return (
@@ -417,7 +512,7 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
       <div className="pointer-events-none fixed inset-0 z-[-2] bg-[radial-gradient(circle_at_top,rgba(255,106,0,0.14),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(119,0,255,0.10),transparent_42%)]" />
       <div className="pointer-events-none fixed inset-0 z-[-3] bg-[linear-gradient(to_bottom,rgba(0,0,0,0.45),transparent_35%)]" />
 
-      {/* Hero is always first — rendered directly, not in the container */}
+      {/* Hero is always first */}
       {sectionMap.hero}
 
       {/* Dynamic sections — ordered and filtered by experience config */}
