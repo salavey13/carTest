@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FranchizeCrewVM } from "../actions";
+import { toInternalHref } from "../lib/navigation";
 import { crewPaletteForSurface } from "../lib/theme";
 
 interface HeaderMenuProps {
@@ -115,11 +116,36 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
 
         <div className="space-y-2">
           {crew.header.menuLinks.map((link) => {
-            const isActive = activePath === link.href;
+            const internalHref = toInternalHref(link.href);
+            const normalizedHref = internalHref ?? link.href;
+            const isActive = activePath === normalizedHref;
+            const linkClassName = `w-full text-left block rounded-xl border px-4 py-3 text-sm no-underline transition cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--header-menu-accent)] ${
+              isActive
+                ? "border-[var(--header-menu-accent)] text-[var(--header-menu-accent)]"
+                : "border-[var(--header-menu-border)] text-[var(--header-menu-text)]"
+            }`;
+
+            if (internalHref === null) {
+              return (
+                <a
+                  key={`${link.href}-${link.label}`}
+                  href={link.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => onOpenChange(false)}
+                  className={linkClassName}
+                  style={{ textDecoration: "none" }}
+                  aria-label={`${link.label} (откроется в новой вкладке)`}
+                >
+                  {link.label}
+                </a>
+              );
+            }
+
             return (
               <Link
                 key={`${link.href}-${link.label}`}
-                href={link.href}
+                href={internalHref}
                 onClick={(e) => {
                   // ── FIX v6: Always close menu + let Link navigate ──
                   // v5 tried: "don't close menu for regular links, let pathname
@@ -137,19 +163,15 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
                   // batch, so they don't conflict.
                   //
                   // For hash links, prevent default and scroll manually.
-                  if (link.href.startsWith("#")) {
+                  if (internalHref.startsWith("#")) {
                     e.preventDefault();
-                    const target = document.querySelector(link.href);
+                    const target = document.querySelector(internalHref);
                     target?.scrollIntoView({ behavior: "smooth", block: "start" });
                   }
                   onOpenChange(false);
                 }}
                 aria-current={isActive ? "page" : undefined}
-                className={`w-full text-left block rounded-xl border px-4 py-3 text-sm no-underline transition cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--header-menu-accent)] ${
-                  isActive
-                    ? "border-[var(--header-menu-accent)] text-[var(--header-menu-accent)]"
-                    : "border-[var(--header-menu-border)] text-[var(--header-menu-text)]"
-                }`}
+                className={linkClassName}
                 style={{ textDecoration: "none" }}
               >
                 {link.label}
