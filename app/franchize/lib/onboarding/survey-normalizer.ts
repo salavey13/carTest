@@ -87,10 +87,14 @@ const BEHAVIOR_DECAY_HALF_LIFE_DAYS = 60;
  * This is the PRIMARY segment driver.
  */
 const BIKE_STYLE_TO_SEGMENT: Array<{ keywords: string[]; segment: VipBikeSegment }> = [
-  { keywords: ["нео-ретро", "neo", "ретро", "харизма"], segment: "retro" },
-  { keywords: ["суперспорт", "спорт", "обтекател", "эмбриона"], segment: "sport" },
+  { keywords: ["нео-ретро электро", "фотогеничн", "стиль", "харизма"], segment: "retro" },
+  { keywords: ["электроспорт", "спорт", "быстрый", "мощный", "обтекаемый"], segment: "sport" },
+  { keywords: ["электроэндуро", "эндуро", "внедорож", "лёгкий"], segment: "electro" },
+  { keywords: ["электро-турист", "дальнобой", "багаж", "комфорт"], segment: "touring" },
+  // Legacy sportbike keywords (backward compatibility with old survey answers)
+  { keywords: ["суперспорт", "обтекател", "эмбриона"], segment: "sport" },
   { keywords: ["стритфайтер", "нейкед", "агрессивн"], segment: "sport" },
-  { keywords: ["спорт-турист", "мощность и комфорт", "тур"], segment: "touring" },
+  { keywords: ["нео-ретро", "neo", "ретро"], segment: "retro" },
   { keywords: ["электро", "электр", "electro", "enduro"], segment: "electro" },
 ];
 
@@ -106,11 +110,11 @@ const PURPOSE_TO_INTENT: Array<{ keywords: string[]; intent: VipBikeIntent }> = 
   // Explicit purchase signals
   { keywords: ["покупк", "купить", "сво"], intent: "buy" },
   // Explicit rental/try signals
-  { keywords: ["прокат", "аренд"], intent: "rent" },
+  { keywords: ["прокат", "аренд", "прокатить", "понять", "стоит ли покупать"], intent: "rent" },
   // Community signals
   { keywords: ["групп", "карт", "вместе", "компани", "друз"], intent: "community" },
   // Exploration signals
-  { keywords: ["загород", "извилист", "маршрут"], intent: "explore" },
+  { keywords: ["загород", "маршрут", "извилист"], intent: "explore" },
 ];
 
 /**
@@ -118,9 +122,12 @@ const PURPOSE_TO_INTENT: Array<{ keywords: string[]; intent: VipBikeIntent }> = 
  * Riding LOCATION drives WHAT kind of bike, not WHY they're here.
  */
 const PURPOSE_TO_SEGMENT: Array<{ keywords: string[]; segment: VipBikeSegment }> = [
-  { keywords: ["город", "между рядами"], segment: "urban" },
+  { keywords: ["город", "коммутика", "городск"], segment: "urban" },
+  { keywords: ["бездорож", "эндуро"], segment: "electro" },
+  { keywords: ["дальн", "загород", "маршрут"], segment: "touring" },
   { keywords: ["трек", "гоночн"], segment: "sport" },
-  { keywords: ["дальн", "загород"], segment: "touring" },
+  // Legacy keywords (backward compatibility)
+  { keywords: ["между рядами"], segment: "urban" },
   { keywords: ["групп", "карт"], segment: "mixed" },
 ];
 
@@ -133,10 +140,14 @@ const PURPOSE_TO_SEGMENT: Array<{ keywords: string[]; segment: VipBikeSegment }>
  * Only explicit purchase/rent keywords should drive intent from priority.
  */
 const PRIORITY_TO_SEGMENT: Array<{ keywords: string[]; segment: VipBikeSegment }> = [
-  { keywords: ["ускорен", "адреналин", "скорость"], segment: "sport" },
+  { keywords: ["динамик", "ускорен", "скорость", "мощь"], segment: "sport" },
+  { keywords: ["запас хода", "автономн", "дальнобой"], segment: "touring" },
+  { keywords: ["внешн", "вниман", "стиль", "фотогеничн"], segment: "retro" },
+  { keywords: ["комфорт", "тишина", "посадк"], segment: "touring" },
+  // Legacy keywords (backward compatibility)
+  { keywords: ["адреналин"], segment: "sport" },
   { keywords: ["управля", "маневр", "остр"], segment: "sport" },
-  { keywords: ["внешн", "вниман", "стиль", "дорог"], segment: "retro" },
-  { keywords: ["удобств", "технолог", "комфорт"], segment: "touring" },
+  { keywords: ["удобств", "технолог"], segment: "touring" },
 ];
 
 /**
