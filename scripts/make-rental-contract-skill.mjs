@@ -23,7 +23,7 @@ function renderTemplateWithVars(template, vars) {
 function renderHtmlTemplateAdapterLegacy(htmlTemplate, vars) {
   const renderedHtml = renderTemplateWithVars(htmlTemplate, vars);
   return renderedHtml
-    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\s*br\s*\/?\/>/gi, '\n')
     .replace(/<\s*\/p\s*>/gi, '\n\n')
     .replace(/<\s*\/div\s*>/gi, '\n')
     .replace(/<[^>]+>/g, '')
@@ -219,6 +219,9 @@ const vars = {
   bike_year: bike.specs?.year || bike.specs?.production_year || 'уточняется',
   bike_engine_cc: bike.specs?.engine_cc || bike.specs?.displacement_cc || '0',
   bike_power_hp: bike.specs?.power_hp || bike.specs?.max_power_hp || '0',
+  bike_power_kw: bike.specs?.power_kw || bike.specs?.nominal_power_kw || '0',
+  bike_max_speed: bike.specs?.max_speed || bike.specs?.top_speed_kmh || 'уточняется',
+  bike_battery: bike.specs?.battery || bike.specs?.battery_type_capacity || 'уточняется',
   rent_start_time: arg('startTime', phraseSchedule.startTime || '18:00'), rent_start_date: startDate,
   rent_end_time: arg('endTime', phraseSchedule.endTime || '10:00'), rent_end_date: endDate,
   daily_price_rub: arg('dailyPrice','10000'), subtotal_rub: arg('subtotal','20000'), deposit_rub: arg('deposit','20000'),
