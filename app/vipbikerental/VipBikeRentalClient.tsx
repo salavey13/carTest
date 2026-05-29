@@ -368,7 +368,11 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
         onHeroModeChange={handleHeroModeChange}
       />
     ),
-    bikeShowcase: <motion.section style={{ y }} className="relative"><BikeShowcase /></motion.section>,
+    bikeShowcase: (
+      <motion.section style={{ y }} className="relative w-full">
+        <BikeShowcase edgeToEdge />
+      </motion.section>
+    ),
     conversionPilot: <ConversionPilot items={catalogItems} overview={mapOverview} isCatalogLoading={isCatalogLoading} />,
     electroShowcase: (
       <motion.div onViewportEnter={() => tracker.trackViewCategory("electro")}>
@@ -400,8 +404,16 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
       .filter((id) => id !== "hero" && sectionMap[id] !== undefined)
       .map((id) => {
         const isFeatured = experience.featuredSections.includes(id);
+        const isFullBleed = id === "bikeShowcase";
+
         return (
-          <div key={id} className={cn(isFeatured && "ring-2 ring-brand-yellow/20 rounded-2xl")}>
+          <div
+            key={id}
+            className={cn(
+              isFullBleed && "relative left-1/2 w-screen -translate-x-1/2",
+              isFeatured && !isFullBleed && "ring-2 ring-brand-yellow/20 rounded-2xl",
+            )}
+          >
             {sectionMap[id]}
           </div>
         );

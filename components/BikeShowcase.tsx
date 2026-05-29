@@ -9,6 +9,7 @@ import Autoplay from "embla-carousel-autoplay";
 import { Button } from "@/components/ui/button";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 type ShowcaseBike = {
   name: string;
@@ -42,12 +43,21 @@ const bikes: ShowcaseBike[] = [
 
 const options: EmblaOptionsType = { loop: true };
 
-export function BikeShowcase() {
+type BikeShowcaseProps = {
+  edgeToEdge?: boolean;
+  className?: string;
+};
+
+export function BikeShowcase({ edgeToEdge = false, className }: BikeShowcaseProps) {
   const [emblaRef] = useEmblaCarousel(options, [Autoplay({ delay: 5000 })]);
 
   return (
     <section
-      className="relative h-[46vh] min-h-[360px] w-full overflow-hidden border-y border-white/10 md:h-[54vh]"
+      className={cn(
+        "relative h-[46vh] min-h-[360px] w-full overflow-hidden md:h-[54vh]",
+        edgeToEdge ? "border-y-0" : "border-y border-white/10",
+        className,
+      )}
       ref={emblaRef}
     >
       <div className="flex h-full">
