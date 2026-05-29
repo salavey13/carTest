@@ -49,6 +49,16 @@ This root file stays intentionally compact so operators and agents can load it q
 ## 2) Mini execution diary
 
 
+
+### 2026-05-29 — Telegram buy share button repair
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-29T00:00:00Z
+- `owner`: codex
+- `notes`: Executed explicit operator scope: repaired the `/franchize/{slug}/market/{bike_id}/buy` share CTA by routing the button through Telegram's `t.me/share/url` chat picker first instead of inline-query mode, and added native share plus clipboard/popup fallbacks so the button gives visible recovery feedback when a Telegram client blocks opening.
+- `next_step`: Smoke `/franchize/vip-bike/market/<bike_id>/buy` inside Telegram WebApp and confirm the button opens chat selection with the `buy_<bikeId>` WebApp link.
+- `risks`: Final confirmation still depends on a live Telegram client because local browser smoke cannot emulate Telegram's native share bridge.
+
 ### 2026-05-14 — Telegram buy print/share capability polish
 
 - `status`: ready_for_pr
