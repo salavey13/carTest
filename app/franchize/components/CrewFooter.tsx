@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ChevronRight, MapPin, Phone, Send } from "lucide-react";
 import type { FranchizeCrewVM } from "../actions";
-import { isExternalHref } from "../lib/navigation";
+import { toInternalHref } from "../lib/navigation";
 import { readablePaletteTextOnColor, withAlpha } from "../lib/theme";
 
 interface CrewFooterProps {
@@ -61,13 +61,13 @@ export function CrewFooter({ crew }: CrewFooterProps) {
           </h3>
           <ul className="mt-3 space-y-1 text-sm">
             {crew.header.menuLinks.map((link) => {
-              const isExternal = isExternalHref(link.href);
+              const internalHref = toInternalHref(link.href);
               return (
                 <li
                   key={`${link.href}-${link.label}`}
                   className="border-b border-[var(--footer-border)]"
                 >
-                  {isExternal ? (
+                  {internalHref === null ? (
                     <a
                       href={link.href}
                       className="flex items-center gap-2 py-2 transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
@@ -80,7 +80,7 @@ export function CrewFooter({ crew }: CrewFooterProps) {
                     </a>
                   ) : (
                     <Link
-                      href={link.href}
+                      href={internalHref}
                       className="flex items-center gap-2 py-2 hover:opacity-90 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                     >
                       <ChevronRight className="h-4 w-4" />
