@@ -199,6 +199,7 @@ if (!startDate || !endDate) failStage('rental_dates', 'missing_rental_dates', { 
 
 // ── Determine bike type: electric vs ICE ────────────────────────────
 const isElectric = bike.type === 'ebike'
+  || /electric/i.test(String(bike.specs?.type || ''))
   || /электро|electric|e-bike|ebike/i.test(String(bike.specs?.fuel_type || ''))
   || (bike.specs?.power_kw && Number(bike.specs.power_kw) > 0 && !bike.specs?.engine_cc)
   || (bike.specs?.battery && !bike.specs?.engine_cc);
@@ -258,11 +259,18 @@ if (startDP && endDP) {
 const rentalDays = rentalHours > 0 ? Math.max(1, Math.ceil(rentalHours / 24)) : 1;
 const isHourlyRental = rentalHours > 0 && rentalHours < 24;
 
-// Pricing: prefer bike.specs values, fall back to args, fall back to defaults
-const bikeDailyPrice = Number(bike.specs?.price_rub) > 0 ? String(bike.specs.price_rub) : arg('dailyPrice', '10000');
-const bikeHourlyPrice = Number(bike.specs?.price_per_hour) > 0 ? String(bike.specs.price_per_hour) : arg('hourlyPrice', String(Math.round(Number(bikeDailyPrice) / 8)));
+// Pricing: prefer rental-specific specs, fall back to args, fall back to defaults
+// NOTE: price_rub is SALE price, NOT daily rental price. Use dailyPrice / rent_weekday for rental.
+const bikeDailyPrice = Number(bike.specs?.dailyPrice) > 0 ? String(bike.specs.dailyPrice)
+  : Number(bike.specs?.rent_weekday) > 0 ? String(bike.specs.rent_weekday)
+  : arg('dailyPrice', '10000');
+const bikeHourlyPrice = Number(bike.specs?.price_per_hour) > 0 ? String(bike.specs.price_per_hour)
+  : arg('hourlyPrice', String(Math.round(Number(bikeDailyPrice) / 8)));
 const bikeDeposit = Number(bike.specs?.deposit_rub) > 0 ? String(bike.specs.deposit_rub) : arg('deposit', '20000');
-const bikeValueRub = Number(bike.specs?.value_rub) > 0 ? String(bike.specs.value_rub) : arg('bikeValue', '850000');
+// Bike value for loss/total-loss compensation = sale price or market price
+const bikeValueRub = Number(bike.specs?.sale_price) > 0 ? String(bike.specs.sale_price)
+  : Number(bike.specs?.price_rub) > 0 ? String(bike.specs.price_rub)
+  : arg('bikeValue', '850000');
 
 let subtotal;
 if (isHourlyRental) {
