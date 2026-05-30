@@ -48,12 +48,17 @@ This root file stays intentionally compact so operators and agents can load it q
 
 ## 2) Mini execution diary
 
-
-### 2026-05-29 — Main catalog bike card 9:21 visual polish
+### 2026-05-29 — VIPBikeRental Bike Showcase full-bleed restore
 
 - `status`: ready_for_pr
 - `updated_at`: 2026-05-29T00:00:00Z
 - `owner`: codex
+- `notes`: Executed explicit operator scope: restored the dynamic VIPBikeRental `bikeShowcase` section to viewport-width rendering, removed featured-section ring/rounded chrome for that block, and let the showcase opt out of its own divider border when embedded edge-to-edge.
+- `next_step`: Smoke `/vipbikerental` and `/franchize/vip-bike` on a narrow mobile viewport to confirm the showcase touches both screen edges and CTA remains tappable.
+- `risks`: Visual verification still depends on local Next runtime and Supabase-backed catalog hydration; the static showcase images remain external Supabase Storage URLs.
+
+### 2026-05-29 — Main catalog bike card 9:21 visual polish
+
 - `notes`: Executed explicit operator scope for franchize/vip-bike catalog cards: made the main catalog bike cards taller at 9:21 while keeping the bike photo itself pinned to a top 9:16 crop and preserving a bottom-to-photo gradient for readable content.
 - `next_step`: Smoke `/franchize/vip-bike` on mobile width and confirm the taller card rhythm feels right against real bike photos.
 - `risks`: Visual verification depends on local Supabase/catalog hydration or a reachable preview with seeded `vip-bike` data.
