@@ -197,6 +197,89 @@ if (!renterPassportSeries || !renterPassportNumber) failStage('renter_parse', 'm
 if (!renterLicenseSeries || !renterLicenseNumber) failStage('renter_parse', 'missing_driver_license_data');
 if (!startDate || !endDate) failStage('rental_dates', 'missing_rental_dates', { hint: 'Pass --startDate/--endDate or include explicit dates in phrase.' });
 
+// ── Determine bike type: electric vs ICE ────────────────────────────
+const isElectric = bike.type === 'ebike'
+  || /electric/i.test(String(bike.specs?.type || ''))
+  || /электро|electric|e-bike|ebike/i.test(String(bike.specs?.fuel_type || ''))
+  || (bike.specs?.power_kw && Number(bike.specs.power_kw) > 0 && !bike.specs?.engine_cc)
+  || (bike.specs?.battery && !bike.specs?.engine_cc);
+
+// Vehicle type labels for template
+const bike_vehicle_type_label   = isElectric ? 'ЭЛЕКТРОМОТОЦИКЛА' : 'МОТОЦИКЛА';
+const bike_vehicle_type_accusative = isElectric ? 'электромотоцикл' : 'мотоцикл';
+const bike_vehicle_type_genitive  = isElectric ? 'электромотоцикла' : 'мотоцикла';
+
+// Engine spec lines: 3 lines, content depends on ICE vs electro
+// For electro: power_kw, max_speed, battery
+// For ICE: engine_cc + power_hp, max_speed, (blank — no battery)
+const power_kw  = bike.specs?.power_kw || bike.specs?.nominal_power_kw || '';
+const power_hp  = bike.specs?.power_hp || bike.specs?.max_power_hp || '';
+const engine_cc = bike.specs?.engine_cc || bike.specs?.displacement_cc || '';
+const maxSpeed  = bike.specs?.max_speed || bike.specs?.top_speed_kmh || '';
+const battery   = bike.specs?.battery || bike.specs?.battery_type_capacity || '';
+
+let bike_engine_spec_line_1, bike_engine_spec_line_2, bike_engine_spec_line_3;
+if (isElectric) {
+  bike_engine_spec_line_1 = power_kw  ? `мощность двигателя (номинальная) ${power_kw} кВт` : '';
+  bike_engine_spec_line_2 = maxSpeed  ? `максимальная конструктивная скорость ${maxSpeed} км/ч` : '';
+  bike_engine_spec_line_3 = battery   ? `аккумулятор: тип/ёмкость ${battery}` : '';
+} else {
+  // ICE: show engine displacement + power in HP on line 1, max speed on line 2, blank line 3
+  const ccPart  = engine_cc ? `рабочий объем ${engine_cc} куб. см` : '';
+  const hpPart  = power_hp  ? `мощность ${power_hp} л.с.` : '';
+  bike_engine_spec_line_1 = [ccPart, hpPart].filter(Boolean).join(', ') || '';
+  bike_engine_spec_line_2 = maxSpeed ? `максимальная конструктивная скорость ${maxSpeed} км/ч` : '';
+  bike_engine_spec_line_3 = ''; // No battery for ICE
+}
+
+// ── Calculate rental duration and pricing ───────────────────────────
+const startTimeArg = arg('startTime', phraseSchedule.startTime || '18:00');
+const endTimeArg   = arg('endTime', phraseSchedule.endTime || '10:00');
+
+// Parse dates to compute duration
+function parseRuDateParts(dateStr) {
+  const m = String(dateStr).match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!m) return null;
+  return { d: Number(m[1]), mo: Number(m[2])-1, y: Number(m[3]) };
+}
+function parseTimeToMinutes(timeStr) {
+  const m = String(timeStr).match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return 0;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+const startDP = parseRuDateParts(startDate);
+const endDP   = parseRuDateParts(endDate);
+let rentalHours = 0;
+if (startDP && endDP) {
+  const startMin = new Date(startDP.y, startDP.mo, startDP.d, 0, 0, 0).getTime() / 60000 + parseTimeToMinutes(startTimeArg);
+  const endMin   = new Date(endDP.y, endDP.mo, endDP.d, 0, 0, 0).getTime() / 60000 + parseTimeToMinutes(endTimeArg);
+  rentalHours = Math.max(0, Math.round((endMin - startMin) / 60 * 10) / 10); // round to 0.1h
+}
+const rentalDays = rentalHours > 0 ? Math.max(1, Math.ceil(rentalHours / 24)) : 1;
+const isHourlyRental = rentalHours > 0 && rentalHours < 24;
+
+// Pricing: prefer rental-specific specs, fall back to args, fall back to defaults
+// NOTE: price_rub is SALE price, NOT daily rental price. Use dailyPrice / rent_weekday for rental.
+const bikeDailyPrice = Number(bike.specs?.dailyPrice) > 0 ? String(bike.specs.dailyPrice)
+  : Number(bike.specs?.rent_weekday) > 0 ? String(bike.specs.rent_weekday)
+  : arg('dailyPrice', '10000');
+const bikeHourlyPrice = Number(bike.specs?.price_per_hour) > 0 ? String(bike.specs.price_per_hour)
+  : arg('hourlyPrice', String(Math.round(Number(bikeDailyPrice) / 8)));
+const bikeDeposit = Number(bike.specs?.deposit_rub) > 0 ? String(bike.specs.deposit_rub) : arg('deposit', '20000');
+// Bike value for loss/total-loss compensation = sale price or market price
+const bikeValueRub = Number(bike.specs?.sale_price) > 0 ? String(bike.specs.sale_price)
+  : Number(bike.specs?.price_rub) > 0 ? String(bike.specs.price_rub)
+  : arg('bikeValue', '850000');
+
+let subtotal;
+if (isHourlyRental) {
+  subtotal = Number(bikeHourlyPrice) * rentalHours;
+} else {
+  subtotal = Number(bikeDailyPrice) * rentalDays;
+}
+const subtotalRounded = Math.round(subtotal);
+
 const vars = {
   contract_number: `${now.getDate()}.${now.getMonth()+1}/${bike.id}`,
   day: String(now.getDate()).padStart(2,'0'),
@@ -217,13 +300,43 @@ const vars = {
   bike_category: bike.specs?.category || bike.specs?.tp_category || 'A/L3',
   bike_color: bike.specs?.color || 'уточняется',
   bike_year: bike.specs?.year || bike.specs?.production_year || 'уточняется',
-  bike_engine_cc: bike.specs?.engine_cc || bike.specs?.displacement_cc || '0',
-  bike_power_hp: bike.specs?.power_hp || bike.specs?.max_power_hp || '0',
-  rent_start_time: arg('startTime', phraseSchedule.startTime || '18:00'), rent_start_date: startDate,
-  rent_end_time: arg('endTime', phraseSchedule.endTime || '10:00'), rent_end_date: endDate,
-  daily_price_rub: arg('dailyPrice','10000'), subtotal_rub: arg('subtotal','20000'), deposit_rub: arg('deposit','20000'),
-  included_mileage:'200', overage_rate:'35', included_km_per_day:'200', extra_km_fee_rub:'35', late_return_penalty_rub:'10000', late_return_penalty_max_days:'90', bike_value_rub:'850000', bike_value_words:'Восемьсот пятьдесят тысяч',
-  return_address:'г. Нижний Новгород, пл. Комсомольская 2', issuer_name:'Воробьев Р.В.', issuer_signatory:'Менеджер Мотосалона', issuer_representative:'ИП Воробьев Р.В.', signature_timestamp: now.toLocaleString('ru-RU'), signature_fingerprint:'offline-skill', renter_signature:'согласие через Telegram', bike_mileage: String(bike.specs?.mileage||''), equipment:'ключ(и) 1 шт.; шлем 1', damage_notes_at_delivery:'от даты начала аренды', damage_notes_at_return:'от даты возврата тс', battery_level_start:'100 %', battery_level_end:'____ %', media_links:'телефон', renter_passport_issue_date: passportJson.issueDate || '', renter_registration: passportJson.registration || '', damage_price_list:'мотоцикл в сборе / царапина на пластике / прочее по расчету', document_key:`rental-${bike.id}-${Date.now()}`
+  bike_engine_cc: engine_cc || '0',
+  bike_power_hp: power_hp || '0',
+  bike_power_kw: power_kw || '0',
+  bike_max_speed: maxSpeed || 'уточняется',
+  bike_battery: battery || (isElectric ? 'уточняется' : ''),
+  // Dynamic vehicle type labels
+  bike_vehicle_type_label,
+  bike_vehicle_type_accusative,
+  bike_vehicle_type_genitive,
+  // Dynamic engine spec lines (3 lines, ICE vs electro)
+  bike_engine_spec_line_1,
+  bike_engine_spec_line_2,
+  bike_engine_spec_line_3,
+  rent_start_time: startTimeArg, rent_start_date: startDate,
+  rent_end_time: endTimeArg, rent_end_date: endDate,
+  // Pricing: hourly + daily + computed subtotal
+  hourly_price_rub: bikeHourlyPrice,
+  daily_price_rub: bikeDailyPrice,
+  subtotal_rub: arg('subtotal', String(subtotalRounded)),
+  deposit_rub: bikeDeposit,
+  included_mileage:'200', overage_rate:'35', included_km_per_day:'200', extra_km_fee_rub:'35',
+  late_return_penalty_rub: arg('latePenalty','10000'),
+  late_return_penalty_max_days: arg('latePenaltyMaxDays','90'),
+  bike_value_rub: bikeValueRub,
+  bike_value_words: arg('bikeValueWords',''),
+  return_address:'г. Нижний Новгород, пл. Комсомольская 2',
+  lessor_address: arg('lessorAddress','г. Нижний Новгород'),
+  issuer_name:'Воробьев Р.В.', issuer_signatory:'Менеджер Мотосалона', issuer_representative:'ИП Воробьев Р.В.',
+  signature_timestamp: now.toLocaleString('ru-RU'), signature_fingerprint:'offline-skill', renter_signature:'согласие через Telegram',
+  bike_mileage: String(bike.specs?.mileage||''),
+  equipment:'ключ(и) 1 шт.; шлем 1',
+  damage_notes_at_delivery:'от даты начала аренды', damage_notes_at_return:'от даты возврата тс',
+  battery_level_start:'100 %', battery_level_end:'____ %',
+  media_links:'телефон',
+  renter_passport_issue_date: passportJson.issueDate || '', renter_registration: passportJson.registration || '',
+  damage_price_list:'мотоцикл в сборе / царапина на пластике / прочее по расчету',
+  document_key:`rental-${bike.id}-${Date.now()}`
 };
 
 // ── Build Document ──────────────────────────────────────────────────
@@ -284,13 +397,17 @@ if (RENTAL_DOC_TEMPLATE_MODE === 'html') {
 const buf = await Packer.toBuffer(doc);
 const originalSha256 = createHash('sha256').update(buf).digest('hex');
 
+// Build descriptive filename: rental-contract-Make-Model-DD.MM.YYYY.docx
+const safeName = s => String(s || '').replace(/[^a-zA-Zа-яА-Я0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+const docFileName = `rental-contract-${safeName(bike.make)}-${safeName(bike.model)}-${startDate}.docx`;
+
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const telegramUrl = `https://api.telegram.org/bot${token}/sendDocument`;
 let json;
 try {
   const form = new FormData();
   form.append('chat_id', telegramChatId);
-  form.append('document', new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), `rental-contract-${bikeId}.docx`);
+  form.append('document', new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), docFileName);
   const res = await fetch(telegramUrl, {method:'POST', body: form});
   json = await res.json();
 } catch (networkError) {
@@ -302,7 +419,7 @@ try {
 }
 if (!json.ok) failStage('telegram_delivery', 'telegram_send_failed', { telegram: json });
 
-const result = {ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id, contractKey: vars.document_key, templateMode: RENTAL_DOC_TEMPLATE_MODE};
+const result = {ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id, contractKey: vars.document_key, templateMode: RENTAL_DOC_TEMPLATE_MODE, docFileName, isElectric, isHourlyRental, rentalHours, rentalDays, subtotal: vars.subtotal_rub};
 const saveMetadata = arg('saveMetadata', '0') !== '0';
 const metadataTable = arg('metadataTable', 'rental_contract_artifacts');
 if (saveMetadata) {
