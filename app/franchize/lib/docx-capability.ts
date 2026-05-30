@@ -53,7 +53,7 @@ export async function buildFranchizeDocxFromTemplate(input: BuildFranchizeDocxIn
     }
   }
 
-  const templateMode = input.templateMode ?? "md";
+  const templateMode = input.templateMode ?? "html";
   let bytes: Uint8Array;
   let renderedMarkdown: string;
   let renderedHtml: string | undefined;
