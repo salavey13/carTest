@@ -58,6 +58,11 @@ This root file stays intentionally compact so operators and agents can load it q
 - `next_step`: Smoke `/franchize/vip-bike` on mobile width and confirm the taller card rhythm feels right against real bike photos.
 - `risks`: Visual verification depends on local Supabase/catalog hydration or a reachable preview with seeded `vip-bike` data.
 
+### 2026-05-29 — Telegram buy share button repair
+
+- `notes`: Executed explicit operator scope: repaired the `/franchize/{slug}/market/{bike_id}/buy` share CTA by routing the button through Telegram's `t.me/share/url` chat picker first instead of inline-query mode, and added native share plus clipboard/popup fallbacks so the button gives visible recovery feedback when a Telegram client blocks opening.
+- `next_step`: Smoke `/franchize/vip-bike/market/<bike_id>/buy` inside Telegram WebApp and confirm the button opens chat selection with the `buy_<bikeId>` WebApp link.
+- `risks`: Final confirmation still depends on a live Telegram client because local browser smoke cannot emulate Telegram's native share bridge.
 
 ### 2026-05-14 — Telegram buy print/share capability polish
 

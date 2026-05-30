@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Battery,
@@ -528,26 +528,68 @@ export function SaleBikeLandingClient({
   };
 
 
-  const handleShareBuyLink = () => {
-    const shareText = `Карточка ${item.title}: ${buyWebAppHref}`;
+  const handleShareBuyLink = useCallback(async () => {
+    const shareTitle = `Карточка ${item.title}`;
+    const shareText = `${shareTitle}: ${buyWebAppHref}`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(buyWebAppHref)}&text=${encodeURIComponent(shareTitle)}`;
 
-    if (tg?.switchInlineQuery) {
-      tg.switchInlineQuery(shareText, ["users", "groups", "channels"]);
-      return;
+    tg?.HapticFeedback?.impactOccurred?.("light");
+
+    const openTelegramShare = () => {
+      if (tg?.openTelegramLink) {
+        tg.openTelegramLink(shareUrl);
+        return true;
+      }
+
+      if (tg?.openLink) {
+        tg.openLink(shareUrl);
+        return true;
+      }
+
+      if (typeof window !== "undefined") {
+        window.open(shareUrl, "_blank", "noopener,noreferrer");
+        return true;
+      }
+
+      return false;
+    };
+
+    try {
+      // Native `switchInlineQuery` silently depends on bot inline-mode support,
+      // so prefer Telegram's share URL first: it opens the chat picker for any bot.
+      if (openTelegramShare()) {
+        setCartMessage("Открыли Telegram-отправку карточки. Выберите чат для ссылки.");
+        return;
+      }
+    } catch (error) {
+      console.warn("buy/share telegram link failed", error);
     }
 
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(buyWebAppHref)}&text=${encodeURIComponent(`Карточка ${item.title}`)}`;
-    if (tg?.openTelegramLink) {
-      tg.openTelegramLink(shareUrl);
-      return;
-    }
-    if (tg?.openLink) {
-      tg.openLink(shareUrl);
-      return;
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ title: shareTitle, text: shareText, url: buyWebAppHref });
+        setCartMessage("Ссылка на карточку отправлена через системное меню.");
+        return;
+      }
+    } catch (error) {
+      console.warn("buy/share native menu failed", error);
     }
 
-    window.open(shareUrl, "_blank", "noopener,noreferrer");
-  };
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareText);
+        setCartMessage("Ссылка скопирована. Вставьте её в нужный Telegram-чат.");
+        tg?.showPopup?.({
+          title: "Ссылка скопирована",
+          message: "Вставьте её в нужный Telegram-чат.",
+          buttons: [{ type: "ok" }],
+        });
+      }
+    } catch (error) {
+      console.warn("buy/share clipboard fallback failed", error);
+      setCartMessage("Не удалось открыть отправку. Скопируйте ссылку из адресной строки.");
+    }
+  }, [buyWebAppHref, item.title, tg]);
 
   const handlePrintBuySheet = async () => {
     setPrintState("loading");
