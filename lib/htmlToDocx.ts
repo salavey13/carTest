@@ -180,12 +180,47 @@ function buildTable($table: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): Table 
     ? $table.children("tr")
     : $table.children("thead, tbody, tfoot").children("tr");
 
+  // ── Determine column count and compute proportional widths ──
+  const firstRowCells = $rows.first().children("td, th");
+  const colCount = firstRowCells.length || 1;
+
+  // Table width from style (default = page width minus margins ≈ 9000 twip for A4)
+  const tableStyle = parseStyle($table.attr("style"));
+  const tableWidthTwip = cssLengthToTwip(tableStyle["width"]) || 9000;
+
+  // Collect explicit column widths from first row; fall back to equal division
+  const colWidths: number[] = [];
+  firstRowCells.each((__, cellNode) => {
+    const $cell = $(cellNode);
+    const cellStyle = parseStyle($cell.attr("style"));
+    const w = cellStyle["width"];
+    if (w) {
+      // Handle percentage widths
+      const pct = String(w).match(/^([\d.]+)%$/);
+      if (pct) {
+        colWidths.push(Math.round(tableWidthTwip * parseFloat(pct[1]) / 100));
+      } else {
+        const twip = cssLengthToTwip(w);
+        colWidths.push(twip || Math.round(tableWidthTwip / colCount));
+      }
+    } else {
+      colWidths.push(Math.round(tableWidthTwip / colCount));
+    }
+  });
+
+  // Normalize widths: ensure they sum to tableWidthTwip
+  const totalW = colWidths.reduce((a, b) => a + b, 0);
+  if (totalW > 0 && Math.abs(totalW - tableWidthTwip) > 10) {
+    const scale = tableWidthTwip / totalW;
+    for (let i = 0; i < colWidths.length; i++) colWidths[i] = Math.round(colWidths[i] * scale);
+  }
+
   $rows.each((_, trNode) => {
     const $tr = $(trNode);
     const rowStyle = parseStyle($tr.attr("style"));
     const cells: TableCell[] = [];
 
-    $tr.children("td, th").each((__, cellNode) => {
+    $tr.children("td, th").each((colIdx, cellNode) => {
       const $cell = $(cellNode);
       const cellStyle = parseStyle($cell.attr("style"));
       const isHeader = (cellNode as any).tagName?.toLowerCase() === "th";
@@ -225,9 +260,10 @@ function buildTable($table: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): Table 
         );
       }
 
-      const widthTwip = cssLengthToTwip(cellStyle["width"]);
       const cellOpts: any = { children: cellParagraphs, borders };
-      if (widthTwip) cellOpts.width = { size: widthTwip, type: WidthType.DXA };
+      // Always set explicit column width to prevent vertical-letter rendering bug
+      const colW = colWidths[colIdx] || Math.round(tableWidthTwip / colCount);
+      cellOpts.width = { size: colW, type: WidthType.DXA };
 
       cells.push(new TableCell(cellOpts));
     });
@@ -236,7 +272,7 @@ function buildTable($table: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): Table 
   });
 
   if (!rows.length) return null;
-  return new Table({ rows });
+  return new Table({ rows, width: { size: tableWidthTwip, type: WidthType.DXA } });
 }
 
 // ─── Paragraph builder ──────────────────────────────────────────────
@@ -245,8 +281,10 @@ function buildParagraph($el: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): Parag
   const style = parseStyle($el.attr("style"));
   const pOpts: any = {};
 
+  // Default to JUSTIFIED for body paragraphs (matches GOST legal doc standard)
+  // Only override for explicit text-align in style
   const align = mapAlign(style);
-  if (align) pOpts.alignment = align;
+  pOpts.alignment = align || AlignmentType.JUSTIFIED;
 
   if (style["text-indent"]) {
     const twip = cssLengthToTwip(style["text-indent"]);
