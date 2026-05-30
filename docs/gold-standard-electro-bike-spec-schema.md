@@ -110,8 +110,8 @@ Every `specs` JSONB object **MUST** include a `spec_labels` sub-object that maps
 | `price_per_hour` | Аренда (час) | rent | ₽/час | asc | **Primary hourly rental rate.** Falls back to `dailyPrice / 8` if not set. Used when rental duration < 24h. |
 | `rent_weekday` | Аренда (будни) | rent | ₽/сутки | asc | Weekday-specific daily rate. Some bikes have different weekday/weekend pricing. |
 | `rent_weekend` | Аренда (выходные) | rent | ₽/сутки | asc | Weekend-specific daily rate. Typically 15–20% higher than weekday. |
-| `rent_weekday_hour` | Аренда (будни) | rent | ₽/ч | asc | Weekday hourly rate (for bikes rented primarily by the hour, e.g. Y-VOLT Surge V). |
-| `rent_weekend_hour` | Аренда (выходные) | rent | ₽/ч | asc | Weekend hourly rate. |
+| `rent_weekday_hour` | Аренда (будни, час) | rent | ₽/ч | asc | Weekday hourly rate (for bikes rented primarily by the hour, e.g. Y-VOLT Surge V). |
+| `rent_weekend_hour` | Аренда (выходные, час) | rent | ₽/ч | asc | Weekend hourly rate. |
 | `rent_price_label` | Аренда | rent | — | — | Human-readable label, e.g. "15 000 ₽/день" or "5 000 ₽/час (будни)". Used in UI cards. |
 
 #### Rental pricing priority (contract skill lookup order):
