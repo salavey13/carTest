@@ -116,17 +116,18 @@
 > **Complexity**: M
 > **Depends on**: Task C ✅
 
-- [ ] **Skill script** (`make-rental-contract-skill.mjs`):
-  - [ ] After successful DOCX generation + SHA256, insert row into `private.user_rental_secrets`
-  - [ ] Extract renter fields from the same data used to fill template variables
-  - [ ] Set `verification_status = 'verified'` (doc was just generated and sent)
-  - [ ] Set `template_version` from current template version constant
+- [x] **Skill script** (`make-rental-contract-skill.mjs`):
+  - [x] After successful DOCX generation + SHA256, insert row into `private.user_rental_secrets`
+  - [x] Extract renter fields from the same data used to fill template variables
+  - [x] Set `verification_status = 'verified'` (doc was just generated and sent)
+  - [x] Set `template_version` from current template version constant
 
-- [ ] **Web-app pipeline** (`buildFranchizeOrderDocAndNotify`):
-  - [ ] Same insert logic after successful doc generation
-  - [ ] Read renter data from `userSensitive` + payload fields
+- [x] **Web-app pipeline** (`buildFranchizeOrderDocAndNotify`):
+  - [x] Same insert logic after successful doc generation
+  - [x] Read renter data from `userSensitive` + payload fields
 
-- [ ] **Future preparation**: design insert to work for batch imports (digitize old docs workflow)
+- [x] **Future preparation**: design insert to work for batch imports (digitize old docs workflow)
+- [x] **Shared template version**: `CURRENT_RENTAL_TEMPLATE_VERSION` constant defined for contract save paths
 
 ---
 
@@ -250,11 +251,11 @@
 > **Complexity**: S
 > **Depends on**: nothing (bug fixes in existing code)
 
-- [ ] **Bug 1 — renter name fallback**: `metadata.renter_full_name` is null for web-app rentals → add fallback to `metadata.recipientName` + join `users` table for actual name
+- [x] **Bug 1 — renter name fallback**: `metadata.renter_full_name` is null for web-app rentals → add fallback to `metadata.recipientName` + join `users` table for actual name
   - Current code: `metadata.renter_full_name` → `metadata.recipientName` → `metadata.customerName` → `row.user_id`
   - Fix: also try `users.display_name` or `users.metadata.franchizeFormPrefill[slug].fullName` via user_id join
 
-- [ ] **Bug 2 — missing date fallback**: `agreed_start_date` / `requested_start_date` are null for payment-webhook rentals → add fallback to `metadata.rentalStartDate` / `metadata.rentalEndDate`
+- [x] **Bug 2 — missing date fallback**: `agreed_start_date` / `requested_start_date` are null for payment-webhook rentals → add fallback to `metadata.rentalStartDate` / `metadata.rentalEndDate`
   - Current code: `agreed_start_date` → `requested_start_date` → null
   - Fix: `agreed_start_date` → `requested_start_date` → `metadata.rentalStartDate` → null
 

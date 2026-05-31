@@ -14,6 +14,7 @@ import { cloneFranchizeContentBlocks, readFranchizeContentBlocks, type Franchize
 import { resolveFranchizeTheme, resolvePaletteByMode } from "@/app/franchize/lib/theme-resolver";
 import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context";
 import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
+import { CURRENT_RENTAL_TEMPLATE_VERSION } from "@/lib/rental-template-version";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 import {
   DEFAULT_AD_CARDS_TEXT,
@@ -1943,6 +1944,8 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       last_error: "",
     });
 
+    let sourceRentalId: string | null = null;
+
     if (flowType === "rental") {
       const { data: rentalRow, error: rentalLookupError } = await supabaseAdmin
         .from("rentals")
@@ -1966,6 +1969,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           documentKey: variables.document_key,
         });
       } else {
+        sourceRentalId = String(rentalRow.rental_id);
         const existingMetadata =
           rentalRow.metadata && typeof rentalRow.metadata === "object" ? (rentalRow.metadata as Record<string, unknown>) : {};
         const rentalScope = `rental:${rentalRow.rental_id}`;
@@ -1996,6 +2000,32 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           });
         }
       }
+    }
+
+    try {
+      const { saveUserRentalSecrets } = await import("@/app/lib/user-rental-secrets");
+      await saveUserRentalSecrets({
+        chat_id: payload.telegramUserId,
+        crew_slug: payload.slug,
+        doc_sha256: sha256,
+        renter_full_name: variables.renter_full_name,
+        renter_passport: variables.renter_passport,
+        renter_driver_license: variables.renter_driver_license,
+        renter_birth_date: variables.renter_birth_date,
+        renter_phone: variables.renter_phone,
+        renter_email: variables.renter_email,
+        renter_address: null,
+        source_doc_key: variables.document_key,
+        source_rental_id: sourceRentalId,
+        verification_status: "verified",
+        template_version: CURRENT_RENTAL_TEMPLATE_VERSION,
+      });
+    } catch (error) {
+      logger.error("[buildFranchizeOrderDocAndNotify] failed to save rental secrets", {
+        slug: payload.slug,
+        orderId: payload.orderId,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
     }
 
     return { renderedMarkdown, docFileName };
@@ -2238,7 +2268,7 @@ export async function getFranchizeSuccessfulRentals(input: unknown): Promise<{ s
 
   const { data, error } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id, user_id, vehicle_id, status, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date, created_at, metadata, vehicle:cars!inner(id, make, model, crew_id)")
+    .select("rental_id, user_id, vehicle_id, status, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date, created_at, metadata, vehicle:cars!inner(id, make, model, crew_id), user:users(user_id, full_name, username, metadata)")
     .eq("vehicle.crew_id", crew.id)
     .in("status", ["confirmed", "active", "completed"])
     .order("created_at", { ascending: false })
@@ -2250,27 +2280,49 @@ export async function getFranchizeSuccessfulRentals(input: unknown): Promise<{ s
     success: true,
     items: ((data ?? []) as UnknownRecord[]).map((row) => {
       const vehicle = (Array.isArray(row.vehicle) ? row.vehicle[0] : row.vehicle) as UnknownRecord | undefined;
+      const user = (Array.isArray(row.user) ? row.user[0] : row.user) as UnknownRecord | undefined;
       const metadata = (row.metadata && typeof row.metadata === "object" ? row.metadata : {}) as UnknownRecord;
+      const userMetadata = (user?.metadata && typeof user.metadata === "object" ? user.metadata : {}) as UnknownRecord;
+      const franchizeFormPrefill = (userMetadata.franchizeFormPrefill && typeof userMetadata.franchizeFormPrefill === "object"
+        ? userMetadata.franchizeFormPrefill
+        : {}) as UnknownRecord;
+      const slugPrefill = (franchizeFormPrefill[normalizeCrewSlug(slug)] && typeof franchizeFormPrefill[normalizeCrewSlug(slug)] === "object"
+        ? franchizeFormPrefill[normalizeCrewSlug(slug)]
+        : {}) as UnknownRecord;
       const verifier = (metadata.contract_verifier && typeof metadata.contract_verifier === "object" ? metadata.contract_verifier : {}) as UnknownRecord;
       const contractStatus = typeof verifier.status === "string" && verifier.status.trim() ? verifier.status.trim() : "none";
       const bikeName = `${typeof vehicle?.make === "string" ? vehicle.make : ""} ${typeof vehicle?.model === "string" ? vehicle.model : ""}`.trim();
+      const fallbackUserId = String(row.user_id ?? "").trim();
+      const renterNameCandidates = [
+        metadata.renter_full_name,
+        metadata.recipientName,
+        metadata.recipient,
+        metadata.customerName,
+        user?.full_name,
+        userMetadata.display_name,
+        slugPrefill.fullName,
+        user?.username,
+      ];
       const renterName =
-        typeof metadata.renter_full_name === "string" && metadata.renter_full_name.trim()
-          ? metadata.renter_full_name.trim()
-          : typeof metadata.recipientName === "string" && metadata.recipientName.trim()
-            ? metadata.recipientName.trim()
-            : typeof metadata.customerName === "string" && metadata.customerName.trim()
-              ? metadata.customerName.trim()
-              : String(row.user_id ?? "");
+        renterNameCandidates.find((value) => typeof value === "string" && value.trim()) as string | undefined;
+      const displayRenterName = renterName?.trim() || (fallbackUserId ? `Пользователь #${fallbackUserId}` : "");
+      const startDate = typeof row.agreed_start_date === "string" ? row.agreed_start_date
+        : typeof row.requested_start_date === "string" ? row.requested_start_date
+          : typeof metadata.rentalStartDate === "string" ? metadata.rentalStartDate
+            : null;
+      const endDate = typeof row.agreed_end_date === "string" ? row.agreed_end_date
+        : typeof row.requested_end_date === "string" ? row.requested_end_date
+          : typeof metadata.rentalEndDate === "string" ? metadata.rentalEndDate
+            : null;
 
       return {
         rentalId: String(row.rental_id ?? ""),
         status: String(row.status ?? ""),
         bikeId: String(row.vehicle_id ?? ""),
         bikeName: bikeName || String(row.vehicle_id ?? "Техника"),
-        renterName: renterName || "Арендатор не указан",
-        startDate: typeof row.agreed_start_date === "string" ? row.agreed_start_date : typeof row.requested_start_date === "string" ? row.requested_start_date : null,
-        endDate: typeof row.agreed_end_date === "string" ? row.agreed_end_date : typeof row.requested_end_date === "string" ? row.requested_end_date : null,
+        renterName: displayRenterName || "Арендатор не указан",
+        startDate,
+        endDate,
         createdAt: String(row.created_at ?? ""),
         contractStatus,
       };

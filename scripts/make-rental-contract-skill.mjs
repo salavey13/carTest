@@ -11,6 +11,19 @@ function arg(name, fallback = '') { const i = process.argv.indexOf(`--${name}`);
 const RENTAL_DOC_TEMPLATE_MODE = String(process.env.RENTAL_DOC_TEMPLATE_MODE || 'md').trim().toLowerCase();
 const RENTAL_DOC_BASELINE_TEMPLATE_PATH = 'docs/RENTAL_DEAL_TEMPLATE.md';
 const RENTAL_DOC_HTML_TEMPLATE_PATH = 'docs/RENTAL_DEAL_TEMPLATE.html';
+const RENTAL_TEMPLATE_VERSION_PATH = 'lib/rental-template-version.ts';
+
+function readCurrentRentalTemplateVersion() {
+  try {
+    const source = readFileSync(RENTAL_TEMPLATE_VERSION_PATH, 'utf8');
+    const match = source.match(/CURRENT_RENTAL_TEMPLATE_VERSION\s*=\s*(\d+)/);
+    return match ? Number(match[1]) : 1;
+  } catch {
+    return 1;
+  }
+}
+
+const CURRENT_RENTAL_TEMPLATE_VERSION = readCurrentRentalTemplateVersion();
 
 function renderTemplateWithVars(template, vars) {
   return template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_,k)=> String(vars[k] ?? ''));
@@ -103,7 +116,7 @@ const supabaseRestSelect = (from, to) => {
     throw new Error('Supabase env is missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
 
-  const url = `${baseUrl}/rest/v1/cars?select=id,make,model,specs,type&type=in.(bike,ebike)&offset=${from}&limit=${to - from + 1}`;
+  const url = `${baseUrl}/rest/v1/cars?select=id,make,model,specs,type,crew_id&type=in.(bike,ebike)&offset=${from}&limit=${to - from + 1}`;
   const curl = spawnSync('curl', ['-sS', url, '-H', `apikey: ${serviceKey}`, '-H', `Authorization: Bearer ${serviceKey}`], {
     encoding: 'utf8',
   });
@@ -145,7 +158,7 @@ const fetchAllBikeCandidates = async () => {
     try {
       const response = await supabase
         .from('cars')
-        .select('id,make,model,specs,type')
+        .select('id,make,model,specs,type,crew_id')
         .in('type', ['bike', 'ebike'])
         .range(from, to);
       data = response.data;
@@ -178,6 +191,18 @@ const ranked = bikes.map(b => ({ bike: b, score: scoreBike(bikeId, b) })).sort((
 const top = ranked[0];
 if (!top || top.score <= 0) failStage('bike_resolve', 'bike_not_found', { bikeQuery: bikeId });
 const bike = top.bike;
+let resolvedCrewSlug = arg('crewSlug', '');
+if (!resolvedCrewSlug && bike.crew_id) {
+  const { data: crewSlugRow, error: crewSlugError } = await supabase
+    .from('crews')
+    .select('slug')
+    .eq('id', bike.crew_id)
+    .maybeSingle();
+  if (crewSlugError) {
+    console.warn(`[make-rental-contract-skill] failed to resolve crew slug: ${crewSlugError.message}`);
+  }
+  resolvedCrewSlug = String(crewSlugRow?.slug || '').trim();
+}
 
 const mdTemplate = readFileSync(RENTAL_DOC_BASELINE_TEMPLATE_PATH, 'utf8');
 const now = new Date();
@@ -290,6 +315,7 @@ const vars = {
   renter_birth_date: renterBirthDate,
   renter_phone: passportJson.phone || '',
   renter_email: passportJson.email || '',
+  renter_address: passportJson.address || passportJson.registration || '',
   renter_driver_license: `${renterLicenseSeries} ${renterLicenseNumber}`.trim(),
   renter_passport: `${renterPassportSeries} ${renterPassportNumber}`.trim(),
   bike_make_model: `${bike.make||''} ${bike.model||''}`.trim(),
@@ -458,6 +484,43 @@ if (saveMetadata) {
   }
   result.metadataVerified = true;
   result.metadataTable = metadataTable;
+}
+
+const rentalSecretsPayload = {
+  chat_id: telegramChatId,
+  crew_slug: resolvedCrewSlug,
+  doc_sha256: originalSha256,
+  renter_full_name: vars.renter_full_name,
+  renter_passport: vars.renter_passport,
+  renter_driver_license: vars.renter_driver_license,
+  renter_birth_date: vars.renter_birth_date,
+  renter_phone: vars.renter_phone,
+  renter_email: vars.renter_email,
+  renter_address: vars.renter_address || null,
+  source_doc_key: vars.document_key,
+  source_rental_id: null,
+  verification_status: 'verified',
+  template_version: CURRENT_RENTAL_TEMPLATE_VERSION,
+};
+
+try {
+  const { saveUserRentalSecrets } = await import('../app/lib/user-rental-secrets.ts');
+  const saved = await saveUserRentalSecrets(rentalSecretsPayload);
+  if (!saved) throw new Error('saveUserRentalSecrets returned null');
+  result.rentalSecretsSaved = true;
+} catch (err) {
+  try {
+    const { error: fallbackError } = await supabase
+      .schema('private')
+      .from('user_rental_secrets')
+      .insert({ ...rentalSecretsPayload, updated_at: new Date().toISOString() });
+    if (fallbackError) throw fallbackError;
+    result.rentalSecretsSaved = true;
+    result.rentalSecretsSaveFallback = true;
+  } catch (fallbackErr) {
+    console.error('[make-rental-contract-skill] failed to save rental secrets:', fallbackErr?.message || fallbackErr, 'primary:', err?.message || err);
+    result.rentalSecretsSaved = false;
+  }
 }
 
 console.log(JSON.stringify(result, null, 2));
