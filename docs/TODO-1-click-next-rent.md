@@ -190,9 +190,9 @@
 > **Complexity**: M
 > **Blocks**: Tasks D, E, F, G (all depend on this table existing)
 
-- [ ] **Create migration file**: `supabase/migrations/202606XXXXXXX_user_rental_secrets.sql`
+- [x] **Create migration file**: `supabase/migrations/20260601000000_user_rental_secrets.sql`
 
-- [ ] **Schema** (refined based on Phase 1 findings):
+- [x] **Schema** (refined based on Phase 1 findings):
   ```sql
   CREATE TABLE private.user_rental_secrets (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -222,33 +222,33 @@
     ON private.user_rental_secrets(chat_id, crew_slug, verification_status);
   ```
 
-- [ ] **Follow `private` schema pattern** (from investigation 1.2):
-  - [ ] Revoke all from `anon` and `authenticated`
-  - [ ] Grant USAGE + table access only to `service_role`
-  - [ ] Follow `20260304_private_scheme.sql` pattern exactly
+- [x] **Follow `private` schema pattern** (from investigation 1.2):
+  - [x] Revoke all from `anon` and `authenticated`
+  - [x] Grant USAGE + table access only to `service_role`
+  - [x] Follow `20260304_private_scheme.sql` pattern exactly
 
-- [ ] **Server-side access module**: create `app/lib/user-rental-secrets.ts`
-  - [ ] `"use server"` + `server-only` imports (same pattern as `private-secrets.ts`)
-  - [ ] `getUserRentalSecrets(chatId, crewSlug)` — returns most recent verified row per user+crew
-  - [ ] `getUserRentalSecretsByDocSha(docSha256)` — lookup by doc hash (for QR verification)
-  - [ ] `saveUserRentalSecrets(data)` — insert new row
-  - [ ] `revokeUserRentalSecrets(docSha256)` — set `verification_status = 'revoked'`
-  - [ ] All reads through `supabaseAdmin.schema("private")`
+- [x] **Server-side access module**: create `app/lib/user-rental-secrets.ts`
+  - [x] `"use server"` + `server-only` imports (same pattern as `private-secrets.ts`)
+  - [x] `getUserRentalSecrets(chatId, crewSlug)` — returns most recent verified row per user+crew
+  - [x] `getUserRentalSecretsByDocSha(docSha256)` — lookup by doc hash (for QR verification)
+  - [x] `saveUserRentalSecrets(data)` — insert new row
+  - [x] `revokeUserRentalSecrets(docSha256)` — set `verification_status = 'revoked'`
+  - [x] All reads through `supabaseAdmin.schema("private")`
 
-- [ ] **Design decisions** (check when decided):
-  - [ ] Should this replace or augment existing `getUserSensitiveDataOrDefault`? Or coexist during migration?
-  - [ ] How does it relate to existing `private.user_secrets` table? Merge or coexist?
-  - [ ] Recommendation from Phase 1: **coexist**. `user_secrets` stores raw OCR scan data (passport, license strings). `user_rental_secrets` stores rental-contextual identity (with doc_sha256 provenance, crew scope, verification status). Different lifecycle, different access patterns.
+- [x] **Design decisions** (check when decided):
+  - [x] Should this replace or augment existing `getUserSensitiveDataOrDefault`? Or coexist during migration?
+  - [x] How does it relate to existing `private.user_secrets` table? Merge or coexist?
+  - [x] Recommendation from Phase 1: **coexist**. `user_secrets` stores raw OCR scan data (passport, license strings). `user_rental_secrets` stores rental-contextual identity (with doc_sha256 provenance, crew scope, verification status). Different lifecycle, different access patterns.
 
-- [ ] **Privacy**: Paper contract consent (Appendix 4 — Согласие на обработку ПД) covers data storage. `private.*` schema + service-role-only access is sufficient. No separate digital consent needed.
+- [x] **Privacy**: Paper contract consent (Appendix 4 — Согласие на обработку ПД) covers data storage. `private.*` schema + service-role-only access is sufficient. No separate digital consent needed.
 
-- [ ] **No data versioning column**: Each rental creates a new row (unique on `chat_id + crew_slug + doc_sha256`). Multiple rows for same user across different rentals are expected — most recent verified row is used for auto-fill. Use `created_at DESC` for ordering.
+- [x] **No data versioning column**: Each rental creates a new row (unique on `chat_id + crew_slug + doc_sha256`). Multiple rows for same user across different rentals are expected — most recent verified row is used for auto-fill. Use `created_at DESC` for ordering.
 
-- [ ] **`template_version` field**: Tracks which contract template version was used. When template is updated, old rentals on previous version can be identified for re-sign.
+- [x] **`template_version` field**: Tracks which contract template version was used. When template is updated, old rentals on previous version can be identified for re-sign.
 
-- [ ] **Future preparation**: design the schema to support batch imports (digitize old docs workflow — batch-insert rows from historical paper documents)
+- [x] **Future preparation**: design the schema to support batch imports (digitize old docs workflow — batch-insert rows from historical paper documents)
 
-- [ ] **Write a seed migration** or test data script to verify the table works with `supabaseAdmin`
+- [x] **Write a seed migration** or test data script to verify the table works with `supabaseAdmin`
 
 ---
 
@@ -404,12 +404,12 @@
 > **Depends on**: nothing (independent enhancement)
 
 - [x] Find existing admin dashboard component — **Found** in Phase 1: `app/franchize/[slug]/admin/page.tsx` + `FranchizeAdminClient.tsx`
-- [ ] **Currently shows**: fleet, failed orders, retry controls, review moderation, vehicle editing
-- [ ] **Enhancement**: add successful rents section
-  - [ ] Query `rentals` joined with vehicle data and `metadata.contract_verifier`
-  - [ ] Show rental history with doc verification status
-  - [ ] Display: bike name, renter, dates, contract status (verified/pending/none)
-  - [ ] Auto-refresh or live updates when new rents complete
+- [x] **Currently shows**: fleet, failed orders, retry controls, review moderation, vehicle editing; added successful rental history with contract verifier status
+- [x] **Enhancement**: add successful rents section
+  - [x] Query `rentals` joined with vehicle data and `metadata.contract_verifier`
+  - [x] Show rental history with doc verification status
+  - [x] Display: bike name, renter, dates, contract status (verified/pending/none)
+  - [x] Auto-refresh or live updates when new rents complete
 
 ---
 
