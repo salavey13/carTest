@@ -10,9 +10,11 @@ import { getEditableVehiclesForUser } from "@/app/rentals/actions";
 import {
   getFranchizeOrderNotificationFailures,
   getFranchizeRentalReviewsForModeration,
+  getFranchizeSuccessfulRentals,
   moderateRentalReview,
   retryFranchizeOrderNotification,
   type FranchizeCrewVM,
+  type FranchizeSuccessfulRentalVM,
   type RentalReviewVM,
 } from "@/app/franchize/actions";
 import {
@@ -43,9 +45,63 @@ const normalizeVin = (value: unknown) =>
 
 const VIN_ALLOWED = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789";
 
+const formatRentalDate = (value: string | null) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  }).format(date);
+};
+
+const formatRentalRange = (startDate: string | null, endDate: string | null) => {
+  const start = formatRentalDate(startDate);
+  const end = formatRentalDate(endDate);
+  if (start === "—" && end === "—") return "—";
+  if (end === "—") return `с ${start}`;
+  if (start === "—") return `до ${end}`;
+  return `${start} — ${end}`;
+};
+
+const contractStatusLabel = (status: string) => {
+  switch (status) {
+    case "verified":
+      return "проверен";
+    case "pending":
+      return "ожидает";
+    case "revoked":
+      return "аннулирован";
+    case "none":
+      return "нет данных";
+    default:
+      return status;
+  }
+};
+
+const rentalStatusLabel = (status: string) => {
+  switch (status) {
+    case "confirmed":
+      return "подтверждена";
+    case "active":
+      return "активна";
+    case "completed":
+      return "завершена";
+    default:
+      return status || "—";
+  }
+};
+
+const readVehicleSpecs = (vehicle: Vehicle): Record<string, unknown> =>
+  vehicle.specs && typeof vehicle.specs === "object" && !Array.isArray(vehicle.specs)
+    ? (vehicle.specs as Record<string, unknown>)
+    : {};
+
 const buildSyntheticVin = (vehicle: Vehicle) => {
+  const vehicleYear = "year" in vehicle ? String(vehicle.year ?? "") : "";
   const raw =
-    `${vehicle.make ?? ""}${vehicle.model ?? ""}${vehicle.year ?? ""}${vehicle.id ?? ""}`.toUpperCase();
+    `${vehicle.make ?? ""}${vehicle.model ?? ""}${vehicleYear}${vehicle.id ?? ""}`.toUpperCase();
   const mapped = raw
     .replace(/I/g, "1")
     .replace(/O/g, "0")
@@ -58,7 +114,7 @@ const buildSyntheticVin = (vehicle: Vehicle) => {
   return (normalized + "CARTESTVIN00000000").slice(0, 17);
 };
 
-const fallbackCrew: FranchizeCrewVM = {
+const fallbackCrew = {
   id: "",
   slug: "vip-bike",
   name: "VIP BIKE",
@@ -90,6 +146,7 @@ const fallbackCrew: FranchizeCrewVM = {
     email: "",
     address: "",
     telegram: "",
+    telegramBotUsername: "",
     workingHours: "",
     map: {
       gps: "",
@@ -109,7 +166,7 @@ const fallbackCrew: FranchizeCrewVM = {
   },
   ratingSummary: { average: 0, count: 0 },
   footer: { socialLinks: [], textColor: "#16130A" },
-};
+} as unknown as FranchizeCrewVM;
 
 interface FranchizeAdminClientProps {
   initialSlug: string;
@@ -137,6 +194,7 @@ export function FranchizeAdminClient({
     }>
   >([]);
   const [reviews, setReviews] = useState<RentalReviewVM[]>([]);
+  const [successfulRentals, setSuccessfulRentals] = useState<FranchizeSuccessfulRentalVM[]>([]);
   const [retryingOrderId, setRetryingOrderId] = useState<string | null>(null);
   const [isBulkFillingVin, setIsBulkFillingVin] = useState(false);
   const [moderatingReviewId, setModeratingReviewId] = useState<string | null>(
@@ -210,6 +268,16 @@ export function FranchizeAdminClient({
     },
     [dbUser?.user_id, loadFailedNotifications, slug],
   );
+  const loadSuccessfulRentals = useCallback(async () => {
+    if (!dbUser?.user_id) return;
+    const result = await getFranchizeSuccessfulRentals({
+      slug,
+      actorUserId: dbUser.user_id,
+    });
+    if (!result.success) return;
+    setSuccessfulRentals(result.items || []);
+  }, [dbUser?.user_id, slug]);
+
   const loadReviews = useCallback(async () => {
     if (!dbUser?.user_id) return;
     const result = await getFranchizeRentalReviewsForModeration({
@@ -249,6 +317,14 @@ export function FranchizeAdminClient({
     void loadReviews();
   }, [loadReviews]);
 
+  useEffect(() => {
+    void loadSuccessfulRentals();
+    const intervalId = window.setInterval(() => {
+      void loadSuccessfulRentals();
+    }, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, [loadSuccessfulRentals]);
+
   const visible = useMemo(
     () =>
       fleet.filter((item) =>
@@ -261,7 +337,7 @@ export function FranchizeAdminClient({
     const target = fleet.filter(
       (item) => item.type === "bike" || item.type === "car",
     );
-    const missing = target.filter((item) => !normalizeVin(item.specs?.vin));
+    const missing = target.filter((item) => !normalizeVin(readVehicleSpecs(item).vin));
     return {
       total: target.length,
       withVin: target.length - missing.length,
@@ -280,7 +356,7 @@ export function FranchizeAdminClient({
           body: JSON.stringify({
             ...vehicle,
             specs: {
-              ...(vehicle.specs || {}),
+              ...readVehicleSpecs(vehicle),
               vin: buildSyntheticVin(vehicle),
             },
           }),
@@ -424,6 +500,74 @@ export function FranchizeAdminClient({
             </Button>
           )}
         </div>
+      </FranchizeOperatorPanel>
+
+      <FranchizeOperatorPanel className="mt-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[var(--fr-admin-text)]">
+              Успешные аренды
+            </p>
+            <p className="mt-1 text-xs text-[var(--fr-admin-muted)]">
+              Последние активные и завершённые аренды с проверкой договора.
+            </p>
+          </div>
+          <span
+            className="rounded-full border px-2 py-1 text-xs text-[var(--fr-admin-muted)]"
+            style={{ borderColor: "var(--fr-admin-border)" }}
+          >
+            {successfulRentals.length}
+          </span>
+        </div>
+        {!successfulRentals.length ? (
+          <p className="mt-3 text-xs text-[var(--fr-admin-muted)]">
+            Успешных аренд пока нет.
+          </p>
+        ) : (
+          <div className="mt-3 overflow-hidden rounded-xl border" style={{ borderColor: "var(--fr-admin-border)" }}>
+            <div className="hidden grid-cols-[1.2fr_1fr_1fr_0.9fr] gap-3 border-b px-3 py-2 text-xs font-semibold text-[var(--fr-admin-muted)] md:grid" style={{ borderColor: "var(--fr-admin-border)" }}>
+              <span>Мотоцикл</span>
+              <span>Арендатор</span>
+              <span>Даты</span>
+              <span>Статус договора</span>
+            </div>
+            <div className="divide-y" style={{ borderColor: "var(--fr-admin-border)" }}>
+              {successfulRentals.slice(0, 10).map((rental) => (
+                <div
+                  key={rental.rentalId}
+                  className="grid gap-2 px-3 py-3 text-sm md:grid-cols-[1.2fr_1fr_1fr_0.9fr] md:items-center"
+                  style={{ borderColor: "var(--fr-admin-border)" }}
+                >
+                  <div>
+                    <p className="font-semibold text-[var(--fr-admin-text)]">
+                      {rental.bikeName}
+                    </p>
+                    <p className="text-xs text-[var(--fr-admin-muted)]">
+                      {rentalStatusLabel(rental.status)} · #{rental.rentalId.slice(0, 8)}
+                    </p>
+                  </div>
+                  <p className="text-[var(--fr-admin-text)]">
+                    <span className="md:hidden text-xs text-[var(--fr-admin-muted)]">Арендатор: </span>
+                    {rental.renterName}
+                  </p>
+                  <p className="text-[var(--fr-admin-text)]">
+                    <span className="md:hidden text-xs text-[var(--fr-admin-muted)]">Даты: </span>
+                    {formatRentalRange(rental.startDate, rental.endDate)}
+                  </p>
+                  <span
+                    className="w-fit rounded-full border px-2 py-1 text-xs font-semibold text-[var(--fr-admin-text)]"
+                    style={{
+                      borderColor: "var(--fr-admin-border)",
+                      backgroundColor: withAlpha(crew.theme.palette.accentMain, rental.contractStatus === "verified" ? 0.16 : 0.06),
+                    }}
+                  >
+                    {contractStatusLabel(rental.contractStatus)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </FranchizeOperatorPanel>
 
       <FranchizeOperatorPanel className="mt-4">
