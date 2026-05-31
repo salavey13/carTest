@@ -6,176 +6,83 @@
 
 ---
 
-## 🔍 Phase 1: Investigation
+## 🔍 Phase 1: Investigation ✅
 
-> Complete these investigations BEFORE designing anything. Read actual source files, trace call chains, document findings inline under each item.
+> All investigations complete. Findings documented inline.
 
-### 1.1 Rental Contract Generation Pipeline
+### 1.1 Rental Contract Generation Pipeline ✅
+- [x] **Skill script** — full flow traced. Findings: `--phrase` → fuzzy bike match, `--passportJson`/`--licenseJson` for OCR data, mustache `{{key}}` replacement, `sha256(buf)` from DOCX bytes, `rental_contract_artifacts` metadata save, Telegram `sendDocument` delivery. Duplicate bug root cause found + fixed (Task A).
+- [x] **Web-app pipeline** — `buildFranchizeOrderDocAndNotify()` → `buildFranchizeDocxFromTemplate()` → `htmlToDocxDocument()` → `registerVerifierOriginalForBuffer()`. SHA256 chain: `doc_verifier_records.original_sha256` = `rentals.metadata.contract_verifier.originalSha256`.
+- [x] **Template** — HTML mode (`RENTAL_DOC_TEMPLATE_MODE=html`) is high-fidelity path. MD fallback exists. `renter_address` placeholder missing from templates. Page-break divs now added (Task H).
 
-- [x] **Skill script** (`scripts/make-rental-contract-skill.mjs`): Trace full flow from trigger to delivered DOCX
-  - [x] How does it parse bike identification? (`--phrase`, `--bikeId`, fuzzy matching against `cars` table)
-  - [x] How does it receive renter data? (`--passportJson`, `--licenseJson` from OCR)
-  - [x] How does it fill template variables? (~40 `{{mustache}}` placeholders)
-  - [x] How does it compute `original_sha256`? (from DOCX buffer bytes)
-  - [x] How does it save metadata? (`--saveMetadata 1` → `rental_contract_artifacts` table)
-  - [x] How does it deliver the doc? (Telegram Bot API `sendDocument`)
-  - [x] **Bug: duplicate DOCX** — trace the delivery code path, find where the same doc is sent twice
-  - Findings: `--phrase` is trimmed into a bike query after the trigger words, falling back to `--bikeId`; date words are stripped, then all `cars` with `type in (bike, ebike)` are loaded and ranked by normalized id/make/model/VIN/frame fuzzy score. Renter data is JSON read from `--passportJson` and `--licenseJson`; required full name, birth date, passport series/number, and license series/number fail fast if missing. Variables are assembled in `vars` and rendered through mustache-style `{{key}}` replacement into either HTML (`RENTAL_DOC_TEMPLATE_MODE=html`) or MD fallback (`md` default). DOCX bytes come from `Packer.toBuffer(doc)`, and `original_sha256` is `sha256(buf)` after DOCX generation. Metadata is optional (`--saveMetadata 1`) and inserts `contract_key`, requested/resolved bike, Telegram chat/message id, renter name, rental dates, and `original_sha256` into `rental_contract_artifacts`, followed by read-after-write verification. Delivery sends one Telegram Bot API `sendDocument` request by `fetch`, with curl fallback only for network failure after this pass. Duplicate root cause found: the old `try` wrapped `fetch` plus `res.json()`, so if Telegram accepted the upload but response parsing/streaming failed, the catch retried with curl and could send the same DOCX again. Fixed in Task A by reading response text and failing parse errors without retrying the already-sent document.
+### 1.2 Existing Secret Tables & Access Patterns ✅
+- [x] **`private.crew_secrets`** — `crew_slug TEXT PK`, `contract_defaults TEXT`, `doc_templates TEXT`, `price_lists TEXT`, `sensitive_metadata JSONB`. Access via `getCrewSensitiveDataOrDefault(slug)` / `saveCrewSensitiveData(slug, data)`.
+- [x] **`private.user_secrets`** — `user_id TEXT PK`, `driver_license TEXT`, `passport TEXT`, `sensitive_metadata JSONB`. Return shape only `{ driverLicense, passport }` — no birth/phone/email yet.
+- [x] **`private` schema pattern** — REVOKE all from anon/authenticated, GRANT to service_role only. Server-only access via `supabaseAdmin.schema("private")`.
 
-- [x] **Web-app pipeline** (`lib/docx-capability.ts` → `buildFranchizeDocxFromTemplate()`)
-  - [x] How is it called? (from `buildFranchizeOrderDocAndNotify()` in `actions-runtime.ts`)
-  - [x] What's the `integrationScope` / `documentKey` pattern?
-  - [x] How is `doc_verifier_records` populated? (via `registerVerifierOriginalForBuffer`)
-  - [x] How is the SHA256 stored in rental's metadata? (`rentals.metadata.contract_verifier` JSONB)
-  - Findings: `buildFranchizeOrderDocAndNotify()` loads cart cars, private user/crew data, resolves legal variables, then calls `buildFranchizeDocxFromTemplate()` with `integrationScope = ${flowType}:${slug}:${orderId}` and `documentKey = rental-${slug}-${orderId}` (or `sale-...`). `docx-capability` defaults to HTML mode, applies template vars, builds a DOCX through `htmlToDocxDocument()`, computes `sha256` from the final DOCX bytes, and calls `registerVerifierOriginalForBuffer()` when `documentKey` exists. That action upserts `doc_verifier_records` on `(integration_scope, document_key)` with `original_sha256`. After sending the DOCX to admin/user/crew owner, rental metadata is patched with `contract_verifier = { scope: rental:${rental_id}, sourceScope, documentKey, docVerifierRecordId, originalSha256: sha256, status: "verified", verifiedAt, expiresAt: null }`.
+### 1.3 Deep-Link & Telegram Mini App Flow ✅
+- [x] **Current pattern**: `startapp=rental-${rentalId}` → `useTelegramAuth` → `useStartParamRouter()`.
+- [x] **`rent_` prefix** already routes to `/api/startapp/vehicle?flow=rent`. New `rent_{bikeId}_{docSha}` won't collide with `rental-{id}` but must extend existing `rent_` handler for 3-part format.
 
-- [x] **Template** (`docs/RENTAL_DEAL_TEMPLATE.html` and `.md`)
-  - [x] What variables exist? (focus on renter fields: `renter_full_name`, `renter_passport`, `renter_driver_license`, `renter_birth_date`, `renter_phone`, `renter_address`)
-  - [x] What's the template mode switch? (`RENTAL_DOC_TEMPLATE_MODE` env var → `html` vs `md`)
-  - Findings: HTML is the active high-fidelity template path for the web-app pipeline; the skill script can use HTML only when `RENTAL_DOC_TEMPLATE_MODE=html`, otherwise it defaults to MD. Renter placeholders present in the templates include `renter_full_name`, `renter_birth_date`, `renter_phone`, `renter_email`, `renter_driver_license`, `renter_passport`, and `renter_passport_issue_date`; `renter_address` is referenced by the TODO/design but is not currently present in the HTML or MD template. Page-break support already existed in `htmlToDocx.mjs` for `<div style="page-break-before: always"></div>` / `.page-break`, but the rental HTML template did not emit those break markers before appendices, causing continuous printed flow.
+### 1.4 Franchise Profile & User Data Pre-set ✅
+- [x] Profile page at `app/franchize/[slug]/profile/page.tsx`. Prefill stores in `users.metadata.franchizeFormPrefill[slug]`. No passport/license editing on profile. Sensitive data lives in `private.user_secrets`.
 
-### 1.2 Existing Secret Tables & Access Patterns
+### 1.5 QR Code — Current State ✅
+- [x] Mostly remote-image based (`api.qrserver.com`). Network-dependent. Local `qrcode` npm package recommended for Task B.
 
-- [x] **`private.crew_secrets`** table:
-  - [x] Document exact schema: `crew_slug (TEXT PK)`, `contract_defaults (JSONB)`, `updated_at (TIMESTAMPTZ)`
-  - [x] Read by: `getCrewSensitiveDataOrDefault(slug, context)` from `@/app/lib/private-secrets`
-  - [x] Written by: `saveCrewSensitiveData(slug, data)` from same module
-  - Findings: Actual migrations define `private.crew_secrets` as `crew_slug TEXT PRIMARY KEY`, `contract_defaults TEXT`, `doc_templates TEXT`, `price_lists TEXT`, `sensitive_metadata JSONB DEFAULT '{}'::jsonb`, `updated_at TIMESTAMPTZ DEFAULT now()`; the code serializes/deserializes `contract_defaults` and `doc_templates` as JSON strings rather than JSONB. `getCrewSensitiveDataOrDefault()` reads through `supabaseAdmin.schema("private").from("crew_secrets")`, sanitizes JSON records, and returns `{ contractDefaults, docTemplates }` or empty defaults on private-read failure. `saveCrewSensitiveData()` upserts `crew_slug`, serialized `contract_defaults`/`doc_templates`, and `updated_at`, with guards against credential-like keys in editable crew JSON.
+### 1.6 Document Verification & SHA256 Chain ✅
+- [x] Web-app and skill paths compute SHA256 independently. Skill stores in `rental_contract_artifacts`, web-app stores in `doc_verifier_records` + rental metadata. QR should encode `rental_contract_artifacts.original_sha256` for skill flow.
 
-- [x] **User secrets** (module exists but table schema not in repo):
-  - [x] **FIND the actual table**: search for `user_secrets` or similar in migrations, SQL files, or `private-secrets` module
-  - [x] Document `getUserSensitiveDataOrDefault(telegramUserId, context)` return shape: `{ driverLicense, passport, renterBirthDate?, renterPhone?, renterEmail? }`
-  - Findings: The actual table is `private.user_secrets` in `supabase/migrations/20260304_private_scheme.sql`: `user_id TEXT PRIMARY KEY REFERENCES public.users(user_id) ON DELETE CASCADE`, `driver_license TEXT`, `passport TEXT`, `sensitive_metadata JSONB DEFAULT '{}'::jsonb`, `updated_at TIMESTAMPTZ DEFAULT now()`. Current code return shape is only `{ driverLicense: string, passport: string }`; `renterBirthDate`, `renterPhone`, and `renterEmail` are not part of `UserSensitiveData` yet. The web-app doc identity resolver therefore pulls birth/phone/email from payload/defaults where possible and warns when birth date is missing.
+### 1.7 Full Rental Lifecycle & Handoff Steps ✅
+- [x] State machine: `checkout_started` → `pending_confirmation` → `confirmed` → `active` → completed/closed. Handoff photos partially implemented (bot assigns before/after based on rent state). Paper fields now added (Task I). Hot-stage QR needs to navigate to rental detail directly.
 
-- [x] **`private` schema pattern**: PostgREST only exposes `public` schema. Data in `private.*` is inaccessible via anon/auth REST keys — implicit access control. Document how this is used.
-  - Findings: Migrations revoke all on schema `private` from `anon` and `authenticated`, grant `USAGE` only to `service_role`, and grant table access only to `service_role`. App access is through server-only `app/lib/private-secrets.ts` (`"use server"`, `server-only`, `supabaseAdmin.schema("private")`), so client modules should not import it. The current pattern is service-role-only server mediation, not direct user RLS through public PostgREST.
+### 1.8 Web-App Rental Order Flow ✅
+- [x] Checkout asks: name, phone, time text, start date, auto-computed end date, signature, comment, payment, delivery, extras, promo, consent, safety quiz. No time-of-day picker. No passport/license/birth date in form — relies on `private.user_secrets` or auto-fill.
 
-### 1.3 Deep-Link & Telegram Mini App Flow
-
-- [x] **Current deep-link pattern**: `https://t.me/oneBikePlsBot/app?startapp=rental-${rentalId}`
-  - [x] Found in: `actions-runtime.ts` → `getFranchizeRentalCard()`
-  - [x] Parsed by: `useTelegramAuth.ts` → reads `startParam`
-  - [x] Routed by: router inside `ClientLayout.tsx` that maps `rental-*` prefix to rental detail page
-  - [x] **Design question**: can `startapp` be extended to `rent_{bikeId}_{docSha}` without breaking existing `rental-{id}` parsing?
-  - Findings: `getFranchizeRentalCard()` emits `startapp=rental-${rentalId}` for rental detail cards. `useTelegramAuth` reads `webApp.initDataUnsafe.start_param` (with launch-param fallback) and stores it in app context. `ClientLayout` calls `useStartParamRouter()`, which currently routes `rental-*`, `rentals-*`, and `sale-*` to `/franchize/{slug}/rental/{id}`. `rent_` is already reserved for vehicle rent QR and calls `/api/startapp/vehicle?flow=rent`; therefore `rent_{bikeId}_{docSha}` will not collide with `rental-{id}`, but it will require refining the existing `rent_` branch to distinguish a two-part vehicle deep link from the new three-part document-hash format.
-
-- [x] **Telegram auth hook**: `useTelegramAuth.ts` → `initData`, `initDataUnsafe.start_param`, validation via `/api/validate-telegram-auth`, upsert via `upsertTelegramUserAction`
-  - Findings: The hook safely reads Telegram SDK fields with Safari-safe try/catch guards, validates `initData` through `/api/validate-telegram-auth`, allows dev/mock fallback only in allowed contexts, then calls `handleAuthentication()` / `upsertTelegramUserAction` to persist the Telegram user and set `dbUser`. Auth is therefore available before private QR auto-fill should be attempted, and `doc_sha256` must be treated as a lookup key rather than an auth token.
-
-### 1.4 Franchise Profile & User Data Pre-set
-
-- [x] **Franchise profile route**: `/franchize/{slug}/profile`
-  - [x] **FIND the actual page component** — it's not in the current workspace but must exist in the repo
-  - [x] What data can users currently preset/save?
-  - [x] How is sensitive user data (passport, license) currently saved?
-  - Findings: The page exists at `app/franchize/[slug]/profile/page.tsx` and renders `FranchizeProfileClient`. The client loads achievements/activity, capability contracts, operator access, and `FranchizeFormPrefill` (`fullName`, `phone`, `preferredTime`, `deliveryMode`, `comment`). `saveFranchizeFormPrefillAction()` stores this prefill under `users.metadata.franchizeFormPrefill[slug]`, so it is non-secret contact/order convenience data. Passport and license are not edited on this page; sensitive doc data currently lives in `private.user_secrets` via `saveUserSensitiveData()` when used elsewhere, and new rental-history fields should not be added to `users.metadata`.
-
-- [x] **User metadata JSONB** (`users.metadata`):
-  - Current keys: `settings`, `cyberFitness`, `survey_results`, `behavior_signals`, `experience_lock`, `franchizeProfiles`, `franchizeNotificationPreferences`, `onboarding_context`
-  - Design principle: **metadata stores RAW SIGNALS ONLY, never derived state**
-  - Findings: Current profile prefill slightly extends metadata with `franchizeFormPrefill`; keep future scanned-contract/rental-derived identity data in `private.user_rental_secrets`, not metadata.
-
-### 1.5 QR Code — Current State
-
-- [x] **QR generation code exists** in the repo — find the web method that creates QR codes
-  - [x] What library does it use?
-  - [x] How does it render QR images?
-  - [x] Can it output PNG buffer for Telegram sending?
-  - Findings: Existing web QR generation is mostly remote-image based: strikeball pages and franchize buy-print fetch/use `https://api.qrserver.com/v1/create-qr-code/?size=...&data=...`; `buy-print.ts` fetches that URL as an image and embeds it into a PDF, while React pages render it as `<img>`. There is also a `QRCodeSVG` import in `app/strikeball/test-lab/page.tsx`, but `qrcode.react` is not declared in `package.json`, so it is not a reliable dependency. The current method can produce a PNG buffer for Telegram if the server fetches `api.qrserver.com`, but it is network-dependent; a local `qrcode` package remains the safer fallback for Task B.
-
-### 1.6 Document Verification & SHA256 Chain
-
-- [x] Trace the SHA256 chain across tables:
-  - [x] `doc_verifier_records.original_sha256`
-  - [x] `rental_contract_artifacts.original_sha256`
-  - [x] `rentals.metadata.contract_verifier.originalSha256`
-  - [x] Are they always the same value? Which one should the QR link encode?
-  - Findings: Web-app contracts compute one SHA256 from final DOCX bytes inside `buildFranchizeDocxFromTemplate()`, register the same bytes in `doc_verifier_records.original_sha256`, and copy that `sha256` into `rentals.metadata.contract_verifier.originalSha256`. The skill script separately computes `originalSha256` from its final DOCX buffer and stores it in `rental_contract_artifacts.original_sha256` when metadata is enabled; it does not currently register `doc_verifier_records`. Values are the same only within a single generation path for the same bytes; web-app and skill-generated docs can differ if templates/modes/defaults differ. QR should encode the exact `rental_contract_artifacts.original_sha256` for the delivered paper/DOCX artifact when using the skill flow; for web-app flow, either create the artifact row from the same bytes or encode the verifier/rental metadata hash from the same final buffer.
-
-### 1.7 Full Rental Lifecycle & Handoff Steps
-
-> **Critical for understanding where "1-click" actually fits.** The rental flow is NOT a single step.
-
-- [x] **Contract generation** — what we have now: bike + renter data → DOCX + QR
-- [x] **Handoff** — when renter picks up the bike:
-  - [x] Photos of preexisting damage — **partially implemented**: sending photo to Telegram bot auto-assigns it as "before" or "after" depending on active rent state
-  - [x] Odometer reading — currently manual on paper
-  - [x] Fuel level — currently manual on paper
-  - [x] Condition notes — currently manual on paper
-  - **Key insight**: the "hot stage" (rent in progress) needs a way to enter the web app WITHOUT requiring user to re-click/navigate. QR scan should open the rent-in-progress view directly.
-  - Findings: Rental detail route `/franchize/[slug]/rental/[id]` loads `getFranchizeRentalCard()` and includes `FranchizeRentalDocumentsPanel`. That panel already exposes pickup freeze and damage report actions (`saveRentalPickupFreeze`, `addRentalDamageReport`) for active rental documentation, so hot-stage QR should resolve to this rental detail route when there is an active rental for the scanned bike/user. Paper fields for odometer/fuel/tires/damage were missing in Appendix 1 and are now added by Task I.
-
-- [x] **Return** — when renter brings bike back:
-  - [x] Final odometer, damage check, fuel level
-  - Findings: The existing rental docs panel has before/after style damage report support via rental actions, but final odometer/fuel-level structured capture is still not fully digitized in this TODO scope. Keep manual blanks on Appendix 1 until the hot-stage view adds structured return fields.
-
-- [x] What states does a rental go through in the web app? Document the full state machine.
-  - Findings: Availability logic treats `pending_confirmation` and `confirmed` as upcoming bookings and `active` as in-use; order creation and rental card code also handles missing/not-found fallback, and review/completion surfaces imply a later completed/returned state. Practical state machine for 1-click design: `checkout_started` recovery snapshot → order notification/payment → `pending_confirmation` rental → `confirmed` booking → `active` handoff/hot-stage → return/damage review → completed/closed (plus cancellation/revocation error paths).
-
-### 1.8 Web-App Rental Order Flow
-
-- [x] What fields does the renter currently fill in during checkout?
-- [x] What are the duration options? (likely 1/3/7 day presets currently)
-- [x] Is there a date/time picker or only preset durations?
-- [x] How does the web-app pipeline differ from the skill pipeline in data completeness?
-- [x] **Known gap**: web-app order flow doesn't cover 100% of data needed for the contract (some fields like birth date missing from form). Skill pipeline fills these from OCR. How to bridge this gap?
-  - Findings: Checkout currently asks for recipient name, phone, convenient time text, start date (`type=date`), auto-computed end date, signature name, comment, payment, delivery mode, extras, promo, consent, and safety quiz. Duration comes from cart line options (`duration`, default `1 день`) and `rentalDays`; checkout only exposes start date and computes end date from max rental days, with no start/end time picker. Web-app pipeline is less complete than the OCR skill: it does not collect passport/license/birth date in the order form and relies on `private.user_secrets` or placeholders. Bridge gap by using `private.user_rental_secrets`/previous verified rentals for auto-fill and adding explicit editable document fields only behind server/private storage.
-
-### 1.9 Admin Dashboard — Current State
-
-- [x] **Partially implemented**: admin dashboard shows which step user got stuck in rental process
-- [x] Find and document the existing admin dashboard component
-- [x] What data does it currently show?
-- [x] Enhancement: showing successful rents automatically would be valuable
-  - Findings: Existing admin UI lives in `app/franchize/[slug]/admin/page.tsx` + `app/franchize/components/FranchizeAdminClient.tsx`. It loads editable fleet, failed order notifications (`getFranchizeOrderNotificationFailures`), retry controls, review moderation, and vehicle editing. Checkout recovery snapshots are sent from cart/order flows with stages like `checkout_started`, but the admin panel currently focuses on failures/moderation/fleet and does not surface successful rental history with contract verifier status. Task K should add a successful-rentals section from `rentals` joined with vehicle and metadata `contract_verifier`.
+### 1.9 Admin Dashboard — Current State ✅
+- [x] `FranchizeAdminClient.tsx` loads fleet, failed orders, retry, review moderation, vehicle editing. Successful rentals section added (Task K).
 
 ---
 
 ## 🏗️ Phase 2: Design & Implementation Tasks
 
-> Each task is self-contained with its own checkboxes. Complete Phase 1 investigations first, then work through these in order.
+> Each task is self-contained with its own checkboxes.
 
 ---
 
 ### Task A: Fix Duplicate DOCX Delivery Bug ✅
 
-> **Prerequisite**: investigation 1.1 (find the bug)
-> **Complexity**: S
-> **Blocks**: Task B (QR delivery) — must fix delivery mechanism before adding QR
-
 - [x] Find root cause of duplicate `sendDocument` call in skill script
-- [x] Fix: ensure DOCX is sent exactly once
+- [x] Fix: ensure DOCX is sent exactly once (parse errors no longer trigger curl retry)
 - [x] Verify fix doesn't break existing delivery
-  - Findings: The fetch/curl fallback no longer retries after a response body parse failure from an already accepted Telegram request; curl fallback is reserved for network/send exceptions before a response is available.
 
 ---
 
 ### Task B: QR Code Alongside Rental Contract
 
-> **Prerequisite**: investigation 1.5 (QR generation), Task A (fix duplicate doc)
+> **Prerequisite**: Task A ✅, Task C ✅
 > **Complexity**: M
-> **Depends on**: Task A ✅, Task C (for doc_sha256 source)
+> **Depends on**: Task A ✅, Task C ✅
 
 - [ ] **Design QR URL format**:
   ```
   https://t.me/oneBikePlsBot/app?startapp=rent_{bike_id}_{doc_sha256}
   ```
   - `bike_id` = `cars.id` (human-readable slug like `kawasaki-ex650k`, NOT a UUID)
-  - `doc_sha256` = SHA256 hex from `rental_contract_artifacts.original_sha256` (hex string, not UUID — don't confuse with `crew_id` which IS a UUID)
+  - `doc_sha256` = SHA256 hex from `rental_contract_artifacts.original_sha256`
 
-- [ ] **Generate QR PNG** using existing web QR method (found in investigation 1.5)
-  - [ ] Confirm it can output PNG buffer for Telegram
-  - [ ] If not, add `qrcode` npm package as fallback
+- [ ] **Generate QR PNG** using local `qrcode` npm package (safer than remote API)
+  - [ ] Add `qrcode` to package.json
+  - [ ] Output PNG buffer for Telegram sending
 
 - [ ] **Send DOCX + QR in ONE Telegram message**
-  - [ ] Use `sendMediaGroup` or equivalent to combine document + photo
-  - [ ] DO NOT send as separate messages (confusing for users)
-  - [ ] Include deep-link URL as text caption below QR image (for non-QR-capable devices)
+  - [ ] Use `sendMediaGroup` to combine document + photo
+  - [ ] DO NOT send as separate messages
+  - [ ] Include deep-link URL as text caption below QR image
 
 - [ ] **Update skill script** (`make-rental-contract-skill.mjs`):
   - [ ] After DOCX generation + SHA256 computation, construct QR URL
-  - [ ] Generate QR PNG
-  - [ ] Send combined message
+  - [ ] Generate QR PNG, send combined message
 
 - [ ] **Update web-app pipeline** (`buildFranchizeOrderDocAndNotify`):
   - [ ] Same QR generation + combined delivery logic
@@ -184,79 +91,30 @@
 
 ---
 
-### Task C: `private.user_rental_secrets` Table Migration
-
-> **Prerequisite**: investigation 1.2 (existing secret tables)
-> **Complexity**: M
-> **Blocks**: Tasks D, E, F, G (all depend on this table existing)
+### Task C: `private.user_rental_secrets` Table Migration ✅
 
 - [x] **Create migration file**: `supabase/migrations/20260601000000_user_rental_secrets.sql`
-
-- [x] **Schema** (refined based on Phase 1 findings):
-  ```sql
-  CREATE TABLE private.user_rental_secrets (
-    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    chat_id           TEXT NOT NULL,          -- telegram user's chat_id (matches users table key)
-    crew_slug         TEXT NOT NULL,           -- franchise scope (crew isolation is intentional — do NOT design cross-franchise sharing)
-    doc_sha256        TEXT NOT NULL,           -- links to rental_contract_artifacts.original_sha256
-    renter_full_name  TEXT,
-    renter_passport   TEXT,
-    renter_driver_license TEXT,
-    renter_birth_date TEXT,
-    renter_phone      TEXT,
-    renter_email      TEXT,
-    renter_address    TEXT,
-    source_doc_key    TEXT,                    -- contract_key of the source document
-    source_rental_id  TEXT,                    -- rental_id if available
-    verification_status TEXT NOT NULL DEFAULT 'verified',  -- 'verified' | 'pending' | 'revoked'
-    template_version  INTEGER,                 -- version of contract template used (for template revocation — re-sign if template changes)
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(chat_id, crew_slug, doc_sha256)
-  );
-
-  CREATE INDEX idx_user_rental_secrets_doc_sha
-    ON private.user_rental_secrets(doc_sha256);
-
-  CREATE INDEX idx_user_rental_secrets_user_crew
-    ON private.user_rental_secrets(chat_id, crew_slug, verification_status);
-  ```
-
-- [x] **Follow `private` schema pattern** (from investigation 1.2):
-  - [x] Revoke all from `anon` and `authenticated`
-  - [x] Grant USAGE + table access only to `service_role`
-  - [x] Follow `20260304_private_scheme.sql` pattern exactly
-
-- [x] **Server-side access module**: create `app/lib/user-rental-secrets.ts`
-  - [x] `"use server"` + `server-only` imports (same pattern as `private-secrets.ts`)
-  - [x] `getUserRentalSecrets(chatId, crewSlug)` — returns most recent verified row per user+crew
-  - [x] `getUserRentalSecretsByDocSha(docSha256)` — lookup by doc hash (for QR verification)
+- [x] **Schema** with all required fields, indexes, UNIQUE constraint
+- [x] **Follow `private` schema pattern** — REVOKE/GRANT on schema + table
+- [x] **Server-side access module**: `app/lib/user-rental-secrets.ts`
+  - [x] `getUserRentalSecrets(chatId, crewSlug)` — most recent verified row
+  - [x] `getUserRentalSecretsByDocSha(docSha256)` — lookup by doc hash
   - [x] `saveUserRentalSecrets(data)` — insert new row
-  - [x] `revokeUserRentalSecrets(docSha256)` — set `verification_status = 'revoked'`
+  - [x] `revokeUserRentalSecrets(docSha256)` — set status = 'revoked'
   - [x] All reads through `supabaseAdmin.schema("private")`
-
-- [x] **Design decisions** (check when decided):
-  - [x] Should this replace or augment existing `getUserSensitiveDataOrDefault`? Or coexist during migration?
-  - [x] How does it relate to existing `private.user_secrets` table? Merge or coexist?
-  - [x] Recommendation from Phase 1: **coexist**. `user_secrets` stores raw OCR scan data (passport, license strings). `user_rental_secrets` stores rental-contextual identity (with doc_sha256 provenance, crew scope, verification status). Different lifecycle, different access patterns.
-
-- [x] **Privacy**: Paper contract consent (Appendix 4 — Согласие на обработку ПД) covers data storage. `private.*` schema + service-role-only access is sufficient. No separate digital consent needed.
-
-- [x] **No data versioning column**: Each rental creates a new row (unique on `chat_id + crew_slug + doc_sha256`). Multiple rows for same user across different rentals are expected — most recent verified row is used for auto-fill. Use `created_at DESC` for ordering.
-
-- [x] **`template_version` field**: Tracks which contract template version was used. When template is updated, old rentals on previous version can be identified for re-sign.
-
-- [x] **Future preparation**: design the schema to support batch imports (digitize old docs workflow — batch-insert rows from historical paper documents)
-
-- [x] **Write a seed migration** or test data script to verify the table works with `supabaseAdmin`
+- [x] **Design decisions**: coexist with `private.user_secrets` (different lifecycle/purpose)
+- [x] **Privacy**: Paper consent (Appendix 4) sufficient
+- [x] **No data versioning column**: multiple rows per user, `created_at DESC` ordering
+- [x] **`template_version` field**: for re-sign detection on template changes
+- [x] **Future preparation**: schema supports batch imports
 
 ---
 
 ### Task D: Save Renter Data on Contract Generation
 
-> **Prerequisite**: Task C (table exists)
+> **Prerequisite**: Task C ✅
 > **Complexity**: M
-> **Depends on**: Task C
+> **Depends on**: Task C ✅
 
 - [ ] **Skill script** (`make-rental-contract-skill.mjs`):
   - [ ] After successful DOCX generation + SHA256, insert row into `private.user_rental_secrets`
@@ -268,44 +126,33 @@
   - [ ] Same insert logic after successful doc generation
   - [ ] Read renter data from `userSensitive` + payload fields
 
-- [ ] **Future preparation**: design the insert to work for batch imports too (digitize old docs workflow — batch-insert rows from historical paper documents, generate shareable links per rider)
+- [ ] **Future preparation**: design insert to work for batch imports (digitize old docs workflow)
 
 ---
 
 ### Task E: QR Deep-Link Parsing & Data Auto-fill
 
-> **Prerequisite**: investigation 1.3 (deep-links), Task B (QR generation), Task C (table), Task D (data saved)
+> **Prerequisite**: Task B, Task C ✅, Task D
 > **Complexity**: L
-> **Depends on**: Tasks B, C, D
+> **Depends on**: Tasks B, D
 
-- [ ] **Parse `startParam`**: Detect `rent_` prefix (NOT `rental-`), extract `bikeId` and `docSha`
+- [ ] **Parse `startParam`**: Detect `rent_` prefix, extract `bikeId` and `docSha`
   - [ ] Must NOT break existing `rental-{id}` parsing
-  - [ ] Add new route/dispatch case for `rent_` prefix
-  - [ ] Phase 1 finding: `rent_` already routes to `/api/startapp/vehicle?flow=rent` — extend this handler to detect three-part format `rent_{bikeId}_{docSha}` vs existing two-part `rent_{bikeId}`
+  - [ ] Extend existing `rent_` handler for 3-part format `rent_{bikeId}_{docSha}` vs 2-part `rent_{bikeId}`
 
-- [ ] **Authenticate**: Use existing `useTelegramAuth` flow → get `chat_id` from `initData`
+- [ ] **Authenticate**: Use `useTelegramAuth` → get `chat_id` from `initData`
 
-- [ ] **Lookup renter data**: Query `private.user_rental_secrets` where:
-  - `doc_sha256 = docSha`
-  - `chat_id = current_user_chat_id`
-  - `verification_status = 'verified'`
-
-- [ ] **Verify source doc exists**: Cross-reference with `rental_contract_artifacts`
+- [ ] **Lookup renter data**: Query `private.user_rental_secrets` by `doc_sha256` + `chat_id` + `verification_status = 'verified'`
 
 - [ ] **Pre-fill rental form**: Auto-populate renter fields, skip "photograph documents" step
 
 - [ ] **Allow edit**: User can modify any pre-filled field before submission
 
-- [ ] **First-time renter flow**: If scanner has no matching data (different user or no history):
+- [ ] **First-time renter flow** (no matching data):
   - [ ] Open rental page with bike pre-selected (using `bikeId` from QR)
   - [ ] No auto-fill — standard rental flow
-  - [ ] This is also the "cold start" onboarding path
 
-- [ ] **QR expiration**: Consider expiring after first successful usage, or on doc revocation
-  - [ ] Decide: expire on first use? Or keep link alive for repeated use?
-  - [ ] If expired, show "Ссылка использована" → redirect to manual rental
-
-- [ ] **Security**: `doc_sha256` is a lookup key, NOT an auth token. Auth comes from Telegram `initData`. QR is given to driver personally (not public).
+- [ ] **QR expiration**: expire on doc revocation, keep alive for repeated use otherwise
 
 - [ ] **Error states** (implement all):
   | Scenario | Behavior |
@@ -313,8 +160,7 @@
   | QR scanned by different user | Open rental with bike pre-selected, no auto-fill |
   | Doc revoked | Error: "Документ аннулирован" → manual rental |
   | Bike no longer in fleet | Error: "Мотоцикл не доступен" → suggest alternatives |
-  | QR link expired | Error: "Ссылка использована" → manual rental |
-  | Stale data (old rental) | Show with date context: "Данные от DD.MM.YYYY" → let user verify |
+  | Stale data (old rental) | Show with date context: "Данные от DD.MM.YYYY" |
   | Multiple rentals for same user | Show picker (Task F) |
   | No rental history | Standard rental flow |
 
@@ -322,9 +168,9 @@
 
 ### Task F: "Previous Rental" Data Picker UI
 
-> **Prerequisite**: Task C (table), Task D (data saved), Task E (auto-fill flow)
+> **Prerequisite**: Task C ✅, Task D
 > **Complexity**: M
-> **Depends on**: Tasks C, D
+> **Depends on**: Tasks C ✅, D
 
 - [ ] **Query**: `private.user_rental_secrets` where `chat_id = current_user` AND `crew_slug = current_franchise` AND `verification_status = 'verified'`
 - [ ] **Sort**: `created_at DESC` (most recent first)
@@ -332,15 +178,15 @@
 - [ ] **On selection**: pre-fill rental creation form
 - [ ] **Design decisions**:
   - [ ] Where in UI? (profile page section? modal in rental flow? both?)
-  - [ ] Data staleness: show date of last rental as context, let user decide
+  - [ ] Data staleness: show date of last rental as context
 
 ---
 
 ### Task G: Franchise Profile Page Enhancement
 
-> **Prerequisite**: investigation 1.4 (find profile page), Task C (table)
+> **Prerequisite**: Task C ✅, Task D
 > **Complexity**: M
-> **Depends on**: Tasks C, D
+> **Depends on**: Tasks C ✅, D
 
 - [ ] Show user's saved rental data (masked: "Паспорт: **** 4512")
 - [ ] Allow editing/clearing saved data
@@ -351,103 +197,182 @@
 
 ### Task H: Contract Template Page Breaks ✅
 
-> **Prerequisite**: investigation 1.1 (template structure)
-> **Complexity**: S
-> **Depends on**: nothing (independent fix)
-
-- [x] **Problem**: DOCX prints as continuous flow ("сплошняком"), signature shifts to wrong side
-- [x] **Fix option A**: Add `<div style="page-break-before: always">` to HTML template before each Appendix — **CHOSEN ✅**
-- [x] ~~Fix option B~~: Detect section headers in `htmlToDocx` — **SKIPPED** (option A sufficient, `htmlToDocx` already supports page-break divs)
-- [x] Choose approach and implement
-- [x] Verify printed output has proper page breaks between sections
-  - Findings: Chose option A because `htmlToDocx.mjs` already converts page-break divs into DOCX `PageBreak` paragraphs. Verified generated DOCX XML contains four `w:br w:type="page"` markers.
+- [x] Add `<div style="page-break-before: always">` to HTML template before each Appendix
+- [x] Verified: 4 `w:br w:type="page"` markers in generated DOCX XML
 
 ---
 
 ### Task I: Missing Blank Fields for Handoff ✅
 
-> **Prerequisite**: investigation 1.7 (rental lifecycle)
-> **Complexity**: S
-> **Depends on**: nothing (independent fix)
-
-- [x] **Add blank placeholders to Appendix 1 (Акт приема-передачи)**:
-  - [x] Показания одометра: ____________
-  - [x] Уровень топлива: ____________
-  - [x] Состояние шин: ____________
-  - [x] Повреждения при передаче: ____________
-- [x] Update both HTML and MD templates
-- [x] These fields are filled manually during handoff until digitized handoff is implemented
+- [x] Added: odometer, fuel level, tire condition, delivery damage blanks to Appendix 1
+- [x] Updated both HTML and MD templates
 
 ---
 
 ### Task J: Web-App Duration & Time Picker
 
-> **Prerequisite**: investigation 1.8 (current checkout flow)
 > **Complexity**: M
-> **Depends on**: nothing (independent enhancement)
+> **Depends on**: nothing (independent)
 
-- [ ] **Current state**: checkout has preset duration options (1/3/7 days) as "quick presets" only
-- [ ] **Real-world usage**: hourly rentals (3 hours on Kawasaki), custom time ranges, arbitrary hours
-- [ ] **Enhancement**:
-  - [ ] Add date/time picker for start and end date+time (precise to hours)
-  - [ ] Keep quick preset buttons ("1 день", "3 дня", "неделя") as popular shortcuts
-  - [ ] Presets are NOT the only options — they just pre-fill the picker
-  - [ ] Aligns web-app with skill pipeline's arbitrary time range support
-  - [ ] Phase 1 finding: checkout only exposes start date (`type=date`) and computes end from `rentalDays`; no time-of-day picker exists yet
+- [ ] Add date/time picker for start and end date+time (precise to hours)
+- [ ] Keep quick preset buttons ("1 день", "3 дня", "неделя") as shortcuts
+- [ ] Presets pre-fill the picker, not the only options
+- [ ] Aligns web-app with skill pipeline's arbitrary time range support
 
 ---
 
-### Task K: Admin Dashboard — Successful Rents Display
+### Task K: Admin Dashboard — Successful Rents Display ✅
 
-> **Prerequisite**: investigation 1.9 (current admin dashboard) ✅
-> **Complexity**: S
-> **Depends on**: nothing (independent enhancement)
-
-- [x] Find existing admin dashboard component — **Found** in Phase 1: `app/franchize/[slug]/admin/page.tsx` + `FranchizeAdminClient.tsx`
-- [x] **Currently shows**: fleet, failed orders, retry controls, review moderation, vehicle editing; added successful rental history with contract verifier status
-- [x] **Enhancement**: add successful rents section
-  - [x] Query `rentals` joined with vehicle data and `metadata.contract_verifier`
-  - [x] Show rental history with doc verification status
-  - [x] Display: bike name, renter, dates, contract status (verified/pending/none)
-  - [x] Auto-refresh or live updates when new rents complete
+- [x] Find existing admin dashboard component — **Found** in Phase 1
+- [x] Added "Успешные аренды" section with bike, renter, dates, contract status
+- [x] 60-second auto-refresh
+- [x] Wired through `getFranchizeSuccessfulRentals` action
 
 ---
 
 ### Task L: Hot-Stage QR Entry (Rent-in-Progress View)
 
-> **Prerequisite**: investigation 1.7 (rental lifecycle) ✅, Task E (QR deep-link parsing)
+> **Prerequisite**: Task E
 > **Complexity**: M
 > **Depends on**: Task E
 
-> **Context**: Handoff photos are partially implemented — sending a photo to Telegram bot auto-assigns it as "before" or "after" depending on active rent state. But there's no way to enter the "hot stage" (rent in progress) web view without navigating manually.
+> **Context**: Handoff photos partially implemented (bot assigns before/after). Need way to enter "hot stage" web view directly via QR.
 
-- [ ] **Design**: QR scan should open rent-in-progress view directly (not just contract pre-fill)
-- [ ] When user scans QR during active rental:
-  - [ ] Open the rental detail page for that active rental (`/franchize/[slug]/rental/[id]`)
-  - [ ] Show "handoff mode" — add damage photos, odometer, notes
-  - [ ] No need to re-navigate or re-click anything
-- [ ] This bridges the gap between paper handoff and digitized handoff
-- [ ] Phase 1 finding: `FranchizeRentalDocumentsPanel` already has `saveRentalPickupFreeze` and `addRentalDamageReport` actions — hot-stage QR just needs to navigate there
+- [ ] QR scan during active rental → open rental detail page directly
+- [ ] Show "handoff mode" — add damage photos, odometer, notes
+- [ ] No re-navigation required
+- [ ] `FranchizeRentalDocumentsPanel` already has `saveRentalPickupFreeze` and `addRentalDamageReport`
+
+---
+
+### Task M: Fix Admin Dashboard Bugs (from Run 2 Code Review)
+
+> **Complexity**: S
+> **Depends on**: nothing (bug fixes in existing code)
+
+- [ ] **Bug 1 — renter name fallback**: `metadata.renter_full_name` is null for web-app rentals → add fallback to `metadata.recipientName` + join `users` table for actual name
+  - Current code: `metadata.renter_full_name` → `metadata.recipientName` → `metadata.customerName` → `row.user_id`
+  - Fix: also try `users.display_name` or `users.metadata.franchizeFormPrefill[slug].fullName` via user_id join
+
+- [ ] **Bug 2 — missing date fallback**: `agreed_start_date` / `requested_start_date` are null for payment-webhook rentals → add fallback to `metadata.rentalStartDate` / `metadata.rentalEndDate`
+  - Current code: `agreed_start_date` → `requested_start_date` → null
+  - Fix: `agreed_start_date` → `requested_start_date` → `metadata.rentalStartDate` → null
+
+---
+
+## 🏆 Phase 3: VIP Club — Trust-Based Access Tiers
+
+> **Vision**: Once a renter completes a verified rental, they become a VIP Club member. Their docs are verified, their data is saved, and they can rent bikes in their access tier without re-photographing documents. The QR code is the gateway — scan once, agree to ФЗ-152 data storage, link web-app account to verified identity, and all future rentals are streamlined.
+
+### 3.0 VIP Club — Concept & Lore
+
+> **Why "VIP Bike"?** — Those who rented once become part of the VIP Club. Trust is established after one successful rent. Docs are verified manually once and saved to secrets. By scanning QR code, the user agrees to ФЗ-152 (Federal Law on Personal Data) storage, links their web-app profile, and all future rents in their access tier are 1-click.
+
+**The core loop:**
+1. First rent → docs photographed + verified manually → contract signed → QR on contract
+2. User scans QR → agrees to ФЗ-152 → profile linked → VIP status unlocked
+3. Next rent → select bike in access tier → notification to admin with doc ready → confirm → ride
+4. Future: NFC activation via phone (bike started by card with NFC today, phone-as-key tomorrow)
+
+### 3.1 Bike Access Tiers
+
+> **Concept**: Bikes require different levels of documentation/qualification. Tier determines what docs are needed and what VIP members can access.
+
+- [ ] **Design access tier system** for bikes:
+  - [ ] **Entry** — e-bikes, scooters, low-power (no driver's license required, basic ID only)
+  - [ ] **Mid** — mid-size motorcycles (category A1/A license required, full passport + license)
+  - [ ] **Pro** — high-power motorcycles (category A license + experience verification)
+  - [ ] Tier stored where? `cars.metadata.access_tier` or `cars.specs.access_tier`?
+
+- [ ] **Tier determination logic**:
+  - [ ] What fields on `cars` determine tier? (type, engine displacement, power, category)
+  - [ ] Can tiers be configured per crew? (crew A classifies differently than crew B)
+  - [ ] Should tiers be hardcoded or configurable in `crew_secrets.price_lists`?
+
+- [ ] **VIP access check**: when VIP member scans QR or opens rental:
+  - [ ] What tier(s) is this user verified for?
+  - [ ] Based on: verified doc types in `user_rental_secrets` + driver's license category
+  - [ ] Entry-tier VIP: passport verified → can rent entry-level
+  - [ ] Mid-tier VIP: passport + license (A1/A) verified → can rent entry + mid
+  - [ ] Pro-tier VIP: passport + license (A) + experience confirmed → can rent all
+
+### 3.2 VIP Status & Trust Level
+
+- [ ] **Design VIP status mechanism**:
+  - [ ] Option A: derived status — query `user_rental_secrets` for verified rows to determine tier (no new column needed)
+  - [ ] Option B: explicit `vip_tier` column on `users.metadata` or new `user_vip_status` table
+  - [ ] Recommendation: **Option A first** — derive from existing data, add explicit column only if query performance requires it
+
+- [ ] **Trust establishment flow**:
+  - [ ] First rent: docs photographed via OCR, verified by admin manually
+  - [ ] Admin confirms verification → `user_rental_secrets.verification_status = 'verified'`
+  - [ ] User scans QR on paper contract → ФЗ-152 consent → profile linked
+  - [ ] VIP unlocked: next rentals skip doc photographing step
+
+- [ ] **ФЗ-152 digital consent** (via QR scan):
+  - [ ] When user scans QR for first time, show consent screen
+  - [ ] "Вы соглашаетесь с обработкой персональных данных в соответствии с ФЗ-152"
+  - [ ] Paper consent (Appendix 4) covers the original rental; this covers digital storage for re-use
+  - [ ] Store consent timestamp in `user_rental_secrets` or separate `user_consent_records`
+  - [ ] User can revoke → data deleted from `user_rental_secrets`
+
+### 3.3 Streamlined Re-Rental for VIP Members
+
+- [ ] **VIP rental flow** (1-click for returning riders):
+  - [ ] User opens web app → sees bikes available in their tier
+  - [ ] Selects bike → duration → submit
+  - [ ] No doc photographing needed — data pre-filled from `user_rental_secrets`
+  - [ ] Contract auto-generated with saved data → sent to admin for confirmation
+  - [ ] Admin gets notification: "VIP-аренда: [Name] → [Bike] — данные проверены"
+  - [ ] Admin confirms → rental active → user gets bike
+
+- [ ] **Admin notification enhancement**:
+  - [ ] Distinguish VIP rentals from first-time rentals in admin dashboard
+  - [ ] Show "VIP ✅" badge vs "Новый клиент 🆕" badge
+  - [ ] VIP rentals can be auto-confirmed (configurable per crew)
+
+### 3.4 NFC Activation (Future / Research)
+
+> **Context**: Bikes are currently started by NFC card. VIP members could use their phone as key.
+
+- [ ] **Research NFC capabilities**:
+  - [ ] What NFC hardware is on the bikes? (reader model, protocol)
+  - [ ] Can phone NFC emulate the same card? (Web NFC API? Native Android/iOS?)
+  - [ ] Temporary NFC marks — can the system generate one-time NFC tokens?
+  - [ ] Security: NFC token tied to rental + user, expires at rental end
+
+- [ ] **Phone-as-key design** (speculative):
+  - [ ] Rental confirmed → generate NFC token → send to user's phone via Telegram mini-app
+  - [ ] User taps phone on bike → bike starts
+  - [ ] Token expires at rental end → bike won't start for expired rentals
+  - [ ] Fallback: admin can generate temporary NFC card mark
+
+- [ ] **Investigate existing NFC system**:
+  - [ ] Find NFC hardware integration code in repo
+  - [ ] What API/protocol does it use?
+  - [ ] Is there a management interface for NFC tokens?
 
 ---
 
 ## 📊 Task Dependency Graph
 
 ```
-Task A (fix duplicate doc) ✅ ──→ Task B (QR alongside doc)
-                                         │
-Task C (secret table) ───────────────────┼──→ Task D (save renter data)
-                                         │         │
-                                         │         ├──→ Task E (QR deep-link auto-fill) ──→ Task L (hot-stage entry)
-                                         │         │
-                                         │         ├──→ Task F (previous rental picker)
-                                         │         │
-                                         │         └──→ Task G (profile page enhancement)
+Phase 2 (core infrastructure):
+  Task A ✅ ──→ Task B (QR alongside doc) ──→ Task E (deep-link auto-fill) ──→ Task L (hot-stage entry)
+  Task C ✅ ──→ Task D (save renter data) ──┤
+                                             ├──→ Task F (previous rental picker)
+                                             └──→ Task G (profile page enhancement)
 
-Independent: Task H ✅, Task I ✅, Task J (time picker), Task K (admin dashboard)
+  Independent: Task H ✅, Task I ✅, Task J (time picker), Task K ✅, Task M (bug fixes)
+
+Phase 3 (VIP Club — builds on Phase 2):
+  Task D ──→ 3.1 (bike access tiers) ──→ 3.3 (streamlined re-rental)
+  Task D ──→ 3.2 (VIP status/trust)  ──→ 3.3 (streamlined re-rental)
+  Task E ──→ 3.2 (ФЗ-152 consent via QR)
+  3.4 (NFC) — independent research track
 ```
 
-**Suggested execution order**: C → D → B → E → F → G → L | J, K can run in parallel
+**Current execution order**: D + M → B → E → F → G → L → then Phase 3
 
 ---
 
@@ -456,10 +381,10 @@ Independent: Task H ✅, Task I ✅, Task J (time picker), Task K (admin dashboa
 - **No breaking changes**: Existing `rental-{id}` deep-links must continue to work. New `rent_{bikeId}_{docSha}` must not collide.
 - **Private schema for secrets**: Sensitive renter data MUST live in `private.*` tables, never `public.*`.
 - **Metadata principle**: `users.metadata` stores raw signals only. Derived state goes in secret table, not metadata.
-- **Crew isolation**: Scoped per franchise (`crew_slug`). Do NOT design cross-franchise data sharing. Different crews may have different doc types and templates.
-- **Privacy**: Paper contract consent (Appendix 4) covers data storage. `private.*` schema + service-role-only access is sufficient.
-- **Bike IDs are slugs**: `cars.id` is human-readable (`kawasaki-ex650k`), NOT a UUID. `doc_sha256` is a hex string (also not UUID). Don't confuse with `crew_id` which IS a UUID.
-- **No multi-bike support**: 1 bike = 1 doc = 1 contract. Keep it simple.
+- **Crew isolation**: Scoped per franchise (`crew_slug`). Do NOT design cross-franchise data sharing.
+- **Privacy**: Paper contract consent (Appendix 4) covers initial data storage. ФЗ-152 digital consent needed for re-use of data across rentals (Phase 3).
+- **Bike IDs are slugs**: `cars.id` is human-readable (`kawasaki-ex650k`), NOT a UUID.
+- **No multi-bike support**: 1 bike = 1 doc = 1 contract.
 - **Russian language**: All user-facing text in Russian. Code/comments can be English.
 - **Supabase-first**: Use Supabase client (service role for `private.*` access), not raw SQL from app code.
 
@@ -475,11 +400,13 @@ Contract was **printed and signed IRL** ✅
 
 | # | Issue | Status | Task |
 |---|-------|--------|------|
-| LAYOUT-1 | No page breaks — doc prints "сплошняком" | **Fixed** ✅ — HTML template emits DOCX page-break markers before appendices | Task H |
-| PRICE-1 | Explicit price in prompt ignored | **Deferred** — price override from prompt text needs more thought, could raise questions. Seed data fixed instead. | Not in scope |
+| LAYOUT-1 | No page breaks — doc prints "сплошняком" | **Fixed** ✅ | Task H |
+| PRICE-1 | Explicit price in prompt ignored | **Deferred** — seed data fixed instead | Not in scope |
 | DATA-1 | Kawasaki daily price wrong | **Fixed** ✅ (dailyPrice=16000, price_per_hour=2000) | Done |
-| DATA-2 | Missing blank handoff fields | **Fixed** ✅ — manual blanks added to Appendix 1 in HTML + MD | Task I |
-| BUG | Duplicate DOCX delivery | **Fixed** ✅ — Telegram response parse errors no longer trigger resend fallback | Task A |
+| DATA-2 | Missing blank handoff fields | **Fixed** ✅ | Task I |
+| BUG | Duplicate DOCX delivery | **Fixed** ✅ | Task A |
+| BUG-M1 | Admin renter name shows user_id for web-app rentals | **Open** — fallback chain misses `metadata.recipientName` + user join | Task M |
+| BUG-M2 | Admin dates show "—" for payment-webhook rentals | **Open** — missing `metadata.rentalStartDate` fallback | Task M |
 
 ---
 
@@ -490,25 +417,19 @@ Contract was **printed and signed IRL** ✅
 - `lib/docx-capability.ts` — Web-app doc builder
 - `lib/htmlToDocx.mjs` and `lib/htmlToDocx.ts` — HTML→DOCX conversion
 - `docs/RENTAL_DEAL_TEMPLATE.html` — Contract template with all `{{variables}}`
-- `actions-runtime.ts` — Main server actions (search for `buildFranchizeOrderDocAndNotify`, `getFranchizeRentalCard`, `getUserSensitiveDataOrDefault`)
+- `app/franchize/actions-runtime.ts` — Main server actions (including `getFranchizeSuccessfulRentals`)
+- `app/franchize/components/FranchizeAdminClient.tsx` — Admin dashboard (includes "Успешные аренды")
+- `app/lib/user-rental-secrets.ts` — Rental secrets access module
+- `supabase/migrations/20260601000000_user_rental_secrets.sql` — Rental secrets table migration
 - `useTelegramAuth.ts` — Telegram auth hook with `startParam`
-- `start.ts` — `/start` command handler
-- `FranchizeProfileButton.tsx` — Profile dropdown (links to `/franchize/{slug}/profile`)
-- `experience-types.ts` — Type definitions including `VipBikeUserMetadata`
-- `track-behavior.ts` — Existing QR scan tracking
-- `20260527090000_rental_contract_artifacts.sql` — Existing artifacts table migration
-- `20260304_private_scheme.sql` — Existing private schema migration (pattern to follow)
-- `crews_rows.csv` / `users_rows.csv` — Seed data with metadata JSONB structure
-- `app/franchize/[slug]/admin/page.tsx` + `FranchizeAdminClient.tsx` — Admin dashboard
-- `app/franchize/[slug]/profile/page.tsx` + `FranchizeProfileClient` — User profile
+- `app/franchize/[slug]/admin/page.tsx` — Admin page
+- `app/franchize/[slug]/profile/page.tsx` — User profile
 
 **Key search terms:**
-- `private.crew_secrets` / `crew_secrets` — existing secret table pattern
-- `private.user_secrets` / `user_secrets` — existing user secrets table
-- `getUserSensitiveDataOrDefault` / `saveCrewSensitiveData` — secret access functions
+- `private.crew_secrets` / `private.user_secrets` / `private.user_rental_secrets` — secret tables
+- `getUserSensitiveDataOrDefault` / `getUserRentalSecrets` — secret access functions
 - `startapp` / `startParam` / `start_param` — deep-link handling
 - `contract_verifier` / `originalSha256` / `doc_verifier` — document verification
 - `rental_contract_artifacts` — contract metadata table
 - `franchize` / `franchise` — franchise-related code (both spellings exist!)
-- `qr` / `qrcode` / `QR` — QR code generation (web method exists in repo)
 - `sendMediaGroup` / `sendDocument` — Telegram bot API delivery methods
