@@ -560,29 +560,26 @@ The gold seed already has `license_class` on every bike. Here's the mapping:
 ## 📊 Full Roadmap — Execution Order
 
 ```
-Phase 2 (core — in progress):
-  Run 3:  Task D (save renter data) + Task M (admin bugs)     ✅ DONE — M3 FK fix pending
-  Run 4:  Task B (QR alongside contract) + Bug M3 (FK disambiguation)
-  Run 5:  Task E (deep-link auto-fill) + Task J (time picker)
-  Run 6:  Task F (previous rental picker) + Task L (hot-stage QR)
-  Run 7:  Task G (profile page enhancement)
+Phase 2+3+4 MEGA RUN (Run 4 — execute until context limit):
+  1. Bug M3 + Bug D1                          (one-liners)
+  2. Task B (QR alongside contract)
+  3. Phase 3.1 (access tier utility)
+  4. Task E (deep-link auto-fill)
+  5. Task J (time picker)
+  6. Task F (previous rental picker)
+  7. Task L (hot-stage QR entry)
+  8. Task G (profile page enhancement)
+  9. Phase 3.2 (VIP status from license + ФЗ-152)
+  10. Phase 3.3 (VIP rental flow + bike filtering)
+  11. Phase 4.0 (OCR architecture decision)
+  12. Phase 4.1 (Telegram /doc command)
+  13. Phase 4.2 (OCR API endpoint + VLM)
+  14. Phase 4.3 (OCR → tier auto-upgrade)
+  15. Phase 4.4 (OCR quality + admin verification)
+  16. Phase 3.4 (NFC research)
 
-Phase 3 (VIP Club — D ✅ landed, unblocked):
-  Run 8:  3.1 (access tiers in gold seed + utility function)
-  Run 9:  3.2 (VIP tier derivation from license + ФЗ-152 consent)
-  Run 10: 3.3 (streamlined VIP re-rental + bike catalog filtering)
-
-Phase 4 (OCR — can start in parallel with Phase 3):
-  Run 11: 4.1 (Telegram /doc command + conversation state)
-  Run 12: 4.2 (OCR API endpoint + VLM integration)
-  Run 13: 4.3 (OCR → VIP tier auto-upgrade)
-  Run 14: 4.4 (OCR quality + admin verification UI)
-
-Phase 5 (future):
-  3.4 NFC activation research
-  Digitize old docs batch import
-  Price override from natural language prompt
-  Multi-franchise expansion
+  Parallel-safe: 5↔6, 11↔any, 16↔any
+  Skip tasks whose deps aren't met, come back later
 ```
 
 ---
