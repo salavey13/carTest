@@ -48,6 +48,15 @@ This root file stays intentionally compact so operators and agents can load it q
 
 ## 2) Mini execution diary
 
+### 2026-05-31 — VIP Bike 1-click next rent Task D/M
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-05-31T00:00:00Z
+- `owner`: codex
+- `notes`: Wired rental contract generation paths to persist verified renter identity snapshots into `private.user_rental_secrets` using the shared rental template version, and fixed successful-rent admin fallbacks for renter display names plus webhook metadata dates.
+- `next_step`: Continue with QR/deep-link auto-fill tasks after this save path lands.
+- `risks`: Skill-script identity save uses a direct private-schema fallback when Node cannot load the Next.js TypeScript server module at runtime.
+
 ### 2026-05-29 — VIPBikeRental Bike Showcase full-bleed restore
 
 - `status`: ready_for_pr
