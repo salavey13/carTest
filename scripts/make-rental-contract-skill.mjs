@@ -409,13 +409,29 @@ try {
   form.append('chat_id', telegramChatId);
   form.append('document', new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), docFileName);
   const res = await fetch(telegramUrl, {method:'POST', body: form});
-  json = await res.json();
+  const bodyText = await res.text();
+  try {
+    json = JSON.parse(bodyText || '{}');
+  } catch (parseError) {
+    failStage('telegram_delivery', 'telegram_response_parse_failed_after_send', {
+      status: res.status,
+      bodyPreview: bodyText.slice(0, 500),
+      error: String(parseError?.message || parseError),
+    });
+  }
 } catch (networkError) {
   const tmpFile = `/tmp/rental-contract-${Date.now()}.docx`;
   await import('node:fs/promises').then(fs => fs.writeFile(tmpFile, buf));
   const curl = spawnSync('curl', ['-sS', '-X', 'POST', telegramUrl, '-F', `chat_id=${telegramChatId}`, '-F', `document=@${tmpFile}`], { encoding: 'utf8' });
   if (curl.status !== 0) throw new Error(`Telegram curl send failed: ${curl.stderr || curl.stdout}`);
-  json = JSON.parse(curl.stdout || '{}');
+  try {
+    json = JSON.parse(curl.stdout || '{}');
+  } catch (parseError) {
+    failStage('telegram_delivery', 'telegram_curl_response_parse_failed', {
+      bodyPreview: String(curl.stdout || '').slice(0, 500),
+      error: String(parseError?.message || parseError),
+    });
+  }
 }
 if (!json.ok) failStage('telegram_delivery', 'telegram_send_failed', { telegram: json });
 
