@@ -72,6 +72,19 @@ export interface FranchizeHeaderVM {
   menuLinks: Array<{ label: string; href: string }>;
 }
 
+
+export interface FranchizeSuccessfulRentalVM {
+  rentalId: string;
+  status: string;
+  bikeId: string;
+  bikeName: string;
+  renterName: string;
+  startDate: string | null;
+  endDate: string | null;
+  createdAt: string;
+  contractStatus: "verified" | "pending" | "revoked" | "none" | string;
+}
+
 export interface RentalReviewVM {
   id: string;
   rentalId: string;
@@ -2212,6 +2225,57 @@ export async function retryFranchizeOrderNotification(input: unknown): Promise<{
   }
 
   return submitFranchizeOrderNotification(logRow.payload);
+}
+
+export async function getFranchizeSuccessfulRentals(input: unknown): Promise<{ success: boolean; items?: FranchizeSuccessfulRentalVM[]; error?: string }> {
+  const parsed = z.object({ slug: z.string().trim().min(1), actorUserId: z.string().trim().min(1) }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректный запрос." };
+  const { slug, actorUserId } = parsed.data;
+  const { data: crew } = await supabaseAdmin.from("crews").select("id, owner_id").eq("slug", normalizeCrewSlug(slug)).maybeSingle();
+  if (!crew) return { success: false, error: "Экипаж не найден." };
+  const canRead = await resolveFranchizeEditorAccess(actorUserId, crew);
+  if (!canRead) return { success: false, error: "Недостаточно прав для просмотра аренд." };
+
+  const { data, error } = await supabaseAdmin
+    .from("rentals")
+    .select("rental_id, user_id, vehicle_id, status, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date, created_at, metadata, vehicle:cars!inner(id, make, model, crew_id)")
+    .eq("vehicle.crew_id", crew.id)
+    .in("status", ["confirmed", "active", "completed"])
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  if (error) return { success: false, error: error.message };
+
+  return {
+    success: true,
+    items: ((data ?? []) as UnknownRecord[]).map((row) => {
+      const vehicle = (Array.isArray(row.vehicle) ? row.vehicle[0] : row.vehicle) as UnknownRecord | undefined;
+      const metadata = (row.metadata && typeof row.metadata === "object" ? row.metadata : {}) as UnknownRecord;
+      const verifier = (metadata.contract_verifier && typeof metadata.contract_verifier === "object" ? metadata.contract_verifier : {}) as UnknownRecord;
+      const contractStatus = typeof verifier.status === "string" && verifier.status.trim() ? verifier.status.trim() : "none";
+      const bikeName = `${typeof vehicle?.make === "string" ? vehicle.make : ""} ${typeof vehicle?.model === "string" ? vehicle.model : ""}`.trim();
+      const renterName =
+        typeof metadata.renter_full_name === "string" && metadata.renter_full_name.trim()
+          ? metadata.renter_full_name.trim()
+          : typeof metadata.recipientName === "string" && metadata.recipientName.trim()
+            ? metadata.recipientName.trim()
+            : typeof metadata.customerName === "string" && metadata.customerName.trim()
+              ? metadata.customerName.trim()
+              : String(row.user_id ?? "");
+
+      return {
+        rentalId: String(row.rental_id ?? ""),
+        status: String(row.status ?? ""),
+        bikeId: String(row.vehicle_id ?? ""),
+        bikeName: bikeName || String(row.vehicle_id ?? "Техника"),
+        renterName: renterName || "Арендатор не указан",
+        startDate: typeof row.agreed_start_date === "string" ? row.agreed_start_date : typeof row.requested_start_date === "string" ? row.requested_start_date : null,
+        endDate: typeof row.agreed_end_date === "string" ? row.agreed_end_date : typeof row.requested_end_date === "string" ? row.requested_end_date : null,
+        createdAt: String(row.created_at ?? ""),
+        contractStatus,
+      };
+    }),
+  };
 }
 
 export async function getFranchizeOrderNotificationFailures(input: unknown): Promise<{ success: boolean; items?: Array<{ orderId: string; sendTo: string; lastError: string; createdAt: string }>; error?: string }> {
