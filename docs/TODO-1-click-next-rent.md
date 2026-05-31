@@ -110,27 +110,33 @@
 
 ---
 
-### Task D: Save Renter Data on Contract Generation
+### Task D: Save Renter Data on Contract Generation ✅
 
 > **Prerequisite**: Task C ✅
 > **Complexity**: M
 > **Depends on**: Task C ✅
 
-- [ ] **Skill script** (`make-rental-contract-skill.mjs`):
-  - [ ] After successful DOCX generation + SHA256, insert row into `private.user_rental_secrets`
-  - [ ] Extract renter fields from the same data used to fill template variables
-  - [ ] Set `verification_status = 'verified'` (doc was just generated and sent)
-  - [ ] Set `template_version` from current template version constant
+- [x] **Skill script** (`make-rental-contract-skill.mjs`):
+  - [x] After successful DOCX generation + SHA256, insert row into `private.user_rental_secrets`
+  - [x] Extract renter fields from the same data used to fill template variables
+  - [x] Set `verification_status = 'verified'` (doc was just generated and sent)
+  - [x] Set `template_version` from current template version constant
 
-- [ ] **Web-app pipeline** (`buildFranchizeOrderDocAndNotify`):
-  - [ ] Same insert logic after successful doc generation
-  - [ ] Read renter data from `userSensitive` + payload fields
+- [x] **Web-app pipeline** (`buildFranchizeOrderDocAndNotify`):
+  - [x] Same insert logic after successful doc generation
+  - [x] Read renter data from `userSensitive` + payload fields
 
-- [ ] **Shared template version constant** (`CURRENT_RENTAL_TEMPLATE_VERSION = 1`)
+- [x] **Shared template version**: `CURRENT_RENTAL_TEMPLATE_VERSION` constant defined in `lib/rental-template-version.ts`
 
-- [ ] **Non-blocking**: save failures must NOT prevent doc delivery
+- [x] **Non-blocking**: save failures must NOT prevent doc delivery
 
-- [ ] **Future preparation**: design insert to work for batch imports (digitize old docs workflow)
+- [x] **Future preparation**: design insert to work for batch imports (digitize old docs workflow)
+
+- [x] **`renter_address` added** to template vars in skill script (`passportJson.address || passportJson.registration`)
+
+- [x] **Crew slug resolution** in skill script: resolve from `bike.crew_id` → `crews.slug` when `--crewSlug` arg not provided
+
+- [x] **Skill script fallback insert**: when `saveUserRentalSecrets` TypeScript import fails, falls back to direct Supabase REST insert to `private.user_rental_secrets`
 
 ---
 
@@ -249,18 +255,20 @@
 
 ---
 
-### Task M: Fix Admin Dashboard Bugs (from Run 2 Code Review)
+### Task M: Fix Admin Dashboard Bugs (from Run 2 Code Review) ✅
 
 > **Complexity**: S
 > **Depends on**: nothing (bug fixes in existing code)
 
-- [ ] **Bug 1 — renter name fallback**: `metadata.renter_full_name` is null for web-app rentals → add fallback to `metadata.recipientName` + join `users` table for actual name
-  - Current code: `metadata.renter_full_name` → `metadata.recipientName` → `metadata.customerName` → `row.user_id`
-  - Fix: also try `users.display_name` or `users.metadata.franchizeFormPrefill[slug].fullName` via user_id join
+- [x] **Bug 1 — renter name fallback**: `metadata.renter_full_name` is null for web-app rentals → add fallback to `metadata.recipientName` + join `users` table for actual name
+  - Old code: `metadata.renter_full_name` → `metadata.recipientName` → `metadata.customerName` → `row.user_id`
+  - Fixed: extended chain → `metadata.recipient` → `user.full_name` → `userMetadata.display_name` → `slugPrefill.fullName` → `user.username` → `Пользователь #${user_id}`
 
-- [ ] **Bug 2 — missing date fallback**: `agreed_start_date` / `requested_start_date` are null for payment-webhook rentals → add fallback to `metadata.rentalStartDate` / `metadata.rentalEndDate`
-  - Current code: `agreed_start_date` → `requested_start_date` → null
-  - Fix: `agreed_start_date` → `requested_start_date` → `metadata.rentalStartDate` → null
+- [x] **Bug 2 — missing date fallback**: `agreed_start_date` / `requested_start_date` are null for payment-webhook rentals → add fallback to `metadata.rentalStartDate` / `metadata.rentalEndDate`
+  - Old code: `agreed_start_date` → `requested_start_date` → null
+  - Fixed: `agreed_start_date` → `requested_start_date` → `metadata.rentalStartDate` → null
+
+- [ ] **Bug M3 — PostgREST FK disambiguation** (found by Codex Review): `user:users(...)` is ambiguous because `rentals` has both `user_id` and `owner_id` FKs to `users`. Query will error in production. Fix: `user:users!rentals_user_id_fkey(...)` to explicitly select the `user_id` FK relationship.
 
 ---
 
@@ -553,13 +561,13 @@ The gold seed already has `license_class` on every bike. Here's the mapping:
 
 ```
 Phase 2 (core — in progress):
-  Run 3:  Task D (save renter data) + Task M (admin bugs)     ← Codex cooking now
-  Run 4:  Task B (QR alongside contract)
+  Run 3:  Task D (save renter data) + Task M (admin bugs)     ✅ DONE — M3 FK fix pending
+  Run 4:  Task B (QR alongside contract) + Bug M3 (FK disambiguation)
   Run 5:  Task E (deep-link auto-fill) + Task J (time picker)
   Run 6:  Task F (previous rental picker) + Task L (hot-stage QR)
   Run 7:  Task G (profile page enhancement)
 
-Phase 3 (VIP Club — can start after D lands):
+Phase 3 (VIP Club — D ✅ landed, unblocked):
   Run 8:  3.1 (access tiers in gold seed + utility function)
   Run 9:  3.2 (VIP tier derivation from license + ФЗ-152 consent)
   Run 10: 3.3 (streamlined VIP re-rental + bike catalog filtering)
@@ -584,26 +592,26 @@ Phase 5 (future):
 ```
 Phase 2 (core infrastructure):
   Task A ✅ ──→ Task B (QR alongside doc) ──→ Task E (deep-link auto-fill) ──→ Task L (hot-stage entry)
-  Task C ✅ ──→ Task D (save renter data) ──┤
-                                             ├──→ Task F (previous rental picker)
-                                             └──→ Task G (profile page enhancement)
+  Task C ✅ ──→ Task D ✅ ──┤
+                             ├──→ Task F (previous rental picker)
+                             └──→ Task G (profile page enhancement)
 
-  Independent: Task H ✅, Task I ✅, Task J (time picker), Task K ✅, Task M (bug fixes)
+  Independent: Task H ✅, Task I ✅, Task J (time picker), Task K ✅, Task M ✅ (M3 FK fix pending)
 
 Phase 3 (VIP Club — builds on Phase 2):
-  Task D ──→ 3.1 (bike access tiers) ──→ 3.3 (streamlined re-rental)
-  Task D ──→ 3.2 (VIP status/trust)  ──→ 3.3 (streamlined re-rental)
+  Task D ✅ ──→ 3.1 (bike access tiers) ──→ 3.3 (streamlined re-rental)
+  Task D ✅ ──→ 3.2 (VIP status/trust)  ──→ 3.3 (streamlined re-rental)
   Task E ──→ 3.2 (ФЗ-152 consent via QR)
   3.4 (NFC) — independent research track
 
 Phase 4 (OCR — builds on Phase 2 + 3):
-  D ──→ 4.1 (/doc command)
+  D ✅ ──→ 4.1 (/doc command)
   4.2 (OCR API) ──→ 4.3 (OCR → tier upgrade)
   4.1 ──→ 4.2 (bot needs OCR to process photos)
   3.2 ──→ 4.3 (tier system must exist for auto-upgrade)
 ```
 
-**Current execution order**: D + M → B → E → F → G → L → then Phase 3
+**Current execution order**: B + M3 → E + J → F + L → G → then Phase 3
 
 ---
 
@@ -637,8 +645,9 @@ Contract was **printed and signed IRL** ✅
 | DATA-1 | Kawasaki daily price wrong | **Fixed** ✅ (dailyPrice=16000, price_per_hour=2000) | Done |
 | DATA-2 | Missing blank handoff fields | **Fixed** ✅ | Task I |
 | BUG | Duplicate DOCX delivery | **Fixed** ✅ | Task A |
-| BUG-M1 | Admin renter name shows user_id for web-app rentals | **Open** — fallback chain misses `metadata.recipientName` + user join | Task M |
-| BUG-M2 | Admin dates show "—" for payment-webhook rentals | **Open** — missing `metadata.rentalStartDate` fallback | Task M |
+| BUG-M1 | Admin renter name shows user_id for web-app rentals | **Fixed** ✅ — extended fallback chain + users table join | Task M |
+| BUG-M2 | Admin dates show "—" for payment-webhook rentals | **Fixed** ✅ — added `metadata.rentalStartDate/rentalEndDate` fallback | Task M |
+| BUG-M3 | PostgREST FK ambiguity on `user:users(...)` — query will error | **Open** — need `!rentals_user_id_fkey` disambiguation | Task M |
 
 ---
 
@@ -647,6 +656,7 @@ Contract was **printed and signed IRL** ✅
 **Key files:**
 - `scripts/make-rental-contract-skill.mjs` — Skill script (Codex/Slack trigger)
 - `lib/docx-capability.ts` — Web-app doc builder
+- `lib/rental-template-version.ts` — Shared `CURRENT_RENTAL_TEMPLATE_VERSION` constant
 - `lib/htmlToDocx.mjs` and `lib/htmlToDocx.ts` — HTML→DOCX conversion
 - `docs/RENTAL_DEAL_TEMPLATE.html` — Contract template with all `{{variables}}`
 - `app/franchize/actions-runtime.ts` — Main server actions (including `getFranchizeSuccessfulRentals`)
