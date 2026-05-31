@@ -10,6 +10,7 @@ export type {
   FranchizeCrewVM,
   FranchizeHeaderVM,
   FranchizeTheme,
+  FranchizeSuccessfulRentalVM,
   RentalReviewSummaryVM,
   RentalReviewVM,
 } from "@/app/franchize/actions-runtime";
@@ -48,6 +49,7 @@ import {
 import {
   checkFranchizeCarsAvailability as checkFranchizeCarsAvailabilityAction,
   getFranchizeRentalCard as getFranchizeRentalCardAction,
+  getFranchizeSuccessfulRentals as getFranchizeSuccessfulRentalsAction,
   reconcileRentalContractVerifierAttachment as reconcileRentalContractVerifierAttachmentAction,
 } from "@/app/franchize/server-actions/rentals";
 
@@ -181,6 +183,12 @@ export async function getFranchizeRentalCard(
   ...args: Parameters<typeof getFranchizeRentalCardAction>
 ) {
   return getFranchizeRentalCardAction(...args);
+}
+
+export async function getFranchizeSuccessfulRentals(
+  ...args: Parameters<typeof getFranchizeSuccessfulRentalsAction>
+) {
+  return getFranchizeSuccessfulRentalsAction(...args);
 }
 
 export async function reconcileRentalContractVerifierAttachment(

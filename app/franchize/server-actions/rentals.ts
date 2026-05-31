@@ -3,6 +3,7 @@
 import {
   checkFranchizeCarsAvailability as checkFranchizeCarsAvailabilityRuntime,
   getFranchizeRentalCard as getFranchizeRentalCardRuntime,
+  getFranchizeSuccessfulRentals as getFranchizeSuccessfulRentalsRuntime,
   reconcileRentalContractVerifierAttachment as reconcileRentalContractVerifierAttachmentRuntime,
 } from "@/app/franchize/actions-runtime";
 
@@ -19,4 +20,8 @@ export async function checkFranchizeCarsAvailability(input: unknown) {
 
 export async function getFranchizeRentalCard(slug: string, rentalId: string) {
   return getFranchizeRentalCardRuntime(slug, rentalId);
+}
+
+export async function getFranchizeSuccessfulRentals(input: unknown) {
+  return getFranchizeSuccessfulRentalsRuntime(input);
 }
