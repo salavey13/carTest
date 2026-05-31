@@ -137,7 +137,7 @@
 
 ---
 
-### Task A: Fix Duplicate DOCX Delivery Bug
+### Task A: Fix Duplicate DOCX Delivery Bug ✅
 
 > **Prerequisite**: investigation 1.1 (find the bug)
 > **Complexity**: S
@@ -154,7 +154,7 @@
 
 > **Prerequisite**: investigation 1.5 (QR generation), Task A (fix duplicate doc)
 > **Complexity**: M
-> **Depends on**: Task A
+> **Depends on**: Task A ✅, Task C (for doc_sha256 source)
 
 - [ ] **Design QR URL format**:
   ```
@@ -190,9 +190,9 @@
 > **Complexity**: M
 > **Blocks**: Tasks D, E, F, G (all depend on this table existing)
 
-- [ ] **Create migration file**: `202606XXXXXXX_user_rental_secrets.sql`
+- [ ] **Create migration file**: `supabase/migrations/202606XXXXXXX_user_rental_secrets.sql`
 
-- [ ] **Schema** (refine based on investigation findings):
+- [ ] **Schema** (refined based on Phase 1 findings):
   ```sql
   CREATE TABLE private.user_rental_secrets (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -222,10 +222,23 @@
     ON private.user_rental_secrets(chat_id, crew_slug, verification_status);
   ```
 
-- [ ] **Design decisions to resolve** (check when decided):
+- [ ] **Follow `private` schema pattern** (from investigation 1.2):
+  - [ ] Revoke all from `anon` and `authenticated`
+  - [ ] Grant USAGE + table access only to `service_role`
+  - [ ] Follow `20260304_private_scheme.sql` pattern exactly
+
+- [ ] **Server-side access module**: create `app/lib/user-rental-secrets.ts`
+  - [ ] `"use server"` + `server-only` imports (same pattern as `private-secrets.ts`)
+  - [ ] `getUserRentalSecrets(chatId, crewSlug)` — returns most recent verified row per user+crew
+  - [ ] `getUserRentalSecretsByDocSha(docSha256)` — lookup by doc hash (for QR verification)
+  - [ ] `saveUserRentalSecrets(data)` — insert new row
+  - [ ] `revokeUserRentalSecrets(docSha256)` — set `verification_status = 'revoked'`
+  - [ ] All reads through `supabaseAdmin.schema("private")`
+
+- [ ] **Design decisions** (check when decided):
   - [ ] Should this replace or augment existing `getUserSensitiveDataOrDefault`? Or coexist during migration?
-  - [ ] How does it relate to existing (undocumented) user secrets table? Merge or coexist?
-  - [ ] RLS policy: users can only read own rows (by `chat_id`). Service role can read/write all. Define exact SQL policies.
+  - [ ] How does it relate to existing `private.user_secrets` table? Merge or coexist?
+  - [ ] Recommendation from Phase 1: **coexist**. `user_secrets` stores raw OCR scan data (passport, license strings). `user_rental_secrets` stores rental-contextual identity (with doc_sha256 provenance, crew scope, verification status). Different lifecycle, different access patterns.
 
 - [ ] **Privacy**: Paper contract consent (Appendix 4 — Согласие на обработку ПД) covers data storage. `private.*` schema + service-role-only access is sufficient. No separate digital consent needed.
 
@@ -233,7 +246,9 @@
 
 - [ ] **`template_version` field**: Tracks which contract template version was used. When template is updated, old rentals on previous version can be identified for re-sign.
 
-- [ ] **Migration pattern**: Follow `private.crew_secrets` approach — SQL migration file
+- [ ] **Future preparation**: design the schema to support batch imports (digitize old docs workflow — batch-insert rows from historical paper documents)
+
+- [ ] **Write a seed migration** or test data script to verify the table works with `supabaseAdmin`
 
 ---
 
@@ -266,6 +281,7 @@
 - [ ] **Parse `startParam`**: Detect `rent_` prefix (NOT `rental-`), extract `bikeId` and `docSha`
   - [ ] Must NOT break existing `rental-{id}` parsing
   - [ ] Add new route/dispatch case for `rent_` prefix
+  - [ ] Phase 1 finding: `rent_` already routes to `/api/startapp/vehicle?flow=rent` — extend this handler to detect three-part format `rent_{bikeId}_{docSha}` vs existing two-part `rent_{bikeId}`
 
 - [ ] **Authenticate**: Use existing `useTelegramAuth` flow → get `chat_id` from `initData`
 
@@ -333,22 +349,22 @@
 
 ---
 
-### Task H: Contract Template Page Breaks
+### Task H: Contract Template Page Breaks ✅
 
 > **Prerequisite**: investigation 1.1 (template structure)
 > **Complexity**: S
 > **Depends on**: nothing (independent fix)
 
 - [x] **Problem**: DOCX prints as continuous flow ("сплошняком"), signature shifts to wrong side
-- [x] **Fix option A**: Add `<div style="page-break-before: always">` to HTML template before each Appendix
-- [ ] **Fix option B**: Detect section headers in `htmlToDocx` and insert `new Paragraph({ pageBreakBefore: true })`
+- [x] **Fix option A**: Add `<div style="page-break-before: always">` to HTML template before each Appendix — **CHOSEN ✅**
+- [x] ~~Fix option B~~: Detect section headers in `htmlToDocx` — **SKIPPED** (option A sufficient, `htmlToDocx` already supports page-break divs)
 - [x] Choose approach and implement
 - [x] Verify printed output has proper page breaks between sections
   - Findings: Chose option A because `htmlToDocx.mjs` already converts page-break divs into DOCX `PageBreak` paragraphs. Verified generated DOCX XML contains four `w:br w:type="page"` markers.
 
 ---
 
-### Task I: Missing Blank Fields for Handoff
+### Task I: Missing Blank Fields for Handoff ✅
 
 > **Prerequisite**: investigation 1.7 (rental lifecycle)
 > **Complexity**: S
@@ -370,32 +386,36 @@
 > **Complexity**: M
 > **Depends on**: nothing (independent enhancement)
 
-- [ ] **Current state**: checkout likely has preset duration options (1/3/7 days)
-- [ ] **Real-world usage**: hourly rentals (3 hours on Kawasaki), custom time ranges
+- [ ] **Current state**: checkout has preset duration options (1/3/7 days) as "quick presets" only
+- [ ] **Real-world usage**: hourly rentals (3 hours on Kawasaki), custom time ranges, arbitrary hours
 - [ ] **Enhancement**:
   - [ ] Add date/time picker for start and end date+time (precise to hours)
   - [ ] Keep quick preset buttons ("1 день", "3 дня", "неделя") as popular shortcuts
   - [ ] Presets are NOT the only options — they just pre-fill the picker
   - [ ] Aligns web-app with skill pipeline's arbitrary time range support
+  - [ ] Phase 1 finding: checkout only exposes start date (`type=date`) and computes end from `rentalDays`; no time-of-day picker exists yet
 
 ---
 
 ### Task K: Admin Dashboard — Successful Rents Display
 
-> **Prerequisite**: investigation 1.9 (current admin dashboard)
+> **Prerequisite**: investigation 1.9 (current admin dashboard) ✅
 > **Complexity**: S
 > **Depends on**: nothing (independent enhancement)
 
-- [ ] Find existing admin dashboard component
-- [ ] Currently shows which step user got stuck in
-- [ ] **Enhancement**: also show successful rents automatically
-- [ ] Display rental history with doc verification status
+- [x] Find existing admin dashboard component — **Found** in Phase 1: `app/franchize/[slug]/admin/page.tsx` + `FranchizeAdminClient.tsx`
+- [ ] **Currently shows**: fleet, failed orders, retry controls, review moderation, vehicle editing
+- [ ] **Enhancement**: add successful rents section
+  - [ ] Query `rentals` joined with vehicle data and `metadata.contract_verifier`
+  - [ ] Show rental history with doc verification status
+  - [ ] Display: bike name, renter, dates, contract status (verified/pending/none)
+  - [ ] Auto-refresh or live updates when new rents complete
 
 ---
 
 ### Task L: Hot-Stage QR Entry (Rent-in-Progress View)
 
-> **Prerequisite**: investigation 1.7 (rental lifecycle), Task E (QR deep-link parsing)
+> **Prerequisite**: investigation 1.7 (rental lifecycle) ✅, Task E (QR deep-link parsing)
 > **Complexity**: M
 > **Depends on**: Task E
 
@@ -403,30 +423,31 @@
 
 - [ ] **Design**: QR scan should open rent-in-progress view directly (not just contract pre-fill)
 - [ ] When user scans QR during active rental:
-  - [ ] Open the rental detail page for that active rental
+  - [ ] Open the rental detail page for that active rental (`/franchize/[slug]/rental/[id]`)
   - [ ] Show "handoff mode" — add damage photos, odometer, notes
   - [ ] No need to re-navigate or re-click anything
 - [ ] This bridges the gap between paper handoff and digitized handoff
+- [ ] Phase 1 finding: `FranchizeRentalDocumentsPanel` already has `saveRentalPickupFreeze` and `addRentalDamageReport` actions — hot-stage QR just needs to navigate there
 
 ---
 
 ## 📊 Task Dependency Graph
 
 ```
-Task A (fix duplicate doc) ──→ Task B (QR alongside doc)
-                                    │
-Task C (secret table) ──────────────┼──→ Task D (save renter data)
-                                    │         │
-                                    │         ├──→ Task E (QR deep-link auto-fill) ──→ Task L (hot-stage entry)
-                                    │         │
-                                    │         ├──→ Task F (previous rental picker)
-                                    │         │
-                                    │         └──→ Task G (profile page enhancement)
+Task A (fix duplicate doc) ✅ ──→ Task B (QR alongside doc)
+                                         │
+Task C (secret table) ───────────────────┼──→ Task D (save renter data)
+                                         │         │
+                                         │         ├──→ Task E (QR deep-link auto-fill) ──→ Task L (hot-stage entry)
+                                         │         │
+                                         │         ├──→ Task F (previous rental picker)
+                                         │         │
+                                         │         └──→ Task G (profile page enhancement)
 
-Independent: Task H (page breaks), Task I (blank fields), Task J (time picker), Task K (admin dashboard)
+Independent: Task H ✅, Task I ✅, Task J (time picker), Task K (admin dashboard)
 ```
 
-**Suggested execution order**: C → D → A → B → E → F → G → L | H, I, J, K can run in parallel
+**Suggested execution order**: C → D → B → E → F → G → L | J, K can run in parallel
 
 ---
 
@@ -476,13 +497,18 @@ Contract was **printed and signed IRL** ✅
 - `experience-types.ts` — Type definitions including `VipBikeUserMetadata`
 - `track-behavior.ts` — Existing QR scan tracking
 - `20260527090000_rental_contract_artifacts.sql` — Existing artifacts table migration
+- `20260304_private_scheme.sql` — Existing private schema migration (pattern to follow)
 - `crews_rows.csv` / `users_rows.csv` — Seed data with metadata JSONB structure
+- `app/franchize/[slug]/admin/page.tsx` + `FranchizeAdminClient.tsx` — Admin dashboard
+- `app/franchize/[slug]/profile/page.tsx` + `FranchizeProfileClient` — User profile
 
 **Key search terms:**
 - `private.crew_secrets` / `crew_secrets` — existing secret table pattern
+- `private.user_secrets` / `user_secrets` — existing user secrets table
 - `getUserSensitiveDataOrDefault` / `saveCrewSensitiveData` — secret access functions
 - `startapp` / `startParam` / `start_param` — deep-link handling
 - `contract_verifier` / `originalSha256` / `doc_verifier` — document verification
 - `rental_contract_artifacts` — contract metadata table
 - `franchize` / `franchise` — franchise-related code (both spellings exist!)
 - `qr` / `qrcode` / `QR` — QR code generation (web method exists in repo)
+- `sendMediaGroup` / `sendDocument` — Telegram bot API delivery methods
