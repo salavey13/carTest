@@ -8,6 +8,7 @@ import { randomUUID } from "crypto";
 import { readFile } from "fs/promises";
 import path from "path";
 import { getCrewSensitiveDataOrDefault, getUserSensitiveDataOrDefault, saveCrewSensitiveData } from "@/app/lib/private-secrets";
+import { getUserRentalSecrets as getVerifiedRentalSecrets, saveUserRentalSecrets } from "@/app/lib/user-rental-secrets";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 import { upsertFranchizeIntent } from "@/app/franchize/server-actions/intents";
 import { cloneFranchizeContentBlocks, readFranchizeContentBlocks, type FranchizeContentBlocks } from "@/app/franchize/lib/content-blocks";
@@ -1770,53 +1771,6 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
   }
 }
 
-/**
- * Fetch the most recent verified rental secrets for a user+crew.
- * Returns the richest personal data from past rentals — used to pre-fill
- * the HTML template (passport issue date, registration, etc.).
- * Falls back gracefully if table is empty or query fails.
- */
-async function getLatestVerifiedRentalSecrets(
-  chatId: string,
-  crewSlug: string,
-): Promise<Record<string, string> | null> {
-  try {
-    const { data, error } = await supabaseAdmin
-      .schema("private")
-      .from("user_rental_secrets")
-      .select("renter_full_name, renter_passport, renter_passport_issue_date, renter_registration, renter_driver_license, renter_birth_date, renter_phone, renter_email, renter_address, verification_status, created_at")
-      .eq("chat_id", chatId)
-      .eq("crew_slug", crewSlug)
-      .eq("verification_status", "verified")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      logger.warn("[franchize] getLatestVerifiedRentalSecrets query failed", {
-        chatId, crewSlug, error: error.message,
-      });
-      return null;
-    }
-
-    if (!data) return null;
-
-    // Return only non-null string fields
-    const result: Record<string, string> = {};
-    for (const [key, value] of Object.entries(data)) {
-      if (typeof value === "string" && value.trim().length > 0) {
-        result[key] = value.trim();
-      }
-    }
-    return result;
-  } catch (error) {
-    logger.warn("[franchize] getLatestVerifiedRentalSecrets unexpected error", {
-      chatId, crewSlug, error: error instanceof Error ? error.message : String(error),
-    });
-    return null;
-  }
-}
-
 async function createFranchizeOrderNotificationLog(payload: FranchizeOrderNotifyPayload) {
   const snapshot = {
     ...payload,
@@ -1909,7 +1863,16 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
     // Fetch verified rental secrets from past rentals — richest personal data source
     // Priority chain: rental secrets (verified OCR/past contract) > userSensitive > placeholder
-    const rentalSecrets = await getLatestVerifiedRentalSecrets(payload.telegramUserId, payload.slug);
+    const rentalSecretsRecord = await getVerifiedRentalSecrets(payload.telegramUserId, payload.slug);
+    // Extract non-null string fields for convenient access in variables map
+    const rentalSecrets: Record<string, string> = {};
+    if (rentalSecretsRecord) {
+      for (const [key, value] of Object.entries(rentalSecretsRecord)) {
+        if (typeof value === "string" && value.trim().length > 0) {
+          rentalSecrets[key] = value.trim();
+        }
+      }
+    }
 
     const variables = {
       contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}`,
@@ -2150,7 +2113,6 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     }
 
     try {
-      const { saveUserRentalSecrets } = await import("@/app/lib/user-rental-secrets");
       await saveUserRentalSecrets({
         chat_id: payload.telegramUserId,
         crew_slug: payload.slug,
