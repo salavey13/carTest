@@ -163,7 +163,7 @@ set
               'items', jsonb_build_array(
                 jsonb_build_object('type', 'external', 'label', '@I_O_S_NN', 'href', 'https://t.me/I_O_S_NN', 'icon', 'FaTelegram'),
                 jsonb_build_object('type', 'phone', 'label', '+7 9200-789-888', 'href', 'tel:+79200789888', 'icon', 'FaPhone'),
-                jsonb_build_object('type', 'text', 'label', 'Н. Н. ул. Комсомольская 2', 'icon', 'FaMapLocationDot')
+                jsonb_build_object('type', 'text', 'label', 'Н. Н. пл. Комсомольская 2', 'icon', 'FaMapLocationDot')
               )
             )
           ),
@@ -177,7 +177,7 @@ set
             'Быстрая онлайн-бронь',
             'ОСАГО + комплект экипировки',
             'Поддержка на маршруте',
-            'Новая локация сервиса: ул. Комсомольская 2'
+            'Новая локация сервиса: пл. Комсомольская 2'
           ),
           'faq', jsonb_build_array(
             jsonb_build_object('q', 'Какой минимальный возраст?', 'a', 'Базовый минимум — 23 года для аренды мотоциклов.'),
@@ -185,7 +185,7 @@ set
           )
         ),
         'contacts', jsonb_build_object(
-          'address', 'ул. Комсомольская 2, Нижний Новгород',
+          'address', 'пл. Комсомольская 2, Нижний Новгород',
           'phone', '+7 9200-789-888',
           'email', 'hello@vipbike-rental.example',
           'telegram', '@I_O_S_NN',
@@ -291,7 +291,7 @@ set
         'contractDefaults', jsonb_build_object(
           'issuerName', 'Рысан Григорий Константинович',
           'issuerRepresentative', 'Сидоров Илья Олегович',
-          'returnAddress', 'Н. Н. ул. Комсомольская 2',
+          'returnAddress', 'Н. Н. пл. Комсомольская 2',
           'includedMileage', 200,
           'overageRate', 30,
           'lateReturnPenaltyRub', 5000,
@@ -303,7 +303,7 @@ set
             'bike_value_rub', jsonb_build_object('description', 'Полная стоимость мотоцикла (руб)', 'source', 'bike.estimated_value_rub', 'required', true, 'placeholder', '700000'),
             'bike_value_words', jsonb_build_object('description', 'Сумма прописью', 'source', 'computed_from_bike_value', 'required', true, 'computed', true, 'placeholder', 'Семьсот тысяч'),
             'late_return_penalty_rub', jsonb_build_object('description', 'Неустойка за просрочку (руб/день)', 'source', 'contractDefaults.lateReturnPenaltyRub', 'required', true, 'default', 5000),
-            'return_address', jsonb_build_object('description', 'Адрес возврата мотоцикла', 'source', 'contractDefaults.returnAddress', 'required', true, 'default', 'Н. Н. ул. Комсомольская 2'),
+            'return_address', jsonb_build_object('description', 'Адрес возврата мотоцикла', 'source', 'contractDefaults.returnAddress', 'required', true, 'default', 'Н. Н. пл. Комсомольская 2'),
             'issuer_representative', jsonb_build_object('description', 'Представитель арендодателя', 'source', 'contractDefaults.issuerRepresentative', 'required', true, 'default', 'Сидоров Илья Олегович')
           ),
           'defaults', jsonb_build_object(
@@ -314,7 +314,7 @@ set
             'bike_value_rub', 700000,
             'bike_value_words', 'Семьсот тысяч',
             'late_return_penalty_rub', 5000,
-            'return_address', 'Н. Н. ул. Комсомольская 2',
+            'return_address', 'Н. Н. пл. Комсомольская 2',
             'issuer_representative', 'Сидоров Илья Олегович'
           )
         )
