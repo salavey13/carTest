@@ -46,6 +46,34 @@ const BIO30_PRODUCT_PATHS: Record<string, string> = {
   "magnesium-pyridoxine": "/bio30/categories/magnesium-pyridoxine",
 };
 
+/**
+ * Parse a rent_ deep-link parameter into its components.
+ *
+ * Formats:
+ *   rent_{bikeId}              → standard rent (no QR, no doc hash)
+ *   rent_{bikeId}_{docSha256}  → QR deep-link with doc hash for 1-click next rent
+ *
+ * Returns null if the param doesn't start with "rent_".
+ */
+function parseRentDeepLink(param: string): { bikeId: string; docSha256: string | null } | null {
+  if (!param.startsWith("rent_")) return null;
+
+  const afterPrefix = param.slice(5); // everything after "rent_"
+  if (!afterPrefix) return null;
+
+  // Split on "_" — bike IDs use hyphens, sha256 is hex; neither contains "_"
+  // "kawasaki-ex650k_abc123def" → ["kawasaki-ex650k", "abc123def"]
+  // "kawasaki-ex650k"          → ["kawasaki-ex650k"]
+  const parts = afterPrefix.split("_");
+  const bikeId = parts[0].trim().toLowerCase();
+  if (!bikeId) return null;
+
+  // SHA256 hex is 64 chars, but accept any non-empty second segment
+  const docSha256 = parts.length > 1 && parts[1].trim() ? parts[1].trim() : null;
+
+  return { bikeId, docSha256 };
+}
+
 export function useStartParamRouter() {
   const router = useRouter();
   const pathname = usePathname();
@@ -119,12 +147,73 @@ export function useStartParamRouter() {
     [dbUser, refreshDbUser, showToast],
   );
 
+  /**
+   * Claim rental secrets from a QR deep-link.
+   *
+   * When a renter scans their contract QR, the startParam contains
+   * rent_{bikeId}_{docSha256}. We atomically link chat_id to this
+   * secret so the checkout form can auto-fill from verified data.
+   *
+   * Returns crewSlug from the claimed secret (for routing) or null on failure.
+   */
+  const claimQrRentalSecrets = useCallback(
+    async (docSha256: string): Promise<{ crewSlug: string | null; claimedNow: boolean }> => {
+      if (!dbUser?.user_id) {
+        logger.warn("[ClientLayout] Cannot claim rental secrets: no dbUser.user_id");
+        return { crewSlug: null, claimedNow: false };
+      }
+
+      try {
+        const { claimRentalSecretsAction } = await import(
+          "@/app/franchize/server-actions/rental-secrets-claim"
+        );
+        const result = await claimRentalSecretsAction(dbUser.user_id, docSha256);
+
+        if (result.ok) {
+          if (result.claimedNow) {
+            logger.info(`[ClientLayout] Successfully claimed rental secrets for doc ${docSha256.slice(0, 12)}...`);
+            showToast("✅ Ваши данные привязаны! Форма заполнится автоматически.", { duration: 4000 });
+          } else {
+            logger.info(`[ClientLayout] Rental secrets already linked for doc ${docSha256.slice(0, 12)}...`);
+          }
+          return { crewSlug: result.crewSlug ?? null, claimedNow: result.claimedNow ?? false };
+        }
+
+        // Handle specific failure reasons
+        switch (result.reason) {
+          case "already_claimed_by_other":
+            showToast("⚠️ Эта ссылка уже привязана к другому пользователю.", { duration: 5000 });
+            logger.warn(`[ClientLayout] QR already claimed by other user: ${docSha256.slice(0, 12)}...`);
+            break;
+          case "revoked":
+            showToast("⚠️ Документ аннулирован. Обратитесь к администратору.", { duration: 5000 });
+            logger.warn(`[ClientLayout] Claimed secret is revoked: ${docSha256.slice(0, 12)}...`);
+            break;
+          case "not_found":
+            logger.info(`[ClientLayout] No rental secret found for doc ${docSha256.slice(0, 12)}... — first-time renter flow`);
+            break;
+          default:
+            logger.warn(`[ClientLayout] Claim failed: ${result.reason}`, { error: result.error });
+            break;
+        }
+
+        return { crewSlug: null, claimedNow: false };
+      } catch (error) {
+        logger.error("[ClientLayout] Error claiming rental secrets:", error);
+        return { crewSlug: null, claimedNow: false };
+      }
+    },
+    [dbUser, showToast],
+  );
+
   const resolveFranchizeVehicleLink = useCallback(
-    async (rawParam: string, flow: "rent" | "buy") => {
+    async (rawParam: string, flow: "rent" | "buy", docSha256?: string | null) => {
       const vehicleId = rawParam.slice(4).trim().toLowerCase();
       if (!vehicleId) return null;
       try {
-        const response = await fetch(`/api/startapp/vehicle?vehicle=${encodeURIComponent(vehicleId)}&flow=${flow}`, { cache: "no-store" });
+        const qs = new URLSearchParams({ vehicle: vehicleId, flow });
+        if (docSha256) qs.set("docSha256", docSha256);
+        const response = await fetch(`/api/startapp/vehicle?${qs.toString()}`, { cache: "no-store" });
         if (!response.ok) return null;
         const data = (await response.json()) as { slug?: string; vehicleId?: string; flow?: string };
         const slug = (data.slug || "vip-bike").trim() || "vip-bike";
@@ -133,13 +222,18 @@ export function useStartParamRouter() {
         if (resolvedFlow === "buy") {
           return `/franchize/${slug}/market/${encodeURIComponent(resolvedVehicle)}/buy`;
         }
-        return `/franchize/${slug}?vehicle=${encodeURIComponent(resolvedVehicle)}&flow=${resolvedFlow}`;
+        // Rental: include docSha256 as URL param so checkout page can auto-fill
+        const rentalQs = new URLSearchParams({ vehicle: resolvedVehicle, flow: resolvedFlow });
+        if (docSha256) rentalQs.set("docSha256", docSha256);
+        return `/franchize/${slug}?${rentalQs.toString()}`;
       } catch (error) {
         logger.warn("[ClientLayout] failed to resolve vehicle deep-link, using vip-bike fallback", { rawParam, error });
         if (flow === "buy") {
           return `/franchize/vip-bike/market/${encodeURIComponent(vehicleId)}/buy`;
         }
-        return `/franchize/vip-bike?vehicle=${encodeURIComponent(vehicleId)}&flow=${flow}`;
+        const fallbackQs = new URLSearchParams({ vehicle: vehicleId, flow });
+        if (docSha256) fallbackQs.set("docSha256", docSha256);
+        return `/franchize/vip-bike?${fallbackQs.toString()}`;
       }
     },
     [],
@@ -210,7 +304,21 @@ export function useStartParamRouter() {
         } else if (paramToProcess.startsWith("buy_")) {
           targetPath = await resolveFranchizeVehicleLink(paramToProcess, "buy") ?? undefined;
         } else if (paramToProcess.startsWith("rent_")) {
-          targetPath = await resolveFranchizeVehicleLink(paramToProcess, "rent") ?? undefined;
+          // ── QR deep-link: rent_{bikeId} or rent_{bikeId}_{docSha256} ──
+          const parsed = parseRentDeepLink(paramToProcess);
+          if (parsed) {
+            // Step 1: If QR includes docSha256, claim rental secrets BEFORE routing
+            if (parsed.docSha256 && dbUser?.user_id) {
+              await claimQrRentalSecrets(parsed.docSha256);
+            }
+
+            // Step 2: Resolve vehicle → route to bike page (with docSha256 in URL params)
+            const rentParam = `rent_${parsed.bikeId}`;
+            targetPath = await resolveFranchizeVehicleLink(rentParam, "rent", parsed.docSha256) ?? undefined;
+          } else {
+            // Fallback: couldn't parse, try old behavior
+            targetPath = await resolveFranchizeVehicleLink(paramToProcess, "rent") ?? undefined;
+          }
         } else if (START_PARAM_PAGE_MAP[paramToProcess]) {
           targetPath = START_PARAM_PAGE_MAP[paramToProcess];
         } else if (paramToProcess.startsWith("crew_")) {
@@ -238,12 +346,6 @@ export function useStartParamRouter() {
           const lobbyId = paramToProcess.substring(6);
           if (lobbyId) {
             targetPath = `/strikeball/lobbies/${lobbyId}`;
-          }
-        } else if (paramToProcess.startsWith("buy_")) {
-          const bikeId = paramToProcess.substring(4);
-          const franchizeSlug = searchParams.get("slug") || userCrewInfo?.slug || "vip-bike";
-          if (bikeId) {
-            targetPath = `/franchize/${franchizeSlug}/market/${bikeId}/buy`;
           }
         } else if (paramToProcess.startsWith("rental-") || paramToProcess.startsWith("rentals-") || paramToProcess.startsWith("sale-")) {
           const rentalId = paramToProcess.split("-").at(-1);
@@ -316,6 +418,7 @@ export function useStartParamRouter() {
     clearStartParam,
     handleBio30Referral,
     handleSyndicateReferral,
+    claimQrRentalSecrets,
     resolveFranchizeVehicleLink,
   ]);
 }
