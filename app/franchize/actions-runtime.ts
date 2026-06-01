@@ -2014,7 +2014,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         renter_birth_date: variables.renter_birth_date,
         renter_phone: variables.renter_phone,
         renter_email: variables.renter_email,
-        renter_address: null,
+        renter_address: String(readPath(userSensitive, ["renterAddress"], "") || readPath(userSensitive, ["registration"], "")) || null,
         source_doc_key: variables.document_key,
         source_rental_id: sourceRentalId,
         verification_status: "verified",
@@ -2268,7 +2268,7 @@ export async function getFranchizeSuccessfulRentals(input: unknown): Promise<{ s
 
   const { data, error } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id, user_id, vehicle_id, status, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date, created_at, metadata, vehicle:cars!inner(id, make, model, crew_id), user:users(user_id, full_name, username, metadata)")
+    .select("rental_id, user_id, vehicle_id, status, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date, created_at, metadata, vehicle:cars!inner(id, make, model, crew_id), user:users!rentals_user_id_fkey(user_id, full_name, username, metadata)")
     .eq("vehicle.crew_id", crew.id)
     .in("status", ["confirmed", "active", "completed"])
     .order("created_at", { ascending: false })
