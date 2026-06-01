@@ -429,13 +429,16 @@ The gold seed already has `license_class` on every bike. Here's the mapping:
 
 ### 4.0 OCR Architecture Decision
 
-- [x] **Evaluate OCR approaches** ✅ **Decision: VLM-based (Option A)**
-  - [x] **Option A: VLM-based** — send photo to GLM-4V via `z-ai-web-dev-sdk` → structured JSON extraction
-    - Pros: already using VLM for bike specs, handles Russian passports/licenses well
+- [ ] **Evaluated OCR approaches**:
+  - [ ] **Option A: VLM-based** — send photo to GLM-4V / GPT-4V → structured JSON extraction
     - Cons: API latency, cost per call, not always deterministic
-  - [ ] **Option B: Tesseract.js** — open-source OCR in Node.js (deferred)
-  - [ ] **Option C: Hybrid** — Tesseract + VLM (deferred)
-  - [x] **Recommendation**: **Option A first** (VLM) — implemented in `app/api/ocr/route.ts` + `app/lib/ocr-constants.ts`
+  - [x] **Option B: Tesseract.js** — open-source OCR in Node.js
+    - Pros: free, local, no API dependency
+    - Cons: lower accuracy on Russian passports, needs trained models
+  - [ ] **Option C: Hybrid** — Tesseract for text extraction + VLM for structured parsing
+    - Pros: Tesseract handles layout, VLM handles semantics
+    - Cons: two-pass complexity
+- [x] **Implemented**: **Option B** (Tesseract.js) — implemented in `app/api/ocr/route.ts` + `app/lib/ocr-constants.ts`
 
 ### 4.1 Telegram Bot `/doc` Command
 
