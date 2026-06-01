@@ -1,91 +1,126 @@
 /**
- * VIP Bike Rental — VIP Access Tier Resolution
+ * VIP Bike Rental — VIP Access Check Module
  *
- * Determines a user's access tier from their verified rental secrets.
- * Used in the rental flow to check if a user can rent a given bike.
+ * Server-side module that determines a user's access tier
+ * by querying their rental secrets (verified doc data).
  *
- * Depends on:
- *   - `app/lib/user-rental-secrets.ts` — getUserRentalSecrets
- *   - `lib/derive-access-tier.ts` — deriveUserAccessTier, canAccessTier, deriveAccessTier
+ * Uses supabaseAdmin + private schema — server-only.
  */
 
-import { getUserRentalSecrets } from "@/app/lib/user-rental-secrets";
-import {
-  deriveUserAccessTier,
-  canAccessTier,
-  deriveAccessTier,
-  tierRequiredLicenseLabel,
-  type AccessTier,
-} from "@/lib/derive-access-tier";
+import "server-only";
+import { supabaseAdmin } from "@/lib/supabase-server";
+import { deriveUserAccessTier, canAccessTier, type AccessTier } from "./derive-access-tier";
+import { logger } from "@/lib/logger";
+
+export interface VipAccessInfo {
+  tier: AccessTier;
+  categories: string[];
+  source: "license_ocr" | "manual" | "none";
+  verifiedAt: string | null;
+  docSha256: string | null;
+}
 
 /**
- * Resolves the current user's access tier by looking up their verified
- * rental secrets and extracting driver's license category info.
+ * Get a user's VIP access info based on their verified rental secrets.
+ * Looks up the most recent verified license data from user_rental_secrets.
  *
- * Returns "entry" if no verified secrets exist (cold start — safe default).
+ * The license data includes a `renter_driver_license` field which may contain
+ * category information if it was OCR'd. For now we derive categories from
+ * the driver_license string pattern or from OCR metadata.
  */
-export async function getUserAccessTier(
+export async function getUserVipAccess(
   chatId: string,
-  crewSlug: string
-): Promise<AccessTier> {
-  const secrets = await getUserRentalSecrets(chatId, crewSlug);
-  if (!secrets) return "entry";
+  crewSlug: string,
+): Promise<VipAccessInfo> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .schema("private")
+      .from("user_rental_secrets")
+      .select("renter_driver_license, verification_status, created_at, doc_sha256")
+      .eq("chat_id", chatId)
+      .eq("crew_slug", crewSlug)
+      .eq("verification_status", "verified")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  // Try to extract categories from the renter_driver_license field
-  // The field stores something like "99 76 543210 (кат. А, В)" or "99 76 543210"
-  const licenseStr = secrets.renter_driver_license || "";
-  const categories = parseLicenseCategories(licenseStr);
+    if (error) {
+      logger.warn("[vip-access] failed to query user_rental_secrets", {
+        chatId,
+        crewSlug,
+        error: error.message,
+      });
+      return { tier: "none", categories: [], source: "none", verifiedAt: null, docSha256: null };
+    }
 
-  return deriveUserAccessTier(categories);
+    if (!data) {
+      return { tier: "none", categories: [], source: "none", verifiedAt: null, docSha256: null };
+    }
+
+    // Extract categories from the driver_license string
+    // Format examples: "1234 567890", "А 1234 567890", or just "567890"
+    // Categories are stored in a separate metadata path — for now, derive from OCR
+    const categories = extractCategoriesFromLicense(data.renter_driver_license);
+    const tier = deriveUserAccessTier(categories);
+
+    return {
+      tier,
+      categories,
+      source: categories.length > 0 ? "license_ocr" : "manual",
+      verifiedAt: data.created_at,
+      docSha256: data.doc_sha256,
+    };
+  } catch (error) {
+    logger.error("[vip-access] unexpected error", {
+      chatId,
+      crewSlug,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { tier: "none", categories: [], source: "none", verifiedAt: null, docSha256: null };
+  }
 }
 
 /**
- * Parses license categories from the stored `renter_driver_license` string.
+ * Check whether a user can access a specific bike based on the bike's required tier.
  *
- * Expected formats:
- * - "99 76 543210 (кат. А, В)"  → ["А", "В"]
- * - "99 76 543210 (кат. A, B, M)" → ["A", "B", "M"]
- * - "99 76 543210"               → [] (no categories found)
+ * @param userChatId - Telegram chat_id of the user
+ * @param crewSlug   - Franchise slug for crew-scoped lookup
+ * @param requiredTier - The bike's minimum access tier (from specs.access_tier)
  */
-export function parseLicenseCategories(licenseStr: string): string[] {
-  if (!licenseStr || typeof licenseStr !== "string") return [];
-
-  // Try to extract "кат. А, В" or "кат.A, B, M" pattern from the string
-  const catMatch = licenseStr.match(
-    /кат\.?\s*([АA0-9ВBМMСC,\s]+)/i
-  );
-  if (catMatch) {
-    return catMatch[1]
-      .split(/[,\s]+/)
-      .filter(Boolean)
-      .map((c) => c.toUpperCase());
-  }
-
-  // If no "кат." pattern found, return empty (entry tier)
-  return [];
+export async function checkUserCanAccessBike(
+  userChatId: string,
+  crewSlug: string,
+  requiredTier: AccessTier,
+): Promise<boolean> {
+  const accessInfo = await getUserVipAccess(userChatId, crewSlug);
+  return canAccessTier(accessInfo.tier, requiredTier);
 }
 
 /**
- * Checks whether a user can rent a specific bike based on their access tier.
+ * Extract category letters from a driver license string.
+ * Russian driver license format: "СССС НННННН" where С=series (4 digits), Н=number (6 digits).
+ * Categories are NOT part of the license number — they appear separately on the card.
  *
- * @param userTier - The user's derived access tier
- * @param bikeSpecs - The bike's specs object (must contain `access_tier` or `license_class`)
- * @returns `{ allowed: boolean; message?: string }` — if not allowed, message explains why
+ * For now, this is a best-effort extraction. When OCR pipeline stores categories
+ * explicitly (via /api/ocr returning LicenseOcrResult), we'll read from there.
  */
-export function checkBikeAccess(
-  userTier: AccessTier,
-  bikeSpecs: { access_tier?: string; license_class?: string }
-): { allowed: boolean; message?: string } {
-  const bikeTier: AccessTier =
-    (bikeSpecs.access_tier as AccessTier) ||
-    deriveAccessTier(bikeSpecs.license_class || "");
+function extractCategoriesFromLicense(licenseStr: string | null): string[] {
+  if (!licenseStr) return [];
 
-  if (canAccessTier(userTier, bikeTier)) {
-    return { allowed: true };
+  // Check if categories are embedded in the string somehow
+  // Pattern: "A" or "A, B, M" or "категории: A B M" embedded in the field
+  const categoryPattern = /\b(A1?|B1?|C1?|D1?|M|Tm|Tb)\b/gi;
+  const categories: string[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = categoryPattern.exec(licenseStr)) !== null) {
+    // Filter out false positives: "A" in the middle of Cyrillic text
+    // Only accept if preceded by space, comma, or start of string
+    const idx = match.index;
+    if (idx === 0 || /[\s,/.]/.test(licenseStr[idx - 1])) {
+      categories.push(match[1].toUpperCase());
+    }
   }
 
-  return {
-    allowed: false,
-    message: `Для аренды этого мотоцикла необходимы права ${tierRequiredLicenseLabel(bikeTier)}. Ваши документы позволяют аренду до уровня ${tierRequiredLicenseLabel(userTier)}.`,
-  };
+  return categories;
 }
