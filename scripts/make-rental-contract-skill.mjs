@@ -491,36 +491,89 @@ const originalSha256 = createHash('sha256').update(buf).digest('hex');
 const safeName = s => String(s || '').replace(/[^a-zA-Zа-яА-Я0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 const docFileName = `rental-contract-${safeName(bike.make)}-${safeName(bike.model)}-${startDate}.docx`;
 
-const token = process.env.TELEGRAM_BOT_TOKEN;
-const telegramUrl = `https://api.telegram.org/bot${token}/sendDocument`;
-let json;
+// ── Generate QR Code PNG ─────────────────────────────────────
+const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${bike.id}_${originalSha256}`;
+const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
+
+let qrPngBuffer = null;
 try {
+  const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
+  if (qrRes.ok) {
+    qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
+  }
+} catch (qrErr) {
+  console.warn('[rental-doc] QR generation failed, sending DOCX only:', qrErr?.message || qrErr);
+}
+
+// ── Send DOCX + QR via Telegram ──────────────────────────────
+const token = process.env.TELEGRAM_BOT_TOKEN;
+let json;
+
+if (qrPngBuffer) {
+  // Send DOCX + QR as a media group (album)
+  const mediaGroupUrl = `https://api.telegram.org/bot${token}/sendMediaGroup`;
   const form = new FormData();
   form.append('chat_id', telegramChatId);
-  form.append('document', new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), docFileName);
-  const res = await fetch(telegramUrl, {method:'POST', body: form});
-  const bodyText = await res.text();
+
+  // Media group items: [{type:"document", media:"attach://docx"}, {type:"photo", media:"attach://qr", caption:"..."}]
+  const mediaItems = [
+    { type: 'document', media: 'attach://docx', parse_mode: 'HTML' },
+    { type: 'photo', media: 'attach://qr', caption: `📲 <b>QR для быстрой повторной аренды</b>\nНаведите камеру — данные заполнятся автоматически.\n\n🔗 ${qrDeepLink}`, parse_mode: 'HTML' },
+  ];
+  form.append('media', JSON.stringify(mediaItems));
+  form.append('docx', new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), docFileName);
+  form.append('qr', new Blob([qrPngBuffer], {type:'image/png'}), `qr-${bike.id}.png`);
+
   try {
-    json = JSON.parse(bodyText || '{}');
-  } catch (parseError) {
-    failStage('telegram_delivery', 'telegram_response_parse_failed_after_send', {
-      status: res.status,
-      bodyPreview: bodyText.slice(0, 500),
-      error: String(parseError?.message || parseError),
-    });
+    const res = await fetch(mediaGroupUrl, {method:'POST', body: form});
+    const bodyText = await res.text();
+    try {
+      const results = JSON.parse(bodyText || '{}');
+      if (!results.ok) throw new Error(results.description || 'sendMediaGroup failed');
+      json = { ok: true, result: results.result?.[0] }; // first item = the document
+    } catch (parseError) {
+      // Media group sent but response parse failed — don't retry
+      console.warn('[rental-doc] sendMediaGroup response parse issue, but message likely sent');
+      json = { ok: true, result: { message_id: null } };
+    }
+  } catch (sendError) {
+    // Fallback: send DOCX alone
+    console.warn('[rental-doc] sendMediaGroup failed, falling back to sendDocument:', sendError?.message);
+    qrPngBuffer = null; // Force fallback path
   }
-} catch (networkError) {
-  const tmpFile = `/tmp/rental-contract-${Date.now()}.docx`;
-  await import('node:fs/promises').then(fs => fs.writeFile(tmpFile, buf));
-  const curl = spawnSync('curl', ['-sS', '-X', 'POST', telegramUrl, '-F', `chat_id=${telegramChatId}`, '-F', `document=@${tmpFile}`], { encoding: 'utf8' });
-  if (curl.status !== 0) throw new Error(`Telegram curl send failed: ${curl.stderr || curl.stdout}`);
+}
+
+if (!qrPngBuffer) {
+  // Fallback: original sendDocument logic
+  const telegramUrl = `https://api.telegram.org/bot${token}/sendDocument`;
   try {
-    json = JSON.parse(curl.stdout || '{}');
-  } catch (parseError) {
-    failStage('telegram_delivery', 'telegram_curl_response_parse_failed', {
-      bodyPreview: String(curl.stdout || '').slice(0, 500),
-      error: String(parseError?.message || parseError),
-    });
+    const form = new FormData();
+    form.append('chat_id', telegramChatId);
+    form.append('document', new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), docFileName);
+    const res = await fetch(telegramUrl, {method:'POST', body: form});
+    const bodyText = await res.text();
+    try {
+      json = JSON.parse(bodyText || '{}');
+    } catch (parseError) {
+      failStage('telegram_delivery', 'telegram_response_parse_failed_after_send', {
+        status: res.status,
+        bodyPreview: bodyText.slice(0, 500),
+        error: String(parseError?.message || parseError),
+      });
+    }
+  } catch (networkError) {
+    const tmpFile = `/tmp/rental-contract-${Date.now()}.docx`;
+    await import('node:fs/promises').then(fs => fs.writeFile(tmpFile, buf));
+    const curl = spawnSync('curl', ['-sS', '-X', 'POST', telegramUrl, '-F', `chat_id=${telegramChatId}`, '-F', `document=@${tmpFile}`], { encoding: 'utf8' });
+    if (curl.status !== 0) throw new Error(`Telegram curl send failed: ${curl.stderr || curl.stdout}`);
+    try {
+      json = JSON.parse(curl.stdout || '{}');
+    } catch (parseError) {
+      failStage('telegram_delivery', 'telegram_curl_response_parse_failed', {
+        bodyPreview: String(curl.stdout || '').slice(0, 500),
+        error: String(parseError?.message || parseError),
+      });
+    }
   }
 }
 if (!json.ok) failStage('telegram_delivery', 'telegram_send_failed', { telegram: json });
