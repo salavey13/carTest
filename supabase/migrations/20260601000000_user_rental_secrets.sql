@@ -1,3 +1,4 @@
+-- /supabase/migrations/20260601000000_user_rental_secrets.sql
 -- Create user_rental_secrets table in private schema
 -- Stores rental-contextual identity data with doc_sha256 provenance
 -- Pattern follows private.crew_secrets and private.user_secrets
@@ -11,6 +12,8 @@ CREATE TABLE IF NOT EXISTS private.user_rental_secrets (
   doc_sha256            TEXT NOT NULL,          -- links to rental_contract_artifacts.original_sha256
   renter_full_name      TEXT,
   renter_passport       TEXT,
+  renter_passport_issue_date TEXT,              -- date passport was issued (e.g. "15.03.2019"), needed by HTML template §13 and App4 ФЗ-152 consent
+  renter_registration   TEXT,                   -- registration address (propiska), needed by HTML template §13 and App4 ФЗ-152 consent
   renter_driver_license TEXT,
   renter_birth_date     TEXT,
   renter_phone          TEXT,
