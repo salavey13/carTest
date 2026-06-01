@@ -1,3 +1,4 @@
+// /app/lib/user-rental-secrets.ts
 "use server";
 
 import "server-only";
@@ -11,6 +12,8 @@ export interface UserRentalSecret {
   doc_sha256: string;
   renter_full_name: string | null;
   renter_passport: string | null;
+  renter_passport_issue_date: string | null;
+  renter_registration: string | null;
   renter_driver_license: string | null;
   renter_birth_date: string | null;
   renter_phone: string | null;
@@ -118,6 +121,40 @@ export async function getUserRentalSecretsByDocSha(
   } catch (error) {
     logUserRentalSecretsError("getUserRentalSecretsByDocSha", error);
     return null;
+  }
+}
+
+/**
+ * Get ALL verified rental secrets for a user+crew (for profile/data picker UI).
+ * Returns records ordered by most recent first.
+ * Used by Task F: Previous rental data picker UI.
+ */
+export async function getAllVerifiedRentalSecrets(
+  chatId: string,
+  crewSlug: string,
+): Promise<UserRentalSecret[]> {
+  const normalizedChatId = normalizeRequiredId(chatId, "chatId");
+  const normalizedCrewSlug = normalizeRequiredId(crewSlug, "crewSlug");
+  if (!normalizedChatId || !normalizedCrewSlug) return [];
+
+  try {
+    const { data, error } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("chat_id", normalizedChatId)
+      .eq("crew_slug", normalizedCrewSlug)
+      .eq("verification_status", "verified")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      logUserRentalSecretsError("getAllVerifiedRentalSecrets", error);
+      return [];
+    }
+
+    return (data as UserRentalSecret[]) ?? [];
+  } catch (error) {
+    logUserRentalSecretsError("getAllVerifiedRentalSecrets", error);
+    return [];
   }
 }
 
