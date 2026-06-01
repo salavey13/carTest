@@ -1731,18 +1731,24 @@ function resolveAndValidateFranchizeDocVariables(
 
 type FranchizeOrderFlowType = "rental" | "sale" | "mixed";
 
-async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderFlowType): Promise<string> {
+async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderFlowType): Promise<{ template: string; templateMode: "md" | "html" }> {
   const crewSensitive = await getCrewSensitiveDataOrDefault(slug, { source: "loadFranchizeDealTemplate" });
   const secureTemplateKey = flowType === "rental" ? "rentalDealTemplate" : "saleDealTemplate";
   const secureTemplate = readPath(crewSensitive.docTemplates ?? {}, [secureTemplateKey], "");
   if (typeof secureTemplate === "string" && secureTemplate.trim().length > 0) {
-    return secureTemplate;
+    // Auto-detect mode from stored template content
+    const templateMode = /<[a-z][\s>]/i.test(secureTemplate.trimStart().slice(0, 200)) ? "html" as const : "md" as const;
+    return { template: secureTemplate, templateMode };
   }
 
-  const remoteTemplateUrl = flowType === "rental"
-    ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE_DEMO.md"
+  const isRental = flowType === "rental";
+  // Rental: use the full HTML template (proper DOCX formatting, all appendices, dynamic vehicle types)
+  // Sale: keep MD template (no HTML version yet)
+  const remoteTemplateUrl = isRental
+    ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE.html"
     : "https://raw.githubusercontent.com/salavey13/carTest/main/docs/SALE_DEAL_TEMPLATE_DEMO.md";
-  const localTemplateFile = flowType === "rental" ? "RENTAL_DEAL_TEMPLATE_DEMO.md" : "SALE_DEAL_TEMPLATE_DEMO.md";
+  const localTemplateFile = isRental ? "RENTAL_DEAL_TEMPLATE.html" : "SALE_DEAL_TEMPLATE_DEMO.md";
+  const defaultTemplateMode = isRental ? "html" as const : "md" as const;
 
   try {
     const response = await fetch(remoteTemplateUrl, { cache: "no-store" });
@@ -1752,14 +1758,62 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
 
     const remoteTemplate = await response.text();
     if (remoteTemplate.trim().length > 0) {
-      return remoteTemplate;
+      return { template: remoteTemplate, templateMode: defaultTemplateMode };
     }
 
     throw new Error("template fetch returned empty content");
   } catch (error) {
     logger.warn("[franchize] fallback to local template", { flowType, error });
     const localTemplatePath = path.join(process.cwd(), "docs", localTemplateFile);
-    return readFile(localTemplatePath, "utf8");
+    const localTemplate = await readFile(localTemplatePath, "utf8");
+    return { template: localTemplate, templateMode: defaultTemplateMode };
+  }
+}
+
+/**
+ * Fetch the most recent verified rental secrets for a user+crew.
+ * Returns the richest personal data from past rentals — used to pre-fill
+ * the HTML template (passport issue date, registration, etc.).
+ * Falls back gracefully if table is empty or query fails.
+ */
+async function getLatestVerifiedRentalSecrets(
+  chatId: string,
+  crewSlug: string,
+): Promise<Record<string, string> | null> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .schema("private")
+      .from("user_rental_secrets")
+      .select("renter_full_name, renter_passport, renter_passport_issue_date, renter_registration, renter_driver_license, renter_birth_date, renter_phone, renter_email, renter_address, verification_status, created_at")
+      .eq("chat_id", chatId)
+      .eq("crew_slug", crewSlug)
+      .eq("verification_status", "verified")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      logger.warn("[franchize] getLatestVerifiedRentalSecrets query failed", {
+        chatId, crewSlug, error: error.message,
+      });
+      return null;
+    }
+
+    if (!data) return null;
+
+    // Return only non-null string fields
+    const result: Record<string, string> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (typeof value === "string" && value.trim().length > 0) {
+        result[key] = value.trim();
+      }
+    }
+    return result;
+  } catch (error) {
+    logger.warn("[franchize] getLatestVerifiedRentalSecrets unexpected error", {
+      chatId, crewSlug, error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
   }
 }
 
@@ -1839,8 +1893,13 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const rentStartDate = payload.rentalStartDate || payload.time;
     const rentEndDate = payload.rentalEndDate || payload.time;
     const dailyPriceRub = firstLine?.pricePerDay || Math.round(payload.subtotal / Math.max(1, rentDays));
+    // Vehicle type derivation for dynamic template labels (HTML template uses these)
+    const isElectricBike = String(firstSpecs.type || "").toLowerCase().includes("electric");
+    const bikeVehicleTypeLabel = isElectricBike ? "ЭЛЕКТРОМОТОЦИКЛА" : "МОТОЦИКЛА";
+    const bikeVehicleTypeAccusative = isElectricBike ? "электромотоцикл" : "мотоцикл";
+    const bikeVehicleTypeGenitive = isElectricBike ? "электромотоцикла" : "мотоцикла";
 
-    const template = await loadFranchizeDealTemplate(payload.slug, flowType);
+    const { template, templateMode } = await loadFranchizeDealTemplate(payload.slug, flowType);
     const privateReadContext = { source: "buildFranchizeOrderDocAndNotify", orderId: payload.orderId };
     const userSensitive = await getUserSensitiveDataOrDefault(payload.telegramUserId, privateReadContext);
     const crewSensitive = await getCrewSensitiveDataOrDefault(payload.slug, privateReadContext);
@@ -1848,45 +1907,81 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const defaults = (readPath(contractDefaults, ["defaults"], {}) ?? {}) as UnknownRecord;
     const docIdentity = resolveAndValidateFranchizeDocVariables(payload, userSensitive);
 
+    // Fetch verified rental secrets from past rentals — richest personal data source
+    // Priority chain: rental secrets (verified OCR/past contract) > userSensitive > placeholder
+    const rentalSecrets = await getLatestVerifiedRentalSecrets(payload.telegramUserId, payload.slug);
+
     const variables = {
       contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}`,
       contract_date: new Date().toLocaleDateString("ru-RU"),
       day: new Date().getDate().toString().padStart(2, "0"),
       month: new Date().toLocaleString("ru-RU", { month: "long" }),
+      month_num: String(new Date().getMonth() + 1).padStart(2, "0"),
       year: new Date().getFullYear().toString(),
+      // Renter identity — 3-tier priority: rental secrets (verified past) > userSensitive > placeholder
       renter_full_name: payload.recipient,
       renter_phone: docIdentity.renterPhone,
       renter_birth_date: docIdentity.renterBirthDate,
       renter_email: docIdentity.renterEmail,
-      renter_address: payload.renterAddress || String(readPath(userSensitive, ["renterAddress"], "") || readPath(userSensitive, ["registration"], "")) || null,
-      renter_driver_license: userSensitive.driverLicense || payload.renterDriverLicense || "указывается при выдаче",
-      renter_passport: userSensitive.passport || payload.renterPassport || "указывается при выдаче",
+      renter_address: rentalSecrets?.renter_address || payload.renterAddress || String(readPath(userSensitive, ["renterAddress"], "") || readPath(userSensitive, ["registration"], "")) || null,
+      renter_driver_license: rentalSecrets?.renter_driver_license || userSensitive.driverLicense || payload.renterDriverLicense || "указывается при выдаче",
+      renter_passport: rentalSecrets?.renter_passport || userSensitive.passport || payload.renterPassport || "указывается при выдаче",
+      renter_passport_issue_date: rentalSecrets?.renter_passport_issue_date || String(readPath(userSensitive, ["passportIssueDate"], "") || readPath(userSensitive, ["passport_issue_date"], "")) || "—",
+      renter_registration: rentalSecrets?.renter_registration || String(readPath(userSensitive, ["registration"], "")) || "—",
       issuer_name: String(readPath(defaults, ["issuerName"], `Franchize ${payload.slug}`)),
       issuer_signatory: "Администратор экипажа",
       issuer_representative: String(readPath(defaults, ["issuer_representative"], "Сидоров Илья Олегович")),
+      // Bike identity — separate make/model for HTML template §1.2
       bike_make_model: firstCar
         ? `${firstCar.make || "Bike"} ${firstCar.model || "Model"}`
         : payload.cartLines.map((line) => line.itemId).join(", "),
+      bike_make: firstCar?.make || "уточняется",
+      bike_model: firstCar?.model || "уточняется",
       bike_vin: String(firstSpecs.vin || firstSpecs.frame || firstSpecs.vin_number || "уточняется"),
       bike_plate: String(firstSpecs.plate || firstSpecs.state_number || "уточняется"),
-      bike_mileage: "45073",
+      bike_category: String(firstSpecs.category || firstSpecs.tp_category || "A/L3"),
+      bike_color: String(firstSpecs.color || "уточняется"),
+      bike_year: String(firstSpecs.year || firstSpecs.production_year || "уточняется"),
+      bike_mileage: String(firstSpecs.mileage || "45073"),
+      // Dynamic vehicle type labels (HTML template: title, §1.1, appendices)
+      bike_vehicle_type_label: bikeVehicleTypeLabel,
+      bike_vehicle_type_accusative: bikeVehicleTypeAccusative,
+      bike_vehicle_type_genitive: bikeVehicleTypeGenitive,
+      // Engine spec lines from bike specs (pre-computed in seed data)
+      bike_engine_spec_line_1: String(firstSpecs.bike_engine_spec_line_1 || ""),
+      bike_engine_spec_line_2: String(firstSpecs.bike_engine_spec_line_2 || ""),
+      bike_engine_spec_line_3: String(firstSpecs.bike_engine_spec_line_3 || ""),
       rent_start_time: "12:00",
       rent_start_date: rentStartDate,
       rent_end_time: "12:00",
       rent_end_date: rentEndDate,
       rent_days: rentDays,
+      // Pricing: both hourly and daily for HTML template §4.1
+      hourly_price_rub: formatMoney(Number(firstSpecs.price_per_hour || 0)),
       daily_price_rub: formatMoney(dailyPriceRub),
       subtotal_rub: formatMoney(payload.subtotal),
       extras_rows: extrasRows,
       extras_total_rub: formatMoney(payload.extrasTotal),
       total_price_rub: formatMoney(payload.totalAmount),
-      deposit_rub: "20 000",
+      deposit_rub: String(readPath(defaults, ["deposit_rub"], "20 000")),
       included_mileage: String(readPath(defaults, ["included_mileage"], 200)),
       overage_rate: `${readPath(defaults, ["overage_rate"], 30)} руб/км`,
+      included_km_per_day: String(readPath(defaults, ["included_km_per_day"], 200)),
+      extra_km_fee_rub: String(readPath(defaults, ["extra_km_fee_rub"], 35)),
       bike_value_rub: String(readPath(defaults, ["bike_value_rub"], 700000)),
       bike_value_words: String(readPath(defaults, ["bike_value_words"], "Семьсот тысяч")),
       late_return_penalty_rub: String(readPath(defaults, ["late_return_penalty_rub"], 5000)),
+      late_return_penalty_max_days: String(readPath(defaults, ["late_return_penalty_max_days"], 90)),
+      damage_price_list: String(readPath(defaults, ["damage_price_list"], "мотоцикл в сборе / царапина на пластике / прочее по расчету")),
       return_address: String(readPath(defaults, ["return_address"], "г. Нижний Новгород, ул. Стригинский переулок, дом 13б")),
+      lessor_address: String(readPath(defaults, ["lessor_address"], "г. Нижний Новгород")),
+      // Appendix 1 — act fields (filled at delivery/return; placeholders for pre-contract)
+      battery_level_start: "100 %",
+      battery_level_end: "____ %",
+      equipment: "—",
+      damage_notes_at_delivery: "от даты начала аренды",
+      damage_notes_at_return: "от даты возврата тс",
+      media_links: "—",
       signature_timestamp: new Date().toLocaleString("ru-RU"),
       signature_fingerprint: payload.signatureFingerprint || "—",
       renter_signature: payload.signatureName || "электронное согласие в Telegram WebApp",
@@ -1904,6 +1999,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       template,
       variables,
       flowType,
+      templateMode,
     });
 
     const adminChatId = process.env.ADMIN_CHAT_ID;
@@ -2061,6 +2157,8 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         doc_sha256: sha256,
         renter_full_name: variables.renter_full_name,
         renter_passport: variables.renter_passport,
+        renter_passport_issue_date: variables.renter_passport_issue_date !== "—" ? variables.renter_passport_issue_date : null,
+        renter_registration: variables.renter_registration !== "—" ? variables.renter_registration : null,
         renter_driver_license: variables.renter_driver_license,
         renter_birth_date: variables.renter_birth_date,
         renter_phone: variables.renter_phone,
