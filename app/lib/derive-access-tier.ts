@@ -1,111 +1,112 @@
 /**
- * VIP Bike Rental — Access Tier Derivation
+ * VIP Bike Rental — Derive Access Tier from Driver's License Category
  *
- * Derives a bike's access tier from its `specs.license_class` field,
- * and a user's access tier from their verified driver's license categories.
+ * Pure utility: maps Russian driver's license categories → access tier.
+ * No side effects, no database calls. Reusable across API routes, bot commands, and UI.
  *
- * Tier definitions (based on Russian driver's license categories):
- * - "entry": Category M/М1 — moped-class, no motorcycle license needed.
- *   Car license (B) sufficient or no license at all for electric under 4 kW nominal.
- * - "mid": Category A1/B — 125cc equivalent, limited power.
- *   Requires A1 or B-category license with motorcycle confirmation.
- * - "pro": Category A — full motorcycle license required.
- *   ICE or high-power electric (30+ kW).
- *
- * Trickle-down: Pro users can rent Mid + Entry, Mid users can rent Entry + Mid.
- * Entry users can only rent Entry bikes.
+ * Tier hierarchy:  entry < mid < pro
+ *   - entry:  Falcon GT, Falcon Pro, Ducati Panigale S (49cc / M-category electric)
+ *   - mid:    + HORWIN SK3 Plus (125cc / A1+B)
+ *   - pro:    + Sequence Zero, Y-VOLT, Kawasaki EX650K (A-category, high-power electric/ICE)
  */
 
-export type AccessTier = "entry" | "mid" | "pro";
+import { LICENSE_CATEGORY_TIER_MAP, type AccessTier } from "./ocr-constants";
 
-const TIER_LEVEL: Record<AccessTier, number> = { entry: 1, mid: 2, pro: 3 };
-
-/**
- * Derives a bike's access tier from its `specs.license_class` string.
- *
- * The `license_class` field in the gold seed is human-readable Russian text,
- * e.g. "М (49 сс), подходят права В или А1" or "А (электро 30 кВт, экв. 125 сс+)".
- *
- * Mapping logic:
- * - "А " or "А/" at start → Pro  (full motorcycle category A)
- * - Contains "A1" or "125 сс"   → Mid  (125cc equivalent)
- * - Everything else              → Entry (moped-class)
- */
-export function deriveAccessTier(licenseClass: string): AccessTier {
-  if (!licenseClass || typeof licenseClass !== "string") return "entry";
-
-  const lc = licenseClass.toUpperCase();
-
-  // Pro: starts with Russian "А " or "А/" (А = Cyrillic category A motorcycle)
-  // Matches: "А (электро 30 кВт...)", "А / L3"
-  // Also handles Latin "A" just in case
-  if (/^[АA]\s*[\/(]/.test(lc) || /^[АA]$/.test(lc.trim())) return "pro";
-
-  // Mid: contains A1 or "125 СС" pattern
-  // Matches: "125 сс (A1 / B)"
-  if (/A1/.test(lc) || /125\s*СС/.test(lc)) return "mid";
-
-  // Entry: everything else (М category, moped-class)
-  // Matches: "М (49 сс)", "М (49 сс), подходят права В или А1"
-  return "entry";
-}
+const TIER_PRIORITY: Record<AccessTier, number> = {
+  none: 0,
+  entry: 1,
+  mid: 2,
+  pro: 3,
+};
 
 /**
- * Returns the access tier for a user based on their verified driver's license categories.
- * The highest category determines the tier: A > A1/B > M > none.
+ * Derive a single access tier from an array of license categories.
+ * Returns the HIGHEST tier that any category grants.
  *
- * @param categories - Array of license categories, e.g. ["A", "B", "M"]
- *   These come from OCR'd driver's license: `renter_driver_license` parsed or
- *   stored explicitly in `user_secrets.sensitive_metadata.license_categories`.
+ * Example:
+ *   deriveUserAccessTier(["M", "B"])  → "mid"   (M→entry, B→mid → max=mid)
+ *   deriveUserAccessTier(["A"])       → "pro"   (A→pro)
+ *   deriveUserAccessTier(["M"])       → "entry" (M→entry)
+ *   deriveUserAccessTier([])          → "none"  (no categories)
  */
 export function deriveUserAccessTier(categories: string[]): AccessTier {
-  if (!categories || categories.length === 0) return "entry";
+  if (!categories || categories.length === 0) return "none";
 
-  const upper = categories.map((c) => c.toUpperCase().trim());
+  let maxTier: AccessTier = "none";
+  for (const raw of categories) {
+    // Normalize: uppercase, trim, remove digits that aren't part of known categories
+    const cat = raw.trim().toUpperCase();
 
-  // Pro: has category A (full motorcycle, not just A1)
-  if (upper.some((c) => c === "A" || c === "А")) return "pro";
+    // Try exact match first (A, A1, B, B1, M, etc.)
+    const tier = LICENSE_CATEGORY_TIER_MAP[cat];
+    if (tier && TIER_PRIORITY[tier] > TIER_PRIORITY[maxTier]) {
+      maxTier = tier;
+    }
+  }
 
-  // Mid: has A1, B, B1, or M
-  if (upper.some((c) => ["A1", "B", "M", "B1", "А1", "В", "В1", "М"].includes(c)))
-    return "mid";
-
-  // Entry: only has lesser categories or none
-  return "entry";
+  return maxTier;
 }
 
 /**
- * Checks if a user with the given tier can access a bike with the required tier.
- * Trickle-down: Pro > Mid > Entry.
+ * Check whether a user's tier grants access to a bike's required tier.
+ *
+ * Example:
+ *   canAccessTier("mid", "entry")  → true   (mid ≥ entry)
+ *   canAccessTier("entry", "pro")  → false  (entry < pro)
+ *   canAccessTier("pro", "pro")    → true   (pro ≥ pro)
  */
 export function canAccessTier(userTier: AccessTier, requiredTier: AccessTier): boolean {
-  return TIER_LEVEL[userTier] >= TIER_LEVEL[requiredTier];
+  return TIER_PRIORITY[userTier] >= TIER_PRIORITY[requiredTier];
 }
 
 /**
- * Returns a human-readable Russian label for the tier.
+ * Derive access tier from a single license class string (as found in bike specs).
+ * Handles Russian text like "М (49 сс)", "125 сс (A1/B)", "А (электро 30 кВт)".
+ *
+ * Extracts all category letters found in the string and returns the highest tier.
  */
-export function tierLabel(tier: AccessTier): string {
+export function deriveAccessTierFromLicenseClass(licenseClassStr: string): AccessTier {
+  if (!licenseClassStr) return "none";
+
+  // Extract category-like tokens: standalone A, A1, B, B1, M, etc.
+  const categoryPattern = /\b(A1?|B1?|C1?|D1?|M|Tm|Tb)\b/gi;
+  const categories: string[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = categoryPattern.exec(licenseClassStr)) !== null) {
+    categories.push(match[1]);
+  }
+
+  // Special case: if the string mentions "49 сс" or "49сс" without categories → M
+  if (categories.length === 0 && /49\s*сс/i.test(licenseClassStr)) {
+    categories.push("M");
+  }
+
+  return deriveUserAccessTier(categories);
+}
+
+/**
+ * Get a human-readable Russian label for an access tier.
+ */
+export function getAccessTierLabel(tier: AccessTier): string {
   switch (tier) {
-    case "entry":
-      return "Entry (М/М1 — скутеры и электро)";
-    case "mid":
-      return "Mid (A1/B — 125 сс)";
-    case "pro":
-      return "Pro (А — мотоциклы и мощное электро)";
+    case "entry": return "Базовый";
+    case "mid":   return "Средний";
+    case "pro":   return "Профессиональный";
+    case "none":  return "Без допуска";
   }
 }
 
 /**
- * Returns the required license category label for a tier (for error messages).
+ * Get a description of which bike categories are accessible at this tier.
  */
-export function tierRequiredLicenseLabel(tier: AccessTier): string {
+export function getAccessTierDescription(tier: AccessTier): string {
   switch (tier) {
-    case "entry":
-      return "не требуются (достаточно паспорта)";
-    case "mid":
-      return "категории A1 или B";
-    case "pro":
-      return "категории А";
+    case "entry": return "Электроскутеры до 50 сс эквивалент (категория М)";
+    case "mid":   return "Скутеры до 125 сс, электроэндуро до 11 кВт (категории A1, B)";
+    case "pro":   return "Все мотоциклы без ограничений (категория A)";
+    case "none":  return "Требуется verification водительского удостоверения";
   }
 }
+
+export { TIER_PRIORITY };
