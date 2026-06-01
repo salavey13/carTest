@@ -89,6 +89,8 @@
 
 - [ ] Test: verify DOCX + QR arrive in one message, no duplicates
 
+> **⚠️ BLOCKED** — needs current `actions-runtime.ts` (with Run 3 changes) + `package.json` from repo
+
 ---
 
 ### Task C: `private.user_rental_secrets` Table Migration ✅
@@ -309,24 +311,24 @@ The gold seed already has `license_class` on every bike. Here's the mapping:
 
 **Trickling down**: VIP with Pro access can also rent Mid and Entry bikes. VIP with Mid access can rent Entry and Mid. VIP with Entry access can only rent Entry bikes.
 
-- [ ] **Design access tier system** for bikes:
-  - [ ] **Entry** — e-bikes, scooters, low-power (no driver's license required, basic ID only)
-  - [ ] **Mid** — mid-size motorcycles (category A1/A license required, full passport + license)
-  - [ ] **Pro** — high-power motorcycles (category A license + experience verification)
-  - [ ] Tier stored where? `cars.metadata.access_tier` or `cars.specs.access_tier`?
+- [x] **Design access tier system** for bikes ✅ **Done** → `lib/derive-access-tier.ts`
+  - [x] **Entry** — e-bikes, scooters, low-power (no driver's license required, basic ID only)
+  - [x] **Mid** — mid-size motorcycles (category A1/A license required, full passport + license)
+  - [x] **Pro** — high-power motorcycles (category A license + experience verification)
+  - [x] Tier stored in `cars.specs.access_tier` (Option B — explicit field in gold seed)
 
-- [ ] **Tier determination logic**:
-  - [ ] What fields on `cars` determine tier? (type, engine displacement, power, category)
-  - [ ] Can tiers be configured per crew? (crew A classifies differently than crew B)
-  - [ ] Should tiers be hardcoded or configurable in `crew_secrets.price_lists`?
+- [x] **Tier determination logic** ✅ **Done**
+  - [x] Derived from `specs.license_class` → `deriveAccessTier()` regex
+  - [x] Tiers are hardcoded from license class (not per-crew configurable yet)
+  - [x] Future: configurable in `crew_secrets.price_lists` if needed
 
-- [ ] **Add `access_tier` derived field** to bike data:
-  - [ ] Option A: compute at query time from `specs.license_class` (no migration)
-  - [ ] Option B: add `specs.access_tier` field to gold seed ("entry" | "mid" | "pro")
-  - [ ] Recommendation: **Option B** — explicit is better, `license_class` is human-readable Russian text, `access_tier` is machine-parseable
-  - [ ] Update gold seed CSV: add `access_tier` to each bike's specs JSON
+- [x] **Add `access_tier` derived field** to bike data:
+  - [x] Option A: compute at query time from `specs.license_class` (no migration)
+  - [x] Option B: add `specs.access_tier` field to gold seed ("entry" | "mid" | "pro")
+  - [x] Recommendation: **Option B** — explicit is better, `license_class` is human-readable Russian text, `access_tier` is machine-parseable
+  - [x] Update gold seed CSV: add `access_tier` to each bike's specs JSON ✅ **Done**
 
-- [ ] **Extract access tier from `license_class`** (utility function):
+- [x] **Extract access tier from `license_class`** (utility function) ✅ **Done** → `lib/derive-access-tier.ts`
   ```typescript
   function deriveAccessTier(licenseClass: string): "entry" | "mid" | "pro" {
     // "М (49 сс)" → "entry"
@@ -335,31 +337,30 @@ The gold seed already has `license_class` on every bike. Here's the mapping:
     // "А / L3" → "pro"
   }
   ```
+  Also includes: `deriveUserAccessTier(categories[])`, `canAccessTier(userTier, requiredTier)`, `tierLabel()`, `tierRequiredLicenseLabel()`
 
-- [ ] **VIP access check**: when VIP member scans QR or opens rental:
-  - [ ] What tier(s) is this user verified for?
-  - [ ] Based on: verified doc types in `user_rental_secrets` + driver's license category
-  - [ ] Entry-tier VIP: passport verified → can rent entry-level
-  - [ ] Mid-tier VIP: passport + license (A1/A) verified → can rent entry + mid
-  - [ ] Pro-tier VIP: passport + license (A) + experience confirmed → can rent all
+- [x] **VIP access check**: when VIP member scans QR or opens rental ✅ **Done** → `app/lib/vip-access.ts`
+  - [x] `getUserAccessTier(chatId, crewSlug)` — resolves tier from `user_rental_secrets`
+  - [x] `parseLicenseCategories(licenseStr)` — extracts categories from stored license string
+  - [x] `checkBikeAccess(userTier, bikeSpecs)` — returns allowed/denied + Russian error message
 
 ### 3.2 VIP Status — Derived from User's Verified Docs
 
-- [ ] **Determine user's access tier from their verified documents**:
-  - [ ] No driver's license on file → **Entry only** (can rent Entry bikes — Falcon GT, Falcon Pro, Ducati Panigale S)
-  - [ ] License category B/M confirmed → **Mid access** (Entry + Mid bikes — adds HORWIN SK3 Plus)
-  - [ ] License category A confirmed → **Pro access** (all bikes — adds Sequence Zero, Y-VOLT Surge V, Kawasaki)
-  - [ ] Query: look at `user_rental_secrets.renter_driver_license` field — does it contain category info? Or query `user_secrets.driver_license`
+- [x] **Determine user's access tier from their verified documents** ✅ **Done** → `app/lib/vip-access.ts`
+  - [x] No driver's license on file → **Entry only** (can rent Entry bikes — Falcon GT, Falcon Pro, Ducati Panigale S)
+  - [x] License category B/M confirmed → **Mid access** (Entry + Mid bikes — adds HORWIN SK3 Plus)
+  - [x] License category A confirmed → **Pro access** (all bikes — adds Sequence Zero, Y-VOLT Surge V, Kawasaki)
+  - [x] Query: `getUserRentalSecrets(chatId, crewSlug)` → `parseLicenseCategories(renter_driver_license)` → `deriveUserAccessTier(categories)`
 
-- [ ] **License category extraction from OCR**:
-  - [ ] OCR of driver's license returns category fields (A, A1, B, B1, M, etc.)
-  - [ ] Store extracted categories in `user_rental_secrets.renter_driver_license` or `user_secrets.sensitive_metadata`
-  - [ ] Derive access tier from highest category: A > A1/B > M > none
+- [x] **License category extraction from OCR** ✅ **Done** → `app/lib/vip-access.ts:parseLicenseCategories()`
+  - [x] OCR of driver's license returns category fields (A, A1, B, B1, M, etc.)
+  - [x] Store extracted categories in `user_rental_secrets.renter_driver_license` as `(кат. А, В)` suffix
+  - [x] Derive access tier from highest category: A > A1/B > M > none
 
-- [ ] **Access tier check in rental flow**:
-  - [ ] When user selects a bike, check if their access tier allows it
-  - [ ] If not: "Для аренды этого мотоцикла необходимы права категории А. Ваши документы позволяют аренду до уровня Mid."
-  - [ ] If yes: proceed with VIP 1-click flow or standard flow
+- [x] **Access tier check in rental flow** ✅ **Done** → `app/lib/vip-access.ts:checkBikeAccess()`
+  - [x] When user selects a bike, check if their access tier allows it
+  - [x] If not: "Для аренды этого мотоцикла необходимы права категории А. Ваши документы позволяют аренду до уровня Mid."
+  - [x] If yes: proceed with VIP 1-click flow or standard flow
 
 - [ ] **Design VIP status mechanism**:
   - [ ] Option A: derived status — query `user_rental_secrets` for verified rows to determine tier (no new column needed)
@@ -428,17 +429,13 @@ The gold seed already has `license_class` on every bike. Here's the mapping:
 
 ### 4.0 OCR Architecture Decision
 
-- [ ] **Evaluate OCR approaches**:
-  - [ ] **Option A: VLM-based** — send photo to GLM-4V / GPT-4V → structured JSON extraction
+- [x] **Evaluate OCR approaches** ✅ **Decision: VLM-based (Option A)**
+  - [x] **Option A: VLM-based** — send photo to GLM-4V via `z-ai-web-dev-sdk` → structured JSON extraction
     - Pros: already using VLM for bike specs, handles Russian passports/licenses well
     - Cons: API latency, cost per call, not always deterministic
-  - [ ] **Option B: Tesseract.js** — open-source OCR in Node.js
-    - Pros: free, local, no API dependency
-    - Cons: lower accuracy on Russian passports, needs trained models
-  - [ ] **Option C: Hybrid** — Tesseract for text extraction + VLM for structured parsing
-    - Pros: Tesseract handles layout, VLM handles semantics
-    - Cons: two-pass complexity
-  - [ ] **Recommendation**: **Option A first** (VLM) — simplest to implement, highest accuracy. Add Tesseract fallback later for cost optimization.
+  - [ ] **Option B: Tesseract.js** — open-source OCR in Node.js (deferred)
+  - [ ] **Option C: Hybrid** — Tesseract + VLM (deferred)
+  - [x] **Recommendation**: **Option A first** (VLM) — implemented in `app/api/ocr/route.ts` + `app/lib/ocr-constants.ts`
 
 ### 4.1 Telegram Bot `/doc` Command
 
