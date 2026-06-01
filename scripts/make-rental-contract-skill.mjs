@@ -128,6 +128,63 @@ const supabaseRestSelect = (from, to) => {
   return JSON.parse(curl.stdout || '[]');
 };
 
+function supabaseRestRequest(pathAndQuery, { method = 'GET', body = null, prefer = '' } = {}) {
+  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!baseUrl || !serviceKey) {
+    throw new Error('Supabase env is missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+  }
+
+  const args = [
+    '-sS',
+    '-X', method,
+    `${baseUrl}/rest/v1/${pathAndQuery}`,
+    '-H', `apikey: ${serviceKey}`,
+    '-H', `Authorization: Bearer ${serviceKey}`,
+    '-H', 'Content-Type: application/json',
+  ];
+  if (prefer) args.push('-H', `Prefer: ${prefer}`);
+  if (body) args.push('--data', JSON.stringify(body));
+
+  const curl = spawnSync('curl', args, { encoding: 'utf8' });
+  if (curl.status !== 0) {
+    throw new Error(`Supabase REST request failed: ${curl.stderr || curl.stdout}`);
+  }
+
+  return JSON.parse(curl.stdout || '[]');
+}
+
+async function insertMetadataWithFallback(table, payload) {
+  try {
+    const response = await supabase.from(table).insert(payload).select('contract_key').limit(1);
+    if (!response.error) return response;
+    if (!/fetch failed/i.test(String(response.error?.message || response.error))) return response;
+  } catch (error) {
+    if (!/fetch failed/i.test(String(error?.message || error))) throw error;
+  }
+
+  const data = supabaseRestRequest(`${encodeURIComponent(table)}?select=contract_key`, {
+    method: 'POST',
+    body: payload,
+    prefer: 'return=representation',
+  });
+  return { data, error: null };
+}
+
+async function verifyMetadataWithFallback(table, contractKey) {
+  try {
+    const response = await supabase.from(table).select('contract_key').eq('contract_key', contractKey).maybeSingle();
+    if (!response.error) return response;
+    if (!/fetch failed/i.test(String(response.error?.message || response.error))) return response;
+  } catch (error) {
+    if (!/fetch failed/i.test(String(error?.message || error))) throw error;
+  }
+
+  const query = `${encodeURIComponent(table)}?select=contract_key&contract_key=eq.${encodeURIComponent(contractKey)}&limit=1`;
+  const data = supabaseRestRequest(query);
+  return { data: data?.[0] || null, error: null };
+}
+
 
 const norm = (v='') => String(v).toLowerCase().replace(/[^a-zа-я0-9]+/gi,' ').trim();
 const scoreBike = (q, bike) => {
@@ -284,14 +341,21 @@ if (startDP && endDP) {
 const rentalDays = rentalHours > 0 ? Math.max(1, Math.ceil(rentalHours / 24)) : 1;
 const isHourlyRental = rentalHours > 0 && rentalHours < 24;
 
-// Pricing: prefer rental-specific specs, fall back to args, fall back to defaults
+// Pricing: explicit operator-provided CLI values win over catalog defaults.
 // NOTE: price_rub is SALE price, NOT daily rental price. Use dailyPrice / rent_weekday for rental.
-const bikeDailyPrice = Number(bike.specs?.dailyPrice) > 0 ? String(bike.specs.dailyPrice)
+const explicitDailyPrice = arg('dailyPrice', '');
+const explicitHourlyPrice = arg('hourlyPrice', '');
+const explicitDeposit = arg('deposit', '');
+const bikeDailyPrice = Number(explicitDailyPrice) > 0 ? explicitDailyPrice
+  : Number(bike.specs?.dailyPrice) > 0 ? String(bike.specs.dailyPrice)
   : Number(bike.specs?.rent_weekday) > 0 ? String(bike.specs.rent_weekday)
-  : arg('dailyPrice', '10000');
-const bikeHourlyPrice = Number(bike.specs?.price_per_hour) > 0 ? String(bike.specs.price_per_hour)
-  : arg('hourlyPrice', String(Math.round(Number(bikeDailyPrice) / 8)));
-const bikeDeposit = Number(bike.specs?.deposit_rub) > 0 ? String(bike.specs.deposit_rub) : arg('deposit', '20000');
+  : '10000';
+const bikeHourlyPrice = Number(explicitHourlyPrice) > 0 ? explicitHourlyPrice
+  : Number(bike.specs?.price_per_hour) > 0 ? String(bike.specs.price_per_hour)
+  : String(Math.round(Number(bikeDailyPrice) / 8));
+const bikeDeposit = Number(explicitDeposit) > 0 ? explicitDeposit
+  : Number(bike.specs?.deposit_rub) > 0 ? String(bike.specs.deposit_rub)
+  : '20000';
 // Bike value for loss/total-loss compensation = sale price or market price
 const bikeValueRub = Number(bike.specs?.sale_price) > 0 ? String(bike.specs.sale_price)
   : Number(bike.specs?.price_rub) > 0 ? String(bike.specs.price_rub)
@@ -476,9 +540,9 @@ if (saveMetadata) {
     rent_end_date: endDate,
     original_sha256: originalSha256,
   };
-  const writeRes = await supabase.from(metadataTable).insert(payload).select('contract_key').limit(1);
+  const writeRes = await insertMetadataWithFallback(metadataTable, payload);
   if (writeRes.error) failStage('metadata_write', 'metadata_write_failed', { table: metadataTable, error: writeRes.error.message });
-  const verifyRes = await supabase.from(metadataTable).select('contract_key').eq('contract_key', vars.document_key).maybeSingle();
+  const verifyRes = await verifyMetadataWithFallback(metadataTable, vars.document_key);
   if (verifyRes.error || !verifyRes.data?.contract_key) {
     failStage('metadata_verify', 'read_after_write_verification_failed', { table: metadataTable, contractKey: vars.document_key, error: verifyRes.error?.message || null });
   }
