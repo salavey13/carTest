@@ -633,3 +633,12 @@ This root file stays intentionally compact so operators and agents can load it q
 - `risks`: Визуальный Telegram fullscreen всё ещё требует девайс-проверки, локальный браузер не воспроизводит native top buttons.
 
 - 2026-05-08 — Self-review micro-polish: side header controls restored, vertical safe offset retained, mixed-language copy tightened.
+
+### 2026-06-03 — MapRiders mobile gesture passthrough fix
+
+- `status`: ready_for_pr
+- `updated_at`: 2026-06-03T00:00:00Z
+- `owner`: codex
+- `notes`: Fixed a tricky VIP Bike MapRiders touch trap: the secondary mobile riders drawer was leaving invisible Vaul content in the pointer hit-test stack while closed, so Leaflet pan/zoom worked reliably only from marker interactions. Closed drawer content now unmounts, only the small handle remains interactive, and the Leaflet map explicitly owns touch gestures.
+- `next_step`: Preview-smoke `/franchize/vip-bike/map-riders` in Telegram WebApp on mobile: pan/zoom from blank map tiles, rider marker drag-start, drawer handle open/close, and meetup long-press.
+- `risks`: Local Playwright browser launch was blocked by missing system library `libatk-1.0.so.0`, so device QA remains the decisive proof.
