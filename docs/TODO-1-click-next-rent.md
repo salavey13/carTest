@@ -423,22 +423,27 @@ The gold seed already has `license_class` on every bike. Here's the mapping:
 
 ---
 
-## 🔬 Phase 4: OCR Pipeline — `/doc` Command & Web-App OCR
+## 🔬 Phase 4: VLM Photo Extraction Pipeline — `/doc` Command & Web-App Intake
 
-> **Goal**: Users send passport/license photos to bot → OCR extracts data → contract generated. No more manual JSON files. OCR result also extracts license category, feeding directly into VIP tier system.
+> **Goal**: Users send passport/license photos to bot → ZAI VLM extracts structured data → contract generated. No more manual JSON files. VLM result also extracts license category, feeding directly into VIP tier system.
 
-### 4.0 OCR Architecture Decision
+### 4.0 VLM/OCR Architecture Decision
 
-- [ ] **Evaluated OCR approaches**:
-  - [ ] **Option A: VLM-based** — send photo to GLM-4V / GPT-4V → structured JSON extraction
-    - Cons: API latency, cost per call, not always deterministic
-  - [x] **Option B: Tesseract.js** — open-source OCR in Node.js
+> **Updated direction (June 2026): ZAI VLM-first.** Tesseract.js was tried as a cheap/local prototype, but for Russian passport + водительское удостоверение photos the target implementation should use a vision-language model: send the image to ZAI VLM, receive strict JSON, validate it, then allow admin correction. Tesseract can remain only as a fallback/cost experiment, not the main path.
+
+- [ ] **Evaluated OCR/VLM approaches**:
+  - [x] **Option A: ZAI VLM-based** — send photo to ZAI/GLM vision model → structured JSON extraction
+    - Pros: better with real-world photos, rotated documents, shadows, Russian fields, mixed passport/license layouts
+    - Cons: requires API access, latency/cost, must validate JSON strictly
+    - Decision: **primary roadmap path** once ZAI VLM access is available
+  - [x] **Option B: Tesseract.js prototype** — open-source OCR in Node.js
     - Pros: free, local, no API dependency
-    - Cons: lower accuracy on Russian passports, needs trained models
-  - [ ] **Option C: Hybrid** — Tesseract for text extraction + VLM for structured parsing
-    - Pros: Tesseract handles layout, VLM handles semantics
-    - Cons: two-pass complexity
-- [x] **Implemented**: **Option B** (Tesseract.js) — implemented in `app/api/ocr/route.ts` + `app/lib/ocr-constants.ts`
+    - Cons: lower accuracy on Russian documents, trained-data/runtime friction, brittle parsing
+    - Decision: keep as fallback/research only; do not design the production skill around Tesseract
+  - [ ] **Option C: Hybrid fallback** — ZAI VLM primary, Tesseract/manual entry fallback when API is unavailable
+    - Pros: resilient delivery; operator can still generate contract during provider outage
+    - Cons: more branches to test; fallback output must be clearly marked as lower confidence
+- [ ] **Target implementation**: replace the Tesseract-first `/api/ocr` contract with a **VLM-first extraction service** while preserving the same downstream JSON shape used by `make-rental-contract-skill.mjs`.
 
 ### 4.1 Telegram Bot `/doc` Command
 
@@ -484,75 +489,108 @@ The gold seed already has `license_class` on every bike. Here's the mapping:
   - [ ] Store state in `users.metadata.doc_flow_state` (temporary, cleared after completion)
   - [ ] Timeout: 5 minutes of inactivity → reset state
 
-- [ ] **Photo handling**:
+- [ ] **Photo handling — VLM-first**:
   - [ ] Receive photo via Telegram `message.photo` (largest size)
-  - [ ] Download to temp storage or pass URL to VLM
-  - [ ] VLM extracts structured data → `passportJson` / `licenseJson` format
-  - [ ] Validate extracted fields (non-empty name, valid series/number format)
+  - [ ] Download Telegram file to a short-lived server buffer or signed temporary URL
+  - [ ] Send image + document type (`passport` / `license`) to ZAI VLM extraction service
+  - [ ] VLM returns strict JSON in `passportJson` / `licenseJson` format
+  - [ ] Validate required fields (non-empty name, birth date, passport series/number, license categories when provided)
+  - [ ] If confidence/validation fails, ask user for a clearer photo or route to manual admin correction
 
-### 4.2 OCR Service (Next.js API Route)
+### 4.2 VLM Extraction Service (Next.js API Route)
 
-- [ ] **Create `/api/ocr` endpoint** — reusable by both bot and web app:
+- [ ] **Create/replace `/api/ocr` as a VLM-first endpoint** — reusable by both bot and web app:
   ```typescript
   // POST /api/ocr
-  // Body: { image: base64, type: "passport" | "license" }
-  // Response: { passportJson } or { licenseJson }
+  // Body: { image: base64 | imageUrl, type: "passport" | "license", provider?: "zai-vlm" }
+  // Response: { success: true, provider: "zai-vlm", passportJson } or { licenseJson }
   ```
 
-- [ ] **VLM integration**:
-  - [ ] Use `z-ai-web-dev-sdk` VLM capabilities (already available in project)
-  - [ ] System prompt for passport extraction:
-    ```
-    Extract passport data from this Russian passport photo. Return JSON:
-    { "fullName": "...", "birthDate": "DD.MM.YYYY", "series": "1234",
-      "number": "567890", "issueDate": "DD.MM.YYYY", "registration": "..." }
-    ```
-  - [ ] System prompt for license extraction:
-    ```
-    Extract driver's license data from this Russian ВУ photo. Return JSON:
-    { "series": "99 76", "number": "543210", "categories": ["A", "B", "M"],
-      "issueDate": "DD.MM.YYYY", "expiryDate": "DD.MM.YYYY" }
-    ```
+- [ ] **Provider wrapper**:
+  - [ ] Add a server-only `extractRentalDocumentWithZaiVlm()` helper (no client imports)
+  - [ ] Read provider credentials only from server env (for example `ZAI_API_KEY` / SDK-specific config)
+  - [ ] Keep request payloads short-lived; never persist raw images in public storage unless explicitly needed for admin review
+  - [ ] Return normalized JSON plus `confidence`, `warnings[]`, and masked debug metadata
 
-- [ ] **License category extraction** — CRITICAL for VIP tier system:
-  - [ ] Parse `categories` array from OCR result
+- [ ] **ZAI VLM passport prompt**:
+  ```text
+  You are extracting fields from a Russian passport photo for a legal motorcycle rental agreement.
+  Return JSON only. Do not invent missing fields.
+  Required shape:
+  {
+    "fullName": "...",
+    "birthDate": "DD.MM.YYYY",
+    "series": "1234",
+    "number": "567890",
+    "issueDate": "DD.MM.YYYY",
+    "divisionCode": "XXX-XXX",
+    "registration": "...",
+    "confidence": 0.0,
+    "warnings": []
+  }
+  ```
+
+- [ ] **ZAI VLM driver-license prompt**:
+  ```text
+  You are extracting fields from a Russian driver license photo for a motorcycle rental access check.
+  Return JSON only. Do not invent missing fields.
+  Required shape:
+  {
+    "series": "99 76",
+    "number": "543210",
+    "categories": ["A", "B", "M"],
+    "issueDate": "DD.MM.YYYY",
+    "expiryDate": "DD.MM.YYYY",
+    "confidence": 0.0,
+    "warnings": []
+  }
+  ```
+
+- [ ] **Strict JSON safety**:
+  - [ ] Parse model output with safe JSON extraction; reject markdown/text wrappers
+  - [ ] Validate with Zod or existing OCR validators before passing data to the contract script
+  - [ ] Never let malformed model JSON crash the bot/web route; return exact field-level errors
+  - [ ] Mask PII in logs (`1234 ******`, `Иванов И***`) and keep full values only in server-only flow
+
+- [ ] **License category extraction — CRITICAL for VIP tier system**:
+  - [ ] Parse `categories` array from VLM result
   - [ ] Map to access tier: A → Pro, A1/B/M → Mid, none → Entry
-  - [ ] Store in `user_rental_secrets` or `user_secrets.sensitive_metadata.license_categories`
+  - [ ] Store in `user_rental_secrets` or `user_secrets.sensitive_metadata.license_categories` after user/admin verification
 
-- [ ] **Web-app OCR integration**:
+- [ ] **Web-app VLM integration**:
   - [ ] Camera capture in checkout flow: "Сфотографируйте паспорт"
-  - [ ] Upload to `/api/ocr` → extract data → pre-fill form
-  - [ ] Fallback: manual entry if OCR fails or user prefers typing
+  - [ ] Upload to `/api/ocr` → ZAI VLM extracts data → pre-fill form
+  - [ ] Fallback: manual entry if VLM fails or user prefers typing
   - [ ] Progressive disclosure: passport first, then license (license = tier upgrade)
 
-### 4.3 OCR Result → VIP Tier Auto-Upgrade
+### 4.3 VLM Result → VIP Tier Auto-Upgrade
 
-- [ ] **On successful OCR + verification**:
-  - [ ] Extract license categories from OCR
+- [ ] **On successful VLM extraction + verification**:
+  - [ ] Extract license categories from VLM result
   - [ ] Derive access tier: `A → "pro"`, `A1/B/M → "mid"`, `no license → "entry"`
   - [ ] Store tier in `user_rental_secrets.sensitive_metadata.access_tier`
   - [ ] Or compute dynamically from stored license categories at rental time
 
-- [ ] **No OCR result → Entry tier only**:
+- [ ] **No verified license result → Entry tier only**:
   - [ ] User who didn't provide license can only rent Entry bikes
   - [ ] This is the "cold start" path — safe default, no license check needed
   - [ ] Upgrade available at any time: "Улучшите доступ — предоставьте ВУ"
 
-### 4.4 OCR Quality & Fallbacks
+### 4.4 VLM Quality, Validation & Fallbacks
 
-- [ ] **Validation**: check OCR output for common errors
+- [ ] **Validation**: check VLM output for common errors
   - [ ] Russian passport: series is 4 digits, number is 6 digits
   - [ ] License: series is 2+2 digits, number is 6 digits
   - [ ] Birth date format: DD.MM.YYYY
   - [ ] Category format: A, A1, B, B1, M, etc.
 
-- [ ] **Human verification**: admin can review + correct OCR results
+- [ ] **Human verification**: admin can review + correct VLM results
   - [ ] Admin dashboard: "Проверка документов" section
-  - [ ] Show OCR result + original photo side-by-side
+  - [ ] Show VLM result + original photo side-by-side
   - [ ] Confirm or edit before saving to secrets
 
-- [ ] **OCR caching**: don't re-OCR same photo if user resends
-  - [ ] Hash photo bytes → cache OCR result
+- [ ] **Extraction caching**: don't re-run VLM on the same photo if user resends
+  - [ ] Hash photo bytes → cache validated VLM result
   - [ ] Useful for retry scenarios
 
 ---
@@ -571,11 +609,11 @@ Phase 2+3+4 MEGA RUN (Run 4 — execute until context limit):
   8. Task G (profile page enhancement)
   9. Phase 3.2 (VIP status from license + ФЗ-152)
   10. Phase 3.3 (VIP rental flow + bike filtering)
-  11. Phase 4.0 (OCR architecture decision)
+  11. Phase 4.0 (VLM/OCR architecture decision)
   12. Phase 4.1 (Telegram /doc command)
-  13. Phase 4.2 (OCR API endpoint + VLM)
-  14. Phase 4.3 (OCR → tier auto-upgrade)
-  15. Phase 4.4 (OCR quality + admin verification)
+  13. Phase 4.2 (VLM-first extraction endpoint)
+  14. Phase 4.3 (VLM → tier auto-upgrade)
+  15. Phase 4.4 (VLM quality + admin verification)
   16. Phase 3.4 (NFC research)
 
   Parallel-safe: 5↔6, 11↔any, 16↔any

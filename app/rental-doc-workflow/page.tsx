@@ -39,7 +39,7 @@ const operatorSteps = [
   },
   {
     title: "3. AI достаёт данные клиента",
-    text: "Из фото берутся ФИО, дата рождения, паспорт, адрес регистрации и номер водительского удостоверения. В публичные отчёты полные персональные данные не попадают.",
+    text: "Целевой путь — ZAI VLM: модель смотрит на фото как человек, возвращает строгий JSON с ФИО, датой рождения, паспортом, адресом и правами. Tesseract оставляем только как запасной эксперимент.",
     icon: UserCheck,
   },
   {
@@ -67,8 +67,8 @@ const futureItems = [
   },
   {
     status: "Запланировано",
-    title: "OCR и ручная проверка",
-    text: "Фото документов будут распознаваться через OCR, а админ сможет быстро подтвердить или поправить результат перед сохранением.",
+    title: "ZAI VLM вместо Tesseract",
+    text: "Планируем основной разбор фото через ZAI VLM: лучше для реальных снимков паспорта/прав, а админ подтверждает или правит результат перед сохранением.",
   },
   {
     status: "Запланировано",
@@ -91,6 +91,21 @@ const simpleInputs = [
   "фото водительского удостоверения, если оно нужно для выбранного байка.",
 ];
 
+const vlmPlanItems = [
+  {
+    title: "Почему не Tesseract как основной путь",
+    text: "Локальный OCR полезен как проба, но на реальных фото с бликами, углами и русскими полями он даёт хрупкий результат. Для договора важнее точность и понятные ошибки.",
+  },
+  {
+    title: "Как будет работать ZAI VLM",
+    text: "Сервер отправляет фото паспорта или прав в ZAI VLM и просит вернуть только JSON: ФИО, дата рождения, серия/номер, регистрация, категории ВУ и предупреждения.",
+  },
+  {
+    title: "Безопасность и контроль",
+    text: "Ответ модели валидируется, персональные данные маскируются в логах, а сомнительные поля отправляются на ручную проверку администратора.",
+  },
+];
+
 export default function RentalDocWorkflowPage() {
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -108,7 +123,7 @@ export default function RentalDocWorkflowPage() {
                 Один текст, две фотки — и договор аренды готов
               </h1>
               <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
-                Эта страница объясняет человеческим языком, как работает новый поток VIP Bike Rental: оператор отправляет короткое сообщение, прикладывает фото документов, а система сама находит мотоцикл в базе, собирает DOCX и добавляет QR-код для следующей аренды.
+                Эта страница объясняет человеческим языком, как работает новый поток VIP Bike Rental: оператор отправляет короткое сообщение, прикладывает фото документов, ZAI VLM достаёт данные из снимков, а система сама находит мотоцикл в базе, собирает DOCX и добавляет QR-код для следующей аренды.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link
@@ -166,6 +181,28 @@ export default function RentalDocWorkflowPage() {
               <p className="mt-3 text-sm leading-6 text-slate-300">{step.text}</p>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className="border-y border-white/10 bg-slate-900/40">
+        <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8">
+          <div className="mb-8 max-w-3xl">
+            <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-300">Новая версия скилла</p>
+            <h2 className="mt-3 text-3xl font-black sm:text-4xl">Фото разбирает ZAI VLM, а не просто OCR</h2>
+            <p className="mt-4 text-slate-300">
+              В ToDo теперь фиксируем VLM-first план: Tesseract был быстрым тестом, но целевой сценарий — vision-модель, строгий JSON и ручная проверка спорных полей.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {vlmPlanItems.map((item) => (
+              <article key={item.title} className="rounded-3xl border border-cyan-300/15 bg-cyan-300/[0.06] p-6">
+                <Sparkles className="mb-5 h-8 w-8 text-cyan-200" />
+                <h3 className="text-xl font-black text-white">{item.title}</h3>
+                <p className="mt-3 leading-7 text-slate-300">{item.text}</p>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
