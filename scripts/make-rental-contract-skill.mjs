@@ -1,12 +1,10 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createClient } from '@supabase/supabase-js';
-import { Document, Packer, Paragraph, TextRun } from 'docx';
-import { htmlToDocxElements } from '../lib/htmlToDocx.mjs';
 
 function arg(name, fallback = '') { const i = process.argv.indexOf(`--${name}`); return i>=0 ? (process.argv[i+1]||'') : fallback; }
+function hasFlag(name) { return process.argv.includes(`--${name}`); }
 
 const RENTAL_DOC_TEMPLATE_MODE = String(process.env.RENTAL_DOC_TEMPLATE_MODE || 'md').trim().toLowerCase();
 const RENTAL_DOC_BASELINE_TEMPLATE_PATH = 'docs/RENTAL_DEAL_TEMPLATE.md';
@@ -61,10 +59,30 @@ function formatRuDate(d) {
 }
 
 function parseRuTime(raw) {
-  const m = String(raw).match(/(\d{1,2})(?:[:.]?(\d{2}))?/);
+  const source = String(raw || '').toLowerCase().trim();
+  const wordHours = new Map([
+    ['ноль', 0], ['один', 1], ['одного', 1], ['час', 1], ['два', 2], ['двух', 2],
+    ['три', 3], ['трех', 3], ['трёх', 3], ['четыре', 4], ['четырех', 4], ['четырёх', 4],
+    ['пять', 5], ['пяти', 5], ['шесть', 6], ['шести', 6], ['семь', 7], ['семи', 7],
+    ['восемь', 8], ['восьми', 8], ['девять', 9], ['девяти', 9], ['десять', 10], ['десяти', 10],
+    ['одиннадцать', 11], ['одиннадцати', 11], ['двенадцать', 12], ['двенадцати', 12],
+  ]);
+  const wordMatch = source.match(/(ноль|один|одного|час|два|двух|три|тр[её]х|четыре|четыр[её]х|пять|пяти|шесть|шести|семь|семи|восемь|восьми|девять|девяти|десять|десяти|одиннадцать|одиннадцати|двенадцать|двенадцати)(?:\s+(утра|дня|вечера|ночи))?/i);
+  if (wordMatch) {
+    let hh = wordHours.get(wordMatch[1]);
+    const period = wordMatch[2] || '';
+    if ((period === 'вечера' || period === 'дня') && hh < 12) hh += 12;
+    if (period === 'ночи' && hh === 12) hh = 0;
+    return `${String(hh).padStart(2,'0')}:00`;
+  }
+
+  const m = source.match(/(\d{1,2})(?:[:.](\d{2}))?(?:\s*(утра|дня|вечера|ночи))?/);
   if (!m) return null;
-  const hh = Number(m[1]);
+  let hh = Number(m[1]);
   const mm = Number(m[2] || '00');
+  const period = m[3] || '';
+  if ((period === 'вечера' || period === 'дня') && hh < 12) hh += 12;
+  if (period === 'ночи' && hh === 12) hh = 0;
   if (hh > 23 || mm > 59) return null;
   return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
 }
@@ -75,8 +93,10 @@ function extractScheduleFromPhrase(rawPhrase) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
 
-  const start = text.match(/с\s*(сегодня|завтра|\d{1,2}\.\d{1,2}(?:\.\d{2,4})?)\s*(?:в)?\s*(\d{1,2}(?:[:.]\d{2})?)/i);
-  const end = text.match(/до\s*(завтра|сегодня|\d{1,2}\.\d{1,2}(?:\.\d{2,4})?)\s*(?:до|в)?\s*(\d{1,2}(?:[:.]\d{2})?)/i);
+  const dateToken = '(сегодня|завтра|\\d{1,2}\\.\\d{1,2}(?:\\.\\d{2,4})?)';
+  const timeToken = '((?:\\d{1,2}(?:[:.]\\d{2})?|ноль|один|одного|час|два|двух|три|тр[её]х|четыре|четыр[её]х|пять|пяти|шесть|шести|семь|семи|восемь|восьми|девять|девяти|десять|десяти|одиннадцать|одиннадцати|двенадцать|двенадцати)(?:\\s*(?:утра|дня|вечера|ночи))?)';
+  const start = text.match(new RegExp(`(?:${dateToken}[^\\n]{0,80}?(?:^|\\s)с|(?:^|\\s)с\\s*${dateToken})\\s*(?:в)?\\s*${timeToken}`, 'i'));
+  const end = text.match(new RegExp(`(?:^|\\s)до\\s*${dateToken}\\s*(?:до|в)?\\s*${timeToken}`, 'i'));
 
   const parseDateToken = (token) => {
     const t = String(token || '').toLowerCase();
@@ -91,23 +111,69 @@ function extractScheduleFromPhrase(rawPhrase) {
   };
 
   return {
-    startDate: start ? parseDateToken(start[1]) : null,
-    startTime: start ? parseRuTime(start[2]) : null,
+    startDate: start ? parseDateToken(start[1] || start[2]) : null,
+    startTime: start ? parseRuTime(start[3]) : null,
     endDate: end ? parseDateToken(end[1]) : null,
     endTime: end ? parseRuTime(end[2]) : null,
   };
 }
 
+function extractBikeQueryFromPhrase(rawPhrase) {
+  const explicit = arg('bikeId', '').trim();
+  if (explicit) return explicit;
+
+  let rest = (String(rawPhrase || '').match(/(?:сделай\s+договор(?:\s+по\s+фото)?|создай\s+документ(?:\s+по\s+фото)?)\s+(.+)$/i)?.[1] || '').trim();
+  rest = rest
+    .replace(/^(?:сегодня|завтра|\d{1,2}\.\d{1,2}(?:\.\d{2,4})?)\s+/i, '')
+    .replace(/^на\s+/i, '')
+    .replace(/\s+с\s+(?:(?:сегодня|завтра|\d{1,2}\.\d{1,2}(?:\.\d{2,4})?)\s*)?(?:в\s*)?(?:\d{1,2}(?:[:.]\d{2})?(?:\s*(?:утра|дня|вечера|ночи))?|ноль|один|одного|час|два|двух|три|тр[её]х|четыре|четыр[её]х|пять|пяти|шесть|шести|семь|семи|восемь|восьми|девять|девяти|десять|десяти|одиннадцать|одиннадцати|двенадцать|двенадцати).*/i, '')
+    .trim();
+  return rest;
+}
+
+function readRequiredJsonArg(argName, stage, reason) {
+  const filePath = arg(argName, '').trim();
+  if (!filePath) failStage(stage, reason, { expectedArg: `--${argName}` });
+  if (!existsSync(filePath)) failStage(stage, reason, { expectedArg: `--${argName}`, path: filePath });
+  return JSON.parse(readFileSync(filePath, 'utf8'));
+}
+
 const phrase = arg('phrase');
-const bikePhraseRaw = (phrase.match(/(?:сделай\s+договор(?:\s+по\s+фото)?|создай\s+документ(?:\s+по\s+фото)?)\s+(.+)$/i)?.[1] || arg('bikeId')).trim();
-const bikeId = bikePhraseRaw.split(/\s+с\s+(?:сегодня|завтра|\d{1,2}\.\d{1,2}(?:\.\d{2,4})?)/i)[0].trim();
+const dryRun = hasFlag('dryRun');
+const bikeJsonPath = arg('bikeJson', '').trim();
+const bikeId = extractBikeQueryFromPhrase(phrase);
 if (!bikeId) failStage('bike_resolve', 'missing_bike_query', { expected: 'Use --phrase "создай документ <bike_id>" (or "сделай договор <bike_id>") or --bikeId <bike_id>' });
 
-const passportJson = JSON.parse(readFileSync(arg('passportJson'),'utf8'));
-const licenseJson = JSON.parse(readFileSync(arg('licenseJson'),'utf8'));
+const phraseSchedule = extractScheduleFromPhrase(phrase);
+const intake = {
+  ok: true,
+  stage: 'intake',
+  bikeQuery: bikeId,
+  startDate: arg('startDate', phraseSchedule.startDate || ''),
+  startTime: arg('startTime', phraseSchedule.startTime || '18:00'),
+  endDate: arg('endDate', phraseSchedule.endDate || ''),
+  endTime: arg('endTime', phraseSchedule.endTime || '10:00'),
+  passportJson: arg('passportJson', '').trim() || null,
+  licenseJson: arg('licenseJson', '').trim() || null,
+};
+if (hasFlag('intakeOnly')) {
+  console.log(JSON.stringify(intake, null, 2));
+  process.exit(0);
+}
+
+const passportJson = readRequiredJsonArg('passportJson', 'ocr_documents', 'missing_passport_photo');
+const licenseJson = readRequiredJsonArg('licenseJson', 'ocr_documents', 'missing_license_photo');
 const telegramChatId = arg('telegramChatId', process.env.ADMIN_CHAT_ID || '');
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const [supabaseModule, { Document, Packer, Paragraph, TextRun }, { htmlToDocxElements }] = await Promise.all([
+  bikeJsonPath ? Promise.resolve({ createClient: null }) : import('@supabase/supabase-js'),
+  import('docx'),
+  import('../lib/htmlToDocx.mjs'),
+]);
+
+const supabase = supabaseModule.createClient
+  ? supabaseModule.createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  : null;
 
 const supabaseRestSelect = (from, to) => {
   const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -242,14 +308,19 @@ const fetchAllBikeCandidates = async () => {
   return all;
 };
 
-const bikes = await fetchAllBikeCandidates();
-if (!bikes.length) failStage('bike_resolve', 'bike_catalog_empty', { table: 'cars', filter: 'type in (bike, ebike)' });
-const ranked = bikes.map(b => ({ bike: b, score: scoreBike(bikeId, b) })).sort((a,b)=>b.score-a.score);
-const top = ranked[0];
-if (!top || top.score <= 0) failStage('bike_resolve', 'bike_not_found', { bikeQuery: bikeId });
-const bike = top.bike;
+let bike;
+if (bikeJsonPath) {
+  bike = readRequiredJsonArg('bikeJson', 'bike_resolve', 'missing_bike_fixture');
+} else {
+  const bikes = await fetchAllBikeCandidates();
+  if (!bikes.length) failStage('bike_resolve', 'bike_catalog_empty', { table: 'cars', filter: 'type in (bike, ebike)' });
+  const ranked = bikes.map(b => ({ bike: b, score: scoreBike(bikeId, b) })).sort((a,b)=>b.score-a.score);
+  const top = ranked[0];
+  if (!top || top.score <= 0) failStage('bike_resolve', 'bike_not_found', { bikeQuery: bikeId });
+  bike = top.bike;
+}
 let resolvedCrewSlug = arg('crewSlug', '');
-if (!resolvedCrewSlug && bike.crew_id) {
+if (!resolvedCrewSlug && bike.crew_id && supabase) {
   const { data: crewSlugRow, error: crewSlugError } = await supabase
     .from('crews')
     .select('slug')
@@ -263,9 +334,8 @@ if (!resolvedCrewSlug && bike.crew_id) {
 
 const mdTemplate = readFileSync(RENTAL_DOC_BASELINE_TEMPLATE_PATH, 'utf8');
 const now = new Date();
-const phraseSchedule = extractScheduleFromPhrase(phrase);
-const startDate = arg('startDate', phraseSchedule.startDate || '');
-const endDate = arg('endDate', phraseSchedule.endDate || '');
+const startDate = intake.startDate;
+const endDate = intake.endDate;
 const renterFullName = String(passportJson.fullName || '').trim();
 const renterBirthDate = String(passportJson.birthDate || '').trim();
 const renterPassportSeries = String(passportJson.series || '').trim();
@@ -315,8 +385,8 @@ if (isElectric) {
 }
 
 // ── Calculate rental duration and pricing ───────────────────────────
-const startTimeArg = arg('startTime', phraseSchedule.startTime || '18:00');
-const endTimeArg   = arg('endTime', phraseSchedule.endTime || '10:00');
+const startTimeArg = intake.startTime;
+const endTimeArg   = intake.endTime;
 
 // Parse dates to compute duration
 function parseRuDateParts(dateStr) {
@@ -491,18 +561,60 @@ const originalSha256 = createHash('sha256').update(buf).digest('hex');
 const safeName = s => String(s || '').replace(/[^a-zA-Zа-яА-Я0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 const docFileName = `rental-contract-${safeName(bike.make)}-${safeName(bike.model)}-${startDate}.docx`;
 
+if (dryRun) {
+  const outDir = arg('outDir', 'artifacts/rental-contracts');
+  mkdirSync(outDir, { recursive: true });
+  const outFile = arg('outFile', `${outDir}/${docFileName}`);
+  writeFileSync(outFile, buf);
+  console.log(JSON.stringify({
+    ok: true,
+    dryRun: true,
+    requestedBikeId: bikeId,
+    resolvedBikeId: bike.id,
+    contractKey: vars.document_key,
+    templateMode: RENTAL_DOC_TEMPLATE_MODE,
+    docFileName,
+    outFile,
+    originalSha256,
+    isElectric,
+    isHourlyRental,
+    rentalHours,
+    rentalDays,
+    subtotal: vars.subtotal_rub,
+  }, null, 2));
+  process.exit(0);
+}
+
 // ── Generate QR Code PNG ─────────────────────────────────────
 const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${bike.id}_${originalSha256}`;
 const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
+
+function fetchQrWithCurl(url) {
+  const curl = spawnSync('curl', ['-LfsS', '--max-time', '20', url], {
+    encoding: 'buffer',
+    maxBuffer: 2 * 1024 * 1024,
+  });
+  if (curl.status !== 0 || !curl.stdout?.length) {
+    throw new Error(String(curl.stderr || curl.stdout || `curl exited ${curl.status}`));
+  }
+  return Buffer.from(curl.stdout);
+}
 
 let qrPngBuffer = null;
 try {
   const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
   if (qrRes.ok) {
     qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
+  } else {
+    throw new Error(`QR HTTP ${qrRes.status}`);
   }
 } catch (qrErr) {
-  console.warn('[rental-doc] QR generation failed, sending DOCX only:', qrErr?.message || qrErr);
+  try {
+    qrPngBuffer = fetchQrWithCurl(qrPngUrl);
+    console.warn('[rental-doc] QR fetch failed, recovered via curl fallback:', qrErr?.message || qrErr);
+  } catch (curlQrErr) {
+    console.warn('[rental-doc] QR generation failed, sending DOCX only:', curlQrErr?.message || curlQrErr, 'primary:', qrErr?.message || qrErr);
+  }
 }
 
 // ── Send DOCX + QR via Telegram ──────────────────────────────
@@ -537,9 +649,29 @@ if (qrPngBuffer) {
       json = { ok: true, result: { message_id: null } };
     }
   } catch (sendError) {
-    // Fallback: send DOCX alone
-    console.warn('[rental-doc] sendMediaGroup failed, falling back to sendDocument:', sendError?.message);
-    qrPngBuffer = null; // Force fallback path
+    try {
+      const tmpBase = `/tmp/rental-contract-media-${Date.now()}`;
+      const tmpDocx = `${tmpBase}.docx`;
+      const tmpQr = `${tmpBase}.png`;
+      writeFileSync(tmpDocx, buf);
+      writeFileSync(tmpQr, qrPngBuffer);
+      const curl = spawnSync('curl', [
+        '-sS', '-X', 'POST', mediaGroupUrl,
+        '-F', `chat_id=${telegramChatId}`,
+        '-F', `media=${JSON.stringify(mediaItems)}`,
+        '-F', `docx=@${tmpDocx};type=application/vnd.openxmlformats-officedocument.wordprocessingml.document;filename=${docFileName}`,
+        '-F', `qr=@${tmpQr};type=image/png;filename=qr-${bike.id}.png`,
+      ], { encoding: 'utf8' });
+      if (curl.status !== 0) throw new Error(`Telegram mediaGroup curl failed: ${curl.stderr || curl.stdout}`);
+      const results = JSON.parse(curl.stdout || '{}');
+      if (!results.ok) throw new Error(results.description || 'sendMediaGroup curl failed');
+      json = { ok: true, result: results.result?.[0] };
+      console.warn('[rental-doc] sendMediaGroup fetch failed, recovered via curl fallback:', sendError?.message || sendError);
+    } catch (curlSendError) {
+      // Fallback: send DOCX alone
+      console.warn('[rental-doc] sendMediaGroup failed, falling back to sendDocument:', curlSendError?.message || curlSendError, 'primary:', sendError?.message || sendError);
+      qrPngBuffer = null; // Force fallback path
+    }
   }
 }
 
@@ -578,7 +710,7 @@ if (!qrPngBuffer) {
 }
 if (!json.ok) failStage('telegram_delivery', 'telegram_send_failed', { telegram: json });
 
-const result = {ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id, contractKey: vars.document_key, templateMode: RENTAL_DOC_TEMPLATE_MODE, docFileName, isElectric, isHourlyRental, rentalHours, rentalDays, subtotal: vars.subtotal_rub};
+const result = {ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id, contractKey: vars.document_key, templateMode: RENTAL_DOC_TEMPLATE_MODE, docFileName, qrAttached: Boolean(qrPngBuffer), isElectric, isHourlyRental, rentalHours, rentalDays, subtotal: vars.subtotal_rub};
 const saveMetadata = arg('saveMetadata', '0') !== '0';
 const metadataTable = arg('metadataTable', 'rental_contract_artifacts');
 if (saveMetadata) {

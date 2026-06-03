@@ -57,3 +57,9 @@ Open archive only for deep forensics on:
 - Root cause: `scripts/supaplan-skill.mjs` previously treated unknown command values uniformly and did not hint that a bare UUID is likely a task id lookup intent.
 - Fix/workaround: added UUID-shaped command detection in CLI entrypoint and a direct hint to run `task-status --taskId <uuid>` to verify SupaPlan task context first.
 - Verification command: `node scripts/supaplan-skill.mjs f3c5306d-2d8f-4cc4-bb77-26f20f7f9b11`.
+
+### 2026-06-03
+- Symptom: rental contract full Telegram smoke with synthetic DOCX+QR could not complete in this runner: Node `fetch` failed for QR/media upload, then Telegram rejected delivery with `Bad Request: chat not found` for configured `ADMIN_CHAT_ID`.
+- Root cause: runner/Undici network path was unreliable for QR/media requests; callback target chat env was not a valid chat for the configured bot.
+- Fix/workaround: added curl fallback for QR PNG generation and Telegram `sendMediaGroup` uploads so DOCX+QR delivery can recover from Node `fetch` failures when a valid `telegramChatId` is supplied.
+- Verification command: `node scripts/make-rental-contract-skill.mjs --phrase "Создай документ Сегодня на Панигале S Electro с девяти вечера до завтра девяти вечера" --passportJson /tmp/rental-passport-test.json --licenseJson /tmp/rental-license-test.json --bikeJson /tmp/rental-bike-panigale-electro-test.json`.

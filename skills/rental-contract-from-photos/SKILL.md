@@ -76,6 +76,14 @@ node scripts/make-rental-contract-skill.mjs \
 
 `--saveMetadata 1` включает read-after-write verification: после insert в `--metadataTable` скрипт выполняет read-check по `contract_key` и только затем считает процесс завершённым.
 
+`--intakeOnly` запускает безопасную проверку входной фразы без OCR/Supabase/Telegram: скрипт выводит распознанные `bikeQuery`, даты и время, но не импортирует внешние зависимости и не создаёт договор. Это режим для тестовых запросов без фото.
+
+`--dryRun --bikeJson /tmp/bike.json --outDir artifacts/rental-contracts` запускает полный рендер DOCX на синтетических/тестовых JSON-данных без Supabase, Telegram, QR-доставки и записи секретов. Этот режим предназначен только для проверки шаблона/рендера: тестовые паспорт/ВУ могут быть вымышленными, но продакшен-режим по-прежнему не должен фабриковать PII.
+
+В полном Telegram-прогоне скрипт сначала пытается отправить DOCX+QR как `sendMediaGroup`; если Node `fetch` ломается на QR или multipart upload, используется `curl` fallback. Для успешной доставки нужен валидный `--telegramChatId`/`ADMIN_CHAT_ID`, где бот уже имеет доступ к чату.
+
+Если `--passportJson` или `--licenseJson` не переданы в рабочем режиме, скрипт должен завершиться структурированным `ocr_documents` отказом (`missing_passport_photo` / `missing_license_photo`), а не падать сырой ошибкой файловой системы.
+
 ## OCR JSON формат
 `passport.json`
 ```json
