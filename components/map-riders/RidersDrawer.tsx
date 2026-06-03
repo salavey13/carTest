@@ -112,7 +112,7 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY }: Ride
   }, [createMeetup, dbUser?.user_id, meetupComment, meetupTitle]);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden">
+    <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-40 md:hidden">
       <Drawer.Root
         open={isOpen}
         onOpenChange={(nextOpen) => {
@@ -122,15 +122,16 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY }: Ride
         snapPoints={drawerSnapPoints}
       >
         <Drawer.Handle
-          className="mx-auto mb-1 h-1.5 w-12 rounded-full bg-white/30"
+          className="pointer-events-auto mx-auto mb-1 h-1.5 w-12 rounded-full bg-white/30"
           onClick={() => setIsOpen((prev) => !prev)}
         />
-        <Drawer.Content
-          ref={contentRef}
-          role="dialog"
-          aria-label="Панель райдеров и meetup"
-          className="mx-auto flex h-full w-full max-w-lg flex-col rounded-t-2xl bg-black/90 backdrop-blur-xl"
-        >
+        {isOpen ? (
+          <Drawer.Content
+            ref={contentRef}
+            role="dialog"
+            aria-label="Панель райдеров и meetup"
+            className="pointer-events-auto mx-auto flex h-full w-full max-w-lg flex-col rounded-t-2xl bg-black/90 backdrop-blur-xl"
+          >
           <Tabs defaultValue="riders" className="flex h-full flex-col">
             <div className="border-b border-white/10 px-4 pt-3">
               <TabsList className="grid w-full grid-cols-3 bg-transparent">
@@ -285,7 +286,8 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY }: Ride
               </div>
             </TabsContent>
           </Tabs>
-        </Drawer.Content>
+          </Drawer.Content>
+        ) : null}
       </Drawer.Root>
 
       {isReplayOpen ? (

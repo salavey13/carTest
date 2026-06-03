@@ -119,8 +119,18 @@ export function RacingMap({
   const source = TILE_LAYERS[tileLayer] || TILE_LAYERS["cartodb-dark"];
 
   return (
-    <div className={`relative z-0 ${className || ""}`}>
-      <MapContainer bounds={mapBounds} className="z-0 h-full w-full" zoomControl attributionControl preferCanvas>
+    <div className={`relative z-0 ${className || ""}`} style={{ touchAction: "none" }}>
+      <MapContainer
+        bounds={mapBounds}
+        className="z-0 h-full w-full !touch-none"
+        zoomControl
+        attributionControl
+        preferCanvas
+        dragging
+        touchZoom
+        scrollWheelZoom
+        doubleClickZoom
+      >
         <TileLayer url={source} attribution="&copy; OpenStreetMap contributors &copy; CARTO" />
 
         {points.map((poi) => {

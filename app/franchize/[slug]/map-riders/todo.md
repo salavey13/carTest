@@ -175,3 +175,9 @@ Port AGI handoff from `./goldmine` into production `MapRiders` in controlled ite
 - Addressed P1 review: `TEMP_BYPASS_TG_AUTH_VALIDATION` no longer trusts request URL/query/origin/referer markers. Bypass activation uses only server-known deployment env (`VERCEL_ENV=preview` + `VERCEL_URL`/`VERCEL_BRANCH_URL` containing `salavey13`) or exact `TELEGRAM_AUTH_BYPASS_ALLOWED_HOSTS`.
 - Added regression tests for forged production URL `?salavey13`, exact allowlist behavior, and live-like generated Telegram WebApp initData validation.
 - VIP Bike seed SQL now includes `/franchize/{slug}/community` in header/footer navigation; `/vipbikerental` hardcoded location copy now points to `ул. Комсомольская 2`.
+
+## Investigation notes (2026-06-03 — mobile map gesture passthrough)
+- Investigated the `/franchize/vip-bike/map-riders` touch stack across `page.tsx`, `MapRidersClientRefactored`, `RacingMap`, `MapInteractionCapture`, `RiderMarkerLayer`, `RiderFAB`, `RidersDrawer`, and `StatusOverlay`.
+- Root cause found: the secondary mobile `RidersDrawer` wrapper stayed in the hit-test stack while closed; its Vaul content could create an invisible touch layer above the Leaflet map, while rider markers still worked because they live in Leaflet's interactive marker pane.
+- Fix: closed `RidersDrawer` now leaves only its small handle as `pointer-events-auto`, unmounts drawer content while closed, and the Leaflet map root now explicitly owns touch gestures with `touch-action: none` plus enabled touch zoom/drag props.
+- Verification note: local Playwright screenshot/hit-test was blocked by missing system browser library `libatk-1.0.so.0`; route/runtime checks should be repeated in preview Telegram WebApp on a real phone.
