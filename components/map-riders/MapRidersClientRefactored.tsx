@@ -357,7 +357,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
 
   return (
     <div
-      className="relative min-h-[100dvh] w-full pb-24 pt-16 md:pt-20"
+      className="fixed inset-0 isolate h-[100dvh] w-full overflow-hidden"
       style={{
         ["--mr-accent" as string]: crew.theme.palette.accentMain,
         ["--mr-accent-hover" as string]: crew.theme.palette.accentMainHover,
@@ -367,8 +367,6 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         ["--mr-muted" as string]: crew.theme.palette.textSecondary,
       }}
     >
-      <BeginnerRiderOnboardingQuiz crew={crew} />
-
       {/* ── MAP (fullscreen background) ── */}
       <section className="fixed inset-0 overflow-hidden [touch-action:pan-x_pan-y_pinch-zoom]" style={{ borderColor: `${crew.theme.palette.borderSoft}aa` }}>
         <div className="absolute inset-0 z-0">
@@ -491,7 +489,9 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               </div>
             </div>
             <div className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))] [touch-action:pan-y] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`}>
-              <div className="grid gap-3 lg:grid-cols-[1.35fr,1fr]">
+              <BeginnerRiderOnboardingQuiz crew={crew} />
+              <div className="mt-3 grid gap-3 lg:grid-cols-[1.35fr,1fr]">
+
         {/* Stats card */}
         <div className="rounded-2xl border p-4 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
           <Badge className="mb-3 w-fit border" style={{ borderColor: `${crew.theme.palette.accentMain}55`, backgroundColor: `${crew.theme.palette.accentMain}18`, color: crew.theme.palette.accentMain }}>
