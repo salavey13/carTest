@@ -19,17 +19,8 @@ export async function assertCrewMembership(userId: string, crewSlug: string) {
     return true;
   }
 
-  const { data: member, error } = await supabaseAdmin
-    .from("crew_members")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("crew_id", crew.id)
-    .eq("membership_status", "active")
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return Boolean(member);
+  // MapRiders sharing is available to any authenticated rider.
+  // Crew membership still influences visibility mode (crew/public),
+  // but is no longer a hard gate for starting a session.
+  return true;
 }
