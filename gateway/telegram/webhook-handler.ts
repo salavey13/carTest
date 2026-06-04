@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendComplexMessage, KeyboardButton } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { handleWebhookProxy } from "@/app/webhook-handlers/proxy";
 import { handleCommand } from "@/app/webhook-handlers/commands/command-handler";
+import { handleDocPhoto } from "@/app/webhook-handlers/commands/doc";
 import { ensureTelegramSubscriptions } from "@/gateway/telegram/subscriptions";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -13,6 +14,10 @@ const TELEGRAM_LOCATION_DEDUPE_METERS = 5;
 
 function isCodexCaption(caption: string | undefined) {
     return Boolean(caption?.trim().match(/^\/codex(?:@[\w_]+)?(?:\s|$)/i));
+}
+
+function isDocCaption(caption: string | undefined) {
+    return Boolean(caption?.trim().match(/^\/doc(?:@[\w_]+)?(?:\s|$)/i));
 }
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -177,6 +182,10 @@ async function mirrorTelegramLocationToActiveMapRiderSession(userId: string, loc
 async function handlePhotoMessage(message: any) {
     const userId = message.from.id.toString();
     const chatId = message.chat.id;
+
+    // ── CHECK: Is user in /doc flow? ──
+    const docConsumed = await handleDocPhoto(message);
+    if (docConsumed) return;
 
     const { data: userState, error: stateError } = await supabaseAnon
         .from('user_states')
@@ -515,6 +524,8 @@ export async function handleTelegramWebhook(request: Request) {
     if (update.pre_checkout_query || update.message?.successful_payment) {
       await handleWebhookProxy(update);
     } else if ((update.message?.photo && isCodexCaption(update.message?.caption)) || (update.message?.document && isCodexCaption(update.message?.caption))) {
+      await handleCommand(update);
+    } else if ((update.message?.photo && isDocCaption(update.message?.caption)) || (update.message?.document && isDocCaption(update.message?.caption))) {
       await handleCommand(update);
     } else if (update.message?.photo) {
       await handlePhotoMessage(update.message);
