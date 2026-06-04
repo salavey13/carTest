@@ -69,18 +69,42 @@ const SPEC_MAX_VALUE_LINES = 2;
 const FOOTER_Y = 24;
 const FOOTER_GENERATED_X = 180;
 
-// Bottom section: QR → link box stacked in right column
-// QR is positioned relative to image panel bottom edge
-const QR_SIZE = 220; // doubled — fills right column
-const QR_GAP_FROM_IMAGE = 8;
-const QR_Y = IMAGE_PANEL_Y - QR_GAP_FROM_IMAGE - QR_SIZE;
-const QR_X = RIGHT_COL_X + (RIGHT_COL_WIDTH - QR_SIZE) / 2; // centered in right col
+// Bottom section: QR pair → rental box → link box stacked in right column
+const VK_LINK = "https://vk.com/vip_bike_electro";
 
+// QR codes — two side by side (buy link + VK community)
+const QR_SIZE = 110;
+const VK_QR_SIZE = 110;
+const QR_GAP_FROM_IMAGE = 8;
+const QR_PAIR_GAP = 10;
+const QR_PAIR_TOTAL_WIDTH = QR_SIZE + QR_PAIR_GAP + VK_QR_SIZE; // 230
+
+const QR_Y = IMAGE_PANEL_Y - QR_GAP_FROM_IMAGE - QR_SIZE;
+const QR_X = RIGHT_COL_X + (RIGHT_COL_WIDTH - QR_PAIR_TOTAL_WIDTH) / 2;
+const VK_QR_X = QR_X + QR_SIZE + QR_PAIR_GAP;
+
+// QR labels
+const QR_LABEL_GAP = 4;
+const QR_LABEL_FONT_SIZE = 7;
+
+// Rental price box
+const RENTAL_BOX_HEIGHT = 72;
+const RENTAL_BOX_GAP = 8;
+const RENTAL_BOX_Y = QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE - RENTAL_BOX_GAP - RENTAL_BOX_HEIGHT;
+const RENTAL_BOX_X = RIGHT_COL_X;
+const RENTAL_BOX_WIDTH = RIGHT_COL_WIDTH;
+const RENTAL_HEADING_FONT_SIZE = 9;
+const RENTAL_VALUE_FONT_SIZE = 8.5;
+const RENTAL_LINE_HEIGHT = 14;
+const RENTAL_INNER_X = 10;
+const RENTAL_INNER_Y = 10;
+
+// Link box
 const LINK_BOX_HEIGHT = 46;
-const LINK_BOX_GAP_FROM_QR = 8;
-const LINK_BOX_X = RIGHT_COL_X; // aligned with right column
-const LINK_BOX_WIDTH = RIGHT_COL_WIDTH; // right column width only
-const LINK_BOX_Y = QR_Y - LINK_BOX_GAP_FROM_QR - LINK_BOX_HEIGHT;
+const LINK_BOX_GAP = 8;
+const LINK_BOX_X = RIGHT_COL_X;
+const LINK_BOX_WIDTH = RIGHT_COL_WIDTH;
+const LINK_BOX_Y = RENTAL_BOX_Y - LINK_BOX_GAP - LINK_BOX_HEIGHT;
 const LINK_BOX_INNER_X = 10;
 const LINK_BOX_LINK_LINE_HEIGHT = 9;
 const LINK_BOX_MAX_WIDTH = LINK_BOX_WIDTH - LINK_BOX_INNER_X * 2;
@@ -420,9 +444,10 @@ function formatTimestamp(date: Date): string {
  * │  Price        │    IMAGE PANEL       │
  * │  Description  │    (9:16 graphite)   │
  * │  ─────────    │                      │
- * │  Specs table  │       QR CODE        │
- * │  (dark rows)  │       (220×220)      │
+ * │  Specs table  │   QR buy │ QR VK     │
+ * │  (dark rows)  │  (110)   (110)       │
  * │               │   ──────────────     │
+ * │               │   RENTAL BOX         │
  * │               │   LINK BOX (dark)    │
  * ├───────────────┴──────────────────────┤
  * │  ID: ...        Generated: ...       │
@@ -681,8 +706,9 @@ async function generateBuyPdf(input: {
     });
   }
 
-  // ── QR Code (220×220, centered in right column) ─────────────────────────
+  // ── QR Codes (buy link + VK, side by side) ────────────────────────────
 
+  // Buy QR
   try {
     const controller = new AbortController();
     const timeout = setTimeout(
@@ -691,7 +717,7 @@ async function generateBuyPdf(input: {
     );
 
     const qrBytes = await fetch(
-      `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(
+      `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
         buyLink,
       )}&color=000000&bgcolor=ffffff&margin=1`,
       { signal: controller.signal },
@@ -707,8 +733,115 @@ async function generateBuyPdf(input: {
       width: QR_SIZE,
       height: QR_SIZE,
     });
+
+    // Label under buy QR
+    const buyLabel = "Купить";
+    const buyLabelWidth = font.widthOfTextAtSize(buyLabel, QR_LABEL_FONT_SIZE);
+    page.drawText(buyLabel, {
+      x: QR_X + (QR_SIZE - buyLabelWidth) / 2,
+      y: QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE,
+      size: QR_LABEL_FONT_SIZE,
+      font,
+      color: COLORS.muted,
+    });
   } catch (error) {
-    logger.warn("[franchize] failed to generate QR", error);
+    logger.warn("[franchize] failed to generate buy QR", error);
+  }
+
+  // VK QR
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      FETCH_TIMEOUT_MS,
+    );
+
+    const vkQrBytes = await fetch(
+      `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+        VK_LINK,
+      )}&color=000000&bgcolor=ffffff&margin=1`,
+      { signal: controller.signal },
+    ).then((response) => response.arrayBuffer());
+
+    clearTimeout(timeout);
+
+    const vkQr = await pdfDoc.embedPng(vkQrBytes);
+
+    page.drawImage(vkQr, {
+      x: VK_QR_X,
+      y: QR_Y,
+      width: VK_QR_SIZE,
+      height: VK_QR_SIZE,
+    });
+
+    // Label under VK QR
+    const vkLabel = "\u041C\u044B \u0412\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u0435";
+    const vkLabelWidth = font.widthOfTextAtSize(vkLabel, QR_LABEL_FONT_SIZE);
+    page.drawText(vkLabel, {
+      x: VK_QR_X + (VK_QR_SIZE - vkLabelWidth) / 2,
+      y: QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE,
+      size: QR_LABEL_FONT_SIZE,
+      font,
+      color: COLORS.muted,
+    });
+  } catch (error) {
+    logger.warn("[franchize] failed to generate VK QR", error);
+  }
+
+  // ── Rental Price Box ──────────────────────────────────────────────────
+
+  const rentWeekday =
+    typeof specs.rent_weekday === "number" && specs.rent_weekday > 0
+      ? specs.rent_weekday
+      : typeof specs.dailyPrice === "number" && specs.dailyPrice > 0
+        ? specs.dailyPrice
+        : 0;
+  const rentWeekend =
+    typeof specs.rent_weekend === "number" && specs.rent_weekend > 0
+      ? specs.rent_weekend
+      : 0;
+
+  if (rentWeekday > 0 || rentWeekend > 0) {
+    page.drawRectangle({
+      x: RENTAL_BOX_X,
+      y: RENTAL_BOX_Y,
+      width: RENTAL_BOX_WIDTH,
+      height: RENTAL_BOX_HEIGHT,
+      color: COLORS.linkBg,
+      borderColor: COLORS.accent,
+      borderWidth: 1.2,
+    });
+
+    // Heading
+    page.drawText("\u0410\u0420\u0415\u041D\u0414\u0410", {
+      x: RENTAL_BOX_X + RENTAL_INNER_X,
+      y: RENTAL_BOX_Y + RENTAL_BOX_HEIGHT - RENTAL_INNER_Y - RENTAL_HEADING_FONT_SIZE + 2,
+      size: RENTAL_HEADING_FONT_SIZE,
+      font,
+      color: COLORS.accent,
+    });
+
+    // Weekday price
+    if (rentWeekday > 0) {
+      page.drawText(`\u0411\u0443\u0434\u043D\u0438  ${formatRub(rentWeekday)}/\u0441\u0443\u0442\u043A\u0438`, {
+        x: RENTAL_BOX_X + RENTAL_INNER_X,
+        y: RENTAL_BOX_Y + RENTAL_BOX_HEIGHT - RENTAL_INNER_Y - RENTAL_HEADING_FONT_SIZE - 6,
+        size: RENTAL_VALUE_FONT_SIZE,
+        font,
+        color: COLORS.text,
+      });
+    }
+
+    // Weekend price
+    if (rentWeekend > 0) {
+      page.drawText(`\u0412\u044B\u0445\u043E\u0434\u043D\u044B\u0435  ${formatRub(rentWeekend)}/\u0441\u0443\u0442\u043A\u0438`, {
+        x: RENTAL_BOX_X + RENTAL_INNER_X,
+        y: RENTAL_BOX_Y + RENTAL_BOX_HEIGHT - RENTAL_INNER_Y - RENTAL_HEADING_FONT_SIZE - 6 - RENTAL_LINE_HEIGHT,
+        size: RENTAL_VALUE_FONT_SIZE,
+        font,
+        color: COLORS.text,
+      });
+    }
   }
 
   // ── Link Box (dark, right column, below QR) ────────────────────────────
