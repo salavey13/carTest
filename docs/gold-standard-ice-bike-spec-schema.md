@@ -95,9 +95,15 @@ These keys replace the Battery & Charging section from the electro schema.
 | Key | Русский лейбл | Category | Unit suffix | Sort (compare) | Description |
 |---|---|---|---|---|---|
 | `dailyPrice` | Аренда (сутки) | rent | ₽/сутки | asc | **Primary daily rental rate.** First-choice for contract skill. Must be > 0 for rentable bikes. |
-| `price_per_hour` | Аренда (час) | rent | ₽/час | asc | **Hourly rental rate.** Falls back to `dailyPrice / 8` if not set. Used when rental < 24h. |
+| `price_per_hour` | Аренда (1 час) | rent | ₽/час | asc | **Hourly rental rate.** Falls back to `dailyPrice / 8` if not set. Used when rental < 24h. |
+| `price_per_3h` | Аренда (3 часа) | rent | ₽/3ч | asc | 3-hour rental rate. Short-ride / city tour pricing. |
+| `price_per_6h` | Аренда (6 часов) | rent | ₽/6ч | asc | Half-day rental rate (6 hours). |
+| `price_per_12h` | Аренда (12 часов) | rent | ₽/12ч | asc | Half-day+ rental rate (12 hours). |
 | `rent_weekday` | Аренда (будни) | rent | ₽/сутки | asc | Weekday-specific daily rate. |
 | `rent_weekend` | Аренда (выходные) | rent | ₽/сутки | asc | Weekend-specific daily rate. Typically 15–20% higher. |
+| `rent_2_4d` | Аренда (2–4 суток) | rent | ₽/сутки | asc | Daily rate when renting for 2–4 days. Lower per-day rate than 1-day. |
+| `rent_5_10d` | Аренда (5–10 суток) | rent | ₽/сутки | asc | Daily rate when renting for 5–10 days. Volume discount tier 2. |
+| `rent_11_30d` | Аренда (11–30 суток) | rent | ₽/сутки | asc | Daily rate when renting for 11–30 days. Maximum volume discount tier. |
 | `rent_price_label` | Аренда | rent | — | — | Human-readable label for UI cards. |
 
 #### Rental pricing priority (contract skill lookup order):
@@ -106,6 +112,16 @@ These keys replace the Battery & Charging section from the electro schema.
 bikeDailyPrice  = specs.dailyPrice  → specs.rent_weekday  → arg('dailyPrice', '10000')
 bikeHourlyPrice = specs.price_per_hour → arg('hourlyPrice', dailyPrice / 8)
 bikeValueRub    = specs.sale_price  → specs.price_rub     → arg('bikeValue', '850000')
+
+// Multi-hour rates (fallback to hourly × hours if not set)
+bike3hPrice  = specs.price_per_3h  → bikeHourlyPrice × 3
+bike6hPrice  = specs.price_per_6h  → bikeHourlyPrice × 6
+bike12hPrice = specs.price_per_12h → bikeHourlyPrice × 12
+
+// Multi-day rates (fallback to dailyPrice if not set)
+bike2_4dPrice   = specs.rent_2_4d   → specs.dailyPrice
+bike5_10dPrice  = specs.rent_5_10d  → specs.dailyPrice
+bike11_30dPrice = specs.rent_11_30d → specs.dailyPrice
 ```
 
 > Note: For ICE bikes where `sale_price = 0` (rent-only), `price_rub` becomes the fallback for `bike_value_rub`. Ensure `price_rub` reflects actual market value.
@@ -114,11 +130,18 @@ bikeValueRub    = specs.sale_price  → specs.price_rub     → arg('bikeValue',
 
 | Key | Value |
 |---|---|
-| `dailyPrice` | 10 000 |
-| `price_per_hour` | 1 250 |
-| `rent_weekday` | 10 000 |
-| `rent_weekend` | 12 000 |
+| `dailyPrice` | 16 000 |
+| `price_per_hour` | 2 000 |
+| `price_per_3h` | — |
+| `price_per_6h` | — |
+| `price_per_12h` | — |
+| `rent_weekday` | 16 000 |
+| `rent_weekend` | 18 000 |
+| `rent_2_4d` | — |
+| `rent_5_10d` | — |
+| `rent_11_30d` | — |
 | `price_rub` (market value) | 850 000 |
+| `sale_price` | 0 (rent-only) |
 
 ### 1.9 Contract Template Integration
 
@@ -198,6 +221,12 @@ Same bar visualization rules as electro schema, with these ICE-specific addition
 | `dailyPrice` | lower is better |
 | `rent_weekday` | lower is better |
 | `rent_weekend` | lower is better |
+| `price_per_3h` | lower is better |
+| `price_per_6h` | lower is better |
+| `price_per_12h` | lower is better |
+| `rent_2_4d` | lower is better |
+| `rent_5_10d` | lower is better |
+| `rent_11_30d` | lower is better |
 
 All other numeric keys: **higher is better**.
 
@@ -246,6 +275,17 @@ color, spec_labels
 dailyPrice, price_per_hour, rent_weekday, rent_weekend
 ```
 
+### Recommended rental fields (fill when pricing strategy requires):
+
+```
+price_per_3h, price_per_6h, price_per_12h,
+rent_2_4d, rent_5_10d, rent_11_30d
+```
+
+> **When to use multi-hour fields:** If a bike is frequently rented for short rides (3h city tour, 6h half-day), set explicit `price_per_3h`/`price_per_6h`/`price_per_12h` to offer a discount vs. straight hourly multiplication. If not set, the system falls back to `price_per_hour × hours`.
+>
+> **When to use multi-day fields:** If a bike has volume pricing for extended rentals, set `rent_2_4d`/`rent_5_10d`/`rent_11_30d` with the per-day rate for each tier. If not set, the system uses `dailyPrice` for all durations.
+
 ### ICE-specific required fields (not present in electro):
 
 ```
@@ -270,7 +310,7 @@ features, buy_colors, gallery
 3. Map engine specs: `engine_cc`, `power_hp`, `power_kw`, `torque_nm`, `cooling`, `transmission`
 4. Map fuel specs: `fuel_capacity_l`, `fuel_type`, `fuel_consumption_l_100km`, `range_km`
 5. Set `battery` to fuel description, e.g. "Бензин, 15 л" — needed for type detection fallback
-6. **Set rental pricing:** `dailyPrice`, `price_per_hour`, `rent_weekday`, `rent_weekend`
+6. **Set rental pricing:** `dailyPrice`, `price_per_hour`, `rent_weekday`, `rent_weekend` — and optionally `price_per_3h`, `price_per_6h`, `price_per_12h`, `rent_2_4d`, `rent_5_10d`, `rent_11_30d`
 7. Set `price_rub` to market value (used as `bike_value_rub` for loss compensation)
 8. Build `spec_labels` — include ALL keys present in this bike's specs, especially `engine_cc`, `power_hp`, `fuel_capacity_l`, `transmission`, `cooling`
 9. Add `gallery` array with Supabase storage URLs
@@ -302,7 +342,7 @@ features, buy_colors, gallery
   "weight_kg": "193",
   "brake_type": "Дисковые (передние 2x300 мм + задний 220 мм), ABS",
   "brand_type": "manufacturer_data",
-  "dailyPrice": 10000,
+  "dailyPrice": 16000,
   "frame_type": "Алюминиевая периметральная",
   "sale_price": 0,
   "bike_subtype": "Sport-Touring (ICE)",
@@ -320,9 +360,9 @@ features, buy_colors, gallery
   "dimensions_mm": "2055 x 740 x 1135",
   "transmission": "6-ступенчатая",
   "cooling": "Жидкостное",
-  "price_per_hour": 1250,
-  "rent_weekday": 10000,
-  "rent_weekend": 12000,
+  "price_per_hour": 2000,
+  "rent_weekday": 16000,
+  "rent_weekend": 18000,
   "bike_engine_spec_line_1": "рабочий объем 649 куб. см, мощность 68 л.с.",
   "bike_engine_spec_line_2": "максимальная конструктивная скорость 210 км/ч",
   "bike_engine_spec_line_3": ""
