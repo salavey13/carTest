@@ -107,9 +107,15 @@ Every `specs` JSONB object **MUST** include a `spec_labels` sub-object that maps
 | Key | Русский лейбл | Category | Unit suffix | Sort (compare) | Description |
 |---|---|---|---|---|---|
 | `dailyPrice` | Аренда (сутки) | rent | ₽/сутки | asc | **Primary daily rental rate.** Used by the contract skill as the first-choice daily price. Must be > 0 for rentable bikes. |
-| `price_per_hour` | Аренда (час) | rent | ₽/час | asc | **Primary hourly rental rate.** Falls back to `dailyPrice / 8` if not set. Used when rental duration < 24h. |
+| `price_per_hour` | Аренда (1 час) | rent | ₽/час | asc | **Primary hourly rental rate.** Falls back to `dailyPrice / 8` if not set. Used when rental duration < 24h. |
+| `price_per_3h` | Аренда (3 часа) | rent | ₽/3ч | asc | 3-hour rental rate. Short-ride / city tour pricing. |
+| `price_per_6h` | Аренда (6 часов) | rent | ₽/6ч | asc | Half-day rental rate (6 hours). |
+| `price_per_12h` | Аренда (12 часов) | rent | ₽/12ч | asc | Half-day+ rental rate (12 hours). |
 | `rent_weekday` | Аренда (будни) | rent | ₽/сутки | asc | Weekday-specific daily rate. Some bikes have different weekday/weekend pricing. |
 | `rent_weekend` | Аренда (выходные) | rent | ₽/сутки | asc | Weekend-specific daily rate. Typically 15–20% higher than weekday. |
+| `rent_2_4d` | Аренда (2–4 суток) | rent | ₽/сутки | asc | Daily rate when renting for 2–4 days. Lower per-day rate than 1-day. |
+| `rent_5_10d` | Аренда (5–10 суток) | rent | ₽/сутки | asc | Daily rate when renting for 5–10 days. Volume discount tier 2. |
+| `rent_11_30d` | Аренда (11–30 суток) | rent | ₽/сутки | asc | Daily rate when renting for 11–30 days. Maximum volume discount tier. |
 | `rent_weekday_hour` | Аренда (будни, час) | rent | ₽/ч | asc | Weekday hourly rate (for bikes rented primarily by the hour, e.g. Y-VOLT Surge V). |
 | `rent_weekend_hour` | Аренда (выходные, час) | rent | ₽/ч | asc | Weekend hourly rate. |
 | `rent_price_label` | Аренда | rent | — | — | Human-readable label, e.g. "15 000 ₽/день" or "5 000 ₽/час (будни)". Used in UI cards. |
@@ -120,18 +126,33 @@ Every `specs` JSONB object **MUST** include a `spec_labels` sub-object that maps
 bikeDailyPrice  = specs.dailyPrice  → specs.rent_weekday  → arg('dailyPrice', '10000')
 bikeHourlyPrice = specs.price_per_hour → arg('hourlyPrice', dailyPrice / 8)
 bikeValueRub    = specs.sale_price  → specs.price_rub     → arg('bikeValue', '850000')
+
+// Multi-hour rates (fallback to hourly × hours if not set)
+bike3hPrice  = specs.price_per_3h  → bikeHourlyPrice × 3
+bike6hPrice  = specs.price_per_6h  → bikeHourlyPrice × 6
+bike12hPrice = specs.price_per_12h → bikeHourlyPrice × 12
+
+// Multi-day rates (fallback to dailyPrice if not set)
+bike2_4dPrice   = specs.rent_2_4d   → specs.dailyPrice
+bike5_10dPrice  = specs.rent_5_10d  → specs.dailyPrice
+bike11_30dPrice = specs.rent_11_30d → specs.dailyPrice
 ```
 
-#### Rate card examples from current catalog:
+#### Rate card examples from current catalog (June 2025):
 
-| Bike | `dailyPrice` | `price_per_hour` | `rent_weekday` | `rent_weekend` | Notes |
-|---|---|---|---|---|---|
-| Falcon GT | 12 000 | 1 500 | 12 000 | 14 000 | Standard daily bike |
-| Falcon Pro | 12 000 | 1 500 | 12 000 | 14 000 | Same rate as GT |
-| Horwin SK3+ | 10 000 | 1 250 | 10 000 | 12 000 | Most affordable |
-| Sequence Zero | 15 000 | 1 875 | 15 000 | 18 000 | Premium sport |
-| Y-VOLT Surge V | 40 000 | 5 000 | 40 000 | 48 000 | Premium enduro (hourly-primary: 5K/6K per hour) |
-| Ducati Panigale S Electro | 10 000 | 1 250 | 10 000 | 12 000 | Entry-level sport replica |
+| Bike | `sale_price` | `dailyPrice` | `price_per_hour` | `price_per_3h` | `price_per_6h` | `price_per_12h` | `rent_weekday` | `rent_weekend` | `rent_2_4d` | `rent_5_10d` | `rent_11_30d` | Notes |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Ducati Panigale S Electro | 600 000 | 10 000 | 3 000 | 6 500 | — | — | 10 000 | 12 000 | — | — | — | Updated sale + hourly |
+| Falcon GT | 390 000 | 12 000 | 5 000 | — | — | — | 12 000 | 14 000 | — | — | — | |
+| Falcon Pro | 310 000 | 10 000 | 5 000 | — | — | — | 10 000 | 14 000 | — | — | — | Discount 5% (325K→310K) |
+| Horwin SK3+ | 380 000 | 10 000 | 1 250 | — | — | — | 10 000 | 12 000 | — | — | — | Most affordable |
+| Sequence Zero | 750 000 | 15 000 | 1 875 | — | — | — | 15 000 | 18 000 | — | — | — | Premium sport |
+| Y-VOLT Surge V | 550 000 | 40 000 | 5 000 | — | — | — | 40 000 | 48 000 | — | — | — | Premium enduro, discount 6% |
+| Nibbler regumoto 4v | 390 000 | 12 000 | 5 000 | — | — | — | 12 000 | 14 000 | — | — | — | New bike |
+| Motoland Breakout | 0 | 6 000 | 5 000 | — | — | — | 6 000 | 14 000 | 5 000 | 4 000 | 3 500 | Rent-only, multi-day tiers |
+| Soti EM01 | 390 000 | 12 000 | 5 000 | — | — | — | 12 000 | 14 000 | — | — | — | New bike |
+
+> **Note:** "—" means the field is not yet set and will fall back to computed value (hourly × hours or dailyPrice). Fields without data should be omitted from specs JSONB, not set to 0.
 
 ### 1.9 Contract Template Integration 🆕
 
@@ -214,6 +235,12 @@ Key pattern:  {key}_bar_width_percent = (value / max_in_compare_set) * 100
 | `rent_weekend` | lower is better |
 | `rent_weekday_hour` | lower is better |
 | `rent_weekend_hour` | lower is better |
+| `price_per_3h` | lower is better |
+| `price_per_6h` | lower is better |
+| `price_per_12h` | lower is better |
+| `rent_2_4d` | lower is better |
+| `rent_5_10d` | lower is better |
+| `rent_11_30d` | lower is better |
 
 All other numeric keys: **higher is better**.
 
@@ -285,6 +312,27 @@ When rental keys are present, show a **rental rate card**:
 
 If `rent_price_label` exists, use it as the primary display string instead.
 
+When multi-hour or multi-day rental keys are present, extend the rate card:
+
+```
+┌──────────────────────────────────────┐
+│  АРЕНДА                               │
+│  1 час:    3 000 ₽                     │
+│  3 часа:   6 500 ₽                     │
+│  6 часов:  8 000 ₽                     │
+│  12 часов: 10 000 ₽                    │
+│  ─────────────────────────            │
+│  Будни:  10 000 ₽/сутки                │
+│  Выходные: 12 000 ₽/сутки              │
+│  ─────────────────────────            │
+│  2–4 дня:   8 000 ₽/сутки              │
+│  5–10 дней: 6 000 ₽/сутки              │
+│  11–30 дней: 5 000 ₽/сутки             │
+└──────────────────────────────────────┘
+```
+
+Omit sections where the bike has no data (no multi-day → skip the 2–4/5–10/11–30 block).
+
 ### 4.8 Buy Options (Trim Levels)
 
 Render `buy_options` as a selectable radio group. When the user picks a trim:
@@ -318,6 +366,17 @@ color, license_class
 ```
 dailyPrice, price_per_hour, rent_weekday, rent_weekend
 ```
+
+### Recommended rental fields (fill when pricing strategy requires):
+
+```
+price_per_3h, price_per_6h, price_per_12h,
+rent_2_4d, rent_5_10d, rent_11_30d
+```
+
+> **When to use multi-hour fields:** If a bike is frequently rented for short rides (3h city tour, 6h half-day), set explicit `price_per_3h`/`price_per_6h`/`price_per_12h` to offer a discount vs. straight hourly multiplication. If not set, the system falls back to `price_per_hour × hours`.
+>
+> **When to use multi-day fields:** If a bike has volume pricing for extended rentals, set `rent_2_4d`/`rent_5_10d`/`rent_11_30d` with the per-day rate for each tier. If not set, the system uses `dailyPrice` for all durations.
 
 ### Optional but encouraged:
 
