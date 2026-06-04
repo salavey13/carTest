@@ -25,10 +25,13 @@ interface CatalogClientProps {
   ctaPolicy?: FranchizeRouteCtaPolicy;
 }
 
-type QuickFilterKey = "all" | "budget" | "premium" | "newbie" | "topRated";
+type QuickFilterKey = "all" | "budget" | "premium" | "newbie" | "topRated" | "entry" | "mid" | "pro";
 
-const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string; compactLabel?: string }> = [
+const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string; compactLabel?: string; tierColor?: string }> = [
   { key: "all", label: "Все" },
+  { key: "entry", label: "Базовый", compactLabel: "Базов.", tierColor: "#22c55e" },
+  { key: "mid", label: "Средний", compactLabel: "Средн.", tierColor: "#eab308" },
+  { key: "pro", label: "Профи", tierColor: "#ef4444" },
   { key: "budget", label: "До 5000" },
   { key: "premium", label: "Премиум 7000+" },
   { key: "newbie", label: "Для новичка", compactLabel: "Для новичков" },
@@ -41,22 +44,57 @@ const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
   return [...regular, ...wbItems];
 };
 
+type AccessTier = "entry" | "mid" | "pro" | "none";
+
+/** Extract access_tier from item's rawSpecs */
+function getItemAccessTier(item: CatalogItemVM): AccessTier {
+  const tier = (item.rawSpecs as Record<string, unknown> | undefined)?.access_tier;
+  if (tier === "entry" || tier === "mid" || tier === "pro") return tier;
+  return "none";
+}
+
+/** Get tier emoji + color for a given access tier */
+function tierVisuals(tier: AccessTier): { emoji: string; color: string; label: string } {
+  switch (tier) {
+    case "entry": return { emoji: "🟢", color: "#22c55e", label: "Базовый" };
+    case "mid":   return { emoji: "🟡", color: "#eab308", label: "Средний" };
+    case "pro":   return { emoji: "🔴", color: "#ef4444", label: "Профи" };
+    default:      return { emoji: "⚪", color: "#9ca3af", label: "" };
+  }
+}
+
 const hasRentPrice = (item: CatalogItemVM) => item.pricePerDay > 0;
 const hasSalePrice = (item: CatalogItemVM) => item.saleAvailable && Boolean(item.salePrice && item.salePrice > 0);
 
-// Derive flow type per-item from pricing — no need for drilled "mode" prop
-// Items with rental pricing → "rental" (shows 1/3/7 days, packages, auction)
-// Items without → "order" (simple select/purchase flow, no rental UI)
+// Check if a rawSpecs flag is truthy (same logic as electro-enduro page)
+const isSpecEnabled = (value: unknown) =>
+  value === 1 || value === true ||
+  String(value).toLowerCase() === "1" ||
+  String(value).toLowerCase() === "true";
+
+// Derive flow type per-item from pricing + rawSpecs rent/sale flags
+// "rental" → shows 1/3/7 days, packages, auction, rental strip
+// "order"  → simple select/purchase flow, no rental UI
 function getItemFlowType(item: CatalogItemVM): FlowType {
+  const rs = item.rawSpecs;
+  const hasExplicitRent = rs != null && "rent" in rs;
+  const hasExplicitSale = rs != null && "sale" in rs;
+
+  // rent explicitly disabled → order flow (even if pricePerDay > 0)
+  if (hasExplicitRent && !isSpecEnabled(rs!.rent)) return "order";
+  // sale present but no rent → order flow (svarprofi, custom orders)
+  if (hasExplicitSale && !hasExplicitRent && item.pricePerDay === 0) return "order";
+  // Items with rental pricing → rental flow
   return item.pricePerDay > 0 ? "rental" : "order";
 }
 
-// Derive CTA label per-item from pricing + saleAvailable
+// Derive CTA label per-item from flow type + saleAvailable
 function getItemCtaLabel(item: CatalogItemVM): string {
-  // Sale item that also has rental → "Купить" (buy option on rental context)
-  if (item.saleAvailable && item.pricePerDay > 0) return "Купить";
+  const flow = getItemFlowType(item);
+  // Sale item in rental context → "Купить" (buy option alongside rent)
+  if (item.saleAvailable && flow === "rental") return "Купить";
   // Pure rental → "Забронировать"
-  if (item.pricePerDay > 0) return "Забронировать";
+  if (flow === "rental") return "Забронировать";
   // Sale-only or order-only (svarprofi etc.) → "Выбрать"
   return "Выбрать";
 }
@@ -177,8 +215,7 @@ function getVisibleSpecChips(item: CatalogItemVM): Array<{ icon: string; text: s
 function CatalogCardSkeleton({ index }: { index: number }) {
   return (
     <article className="overflow-hidden rounded-3xl border border-[var(--catalog-border)] bg-[var(--catalog-card-bg)]" aria-hidden="true">
-      <div className="relative aspect-[9/21] overflow-hidden bg-black/20">
-        <div className="absolute inset-x-0 top-0 aspect-[9/16] w-full bg-black/20" />
+      <div className="relative aspect-[9/16] overflow-hidden bg-black/20">
         <div
           className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent"
           style={{ animationDelay: `${index * 120}ms` }}
@@ -342,6 +379,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     if (filter === "topRated") {
       return item.reviewSummary.count > 0 && item.reviewSummary.average >= 4.5;
     }
+    if (filter === "entry" || filter === "mid" || filter === "pro") {
+      return getItemAccessTier(item) === filter;
+    }
     return true;
   };
 
@@ -362,7 +402,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         acc[filter.key] = searchFiltered.filter((item) => matchesQuickFilter(item, filter.key)).length;
         return acc;
       },
-      { all: 0, budget: 0, premium: 0, newbie: 0, topRated: 0 },
+      { all: 0, budget: 0, premium: 0, newbie: 0, topRated: 0, entry: 0, mid: 0, pro: 0 },
     );
   }, [items, searchQuery]);
 
@@ -580,7 +620,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         </div>
 
         {promoModules.length > 0 && mode !== "electro" && (
-          <div className="mb-5 flex gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
+          <div className="mb-5 flex gap-2 overflow-x-auto [overflow-y:clip] touch-pan-x overscroll-behavior-x-contain pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
             {visiblePromoModules.map((module, index) => {
               const isExternal = /^(https?:|mailto:|tel:)/.test(module.href);
               return (
@@ -618,7 +658,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           Найдено позиций: {filteredItems.length}
         </p>
 
-        <div className="mb-5 flex gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-1 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Быстрые фильтры каталога">
+        <div className="mb-5 flex gap-2 overflow-x-auto [overflow-y:clip] touch-pan-x overscroll-behavior-x-contain pb-1 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Быстрые фильтры каталога">
           {QUICK_FILTERS.map((filter) => {
             const active = quickFilter === filter.key;
             return (
@@ -629,10 +669,12 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                 aria-pressed={active}
                 className="shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
                 style={{
-                  ["--quick-pill-bg" as string]: active ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
-                  ["--quick-pill-text" as string]: active ? "#000000" : crew.theme.palette.textPrimary,
+                  ["--quick-pill-bg" as string]: active ? (filter.tierColor || crew.theme.palette.accentMain) : crew.theme.palette.bgCard,
+                  ["--quick-pill-text" as string]: active ? (filter.tierColor ? "#000000" : "#000000") : crew.theme.palette.textPrimary,
+                  ...(active && filter.tierColor ? { boxShadow: `0 0 8px ${filter.tierColor}60` } : {}),
                 }}
               >
+                {filter.tierColor && <span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: filter.tierColor }} />}
                 {(filter.compactLabel ?? filter.label)} · {quickFilterCounts[filter.key]}
               </button>
             );
@@ -687,7 +729,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       ref={(node) => {
                         carouselRefs.current[group.category] = node;
                       }}
-                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto [overflow-y:clip] pt-1 pb-2 [touch-action:pan-y_pan-x] overscroll-behavior-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto [overflow-y:clip] pt-1 pb-2 touch-pan-x overscroll-behavior-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                       tabIndex={0}
                       role="region"
                       aria-label={`Карусель категории ${group.category}`}
@@ -734,29 +776,27 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           setCarouselParallaxByItem((prev) => ({ ...prev, [item.id]: { x: 0, y: 0 } }));
                         }}
                       >
-                        <div className="relative aspect-[9/21] w-full overflow-hidden">
+                        <div className="relative aspect-[9/16] w-full overflow-hidden">
                           {item.imageUrl && !carouselLoadedByItem[item.id] && (
-                            <div className="absolute inset-x-0 top-0 aspect-[9/16] w-full overflow-hidden bg-black/30">
+                            <div className="absolute inset-0 overflow-hidden bg-black/30">
                               <div className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent" />
                             </div>
                           )}
                           {item.imageUrl ? (
-                            <div className="absolute inset-x-0 top-0 aspect-[9/16] w-full overflow-hidden">
-                              <Image
-                                src={item.imageUrl}
-                                alt={item.title}
-                                fill
-                                sizes="(max-width: 1279px) 46vw, 260px"
-                                className="object-cover transition-transform duration-300 ease-out"
-                                style={{ transform: `scale(1.04) translate3d(${parallax.x * 4}px, ${parallax.y * 4}px, 0)` }}
-                                onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
-                              />
-                            </div>
+                            <Image
+                              src={item.imageUrl}
+                              alt={item.title}
+                              fill
+                              sizes="(max-width: 1279px) 46vw, 260px"
+                              className="object-cover transition-transform duration-300 ease-out"
+                              style={{ transform: `scale(1.04) translate3d(${parallax.x * 4}px, ${parallax.y * 4}px, 0)` }}
+                              onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
+                            />
                           ) : (
-                            <div className="absolute inset-x-0 top-0 flex aspect-[9/16] w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается — карточка уже доступна</div>
+                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается — карточка уже доступна</div>
                           )}
-                          {/* Gradient overlay — starts from the text area and fades upward into the top 9:16 image */}
-                          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-[color:color-mix(in_srgb,var(--catalog-card-bg)_96%,#000)] via-[color:color-mix(in_srgb,var(--catalog-card-bg)_78%,transparent)] to-transparent" />
+                          {/* Gradient overlay — smooth transition from image to details */}
+                          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-[color:color-mix(in_srgb,var(--catalog-card-bg)_92%,#000)] via-[color:color-mix(in_srgb,var(--catalog-card-bg)_65%,transparent)] to-transparent" />
                           {/* Card content overlaid on image bottom */}
                           <div className="absolute inset-x-0 bottom-0 p-3">
                         {/* Badges */}
@@ -768,6 +808,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           )}
                           <span className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em]" style={{ backgroundColor: rentalStrip.isAvailable ? "#1f7a3a3d" : "#dc262640", color: "#e6f4ea", border: rentalStrip.isAvailable ? "1px solid rgba(46, 160, 67, 0.45)" : "1px solid rgba(220, 38, 38, 0.45)" }}>{rentalStrip.availabilityLabel}</span>
                           {item.saleAvailable && <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-amber-100">Доступен к покупке</span>}
+                          {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-[0.02em]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="text-[8px]">{tv.emoji}</span>{tv.label}</span> : null; })()}
                         </div>
 
                         {/* Title */}
@@ -852,15 +893,13 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
                         style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
                       >
-                        <div className="relative aspect-[9/21] w-full overflow-hidden">
+                        <div className="relative aspect-[9/16] w-full">
                           {item.imageUrl ? (
-                            <div className="absolute inset-x-0 top-0 aspect-[9/16] w-full overflow-hidden">
-                              <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 1279px) 50vw, (max-width: 1535px) 33vw, 25vw" className="object-cover" />
-                            </div>
+                            <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 1279px) 50vw, (max-width: 1535px) 33vw, 25vw" className="object-cover" />
                           ) : (
-                            <div className="absolute inset-x-0 top-0 flex aspect-[9/16] w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается — карточка уже доступна</div>
+                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается — карточка уже доступна</div>
                           )}
-                          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[52%] bg-gradient-to-t from-[color:color-mix(in_srgb,var(--catalog-card-bg)_96%,#000)] via-[color:color-mix(in_srgb,var(--catalog-card-bg)_78%,transparent)] to-transparent" />
+                          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[62%] bg-gradient-to-t from-[color:color-mix(in_srgb,var(--catalog-card-bg)_92%,#000)] via-[color:color-mix(in_srgb,var(--catalog-card-bg)_72%,transparent)] to-transparent" />
                           <div className="absolute inset-x-0 bottom-0 p-2.5 pb-3 sm:p-3">
                             <div className="mb-1 flex flex-wrap gap-1">
                               {item.isHot && (
@@ -879,6 +918,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                                 {rentalStrip.availabilityLabel}
                               </span>
                               {item.saleAvailable && <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-amber-100">Продажа</span>}
+                              {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="text-[7px]">{tv.emoji}</span>{tv.label}</span> : null; })()}
                             </div>
                             <h3 className="text-sm font-semibold leading-5 text-white">{item.title}</h3>
                             <div className="mt-1.5 space-y-0.5 text-[10px] text-white/75">
