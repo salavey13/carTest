@@ -43,9 +43,10 @@ const COL_GAP = RIGHT_COL_X - (LEFT_COL_X + LEFT_COL_WIDTH); // 28
 // Content vertical anchors (from top of page)
 const TITLE_BLOCK_TOP = PAGE_HEIGHT - 118;
 
-// Image panel (right column) — 9:16 portrait ratio
-const IMAGE_PANEL_HEIGHT = Math.round(RIGHT_COL_WIDTH * 16 / 9); // ≈ 430 (242 × 16/9)
-const IMAGE_PANEL_TOP_GAP = 4; // gap between header accent and image top edge
+// Image panel (right column) — shorter to make room for expanded rental box
+// Was 9:16 ratio (≈430). Reduced to give title breathing room and fit more rental lines.
+const IMAGE_PANEL_HEIGHT = 370;
+const IMAGE_PANEL_TOP_GAP = 20; // pushed down so long title can breathe
 // Y is the bottom-left corner in pdf-lib; panel extends from Y upward to Y + height
 const IMAGE_PANEL_Y = PAGE_HEIGHT - HEADER_HEIGHT - IMAGE_PANEL_TOP_GAP - IMAGE_PANEL_HEIGHT;
 const IMAGE_PANEL_PADDING = 18; // inset for scaled images
@@ -65,14 +66,9 @@ const SPEC_ROW_GAP = 4;
 const SPEC_MAX_ROWS = 13;
 const SPEC_MAX_VALUE_LINES = 2;
 
-// Footer
-const FOOTER_Y = 24;
-const FOOTER_GENERATED_X = 180;
-
-// Bottom section: QR pair → rental box → link box stacked in right column
+// QR codes — two side by side (buy link + VK community)
 const VK_LINK = "https://vk.com/vip_bike_electro";
 
-// QR codes — two side by side (buy link + VK community)
 const QR_SIZE = 110;
 const VK_QR_SIZE = 110;
 const QR_GAP_FROM_IMAGE = 8;
@@ -87,29 +83,21 @@ const VK_QR_X = QR_X + QR_SIZE + QR_PAIR_GAP;
 const QR_LABEL_GAP = 4;
 const QR_LABEL_FONT_SIZE = 7;
 
-// Rental price box
-const RENTAL_BOX_HEIGHT = 72;
+// Rental price box — expanded to hold hourly + daily rates + CTA
+const RENTAL_BOX_HEIGHT = 148;
 const RENTAL_BOX_GAP = 8;
 const RENTAL_BOX_Y = QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE - RENTAL_BOX_GAP - RENTAL_BOX_HEIGHT;
 const RENTAL_BOX_X = RIGHT_COL_X;
 const RENTAL_BOX_WIDTH = RIGHT_COL_WIDTH;
-const RENTAL_HEADING_FONT_SIZE = 9;
-const RENTAL_VALUE_FONT_SIZE = 8.5;
-const RENTAL_LINE_HEIGHT = 14;
+const RENTAL_HEADING_FONT_SIZE = 11;
+const RENTAL_VALUE_FONT_SIZE = 11;
+const RENTAL_LINE_HEIGHT = 15;
 const RENTAL_INNER_X = 10;
 const RENTAL_INNER_Y = 10;
 
-// Link box
-const LINK_BOX_HEIGHT = 46;
-const LINK_BOX_GAP = 8;
-const LINK_BOX_X = RIGHT_COL_X;
-const LINK_BOX_WIDTH = RIGHT_COL_WIDTH;
-const LINK_BOX_Y = RENTAL_BOX_Y - LINK_BOX_GAP - LINK_BOX_HEIGHT;
-const LINK_BOX_INNER_X = 10;
-const LINK_BOX_LINK_LINE_HEIGHT = 9;
-const LINK_BOX_MAX_WIDTH = LINK_BOX_WIDTH - LINK_BOX_INNER_X * 2;
-const LINK_FONT_SIZE = 7.2;
-const LINK_TITLE_FONT_SIZE = 8.4;
+// CTA (call-to-action) text at the bottom of rental box
+const CTA_FONT_SIZE = 8;
+const CTA_LINE_HEIGHT = 11;
 
 // Description
 const DESC_FONT_SIZE = 10.4;
@@ -409,28 +397,6 @@ function wrapText(
   return lines;
 }
 
-/**
- * Formats a stable timestamp string for PDF footers.
- * Uses manual UTC-based formatting to avoid locale-dependent
- * `toLocaleString` inconsistencies across Node.js versions and hosts.
- */
-function formatTimestamp(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-
-  return [
-    [
-      pad(date.getDate()),
-      pad(date.getMonth() + 1),
-      date.getFullYear(),
-    ].join("."),
-    [
-      pad(date.getHours()),
-      pad(date.getMinutes()),
-      pad(date.getSeconds()),
-    ].join(":"),
-  ].join(", ");
-}
-
 // ─── PDF Generation ─────────────────────────────────────────────────────────
 
 /**
@@ -442,16 +408,15 @@ function formatTimestamp(date: Date): string {
  * ├───────────────┬──────────────────────┤
  * │  Title        │                      │
  * │  Price        │    IMAGE PANEL       │
- * │  Description  │    (9:16 graphite)   │
+ * │  Description  │    (graphite bg)     │
  * │  ─────────    │                      │
  * │  Specs table  │   QR buy │ QR VK     │
  * │  (dark rows)  │  (110)   (110)       │
  * │               │   ──────────────     │
  * │               │   RENTAL BOX         │
- * │               │   LINK BOX (dark)    │
- * ├───────────────┴──────────────────────┤
- * │  ID: ...        Generated: ...       │
- * └──────────────────────────────────────┘
+ * │               │   (hourly + daily    │
+ * │               │    rates + CTA)      │
+ * └───────────────┴──────────────────────┘
  */
 async function generateBuyPdf(input: {
   slug: string;
@@ -775,7 +740,7 @@ async function generateBuyPdf(input: {
     });
 
     // Label under VK QR
-    const vkLabel = "\u041C\u044B \u0412\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u0435";
+    const vkLabel = "Мы ВКонтакте";
     const vkLabelWidth = font.widthOfTextAtSize(vkLabel, QR_LABEL_FONT_SIZE);
     page.drawText(vkLabel, {
       x: VK_QR_X + (VK_QR_SIZE - vkLabelWidth) / 2,
@@ -788,7 +753,7 @@ async function generateBuyPdf(input: {
     logger.warn("[franchize] failed to generate VK QR", error);
   }
 
-  // ── Rental Price Box ──────────────────────────────────────────────────
+  // ── Rental Price Box (expanded: hourly + daily rates + CTA) ───────────
 
   const rentWeekday =
     typeof specs.rent_weekday === "number" && specs.rent_weekday > 0
@@ -801,7 +766,41 @@ async function generateBuyPdf(input: {
       ? specs.rent_weekend
       : 0;
 
-  if (rentWeekday > 0 || rentWeekend > 0) {
+  // Hourly rates from specs (with fallback to computed from daily)
+  const pricePerHour =
+    typeof specs.price_per_hour === "number" && specs.price_per_hour > 0
+      ? specs.price_per_hour
+      : rentWeekday > 0
+        ? Math.round(rentWeekday / 8)
+        : 0;
+  const pricePer3h =
+    typeof specs.price_per_3h === "number" && specs.price_per_3h > 0
+      ? specs.price_per_3h
+      : pricePerHour > 0
+        ? pricePerHour * 3
+        : 0;
+  const pricePer6h =
+    typeof specs.price_per_6h === "number" && specs.price_per_6h > 0
+      ? specs.price_per_6h
+      : pricePerHour > 0
+        ? pricePerHour * 6
+        : 0;
+  const pricePer12h =
+    typeof specs.price_per_12h === "number" && specs.price_per_12h > 0
+      ? specs.price_per_12h
+      : pricePerHour > 0
+        ? pricePerHour * 12
+        : 0;
+
+  const hasRentalRates =
+    pricePerHour > 0 ||
+    pricePer3h > 0 ||
+    pricePer6h > 0 ||
+    pricePer12h > 0 ||
+    rentWeekday > 0 ||
+    rentWeekend > 0;
+
+  if (hasRentalRates) {
     page.drawRectangle({
       x: RENTAL_BOX_X,
       y: RENTAL_BOX_Y,
@@ -812,101 +811,135 @@ async function generateBuyPdf(input: {
       borderWidth: 1.2,
     });
 
+    // Current Y inside the rental box (top-down)
+    let rentalY =
+      RENTAL_BOX_Y + RENTAL_BOX_HEIGHT - RENTAL_INNER_Y - RENTAL_HEADING_FONT_SIZE + 2;
+
     // Heading
-    page.drawText("\u0410\u0420\u0415\u041D\u0414\u0410", {
+    page.drawText("АРЕНДА", {
       x: RENTAL_BOX_X + RENTAL_INNER_X,
-      y: RENTAL_BOX_Y + RENTAL_BOX_HEIGHT - RENTAL_INNER_Y - RENTAL_HEADING_FONT_SIZE + 2,
+      y: rentalY,
       size: RENTAL_HEADING_FONT_SIZE,
       font,
       color: COLORS.accent,
     });
 
-    // Weekday price
-    if (rentWeekday > 0) {
-      page.drawText(`\u0411\u0443\u0434\u043D\u0438  ${formatRub(rentWeekday)}/\u0441\u0443\u0442\u043A\u0438`, {
+    rentalY -= RENTAL_LINE_HEIGHT + 2;
+
+    // ── Hourly rates ──────────────────────────────────────────────────────
+    if (pricePerHour > 0) {
+      page.drawText(`1 час   ${formatRub(pricePerHour)}`, {
         x: RENTAL_BOX_X + RENTAL_INNER_X,
-        y: RENTAL_BOX_Y + RENTAL_BOX_HEIGHT - RENTAL_INNER_Y - RENTAL_HEADING_FONT_SIZE - 6,
+        y: rentalY,
         size: RENTAL_VALUE_FONT_SIZE,
         font,
         color: COLORS.text,
       });
+      rentalY -= RENTAL_LINE_HEIGHT;
     }
 
-    // Weekend price
-    if (rentWeekend > 0) {
-      page.drawText(`\u0412\u044B\u0445\u043E\u0434\u043D\u044B\u0435  ${formatRub(rentWeekend)}/\u0441\u0443\u0442\u043A\u0438`, {
+    if (pricePer3h > 0) {
+      page.drawText(`3 часа  ${formatRub(pricePer3h)}`, {
         x: RENTAL_BOX_X + RENTAL_INNER_X,
-        y: RENTAL_BOX_Y + RENTAL_BOX_HEIGHT - RENTAL_INNER_Y - RENTAL_HEADING_FONT_SIZE - 6 - RENTAL_LINE_HEIGHT,
+        y: rentalY,
         size: RENTAL_VALUE_FONT_SIZE,
         font,
         color: COLORS.text,
       });
+      rentalY -= RENTAL_LINE_HEIGHT;
     }
+
+    if (pricePer6h > 0) {
+      page.drawText(`6 часов  ${formatRub(pricePer6h)}`, {
+        x: RENTAL_BOX_X + RENTAL_INNER_X,
+        y: rentalY,
+        size: RENTAL_VALUE_FONT_SIZE,
+        font,
+        color: COLORS.text,
+      });
+      rentalY -= RENTAL_LINE_HEIGHT;
+    }
+
+    if (pricePer12h > 0) {
+      page.drawText(`12 часов  ${formatRub(pricePer12h)}`, {
+        x: RENTAL_BOX_X + RENTAL_INNER_X,
+        y: rentalY,
+        size: RENTAL_VALUE_FONT_SIZE,
+        font,
+        color: COLORS.text,
+      });
+      rentalY -= RENTAL_LINE_HEIGHT;
+    }
+
+    // ── Separator line between hourly and daily ───────────────────────────
+    if ((rentWeekday > 0 || rentWeekend > 0) && pricePerHour > 0) {
+      const sepY = rentalY + 5;
+      page.drawRectangle({
+        x: RENTAL_BOX_X + RENTAL_INNER_X,
+        y: sepY,
+        width: RENTAL_BOX_WIDTH - RENTAL_INNER_X * 2,
+        height: 0.5,
+        color: COLORS.line,
+      });
+      rentalY -= 6;
+    }
+
+    // ── Daily rates ───────────────────────────────────────────────────────
+    if (rentWeekday > 0) {
+      page.drawText(`Будни  ${formatRub(rentWeekday)}/сутки`, {
+        x: RENTAL_BOX_X + RENTAL_INNER_X,
+        y: rentalY,
+        size: RENTAL_VALUE_FONT_SIZE,
+        font,
+        color: COLORS.text,
+      });
+      rentalY -= RENTAL_LINE_HEIGHT;
+    }
+
+    if (rentWeekend > 0) {
+      page.drawText(`Выходные  ${formatRub(rentWeekend)}/сутки`, {
+        x: RENTAL_BOX_X + RENTAL_INNER_X,
+        y: rentalY,
+        size: RENTAL_VALUE_FONT_SIZE,
+        font,
+        color: COLORS.text,
+      });
+      rentalY -= RENTAL_LINE_HEIGHT;
+    }
+
+    // ── CTA (call-to-action) ──────────────────────────────────────────────
+    const ctaText = "Сканируй QR — пройди бесплатный тест-драйв!";
+    const ctaLines = wrapText(
+      ctaText,
+      font,
+      CTA_FONT_SIZE,
+      RENTAL_BOX_WIDTH - RENTAL_INNER_X * 2,
+    ).slice(0, 2);
+
+    // Small separator before CTA
+    const ctaSepY = rentalY + 4;
+    page.drawRectangle({
+      x: RENTAL_BOX_X + RENTAL_INNER_X,
+      y: ctaSepY,
+      width: RENTAL_BOX_WIDTH - RENTAL_INNER_X * 2,
+      height: 0.5,
+      color: COLORS.accent,
+    });
+    rentalY -= 6;
+
+    ctaLines.forEach((line) => {
+      page.drawText(line, {
+        x: RENTAL_BOX_X + RENTAL_INNER_X,
+        y: rentalY,
+        size: CTA_FONT_SIZE,
+        font,
+        color: COLORS.accent,
+      });
+      rentalY -= CTA_LINE_HEIGHT;
+    });
   }
 
-  // ── Link Box (dark, right column, below QR) ────────────────────────────
-
-  page.drawRectangle({
-    x: LINK_BOX_X,
-    y: LINK_BOX_Y,
-    width: LINK_BOX_WIDTH,
-    height: LINK_BOX_HEIGHT,
-    color: COLORS.linkBg,
-    borderColor: COLORS.accent,
-    borderWidth: 1.2,
-  });
-
-  // Line 1: "Ссылка:" label
-  page.drawText("Ссылка:", {
-    x: LINK_BOX_X + LINK_BOX_INNER_X,
-    y: LINK_BOX_Y + LINK_BOX_HEIGHT - 14,
-    size: LINK_TITLE_FONT_SIZE,
-    font,
-    color: COLORS.muted,
-  });
-
-  // Line 2: actual URL (wrapped to fit)
-  const linkLines = wrapText(
-    buyLink,
-    font,
-    LINK_FONT_SIZE,
-    LINK_BOX_MAX_WIDTH,
-  ).slice(0, 2);
-
-  linkLines.forEach((line, index) => {
-    page.drawText(line, {
-      x: LINK_BOX_X + LINK_BOX_INNER_X,
-      y: LINK_BOX_Y + LINK_BOX_HEIGHT - 24 - index * LINK_BOX_LINK_LINE_HEIGHT,
-      size: LINK_FONT_SIZE,
-      font,
-      color: COLORS.text,
-      maxWidth: LINK_BOX_MAX_WIDTH,
-    });
-  });
-
-  // ── Footer ──────────────────────────────────────────────────────────────
-
-  page.drawText(
-    `ID: ${input.item.id}`,
-    {
-      x: PAGE_PADDING,
-      y: FOOTER_Y,
-      size: 8.3,
-      font,
-      color: COLORS.muted,
-    },
-  );
-
-  page.drawText(
-    formatTimestamp(new Date()),
-    {
-      x: FOOTER_GENERATED_X,
-      y: FOOTER_Y,
-      size: 8.3,
-      font,
-      color: COLORS.muted,
-    },
-  );
+  // ── No footer — removed per request (ID + timestamp removed) ────────────
 
   return pdfDoc.save();
 }
