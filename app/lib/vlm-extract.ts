@@ -1,3 +1,4 @@
+// /app/lib/vlm-extract.ts
 /**
  * VIP Bike Rental — VLM Document Extraction Service
  *
@@ -14,8 +15,10 @@
  * No client imports. Server-only (uses "server-only" guard + env vars).
  *
  * Code review notes:
- *   - Uses zai.chat.completions.create() (standard vision-capable chat API)
- *     NOT createVision (that method doesn't exist in the SDK)
+ *   - Uses getZai() from @/lib/zai wrapper (env vars → ZAI instance, no .z-ai-config file needed on Vercel)
+ *   - Uses zai.chat.completions.create() with multimodal content blocks for vision
+ *     (createVision also exists in SDK — hits /chat/completions/vision endpoint —
+ *      both work; create() is the standard endpoint, kept for consistency)
  *   - 25s AbortController timeout to stay within Vercel's 30s maxDuration
  *   - Multi-step /doc flow splits VLM calls across separate webhook messages,
  *     so each photo extraction gets its own request lifecycle (~5-8s each),
@@ -23,7 +26,8 @@
  */
 
 import "server-only";
-import ZAI from "z-ai-web-dev-sdk";
+
+import { getZai } from "@/lib/zai";
 import { logger } from "@/lib/logger";
 import type { PassportOcrResult, LicenseOcrResult, AccessTier } from "./ocr-constants";
 import { deriveUserAccessTier } from "./derive-access-tier";
@@ -39,17 +43,6 @@ export interface VlmExtractResult {
   warnings?: string[];
   errors?: string[];
   error?: string;
-}
-
-// ─── ZAI VLM Singleton ─────────────────────────────────────────────────────────
-
-let _zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
-
-async function getZai(): Promise<ReturnType<typeof ZAI.create>> {
-  if (!_zaiInstance) {
-    _zaiInstance = await ZAI.create();
-  }
-  return _zaiInstance;
 }
 
 // ─── Timeout for VLM calls ────────────────────────────────────────────────────
@@ -291,8 +284,7 @@ export async function vlmExtractDocument(
     const systemPrompt = docType === "passport" ? PASSPORT_SYSTEM_PROMPT : LICENSE_SYSTEM_PROMPT;
     const userPrompt = docType === "passport" ? PASSPORT_USER_PROMPT : LICENSE_USER_PROMPT;
 
-    // Call ZAI VLM via standard chat.completions.create (NOT createVision — that doesn't exist)
-    // The vision capability is built into chat.completions via multimodal content blocks
+    // Call ZAI VLM via standard chat.completions.create with multimodal content blocks
     const response = await zai.chat.completions.create({
       messages: [
         {
