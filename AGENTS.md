@@ -367,7 +367,7 @@ MANDATORY for bridge-triggered tasks: agent must provide a ready-to-run callback
 
 ### 9.1.2) Rental document autopilot trigger (`создай документ`)
 
-- If operator message contains code phrase **`создай документ`** (or `сделай договор`) and includes/attaches passport + driver-license photos, trigger `skills/rental-contract-from-photos/SKILL.md`.
+- If operator message contains code phrase **`создай документ`** (or `сделай договор`) and includes/attaches passport + driver-license photos, trigger `skills/deal-contract-from-photos/SKILL.md`.
 - Expected extraction from operator message:
   - bike query (id/name/fragment),
   - rental dates (start/end or explicit period),
@@ -375,7 +375,7 @@ MANDATORY for bridge-triggered tasks: agent must provide a ready-to-run callback
 - Execution chain must be end-to-end:
   1. OCR IDs into JSON fields required by the skill.
   2. Resolve bike from Supabase `cars`.
-  3. Generate DOCX from `docs/RENTAL_DEAL_TEMPLATE_DEMO.md`.
+  3. Generate DOCX from `docs/RENTAL_DEAL_TEMPLATE.html` or `docs/SALE_DEAL_TEMPLATE.html` respectively.
   4. Send document to Telegram.
   5. Send bridge callback/notification (`scripts/codex-notify.mjs`).
 - If critical fields are missing (unreadable photo, missing rental date, no bike match), do **not** fabricate — return a concise clarification request.
