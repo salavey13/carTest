@@ -159,6 +159,19 @@ function readString(value: unknown) {
 }
 
 /**
+ * Checks whether a spec value is truthy (true, 1, "true", "1").
+ * Used for boolean-like spec fields such as "sale" and "rent".
+ */
+function isTruthySpec(value: unknown): boolean {
+  if (value === true || value === 1) return true;
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    return v === "true" || v === "1";
+  }
+  return false;
+}
+
+/**
  * Formats a spec value by appending the appropriate unit suffix.
  * Detects numeric-only values and appends units based on the spec key.
  * Values that already contain units or are non-numeric are left as-is.
@@ -656,16 +669,20 @@ async function generateBuyPdf(input: {
     color: COLORS.header,
   });
 
-  page.drawText(
-    (input.brandName || input.slug).toUpperCase(),
-    {
-      x: PAGE_PADDING,
-      y: PAGE_HEIGHT - HEADER_BRAND_Y_OFFSET,
-      size: TITLE_FONT_SIZE,
-      font: boldFont,
-      color: COLORS.accent,
-    },
-  );
+  // Dynamic header title based on bike specs:
+  //   sale=true/1 → "VIP BIKE ELECTRO" (bike is for sale)
+  //   otherwise   → "VIP BIKE RENTAL"  (bike is for rent, or default)
+  const headerTitle = isTruthySpec(specs.sale)
+    ? "VIP BIKE ELECTRO"
+    : "VIP BIKE RENTAL";
+
+  page.drawText(headerTitle, {
+    x: PAGE_PADDING,
+    y: PAGE_HEIGHT - HEADER_BRAND_Y_OFFSET,
+    size: TITLE_FONT_SIZE,
+    font: boldFont,
+    color: COLORS.accent,
+  });
 
   // Cyan accent line at bottom of header
   page.drawRectangle({
