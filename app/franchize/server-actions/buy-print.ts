@@ -31,25 +31,29 @@ const HEADER_HEIGHT = 82;
 const HEADER_BRAND_Y_OFFSET = 40; // from top of page
 const HEADER_ACCENT_HEIGHT = 2; // gold separator line under header
 
-// Columns
-const LEFT_COL_X = PAGE_PADDING;
-const LEFT_COL_WIDTH = 248;
+// Title block — full page width, dynamically positioned below header
+const TITLE_FONT_SIZE = 24;
+const TITLE_LINE_HEIGHT = 28;
+const TITLE_MAX_WIDTH = PAGE_WIDTH - 2 * PAGE_PADDING; // full width: 519px
+const TITLE_BLOCK_TOP = PAGE_HEIGHT - HEADER_HEIGHT - 8; // 8px below header accent
 
+// Price
+const PRICE_FONT_SIZE = 20;
+const TITLE_TO_PRICE_GAP = 10; // gap between last title line baseline and price baseline
+const PRICE_TO_DESC_GAP = 16; // gap between price baseline and description heading
+
+// Right column — positioned dynamically below title block
 const RIGHT_COL_X = 314;
 const RIGHT_COL_WIDTH = 242;
-
-const COL_GAP = RIGHT_COL_X - (LEFT_COL_X + LEFT_COL_WIDTH); // 28
-
-// Content vertical anchors (from top of page)
-const TITLE_BLOCK_TOP = PAGE_HEIGHT - 118;
-
-// Image panel (right column) — shorter to make room for expanded rental box
-// Was 9:16 ratio (≈430). Reduced to give title breathing room and fit more rental lines.
-const IMAGE_PANEL_HEIGHT = 370;
-const IMAGE_PANEL_TOP_GAP = 20; // pushed down so long title can breathe
-// Y is the bottom-left corner in pdf-lib; panel extends from Y upward to Y + height
-const IMAGE_PANEL_Y = PAGE_HEIGHT - HEADER_HEIGHT - IMAGE_PANEL_TOP_GAP - IMAGE_PANEL_HEIGHT;
 const IMAGE_PANEL_PADDING = 18; // inset for scaled images
+const RIGHT_COL_TOP_PADDING = 8; // gap between title block bottom and image top edge
+
+// Image panel height — balanced for expanded rental box
+const IMAGE_PANEL_HEIGHT = 340;
+
+// Left column specs — starts below price, offset from left edge
+const LEFT_COL_X = PAGE_PADDING;
+const LEFT_COL_WIDTH = 248;
 
 // Spec table
 const SPEC_VALUE_FONT_SIZE = 9.4;
@@ -61,7 +65,7 @@ const SPEC_LABEL_X_OFFSET = 12;
 const SPEC_LINE_HEIGHT = 10;
 const SPEC_ROW_MIN_HEIGHT = 30;
 const SPEC_ROW_CONTENT_PADDING = 12;
-const SPEC_ROW_BORDER_OFFSET = 6; // aligns top border with row anchor
+const SPEC_ROW_BORDER_OFFSET = 6;
 const SPEC_ROW_GAP = 4;
 const SPEC_MAX_ROWS = 13;
 const SPEC_MAX_VALUE_LINES = 2;
@@ -75,10 +79,6 @@ const QR_GAP_FROM_IMAGE = 8;
 const QR_PAIR_GAP = 10;
 const QR_PAIR_TOTAL_WIDTH = QR_SIZE + QR_PAIR_GAP + VK_QR_SIZE; // 230
 
-const QR_Y = IMAGE_PANEL_Y - QR_GAP_FROM_IMAGE - QR_SIZE;
-const QR_X = RIGHT_COL_X + (RIGHT_COL_WIDTH - QR_PAIR_TOTAL_WIDTH) / 2;
-const VK_QR_X = QR_X + QR_SIZE + QR_PAIR_GAP;
-
 // QR labels
 const QR_LABEL_GAP = 4;
 const QR_LABEL_FONT_SIZE = 7;
@@ -86,7 +86,6 @@ const QR_LABEL_FONT_SIZE = 7;
 // Rental price box — expanded to hold hourly + daily rates + CTA
 const RENTAL_BOX_HEIGHT = 148;
 const RENTAL_BOX_GAP = 8;
-const RENTAL_BOX_Y = QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE - RENTAL_BOX_GAP - RENTAL_BOX_HEIGHT;
 const RENTAL_BOX_X = RIGHT_COL_X;
 const RENTAL_BOX_WIDTH = RIGHT_COL_WIDTH;
 const RENTAL_HEADING_FONT_SIZE = 11;
@@ -109,12 +108,6 @@ const DESC_SECTION_GAP = 18;
 const SECTION_HEADING_SIZE = 14;
 const SECTION_HEADING_GAP_AFTER = 22;
 const SECTION_HEADING_GAP_BEFORE = 24;
-
-// Title / price block
-const TITLE_FONT_SIZE = 24;
-const PRICE_FONT_SIZE = 20;
-const TITLE_TO_PRICE_GAP = 34;
-const PRICE_TO_DESC_GAP = 44;
 
 // Network
 const FETCH_TIMEOUT_MS = 8_000;
@@ -405,18 +398,23 @@ function wrapText(
  * Layout overview (A4 portrait, dark theme):
  * ┌──────────────────────────────────────┐
  * │ HEADER (near-black + gold accent)    │
+ * ├──────────────────────────────────────┤
+ * │  Title (full page width, multi-line) │
+ * │  Price                               │
  * ├───────────────┬──────────────────────┤
- * │  Title        │                      │
- * │  Price        │    IMAGE PANEL       │
- * │  Description  │    (graphite bg)     │
- * │  ─────────    │                      │
- * │  Specs table  │   QR buy │ QR VK     │
- * │  (dark rows)  │  (110)   (110)       │
+ * │  Description  │    IMAGE PANEL       │
+ * │  ─────────    │    (graphite bg)     │
+ * │  Specs table  │                      │
+ * │  (dark rows)  │   QR buy │ QR VK     │
+ * │               │  (110)   (110)       │
  * │               │   ──────────────     │
  * │               │   RENTAL BOX         │
  * │               │   (hourly + daily    │
  * │               │    rates + CTA)      │
  * └───────────────┴──────────────────────┘
+ *
+ * Key: Title spans full width. Right column (image, QR, rental) is
+ * dynamically positioned below the title block to avoid overlap.
  */
 async function generateBuyPdf(input: {
   slug: string;
@@ -496,24 +494,39 @@ async function generateBuyPdf(input: {
     color: COLORS.accent,
   });
 
-  // ── Title Block ─────────────────────────────────────────────────────────
+  // ── Title Block (full page width, dynamically sized) ────────────────────
+  // Title wraps across the full page width so long names aren't clipped.
+  // Right column elements start BELOW the title block to avoid overlap.
 
   let leftY = TITLE_BLOCK_TOP;
 
-  page.drawText(input.item.title, {
-    x: LEFT_COL_X,
-    y: leftY,
-    size: TITLE_FONT_SIZE,
+  // Wrap title across full page width
+  const titleLines = wrapText(
+    input.item.title,
     font,
-    color: COLORS.text,
+    TITLE_FONT_SIZE,
+    TITLE_MAX_WIDTH,
+  );
+
+  titleLines.forEach((line) => {
+    page.drawText(line, {
+      x: PAGE_PADDING,
+      y: leftY,
+      size: TITLE_FONT_SIZE,
+      font,
+      color: COLORS.text,
+    });
+
+    leftY -= TITLE_LINE_HEIGHT;
   });
 
   leftY -= TITLE_TO_PRICE_GAP;
 
+  // Price
   page.drawText(
     `Цена: ${formatRub(input.item.salePrice)}`,
     {
-      x: LEFT_COL_X,
+      x: PAGE_PADDING,
       y: leftY,
       size: PRICE_FONT_SIZE,
       font,
@@ -522,6 +535,26 @@ async function generateBuyPdf(input: {
   );
 
   leftY -= PRICE_TO_DESC_GAP;
+
+  // ── Compute right column positions (dynamic, below title block) ─────────
+  // The image panel top edge must be below the title + price block.
+  // leftY is now at the bottom of the title/price area; the image top should
+  // be at or slightly above leftY + some padding so both columns start together.
+
+  const titleBlockBottom = leftY;
+  const rightColumnTop = titleBlockBottom + RIGHT_COL_TOP_PADDING;
+
+  // Image panel: top edge = rightColumnTop
+  // Y is bottom-left in pdf-lib, so: IMAGE_PANEL_Y = rightColumnTop - IMAGE_PANEL_HEIGHT
+  const IMAGE_PANEL_Y = rightColumnTop - IMAGE_PANEL_HEIGHT;
+
+  // QR codes below image
+  const QR_Y = IMAGE_PANEL_Y - QR_GAP_FROM_IMAGE - QR_SIZE;
+  const QR_X = RIGHT_COL_X + (RIGHT_COL_WIDTH - QR_PAIR_TOTAL_WIDTH) / 2;
+  const VK_QR_X = QR_X + QR_SIZE + QR_PAIR_GAP;
+
+  // Rental box below QR labels
+  const RENTAL_BOX_Y = QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE - RENTAL_BOX_GAP - RENTAL_BOX_HEIGHT;
 
   // ── Description ─────────────────────────────────────────────────────────
 
@@ -938,8 +971,6 @@ async function generateBuyPdf(input: {
       rentalY -= CTA_LINE_HEIGHT;
     });
   }
-
-  // ── No footer — removed per request (ID + timestamp removed) ────────────
 
   return pdfDoc.save();
 }
