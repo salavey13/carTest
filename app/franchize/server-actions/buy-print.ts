@@ -74,19 +74,23 @@ const SPEC_MAX_VALUE_LINES = 2;
 // QR codes — two side by side (buy link + VK community)
 const VK_LINK = "https://vk.com/vip_bike_electro";
 
-const QR_SIZE = 110;
-const VK_QR_SIZE = 110;
-const QR_PAIR_GAP = 10;
-const QR_PAIR_TOTAL_WIDTH = QR_SIZE + QR_PAIR_GAP + VK_QR_SIZE; // 230
+const QR_SIZE = 88;   // 80% of original 110 — gives breathing room inside image
+const VK_QR_SIZE = 88;
+const QR_PAIR_GAP = 14; // slightly wider gap between QR pair
+const QR_PAIR_TOTAL_WIDTH = QR_SIZE + QR_PAIR_GAP + VK_QR_SIZE; // 190
+const QR_BOTTOM_PADDING = 14; // padding from image panel bottom to QR label bottom
 const IMAGE_TO_RENTAL_GAP = 6; // small gap between image panel bottom and rental box top
 
 // QR labels
 const QR_LABEL_GAP = 4;
 const QR_LABEL_FONT_SIZE = 7;
 
+// Image panel aspect ratio — 9:16 matches bike photos, eliminates black border
+const IMAGE_PANEL_ASPECT = 16 / 9; // height / width
+const IMAGE_PANEL_HEIGHT = Math.round(RIGHT_COL_WIDTH * IMAGE_PANEL_ASPECT); // 242 * 16/9 ≈ 430
+
 // Rental price box — expanded to hold hourly + daily rates + CTA
 const RENTAL_BOX_HEIGHT = 148;
-const RENTAL_BOX_GAP = 8;
 const RENTAL_BOX_X = RIGHT_COL_X;
 const RENTAL_BOX_WIDTH = RIGHT_COL_WIDTH;
 const RENTAL_HEADING_FONT_SIZE = 11;
@@ -660,29 +664,25 @@ async function generateBuyPdf(input: {
   leftY -= PRICE_TO_DESC_GAP;
 
   // ── Compute right column positions (dynamic, below title block) ─────────
-  // The image panel stretches from rightColumnTop down to just above the rental box.
-  // QR codes sit INSIDE the image panel (overlapping with the bike photo).
+  // Image panel has fixed 9:16 aspect ratio (matches bike photos → no black border).
+  // QR codes sit INSIDE the image panel near the bottom, with padding.
   // Rental box sits below the image panel.
 
   const titleBlockBottom = leftY;
   const rightColumnTop = titleBlockBottom + RIGHT_COL_TOP_PADDING;
 
-  // Total vertical span from rightColumnTop to rental box bottom
-  // (keeps the same proportions as the original layout)
-  const RIGHT_COL_TOTAL = 625;
+  // Image panel: fixed 9:16 height, top edge = rightColumnTop
+  const IMAGE_PANEL_Y = rightColumnTop - IMAGE_PANEL_HEIGHT;
 
-  // Rental box: bottom of the right column
-  const RENTAL_BOX_Y = rightColumnTop - RIGHT_COL_TOTAL;
-
-  // QR codes: above rental box, inside the image panel
-  const QR_Y = RENTAL_BOX_Y + RENTAL_BOX_HEIGHT + RENTAL_BOX_GAP + QR_LABEL_FONT_SIZE + QR_LABEL_GAP;
+  // QR codes: positioned from bottom of image panel with padding
+  // QR label bottom edge = IMAGE_PANEL_Y + QR_BOTTOM_PADDING
+  // QR_Y = label bottom + gap + label font size
+  const QR_Y = IMAGE_PANEL_Y + QR_BOTTOM_PADDING + QR_LABEL_GAP + QR_LABEL_FONT_SIZE;
   const QR_X = RIGHT_COL_X + (RIGHT_COL_WIDTH - QR_PAIR_TOTAL_WIDTH) / 2;
   const VK_QR_X = QR_X + QR_SIZE + QR_PAIR_GAP;
 
-  // Image panel: from rightColumnTop to just above the rental box
-  // (covers the QR code area — QR codes intentionally overlap with the bike image)
-  const IMAGE_PANEL_Y = RENTAL_BOX_Y + RENTAL_BOX_HEIGHT + IMAGE_TO_RENTAL_GAP;
-  const IMAGE_PANEL_HEIGHT = rightColumnTop - IMAGE_PANEL_Y;
+  // Rental box: below the image panel with a small gap
+  const RENTAL_BOX_Y = IMAGE_PANEL_Y - IMAGE_TO_RENTAL_GAP - RENTAL_BOX_HEIGHT;
 
   // ── Image Panel (Right Column) — cover fit, drawn BEFORE left column ───
   // Drawn early so that any horizontal overflow can be masked with pageBg,
