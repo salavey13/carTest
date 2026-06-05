@@ -27,15 +27,17 @@ const PAGE_HEIGHT = 841.89;
 const PAGE_PADDING = 38;
 
 // Header
-const HEADER_HEIGHT = 82;
-const HEADER_BRAND_Y_OFFSET = 40; // from top of page
+const HEADER_HEIGHT = 62; // compact — brand text still fits with comfortable padding
+const HEADER_BRAND_Y_OFFSET = 38; // from top of page (visually centered in header)
 const HEADER_ACCENT_HEIGHT = 2; // gold separator line under header
 
 // Title block — full page width, dynamically positioned below header
 const TITLE_FONT_SIZE = 24;
 const TITLE_LINE_HEIGHT = 28;
 const TITLE_MAX_WIDTH = PAGE_WIDTH - 2 * PAGE_PADDING; // full width: 519px
-const TITLE_BLOCK_TOP = PAGE_HEIGHT - HEADER_HEIGHT - 8; // 8px below header accent
+const TITLE_ASCENT = 22; // approximate ascent for DejaVu Sans at TITLE_FONT_SIZE
+const TITLE_BELOW_HEADER_GAP = 10; // visual gap between header accent line and title visual top
+const TITLE_BLOCK_TOP = PAGE_HEIGHT - HEADER_HEIGHT - TITLE_ASCENT - TITLE_BELOW_HEADER_GAP;
 
 // Price
 const PRICE_FONT_SIZE = 20;
