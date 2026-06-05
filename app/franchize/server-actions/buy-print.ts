@@ -131,15 +131,15 @@ interface PdfColors {
 }
 
 const COLORS: PdfColors = {
-  pageBg: rgb(0.10, 0.11, 0.13),       // dark graphite — same as image panel (seamless)
-  header: rgb(0.05, 0.06, 0.08),       // near-black — deeper than page
+  pageBg: rgb(0.16, 0.17, 0.20),       // lighter graphite — better for A5 print
+  header: rgb(0.10, 0.11, 0.14),       // near-black — deeper than page
   text: rgb(0.92, 0.93, 0.95),         // near-white — main body text
   muted: rgb(0.58, 0.60, 0.64),        // medium gray — labels, secondary text
-  line: rgb(0.22, 0.23, 0.26),         // subtle dark — spec row borders
-  accent: rgb(0.96, 0.76, 0.22),       // gold — accent line, link border
-  accentSubtle: rgb(0.96, 0.76, 0.22), // gold (same)
-  imageBg: rgb(0.10, 0.11, 0.13),      // graphite — matches pageBg (seamless panel)
-  linkBg: rgb(0.14, 0.15, 0.18),       // lifted dark — link card background
+  line: rgb(0.28, 0.29, 0.33),         // subtle dark — spec row borders
+  accent: rgb(0.04, 0.745, 0.94),      // electric cyan — matches bike neon accent
+  accentSubtle: rgb(0.04, 0.745, 0.94),// electric cyan (same)
+  imageBg: rgb(0.16, 0.17, 0.20),      // graphite — matches pageBg (seamless panel)
+  linkBg: rgb(0.20, 0.21, 0.24),       // lifted dark — link card background
   imageFallback: rgb(0.50, 0.52, 0.55), // visible on dark — fallback text
   white: rgb(1, 1, 1),                 // pure white — header brand
 };
@@ -392,6 +392,125 @@ function wrapText(
   return lines;
 }
 
+/**
+ * Draws a rounded rectangle on a PDF page.
+ * pdf-lib doesn't natively support borderRadius, so we draw
+ * the path manually using bezier curves for the corners.
+ *
+ * Draws fill first, then stroke on top (two passes) for clean results.
+ */
+function drawRoundedRect(
+  page: ReturnType<PDFDocument["addPage"]>,
+  opts: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    radius: number;
+    color?: RGB;
+    borderColor?: RGB;
+    borderWidth?: number;
+  },
+) {
+  const { x, y, width, height, radius, color, borderColor, borderWidth } = opts;
+  const r = Math.min(radius, width / 2, height / 2);
+  const k = 0.5522847498; // bezier circle approximation constant
+
+  // --- Fill pass ---
+  if (color) {
+    page.drawRectangle({
+      x: x + r,
+      y,
+      width: width - 2 * r,
+      height,
+      color,
+    });
+    page.drawRectangle({
+      x,
+      y: y + r,
+      width,
+      height: height - 2 * r,
+      color,
+    });
+
+    // Four corner quadrants as small filled squares + overlapping circles approximated
+    // by small filled rectangles (close enough at typical corner radius 6-10pt)
+    const cr = r;
+    // Top-left corner fill
+    page.drawRectangle({ x, y: y + height - cr, width: cr, height: cr, color });
+    // Top-right corner fill
+    page.drawRectangle({ x: x + width - cr, y: y + height - cr, width: cr, height: cr, color });
+    // Bottom-left corner fill
+    page.drawRectangle({ x, y, width: cr, height: cr, color });
+    // Bottom-right corner fill
+    page.drawRectangle({ x: x + width - cr, y, width: cr, height: cr, color });
+  }
+
+  // --- Stroke pass (border) using line segments + bezier arcs ---
+  if (borderColor && borderWidth) {
+    page.drawLine({
+      start: { x: x + r, y: y + height },
+      end: { x: x + width - r, y: y + height },
+      thickness: borderWidth,
+      color: borderColor,
+    });
+    page.drawLine({
+      start: { x: x + width, y: y + height - r },
+      end: { x: x + width, y: y + r },
+      thickness: borderWidth,
+      color: borderColor,
+    });
+    page.drawLine({
+      start: { x: x + width - r, y },
+      end: { x: x + r, y },
+      thickness: borderWidth,
+      color: borderColor,
+    });
+    page.drawLine({
+      start: { x, y: y + r },
+      end: { x, y: y + height - r },
+      thickness: borderWidth,
+      color: borderColor,
+    });
+
+    // Four corner arcs as short line segments (approximation)
+    const steps = 4;
+    for (let i = 0; i < steps; i++) {
+      const a1 = (i / steps) * Math.PI / 2;
+      const a2 = ((i + 1) / steps) * Math.PI / 2;
+
+      // Top-right corner (center at x+w-r, y+h-r)
+      page.drawLine({
+        start: { x: x + width - r + r * Math.cos(a1), y: y + height - r + r * Math.sin(a1) },
+        end: { x: x + width - r + r * Math.cos(a2), y: y + height - r + r * Math.sin(a2) },
+        thickness: borderWidth,
+        color: borderColor,
+      });
+      // Bottom-right corner (center at x+w-r, y+r)
+      page.drawLine({
+        start: { x: x + width - r + r * Math.cos(Math.PI / 2 + a1), y: y + r + r * Math.sin(Math.PI / 2 + a1) },
+        end: { x: x + width - r + r * Math.cos(Math.PI / 2 + a2), y: y + r + r * Math.sin(Math.PI / 2 + a2) },
+        thickness: borderWidth,
+        color: borderColor,
+      });
+      // Bottom-left corner (center at x+r, y+r)
+      page.drawLine({
+        start: { x: x + r + r * Math.cos(Math.PI + a1), y: y + r + r * Math.sin(Math.PI + a1) },
+        end: { x: x + r + r * Math.cos(Math.PI + a2), y: y + r + r * Math.sin(Math.PI + a2) },
+        thickness: borderWidth,
+        color: borderColor,
+      });
+      // Top-left corner (center at x+r, y+h-r)
+      page.drawLine({
+        start: { x: x + r + r * Math.cos(3 * Math.PI / 2 + a1), y: y + height - r + r * Math.sin(3 * Math.PI / 2 + a1) },
+        end: { x: x + r + r * Math.cos(3 * Math.PI / 2 + a2), y: y + height - r + r * Math.sin(3 * Math.PI / 2 + a2) },
+        thickness: borderWidth,
+        color: borderColor,
+      });
+    }
+  }
+}
+
 // ─── PDF Generation ─────────────────────────────────────────────────────────
 
 /**
@@ -399,7 +518,7 @@ function wrapText(
  *
  * Layout overview (A4 portrait, dark theme):
  * ┌──────────────────────────────────────┐
- * │ HEADER (near-black + gold accent)    │
+ * │ HEADER (near-black + cyan accent)    │
  * ├──────────────────────────────────────┤
  * │  Title (full page width, multi-line) │
  * │  Price                               │
@@ -836,11 +955,12 @@ async function generateBuyPdf(input: {
     rentWeekend > 0;
 
   if (hasRentalRates) {
-    page.drawRectangle({
+    drawRoundedRect(page, {
       x: RENTAL_BOX_X,
       y: RENTAL_BOX_Y,
       width: RENTAL_BOX_WIDTH,
       height: RENTAL_BOX_HEIGHT,
+      radius: 8,
       color: COLORS.linkBg,
       borderColor: COLORS.accent,
       borderWidth: 1.2,
