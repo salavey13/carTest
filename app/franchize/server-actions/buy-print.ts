@@ -485,10 +485,10 @@ function drawRoundedRect(
         thickness: borderWidth,
         color: borderColor,
       });
-      // Bottom-right corner (center at x+w-r, y+r)
+      // Bottom-right corner (center at x+w-r, y+r) — arc from -90° to 0°
       page.drawLine({
-        start: { x: x + width - r + r * Math.cos(Math.PI / 2 + a1), y: y + r + r * Math.sin(Math.PI / 2 + a1) },
-        end: { x: x + width - r + r * Math.cos(Math.PI / 2 + a2), y: y + r + r * Math.sin(Math.PI / 2 + a2) },
+        start: { x: x + width - r + r * Math.cos(-Math.PI / 2 + a1), y: y + r + r * Math.sin(-Math.PI / 2 + a1) },
+        end: { x: x + width - r + r * Math.cos(-Math.PI / 2 + a2), y: y + r + r * Math.sin(-Math.PI / 2 + a2) },
         thickness: borderWidth,
         color: borderColor,
       });
@@ -499,10 +499,10 @@ function drawRoundedRect(
         thickness: borderWidth,
         color: borderColor,
       });
-      // Top-left corner (center at x+r, y+h-r)
+      // Top-left corner (center at x+r, y+h-r) — arc from 90° to 180°
       page.drawLine({
-        start: { x: x + r + r * Math.cos(3 * Math.PI / 2 + a1), y: y + height - r + r * Math.sin(3 * Math.PI / 2 + a1) },
-        end: { x: x + r + r * Math.cos(3 * Math.PI / 2 + a2), y: y + height - r + r * Math.sin(3 * Math.PI / 2 + a2) },
+        start: { x: x + r + r * Math.cos(Math.PI / 2 + a1), y: y + height - r + r * Math.sin(Math.PI / 2 + a1) },
+        end: { x: x + r + r * Math.cos(Math.PI / 2 + a2), y: y + height - r + r * Math.sin(Math.PI / 2 + a2) },
         thickness: borderWidth,
         color: borderColor,
       });
