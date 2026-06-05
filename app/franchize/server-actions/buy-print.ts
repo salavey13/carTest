@@ -59,7 +59,6 @@ const LEFT_COL_WIDTH = 248;
 // Spec table
 const SPEC_VALUE_FONT_SIZE = 9.4;
 const SPEC_VALUE_MAX_WIDTH = 118;
-const SPEC_VALUE_X_OFFSET = 108;
 const SPEC_LABEL_FONT_SIZE = 9.3;
 const SPEC_LABEL_MAX_WIDTH = 82;
 const SPEC_LABEL_X_OFFSET = 12;
@@ -134,15 +133,15 @@ interface PdfColors {
 }
 
 const COLORS: PdfColors = {
-  pageBg: rgb(0.19, 0.20, 0.23),       // lighter graphite — better for A5 print
-  header: rgb(0.12, 0.13, 0.16),       // near-black — deeper than page
+  pageBg: rgb(0.07, 0.08, 0.10),       // near-black — slick dark, image pops just right
+  header: rgb(0.04, 0.05, 0.07),       // deep black — header bar
   text: rgb(0.92, 0.93, 0.95),         // near-white — main body text
-  muted: rgb(0.58, 0.60, 0.64),        // medium gray — labels, secondary text
-  line: rgb(0.30, 0.31, 0.35),         // subtle dark — spec row borders
+  muted: rgb(0.55, 0.57, 0.60),        // medium gray — labels, secondary text
+  line: rgb(0.18, 0.19, 0.22),         // subtle dark — spec row borders
   accent: rgb(0.04, 0.745, 0.94),      // electric cyan — matches bike neon accent
   accentSubtle: rgb(0.04, 0.745, 0.94),// electric cyan (same)
-  imageBg: rgb(0.19, 0.20, 0.23),      // graphite — matches pageBg (seamless panel)
-  linkBg: rgb(0.22, 0.23, 0.26),       // lifted dark — link card background
+  imageBg: rgb(0.07, 0.08, 0.10),      // near-black — matches pageBg (seamless panel)
+  linkBg: rgb(0.11, 0.12, 0.14),       // lifted dark — link card background
   imageFallback: rgb(0.50, 0.52, 0.55), // visible on dark — fallback text
   white: rgb(1, 1, 1),                 // pure white — header brand
 };
@@ -157,6 +156,43 @@ function readString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
     : "";
+}
+
+/**
+ * Formats a spec value by appending the appropriate unit suffix.
+ * Detects numeric-only values and appends units based on the spec key.
+ * Values that already contain units or are non-numeric are left as-is.
+ */
+function formatSpecValue(key: string, value: string): string {
+  // If the value already contains a unit (non-numeric suffix), leave as-is
+  if (!/^\d+([.,]\d+)?$/.test(value.trim())) {
+    return value;
+  }
+
+  // Map spec keys to their unit suffixes
+  const unitMap: Record<string, string> = {
+    power_kw: " кВт",
+    motor_peak_kw: " кВт",
+    motor_nominal_kw: " кВт",
+    torque_nm: " Н·м",
+    torque_motor_nm: " Н·м",
+    range_km: " км",
+    range_120ah_km: " км",
+    range_100ah_km: " км",
+    top_speed_kmh: " км/ч",
+    weight_kg: " кг",
+    charge_time_h: " ч",
+    acceleration_0_100_s: " с",
+    year: "", // no unit for year
+  };
+
+  const suffix = unitMap[key];
+  if (suffix !== undefined) {
+    return value + suffix;
+  }
+
+  // Fallback: try to infer unit from the label
+  return value;
 }
 
 async function resolveActorUserId() {
@@ -302,7 +338,7 @@ async function embedImage(pdfDoc: PDFDocument, url: string) {
 }
 
 function extractKeySpecs(specs: UnknownRecord) {
-  const rows: [string, string][] = [];
+  const rows: [string, string, string][] = []; // [label, value, rawKey]
 
   const priorityFields: Array<[string, ...string[]]> = [
     ["Тип", "bike_subtype"],
@@ -324,10 +360,10 @@ function extractKeySpecs(specs: UnknownRecord) {
 
   priorityFields.forEach(([label, ...keys]) => {
     for (const key of keys) {
-      const value = readString(specs[key]);
+      const rawValue = readString(specs[key]);
 
-      if (value && value !== "—") {
-        rows.push([label, value]);
+      if (rawValue && rawValue !== "—") {
+        rows.push([label, formatSpecValue(key, rawValue), key]);
         break;
       }
     }
@@ -351,7 +387,8 @@ function extractKeySpecs(specs: UnknownRecord) {
         .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
       if (!rows.some((row) => row[0] === niceLabel)) {
-        rows.push([niceLabel, value]);
+        const rawValue = readString(value);
+        rows.push([niceLabel, formatSpecValue(key, rawValue), key]);
       }
     }
   });
@@ -571,6 +608,24 @@ async function generateBuyPdf(input: {
   const fontBytes = fs.readFileSync(fontPath);
   const font = await pdfDoc.embedFont(fontBytes);
 
+  // Bold font for header brand
+  const boldFontPath = path.join(
+    process.cwd(),
+    "server-assets",
+    "fonts",
+    "DejaVuSans-Bold.ttf",
+  );
+
+  let boldFont: PDFFont;
+  try {
+    const boldFontBytes = fs.readFileSync(boldFontPath);
+    boldFont = await pdfDoc.embedFont(boldFontBytes);
+  } catch {
+    // Fallback to system DejaVuSans-Bold if project copy doesn't exist
+    const sysBoldBytes = fs.readFileSync("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf");
+    boldFont = await pdfDoc.embedFont(sysBoldBytes);
+  }
+
   const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
 
   const specs = input.item.rawSpecs || {};
@@ -607,12 +662,12 @@ async function generateBuyPdf(input: {
       x: PAGE_PADDING,
       y: PAGE_HEIGHT - HEADER_BRAND_Y_OFFSET,
       size: TITLE_FONT_SIZE,
-      font,
-      color: COLORS.white,
+      font: boldFont,
+      color: COLORS.accent,
     },
   );
 
-  // Gold accent line at bottom of header
+  // Cyan accent line at bottom of header
   page.drawRectangle({
     x: 0,
     y: PAGE_HEIGHT - HEADER_HEIGHT,
@@ -737,7 +792,7 @@ async function generateBuyPdf(input: {
 
     leftY -= SECTION_HEADING_GAP_AFTER;
 
-    keySpecs.forEach(([label, value]) => {
+    keySpecs.forEach(([label, value, _rawKey]) => {
       const wrappedValue = wrapText(
         value,
         font,
@@ -775,18 +830,19 @@ async function generateBuyPdf(input: {
         maxWidth: SPEC_LABEL_MAX_WIDTH,
       });
 
-      // Vertically centered multiline value
+      // Vertically centered multiline value — right-aligned
+      const specValueRightEdge = LEFT_COL_X + LEFT_COL_WIDTH - SPEC_LABEL_X_OFFSET;
       const textBaseY =
         leftY - rowHeight / 2 + contentHeight / 2 - 2;
 
       wrappedValue.forEach((line, index) => {
+        const lineWidth = font.widthOfTextAtSize(line, SPEC_VALUE_FONT_SIZE);
         page.drawText(line, {
-          x: LEFT_COL_X + SPEC_VALUE_X_OFFSET,
+          x: specValueRightEdge - lineWidth,
           y: textBaseY - index * SPEC_LINE_HEIGHT,
           size: SPEC_VALUE_FONT_SIZE,
           font,
           color: COLORS.text,
-          maxWidth: SPEC_VALUE_MAX_WIDTH,
         });
       });
 
