@@ -74,10 +74,10 @@ const SPEC_MAX_VALUE_LINES = 2;
 // QR codes — two side by side (buy link + VK community)
 const VK_LINK = "https://vk.com/vip_bike_electro";
 
-const QR_SIZE = 88;   // 80% of original 110 — gives breathing room inside image
-const VK_QR_SIZE = 88;
-const QR_PAIR_GAP = 14; // slightly wider gap between QR pair
-const QR_PAIR_TOTAL_WIDTH = QR_SIZE + QR_PAIR_GAP + VK_QR_SIZE; // 190
+const QR_SIZE = 68;   // compact — gives breathing room inside image, still scannable
+const VK_QR_SIZE = 68;
+const QR_PAIR_GAP = 16; // wider gap between QR pair for visual balance
+const QR_PAIR_TOTAL_WIDTH = QR_SIZE + QR_PAIR_GAP + VK_QR_SIZE; // 152
 const QR_BOTTOM_PADDING = 14; // padding from image panel bottom to QR label bottom
 const IMAGE_TO_RENTAL_GAP = 6; // small gap between image panel bottom and rental box top
 
@@ -85,9 +85,9 @@ const IMAGE_TO_RENTAL_GAP = 6; // small gap between image panel bottom and renta
 const QR_LABEL_GAP = 4;
 const QR_LABEL_FONT_SIZE = 7;
 
-// Image panel aspect ratio — 9:16 matches bike photos, eliminates black border
-const IMAGE_PANEL_ASPECT = 16 / 9; // height / width
-const IMAGE_PANEL_HEIGHT = Math.round(RIGHT_COL_WIDTH * IMAGE_PANEL_ASPECT); // 242 * 16/9 ≈ 430
+// Image panel — 9:16 ratio matches bike photos, eliminates black border
+// Dynamically sized to fill space so CTA bottom aligns with specs table bottom
+// IMAGE_PANEL_HEIGHT is computed at render time after title block height is known
 
 // Rental price box — expanded to hold hourly + daily rates + CTA
 const RENTAL_BOX_HEIGHT = 148;
@@ -134,15 +134,15 @@ interface PdfColors {
 }
 
 const COLORS: PdfColors = {
-  pageBg: rgb(0.16, 0.17, 0.20),       // lighter graphite — better for A5 print
-  header: rgb(0.10, 0.11, 0.14),       // near-black — deeper than page
+  pageBg: rgb(0.19, 0.20, 0.23),       // lighter graphite — better for A5 print
+  header: rgb(0.12, 0.13, 0.16),       // near-black — deeper than page
   text: rgb(0.92, 0.93, 0.95),         // near-white — main body text
   muted: rgb(0.58, 0.60, 0.64),        // medium gray — labels, secondary text
-  line: rgb(0.28, 0.29, 0.33),         // subtle dark — spec row borders
+  line: rgb(0.30, 0.31, 0.35),         // subtle dark — spec row borders
   accent: rgb(0.04, 0.745, 0.94),      // electric cyan — matches bike neon accent
   accentSubtle: rgb(0.04, 0.745, 0.94),// electric cyan (same)
-  imageBg: rgb(0.16, 0.17, 0.20),      // graphite — matches pageBg (seamless panel)
-  linkBg: rgb(0.20, 0.21, 0.24),       // lifted dark — link card background
+  imageBg: rgb(0.19, 0.20, 0.23),      // graphite — matches pageBg (seamless panel)
+  linkBg: rgb(0.22, 0.23, 0.26),       // lifted dark — link card background
   imageFallback: rgb(0.50, 0.52, 0.55), // visible on dark — fallback text
   white: rgb(1, 1, 1),                 // pure white — header brand
 };
@@ -664,117 +664,28 @@ async function generateBuyPdf(input: {
   leftY -= PRICE_TO_DESC_GAP;
 
   // ── Compute right column positions (dynamic, below title block) ─────────
-  // Image panel has fixed 9:16 aspect ratio (matches bike photos → no black border).
+  // Image panel uses 9:16 ratio (matches bike photos → no black border).
+  // Image height is computed dynamically so that the rental box bottom
+  // aligns with the specs table bottom for visual consistency.
   // QR codes sit INSIDE the image panel near the bottom, with padding.
   // Rental box sits below the image panel.
 
   const titleBlockBottom = leftY;
   const rightColumnTop = titleBlockBottom + RIGHT_COL_TOP_PADDING;
 
-  // Image panel: fixed 9:16 height, top edge = rightColumnTop
-  const IMAGE_PANEL_Y = rightColumnTop - IMAGE_PANEL_HEIGHT;
+  // Snapshot leftY before drawing description/specs — we'll track final leftY later.
+  // For now, compute image panel from a target total right-column height.
+  // We want: rightColumnTop - RENTAL_BOX_Y ≈ rightColumnTop - (leftY after specs)
+  // The rental box bottom (RENTAL_BOX_Y) should match specs table bottom (leftY after specs).
+  // Since we don't know leftY after specs yet, we compute the image panel height
+  // dynamically AFTER drawing the left column.
 
-  // QR codes: positioned from bottom of image panel with padding
-  // QR label bottom edge = IMAGE_PANEL_Y + QR_BOTTOM_PADDING
-  // QR_Y = label bottom + gap + label font size
-  const QR_Y = IMAGE_PANEL_Y + QR_BOTTOM_PADDING + QR_LABEL_GAP + QR_LABEL_FONT_SIZE;
-  const QR_X = RIGHT_COL_X + (RIGHT_COL_WIDTH - QR_PAIR_TOTAL_WIDTH) / 2;
-  const VK_QR_X = QR_X + QR_SIZE + QR_PAIR_GAP;
+  // We'll fill in IMAGE_PANEL_Y and IMAGE_PANEL_HEIGHT after the left column.
+  // For now, just record rightColumnTop.
+  let _rightColumnTop = rightColumnTop;
 
-  // Rental box: below the image panel with a small gap
-  const RENTAL_BOX_Y = IMAGE_PANEL_Y - IMAGE_TO_RENTAL_GAP - RENTAL_BOX_HEIGHT;
-
-  // ── Image Panel (Right Column) — cover fit, drawn BEFORE left column ───
-  // Drawn early so that any horizontal overflow can be masked with pageBg,
-  // then left column text renders on top of the mask cleanly.
-
-  page.drawRectangle({
-    x: RIGHT_COL_X,
-    y: IMAGE_PANEL_Y,
-    width: RIGHT_COL_WIDTH,
-    height: IMAGE_PANEL_HEIGHT,
-    color: COLORS.imageBg,
-  });
-
-  const hero = await embedImage(
-    pdfDoc,
-    input.item.imageUrl,
-  );
-
-  if (hero) {
-    // Cover fit: scale image to fill entire panel, center + crop overflow
-    const imgW = hero.width;
-    const imgH = hero.height;
-    const scaleByW = RIGHT_COL_WIDTH / imgW;
-    const scaleByH = IMAGE_PANEL_HEIGHT / imgH;
-    const coverScale = Math.max(scaleByW, scaleByH);
-
-    const drawW = imgW * coverScale;
-    const drawH = imgH * coverScale;
-
-    // Center horizontally in panel, center vertically
-    const imgX = RIGHT_COL_X + (RIGHT_COL_WIDTH - drawW) / 2;
-    const imgY = IMAGE_PANEL_Y + (IMAGE_PANEL_HEIGHT - drawH) / 2;
-
-    page.drawImage(hero, {
-      x: imgX,
-      y: imgY,
-      width: drawW,
-      height: drawH,
-    });
-
-    // Mask left overflow (if image extends beyond right column left edge)
-    if (imgX < RIGHT_COL_X) {
-      page.drawRectangle({
-        x: imgX,
-        y: IMAGE_PANEL_Y,
-        width: RIGHT_COL_X - imgX,
-        height: IMAGE_PANEL_HEIGHT,
-        color: COLORS.pageBg,
-      });
-    }
-
-    // Mask right overflow (if image extends beyond page margin)
-    const imgRight = imgX + drawW;
-    const panelRight = RIGHT_COL_X + RIGHT_COL_WIDTH;
-    if (imgRight > panelRight) {
-      page.drawRectangle({
-        x: panelRight,
-        y: IMAGE_PANEL_Y,
-        width: imgRight - panelRight,
-        height: IMAGE_PANEL_HEIGHT,
-        color: COLORS.pageBg,
-      });
-    }
-  } else {
-    const fallbackText = "Изображение недоступно";
-    const fallbackSize = 11;
-    const fallbackWidth = font.widthOfTextAtSize(fallbackText, fallbackSize);
-
-    page.drawText(fallbackText, {
-      x: RIGHT_COL_X + (RIGHT_COL_WIDTH - fallbackWidth) / 2,
-      y: IMAGE_PANEL_Y + IMAGE_PANEL_HEIGHT / 2 - 4,
-      size: fallbackSize,
-      font,
-      color: COLORS.imageFallback,
-    });
-  }
-
-  // ── QR backdrop (semi-transparent dark rectangle behind QR pair) ───────
-  // Helps QR labels remain readable on top of the bike image.
-
-  const QR_BACKDROP_PADDING = 8;
-  const QR_BACKDROP_Y = QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE - QR_BACKDROP_PADDING;
-  const QR_BACKDROP_HEIGHT = QR_SIZE + QR_LABEL_GAP + QR_LABEL_FONT_SIZE + QR_BACKDROP_PADDING * 2;
-
-  page.drawRectangle({
-    x: QR_X - QR_BACKDROP_PADDING,
-    y: QR_BACKDROP_Y,
-    width: QR_PAIR_TOTAL_WIDTH + QR_BACKDROP_PADDING * 2,
-    height: QR_BACKDROP_HEIGHT,
-    color: COLORS.pageBg,
-    opacity: 0.75,
-  });
+  // ── Image panel & QR codes will be drawn AFTER the left column ──────────
+  // (We need to know leftY after specs to align rental box bottom with specs bottom.)
 
   // ── Description ─────────────────────────────────────────────────────────
 
@@ -883,6 +794,112 @@ async function generateBuyPdf(input: {
     });
   }
 
+  // ── Right column layout — compute positions to align CTA bottom with specs bottom
+  const specsBottom = leftY;
+  const RENTAL_BOX_Y = specsBottom; // CTA bottom = specs table bottom
+
+  // Image panel: from rightColumnTop to just above the rental box
+  const IMAGE_PANEL_Y = RENTAL_BOX_Y + RENTAL_BOX_HEIGHT + IMAGE_TO_RENTAL_GAP;
+  const IMAGE_PANEL_HEIGHT = _rightColumnTop - IMAGE_PANEL_Y;
+
+  // Image width from 9:16 ratio (slightly wider than RIGHT_COL_WIDTH for cover fit)
+  const IMAGE_PANEL_WIDTH = Math.round(IMAGE_PANEL_HEIGHT * 9 / 16);
+
+  // QR codes: positioned from bottom of image panel with padding
+  const QR_Y = IMAGE_PANEL_Y + QR_BOTTOM_PADDING + QR_LABEL_GAP + QR_LABEL_FONT_SIZE;
+  const QR_X = RIGHT_COL_X + (RIGHT_COL_WIDTH - QR_PAIR_TOTAL_WIDTH) / 2;
+  const VK_QR_X = QR_X + QR_SIZE + QR_PAIR_GAP;
+
+  // ── Image Panel (Right Column) — cover fit ─────────────────────────────
+
+  page.drawRectangle({
+    x: RIGHT_COL_X,
+    y: IMAGE_PANEL_Y,
+    width: RIGHT_COL_WIDTH,
+    height: IMAGE_PANEL_HEIGHT,
+    color: COLORS.imageBg,
+  });
+
+  const hero = await embedImage(
+    pdfDoc,
+    input.item.imageUrl,
+  );
+
+  if (hero) {
+    // Cover fit: scale image to fill the 9:16 panel, center + crop overflow
+    const imgW = hero.width;
+    const imgH = hero.height;
+    const scaleByW = IMAGE_PANEL_WIDTH / imgW;
+    const scaleByH = IMAGE_PANEL_HEIGHT / imgH;
+    const coverScale = Math.max(scaleByW, scaleByH);
+
+    const drawW = imgW * coverScale;
+    const drawH = imgH * coverScale;
+
+    // Center horizontally in the right column area, center vertically
+    const imgX = RIGHT_COL_X + (RIGHT_COL_WIDTH - drawW) / 2;
+    const imgY = IMAGE_PANEL_Y + (IMAGE_PANEL_HEIGHT - drawH) / 2;
+
+    page.drawImage(hero, {
+      x: imgX,
+      y: imgY,
+      width: drawW,
+      height: drawH,
+    });
+
+    // Mask left overflow (if image extends beyond right column left edge)
+    if (imgX < RIGHT_COL_X) {
+      page.drawRectangle({
+        x: imgX,
+        y: IMAGE_PANEL_Y,
+        width: RIGHT_COL_X - imgX,
+        height: IMAGE_PANEL_HEIGHT,
+        color: COLORS.pageBg,
+      });
+    }
+
+    // Mask right overflow (if image extends beyond page margin)
+    const imgRight = imgX + drawW;
+    const panelRight = RIGHT_COL_X + RIGHT_COL_WIDTH;
+    if (imgRight > panelRight) {
+      page.drawRectangle({
+        x: panelRight,
+        y: IMAGE_PANEL_Y,
+        width: imgRight - panelRight,
+        height: IMAGE_PANEL_HEIGHT,
+        color: COLORS.pageBg,
+      });
+    }
+  } else {
+    const fallbackText = "Изображение недоступно";
+    const fallbackSize = 11;
+    const fallbackWidth = font.widthOfTextAtSize(fallbackText, fallbackSize);
+
+    page.drawText(fallbackText, {
+      x: RIGHT_COL_X + (RIGHT_COL_WIDTH - fallbackWidth) / 2,
+      y: IMAGE_PANEL_Y + IMAGE_PANEL_HEIGHT / 2 - 4,
+      size: fallbackSize,
+      font,
+      color: COLORS.imageFallback,
+    });
+  }
+
+  // ── QR backdrop (semi-transparent dark rectangle behind QR pair) ───────
+  // Helps QR labels remain readable on top of the bike image.
+
+  const QR_BACKDROP_PADDING = 8;
+  const QR_BACKDROP_Y = QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE - QR_BACKDROP_PADDING;
+  const QR_BACKDROP_HEIGHT = QR_SIZE + QR_LABEL_GAP + QR_LABEL_FONT_SIZE + QR_BACKDROP_PADDING * 2;
+
+  page.drawRectangle({
+    x: QR_X - QR_BACKDROP_PADDING,
+    y: QR_BACKDROP_Y,
+    width: QR_PAIR_TOTAL_WIDTH + QR_BACKDROP_PADDING * 2,
+    height: QR_BACKDROP_HEIGHT,
+    color: COLORS.pageBg,
+    opacity: 0.75,
+  });
+
   // ── QR Codes (buy link + VK, side by side) ────────────────────────────
 
   // Buy QR
@@ -912,7 +929,7 @@ async function generateBuyPdf(input: {
     });
 
     // Label under buy QR
-    const buyLabel = "Купить";
+    const buyLabel = "Купить/Арендовать";
     const buyLabelWidth = font.widthOfTextAtSize(buyLabel, QR_LABEL_FONT_SIZE);
     page.drawText(buyLabel, {
       x: QR_X + (QR_SIZE - buyLabelWidth) / 2,
@@ -1039,49 +1056,43 @@ async function generateBuyPdf(input: {
 
     rentalY -= RENTAL_LINE_HEIGHT + 2;
 
-    // ── Hourly rates ──────────────────────────────────────────────────────
-    if (pricePerHour > 0) {
-      page.drawText(`1 час   ${formatRub(pricePerHour)}`, {
+    // Helper: draw rental line with key left-aligned, value right-aligned
+    const rentalValueX = RENTAL_BOX_X + RENTAL_BOX_WIDTH - RENTAL_INNER_X;
+
+    const drawRentalLine = (key: string, value: string) => {
+      page.drawText(key, {
         x: RENTAL_BOX_X + RENTAL_INNER_X,
         y: rentalY,
         size: RENTAL_VALUE_FONT_SIZE,
         font,
         color: COLORS.text,
       });
+      const valueWidth = font.widthOfTextAtSize(value, RENTAL_VALUE_FONT_SIZE);
+      page.drawText(value, {
+        x: rentalValueX - valueWidth,
+        y: rentalY,
+        size: RENTAL_VALUE_FONT_SIZE,
+        font,
+        color: COLORS.text,
+      });
       rentalY -= RENTAL_LINE_HEIGHT;
+    };
+
+    // ── Hourly rates ──────────────────────────────────────────────────────
+    if (pricePerHour > 0) {
+      drawRentalLine("1 час", formatRub(pricePerHour));
     }
 
     if (pricePer3h > 0) {
-      page.drawText(`3 часа  ${formatRub(pricePer3h)}`, {
-        x: RENTAL_BOX_X + RENTAL_INNER_X,
-        y: rentalY,
-        size: RENTAL_VALUE_FONT_SIZE,
-        font,
-        color: COLORS.text,
-      });
-      rentalY -= RENTAL_LINE_HEIGHT;
+      drawRentalLine("3 часа", formatRub(pricePer3h));
     }
 
     if (pricePer6h > 0) {
-      page.drawText(`6 часов  ${formatRub(pricePer6h)}`, {
-        x: RENTAL_BOX_X + RENTAL_INNER_X,
-        y: rentalY,
-        size: RENTAL_VALUE_FONT_SIZE,
-        font,
-        color: COLORS.text,
-      });
-      rentalY -= RENTAL_LINE_HEIGHT;
+      drawRentalLine("6 часов", formatRub(pricePer6h));
     }
 
     if (pricePer12h > 0) {
-      page.drawText(`12 часов  ${formatRub(pricePer12h)}`, {
-        x: RENTAL_BOX_X + RENTAL_INNER_X,
-        y: rentalY,
-        size: RENTAL_VALUE_FONT_SIZE,
-        font,
-        color: COLORS.text,
-      });
-      rentalY -= RENTAL_LINE_HEIGHT;
+      drawRentalLine("12 часов", formatRub(pricePer12h));
     }
 
     // ── Separator line between hourly and daily ───────────────────────────
@@ -1099,25 +1110,11 @@ async function generateBuyPdf(input: {
 
     // ── Daily rates ───────────────────────────────────────────────────────
     if (rentWeekday > 0) {
-      page.drawText(`Будни  ${formatRub(rentWeekday)}/сутки`, {
-        x: RENTAL_BOX_X + RENTAL_INNER_X,
-        y: rentalY,
-        size: RENTAL_VALUE_FONT_SIZE,
-        font,
-        color: COLORS.text,
-      });
-      rentalY -= RENTAL_LINE_HEIGHT;
+      drawRentalLine("Будни", `${formatRub(rentWeekday)}/сутки`);
     }
 
     if (rentWeekend > 0) {
-      page.drawText(`Выходные  ${formatRub(rentWeekend)}/сутки`, {
-        x: RENTAL_BOX_X + RENTAL_INNER_X,
-        y: rentalY,
-        size: RENTAL_VALUE_FONT_SIZE,
-        font,
-        color: COLORS.text,
-      });
-      rentalY -= RENTAL_LINE_HEIGHT;
+      drawRentalLine("Выходные", `${formatRub(rentWeekend)}/сутки`);
     }
 
     // ── CTA (call-to-action) ──────────────────────────────────────────────
