@@ -365,20 +365,76 @@ MANDATORY for bridge-triggered tasks: agent must provide a ready-to-run callback
 
 Короткое правило памяти: **`ты босс` триггерит режим управления квестом так же надёжно, как `создай документ` триггерит автопилот договора.**
 
-### 9.1.2) Rental document autopilot trigger (`создай документ`)
+### 9.1.2) Deal document autopilot trigger (`создай документ` / `договор продажи`)
 
-- If operator message contains code phrase **`создай документ`** (or `сделай договор`) and includes/attaches passport + driver-license photos, trigger `skills/deal-contract-from-photos/SKILL.md`.
-- Expected extraction from operator message:
-  - bike query (id/name/fragment),
-  - rental dates (start/end or explicit period),
-  - reply targets (`telegramChatId`, `slackChannelId`, `slackThreadTs`) when available.
-- Execution chain must be end-to-end:
-  1. OCR IDs into JSON fields required by the skill.
-  2. Resolve bike from Supabase `cars`.
-  3. Generate DOCX from `docs/RENTAL_DEAL_TEMPLATE.html` or `docs/SALE_DEAL_TEMPLATE.html` respectively.
-  4. Send document to Telegram.
-  5. Send bridge callback/notification (`scripts/codex-notify.mjs`).
-- If critical fields are missing (unreadable photo, missing rental date, no bike match), do **not** fabricate — return a concise clarification request.
+Unified trigger for **rent** and **sale** contracts. Reference skill: `skills/deal-contract-from-photos/SKILL.md`.
+
+**Trigger phrases by deal type:**
+- **Rent:** `создай документ`, `сделай договор`, `сделай документ по фото`
+- **Sale:** `создай договор продажи`, `сделай договор купли-продажи`, `создай документ продажи`, `договор купли-продажи по фото`
+- **Combined:** `ты босс` + document intent → boss-decomposition + document-autopilot chain
+
+**Expected extraction from operator message:**
+- deal type (`rent` or `sale` — see auto-detection rules below),
+- bike query (id/name/fragment),
+- rental dates (start/end — **rent only**; sale does NOT need dates),
+- reply targets (`telegramChatId`, `slackChannelId`, `slackThreadTs`) when available.
+
+**Deal type auto-detection:**
+1. Words `продаж`, `купли-продажи`, `купить`, `покупк`, `sale` in message → `dealType=sale`
+2. Bike found with `specs.sale=true/1` and no rental context → `dealType=sale`
+3. Words `аренд`, `с ... по ...`, `на сутки`, `rent` in message → `dealType=rent`
+4. Default: `dealType=rent`
+
+**Required photos by deal type:**
+- **Rent:** passport + driver license (минимум 1 фото каждого)
+- **Sale:** passport only (2 страницы — разворот + прописка; ВУ **НЕ** нужно)
+
+**Execution chain (STRICT ORDER, no steps may be skipped):**
+
+1. **OCR documents** → write `/tmp/passport.json` (+ `/tmp/license.json` for rent). Validate required fields exist.
+2. **Resolve bike** from Supabase `cars` by fuzzy-matching bike query.
+3. **Run the skill script** with exact CLI flags (see below):
+   ```bash
+   # RENT:
+   node scripts/make-deal-contract-skill.mjs \
+     --dealType rent \
+     --phrase "создай документ <bike> с <start> по <end>" \
+     --passportJson /tmp/passport.json \
+     --licenseJson /tmp/license.json \
+     --telegramChatId <chat_id> \
+     --startDate "DD.MM.YYYY" \
+     --endDate "DD.MM.YYYY"
+
+   # SALE:
+   node scripts/make-deal-contract-skill.mjs \
+     --dealType sale \
+     --phrase "создай договор продажи <bike>" \
+     --passportJson /tmp/passport.json \
+     --telegramChatId <chat_id>
+   ```
+4. **Parse stdout JSON** — extract `messageId`, `contractKey`, `resolvedBikeId` from script output.
+5. **Send bridge callback** via `scripts/codex-notify.mjs` with delivery result.
+
+**⛔ ANTI-HALLUCINATION RULES (CRITICAL):**
+
+The script `make-deal-contract-skill.mjs` has a FIXED set of CLI flags. Agent MUST NOT invent new flags. The following flags **DO NOT EXIST** and must never be used:
+- ~~`--skipTelegram`~~ — DOES NOT EXIST. The script ALWAYS sends the document to Telegram automatically.
+- ~~`--outPath`~~ — DOES NOT EXIST. The script generates the file in memory and sends it directly via Telegram API.
+- ~~`--dealDate`~~ — DOES NOT EXIST. Contract date is auto-set to current date.
+- ~~`--local`~~ — DOES NOT EXIST.
+
+**Telegram delivery is BUILT INTO the script.** Agent does NOT need to send the `.docx` separately. The script:
+1. Generates DOCX in memory
+2. Sends it to Telegram via Bot API (`sendDocument`)
+3. Returns `messageId` in stdout JSON on success
+4. Exits with code 2 + error JSON on stderr on failure
+
+**If Telegram send fails** (exit code 2, `telegram_send_failed`), agent should report the error in callback — do NOT attempt to re-implement Telegram delivery.
+
+**Never commit generated `.docx` files** — they contain PII (passport data, full names).
+
+If critical fields are missing (unreadable photo, missing rental date, no bike match), do **not** fabricate — return a concise clarification request.
 
 Execution preference:
 - If callback auth/env context is available during task execution, agent should **send callback directly** (not only provide copy/paste).
@@ -628,8 +684,8 @@ In addition to system skills, this repo provides task-focused local skills:
 
 - `skills/codex-bridge-operator/SKILL.md`
   - Use for bridge callbacks/notifications and PR lifecycle messaging.
-- `skills/rental-contract-from-photos/SKILL.md`
-  - Use for rental contract generation from passport/license photos + bike lookup in Supabase + DOCX delivery.
+- `skills/deal-contract-from-photos/SKILL.md`
+  - Use for deal contract generation (rent AND sale) from passport/license photos + bike lookup in Supabase + DOCX delivery via Telegram. Supports `--dealType rent|sale`. Script handles Telegram delivery automatically — do NOT use `--skipTelegram` or `--outPath` (those flags do not exist).
 - `skills/homework-ocr-intake/SKILL.md`
   - Use for OCR intake from homework photos.
 - `skills/homework-pdf-rag-runtime/SKILL.md`
