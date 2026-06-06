@@ -381,6 +381,11 @@ const phraseSchedule = extractScheduleFromPhrase(phrase);
 let vars = {};
 let docFileName = '';
 
+// Declare rental summary vars at outer scope so result-building can see them
+let isHourlyRental = false;
+let rentalHours = 0;
+let rentalDays = 1;
+
 if (dealType === 'rent') {
   // ══════════════════════════════════════════════════════════════════════
   // RENT FLOW
@@ -426,14 +431,14 @@ if (dealType === 'rent') {
 
   const startDP = parseRuDateParts(startDate);
   const endDP   = parseRuDateParts(endDate);
-  let rentalHours = 0;
+  rentalHours = 0;
   if (startDP && endDP) {
     const startMin = new Date(startDP.y, startDP.mo, startDP.d, 0, 0, 0).getTime() / 60000 + parseTimeToMinutes(startTimeArg);
     const endMin   = new Date(endDP.y, endDP.mo, endDP.d, 0, 0, 0).getTime() / 60000 + parseTimeToMinutes(endTimeArg);
     rentalHours = Math.max(0, Math.round((endMin - startMin) / 60 * 10) / 10);
   }
-  const rentalDays = rentalHours > 0 ? Math.max(1, Math.ceil(rentalHours / 24)) : 1;
-  const isHourlyRental = rentalHours > 0 && rentalHours < 24;
+  rentalDays = rentalHours > 0 ? Math.max(1, Math.ceil(rentalHours / 24)) : 1;
+  isHourlyRental = rentalHours > 0 && rentalHours < 24;
 
   // Pricing
   const bikeDailyPrice = Number(bike.specs?.dailyPrice) > 0 ? String(bike.specs.dailyPrice)
