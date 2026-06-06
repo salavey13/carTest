@@ -26,16 +26,24 @@
 | `--endDate` | ✅ для rent | Дата окончания аренды (DD.MM.YYYY) |
 | `--startTime` | опционально | Время начала (HH:MM, по умолч. 18:00) |
 | `--endTime` | опционально | Время окончания (HH:MM, по умолч. 10:00) |
-| `--salePrice` | опционально | Цена продажи (если нет в specs байка) |
+| `--salePrice` | опционально | Цена продажи в рублях (если нет в specs.sale_price / specs.price_rub) |
+| `--buyerAddress` | опционально | Полный адрес регистрации покупателя (РУЧНОЙ ВВОД, обход VLM-ограничений для рукописного адреса) |
 | `--saveMetadata` | опционально | `1` = сохранить метаданные в Supabase |
 | `--metadataTable` | опционально | Имя таблицы (по умолч. rental_contract_artifacts / sale_contract_artifacts) |
 | `--dailyPrice` | опционально | Цена аренды за сутки (fallback) |
 | `--hourlyPrice` | опционально | Цена аренды за час (fallback) |
 | `--deposit` | опционально | Размер депозита (fallback) |
 | `--bikeValue` | опционально | Оценочная стоимость байка (fallback) |
+| `--warrantyMonths` | опционально | Гарантия в месяцах (sale only, default 12) |
+| `--sellerAddress` | опционально | Юр. адрес продавца (sale only) |
+| `--lessorAddress` | опционально | Адрес арендодателя (rent only) |
+| `--latePenalty` | опционально | Штраф за просрочку возврата/сутки (rent only) |
+| `--latePenaltyMaxDays` | опционально | Макс. суток штрафа (rent only) |
+| `--subtotal` | опционально | Override computed subtotal (rent only) |
+| `--bikeValueWords` | опционально | Стоимость байка прописью (rent only) |
 
 **🚫 НЕСУЩЕСТВУЮЩИЕ ФЛАГИ — НЕ ИСПОЛЬЗОВАТЬ:**
-- ~~`--skipTelegram`~~ — **НЕ СУЩЕСТВУЕТ**. Скрипт ВСЕГДА отправляет документ в Telegram.
+- ~~`--skipTelegram`~~ — **НЕ СУЩЕСТВУЕТ**. Скрипт ВСЕГДА отправляет документ в Telegram автоматически.
 - ~~`--outPath`~~ — **НЕ СУЩЕСТВУЕТ**. Скрипт сам генерирует имя файла и отправляет.
 - ~~`--dealDate`~~ — **НЕ СУЩЕСТВУЕТ**. Дата договора = текущая дата (`new Date()`).
 - ~~`--local`~~ — **НЕ СУЩЕСТВУЕТ**.
@@ -51,7 +59,7 @@
 
 ### 3. ОБЯЗАТЕЛЬНЫЙ `--telegramChatId`
 
-Если `--telegramChatId` не передан, скрипт использует `ADMIN_CHAT_ID` из env. Агент **ВСЕГДА** должен передать `--telegramChatId` явным образом из контекста задачи (chat_id из bridge-параметров).
+Если `--telegramChatId` не передан, скрипт использует `ADMIN_CHAT_ID` из env. Агент **ВСЕГДА** должен передать `--telegramChatId` явным образом из контекста задачи.
 
 ### 4. РЕЗУЛЬТАТ СКРИПТА — JSON НА STDOUT
 
@@ -68,16 +76,51 @@
 }
 ```
 
-При ошибке — JSON на stderr с кодом выхода 2:
-```json
-{ "ok": false, "stage": "telegram_delivery", "reason": "telegram_send_failed", "details": {...} }
-```
-
-Агент должен **прочитать stdout** для получения `messageId` и других данных для callback.
+При ошибке — JSON на stderr с кодом выхода 2.
 
 ### 5. НЕ КОММИТИТЬ DOCX С ПЕРСОНАЛЬНЫМИ ДАННЫМИ
 
 Сгенерированный `.docx` содержит ПДн (ФИО, паспорт). **Никогда не коммитьте** эти файлы в git. Скрипт не сохраняет файл на диск — он отправляет его напрямую через Telegram API из памяти.
+
+---
+
+## 🏠 Извлечение адреса регистрации (КРИТИЧЕСКИЙ НЮАНС)
+
+### Проблема: рукописный адрес на странице прописки
+
+Вторая страница паспорта (страница с пропиской/регистрацией) часто содержит рукописный текст на русском языке — улица, номер дома, номер квартиры. VLM (и человек!) испытывает трудности с распознаванием русской рукописной скорописи.
+
+**Типичный результат VLM:** только название города (например, "г. Нижний Новгород"), без улицы/дома/квартиры.
+
+### Правила извлечения адреса
+
+1. **Вторая фотография паспорта** — это страница регистрации (прописки). Она отправляется ОТДЕЛЬНО от основной страницы с фото.
+2. **На странице может быть НЕСКОЛЬКО записей** о регистрации (старые зачёркнутые и новая активная). **Использовать только ПОСЛЕДНЮЮ** (самую нижнюю) запись — она является действующей.
+3. **Зачёркнутые/устаревшие записи игнорируются.**
+
+### Обходной путь: `--buyerAddress`
+
+Если VLM вернул адрес только с точностью до города (без улицы/дома/квартиры), оператор может **вручную ввести полный адрес** и передать его через флаг `--buyerAddress`:
+
+```bash
+node scripts/make-deal-contract-skill.mjs \
+  --dealType sale \
+  --phrase "создай договор продажи falcon-gt" \
+  --passportJson /tmp/passport.json \
+  --telegramChatId 123456789 \
+  --buyerAddress "г. Нижний Новгород, ул. Ленина, д. 15, кв. 42"
+```
+
+Когда `--buyerAddress` передан, он **полностью заменяет** `passportJson.registration` в сгенерированном документе.
+
+### Рекомендация для агента
+
+Если OCR вернул адрес только с точностью до города:
+1. Проверить поле `registration` в passport.json
+2. Если содержит только город (нет "ул.", "д.", "кв."):
+   - Предупредить оператора: «Адрес определён только до города. Для полного адреса введите улицу/дом/квартиру в следующем формате: `адрес г. Нижний Новгород, ул. ..., д. ..., кв. ...`»
+   - Использовать `--buyerAddress` с расшифрованным оператором адресом
+3. Если оператор предоставил адрес текстом в сообщении — извлечь его и передать через `--buyerAddress`
 
 ---
 
@@ -104,80 +147,111 @@
 │ 1. PARSE: определить dealType + bikeQuery + даты (rent)        │
 │ 2. OCR: фото → passport.json [+ license.json для rent]         │
 │ 3. VALIDATE: проверить полноту OCR-полей                       │
-│ 4. RUN SCRIPT: make-deal-contract-skill.mjs (генерация+отправка)│
-│ 5. PARSE STDOUT: получить messageId, contractKey               │
-│ 6. CALLBACK: codex-notify.mjs с результатом                    │
+│ 4. ADDRESS CHECK: если registration неполный → --buyerAddress  │
+│ 5. RUN SCRIPT: make-deal-contract-skill.mjs (генерация+отправка)│
+│ 6. PARSE STDOUT: получить messageId, contractKey               │
+│ 7. CALLBACK: codex-notify.mjs с результатом                    │
 └──────────────────────────────────────────────────────────────────┘
 ```
-
-**Пошагово для агента:**
-
-1. **Определить тип сделки** из текста сообщения оператора.
-2. **Извлечь OCR** из фото:
-   - rent: паспорт + ВУ → записать JSON-файлы во `/tmp/`
-   - sale: только паспорт → записать JSON-файл во `/tmp/`
-3. **Валидировать JSON** — проверить наличие обязательных полей (см. OCR JSON формат ниже).
-4. **Запустить скрипт** с полным набором флагов (см. примеры ниже).
-5. **Прочитать stdout** — извлечь `messageId`, `contractKey`, `docFileName`.
-6. **Отправить callback** через `scripts/codex-notify.mjs` с результатом.
 
 ## Шаблоны документов
 
 | dealType | Шаблон | Описание |
 |----------|--------|----------|
 | `rent` | `docs/RENTAL_DEAL_TEMPLATE.html` | Договор проката (аренды) — 13 разделов + 4 приложения |
-| `sale` | `docs/SALE_DEAL_TEMPLATE.html` | Договор купли-продажи — 11 разделов + 2 приложения |
+| `sale` | `docs/SALE_DEAL_TEMPLATE.html` | Договор купли-продажи — 11 разделов + 1 приложение (Спецификация). Нумерация: 1-9, 11-12 (раздел 10 отсутствует в оригинале) |
 
-## Этапы пайплайна: вход/выход/причины отказа
+**Важно:** Шаблон продажи — точная копия оригинального DOCX, включая опечатки ("прядок" вместо "порядок"), отсутствие раздела 10 (нумерация перескакивает с 9 на 11), и только 1 приложение (без ФЗ-152 согласия).
 
-1) **Определение типа сделки**
-- Вход: текст сообщения оператора.
-- Выход: `dealType` = `rent` | `sale`.
-- Логика: ключевые слова + проверка `specs.sale` в найденном байке.
+## Placeholder'ы шаблонов
 
-2) **OCR документов**
-- Вход: читаемые фото.
-  - rent: паспорт + ВУ (минимум по одному фото каждого)
-  - sale: паспорт (2 страницы/фото, водительское удостоверение НЕ требуется)
-- Выход: `passport.json`, `license.json` (rent only).
-- Типовые причины отказа: `ocr_unreadable`, `missing_passport_photo`, `missing_license_photo` (rent only).
+### Sale (SALE_DEAL_TEMPLATE.html):
+| Placeholder | Описание | Источник |
+|------------|----------|----------|
+| `contract_number` | Номер договора | `${day}.${month}/${bikeId}` |
+| `contract_day` | День подписания | `now.getDate()` |
+| `contract_month_genitive` | Месяц в родительном падеже | "января"..."декабря" |
+| `contract_year` | Год подписания | `now.getFullYear()` |
+| `buyer_full_name` | ФИО покупателя | passport.fullName |
+| `buyer_short_name` | Фамилия + инициалы | "Иванов И.И." |
+| `buyer_birth_date` | Дата рождения | passport.birthDate |
+| `buyer_passport_number` | Серия + номер паспорта | "2210 542668" |
+| `buyer_passport_issued_by` | Кем выдан | passport.issuedBy |
+| `buyer_passport_issue_date` | Дата выдачи | passport.issueDate |
+| `buyer_registration` | Адрес регистрации | passport.registration ИЛИ --buyerAddress |
+| `buyer_email` | Email покупателя | passport.email |
+| `seller_address` | Юр. адрес продавца | константа / --sellerAddress |
+| `price_digits` | Цена цифрами | "390 000" |
+| `price_words` | Цена прописью | "Триста девяносто тысяч" |
+| `price_digits_table` | Цена для таблицы | "390 000" (с ",00" в шаблоне) |
+| `product_name` | Наименование товара | "Мотоцикл Falcon Gt" |
+| `product_color` | Цвет | bike.specs.color |
+| `product_type` | Тип | "Эндуро" / bike.specs.bike_subtype |
+| `product_motor_type` | Тип мотора/привода | "Центральный мотор, цепь" |
+| `product_motor_power` | Мощность мотора | "Мотор электро 3,9 кВат" |
+| `product_vin` | VIN / № рамы | bike.specs.vin |
+| `product_year` | Год выпуска | bike.specs.year |
+| `product_unit` | Единица измерения | "шт." |
+| `spec_number` | Номер спецификации | "1" |
+| `appendix_date` | Дата приложения | "DD.MM.YYYY" |
+| `warranty_months` | Гарантия (мес.) | "6" |
 
-3) **Парсинг полей контрагента**
-- Вход: `passport.json`, `license.json` (rent only).
-- Выход: `fullName`, `birthDate`, `passport(series,number)`, `license(series,number)` (rent only).
-- Типовые причины отказа: `missing_full_name`, `missing_birth_date`, `missing_passport_data`, `missing_driver_license_data` (rent only).
+### Rent (RENTAL_DEAL_TEMPLATE.html):
+(Полный список — см. скрипт `make-deal-contract-skill.mjs`, блок `rentVars`)
 
-4) **Резолв байка (`cars`)**
-- Вход: bike query из фразы (`id`/название/VIN-фрагмент).
-- Выход: конкретный `cars.id` + данные байка.
-- Типовые причины отказа: `missing_bike_query`, `bike_catalog_empty`, `bike_not_found`.
+## OCR JSON формат
 
-5) **Генерация DOCX + отправка в Telegram**
-- Вход: validated data + resolved bike + dates (rent) / price (sale) + `telegramChatId`.
-- Выход: `message_id` отправленного документа в Telegram + JSON на stdout.
-- Типовые причины отказа: `missing_rental_dates` (rent), `missing_sale_price` (sale), `template_render_failed`, `telegram_send_failed`.
-- ⚠️ **Скрипт отправляет документ автоматически. Агенту не нужно отправлять файл отдельно.**
+### passport.json (ОСНОВНАЯ СТРАНИЦА — разворот с фото):
+```json
+{
+  "fullName": "Иванов Иван Иванович",
+  "birthDate": "15.03.1990",
+  "series": "2210",
+  "number": "542668",
+  "issueDate": "28.06.2010",
+  "issuedBy": "Отделом УФМС России по ...",
+  "divisionCode": "XXX-XXX",
+  "birthPlace": "г. Ижевск",
+  "registration": "г. Нижний Новгород, ул. ...",
+  "phone": "+79...",
+  "email": "..."
+}
+```
 
-6) **Callback / metadata verification**
-- Вход: delivery result + bridge context.
-- Выход: callback status + (опционально) подтверждённая запись метаданных.
-- Типовые причины отказа: `metadata_write_failed`, `read_after_write_verification_failed`.
+### passport-registration.json (ВТОРАЯ СТРАНИЦА — прописка, sale flow):
+Вторая страница паспорта отправляется **отдельным фото** для извлечения адреса регистрации. VLM должен вернуть тот же формат, но поле `registration` будет основным результатом.
 
-## Правило «не выдумывать значения»
-- Критичные поля (`birthDate`, паспортные данные, права, даты аренды, цена продажи, bike query) **нельзя** подставлять дефолтами.
-- Если критичных данных не хватает — этап завершается статусом clarification-needed и запросом уточнений.
+**⚠️ Критически важно:**
+- На странице может быть несколько штампов регистрации — брать **ТОЛЬКО ПОСЛЕДНИЙ** (самый нижний)
+- Зачёркнутые/устаревшие штампы игнорируются
+- Рукописный текст (улица, дом, квартира) может быть нечитаем — в этом случае использовать `--buyerAddress`
 
-## Обязательный входной контракт
+### license.json (rent only)
+```json
+{
+  "series": "....",
+  "number": "......"
+}
+```
 
-### Для аренды (rent):
-- Фото паспорта и водительского удостоверения (минимум по одному читаемому фото).
-- Текст команды с триггером `создай документ` и указанием байка.
-- Дата аренды в сообщении (если не указана — запросить уточнение).
+## Различия между rent и sale
 
-### Для продажи (sale):
-- Фото паспорта (2 страницы — разворот с фото + страница с пропиской).
-- Текст команды с триггером `договор продажи` / `купли-продажи` и указанием байка.
-- Цена продажи берётся из `specs.sale_price` / `specs.price_rub` байка. Если не найдена — запросить `--salePrice`.
+| Аспект | rent | sale |
+|--------|------|------|
+| Документ | Договор проката (аренды) | Договор купли-продажи |
+| Фото документов | паспорт + ВУ | только паспорт (2 стр.) |
+| Вторая стр. паспорта | не нужна | нужна для адреса регистрации |
+| Даты | обязательны (с...по...) | не нужны |
+| Цена | арендная плата (по суткам/часам) | цена продажи (из specs) |
+| Депозит | обязателен | нет |
+| Гарантия | нет | 6 мес (рама, мотор, АКБ) |
+| Приложения | 4 (Акт, Инструкция, Прайс, Согласие) | 1 (Спецификация) |
+| Шаблон | RENTAL_DEAL_TEMPLATE.html | SALE_DEAL_TEMPLATE.html |
+| Контрагент | Арендатор | Покупатель |
+| Скрипт | make-deal-contract-skill.mjs --dealType rent | make-deal-contract-skill.mjs --dealType sale |
+| metadata table | rental_contract_artifacts | sale_contract_artifacts |
+| licenseJson | обязателен | НЕ нужен |
+| buyerAddress | не применим | опционально (обход рукописного адреса) |
 
 ## Запуск CLI (примеры с полным набором флагов)
 
@@ -195,7 +269,7 @@ node scripts/make-deal-contract-skill.mjs \
   --metadataTable rental_contract_artifacts
 ```
 
-### Продажа (sale):
+### Продажа (sale) — без ручного адреса:
 ```bash
 node scripts/make-deal-contract-skill.mjs \
   --dealType sale \
@@ -206,59 +280,17 @@ node scripts/make-deal-contract-skill.mjs \
   --metadataTable sale_contract_artifacts
 ```
 
-**Проверка exit-кода:**
-- `0` = успех, JSON результат на stdout
-- `2` = ошибка, JSON с деталями на stderr
-
+### Продажа (sale) — с ручным вводом адреса (обход рукописного адреса):
 ```bash
-# Пример правильного запуска с проверкой
-node scripts/make-deal-contract-skill.mjs --dealType sale \
-  --phrase "создай договор продажи falcon pro" \
+node scripts/make-deal-contract-skill.mjs \
+  --dealType sale \
+  --phrase "создай договор продажи falcon-gt" \
   --passportJson /tmp/passport.json \
-  --telegramChatId 123456789 && echo "SUCCESS" || echo "FAILED"
+  --telegramChatId 123456789 \
+  --buyerAddress "г. Нижний Новгород, ул. Ленина, д. 15, кв. 42" \
+  --saveMetadata 1 \
+  --metadataTable sale_contract_artifacts
 ```
-
-## OCR JSON формат
-
-`passport.json`
-```json
-{
-  "fullName": "Иванов Иван Иванович",
-  "birthDate": "15.03.1990",
-  "series": "2210",
-  "number": "542668",
-  "issueDate": "28.06.2010",
-  "issuer": "Отделом УФМС России по ...",
-  "registration": "г. Нижний Новгород, ул. ...",
-  "phone": "+79...",
-  "email": "..."
-}
-```
-
-`license.json` (rent only)
-```json
-{
-  "series": "....",
-  "number": "......"
-}
-```
-
-## Различия между rent и sale
-
-| Аспект | rent | sale |
-|--------|------|------|
-| Документ | Договор проката (аренды) | Договор купли-продажи |
-| Фото документов | паспорт + ВУ | только паспорт (2 стр.) |
-| Даты | обязательны (с...по...) | не нужны |
-| Цена | арендная плата (по суткам/часам) | цена продажи (из specs) |
-| Депозит | обязателен | нет |
-| Гарантия | нет | 6 мес (рама, мотор, АКБ) |
-| Приложения | 4 (Акт, Инструкция, Прайс, Согласие) | 2 (Спецификация, Согласие) |
-| Шаблон | RENTAL_DEAL_TEMPLATE.html | SALE_DEAL_TEMPLATE.html |
-| Контрагент | Арендатор | Покупатель |
-| Скрипт | make-deal-contract-skill.mjs --dealType rent | make-deal-contract-skill.mjs --dealType sale |
-| metadata table | rental_contract_artifacts | sale_contract_artifacts |
-| licenseJson | обязателен | НЕ нужен |
 
 ## Правила безопасности/комплаенса
 - Поток считается легальным для задач аренды и купли-продажи (см. AGENTS.md), но:
