@@ -202,7 +202,7 @@ export async function fetchRepoContents_pro(repoUrl: string, customToken?: strin
     if (!filesToFetch.length) return { success: true, files: [] };
 
     // Ограничение параллельных запросов (увеличено для скорости, Vercel timeout 10s)
-    const CONCURRENCY = ⁶⁹;
+    const CONCURRENCY = 69;
     const results: FileNode[] = [];
     async function fetchInBatches(items: GitTreeFile[]) {
       let index = 0;
