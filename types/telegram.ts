@@ -81,6 +81,15 @@ export interface TelegramWebApp {
       style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'
     ) => void
   }
+  // Version checking
+  version?: string
+  isVersionAtLeast?: (version: string) => boolean
+  // Closing confirmation (v6.2+)
+  enableClosingConfirmation?: () => void
+  disableClosingConfirmation?: () => void
+  // Fullscreen (v7.7+)
+  requestFullscreen?: () => void
+  exitFullscreen?: () => void
 }
 
 declare global {

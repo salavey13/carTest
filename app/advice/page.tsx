@@ -191,6 +191,9 @@ export default function AdvicePage() {
 
   useEffect(() => {
     if (!webApp) return;
+    // BackButton requires v6.1+
+    if (!webApp.isVersionAtLeast?.("6.1")) return;
+
     const backButtonClickHandler = () => { handleGoBack(); };
     if (selectedArticle) {
       webApp.BackButton?.show();
