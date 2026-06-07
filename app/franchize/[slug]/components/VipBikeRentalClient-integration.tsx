@@ -35,6 +35,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BikeShowcase } from "@/components/BikeShowcase";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+
+// VipBike section components
+import { HeroSection } from "@/app/vipbikerental/features/HeroSection";
+import { ConversionPilot } from "@/app/vipbikerental/features/ConversionPilot";
+import { ElectroEnduroShowcase } from "@/app/vipbikerental/features/ElectroEnduroShowcase";
+import { MapRidersLivePreview } from "@/app/vipbikerental/features/MapRidersLivePreview";
+import { GearSection } from "@/app/vipbikerental/features/GearSection";
+import { StepsProgress } from "@/app/vipbikerental/features/StepsProgress";
+import { RentalQuickActionHub } from "@/app/vipbikerental/features/RentalQuickActionHub";
+import { VipBikeCompanyServiceHub } from "@/app/vipbikerental/features/VipBikeCompanyServiceHub";
+import { ServiceCardsSection } from "@/app/vipbikerental/features/ServiceCardsSection";
+import { HowItWorksSection } from "@/app/vipbikerental/features/HowItWorksSection";
+import { InvestSection } from "@/app/vipbikerental/features/InvestSection";
+import { FaqSection } from "@/app/vipbikerental/features/FaqSection";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

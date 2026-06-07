@@ -63,7 +63,8 @@ const systemLinks = [
 export default function Home() {
   const { user: telegramUser, dbUser, isLoading } = useAppContext();
   const [mounted, setMounted] = useState(false);
-  
+  const [avatarError, setAvatarError] = useState(false);
+
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
@@ -79,6 +80,7 @@ export default function Home() {
 
   const userName = dbUser?.first_name || telegramUser?.first_name || 'Оператор';
   const userAvatar = dbUser?.avatar_url || telegramUser?.photo_url || PLACEHOLDER_AVATAR;
+  const userInitial = userName.charAt(0).toUpperCase();
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 selection:bg-cyan-500/30 selection:text-cyan-200">
@@ -110,13 +112,20 @@ export default function Home() {
           
           <Link href="/profile" className="relative group">
             <div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
-            <Image 
-              src={userAvatar} 
-              alt={userName} 
-              width={56} 
-              height={56} 
-              className="relative rounded-full border-2 border-slate-700 group-hover:border-cyan-500/50 transition-colors object-cover"
-            />
+            {avatarError ? (
+              <div className="relative w-14 h-14 rounded-full border-2 border-slate-700 group-hover:border-cyan-500/50 transition-colors bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center text-white font-bold text-xl">
+                {userInitial}
+              </div>
+            ) : (
+              <Image
+                src={userAvatar}
+                alt={userName}
+                width={56}
+                height={56}
+                className="relative rounded-full border-2 border-slate-700 group-hover:border-cyan-500/50 transition-colors object-cover"
+                onError={() => setAvatarError(true)}
+              />
+            )}
             <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-slate-950" />
           </Link>
         </motion.div>

@@ -148,7 +148,8 @@ export function useTelegramBackButton() {
       nativeVisible: backButton?.isVisible,
     });
 
-    if (!backButton) return;
+    // BackButton requires v6.1+
+    if (!backButton || !webApp?.isVersionAtLeast?.("6.1")) return;
 
     const browserPath = currentFullPath();
     const canShow = hasAppBackTarget(browserPath);
@@ -225,10 +226,11 @@ export function useTelegramBackButton() {
       const webApp = getWebApp();
       const backButton = webApp?.BackButton;
 
-      if (!backButton) {
-        // Runtime not available yet — retry
+      // BackButton requires v6.1+
+      if (!backButton || !webApp?.isVersionAtLeast?.("6.1")) {
+        // Runtime not available or version too old — retry
         if (!isSetupRef.current) {
-          logger.info("[Telegram BackButton] Runtime not available yet, will retry...");
+          logger.info("[Telegram BackButton] Runtime not available or version too old, will retry...");
         }
         return false;
       }
@@ -280,8 +282,10 @@ export function useTelegramBackButton() {
         retryTimerRef.current = null;
       }
       // Clean up click handler using the SAME reference as onClick
-      const backButton = getWebApp()?.BackButton;
-      if (backButton) {
+      const webApp = getWebApp();
+      const backButton = webApp?.BackButton;
+      // BackButton requires v6.1+
+      if (backButton && webApp?.isVersionAtLeast?.("6.1")) {
         backButton.offClick(stableClick);
       }
       unsubscribe();
