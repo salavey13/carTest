@@ -22,6 +22,11 @@ import {
   AlertCircle,
   X,
   RefreshCw,
+  QrCode,
+  Send,
+  ShieldCheck,
+  ShieldAlert,
+  Filter,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -31,6 +36,7 @@ import {
   getRentalsDashboard,
   getRentalDocumentDetails,
   getRentalsDateRange,
+  resendRentalContract,
   type RentalDashboardItem,
   type RentalDashboardSummary,
   type RentalDocumentDetail,
@@ -144,6 +150,7 @@ export function RentalsAnalyticsClient({
 }: RentalsAnalyticsClientProps) {
   const { dbUser, isLoading: authLoading } = useAppContext();
   const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [verificationFilter, setVerificationFilter] = useState<"all" | "verified" | "pending" | "revoked">("all");
   const [rentals, setRentals] = useState<RentalDashboardItem[]>([]);
   const [summary, setSummary] = useState<RentalDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -152,6 +159,7 @@ export function RentalsAnalyticsClient({
   const [rentalDetails, setRentalDetails] = useState<RentalDocumentDetail | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [dateRange, setDateRange] = useState<{ minDate: string; maxDate: string } | null>(null);
+  const [resending, setResending] = useState<string | null>(null); // rental_id being resent
 
   const slug = initialSlug?.trim() || "vip-bike";
   const surface = crewPaletteForSurface(crew.theme);
@@ -176,6 +184,7 @@ export function RentalsAnalyticsClient({
         slug,
         actorUserId: dbUser.user_id,
         date,
+        verificationStatus: verificationFilter === "all" ? undefined : verificationFilter,
       });
 
       if (!result.success) {
@@ -192,7 +201,7 @@ export function RentalsAnalyticsClient({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [dbUser?.user_id, slug]);
+  }, [dbUser?.user_id, slug, verificationFilter]);
 
   // Load rental document details
   const loadRentalDetails = useCallback(async (rentalId: string) => {
@@ -245,6 +254,13 @@ export function RentalsAnalyticsClient({
     }
   }, [dbUser?.user_id, selectedDate, loadRentals, loadDateRange]);
 
+  // Reload when verification filter changes
+  useEffect(() => {
+    if (dbUser?.user_id) {
+      void loadRentals(selectedDate);
+    }
+  }, [verificationFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-refresh every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
@@ -255,6 +271,44 @@ export function RentalsAnalyticsClient({
 
     return () => clearInterval(interval);
   }, [dbUser?.user_id, selectedDate, loadRentals, loading]);
+
+  // Resend contract handler
+  const handleResendContract = useCallback(async (rental: RentalDashboardItem) => {
+    if (!dbUser?.user_id || !rental.documentSecret?.doc_sha256) {
+      toast.error("QR код недоступен для этой аренды");
+      return;
+    }
+
+    setResending(rental.rental_id);
+    try {
+      // Prompt for target chat ID (could be the user's chat ID or admin)
+      const targetChatId = rental.user?.metadata?.telegram_chat_id as string | undefined;
+      const chatIdToSend = targetChatId || prompt("Введите ID чата Telegram для отправки:", rental.user_id);
+
+      if (!chatIdToSend) {
+        toast.error("ID чата не указан");
+        return;
+      }
+
+      const result = await resendRentalContract({
+        actorUserId: dbUser.user_id,
+        rentalId: rental.rental_id,
+        telegramChatId: chatIdToSend,
+      });
+
+      if (!result.success) {
+        toast.error(result.error || "Не удалось отправить договор");
+        return;
+      }
+
+      toast.success("Договор успешно отправлен");
+    } catch (error) {
+      console.error("[RentalsAnalytics] Resend error:", error);
+      toast.error("Ошибка отправки");
+    } finally {
+      setResending(null);
+    }
+  }, [dbUser?.user_id]);
 
   // Navigate date
   const navigateDate = (days: number) => {
@@ -394,6 +448,38 @@ export function RentalsAnalyticsClient({
         </div>
       </div>
 
+      {/* Verification Status Filter */}
+      <div className="flex items-center gap-2">
+        <Filter className="h-4 w-4 text-[var(--fr-analytics-muted)]" />
+        <span className="text-sm text-[var(--fr-analytics-muted)]">Фильтр по верификации:</span>
+        <div className="flex gap-1">
+          {[
+            { value: "all", label: "Все", icon: FileText },
+            { value: "verified", label: "Проверены", icon: ShieldCheck },
+            { value: "pending", label: "Ожидают", icon: Clock },
+            { value: "revoked", label: "Отозваны", icon: ShieldAlert },
+          ].map((filter) => {
+            const Icon = filter.icon;
+            const isActive = verificationFilter === filter.value;
+            return (
+              <button
+                key={filter.value}
+                type="button"
+                onClick={() => setVerificationFilter(filter.value as typeof verificationFilter)}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  isActive
+                    ? "bg-[var(--fr-analytics-accent)] text-white"
+                    : "bg-transparent text-[var(--fr-analytics-muted)] hover:bg-[var(--fr-analytics-accent)]/10"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Summary Stats */}
       {summary && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -448,11 +534,12 @@ export function RentalsAnalyticsClient({
         ) : (
           <div className="mt-3 overflow-hidden rounded-xl border" style={{ borderColor: "var(--fr-analytics-border)" }}>
             {/* Table Header */}
-            <div className="hidden grid-cols-[1fr_1.5fr_1fr_1fr_0.8fr] gap-3 border-b px-4 py-3 text-xs font-semibold text-[var(--fr-analytics-muted)] md:grid" style={{ borderColor: "var(--fr-analytics-border)" }}>
+            <div className="hidden grid-cols-[1fr_1.5fr_1fr_1fr_1fr_1.2fr] gap-3 border-b px-4 py-3 text-xs font-semibold text-[var(--fr-analytics-muted)] md:grid" style={{ borderColor: "var(--fr-analytics-border)" }}>
               <span>Время</span>
               <span>Клиент / Техника</span>
               <span>Сумма</span>
               <span>Статус</span>
+              <span>Документы</span>
               <span className="text-right">Действия</span>
             </div>
 
@@ -465,10 +552,13 @@ export function RentalsAnalyticsClient({
                   ? `${rental.vehicle.make} ${rental.vehicle.model}`
                   : "Неизвестно";
 
+                const hasQrCode = !!rental.documentSecret?.doc_sha256;
+                const verificationStatus = rental.documentSecret?.verification_status || "none";
+
                 return (
                   <div
                     key={rental.rental_id}
-                    className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[1fr_1.5fr_1fr_1fr_0.8fr] md:items-center hover:bg-[var(--fr-analytics-accent)]/5 cursor-pointer transition-colors"
+                    className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[1fr_1.5fr_1fr_1fr_1fr_1.2fr] md:items-center hover:bg-[var(--fr-analytics-accent)]/5 cursor-pointer transition-colors"
                     onClick={() => openRentalDetails(rental)}
                   >
                     {/* Time */}
@@ -504,8 +594,53 @@ export function RentalsAnalyticsClient({
                       </span>
                     </div>
 
+                    {/* Documents */}
+                    <div className="flex items-center gap-2">
+                      {hasQrCode && (
+                        <div className="flex items-center gap-1 text-emerald-600" title="QR код доступен">
+                          <QrCode className="h-3.5 w-3.5" />
+                          <span className="text-xs">QR</span>
+                        </div>
+                      )}
+                      {verificationStatus === "verified" && (
+                        <div className="flex items-center gap-1 text-emerald-600" title="Документы проверены">
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                        </div>
+                      )}
+                      {verificationStatus === "pending" && (
+                        <div className="flex items-center gap-1 text-amber-600" title="Ожидает проверки">
+                          <Clock className="h-3.5 w-3.5" />
+                        </div>
+                      )}
+                      {verificationStatus === "revoked" && (
+                        <div className="flex items-center gap-1 text-rose-600" title="Документы отозваны">
+                          <ShieldAlert className="h-3.5 w-3.5" />
+                        </div>
+                      )}
+                    </div>
+
                     {/* Actions */}
-                    <div className="flex justify-end">
+                    <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                      {hasQrCode && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => handleResendContract(rental)}
+                          disabled={resending === rental.rental_id}
+                          title="Отправить договор + QR"
+                        >
+                          {resending === rental.rental_id ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <>
+                              <Send className="h-3.5 w-3.5" />
+                              <span className="hidden sm:inline">Отправить</span>
+                            </>
+                          )}
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         variant="ghost"

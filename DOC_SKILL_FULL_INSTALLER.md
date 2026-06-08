@@ -1124,8 +1124,460 @@ Flow:
 
 ================================================================================
 
+# FILE: app/franchize/[slug]/rentals-analytics/page.tsx
+# Rentals Analytics Page - Server Component
+
+```typescript
+// /app/franchize/[slug]/rentals-analytics/page.tsx
+import type { Metadata } from "next";
+
+import { CrewFooter } from "@/app/franchize/components/CrewFooter";
+import { CrewHeader } from "@/app/franchize/components/CrewHeader";
+import { FranchizePageShell } from "@/app/franchize/components/FranchizePageShell";
+import { getFranchizeBySlug } from "@/app/franchize/actions";
+import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+import { buildFranchizeSectionMetadata } from "../metadata";
+import { RentalsAnalyticsClient } from "./RentalsAnalyticsClient";
+
+interface FranchizeSlugRentalsAnalyticsPageProps {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ date?: string }>;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  return buildFranchizeSectionMetadata(slug, {
+    sectionTitle: "Аналитика аренд",
+    sectionDescription:
+      "Ежедневная статистика аренд с детальной информацией по каждому заказу и документам.",
+    pathSuffix: "/rentals-analytics",
+  });
+}
+
+export default async function FranchizeSlugRentalsAnalyticsPage({
+  params,
+  searchParams,
+}: FranchizeSlugRentalsAnalyticsPageProps) {
+  const { slug } = await params;
+  const { date: dateParam } = await searchParams;
+  const { crew } = await getFranchizeBySlug(slug);
+  const resolvedSlug = crew.slug || slug;
+  const activePath = `/franchize/${resolvedSlug}/rentals-analytics`;
+  const surface = crewPaletteForSurface(crew.theme);
+
+  const today = new Date().toISOString().split("T")[0];
+  const selectedDate = dateParam || today;
+
+  return (
+    <main className="min-h-screen" style={surface.page}>
+      <CrewHeader
+        crew={crew}
+        activePath={activePath}
+        groupLinks={[]}
+      />
+      <FranchizePageShell theme={crew.theme} contentClassName="space-y-4">
+        <RentalsAnalyticsClient
+          initialSlug={resolvedSlug}
+          initialDate={selectedDate}
+          crew={crew}
+        />
+      </FranchizePageShell>
+      <CrewFooter crew={crew} />
+    </main>
+  );
+}
+```
+
+================================================================================
+
+# FILE: app/franchize/[slug]/rentals-analytics/RentalsAnalyticsClient.tsx
+# Rentals Analytics Client Component
+
+```typescript
+// /app/franchize/[slug]/rentals-analytics/RentalsAnalyticsClient.tsx
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import { format } from "date-fns";
+import { ru } from "date-fns/locale";
+import {
+  Calendar, ChevronLeft, ChevronRight, FileText, User, CreditCard,
+  MapPin, Phone, Mail, IdCard, CheckCircle2, XCircle, Clock,
+  AlertCircle, X, RefreshCw, QrCode, Send, ShieldCheck, ShieldAlert, Filter,
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Loading } from "@/components/Loading";
+import { useAppContext } from "@/contexts/AppContext";
+import {
+  getRentalsDashboard,
+  getRentalDocumentDetails,
+  getRentalsDateRange,
+  resendRentalContract,
+  type RentalDashboardItem,
+  type RentalDocumentDetail,
+} from "@/app/franchize/server-actions/rentals-dashboard";
+import { crewPaletteForSurface, focusRingOutlineStyle } from "@/app/franchize/lib/theme";
+import type { FranchizeCrewVM } from "@/app/franchize/actions";
+import {
+  FranchizeOperatorPanel,
+  FranchizeOperatorStatCard,
+} from "@/app/franchize/components/FranchizeOperatorSurface";
+
+const formatRubles = (amount: number | null | undefined): string => {
+  if (amount == null) return "—";
+  return new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency: "RUB",
+    minimumFractionDigits: 0,
+  }).format(amount);
+};
+
+const formatRussianDate = (dateStr: string | null): string => {
+  if (!dateStr) return "—";
+  try {
+    return format(new Date(dateStr), "dd MMM yyyy, HH:mm", { locale: ru });
+  } catch {
+    return "—";
+  }
+};
+
+const formatRussianDateOnly = (dateStr: string | null): string => {
+  if (!dateStr) return "—";
+  try {
+    return format(new Date(dateStr), "dd MMM yyyy", { locale: ru });
+  } catch {
+    return "—";
+  }
+};
+
+const statusConfig = {
+  confirmed: { label: "Подтверждена", icon: CheckCircle2, color: "emerald" },
+  active: { label: "Активна", icon: Clock, color: "blue" },
+  completed: { label: "Завершена", icon: CheckCircle2, color: "green" },
+  cancelled: { label: "Отменена", icon: XCircle, color: "rose" },
+  pending_confirmation: { label: "Ожидает", icon: AlertCircle, color: "amber" },
+  checkout_started: { label: "Оформление", icon: Clock, color: "slate" },
+};
+
+export function RentalsAnalyticsClient({
+  initialSlug,
+  initialDate,
+  crew,
+}: {
+  initialSlug: string;
+  initialDate: string;
+  crew: FranchizeCrewVM;
+}) {
+  const { dbUser, isLoading: authLoading } = useAppContext();
+  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [verificationFilter, setVerificationFilter] = useState<"all" | "verified" | "pending" | "revoked">("all");
+  const [rentals, setRentals] = useState<RentalDashboardItem[]>([]);
+  const [summary, setSummary] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedRental, setSelectedRental] = useState<RentalDashboardItem | null>(null);
+  const [rentalDetails, setRentalDetails] = useState<RentalDocumentDetail | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [dateRange, setDateRange] = useState<{ minDate: string; maxDate: string } | null>(null);
+  const [resending, setResending] = useState<string | null>(null);
+
+  const slug = initialSlug?.trim() || "vip-bike";
+
+  const loadRentals = useCallback(async (date: string, showRefresh = false) => {
+    if (!dbUser?.user_id) return;
+    if (showRefresh) setRefreshing(true); else setLoading(true);
+    try {
+      const result = await getRentalsDashboard({
+        slug, actorUserId: dbUser.user_id, date,
+        verificationStatus: verificationFilter === "all" ? undefined : verificationFilter,
+      });
+      if (!result.success) {
+        toast.error(result.error || "Не удалось загрузить аренды");
+        return;
+      }
+      setRentals(result.data?.items || []);
+      setSummary(result.data?.summary || null);
+    } catch (error) {
+      console.error("[RentalsAnalytics] Load error:", error);
+      toast.error("Ошибка загрузки данных");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [dbUser?.user_id, slug, verificationFilter]);
+
+  const loadRentalDetails = useCallback(async (rentalId: string) => {
+    if (!dbUser?.user_id) return;
+    setLoadingDetails(true);
+    try {
+      const result = await getRentalDocumentDetails({ actorUserId: dbUser.user_id, rentalId });
+      if (!result.success) {
+        toast.error(result.error || "Не удалось загрузить детали");
+        return;
+      }
+      setRentalDetails(result.data || null);
+    } catch (error) {
+      console.error("[RentalsAnalytics] Details load error:", error);
+      toast.error("Ошибка загрузки деталей");
+    } finally {
+      setLoadingDetails(false);
+    }
+  }, [dbUser?.user_id]);
+
+  const loadDateRange = useCallback(async () => {
+    if (!dbUser?.user_id) return;
+    try {
+      const result = await getRentalsDateRange({ slug, actorUserId: dbUser.user_id });
+      if (result.success && result.data) setDateRange(result.data);
+    } catch (error) {
+      console.error("[RentalsAnalytics] Date range error:", error);
+    }
+  }, [dbUser?.user_id, slug]);
+
+  useEffect(() => {
+    if (dbUser?.user_id) {
+      void loadRentals(selectedDate);
+      void loadDateRange();
+    }
+  }, [dbUser?.user_id, selectedDate, loadRentals, loadDateRange]);
+
+  useEffect(() => {
+    if (dbUser?.user_id) void loadRentals(selectedDate);
+  }, [verificationFilter]); // eslint-disable-line
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (dbUser?.user_id && !loading) void loadRentals(selectedDate, true);
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [dbUser?.user_id, selectedDate, loadRentals, loading]);
+
+  const handleResendContract = useCallback(async (rental: RentalDashboardItem) => {
+    if (!dbUser?.user_id || !rental.documentSecret?.doc_sha256) {
+      toast.error("QR код недоступен для этой аренды");
+      return;
+    }
+    setResending(rental.rental_id);
+    try {
+      const targetChatId = rental.user?.metadata?.telegram_chat_id as string | undefined;
+      const chatIdToSend = targetChatId || prompt("Введите ID чата Telegram:", rental.user_id);
+      if (!chatIdToSend) { toast.error("ID чата не указан"); return; }
+      const result = await resendRentalContract({
+        actorUserId: dbUser.user_id, rentalId: rental.rental_id, telegramChatId: chatIdToSend,
+      });
+      if (!result.success) {
+        toast.error(result.error || "Не удалось отправить договор");
+        return;
+      }
+      toast.success("Договор успешно отправлен");
+    } catch (error) {
+      console.error("[RentalsAnalytics] Resend error:", error);
+      toast.error("Ошибка отправки");
+    } finally {
+      setResending(null);
+    }
+  }, [dbUser?.user_id]);
+
+  const navigateDate = (days: number) => {
+    const newDate = new Date(selectedDate);
+    newDate.setDate(newDate.getDate() + days);
+    const newDateStr = newDate.toISOString().split("T")[0];
+    if (dateRange) {
+      if (days < 0 && newDateStr < dateRange.minDate) return;
+      if (days > 0 && newDateStr > dateRange.maxDate) return;
+    }
+    setSelectedDate(newDateStr);
+    window.history.pushState({}, "", `/franchize/${slug}/rentals-analytics?date=${newDateStr}`);
+  };
+
+  const openRentalDetails = (rental: RentalDashboardItem) => {
+    setSelectedRental(rental);
+    setRentalDetails(null);
+    void loadRentalDetails(rental.rental_id);
+  };
+
+  const closeModal = () => { setSelectedRental(null); setRentalDetails(null); };
+
+  const getStatusConfig = (status: string) => {
+    return statusConfig[status as keyof typeof statusConfig] || {
+      label: status, icon: AlertCircle, color: "slate",
+    };
+  };
+
+  if (authLoading) return <Loading text="Загружаем данные..." />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-xs font-medium tracking-wide text-[var(--fr-analytics-accent)]">
+            Аналитика аренд
+          </p>
+          <h1 className="mt-2 break-words text-2xl font-semibold text-[var(--fr-analytics-text)]">
+            Аренды за день
+          </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" size="icon" onClick={() => navigateDate(-1)}
+            disabled={!dateRange || selectedDate <= dateRange.minDate || loading} className="h-9 w-9">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
+            <Calendar className="h-4 w-4" />
+            <span className="text-sm font-medium">{formatRussianDateOnly(selectedDate)}</span>
+          </div>
+          <Button type="button" variant="outline" size="icon" onClick={() => navigateDate(1)}
+            disabled={!dateRange || selectedDate >= dateRange.maxDate || loading} className="h-9 w-9">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <input type="date" value={selectedDate} min={dateRange?.minDate} max={dateRange?.maxDate}
+            onChange={(e) => { setSelectedDate(e.target.value); window.history.pushState({}, "", `/franchize/${slug}/rentals-analytics?date=${e.target.value}`); }}
+            className="h-9 rounded-md border bg-transparent px-3 py-1 text-sm" />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Filter className="h-4 w-4" />
+        <span className="text-sm">Фильтр по верификации:</span>
+        <div className="flex gap-1">
+          {[
+            { value: "all", label: "Все", icon: FileText },
+            { value: "verified", label: "Проверены", icon: ShieldCheck },
+            { value: "pending", label: "Ожидают", icon: Clock },
+            { value: "revoked", label: "Отозваны", icon: ShieldAlert },
+          ].map((filter) => {
+            const Icon = filter.icon;
+            const isActive = verificationFilter === filter.value;
+            return (
+              <button key={filter.value} type="button"
+                onClick={() => setVerificationFilter(filter.value as typeof verificationFilter)}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium ${
+                  isActive ? "bg-[var(--fr-analytics-accent)] text-white" : "bg-transparent hover:bg-[var(--fr-analytics-accent)]/10"
+                }`}>
+                <Icon className="h-3.5 w-3.5" />{filter.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {summary && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <FranchizeOperatorStatCard label="Всего аренд" value={summary.totalCount} icon={<FileText className="h-4 w-4" />} />
+          <FranchizeOperatorStatCard label="Выручка" value={formatRubles(summary.totalRevenue)} icon={<CreditCard className="h-4 w-4" />} highlight />
+          <FranchizeOperatorStatCard label="Подтверждённые" value={summary.byStatus.confirmed || 0} icon={<CheckCircle2 className="h-4 w-4" />} />
+          <FranchizeOperatorStatCard label="Активные" value={summary.byStatus.active || 0} icon={<Clock className="h-4 w-4" />} />
+        </div>
+      )}
+
+      <FranchizeOperatorPanel>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold">Список аренд</p>
+          {refreshing && <RefreshCw className="h-4 w-4 animate-spin" />}
+        </div>
+        {loading ? <div className="flex justify-center py-12"><Loading text="Загружаем аренды..." /></div>
+          : !rentals.length ? <p className="py-12 text-center text-sm">За этот день аренд нет</p>
+          : (
+            <div className="mt-3 overflow-hidden rounded-xl border">
+              <div className="hidden grid-cols-[1fr_1.5fr_1fr_1fr_1fr_1.2fr] gap-3 border-b px-4 py-3 text-xs font-semibold">
+                <span>Время</span><span>Клиент / Техника</span><span>Сумма</span><span>Статус</span><span>Документы</span><span className="text-right">Действия</span>
+              </div>
+              <div className="divide-y">
+                {rentals.map((rental) => {
+                  const statusConf = getStatusConfig(rental.status);
+                  const StatusIcon = statusConf.icon;
+                  const vehicleName = rental.vehicle ? `${rental.vehicle.make} ${rental.vehicle.model}` : "Неизвестно";
+                  const hasQrCode = !!rental.documentSecret?.doc_sha256;
+                  const verificationStatus = rental.documentSecret?.verification_status || "none";
+                  return (
+                    <div key={rental.rental_id} className="grid gap-2 px-4 py-3 md:grid-cols-[1fr_1.5fr_1fr_1fr_1fr_1.2fr] md:items-center hover:bg-[var(--fr-analytics-accent)]/5 cursor-pointer"
+                      onClick={() => openRentalDetails(rental)}>
+                      <div>{formatRussianDate(rental.created_at)?.split(",")?.[1] || "—"}</div>
+                      <div>
+                        <div className="flex items-center gap-2"><User className="h-3.5 w-3.5" />
+                          <span className="font-medium">{rental.user?.full_name || rental.user?.username || `#${rental.user_id.slice(0, 8)}`}</span>
+                        </div>
+                        <div className="mt-0.5 text-xs">{vehicleName}</div>
+                      </div>
+                      <div className="font-medium">{formatRubles(rental.total_cost)}</div>
+                      <div className="flex items-center gap-1.5"><StatusIcon className={`h-3.5 w-3.5 text-${statusConf.color}-500`} /><span className="text-xs">{statusConf.label}</span></div>
+                      <div className="flex items-center gap-2">
+                        {hasQrCode && <div className="flex items-center gap-1 text-emerald-600"><QrCode className="h-3.5 w-3.5" /><span className="text-xs">QR</span></div>}
+                        {verificationStatus === "verified" && <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />}
+                        {verificationStatus === "pending" && <Clock className="h-3.5 w-3.5 text-amber-600" />}
+                        {verificationStatus === "revoked" && <ShieldAlert className="h-3.5 w-3.5 text-rose-600" />}
+                      </div>
+                      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                        {hasQrCode && (
+                          <Button type="button" variant="outline" size="sm" className="h-7 text-xs"
+                            onClick={() => handleResendContract(rental)} disabled={resending === rental.rental_id}>
+                            {resending === rental.rental_id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <><Send className="h-3.5 w-3.5" /><span className="hidden sm:inline">Отправить</span></>}
+                          </Button>
+                        )}
+                        <Button type="button" variant="ghost" size="sm" className="h-7 text-xs"
+                          onClick={(e) => { e.stopPropagation(); openRentalDetails(rental); }}>Подробнее</Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+      </FranchizeOperatorPanel>
+
+      {/* Modal for rental details - simplified version */}
+      {selectedRental && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={closeModal}>
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between">
+              <h2 className="text-lg font-semibold">Детали аренды</h2>
+              <Button type="button" variant="ghost" size="icon" onClick={closeModal}><X className="h-4 w-4" /></Button>
+            </div>
+            <div className="mt-4 space-y-4">
+              <div className="rounded-xl border p-3">
+                <p className="text-xs">Техника</p>
+                <p className="mt-1 text-sm font-semibold">{selectedRental.vehicle ? `${selectedRental.vehicle.make} ${selectedRental.vehicle.model}` : "Неизвестно"}</p>
+              </div>
+              <div className="rounded-xl border p-3">
+                <p className="text-xs">Клиент</p>
+                <p className="mt-1 text-sm font-semibold">{selectedRental.user?.full_name || selectedRental.user?.username || `#${selectedRental.user_id.slice(0, 8)}`}</p>
+              </div>
+              <div className="rounded-xl border p-3">
+                <p className="text-xs">Стоимость</p>
+                <p className="mt-1 text-xl font-bold">{formatRubles(selectedRental.total_cost)}</p>
+              </div>
+              {loadingDetails ? <div className="flex justify-center py-8"><Loading text="Загружаем документы..." /></div>
+                : rentalDetails?.secret ? (
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium">Данные из документов</p>
+                    {rentalDetails.secret.renter_full_name && (
+                      <div className="rounded-xl border p-3"><p className="text-xs">ФИО</p><p className="mt-1 text-sm">{rentalDetails.secret.renter_full_name}</p></div>
+                    )}
+                    {rentalDetails.secret.doc_sha256 && (
+                      <div className="rounded-xl border p-3"><p className="text-xs">QR код доступен</p><p className="mt-1 text-xs font-mono break-all">{rentalDetails.secret.doc_sha256.slice(0, 32)}...</p></div>
+                    )}
+                  </div>
+                ) : <div className="rounded-xl border p-4"><p className="text-sm">Данные из документов не найдены</p></div>}
+            </div>
+            <div className="mt-6 flex justify-end"><Button type="button" variant="outline" onClick={closeModal}>Закрыть</Button></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+================================================================================
+
 # END OF INSTALLER
 
 For issues or questions, see:
 - AGENTS.md
-- TODO-1-click-next-rent.md
+- README.MD
