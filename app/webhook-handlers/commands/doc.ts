@@ -189,6 +189,7 @@ async function downloadTelegramPhotoWithRetry(
 async function extractDocumentFromTelegramPhoto(
   fileId: string,
   docType: "passport" | "license",
+  maxRetries = 2,
 ): Promise<{
   success: boolean;
   data?: Record<string, any>;
@@ -208,37 +209,76 @@ async function extractDocumentFromTelegramPhoto(
     };
   }
 
-  try {
-    const downsampledBuffer = await downsampleImageForVlm(downloadResult.buffer);
-    const base64Image = downsampledBuffer.toString("base64");
+  // Retry VLM extraction for transient failures
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const downsampledBuffer = await downsampleImageForVlm(downloadResult.buffer);
+      const base64Image = downsampledBuffer.toString("base64");
 
-    // VLM extraction
-    const vlmResult = await vlmExtractDocument(base64Image, docType);
+      logger.info(`[/doc] VLM extraction attempt ${attempt}/${maxRetries}`, { docType });
 
-    if (vlmResult.success && vlmResult.data) {
-      return {
-        success: true,
-        data: vlmResult.data as Record<string, any>,
-        accessTier: vlmResult.accessTier,
-        provider: "zai-vlm",
-        confidence: vlmResult.confidence,
-        warnings: vlmResult.warnings,
-      };
+      // VLM extraction
+      const vlmResult = await vlmExtractDocument(base64Image, docType);
+
+      if (vlmResult.success && vlmResult.data) {
+        logger.info(`[/doc] VLM extraction succeeded on attempt ${attempt}`, {
+          docType,
+          confidence: vlmResult.confidence,
+        });
+        return {
+          success: true,
+          data: vlmResult.data as Record<string, any>,
+          accessTier: vlmResult.accessTier,
+          provider: "zai-vlm",
+          confidence: vlmResult.confidence,
+          warnings: vlmResult.warnings,
+        };
+      }
+
+      // Check if error is retryable
+      const isRetryable = vlmResult.error?.includes("timeout") ||
+                         vlmResult.error?.includes("connection") ||
+                         vlmResult.error?.includes("ECONNREFUSED") ||
+                         vlmResult.error?.includes("temporarily");
+
+      if (!isRetryable || attempt === maxRetries) {
+        logger.warn(`[/doc] VLM extraction failed on attempt ${attempt}`, {
+          docType,
+          error: vlmResult.error,
+          isRetryable,
+        });
+        return {
+          success: false,
+          provider: "zai-vlm",
+          error: vlmResult.error || "VLM extraction failed",
+          warnings: vlmResult.warnings,
+        };
+      }
+
+      // Wait before retry
+      logger.info(`[/doc] Retrying VLM extraction after 2s delay...`);
+      await new Promise(r => setTimeout(r, 2000));
+
+    } catch (error) {
+      logger.error(`[/doc] Document extraction error on attempt ${attempt}`, error);
+
+      if (attempt === maxRetries) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown extraction error",
+        };
+      }
+
+      // Wait before retry
+      await new Promise(r => setTimeout(r, 2000));
     }
-
-    return {
-      success: false,
-      provider: "zai-vlm",
-      error: vlmResult.error || "VLM extraction failed",
-      warnings: vlmResult.warnings,
-    };
-  } catch (error) {
-    logger.error("[/doc] Document extraction error", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown extraction error",
-    };
   }
+
+  // Should not reach here, but TypeScript needs it
+  return {
+    success: false,
+    error: "Extraction failed after all retries",
+  };
 }
 
 // ── Bike resolution ───────────────────────────────────────────────────────────
@@ -628,14 +668,23 @@ export async function handleDocPhoto(message: any): Promise<boolean> {
 
   // Show "processing" indicator
   if (state === "doc_awaiting_passport") {
-    await sendComplexMessage(chatId, "🤖 Обрабатываю паспорт через VLM... Это может занять несколько секунд.", [], { removeKeyboard: true });
+    await sendComplexMessage(chatId, "🤖 Анализирую паспорт через ИИ... Это может занять несколько секунд.", [], { removeKeyboard: true });
 
     const result = await extractDocumentFromTelegramPhoto(fileId, "passport");
 
     if (!result.success) {
+      const errorMsg = result.error || "Неизвестная ошибка";
+      const userFriendlyError = errorMsg.includes("timeout")
+        ? "⏰ Сервер ИИ не ответил вовремя. Попробуйте ещё раз."
+        : errorMsg.includes("connection") || errorMsg.includes("ECONNREFUSED")
+        ? "🔌 Не удалось подключиться к серверу ИИ. Попробуйте через минуту."
+        : errorMsg.includes("authentication") || errorMsg.includes("401")
+        ? "🔑 Ошибка доступа к ИИ сервису. Обратитесь к поддержке."
+        : `⚠️ ${errorMsg}`;
+
       await sendComplexMessage(
         chatId,
-        `⚠️ Не удалось распознать паспорт.\n${result.error || ""}\n\nПопробуйте ещё раз — отправьте чёткое фото основной страницы.`,
+        `${userFriendlyError}\n\n💡 Советы:\n• Убедитесь, что фото чёткое и без бликов\n• Вся информация должна быть читаемой\n• Попробуйте отправить фото ещё раз`,
         [],
         { keyboardType: "reply" },
       );
@@ -666,14 +715,23 @@ export async function handleDocPhoto(message: any): Promise<boolean> {
     await sendComplexMessage(chatId, summary, [], { removeKeyboard: true, parseMode: "Markdown" });
   } else {
     // doc_awaiting_license
-    await sendComplexMessage(chatId, "🤖 Обрабатываю водительское удостоверение через VLM...", [], { removeKeyboard: true });
+    await sendComplexMessage(chatId, "🤖 Анализирую водительское удостоверение через ИИ...", [], { removeKeyboard: true });
 
     const result = await extractDocumentFromTelegramPhoto(fileId, "license");
 
     if (!result.success) {
+      const errorMsg = result.error || "Неизвестная ошибка";
+      const userFriendlyError = errorMsg.includes("timeout")
+        ? "⏰ Сервер ИИ не ответил вовремя. Попробуйте ещё раз."
+        : errorMsg.includes("connection") || errorMsg.includes("ECONNREFUSED")
+        ? "🔌 Не удалось подключиться к серверу ИИ. Попробуйте через минуту."
+        : errorMsg.includes("authentication") || errorMsg.includes("401")
+        ? "🔑 Ошибка доступа к ИИ сервису. Обратитесь к поддержке."
+        : `⚠️ ${errorMsg}`;
+
       await sendComplexMessage(
         chatId,
-        `⚠️ Не удалось распознать ВУ.\n${result.error || ""}\n\nПопробуйте ещё раз — отправьте чёткое фото лицевой стороны.`,
+        `${userFriendlyError}\n\n💡 Советы:\n• Убедитесь, что фото чёткое и без бликов\n• Все категории должны быть видны\n• Попробуйте отправить фото ещё раз`,
         [],
         { keyboardType: "reply" },
       );
@@ -775,6 +833,25 @@ export async function docCommand(
 ) {
   const userIdStr = String(userId);
   logger.info(`[/doc] User: ${userIdStr}, Text: "${text}"`);
+
+  // Check ZAI configuration early
+  const zaiBaseUrl = process.env.ZAI_BASE_URL;
+  const zaiApiKey = process.env.ZAI_API_KEY;
+
+  if (!zaiBaseUrl || !zaiApiKey) {
+    logger.error("[/doc] ZAI not configured", {
+      hasBaseUrl: !!zaiBaseUrl,
+      hasApiKey: !!zaiApiKey,
+    });
+    await sendComplexMessage(
+      chatId,
+      "🚨 Сервис ИИ недоступен. Обратитесь к поддержке.",
+      [],
+      { removeKeyboard: true },
+    );
+    await notifyAdmin(`❌ /doc command used but ZAI not configured! Missing: ${!zaiBaseUrl ? 'ZAI_BASE_URL ' : ''}${!zaiApiKey ? 'ZAI_API_KEY' : ''}`);
+    return;
+  }
 
   // If user sent a photo/document WITH /doc caption, process it as the first step
   const hasPhoto = Array.isArray(photoVariants) && photoVariants.length > 0;

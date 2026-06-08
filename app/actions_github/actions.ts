@@ -142,8 +142,32 @@ export async function fetchRepoContents_pro(repoUrl: string, customToken?: strin
     // Фильтры из оригинала
     const allowedRootFiles = new Set(['package.json','tailwind.config.ts','tsconfig.json','next.config.js','next.config.mjs','vite.config.ts','vite.config.js','README.md','AGENTS.md','AGENT_ENTRY.md','AI_MAP.md','seed.sql','autoresearch.md']);
     const allowedPrefixes = ['app/','components/','contexts/','hooks/','lib/','types/','utils/','core/','skills/','infrastructure/','system/','supabase/migrations/'];
-    const excludedExactPaths = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'app/bio30/', 'app/elon/', 'app/arbitrage-live-scanner/', 'app/arbitrage-notdummies/', 'app/arbitrage-test-agent/', 'app/bullshitdetector/', 'app/csv-compare/', 'app/doc-verifier/', 'app/expmind/']);
-    const excludedPrefixes = ['.git/','node_modules/','.next/','dist/','build/','out/','public/','Configame/','components/ui/','.vscode/','.idea/','coverage/','storybook-static/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/','app/bio30/','app/elon/','app/arbitrage-live-scanner/','app/arbitrage-notdummies/','app/arbitrage-test-agent/','app/bullshitdetector/','app/csv-compare/','app/doc-verifier/','app/expmind/'];
+    const excludedExactPaths = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'app/bio30/', 'app/elon/', 'app/arbitrage-live-scanner/', 'app/arbitrage-notdummies/', 'app/arbitrage-test-agent/', 'app/bullshitdetector/', 'app/csv-compare/', 'app/doc-verifier/', 'app/expmind/', 'app/zai-docx-instructions/']);
+    const excludedPrefixes = [
+      '.git/','node_modules/','.next/','dist/','build/','out/','public/','Configame/','components/ui/','.vscode/','.idea/',
+      'coverage/','storybook-static/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/',
+      // Experimental/archived projects
+      'app/bio30/','app/elon/','app/arbitrage-live-scanner/','app/arbitrage-notdummies/','app/arbitrage-test-agent/','app/arbitrage-explained/',
+      'app/bullshitdetector/','app/csv-compare/','app/doc-verifier/','app/expmind/',
+      // Client-specific directories
+      'app/pavele0903/','app/sly13/','app/svarprofi/','app/paddock/','app/greenbox/',
+      // Standalone apps/features
+      'app/about/','app/about_en/','app/advice-upload/','app/blogger/','app/botbusters/','app/buy-subscription/',
+      'app/cartest/','app/cyber-garage/','app/cybervibe/','app/donate/','app/finance-literacy-memo/','app/game-plan/',
+      'app/god-mode-sandbox/','app/homework/','app/hotvibes/','app/invoices/','app/jumpstart/','app/lab/','app/leaderboard/',
+      'app/leads/','app/nexus/','app/nutrition/','app/onesitepls/','app/onesiteplsinstructions/','app/optimapipe/',
+      'app/p-plan/','app/partner/','app/premium/','app/profile/','app/purpose-profit/','app/rastabot/','app/sauna-rent/',
+      'app/selfdev/','app/settings/','app/shadow-fleet-admin/','app/snowboarding/','app/start-training/','app/streamer/',
+      'app/strikeball/','app/style-guide/','app/supaplan/','app/supercar-test/','app/tasks/','app/tea-call/','app/tutorials/',
+      'app/veritasium/','app/vipbikerental/','app/vpr-test/','app/vpr-tests/','app/vpr/','app/wb/','app/wblanding/',
+      'app/youtubeAdmin/','app/youtube_actions/','app/yt/','app/zai-docx-instructions/',
+      // AI/experimental
+      'app/ai-work-future/','app/ai_actions/',
+      // Legacy/redundant
+      'app/admin/','app/advice/',
+      // Test directories
+      'app/vpr-test/','app/vpr-tests/',
+    ];
     const excludedExtensions = ['.pl','.json','.png','.jpg','.jpeg','.gif','.svg','.ico','.webp','.avif','.mp4','.webm','.mov','.mp3','.wav','.ogg','.pdf','.woff','.woff2','.ttf','.otf','.eot','.zip','.gz','.tar','.rar','.env','.lock','.log','.DS_Store','.csv','.xlsx','.xls','.yaml','.yml','.bak','.tmp','.swp','.map','.dll','.exe','.so','.dylib','.md'];
 
     // Определяем ветку
@@ -261,7 +285,38 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
     const token = customToken || process.env.GITHUB_TOKEN; if (!token) throw new Error("GH token missing");
     const repoInfo = parseRepoUrl(repoUrl); owner = repoInfo.owner; repo = repoInfo.repo;
     const octokit = new Octokit({ auth: token });
-    const allowedRootFiles = new Set(['package.json','tailwind.config.ts','tsconfig.json','next.config.js','next.config.mjs','vite.config.ts','vite.config.js','README.md','AI_MAP.md','AGENTS.md','AGENT_ENTRY.md','seed.sql','autoresearch.md']); const allowedPrefixes = ['app/','components/','contexts/','hooks/','lib/','styles/','types/','utils/','data/','core/','docs/','skills/','scripts/','infrastructure/','system/','supabase/migrations/']; const excludedExactPaths = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'app/bio30/', 'app/elon/', 'app/arbitrage-live-scanner/', 'app/arbitrage-notdummies/', 'app/arbitrage-test-agent/', 'app/bullshitdetector/', 'app/csv-compare/', 'app/doc-verifier/', 'app/expmind/']); const excludedPrefixes = ['.git/','node_modules/','.next/','dist/','build/','out/','public/','Configame/','components/ui/','.vscode/','.idea/','coverage/','storybook-static/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/','bio30/','elon/','arbitrage-live-scanner/','arbitrage-notdummies/','arbitrage-test-agent/','bullshitdetector/','csv-compare/','doc-verifier/','expmind/']; const excludedExtensions = ['.pl','.json','.png','.jpg','.jpeg','.gif','.svg','.ico','.webp','.avif','.mp4','.webm','.mov','.mp3','.wav','.ogg','.pdf','.woff','.woff2','.ttf','.otf','.eot','.zip','.gz','.tar','.rar','.env','.lock','.log','.DS_Store','.csv','.xlsx','.xls','.yaml','.yml','.bak','.tmp','.swp','.map','.dll','.exe','.so','.dylib'];
+    const allowedRootFiles = new Set(['package.json','tailwind.config.ts','tsconfig.json','next.config.js','next.config.mjs','vite.config.ts','vite.config.js','README.md','AI_MAP.md','AGENTS.md','AGENT_ENTRY.md','seed.sql','autoresearch.md']);
+    const allowedPrefixes = ['app/','components/','contexts/','hooks/','lib/','styles/','types/','utils/','data/','core/','docs/','skills/','scripts/','infrastructure/','system/','supabase/migrations/'];
+    const excludedExactPaths = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'app/bio30/', 'app/elon/', 'app/arbitrage-live-scanner/', 'app/arbitrage-notdummies/', 'app/arbitrage-test-agent/', 'app/bullshitdetector/', 'app/csv-compare/', 'app/doc-verifier/', 'app/expmind/', 'app/zai-docx-instructions/']);
+    const excludedPrefixes = [
+      '.git/','node_modules/','.next/','dist/','build/','out/','public/','Configame/','components/ui/','.vscode/','.idea/',
+      'coverage/','storybook-static/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/',
+      // Experimental/archived projects
+      'app/bio30/','app/elon/','app/arbitrage-live-scanner/','app/arbitrage-notdummies/','app/arbitrage-test-agent/','app/arbitrage-explained/',
+      'app/bullshitdetector/','app/csv-compare/','app/doc-verifier/','app/expmind/',
+      // Client-specific directories
+      'app/pavele0903/','app/sly13/','app/svarprofi/','app/paddock/','app/greenbox/',
+      // Standalone apps/features
+      'app/about/','app/about_en/','app/advice-upload/','app/blogger/','app/botbusters/','app/buy-subscription/',
+      'app/cartest/','app/cyber-garage/','app/cybervibe/','app/donate/','app/finance-literacy-memo/','app/game-plan/',
+      'app/god-mode-sandbox/','app/homework/','app/hotvibes/','app/invoices/','app/jumpstart/','app/lab/','app/leaderboard/',
+      'app/leads/','app/nexus/','app/nutrition/','app/onesitepls/','app/onesiteplsinstructions/','app/optimapipe/',
+      'app/p-plan/','app/partner/','app/premium/','app/profile/','app/purpose-profit/','app/rastabot/','app/sauna-rent/',
+      'app/selfdev/','app/settings/','app/shadow-fleet-admin/','app/snowboarding/','app/start-training/','app/streamer/',
+      'app/strikeball/','app/style-guide/','app/supaplan/','app/supercar-test/','app/tasks/','app/tea-call/','app/tutorials/',
+      'app/veritasium/','app/vipbikerental/','app/vpr-test/','app/vpr-tests/','app/vpr/','app/wb/','app/wblanding/',
+      'app/youtubeAdmin/','app/youtube_actions/','app/yt/','app/zai-docx-instructions/',
+      // AI/experimental
+      'app/ai-work-future/','app/ai_actions/',
+      // Legacy/redundant
+      'app/admin/','app/advice/',
+      // Test directories
+      'app/vpr-test/','app/vpr-tests/',
+      // Also exclude by short names
+      'bio30/','elon/','arbitrage-live-scanner/','arbitrage-notdummies/','arbitrage-test-agent/','arbitrage-explained/',
+      'bullshitdetector/','csv-compare/','doc-verifier/','expmind/',
+    ];
+    const excludedExtensions = ['.pl','.json','.png','.jpg','.jpeg','.gif','.svg','.ico','.webp','.avif','.mp4','.webm','.mov','.mp3','.wav','.ogg','.pdf','.woff','.woff2','.ttf','.otf','.eot','.zip','.gz','.tar','.rar','.env','.lock','.log','.DS_Store','.csv','.xlsx','.xls','.yaml','.yml','.bak','.tmp','.swp','.map','.dll','.exe','.so','.dylib'];
     if (!targetBranch || targetBranch === 'default') {
         console.log("[Action] Fetching repo info for default...");
         try { const { data: repoData } = await octokit.repos.get({ owner, repo }); targetBranch = repoData.default_branch; isDefaultFetched = true; console.log(`[Action] Default branch via repos.get: ${targetBranch}`); }
