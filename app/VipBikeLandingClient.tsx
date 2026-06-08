@@ -15,6 +15,7 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +41,7 @@ import { getSalePriceLabel } from "@/app/vipbikerental/features/shared/constants
 const HERO_VIDEO_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/2_5219998213838247718.mp4";
 
 // Default feature pills (can be overridden by crew metadata)
-const DEFAULT_featurePills = [
+const DEFAULT_FEATURE_PILLS = [
   { icon: "::FaBolt::", text: "Быстро", detail: "мощно, тихо, экологично" },
   { icon: "::FaClock::", text: "10 дней", detail: "на тест-драйв, деньги обратно" },
   { icon: "::FaCircleDollarSign::", text: "0 ₽", detail: "первичный взнос, рассрочка" },
@@ -88,16 +89,21 @@ export function VipBikeLandingClient({
     return pills?.length ? pills : DEFAULT_FEATURE_PILLS;
   }, [crew?.metadata]);
 
+  const electroItems = useMemo(() =>
+  items.filter(item =>
+    item.category?.toLowerCase().includes("electro") ||
+    item.category?.toLowerCase().includes("electric") ||
+    item.title?.toLowerCase().includes("79bike") ||
+    item.title?.toLowerCase().includes("falcon")
+  ),
+  [items]
+);
+
   // Calculate dynamic pricing from items
   const heroTabs = useMemo(() => {
     // Find rental items for pricing
     const rentalItems = items.filter(item => !item.category?.toLowerCase().includes("продажа") && !item.category?.toLowerCase().includes("sale"));
-    const electroItems = items.filter(item =>
-      item.category?.toLowerCase().includes("electro") ||
-      item.category?.toLowerCase().includes("electric") ||
-      item.title?.toLowerCase().includes("79bike") ||
-      item.title?.toLowerCase().includes("falcon")
-    );
+    
     const saleItems = items.filter(item =>
       item.category?.toLowerCase().includes("продажа") ||
       item.category?.toLowerCase().includes("sale") ||
@@ -252,7 +258,7 @@ export function VipBikeLandingClient({
                       )}
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        <VibeContentRenderer content={tab.icon} className={cn(
+                        <VibeContentRenderer content={currentTab.icon} className={cn(
                           "w-4 h-4",
                           activeTab === tab.id ? "text-amber-400" : "text-slate-400"
                       )} />
