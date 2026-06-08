@@ -7,26 +7,29 @@ import { useAppContext } from "@/contexts/AppContext";
 import { checkAndUnlockFeatureAchievement, Achievement } from "@/hooks/cyberFitnessSupabase";
 
 interface UseFileSelectionProps {
-    files: FileNode[]; 
-    primaryHighlightedPath: string | null; 
-    secondaryHighlightedPaths: Record<ImportCategory, string[]>; 
-    importantFiles: string[]; 
-    imageReplaceTaskActive: boolean; 
+    files: FileNode[];
+    primaryHighlightedPath: string | null;
+    secondaryHighlightedPaths: Record<ImportCategory, string[]>;
+    importantFiles: string[];
+    docXagentFiles: string[];
+    imageReplaceTaskActive: boolean;
 }
 
 interface UseFileSelectionReturn {
     toggleFileSelection: (path: string) => void;
     selectHighlightedFiles: () => void;
     handleAddImportantFiles: () => void;
+    handleAddDocXagentFiles: () => void;
     handleSelectAll: () => void;
     handleDeselectAll: () => void;
 }
 
 export const useFileSelection = ({
-    files, 
+    files,
     primaryHighlightedPath,
     secondaryHighlightedPaths,
     importantFiles,
+    docXagentFiles,
     imageReplaceTaskActive,
 }: UseFileSelectionProps): UseFileSelectionReturn => {
     logger.debug("[useFileSelection] Hook initialized");
@@ -133,7 +136,44 @@ export const useFileSelection = ({
             logger.warn("[File Selection] Cannot log 'usedAddImportantFiles': dbUser.user_id is missing.");
         }
 
-    }, [importantFiles, files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]); 
+    }, [importantFiles, files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]);
+
+    const handleAddDocXagentFiles = useCallback(async () => {
+        if (imageReplaceTaskActive) {
+             logger.warn("[File Selection] Add DocXagent skipped: Image replace task active.");
+             toastWarning("Выбор файлов недоступен во время задачи замены картинки.");
+             return;
+        }
+        const availableDocXagent = docXagentFiles.filter(p => files.some(f => f.path === p));
+        if (availableDocXagent.length === 0) {
+            toastWarning("Файлы DocXagent не найдены в текущем списке файлов репозитория.");
+             logger.warn("[File Selection] No docXagent files found in current file list.");
+            return;
+        }
+
+        logger.info(`[File Selection] Adding ${availableDocXagent.length} docXagent files to selection.`);
+        setSelectedFetcherFiles(prev => {
+            const newSet = new Set(prev);
+            availableDocXagent.forEach(p => {
+                if (!newSet.has(p)) logger.debug(`[File Selection] Adding docXagent: ${p}`);
+                newSet.add(p);
+            });
+            return newSet;
+        });
+        toastSuccess(`Добавлено ${availableDocXagent.length} файлов DocXagent к выделению.`);
+
+        if (dbUser?.user_id) {
+            logger.debug(`[File Selection] Attempting to log 'usedAddDocXagentFiles' for user ${dbUser.user_id}.`);
+            const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedAddDocXagentFiles');
+            newAchievements?.forEach(ach => {
+                addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
+                logger.info(`[File Selection] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`);
+            });
+        } else {
+            logger.warn("[File Selection] Cannot log 'usedAddDocXagentFiles': dbUser.user_id is missing.");
+        }
+
+    }, [docXagentFiles, files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]);
 
     const handleSelectAll = useCallback(async () => { 
         if (imageReplaceTaskActive) {
@@ -190,6 +230,7 @@ export const useFileSelection = ({
         toggleFileSelection,
         selectHighlightedFiles,
         handleAddImportantFiles,
+        handleAddDocXagentFiles,
         handleSelectAll,
         handleDeselectAll,
     };
