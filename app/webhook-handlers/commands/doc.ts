@@ -229,7 +229,9 @@ async function generateAndSendContract(
       renter_driver_license: `${license.series || ""} ${license.number || ""}`.trim(),
       renter_passport: `${passport.series || ""} ${passport.number || ""}`.trim(),
       renter_passport_issue_date: passport.issueDate || "",
+      renter_passport_issued_by: passport.issuedBy || "",
       renter_registration: passport.registration || "",
+      renter_address: passport.registration || "",
       bike_make_model: `${bike.make || ""} ${bike.model || ""}`.trim(),
       bike_make: bike.make || "уточняется",
       bike_model: bike.model || "уточняется",
@@ -246,6 +248,17 @@ async function generateAndSendContract(
       bike_vehicle_type_label: isElectric ? "ЭЛЕКТРОМОТОЦИКЛА" : "МОТОЦИКЛА",
       bike_vehicle_type_accusative: isElectric ? "электромотоцикл" : "мотоцикл",
       bike_vehicle_type_genitive: isElectric ? "электромотоцикла" : "мотоцикла",
+      bike_engine_spec_line_1: (() => {
+        const ccPart = bike.specs?.engine_cc ? `рабочий объем ${bike.specs.engine_cc} куб. см` : "";
+        const hpPart = bike.specs?.power_hp ? `мощность ${bike.specs.power_hp} л.с.` : "";
+        if (isElectric) return bike.specs?.power_kw ? `мощность двигателя (номинальная) ${bike.specs.power_kw} кВт` : "";
+        return [ccPart, hpPart].filter(Boolean).join(", ") || "";
+      })(),
+      bike_engine_spec_line_2: bike.specs?.max_speed ? `максимальная конструктивная скорость ${bike.specs.max_speed} км/ч` : "",
+      bike_engine_spec_line_3: (() => {
+        if (isElectric) return bike.specs?.battery ? `аккумулятор: тип/ёмкость ${bike.specs.battery}` : "";
+        return "";
+      })(),
       rent_start_date: startDate,
       rent_start_time: "18:00",
       rent_end_date: endDate,
@@ -255,14 +268,27 @@ async function generateAndSendContract(
       deposit_rub: String(bike.specs?.deposit_rub || "20000"),
       subtotal_rub: String(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
       bike_value_rub: String(bike.specs?.sale_price || bike.specs?.price_rub || "850000"),
+      bike_value_words: "",
       bike_mileage: String(bike.specs?.mileage || ""),
+      lessor_address: "г. Нижний Новгород",
+      return_address: "г. Нижний Новгород, пл. Комсомольская 2",
+      included_km_per_day: "200",
+      extra_km_fee_rub: "35",
+      late_return_penalty_rub: "10000",
+      late_return_penalty_max_days: "90",
+      equipment: "ключ(и) 1 шт.; шлем 1",
+      damage_notes_at_delivery: "от даты начала аренды",
+      damage_notes_at_return: "от даты возврата ТС",
+      battery_level_start: "100 %",
+      battery_level_end: "____ %",
+      media_links: "телефон",
+      damage_price_list: "мотоцикл в сборе / царапина на пластике / прочее по расчету",
       issuer_name: "Воробьев Р.В.",
       issuer_signatory: "Менеджер Мотосалона",
       issuer_representative: "ИП Воробьев Р.В.",
       signature_timestamp: now.toLocaleString("ru-RU"),
       signature_fingerprint: "vlm-telegram-doc",
       renter_signature: "согласие через Telegram",
-      equipment: "ключ(и) 1 шт.; шлем 1",
       document_key: `rental-${bike.id}-${Date.now()}`,
     };
 
@@ -290,6 +316,7 @@ async function generateAndSendContract(
       renter_full_name: passport.fullName || null,
       renter_passport: `${passport.series || ""} ${passport.number || ""}`.trim() || null,
       renter_passport_issue_date: passport.issueDate || null,
+      renter_passport_issued_by: passport.issuedBy || null,
       renter_registration: passport.registration || null,
       renter_driver_license: `${license.series || ""} ${license.number || ""}`.trim() || null,
       renter_birth_date: passport.birthDate || null,
