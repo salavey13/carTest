@@ -22,7 +22,7 @@ import { actionsCommand, handleActionChoice } from "./actions";
 import { shiftCommand } from "./shift"; 
 import { wbCommand } from "./wb";
 import { codexCommand } from "./codex";
-import { docCommand, handleDocText } from "./doc";
+import { docCommand, handleDocText, handleDocCallback } from "./doc";
 
 
 
@@ -40,6 +40,12 @@ export async function handleCommand(update: any) {
         const args = parts.slice(1);
 
         logger.info(`[Command Handler] Received: '${text}' from User: ${userIdStr}`);
+
+        // Handle callback queries for /doc flow
+        if (update.callback_query && (text.startsWith("doc_") || text.startsWith("cat_"))) {
+            const handled = await handleDocCallback(userIdStr, chatId, text);
+            if (handled) return;
+        }
 
         // Новые handlers для rules
         if (command.startsWith('/approve_')) {

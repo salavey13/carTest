@@ -10,18 +10,31 @@
  *   user types schedule    → "с завтра 18:00 до завтра 10:00"
  *   bot generates contract → sends DOCX + saves rental secrets
  *
+ * Manual fallback (when VLM fails):
+ *   User can choose step-by-step text input with inline keyboards
+ *   Categories, yes/no options via buttons
+ *   Names, addresses via free text
+ *
  * State machine uses `user_states` table:
- *   - doc_awaiting_bike       (if /doc without bikeId)
- *   - doc_awaiting_passport   (waiting for passport photo)
- *   - doc_awaiting_license    (waiting for license photo)
- *   - doc_awaiting_schedule   (waiting for rental schedule text)
+ *   - doc_awaiting_bike           (if /doc without bikeId)
+ *   - doc_awaiting_passport       (waiting for passport photo)
+ *   - doc_awaiting_license        (waiting for license photo)
+ *   - doc_awaiting_schedule       (waiting for rental schedule text)
+ *   - doc_manual_passport_name    (manual: full name)
+ *   - doc_manual_passport_number  (manual: passport number)
+ *   - doc_manual_passport_issue   (manual: issue date and authority)
+ *   - doc_manual_passport_birth   (manual: birth date)
+ *   - doc_manual_passport_reg     (manual: registration address)
+ *   - doc_manual_license_name     (manual: full name for license)
+ *   - doc_manual_license_number   (manual: license number)
+ *   - doc_manual_license_categories (manual: category selection)
+ *   - doc_manual_license_issue    (manual: issue date)
+ *   - doc_manual_license_expiry   (manual: expiry date)
+ *   - doc_awaiting_schedule       (waiting for rental schedule text)
  *
  * The /doc command is the VLM equivalent of the skill script
  * (make-rental-contract-skill.mjs), but runs entirely inside the Telegram
  * bot webhook pipeline — no CLI, no pre-provided JSON.
- *
- * VLM-ONLY: Uses ZAI VLM for photo → structured JSON extraction.
- * Tesseract.js removed — client uses ZAI API key.
  *
  * Multi-step design: each photo/VLM call is a separate Telegram message
  * (= separate webhook call = separate Vercel function invocation),
@@ -44,6 +57,57 @@ import { createHash } from "crypto";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DOC_STATE_EXPIRY_MINUTES = 30;
 
+// ── Keyboard builders for manual input ───────────────────────────────────────────
+
+/**
+ * Build inline keyboard for category selection.
+ * Shows common motorcycle categories as toggle buttons.
+ */
+function buildCategoryKeyboard(selected: string[] = []): KeyboardButton[][] {
+  const categories = ["A", "A1", "B", "B1", "M", "C", "C1"];
+  const rows: KeyboardButton[][] = [];
+
+  // Create rows with 3 categories each
+  for (let i = 0; i < categories.length; i += 3) {
+    const row: KeyboardButton[] = [];
+    for (let j = i; j < Math.min(i + 3, categories.length); j++) {
+      const cat = categories[j];
+      const isSelected = selected.includes(cat);
+      row.push({
+        text: `${cat} ${isSelected ? "✅" : "⭕"}`,
+        callback_data: `cat_${cat}`,
+      });
+    }
+    rows.push(row);
+  }
+
+  // Add "Done" and "None" buttons
+  rows.push([
+    { text: selected.length > 0 ? "✓ Готово" : "Нет прав", callback_data: "cat_done" },
+    { text: "↩️ Отменить", callback_data: "cat_cancel" },
+  ]);
+
+  return rows;
+}
+
+/**
+ * Parse callback data to extract action and value.
+ */
+function parseCallbackData(data: string): { action: string; value: string } | null {
+  if (data.startsWith("cat_")) {
+    const value = data.slice(4);
+    if (value === "done" || value === "cancel") {
+      return { action: value, value: "" };
+    }
+    return { action: "toggle", value };
+  }
+  if (data.startsWith("yesno_")) {
+    const parts = data.slice(6).split("_");
+    return { action: parts[0] || "", value: parts[1] || "" };
+  }
+  return null;
+}
+
 // ── State type for /doc flow ──────────────────────────────────────────────────
 
 interface DocFlowContext {
@@ -54,7 +118,23 @@ interface DocFlowContext {
   licenseData?: Record<string, string>;
   categories?: string[];
   accessTier?: AccessTier;
-  extractionProvider?: "zai-vlm";
+  extractionProvider?: "zai-vlm" | "manual";
+  // Manual input state
+  manualStep?: string;
+  // Manual passport fields
+  mpFullName?: string;
+  mpSeries?: string;
+  mpNumber?: string;
+  mpIssueDate?: string;
+  mpIssuedBy?: string;
+  mpBirthDate?: string;
+  mpRegistration?: string;
+  // Manual license fields
+  mlFullName?: string;
+  mlSeries?: string;
+  mlNumber?: string;
+  mlIssueDate?: string;
+  mlExpiryDate?: string;
 }
 
 // ── VLM Photo Extraction ─────────────────────────────────────────────────────
@@ -675,18 +755,22 @@ export async function handleDocPhoto(message: any): Promise<boolean> {
     if (!result.success) {
       const errorMsg = result.error || "Неизвестная ошибка";
       const userFriendlyError = errorMsg.includes("timeout")
-        ? "⏰ Сервер ИИ не ответил вовремя. Попробуйте ещё раз."
+        ? "⏰ Сервер ИИ не ответил вовремя."
         : errorMsg.includes("connection") || errorMsg.includes("ECONNREFUSED")
-        ? "🔌 Не удалось подключиться к серверу ИИ. Попробуйте через минуту."
+        ? "🔌 Не удалось подключиться к серверу ИИ."
         : errorMsg.includes("authentication") || errorMsg.includes("401")
-        ? "🔑 Ошибка доступа к ИИ сервису. Обратитесь к поддержке."
+        ? "🔑 Ошибка доступа к ИИ сервису."
         : `⚠️ ${errorMsg}`;
 
+      // Offer manual input as fallback
       await sendComplexMessage(
         chatId,
-        `${userFriendlyError}\n\n💡 Советы:\n• Убедитесь, что фото чёткое и без бликов\n• Вся информация должна быть читаемой\n• Попробуйте отправить фото ещё раз`,
-        [],
-        { keyboardType: "reply" },
+        `${userFriendlyError}\n\n💡 *В fallback режим:* введите данные вручную или отправьте другое фото.`,
+        [
+          [{ text: "✍️ Ввести данные вручную", callback_data: "doc_manual_passport_start" }],
+          [{ text: "🔄 Отправить другое фото", callback_data: "doc_retry_passport" }],
+        ],
+        { inlineKeyboard: true, parseMode: "Markdown" },
       );
       return true;
     }
@@ -722,18 +806,22 @@ export async function handleDocPhoto(message: any): Promise<boolean> {
     if (!result.success) {
       const errorMsg = result.error || "Неизвестная ошибка";
       const userFriendlyError = errorMsg.includes("timeout")
-        ? "⏰ Сервер ИИ не ответил вовремя. Попробуйте ещё раз."
+        ? "⏰ Сервер ИИ не ответил вовремя."
         : errorMsg.includes("connection") || errorMsg.includes("ECONNREFUSED")
-        ? "🔌 Не удалось подключиться к серверу ИИ. Попробуйте через минуту."
+        ? "🔌 Не удалось подключиться к серверу ИИ."
         : errorMsg.includes("authentication") || errorMsg.includes("401")
-        ? "🔑 Ошибка доступа к ИИ сервису. Обратитесь к поддержке."
+        ? "🔑 Ошибка доступа к ИИ сервису."
         : `⚠️ ${errorMsg}`;
 
+      // Offer manual input as fallback
       await sendComplexMessage(
         chatId,
-        `${userFriendlyError}\n\n💡 Советы:\n• Убедитесь, что фото чёткое и без бликов\n• Все категории должны быть видны\n• Попробуйте отправить фото ещё раз`,
-        [],
-        { keyboardType: "reply" },
+        `${userFriendlyError}\n\n💡 *В fallback режим:* введите данные вручную или отправьте другое фото.`,
+        [
+          [{ text: "✍️ Ввести данные вручную", callback_data: "doc_manual_license_start" }],
+          [{ text: "🔄 Отправить другое фото", callback_data: "doc_retry_license" }],
+        ],
+        { inlineKeyboard: true, parseMode: "Markdown" },
       );
       return true;
     }
@@ -819,6 +907,372 @@ export async function handleDocText(userId: string, chatId: number, text: string
 
   // Unknown state — let other handlers process the message
   return false;
+}
+
+// ── Update handleDocText to handle manual input states ─────────────────────────────
+
+// Add manual passport states
+if (state === "doc_manual_passport_name") {
+  await handleManualPassportName(userId, chatId, context, text);
+  return true;
+}
+if (state === "doc_manual_passport_number") {
+  await handleManualPassportNumber(userId, chatId, context, text);
+  return true;
+}
+if (state === "doc_manual_passport_issue") {
+  await handleManualPassportIssue(userId, chatId, context, text);
+  return true;
+}
+if (state === "doc_manual_passport_birth") {
+  await handleManualPassportBirth(userId, chatId, context, text);
+  return true;
+}
+if (state === "doc_manual_passport_registration") {
+  await handleManualPassportRegistration(userId, chatId, context, text);
+  return true;
+}
+
+// Add manual license states
+if (state === "doc_manual_license_name") {
+  await handleManualLicenseName(userId, chatId, context, text);
+  return true;
+}
+if (state === "doc_manual_license_number") {
+  await handleManualLicenseNumber(userId, chatId, context, text);
+  return true;
+}
+if (state === "doc_manual_license_issue") {
+  await handleManualLicenseIssue(userId, chatId, context, text);
+  return true;
+}
+if (state === "doc_manual_license_expiry") {
+  await handleManualLicenseExpiry(userId, chatId, context, text);
+  return true;
+}
+
+if (state === "doc_awaiting_bike") {
+
+export async function handleDocCallback(
+  userId: string,
+  chatId: number,
+  callbackData: string,
+): Promise<boolean> {
+  const docState = await getDocState(userId);
+  if (!docState) return false;
+
+  const { state, context } = docState;
+  const userIdNum = Number(userId);
+
+  // Answer callback to remove loading state
+  try {
+    await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery?callback_query_id=${callbackData}`,
+      { method: "POST" },
+    );
+  } catch (e) {
+    logger.warn("[/doc] Failed to answer callback", e);
+  }
+
+  // Manual passport start
+  if (callbackData === "doc_manual_passport_start") {
+    context.extractionProvider = "manual";
+    context.manualStep = "name";
+    await setDocState(userId, "doc_manual_passport_name", context);
+    await sendComplexMessage(
+      chatId,
+      "✍️ *Ввод данных паспорта*\n\nШаг 1 из 5: ФИО\n\nВведите фамилию, имя и отчество полностью.",
+      [],
+      { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  // Manual license start
+  if (callbackData === "doc_manual_license_start") {
+    context.extractionProvider = "manual";
+    context.manualStep = "name";
+    await setDocState(userId, "doc_manual_license_name", context);
+    await sendComplexMessage(
+      chatId,
+      "✍️ *Ввод данных водительского удостоверения*\n\nШаг 1 из 4: ФИО\n\nВведите фамилию, имя и отчество (как в ВУ).",
+      [],
+      { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  // Retry passport photo
+  if (callbackData === "doc_retry_passport") {
+    await sendComplexMessage(
+      chatId,
+      "📸 Отправьте фото паспорта ещё раз.\n\n💡 Убедитесь, что фото чёткое и без бликов.",
+      [],
+      { removeKeyboard: true },
+    );
+    return true;
+  }
+
+  // Retry license photo
+  if (callbackData === "doc_retry_license") {
+    await sendComplexMessage(
+      chatId,
+      "📸 Отправьте фото водительского удостоверения ещё раз.\n\n💡 Убедитесь, что все категории видны.",
+      [],
+      { removeKeyboard: true },
+    );
+    return true;
+  }
+
+  // Category selection
+  if (callbackData.startsWith("cat_")) {
+    const value = callbackData.slice(4);
+
+    if (value === "done") {
+      // Done selecting categories
+      const cats = context.categories || [];
+      context.accessTier = deriveUserAccessTier(cats);
+
+      // Move to expiry date
+      context.manualStep = "expiry";
+      await setDocState(userId, "doc_manual_license_expiry", context);
+
+      const catStr = cats.join(", ") || "нет";
+      await sendComplexMessage(
+        chatId,
+        `✅ Категории: *${catStr}*\n\nШаг 4 из 4: Срок действия\n\nВведите срок действия ВУ (ДД.ММ.ГГГГ).`,
+        [],
+        { removeKeyboard: true, parseMode: "Markdown" },
+      );
+      return true;
+    }
+
+    if (value === "cancel") {
+      // Cancel manual input, go back to photo
+      context.manualStep = undefined;
+      context.categories = [];
+      await setDocState(userId, "doc_awaiting_license", context);
+      await sendComplexMessage(
+        chatId,
+        "❌ Ввод отменён. Отправьте фото ВУ или введите данные вручную.",
+        [
+          [{ text: "✍️ Ввести данные вручную", callback_data: "doc_manual_license_start" }],
+          [{ text: "🔄 Отправить другое фото", callback_data: "doc_retry_license" }],
+        ],
+        { inlineKeyboard: true },
+      );
+      return true;
+    }
+
+    // Toggle category
+    const cats = context.categories || [];
+    const idx = cats.indexOf(value);
+    if (idx >= 0) {
+      cats.splice(idx, 1);
+    } else {
+      cats.push(value);
+    }
+    context.categories = cats;
+    await setDocState(userId, state, context);
+
+    // Update keyboard
+    await sendComplexMessage(
+      chatId,
+      `🏷 Выберите категории:\n\nВыбрано: ${cats.join(", ") || "пока ничего"}`,
+      buildCategoryKeyboard(cats),
+      { inlineKeyboard: true },
+    );
+    return true;
+  }
+
+  logger.warn("[/doc] Unhandled callback", { callbackData, state });
+  return false;
+}
+
+// ── Manual input state handlers ─────────────────────────────────────────────────
+
+async function handleManualPassportName(userId: string, chatId: number, context: DocFlowContext, text: string) {
+  context.mpFullName = text.trim();
+  context.manualStep = "number";
+  await setDocState(userId, "doc_manual_passport_number", context);
+  await sendComplexMessage(
+    chatId,
+    `✅ ФИО: *${text}*\n\nШаг 2 из 5: Серия и номер паспорта\n\nВведите серию и номер через пробел (4 цифры 6 цифр).\n\nПример: *4509 123456*`,
+    [],
+    { removeKeyboard: true, parseMode: "Markdown" },
+  );
+}
+
+async function handleManualPassportNumber(userId: string, chatId: number, context: DocFlowContext, text: string) {
+  const parts = text.trim().split(/\s+/);
+  if (parts.length < 2) {
+    await sendComplexMessage(
+      chatId,
+      "❌ Неверный формат. Введите серию и номер через пробел.\n\nПример: *4509 123456*",
+      [],
+      { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return;
+  }
+  context.mpSeries = parts[0];
+  context.mpNumber = parts[1];
+  context.manualStep = "issue";
+  await setDocState(userId, "doc_manual_passport_issue", context);
+  await sendComplexMessage(
+    chatId,
+    `✅ Паспорт: *${context.mpSeries} ${context.mpNumber}*\n\nШаг 3 из 5: Дата выдачи и кем выдан\n\nВведите в формате:\nДД.ММ.ГГГГ — кем выдан\n\nПример: *15.03.2023 — ОМВД России по Н.Новгороду*`,
+    [],
+    { removeKeyboard: true, parseMode: "Markdown" },
+  );
+}
+
+async function handleManualPassportIssue(userId: string, chatId: number, context: DocFlowContext, text: string) {
+  const parts = text.split(/—|-/).map(s => s.trim());
+  if (parts.length < 2) {
+    await sendComplexMessage(
+      chatId,
+      "❌ Неверный формат. Используйте разделитель — или -\n\nПример: *15.03.2023 — ОМВД России по Н.Новгороду*",
+      [],
+      { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return;
+  }
+  context.mpIssueDate = parts[0];
+  context.mpIssuedBy = parts.slice(1).join(" ");
+  context.manualStep = "birth";
+  await setDocState(userId, "doc_manual_passport_birth", context);
+  await sendComplexMessage(
+    chatId,
+    `✅ Выдан: *${context.mpIssuedBy}*\n\nШаг 4 из 5: Дата рождения\n\nВведите дату рождения (ДД.ММ.ГГГГ).`,
+    [],
+    { removeKeyboard: true, parseMode: "Markdown" },
+  );
+}
+
+async function handleManualPassportBirth(userId: string, chatId: number, context: DocFlowContext, text: string) {
+  context.mpBirthDate = text.trim();
+  context.manualStep = "registration";
+  await setDocState(userId, "doc_manual_passport_registration", context);
+  await sendComplexMessage(
+    chatId,
+    `✅ Дата рождения: *${text}*\n\nШаг 5 из 5: Адрес регистрации\n\nВведите адрес регистрации (можно кратко).\n\nПример: *г. Н.Новгород, ул. Ленина, д. 1, кв. 1*`,
+    [],
+    { removeKeyboard: true, parseMode: "Markdown" },
+  );
+}
+
+async function handleManualPassportRegistration(userId: string, chatId: number, context: DocFlowContext, text: string) {
+  context.mpRegistration = text.trim();
+
+  // Compile passport data
+  context.passportData = {
+    fullName: context.mpFullName,
+    series: context.mpSeries,
+    number: context.mpNumber,
+    issueDate: context.mpIssueDate,
+    issuedBy: context.mpIssuedBy,
+    birthDate: context.mpBirthDate,
+    registration: context.mpRegistration,
+  };
+
+  // Show summary and move to license
+  const summary = [
+    "🪪 *Паспорт введён:*",
+    `👤 ФИО: ${context.mpFullName}`,
+    `🔢 Паспорт: ${context.mpSeries} ${context.mpNumber}`,
+    `📅 Выдан: ${context.mpIssueDate}`,
+    `🏢 Кем: ${context.mpIssuedBy}`,
+    `📅 Дата рождения: ${context.mpBirthDate}`,
+    `🏠 Адрес: ${context.mpRegistration}`,
+    "",
+    "Теперь отправьте фото *водительского удостоверения* или введите данные вручную.",
+  ].join("\n");
+
+  await setDocState(userId, "doc_awaiting_license", context);
+  await sendComplexMessage(chatId, summary, [
+    [{ text: "✍️ Ввести данные вручную", callback_data: "doc_manual_license_start" }],
+  ], { removeKeyboard: true, parseMode: "Markdown" });
+}
+
+async function handleManualLicenseName(userId: string, chatId: number, context: DocFlowContext, text: string) {
+  context.mlFullName = text.trim();
+  context.manualStep = "number";
+  await setDocState(userId, "doc_manual_license_number", context);
+  await sendComplexMessage(
+    chatId,
+    `✅ ФИО: *${text}*\n\nШаг 2 из 4: Серия и номер ВУ\n\nВведите серию и номер через пробел.\n\nПример: *99 76 123456*`,
+    [],
+    { removeKeyboard: true, parseMode: "Markdown" },
+  );
+}
+
+async function handleManualLicenseNumber(userId: string, chatId: number, context: DocFlowContext, text: string) {
+  const parts = text.trim().split(/\s+/);
+  if (parts.length < 2) {
+    await sendComplexMessage(
+      chatId,
+      "❌ Неверный формат. Введите серию и номер через пробел.\n\nПример: *99 76 123456*",
+      [],
+      { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return;
+  }
+  context.mlSeries = parts[0];
+  context.mlNumber = parts[1];
+  context.manualStep = "categories";
+  await setDocState(userId, "doc_manual_license_categories", context);
+  await sendComplexMessage(
+    chatId,
+    `✅ ВУ: *${context.mlSeries} ${context.mlNumber}*\n\nШаг 3 из 4: Категории\n\nВыберите имеющиеся категории.`,
+    buildCategoryKeyboard(),
+    { inlineKeyboard: true, parseMode: "Markdown" },
+  );
+}
+
+async function handleManualLicenseIssue(userId: string, chatId: number, context: DocFlowContext, text: string) {
+  context.mlIssueDate = text.trim();
+  context.manualStep = "expiry";
+  await setDocState(userId, "doc_manual_license_expiry", context);
+  await sendComplexMessage(
+    chatId,
+    `✅ Дата выдачи: *${text}*\n\nШаг 4 из 4: Срок действия\n\nВведите срок действия ВУ (ДД.ММ.ГГГГ).`,
+    [],
+    { removeKeyboard: true, parseMode: "Markdown" },
+  );
+}
+
+async function handleManualLicenseExpiry(userId: string, chatId: number, context: DocFlowContext, text: string) {
+  context.mlExpiryDate = text.trim();
+
+  // Compile license data
+  context.licenseData = {
+    fullName: context.mlFullName,
+    series: context.mlSeries,
+    number: context.mlNumber,
+    issueDate: context.mlIssueDate,
+    expiryDate: context.mlExpiryDate,
+    categories: context.categories,
+  };
+  context.accessTier = deriveUserAccessTier(context.categories || []);
+
+  const tierLabel = getAccessTierLabel(context.accessTier || "none");
+  const catStr = (context.categories || []).join(", ") || "нет";
+
+  const summary = [
+    "🚗 *ВУ введено:*",
+    `👤 ФИО: ${context.mlFullName}`,
+    `🔢 ВУ: ${context.mlSeries} ${context.mlNumber}`,
+    `📅 Выдан: ${context.mlIssueDate}`,
+    `📅 Срок: ${context.mlExpiryDate}`,
+    `🏷 Категории: ${catStr}`,
+    `🛡 Допуск: ${tierLabel}`,
+    "",
+    "Укажите период аренды в свободной форме:",
+    "_с завтра 18:00 до завтра 10:00_",
+  ].filter(Boolean).join("\n");
+
+  await setDocState(userId, "doc_awaiting_schedule", context);
+  await sendComplexMessage(chatId, summary, [], { removeKeyboard: true, parseMode: "Markdown" });
 }
 
 // ── Main: /doc command entry point ────────────────────────────────────────────
@@ -956,4 +1410,5 @@ export async function docCommand(
     buttons,
     { keyboardType: "reply", parseMode: "Markdown" },
   );
+}
 }
