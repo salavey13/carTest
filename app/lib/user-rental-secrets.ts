@@ -13,6 +13,7 @@ export interface UserRentalSecret {
   renter_full_name: string | null;
   renter_passport: string | null;
   renter_passport_issue_date: string | null;
+  renter_passport_issued_by: string | null;   // кем выдан (issuing authority)
   renter_registration: string | null;
   renter_driver_license: string | null;
   renter_birth_date: string | null;
