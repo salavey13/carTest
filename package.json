@@ -117,7 +117,8 @@
     "worker-loader": "^3.0.8",
     "xlsx": "^0.18.5",
     "zod": "^3.24.1",
-    "z-ai-web-dev-sdk": "^0.0.17"
+    "z-ai-web-dev-sdk": "^0.0.17",
+    "sharp": "^0.33.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",

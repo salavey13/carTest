@@ -46,9 +46,9 @@ export interface VlmExtractResult {
 }
 
 // ─── Timeout for VLM calls ────────────────────────────────────────────────────
-// Vercel default function timeout is 10s; maxDuration can go up to 30s on Pro.
-// We set a 25s abort to leave headroom for response handling.
-const VLM_TIMEOUT_MS = 25_000;
+// Vercel default function timeout is 10s. With image downsampling, VLM processes
+// faster, so we set a conservative 8s timeout to leave headroom for response handling.
+const VLM_TIMEOUT_MS = 8_000;
 
 // ─── Prompt Templates ───────────────────────────────────────────────────────────
 
