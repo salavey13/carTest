@@ -7,6 +7,17 @@
 @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&display=swap");
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700&display=swap');
+
+/* VIP BIKE ELECTRO Typography */
+.font-archivo {
+  font-family: 'Archivo Black', sans-serif;
+}
+
+.font-onest {
+  font-family: 'Onest', sans-serif;
+}
 
 .font-comic {
   font-family: 'Comic Neue', cursive;
@@ -14,159 +25,166 @@
 
 @layer base {
   :root {
-    /* --- LIGHT MODE PALETTE (Readable High Contrast) --- */
-    /* Defined as H S% L% for Tailwind opacity support */
-    
+    /* --- VIP BIKE ELECTRO LIGHT MODE PALETTE --- */
+    /* Premium, high-contrast aesthetic */
+
     /* Backgrounds */
-    --background: 0 0% 98%;        /* #FAFAFA */
-    --foreground: 222 47% 11%;     /* Dark Blue-Grey for better contrast */
-    
+    --background: 0 0% 96%;        /* #F5F5F5 - Premium light gray */
+    --foreground: 240 10% 12%;      /* #1A1A1A - Near-black text */
+
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    
+    --card-foreground: 240 10% 12%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    
-    /* UI Elements */
-    --primary: 7 85% 55%;          /* Darker Red-Orange for readability */
+    --popover-foreground: 240 10% 12%;
+
+    /* UI Elements - VIP BIKE ELECTRO Branding */
+    --primary: 7 85% 58%;          /* Vibrant Red-Orange */
     --primary-foreground: 0 0% 100%;
-    
-    --secondary: 228 20% 90%;
-    --secondary-foreground: 228 19% 15%;
-    
-    --muted: 228 20% 92%;
-    --muted-foreground: 228 10% 40%;
-    
-    --accent: 34 90% 45%;          /* Darker Gold/Orange for light mode text */
+
+    --secondary: 240 5% 92%;
+    --secondary-foreground: 240 10% 12%;
+
+    --muted: 240 5% 90%;
+    --muted-foreground: 240 6% 50%;
+
+    --accent: 36 88% 52%;          /* Rich Gold */
     --accent-foreground: 0 0% 100%;
-    
+
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 228 20% 85%;
-    --input: 228 20% 96%;
-    --input-border: 228 20% 80%;
+    --border: 240 6% 88%;
+    --input: 240 5% 96%;
+    --input-border: 240 6% 82%;
     --ring: 7 85% 60%;
     --radius: 0.75rem;
 
-    /* --- BRAND COLORS (HSL Values) --- */
-    /* Adjusted for Light Mode Visibility */
-    --brand-red-orange: 7 85% 55%;
-    --brand-deep-indigo: 228 30% 30%;
-    --brand-gold: 34 90% 45%; 
-    --brand-beige: 40 20% 80%;
-    --brand-cyan: 180 100% 35%;      /* Darker Cyan for white backgrounds */
-    --brand-green: 145 70% 35%;      /* Darker Green */
-    --brand-purple: 270 60% 50%;
-    --brand-pink: 330 70% 50%;
+    /* --- VIP BIKE ELECTRO BRAND COLORS --- */
+    --brand-red-orange: 7 85% 58%;     /* EE6A40 */
+    --brand-deep-indigo: 228 35% 22%;  /* #1E2646 */
+    --brand-gold: 36 88% 52%;          /* F4BD55 */
+    --brand-beige: 45 25% 82%;         /* #E6D8C4 */
+    --brand-cyan: 188 85% 42%;         /* #2F9ACD */
+    --brand-green: 150 72% 38%;       /* #33AA66 */
+    --brand-purple: 275 65% 48%;      /* #7A3F99 */
+    --brand-pink: 340 75% 52%;         /* #D64B7E */
 
-    /* --- RGB HELPERS (Required for legacy rgba() usages) --- */
-    --red-orange-rgb: 238, 106, 89;
-    --deep-indigo-rgb: 58, 63, 88;
-    --gold-rgb: 249, 172, 103;
-    --beige-rgb: 236, 230, 205;
-    --black-rgb: 0, 0, 0;
-    
-    --purple-rgb: 147, 51, 234;
-    --pink-rgb: 236, 72, 153;
-    --cyan-rgb: 6, 182, 212;
+    /* --- RGB HELPERS --- */
+    --red-orange-rgb: 238, 106, 64;
+    --deep-indigo-rgb: 30, 38, 70;
+    --gold-rgb: 244, 189, 85;
+    --beige-rgb: 230, 216, 196;
+    --black-rgb: 26, 26, 26;
+
+    --purple-rgb: 122, 63, 153;
+    --pink-rgb: 214, 75, 126;
+    --cyan-rgb: 47, 154, 205;
     --blue-rgb: 59, 130, 246;
-    --yellow-rgb: 234, 179, 8;
-    --green-rgb: 34, 197, 94;
+    --yellow-rgb: 250, 189, 47;
+    --green-rgb: 51, 170, 102;
     --orange-rgb: 249, 115, 22;
-    --lime-rgb: 132, 204, 22;
-    --neon-lime-rgb: 132, 204, 22;
-    
-    --bg-rgb: 250, 250, 250;
+
+    --bg-rgb: 245, 245, 245;
     --card-rgb: 255, 255, 255;
-    --default-glow-rgb: 249, 172, 103; 
+    --default-glow-rgb: 244, 189, 85;
 
     /* Chart Colors */
-    --chart-1: 7 85% 55%;
-    --chart-2: 34 90% 45%;
-    --chart-3: 145 70% 35%;
-    --chart-4: 228 30% 30%;
-    --chart-5: 180 100% 35%;
+    --chart-1: 7 85% 58%;
+    --chart-2: 36 88% 52%;
+    --chart-3: 150 72% 38%;
+    --chart-4: 228 35% 22%;
+    --chart-5: 188 85% 42%;
 
     /* Sidebar */
-    --sidebar-background: 228 20% 10%;
+    --sidebar-background: 228 35% 18%;
     --sidebar-foreground: 240 5% 96%;
-    --sidebar-primary: 7 85% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-primary: 36 88% 52%;
+    --sidebar-primary-foreground: 228 35% 18%;
     --sidebar-accent: 228 19% 25%;
     --sidebar-accent-foreground: 240 5% 96%;
-    --sidebar-border: 228 20% 20%;
-    --sidebar-ring: 7 85% 60%;
-    
+    --sidebar-border: 228 20% 25%;
+    --sidebar-ring: 36 88% 52%;
+
     /* Text helpers */
-    --light-text: 228 19% 15%; 
-    --accent-text: 7 85% 55%; 
+    --light-text: 240 10% 12%;
+    --accent-text: 36 88% 52%;
 
     /* Homework solution page */
-    --homework-bg: 210 40% 98%;
-    --homework-text: 222 47% 11%;
+    --homework-bg: 240 5% 98%;
+    --homework-text: 240 10% 12%;
   }
 
   .dark {
-    /* --- DARK MODE PALETTE (Neon/Cyber) --- */
-    --background: 228 20% 8%;      /* #101218 */
-    --foreground: 48 43% 86%;      /* Light Beige Text */
-    
-    --card: 228 20% 12%;
-    --card-foreground: 48 43% 86%;
-    
-    --popover: 228 20% 10%;
-    --popover-foreground: 48 43% 86%;
-    
-    --primary: 34 92% 70%;         /* Gold/Orange for primary */
-    --primary-foreground: 228 20% 10%;
-    
-    --secondary: 228 19% 29%;
-    --secondary-foreground: 0 0% 100%;
-    
-    --muted: 228 15% 25%;
-    --muted-foreground: 48 30% 70%;
-    
-    --accent: 48 43% 86%;
-    --accent-foreground: 228 20% 8%;
-    
+    /* --- VIP BIKE ELECTRO DARK MODE PALETTE --- */
+    /* Cyber/Neon aesthetic with premium feel */
+
+    --background: 228 35% 10%;      /* #121520 - Deep dark */
+    --foreground: 45 25% 88%;       /* #E6D8C4 - Warm beige text */
+
+    --card: 228 35% 14%;
+    --card-foreground: 45 25% 88%;
+
+    --popover: 228 35% 12%;
+    --popover-foreground: 45 25% 88%;
+
+    /* UI Elements - Neon Gold */
+    --primary: 36 92% 68%;          /* Bright Gold */
+    --primary-foreground: 228 35% 10%;
+
+    --secondary: 228 19% 25%;
+    --secondary-foreground: 45 25% 88%;
+
+    --muted: 228 15% 22%;
+    --muted-foreground: 45 20% 65%;
+
+    --accent: 45 25% 88%;
+    --accent-foreground: 228 35% 10%;
+
     --destructive: 0 80% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 228 20% 20%;
-    --input: 228 20% 15%;
-    --input-border: 228 20% 25%;
-    --ring: 34 92% 70%;
+    --border: 228 20% 22%;
+    --input: 228 35% 14%;
+    --input-border: 228 20% 28%;
+    --ring: 36 92% 68%;
 
-    /* --- Brand Colors (HSL) - Neon --- */
-    --brand-red-orange: 7 85% 64%;
-    --brand-deep-indigo: 228 19% 29%;
-    --brand-gold: 34 92% 70%;
-    --brand-beige: 48 43% 86%;
-    --brand-cyan: 180 70% 55%;
-    --brand-green: 145 60% 50%;
-    --brand-purple: 270 70% 60%;
-    --brand-pink: 330 80% 65%;
+    /* --- Brand Colors (Neon) --- */
+    --brand-red-orange: 7 88% 62%;     /* #EE6A40 - Neon Orange */
+    --brand-deep-indigo: 228 35% 18%; /* #1E2E46 */
+    --brand-gold: 36 92% 68%;         /* #F4BD55 - Neon Gold */
+    --brand-beige: 45 25% 88%;        /* #E6D8C4 */
+    --brand-cyan: 188 85% 58%;        /* #3FB8E5 - Neon Cyan */
+    --brand-green: 150 78% 48%;       /* #44CC77 - Neon Green */
+    --brand-purple: 275 72% 58%;       /* #9955DD - Neon Purple */
+    --brand-pink: 340 82% 60%;        /* #DD5588 - Neon Pink */
 
-    /* RGB Helpers (Neon Update) */
-    --cyan-rgb: 100, 220, 255;
-    --green-rgb: 100, 255, 150;
-    --purple-rgb: 180, 100, 255;
-    --pink-rgb: 255, 100, 200;
-    --bg-rgb: 20, 22, 29;
-    --card-rgb: 27, 29, 39;
+    /* RGB Helpers (Neon) */
+    --red-orange-rgb: 238, 106, 64;
+    --deep-indigo-rgb: 30, 46, 70;
+    --gold-rgb: 244, 189, 85;
+    --beige-rgb: 230, 216, 196;
 
-    --light-text: 48 43% 86%;
-    --accent-text: 34 92% 70%;
+    --purple-rgb: 153, 85, 221;
+    --pink-rgb: 221, 85, 136;
+    --cyan-rgb: 63, 184, 229;
+    --green-rgb: 68, 204, 119;
+    --blue-rgb: 96, 165, 250;
+
+    --bg-rgb: 18, 21, 32;
+    --card-rgb: 27, 33, 46;
+
+    --light-text: 45 25% 88%;
+    --accent-text: 36 92% 68%;
 
     /* Homework solution page */
-    --homework-bg: 228 50% 6%;
-    --homework-text: 210 40% 96%;
+    --homework-bg: 228 35% 8%;
+    --homework-text: 240 5% 96%;
   }
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Onest', sans-serif;
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -174,16 +192,22 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Orbitron', sans-serif;
-    @apply text-foreground; 
+  h1, h2, h3, h4, h5, h6, .heading {
+    font-family: 'Archivo Black', sans-serif;
+    @apply text-foreground;
+    letter-spacing: -0.02em;
   }
-  h1 { @apply text-4xl font-bold md:text-5xl; }
-  h2 { @apply text-3xl font-bold md:text-4xl; } 
-  h3 { @apply text-2xl font-semibold md:text-3xl; } 
-  h4 { @apply text-xl font-semibold md:text-2xl; } 
-  h5 { @apply text-lg font-medium md:text-xl; } 
-  h6 { @apply text-base font-medium md:text-lg; } 
+  h1 { @apply text-4xl font-black md:text-5xl lg:text-6xl; }
+  h2 { @apply text-3xl font-black md:text-4xl lg:text-5xl; }
+  h3 { @apply text-2xl font-bold md:text-3xl lg:text-4xl; }
+  h4 { @apply text-xl font-bold md:text-2xl lg:text-3xl; }
+  h5 { @apply text-lg font-semibold md:text-xl lg:text-2xl; }
+  h6 { @apply text-base font-semibold md:text-lg lg:text-xl; }
+
+  /* Orbitron for technical/cyber elements */
+  .font-orbitron {
+    font-family: 'Orbitron', sans-serif;
+  } 
   
   section {
     scroll-margin-top: 96px; 
