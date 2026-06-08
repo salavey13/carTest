@@ -340,7 +340,7 @@ export function VipBikeLandingClient({
                           />
                         </div>
                       ) : (
-                        <VibeContentRenderer content={tab.icon} className="w-24 h-24 text-amber-400" />
+                        <VibeContentRenderer content={currentTab.icon} className="w-24 h-24 text-amber-400" />
                       )}
                     </div>
                   </div>
