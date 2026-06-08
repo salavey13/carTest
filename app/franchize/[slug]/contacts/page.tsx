@@ -33,16 +33,23 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
   const surface = crewPaletteForSurface(crew.theme);
   const resolvedSlug = crew.slug || slug;
   const activePath = `/franchize/${resolvedSlug}/contacts`;
-  const supportTelegramHref = "https://t.me/oneBikePlsBot";
+
+  // Use crew-specific bot username with fallback to env var
+  const crewBotUsername = crew.contacts.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME;
+  const supportTelegramHref = crewBotUsername
+    ? `https://t.me/${crewBotUsername}`
+    : "";
+
   const hasTelegram = Boolean(crew.contacts.telegram);
   const telegramHref = hasTelegram
     ? crew.contacts.telegram.startsWith("http")
       ? crew.contacts.telegram
       : `https://t.me/${crew.contacts.telegram.replace(/^@/, "")}`
     : supportTelegramHref;
+
   const primaryContactCta = hasTelegram
     ? { label: "Написать в Telegram", href: telegramHref }
-    : { label: "Поддержка OneBikePls", href: supportTelegramHref };
+    : { label: "Поддержка", href: supportTelegramHref };
   const phoneHref = crew.contacts.phone ? `tel:${crew.contacts.phone.replace(/[^+\d]/g, "")}` : "";
   const gps = crew.contacts.map.gps.trim();
   const hasGps = /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(gps);

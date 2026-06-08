@@ -55,6 +55,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeTheme } from "@/app/franchize/actions";
+import { crewPaletteForSurface, withAlpha } from "@/app/franchize/lib/theme";
 
 // ── Pipeline imports ──
 import { resolveVipBikeProfile } from "@/app/franchize/lib/onboarding/resolve-profile";
@@ -126,7 +127,8 @@ const fallbackHeroPanels: Record<string, HeroPanel> = {
     title: "Sequence Zero",
     description: "Контролируемый первый выезд: подготовленный электроэндуро, защитный комплект и сопровождение до уверенного возвращения.",
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_bg-cf31dc2b-291b-440b-953b-6e1b4a838e4e.jpg",
-    href: "/franchize/vip-bike",
+    // href will be dynamically replaced with crewSlug below
+    href: "/franchize/{slug}",
     cta: "Выбрать байк",
     meta: [
       { label: "от", value: "4 900 ₽ / день" },
@@ -142,7 +144,7 @@ const fallbackHeroPanels: Record<string, HeroPanel> = {
     title: "Соберите электроэндуро под свой стиль",
     description: "Модель, батарея, цвет и опции собираются в понятный заказ — без хаоса в переписке и с прозрачным следующим шагом.",
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/81Dts9uMBXZXTKC7PjIbBRRRHYGQx_2TPEKFWvaUwDzzgSQPjxUf4GjAiRaDWIcWgwmeaZQTKppFn5VBS6yZeK7R-38bfc7fb-0d5a-4b62-b7e6-ca83950cb265.jpg",
-    href: "/franchize/vip-bike/configurator",
+    href: "/franchize/{slug}/configurator",
     cta: "Конфигуратор",
     meta: [
       { label: "пакеты", value: "Standard / Long Range" },
@@ -157,7 +159,7 @@ const fallbackHeroPanels: Record<string, HeroPanel> = {
     eyebrow: "Живая карта",
     title: "Живые маршруты и точки сбора",
     description: "Видите активность экипажа, точки встреч и темп группы заранее — поездка ощущается организованной ещё до старта.",
-    href: "/franchize/vip-bike/map-riders",
+    href: "/franchize/{slug}/map-riders",
     cta: "Открыть карту",
     meta: [
       { label: "онлайн", value: "3 райдера" },
@@ -172,7 +174,7 @@ const fallbackHeroPanels: Record<string, HeroPanel> = {
     eyebrow: "Личный контроль",
     title: "Контролируйте активные аренды",
     description: "Статусы, подтверждения, фото до/после и возврат собраны в одном центре, чтобы сделка не зависала в чатах.",
-    href: "/franchize/vip-bike/rentals",
+    href: "/franchize/{slug}/rentals",
     cta: "Мои аренды",
     meta: [
       { label: "сценарий", value: "бронь → возврат" },
@@ -188,7 +190,7 @@ const fallbackHeroPanels: Record<string, HeroPanel> = {
     title: "Sequence Zero",
     description: "Премиальный электромотоцикл: центральный двигатель 30 кВт, разгон 0–100 за 2.8 секунды, запас хода до 300 км. Тихая мощь нового поколения.",
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sequence-zero/image_1.jpg",
-    href: "/franchize/vip-bike/electro-enduro",
+    href: "/franchize/{slug}/electro-enduro",
     cta: "Изучить электро",
     meta: [
       { label: "тип", value: "Electric Sport" },
@@ -240,8 +242,21 @@ function deriveNote(profile: VipBikeUserProfile, experience: VipBikeExperienceCo
 // MAIN COMPONENT — thin orchestration shell
 // ═══════════════════════════════════════════════════════
 
-export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; theme: FranchizeTheme }) {
+export function VipBikeRentalClient({
+  crew,
+  items,
+  theme,
+}: {
+  crew?: { slug?: string; name?: string; header?: { brandName?: string } };
+  items: CatalogItemVM[];
+  theme: FranchizeTheme;
+}) {
+  // Extract crewSlug for dynamic routing - fallback to vip-bike for backward compatibility
+  const crewSlug = crew?.slug || "vip-bike";
   const { dbUser } = useAppContext();
+
+  // Get theme-based surface colors for proper text/background contrast
+  const surface = crewPaletteForSurface(theme);
   const { scrollYProgress } = useScroll();
   const y = useTransform(scrollYProgress, [0, 1], [0, -90]);
 
@@ -325,7 +340,7 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
   useEffect(() => {
     let isMounted = true;
     if (items.length === 0) {
-      fetch("/api/franchize/catalog?slug=vip-bike")
+      fetch(`/api/franchize/catalog?slug=${crewSlug}`)
         .then((response) => (response.ok ? response.json() : null))
         .then((payload) => {
           if (isMounted && payload?.success && Array.isArray(payload.data?.items)) {
@@ -335,12 +350,12 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
         .catch(() => { if (isMounted) setCatalogItems([]); })
         .finally(() => { if (isMounted) setIsCatalogLoading(false); });
     }
-    fetch("/api/map-riders/overview?slug=vip-bike")
+    fetch(`/api/map-riders/overview?slug=${crewSlug}`)
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => { if (isMounted && payload?.success) setMapOverview(payload.data as MapRidersOverview); })
       .catch(() => { if (isMounted) setMapOverview(null); });
     return () => { isMounted = false; };
-  }, [items.length]);
+  }, [items.length, crewSlug]);
 
   // ══════════════════════════════════════════════════════
   // HERO PANELS: Catalog-driven overrides
@@ -348,34 +363,44 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
   const heroPanels = useMemo<Record<string, HeroPanel>>(() => {
     const rentItem = selectFlagshipBike(catalogItems) ?? catalogItems.find((item) => item.pricePerDay > 0);
     const saleItem = catalogItems.find((item) => item.saleAvailable || isEnabled(item.rawSpecs?.sale));
-    return {
+    // Helper to replace {slug} placeholder with actual crewSlug
+    const resolveHref = (href: string) => href.replace("{slug}", crewSlug);
+    const basePanels = {
       ...fallbackHeroPanels,
+      rent: { ...fallbackHeroPanels.rent, href: resolveHref(fallbackHeroPanels.rent.href) },
+      buy: { ...fallbackHeroPanels.buy, href: resolveHref(fallbackHeroPanels.buy.href) },
+      map: { ...fallbackHeroPanels.map, href: resolveHref(fallbackHeroPanels.map.href) },
+      rentals: { ...fallbackHeroPanels.rentals, href: resolveHref(fallbackHeroPanels.rentals.href) },
+      "electro-enduro": { ...fallbackHeroPanels["electro-enduro"], href: resolveHref(fallbackHeroPanels["electro-enduro"].href) },
+    };
+    return {
+      ...basePanels,
       rent: rentItem ? {
-        ...fallbackHeroPanels.rent,
+        ...basePanels.rent,
         title: rentItem.title,
-        description: rentItem.description || fallbackHeroPanels.rent.description,
-        imageUrl: getBikeGallery(rentItem)[0] || fallbackHeroPanels.rent.imageUrl,
-        href: `/franchize/vip-bike?vehicle=${rentItem.id}`,
+        description: rentItem.description || basePanels.rent.description,
+        imageUrl: getBikeGallery(rentItem)[0] || basePanels.rent.imageUrl,
+        href: `/franchize/${crewSlug}?vehicle=${rentItem.id}`,
         meta: [
           { label: "аренда", value: rentItem.rentPriceLabel || `${rentItem.pricePerDay.toLocaleString("ru-RU")} ₽ / день` },
           { label: "статус", value: rentItem.availabilityLabel },
           { label: "категория", value: rentItem.category || "Electro-Enduro" },
         ],
-      } : fallbackHeroPanels.rent,
+      } : basePanels.rent,
       buy: saleItem ? {
-        ...fallbackHeroPanels.buy,
+        ...basePanels.buy,
         title: saleItem.title,
-        description: saleItem.description || fallbackHeroPanels.buy.description,
-        imageUrl: getBikeGallery(saleItem)[0] || fallbackHeroPanels.buy.imageUrl,
-        href: `/franchize/vip-bike/market/${saleItem.id}/buy`,
+        description: saleItem.description || basePanels.buy.description,
+        imageUrl: getBikeGallery(saleItem)[0] || basePanels.buy.imageUrl,
+        href: `/franchize/${crewSlug}/market/${saleItem.id}/buy`,
         meta: [
           { label: "покупка", value: getSalePriceLabel(saleItem) },
           { label: "аренда", value: saleItem.rentPriceLabel || `${saleItem.pricePerDay.toLocaleString("ru-RU")} ₽ / день` },
           { label: "категория", value: saleItem.category || "Electro-Enduro" },
         ],
-      } : fallbackHeroPanels.buy,
+      } : basePanels.buy,
       map: {
-        ...fallbackHeroPanels.map,
+        ...basePanels.map,
         meta: [
           { label: "онлайн", value: `${formatCompactNumber(mapOverview?.stats?.activeRiders, 3)} райдера` },
           { label: "за неделю", value: `${formatCompactNumber(mapOverview?.stats?.totalWeeklyDistanceKm, 127)} км` },
@@ -383,7 +408,7 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
         ],
       },
     };
-  }, [catalogItems, mapOverview]);
+  }, [catalogItems, mapOverview, crewSlug]);
 
   const activeHeroPanel = heroPanels[heroMode] ?? heroPanels.rent;
 
@@ -403,7 +428,7 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/45 px-4 py-2 text-sm text-white/90 backdrop-blur-sm">
             <VibeContentRenderer content="::FaBolt::" className="text-brand-yellow" />
-            <span>VIP BIKE · ПРЕМИАЛЬНЫЙ ПРОКАТ И МАРШРУТЫ</span>
+            <span>{crew?.header?.brandName || crew?.name || "VIP BIKE"} · ПРЕМИАЛЬНЫЙ ПРОКАТ И МАРШРУТЫ</span>
           </div>
           <div className="mb-5 w-full max-w-2xl rounded-2xl border border-white/20 bg-black/40 p-4 text-left text-sm text-white/90 backdrop-blur-sm">
             <div className="mb-1 font-medium text-brand-yellow"><VibeContentRenderer content={vibeProfile.badge} /></div>
@@ -469,26 +494,26 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
         <BikeShowcase edgeToEdge />
       </motion.section>
     ),
-    conversionPilot: <ConversionPilot items={catalogItems} overview={mapOverview} isCatalogLoading={isCatalogLoading} />,
+    conversionPilot: <ConversionPilot items={catalogItems} overview={mapOverview} isCatalogLoading={isCatalogLoading} crewSlug={crewSlug} />,
     electroShowcase: (
       <div onViewportEnter={() => tracker.trackViewCategory("electro")}>
-        <ElectroEnduroShowcase items={catalogItems} isCatalogLoading={isCatalogLoading} />
+        <ElectroEnduroShowcase items={catalogItems} isCatalogLoading={isCatalogLoading} crewSlug={crewSlug} />
       </div>
     ),
     mapPreview: (
       <div onViewportEnter={() => tracker.trackMapOpen()}>
-        <MapRidersLivePreview overview={mapOverview} />
+        <MapRidersLivePreview overview={mapOverview} crewSlug={crewSlug} />
       </div>
     ),
     gearSection: <GearSection />,
-    stepsProgress: <StepsProgress items={catalogItems} />,
-    rentalQuickActions: <RentalQuickActionHub items={catalogItems} overview={mapOverview} isCatalogLoading={isCatalogLoading} />,
-    companyServiceHub: <VipBikeCompanyServiceHub />,
+    stepsProgress: <StepsProgress items={catalogItems} crewSlug={crewSlug} />,
+    rentalQuickActions: <RentalQuickActionHub items={catalogItems} overview={mapOverview} isCatalogLoading={isCatalogLoading} crewSlug={crewSlug} />,
+    companyServiceHub: <VipBikeCompanyServiceHub crewSlug={crewSlug} />,
     serviceCards: <ServiceCardsSection />,
-    howItWorks: <HowItWorksSection />,
+    howItWorks: <HowItWorksSection crewSlug={crewSlug} />,
     investSection: <InvestSection onDwellTime={(seconds) => tracker.trackSectionDwell("investSection", seconds)} />,
     faq: <FaqSection />,
-  }), [catalogItems, mapOverview, isCatalogLoading, heroMode, vibeProfile, tracker, y, handleHeroModeChange, heroPanels]);
+  }), [catalogItems, mapOverview, isCatalogLoading, heroMode, vibeProfile, tracker, y, handleHeroModeChange, heroPanels, crewSlug]);
 
   // ══════════════════════════════════════════════════════
   // DECLARATIVE SECTION RENDERING
@@ -519,9 +544,11 @@ export function VipBikeRentalClient({ items, theme }: { items: CatalogItemVM[]; 
   // RENDER: Hero always first, dynamic sections follow
   // ══════════════════════════════════════════════════════
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      {/* Background gradients */}
-      <div className="pointer-events-none fixed inset-0 z-[-2] bg-[radial-gradient(circle_at_top,rgba(255,106,0,0.14),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(119,0,255,0.10),transparent_42%)]" />
+    <div className="relative min-h-screen overflow-hidden" style={surface.page}>
+      {/* Background gradients - use theme-based colors */}
+      <div className="pointer-events-none fixed inset-0 z-[-2]" style={{
+        background: `radial-gradient(circle at top, ${withAlpha(theme.palette.accentMain, 0.14)} 0%, transparent 35%), radial-gradient(circle at 80% 20%, ${withAlpha(theme.palette.borderSoft, 0.10)} 0%, transparent 42%)`
+      }} />
       <div className="pointer-events-none fixed inset-0 z-[-3] bg-[linear-gradient(to_bottom,rgba(0,0,0,0.45),transparent_35%)]" />
 
       {/* Hero is always first */}

@@ -42,7 +42,14 @@ import { useSessionManager } from "@/app/franchize/hooks/useSessionManager";
 const RacingMap = dynamic(() => import("@/components/maps/RacingMap").then((mod) => mod.RacingMap), { ssr: false });
 
 const DEFAULT_BOUNDS = { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 };
-const HOME_BASE: [number, number] = [56.204245, 43.798905];
+// HQ coordinates: пл. Комсомольская 2 (56.297654, 43.947218)
+// Demo riders placed near HQ for realistic visualization
+const HOME_BASE: [number, number] = [56.297654, 43.947218];
+const DEMO_RIDER_OFFSETS: [number, number][] = [
+  [56.301, 43.952],  // North-east of HQ
+  [56.296, 43.935],  // South-west of HQ
+  [56.294, 43.960],  // South-east of HQ
+];
 const MEETUP_ACTION_DEBOUNCE_MS = 2000;
 
 // Snap labels for the 3-button control (matching vaul snapPoints)
@@ -189,17 +196,15 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
 
   const mapPoints = useMemo(() => {
     const demoPoints = showDemo
-      ? [
-          {
-            id: "demo-rider-alpha",
-            name: "Demo Rider База • 14 км/ч",
-            type: "point" as const,
-            icon: "image:https://placehold.co/56x56/111827/ffffff?text=SB",
-            color: "#60a5fa",
-            coords: [HOME_BASE],
-            markerClassName: "animate-in fade-in duration-300",
-          },
-        ]
+      ? DEMO_RIDER_OFFSETS.map((coords, index) => ({
+          id: `demo-rider-${String.fromCharCode(65 + index)}`,
+          name: `Demo Rider ${String.fromCharCode(65 + index)} • ${12 + index * 2} км/ч`,
+          type: "point" as const,
+          icon: `image:https://placehold.co/56x56/111827/ffffff?text=${String.fromCharCode(65 + index)}`,
+          color: "#60a5fa",
+          coords: [coords],
+          markerClassName: "animate-in fade-in duration-300",
+        }))
       : [];
 
     const meetupPoints = state.meetups.map((m) => ({

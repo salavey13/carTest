@@ -389,7 +389,7 @@ const PRESETS: ExperiencePreset[] = [
     copyTone: "friendly",
     primaryCTA: {
       label: "🚀 Начать анкету /start",
-      href: "https://t.me/oneBikePlsBot?start=onboard",
+      href: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}?start=onboard`,
       isExternal: true,
       variant: "brand-yellow",
     },
@@ -605,7 +605,7 @@ export function resolveCTA(profile: VipBikeUserProfile): PrimaryCTA {
   if (!profile.onboardingCompleted && profile.confidence < 0.3) {
     return {
       label: "🚀 Начать анкету /start",
-      href: "https://t.me/oneBikePlsBot?start=onboard",
+      href: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}?start=onboard`,
       isExternal: true,
       variant: "brand-yellow",
     };

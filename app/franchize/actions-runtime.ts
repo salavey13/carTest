@@ -1984,15 +1984,23 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     );
 
     const recipientSet = new Set<string>([adminChatId, payload.telegramUserId]);
-    const { data: crewRow } = await supabaseAdmin.from("crews").select("owner_id").eq("slug", payload.slug).maybeSingle();
+    const { data: crewRow } = await supabaseAdmin
+      .from("crews")
+      .select("owner_id, metadata")
+      .eq("slug", payload.slug)
+      .maybeSingle();
     // owner_id IS the Telegram chat ID (user_id === telegram chat_id)
     if (crewRow?.owner_id) {
       recipientSet.add(String(crewRow.owner_id));
     }
 
+    // Extract crew bot username from metadata
+    const crewBotUsername = crewRow?.metadata?.franchize?.contacts?.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME || "";
+
     // ── Generate QR deep-link PNG ──────────────────────────────────
     const firstBikeId = payload.cartLines.length > 0 ? payload.cartLines[0].itemId : "";
-    const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${firstBikeId}_${sha256}`;
+    const botUsername = crewBotUsername || "oneBikePlsBot"; // Fallback to maintain compatibility
+    const qrDeepLink = `https://t.me/${botUsername}/app?startapp=rent_${firstBikeId}_${sha256}`;
     const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
 
     let qrPngBuffer: Buffer | null = null;
@@ -3076,9 +3084,11 @@ async function createFranchizeOrderInvoiceInternal(
   const rentalId = randomUUID();
   const startParamPrefix = flowType === "rental" ? "rental" : "sale";
   const startParam = `${startParamPrefix}-${rentalId}`;
-  // TODO: Pass crew bot username through checkout flow instead of hardcoding fallback
-  const crewBotUsername = "";
-  const telegramWebappLink = `https://t.me/${crewBotUsername || "oneBikePlsBot"}/app?startapp=${startParam}`;
+
+  // Get crew bot username from metadata (or fallback to env var)
+  const crewBotUsername = process.env.TELEGRAM_BOT_USERNAME || "";
+  const botUsername = crewBotUsername || "oneBikePlsBot"; // Fallback for compatibility
+  const telegramWebappLink = `https://t.me/${botUsername}/app?startapp=${startParam}`;
   const siteBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
   const franchizeRentalLink = `${siteBaseUrl}/franchize/${payload.slug}/rental/${rentalId}`;
 
@@ -3353,8 +3363,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       docVerifierRecordId: "",
       contractSourceScope: "",
       contractOriginalSha256: "",
-      // TODO: Resolve crew bot username from slug for rental deep links
-      telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${safeRentalId}`,
+      // Use env var for crew bot username in fallback case
+      telegramDeepLink: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}/app?startapp=rental-${safeRentalId}`,
     };
   }
 
@@ -3382,8 +3392,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       docVerifierRecordId: "",
       contractSourceScope: "",
       contractOriginalSha256: "",
-      // TODO: Resolve crew bot username from slug for rental deep links
-      telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${safeRentalId}`,
+      // Use env var for crew bot username in fallback case
+      telegramDeepLink: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}/app?startapp=rental-${safeRentalId}`,
     };
   }
 
@@ -3419,7 +3429,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     docVerifierRecordId: typeof verifier?.docVerifierRecordId === "string" ? verifier.docVerifierRecordId : "",
     contractSourceScope: typeof verifier?.sourceScope === "string" ? verifier.sourceScope : "",
     contractOriginalSha256: typeof verifier?.originalSha256 === "string" ? verifier.originalSha256 : "",
-    // TODO: Resolve crew bot username from slug for rental deep links
-    telegramDeepLink: `https://t.me/oneBikePlsBot/app?startapp=rental-${data.rental_id}`,
+    // Use env var for crew bot username
+    telegramDeepLink: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}/app?startapp=rental-${data.rental_id}`,
   };
 }

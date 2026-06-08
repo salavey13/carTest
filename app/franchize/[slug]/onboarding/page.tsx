@@ -45,8 +45,16 @@ export default async function PartnerOnboardingPage({ params }: PartnerOnboardin
   const crewSlug = crew.slug || slug;
   const activePath = `/franchize/${crewSlug}/onboarding`;
   const surface = crewPaletteForSurface(crew.theme);
-  const brandName = crew.header.brandName || crew.name || "VIP BIKE";
-  const telegramHref = crew.contacts.telegram ? `https://t.me/${crew.contacts.telegram.replace("@", "")}` : "https://t.me/oneBikePlsBot";
+  const brandName = crew.header.brandName || crew.name || "Экипаж";
+
+  // Use crew-specific telegram handle with fallback to bot username
+  const crewTelegram = crew.contacts.telegram?.replace("@", "");
+  const crewBotUsername = crew.contacts.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME;
+  const telegramHref = crewTelegram
+    ? `https://t.me/${crewTelegram}`
+    : crewBotUsername
+      ? `https://t.me/${crewBotUsername}`
+      : "";
   const { onboardingChecklist, onboardingReadinessRows } = crew.contentBlocks;
   const accentText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
 

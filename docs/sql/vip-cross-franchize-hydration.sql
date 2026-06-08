@@ -178,7 +178,7 @@ set
           'phone', '+7 9200-789-999',
           'email', 'hello@vipcross-rental.example',
           'telegram', '@VIP_CROSS_NN',
-          'telegramBotUsername', 'oneBikePlsBot',
+          'telegramBotUsername', 'oneCrossPlsBot',
           'workingHours', '09:00 - 21:00 (ежедневно, сезон апрель-октябрь)',
           'map', jsonb_build_object(
             'imageUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/nnmap.jpg',

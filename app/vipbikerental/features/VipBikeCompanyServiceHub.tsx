@@ -12,10 +12,14 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 
-const serviceLanes = [
-  { title: "Прокат и выдача", icon: "::FaKey::", text: "Быстрая бронь, договор, экипировка и понятная выдача без лишних звонков.", href: "/franchize/vip-bike", cta: "Выбрать байк" },
+interface VipBikeCompanyServiceHubProps {
+  crewSlug?: string;
+}
+
+const getServiceLanes = (crewSlug: string = "vip-bike") => [
+  { title: "Прокат и выдача", icon: "::FaKey::", text: "Быстрая бронь, договор, экипировка и понятная выдача без лишних звонков.", href: `/franchize/${crewSlug}`, cta: "Выбрать байк" },
   { title: "Сервис и ремонт", icon: "::FaWrench::", text: "Обслуживание своего мотоцикла, диагностика, сезонная подготовка и расходники на базе VIP BIKE.", href: "https://t.me/salavey13", cta: "Написать в сервис" },
-  { title: "Комьюнити райдеров", icon: "::FaUsersViewfinder::", text: "MapRiders, точки встреч, живые маршруты и социальное доказательство вокруг реальных поездок.", href: "/franchize/vip-bike/map-riders", cta: "Открыть карту" },
+  { title: "Комьюнити райдеров", icon: "::FaUsersViewfinder::", text: "MapRiders, точки встреч, живые маршруты и социальное доказательство вокруг реальных поездок.", href: `/franchize/${crewSlug}/map-riders`, cta: "Открыть карту" },
 ];
 
 const companyFacts = [
@@ -24,7 +28,8 @@ const companyFacts = [
   "Фокус: electro-enduro и городские тест-драйвы",
 ];
 
-export function VipBikeCompanyServiceHub() {
+export function VipBikeCompanyServiceHub({ crewSlug = "vip-bike" }: VipBikeCompanyServiceHubProps) {
+  const serviceLanes = getServiceLanes(crewSlug);
   return (
     <section className="overflow-hidden rounded-[2rem] border border-primary/20 bg-card/50 p-5 shadow-2xl shadow-primary/10 sm:p-7">
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
