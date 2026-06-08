@@ -39,6 +39,11 @@
 - `ADMIN_CHAT_ID`
 - `GITHUB_TOKEN`
 - `GEMINI_API_KEY`
+- `ZAI_BASE_URL` *(default: https://internal-api.z.ai/v1)*
+- `ZAI_API_KEY`
+- `ZAI_CHAT_ID`	*(опционально, для functions.invoke контекста)*
+- `ZAI_USER_ID`	*(опционально, для user-scoped вызовов)*
+- `ZAI_TOKEN`	*(опционально, JWT токен)*
 - `NEXT_PUBLIC_SITE_URL`
 - `SLACK_BOT_TOKEN` *(для `/codex` -> Slack)*
 - `SLACK_CODEX_CHANNEL_ID` *(ID канала, куда слать Codex-задачи; нужно для `chat.postMessage` mode)*

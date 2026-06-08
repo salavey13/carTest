@@ -22,6 +22,7 @@ import { actionsCommand, handleActionChoice } from "./actions";
 import { shiftCommand } from "./shift"; 
 import { wbCommand } from "./wb";
 import { codexCommand } from "./codex";
+import { docCommand, handleDocText } from "./doc";
 
 
 
@@ -98,6 +99,13 @@ export async function handleCommand(update: any) {
             "/howto": () => howtoCommand(chatId, userId),
             "/ctx": () => ctxCommand(chatId, userId),
             "/profile": () => profileCommand(chatId, userId, username),
+            "/doc": () => {
+                const bestPhotoVariant = update.message?.photo?.length
+                    ? [update.message.photo[update.message.photo.length - 1]]
+                    : [];
+                const documentFiles = update.message?.document ? [update.message.document] : [];
+                return docCommand(chatId, userId, username, text, bestPhotoVariant, documentFiles);
+            },
             "/codex": () => {
                 const bestPhotoVariant = update.message?.photo?.length
                     ? [update.message.photo[update.message.photo.length - 1]]
@@ -107,11 +115,15 @@ export async function handleCommand(update: any) {
             },
         };
 
-        const commandFunction = commandMap[command] || (command.startsWith("/codex@") ? commandMap["/codex"] : undefined);
+        const commandFunction = commandMap[command] || (command.startsWith("/codex@") ? commandMap["/codex"] : undefined) || (command.startsWith("/doc@") ? commandMap["/doc"] : undefined);
 
         if (commandFunction) {
             await commandFunction();
         } else {
+            // Check if user is in /doc flow (awaiting bike selection or schedule)
+            const docHandled = await handleDocText(userIdStr, chatId, text);
+            if (docHandled) return;
+
             const shiftActionMap: { [key: string]: string } = {
                 "✅ Начать Смену": "clock_in", "❌ Завершить Смену": "clock_out",
                 "🏍️ На Байке": "toggle_ride", "🏢 В Боксе": "toggle_ride",

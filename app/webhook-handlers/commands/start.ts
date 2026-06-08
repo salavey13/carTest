@@ -7,6 +7,7 @@
  *   - onboarding_context with timestamps (for intent decay)
  *   - Behavioral signal initialization
  *   - Payload hints available for pre-survey landing personalization
+ *   - ФЗ-152 consent flow (inline, multi-message, not a link)
  *
  * CRITICAL CHANGE vs v1:
  *   We do NOT persist a derived ui_profile to metadata.
@@ -18,6 +19,7 @@
  *   - Old payloads (VIPSTART, ref_CODE) still work — parser handles them
  *   - metadata.ui_profile is NO LONGER WRITTEN — safe to ignore old values
  *   - Components should use resolve-profile.ts, never read ui_profile directly
+ *   - Step 5 is now fz152_consent (was terms_agreement) — inline consent flow
  */
 
 "use server";
@@ -50,7 +52,28 @@ interface SurveyState {
 // Survey version — bump when questions change
 // ─────────────────────────────────────────────────────
 
-const SURVEY_VERSION = "bike-v1";
+const SURVEY_VERSION = "bike-v2"; // bumped for fz152_consent step
+
+// ─────────────────────────────────────────────────────
+// Helper: send a survey question (handles multi-message)
+// ─────────────────────────────────────────────────────
+
+async function sendSurveyQuestion(chatId: number, question: typeof surveyQuestions[number]) {
+  // If this question has a preMessage (e.g., ФЗ-152 consent text),
+  // send it FIRST as a separate message for readability
+  if (question.isMultiMessage && question.preMessage) {
+    await sendComplexMessage(chatId, question.preMessage, [], {
+      removeKeyboard: true,
+      parseMode: "Markdown",
+    });
+  }
+
+  // Then send the question itself with answer buttons
+  const buttons = question.answers ? question.answers.map((a) => [{ text: a.text }]) : [];
+  await sendComplexMessage(chatId, question.question, buttons, {
+    keyboardType: question.answers ? "reply" : "remove",
+  });
+}
 
 // ─────────────────────────────────────────────────────
 // ENHANCED: Survey completion — persist raw signals only
@@ -63,6 +86,37 @@ const handleSurveyCompletion = async (
   payloadRaw?: string,
 ) => {
   const { answers, user_id } = state;
+
+  // ── ФЗ-152 consent check ──
+  // If user declined consent, we cannot proceed with the full onboarding
+  const consentAnswer = answers["fz152_consent"] || answers["terms_agreement"] || "";
+  if (consentAnswer.includes("Не даю") || consentAnswer.includes("❌")) {
+    await sendComplexMessage(
+      chatId,
+      [
+        "⚠️ Без согласия на обработку персональных данных мы не можем оформить аренду.",
+        "",
+        "Это требование ФЗ-152. Ваши данные нужны только для договора аренды.",
+        "",
+        "Вы можете пройти опрос заново в любой момент: /start",
+      ].join("\n"),
+      [],
+      { removeKeyboard: true },
+    );
+
+    // Clean up survey state
+    await supabaseAnon.from("user_survey_state").delete().eq("user_id", user_id);
+
+    // Still persist partial survey results (without consent) for analytics
+    await supabaseAnon.from("user_surveys").insert({
+      user_id,
+      username: username || "unknown",
+      survey_data: { ...answers, fz152_consent: "declined" },
+    });
+
+    logger.info(`[SurveyCompletion] user=${user_id} declined FZ-152 consent`);
+    return;
+  }
 
   // Save to survey-specific table
   await supabaseAnon.from("user_surveys").insert({
@@ -84,6 +138,8 @@ const handleSurveyCompletion = async (
     entryPoint: "telegram:start" as const,
     profileResolverVersion: PROFILE_RESOLVER_VERSION,
     experienceResolverVersion: EXPERIENCE_RESOLVER_VERSION,
+    fz152ConsentGiven: true,
+    fz152ConsentAt: new Date().toISOString(),
   };
 
   const profile = normalizeSurveyToProfile(
@@ -95,7 +151,7 @@ const handleSurveyCompletion = async (
   );
 
   logger.info(
-    `[SurveyCompletion] user=${user_id} segment=${profile.segment} intent=${profile.intent} experience=${profile.experience} confidence=${profile.confidence.toFixed(2)}`,
+    `[SurveyCompletion] user=${user_id} segment=${profile.segment} intent=${profile.intent} experience=${profile.experience} confidence=${profile.confidence.toFixed(2)} fz152=consented`,
   );
 
   // ── PERSIST RAW SIGNALS ONLY ──
@@ -143,7 +199,7 @@ const handleSurveyCompletion = async (
     userId: user_id,
     achievementId: "onboarding_survey_completed",
     source: "telegram:/start",
-    context: { survey: "bike", via: "start_command", version: SURVEY_VERSION },
+    context: { survey: "bike", via: "start_command", version: SURVEY_VERSION, fz152: true },
     incrementCounters: { onboardingCompletions: 1 },
   });
 
@@ -153,6 +209,7 @@ const handleSurveyCompletion = async (
     adminSummary += `- *${answerTexts[key] || key}:* ${answers[key] || "—"}\n`;
   }
   adminSummary += `\n📊 *Профиль (runtime):* ${profile.segment}/${profile.intent}/${profile.experience} (confidence: ${profile.confidence.toFixed(2)})`;
+  adminSummary += `\n📋 ФЗ-152: consent given`;
   await notifyAdmin(adminSummary);
 
   // User summary with personalized next-step
@@ -160,12 +217,14 @@ const handleSurveyCompletion = async (
 
   let summary = `✅ *Профиль настроен.*\nМы зафиксировали параметры твоей вело-анкеты:\n`;
   for (const key in answers) {
+    if (key === "fz152_consent") continue; // don't show consent answer in summary
     summary += `- *${answerTexts[key] || key}:* ${answers[key] || "—"}\n`;
   }
 
   const nextStepHint = deriveNextStepHint(profile);
   summary += `\n${nextStepHint}`;
-  summary += `\n\n⌨️ Клавиатура скрыта. \n\nИспользуй /howto для инструкций или открывай приложение, чтобы начать работу.`;
+  summary += `\n\n📋 Согласие на обработку данных получено.`;
+  summary += `\n\n⌨️ Клавиатура скрыта. \n\nИспользуй /howto для инструкций, /doc для договора по фото, или открывай приложение.`;
   summary += `\n\n👇 *Твой центр управления:*`;
 
   await sendComplexMessage(chatId, summary, [
@@ -289,11 +348,7 @@ export async function startCommand(chatId: number, userId: number, from_user: an
     }
 
     const question = surveyQuestions.find((q) => q.step === newState.current_step)!;
-    const buttons = question.answers ? question.answers.map((a) => [{ text: a.text }]) : [];
-
-    await sendComplexMessage(chatId, question.question, buttons, {
-      keyboardType: question.answers ? "reply" : "remove",
-    });
+    await sendSurveyQuestion(chatId, question);
   } else {
     // Handle Answer (user is in the middle of a survey)
     const { data: currentState } = await supabaseAnon
@@ -344,10 +399,7 @@ export async function startCommand(chatId: number, userId: number, from_user: an
         .update({ current_step: nextStep, answers: newAnswers })
         .eq("user_id", userIdStr);
       const nextQuestion = surveyQuestions.find((q) => q.step === nextStep)!;
-      const buttons = nextQuestion.answers ? nextQuestion.answers.map((a) => [{ text: a.text }]) : [];
-      await sendComplexMessage(chatId, nextQuestion.question, buttons, {
-        keyboardType: nextQuestion.answers ? "reply" : "remove",
-      });
+      await sendSurveyQuestion(chatId, nextQuestion);
     }
   }
 }

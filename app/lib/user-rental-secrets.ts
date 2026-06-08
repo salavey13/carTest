@@ -1,3 +1,4 @@
+// /app/lib/user-rental-secrets.ts
 "use server";
 
 import "server-only";
@@ -6,11 +7,14 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 
 export interface UserRentalSecret {
   id: string;
-  chat_id: string;
+  chat_id: string | null;           // NULL until renter scans QR & claims; then set to their telegram user_id
   crew_slug: string;
   doc_sha256: string;
   renter_full_name: string | null;
   renter_passport: string | null;
+  renter_passport_issue_date: string | null;
+  renter_passport_issued_by: string | null;   // кем выдан (issuing authority)
+  renter_registration: string | null;
   renter_driver_license: string | null;
   renter_birth_date: string | null;
   renter_phone: string | null;
@@ -61,6 +65,14 @@ function logUserRentalSecretsError(operation: string, error: unknown) {
   });
 }
 
+// ─── Result type for claimRentalSecretsByDocSha ──────────────────────────────
+
+export type ClaimResult =
+  | { ok: true; secret: UserRentalSecret; claimedNow: boolean }
+  | { ok: false; reason: "already_claimed_by_other" | "revoked" | "not_found" | "error"; error?: string };
+
+// ─── Read operations ─────────────────────────────────────────────────────────
+
 // Get most recent verified rental data for a user in a crew.
 export async function getUserRentalSecrets(
   chatId: string,
@@ -93,7 +105,7 @@ export async function getUserRentalSecrets(
   }
 }
 
-// Get rental secret by doc hash (for QR verification).
+// Get rental secret by doc hash (for QR verification / claim flow).
 export async function getUserRentalSecretsByDocSha(
   docSha256: string,
 ): Promise<UserRentalSecret | null> {
@@ -121,14 +133,59 @@ export async function getUserRentalSecretsByDocSha(
   }
 }
 
-// Save new rental secret (after contract generation).
+/**
+ * Get ALL verified rental secrets for a user+crew (for profile/data picker UI).
+ * Returns records ordered by most recent first.
+ * Used by Task F: Previous rental data picker UI.
+ */
+export async function getAllVerifiedRentalSecrets(
+  chatId: string,
+  crewSlug: string,
+): Promise<UserRentalSecret[]> {
+  const normalizedChatId = normalizeRequiredId(chatId, "chatId");
+  const normalizedCrewSlug = normalizeRequiredId(crewSlug, "crewSlug");
+  if (!normalizedChatId || !normalizedCrewSlug) return [];
+
+  try {
+    const { data, error } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("chat_id", normalizedChatId)
+      .eq("crew_slug", normalizedCrewSlug)
+      .eq("verification_status", "verified")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      logUserRentalSecretsError("getAllVerifiedRentalSecrets", error);
+      return [];
+    }
+
+    return (data as UserRentalSecret[]) ?? [];
+  } catch (error) {
+    logUserRentalSecretsError("getAllVerifiedRentalSecrets", error);
+    return [];
+  }
+}
+
+// ─── Write operations ────────────────────────────────────────────────────────
+
+/**
+ * Save new rental secret (after contract generation).
+ *
+ * chat_id is OPTIONAL — the skill script creates secrets without Telegram auth context.
+ * When chat_id is null, the secret waits to be claimed via QR deep-link
+ * (see claimRentalSecretsByDocSha).
+ */
 export async function saveUserRentalSecrets(
   data: Omit<UserRentalSecret, "id" | "created_at" | "updated_at">,
 ): Promise<UserRentalSecret | null> {
-  const normalizedChatId = normalizeRequiredId(data.chat_id, "chatId");
+  // chat_id is optional (NULL = unclaimed secret from skill script)
+  const normalizedChatId = typeof data.chat_id === "string" && data.chat_id.trim()
+    ? data.chat_id.trim()
+    : null;
   const normalizedCrewSlug = normalizeRequiredId(data.crew_slug, "crewSlug");
   const normalizedDocSha256 = normalizeRequiredId(data.doc_sha256, "docSha256");
-  if (!normalizedChatId || !normalizedCrewSlug || !normalizedDocSha256) return null;
+  if (!normalizedCrewSlug || !normalizedDocSha256) return null;
 
   try {
     const { data: inserted, error } = await privateSchema()
@@ -152,6 +209,113 @@ export async function saveUserRentalSecrets(
   } catch (error) {
     logUserRentalSecretsError("saveUserRentalSecrets", error);
     return null;
+  }
+}
+
+/**
+ * Claim rental secrets by doc_sha256 — the core of the 1-click next rent flow.
+ *
+ * Called when a renter scans their QR code and opens the Telegram WebApp.
+ * Atomically links this secret row to the claiming user's chat_id.
+ *
+ * Flow:
+ *   1. Look up by doc_sha256 + verification_status='verified'
+ *   2. If chat_id IS NULL → claim it (SET chat_id = caller's chatId) → return secret
+ *   3. If chat_id = caller's chatId → already claimed by same user → return secret
+ *   4. If chat_id ≠ NULL AND ≠ caller → DENY (another user already claimed)
+ *   5. If not found or revoked → return appropriate error
+ */
+export async function claimRentalSecretsByDocSha(
+  chatId: string,
+  docSha256: string,
+): Promise<ClaimResult> {
+  const normalizedChatId = normalizeRequiredId(chatId, "chatId");
+  const normalizedDocSha256 = normalizeRequiredId(docSha256, "docSha256");
+  if (!normalizedChatId || !normalizedDocSha256) {
+    return { ok: false, reason: "error", error: "chatId and docSha256 are required" };
+  }
+
+  try {
+    // Step 1: Find the secret by doc_sha256
+    const { data: existing, error: findError } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("doc_sha256", normalizedDocSha256)
+      .limit(1)
+      .maybeSingle();
+
+    if (findError) {
+      logUserRentalSecretsError("claimRentalSecretsByDocSha.find", findError);
+      return { ok: false, reason: "error", error: findError.message || String(findError) };
+    }
+
+    if (!existing) {
+      return { ok: false, reason: "not_found" };
+    }
+
+    const secret = existing as UserRentalSecret;
+
+    // Step 2: Check verification status
+    if (secret.verification_status === "revoked") {
+      return { ok: false, reason: "revoked" };
+    }
+
+    // Step 3: Already claimed by this same user — return existing data
+    if (secret.chat_id === normalizedChatId) {
+      return { ok: true, secret, claimedNow: false };
+    }
+
+    // Step 4: Claimed by a different user — deny
+    if (secret.chat_id !== null) {
+      return { ok: false, reason: "already_claimed_by_other" };
+    }
+
+    // Step 5: chat_id IS NULL — claim it atomically
+    // Use UPDATE ... WHERE chat_id IS NULL to prevent race conditions
+    const { data: claimed, error: claimError } = await privateSchema()
+      .from("user_rental_secrets")
+      .update({
+        chat_id: normalizedChatId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("doc_sha256", normalizedDocSha256)
+      .is("chat_id", null)                    // atomic: only if still unclaimed
+      .select("*")
+      .maybeSingle();
+
+    if (claimError) {
+      logUserRentalSecretsError("claimRentalSecretsByDocSha.claim", claimError);
+      return { ok: false, reason: "error", error: claimError.message || String(claimError) };
+    }
+
+    // Race condition: another request claimed it between our find and update
+    if (!claimed) {
+      // Re-fetch to determine who claimed it
+      const { data: rechecked } = await privateSchema()
+        .from("user_rental_secrets")
+        .select("chat_id")
+        .eq("doc_sha256", normalizedDocSha256)
+        .limit(1)
+        .maybeSingle();
+
+      if (rechecked?.chat_id === normalizedChatId) {
+        // We actually got it (unlikely timing, but handle gracefully)
+        const { data: fullSecret } = await privateSchema()
+          .from("user_rental_secrets")
+          .select("*")
+          .eq("doc_sha256", normalizedDocSha256)
+          .limit(1)
+          .maybeSingle();
+        return { ok: true, secret: fullSecret as UserRentalSecret, claimedNow: false };
+      }
+
+      return { ok: false, reason: "already_claimed_by_other" };
+    }
+
+    return { ok: true, secret: claimed as UserRentalSecret, claimedNow: true };
+  } catch (error) {
+    logUserRentalSecretsError("claimRentalSecretsByDocSha", error);
+    return { ok: false, reason: "error", error: error instanceof Error ? error.message : String(error) };
   }
 }
 
