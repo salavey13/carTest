@@ -18,7 +18,7 @@ interface VipBikeCompanyServiceHubProps {
 
 const getServiceLanes = (crewSlug: string = "vip-bike") => [
   { title: "Прокат и выдача", icon: "::FaKey::", text: "Быстрая бронь, договор, экипировка и понятная выдача без лишних звонков.", href: `/franchize/${crewSlug}`, cta: "Выбрать байк" },
-  { title: "Сервис и ремонт", icon: "::FaWrench::", text: "Обслуживание своего мотоцикла, диагностика, сезонная подготовка и расходники на базе VIP BIKE.", href: "https://t.me/salavey13", cta: "Написать в сервис" },
+  { title: "Сервис и ремонт", icon: "::FaWrench::", text: "Обслуживание своего мотоцикла, диагностика, сезонная подготовка и расходники на базе VIP BIKE.", href: "https://t.me/I_O_S_NN", cta: "Написать в сервис" },
   { title: "Комьюнити райдеров", icon: "::FaUsersViewfinder::", text: "MapRiders, точки встреч, живые маршруты и социальное доказательство вокруг реальных поездок.", href: `/franchize/${crewSlug}/map-riders`, cta: "Открыть карту" },
 ];
 
