@@ -25,7 +25,12 @@ export function CrewFooter({ crew }: CrewFooterProps) {
               href: `https://t.me/${crew.contacts.telegram.replace("@", "")}`,
             },
           ]
-        : [{ label: "Telegram", href: "https://t.me/oneBikePlsBot" }];
+        : crew.contacts.telegramBotUsername
+          ? [{
+              label: "Telegram",
+              href: `https://t.me/${crew.contacts.telegramBotUsername}`,
+            }]
+          : [];
 
   return (
     <footer

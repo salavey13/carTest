@@ -171,7 +171,7 @@ async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
     issuer_address: String(defaults.return_address ?? "г. Нижний Новгород, Комсомольская пл. 2"),
     issuer_representative: String(defaults.issuer_representative ?? "Сидоров Илья"),
     issuer_phone: String(defaults.phone ?? "не указан"),
-    issuer_telegram: String(defaults.telegram ?? "@oneBikePlsBot"),
+    issuer_telegram: String(defaults.telegram ?? ""),
     client_name: input.userName || "не указано",
     client_telegram_id: input.userTelegramId || "не указано",
     client_user_id: input.userId || "—",

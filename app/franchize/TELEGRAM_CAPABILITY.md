@@ -28,7 +28,7 @@ The sale buy page exposes owner/admin-only **Распечатать**:
 
 1. Client checks operator dashboard access for display only.
 2. Server action revalidates admin/owner access from the signed Telegram actor cookie.
-3. PDF is generated server-side with bike details, image, and a QR code to `https://t.me/oneBikePlsBot/app?startapp=buy_<bikeId>`.
+3. PDF is generated server-side with bike details, image, and a QR code to `https://t.me/{crewBotUsername}/app?startapp=buy_{bikeId}` (crew-specific bot username from metadata).
 4. PDF is delivered with `sendTelegramDocument` to the current Telegram actor.
 
 This pattern is the recommended template for future franchize documents: contracts, inspection sheets, pickup labels, and printed sale tags.

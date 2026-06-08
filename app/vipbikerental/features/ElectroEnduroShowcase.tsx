@@ -43,7 +43,7 @@ function BikeCardSkeleton({ index }: { index: number }) {
   );
 }
 
-export function ElectroEnduroShowcase({ items, isCatalogLoading = false }: { items: CatalogItemVM[]; isCatalogLoading?: boolean }) {
+export function ElectroEnduroShowcase({ items, isCatalogLoading = false, crewSlug = "vip-bike" }: { items: CatalogItemVM[]; isCatalogLoading?: boolean; crewSlug?: string }) {
   const [selectedItem, setSelectedItem] = useState<ElectroPreviewItem | null>(null);
   const [selectedColorId, setSelectedColorId] = useState(DEFAULT_COLOR_OPTIONS[2]?.id ?? DEFAULT_COLOR_OPTIONS[0]?.id ?? "black");
   const [selectedConfigId, setSelectedConfigId] = useState(DEFAULT_CONFIG_OPTIONS[0]?.id ?? "standard");
@@ -89,7 +89,7 @@ export function ElectroEnduroShowcase({ items, isCatalogLoading = false }: { ite
             <h3 className="mt-1 font-orbitron text-2xl">Свободные модели и быстрый конфиг</h3>
           </div>
           <Button asChild variant="outline" className="sm:w-fit">
-            <Link href="/franchize/vip-bike/electro-enduro">Полный раздел Electro-Enduro</Link>
+            <Link href={`/franchize/${crewSlug}/electro-enduro`}>Полный раздел Electro-Enduro</Link>
           </Button>
         </div>
         <div className="flex snap-x gap-4 overflow-x-auto pb-3 [scrollbar-width:thin]">
@@ -178,8 +178,8 @@ export function ElectroEnduroShowcase({ items, isCatalogLoading = false }: { ite
                     <p className="mt-1 text-sm text-muted-foreground">{configuredPrice ? `${configuredPrice.toLocaleString("ru-RU")} ₽ ориентир покупки` : `${activePreview.rentPriceLabel} для тест-драйва`}</p>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <Button asChild className="flex-1"><Link href={`/franchize/vip-bike/market/${activePreview.id}/buy`}>Открыть полный конфигуратор</Link></Button>
-                    <Button asChild variant="outline" className="flex-1"><Link href={`/franchize/vip-bike?vehicle=${activePreview.id}`}>Перейти к аренде</Link></Button>
+                    <Button asChild className="flex-1"><Link href={`/franchize/${crewSlug}/market/${activePreview.id}/buy`}>Открыть полный конфигуратор</Link></Button>
+                    <Button asChild variant="outline" className="flex-1"><Link href={`/franchize/${crewSlug}?vehicle=${activePreview.id}`}>Перейти к аренде</Link></Button>
                   </div>
                 </div>
               </div>

@@ -20,17 +20,19 @@ import {
   fallbackElectroItems,
   fallbackMapLocations,
   conversionPilotChecks,
-  decisionRoutes,
+  getDecisionRoutes,
 } from "./shared/constants";
 
 export function ConversionPilot({
   items,
   overview,
   isCatalogLoading = false,
+  crewSlug = "vip-bike",
 }: {
   items: CatalogItemVM[];
   overview: MapRidersOverview | null;
   isCatalogLoading?: boolean;
+  crewSlug?: string;
 }) {
   const rentableItems = items.filter((item) => item.availabilityStatus === "available" && item.pricePerDay > 0);
   const pricedRentalItems = items.filter((item) => item.pricePerDay > 0);
@@ -41,7 +43,8 @@ export function ConversionPilot({
   const activeRidersCount = Number(overview?.stats?.activeRiders ?? overview?.liveLocations?.length ?? fallbackMapLocations.length);
   const activeRiders = formatCompactNumber(activeRidersCount, fallbackMapLocations.length);
   const leadItem = availableItems[0] ?? saleItems[0] ?? items[0] ?? fallbackElectroItems[0];
-  const leadHref = leadItem?.id ? `/franchize/vip-bike?vehicle=${leadItem.id}` : "/franchize/vip-bike";
+  const leadHref = leadItem?.id ? `/franchize/${crewSlug}?vehicle=${leadItem.id}` : `/franchize/${crewSlug}`;
+  const decisionRoutes = getDecisionRoutes(crewSlug);
   const score = Math.min(9.2, 8.4 + (availableItems.length > 0 ? 0.3 : 0) + (saleItems.length > 0 ? 0.25 : 0) + (overview ? 0.25 : 0));
   const scoreLabel = score.toLocaleString("ru-RU", { maximumFractionDigits: 1 });
   const riderLabel = getRussianRiderLabel(activeRidersCount);

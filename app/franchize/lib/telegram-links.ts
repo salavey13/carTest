@@ -1,4 +1,7 @@
-export const DEFAULT_TELEGRAM_BOT_USERNAME = "oneBikePlsBot";
+// Fallback to environment variable or empty (requires explicit bot username)
+export const DEFAULT_TELEGRAM_BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME
+  ? sanitizeTelegramUsername(process.env.TELEGRAM_BOT_USERNAME)
+  : "";
 
 function sanitizeTelegramUsername(value?: string | null): string {
   return String(value || "")

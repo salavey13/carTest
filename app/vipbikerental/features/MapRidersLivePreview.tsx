@@ -13,7 +13,7 @@ import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import type { MapRidersOverview } from "./shared/types";
 import { formatCompactNumber, formatRideDuration, normalizeMapPoint, fallbackMapLocations, fallbackMeetups, mapRidersJourney } from "./shared/constants";
 
-export function MapRidersLivePreview({ overview }: { overview: MapRidersOverview | null }) {
+export function MapRidersLivePreview({ overview, crewSlug = "vip-bike" }: { overview: MapRidersOverview | null; crewSlug?: string }) {
   const liveLocations = (overview?.liveLocations?.length ? overview.liveLocations : fallbackMapLocations).slice(0, 3);
   const meetups = (overview?.meetups?.length ? overview.meetups : fallbackMeetups).slice(0, 2);
   const latestRide = overview?.latestCompleted?.[0];
@@ -32,7 +32,7 @@ export function MapRidersLivePreview({ overview }: { overview: MapRidersOverview
         <p className="mx-auto mt-3 max-w-3xl text-muted-foreground">Райдеры, встречи и последние поездки — без тяжёлой карты на первом экране.</p>
       </div>
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-        <Link href="/franchize/vip-bike/map-riders" className="group relative min-h-[360px] overflow-hidden rounded-3xl border border-primary/35 bg-[#d8c99b] p-5 text-[#182016] shadow-2xl shadow-black/20" aria-label="Открыть полную карту MapRiders">
+        <Link href={`/franchize/${crewSlug}/map-riders`} className="group relative min-h-[360px] overflow-hidden rounded-3xl border border-primary/35 bg-[#d8c99b] p-5 text-[#182016] shadow-2xl shadow-black/20" aria-label="Открыть полную карту MapRiders">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_18%,rgba(255,244,196,0.78),transparent_28%),radial-gradient(circle_at_72%_64%,rgba(48,142,94,0.30),transparent_30%),linear-gradient(135deg,rgba(255,249,219,0.82),rgba(96,131,91,0.42))]" />
           <svg className="absolute inset-0 h-full w-full opacity-80" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
             <path d="M-6 78 C18 66 30 54 52 54 C70 54 84 42 106 30" fill="none" stroke="rgba(31,54,36,0.20)" strokeWidth="10" strokeLinecap="round" />

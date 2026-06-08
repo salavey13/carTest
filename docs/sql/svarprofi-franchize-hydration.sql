@@ -230,9 +230,11 @@ set metadata = jsonb_set(coalesce(c.metadata, '{}'::jsonb), '{franchize}', $$
     "telegramBotUsername": null,
     "workingHours": null,
     "map": {
-      "lat": 55.7558,
-      "lng": 37.6173,
-      "zoom": 12
+      "imageUrl": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/moscow-map.jpg",
+      "bounds": { "top": 55.92, "bottom": 55.55, "left": 37.30, "right": 37.85 },
+      "gps": "55.7558,37.6173",
+      "publicTransport": "Ближайшее метро: Комсомольская, Красносельская",
+      "carDirections": "Подъезд к производству — см. указатели на месте"
     }
   },
 

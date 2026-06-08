@@ -1,7 +1,8 @@
-import { getCrewPaletteBySlug } from "@/app/franchize/actions";
+import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { VipBikeRentalClient } from "./VipBikeRentalClient";
 
 export default async function HomePage() {
-  const theme = await getCrewPaletteBySlug("vip-bike");
-  return <VipBikeRentalClient items={[]} theme={theme} />;
+  // Use full franchize system to get crew data and items
+  const { crew, items } = await getFranchizeBySlug("vip-bike");
+  return <VipBikeRentalClient crew={crew} items={items} theme={crew.theme} />;
 }

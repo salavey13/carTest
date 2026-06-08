@@ -521,14 +521,18 @@ export async function resendRentalContract(input: {
       return { success: false, error: "Аренда не найдена." };
     }
 
-    // Check crew ownership
+    // Check crew ownership and get crew metadata for bot username
     const { data: crew } = await supabaseAdmin
       .from("crews")
-      .select("owner_id")
+      .select("owner_id, metadata")
       .eq("id", (rental.vehicle as any).crew_id)
       .maybeSingle();
 
     const isCrewOwner = crew?.owner_id === actorUserId;
+
+    // Extract crew bot username from metadata
+    const crewBotUsername = crew?.metadata?.franchize?.contacts?.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME;
+    const botUsername = crewBotUsername || "oneBikePlsBot"; // Fallback for compatibility
 
     if (!isAdmin && !isCrewOwner) {
       return { success: false, error: "Недостаточно прав для отправки." };
@@ -597,8 +601,8 @@ export async function resendRentalContract(input: {
       .replace(/[^a-zA-Zа-яА-Я0-9.\-]/g, "-")
       .replace(/-+/g, "-");
 
-    // Generate QR code
-    const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${vehicle.id}_${docSha256}`;
+    // Generate QR code with crew-specific bot username
+    const qrDeepLink = `https://t.me/${botUsername}/app?startapp=rent_${vehicle.id}_${docSha256}`;
     const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
 
     let qrPngBuffer: Buffer | null = null;

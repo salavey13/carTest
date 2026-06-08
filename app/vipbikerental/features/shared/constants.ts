@@ -65,13 +65,15 @@ export const normalizeMapPoint = (lat: number | undefined, lng: number | undefin
 // Fallback data
 // ─────────────────────────────────────────────────────
 
+// Demo rider locations near HQ: пл. Комсомольская 2 (56.297654, 43.947218)
 export const fallbackMapLocations = [
-  { lat: 56.274, lng: 43.936, speed_kmh: 22, user_id: "fallback-rider-1" },
-  { lat: 56.281, lng: 43.952, speed_kmh: 31, user_id: "fallback-rider-2" },
-  { lat: 56.268, lng: 43.964, speed_kmh: 18, user_id: "fallback-rider-3" },
+  { lat: 56.301, lng: 43.952, speed_kmh: 22, user_id: "fallback-rider-1" },
+  { lat: 56.296, lng: 43.935, speed_kmh: 31, user_id: "fallback-rider-2" },
+  { lat: 56.294, lng: 43.960, speed_kmh: 18, user_id: "fallback-rider-3" },
 ];
 
 export const fallbackMeetups = [
+  { lat: 56.2975, lng: 43.947, title: "Сбор у базы", comment: "пл. Комсомольская 2" },
   { lat: 56.272, lng: 43.948, title: "Старт у речной точки", comment: "легкий темп" },
 ];
 
@@ -122,25 +124,25 @@ export const conversionPilotChecks = [
   { label: "Путь", value: "3 сценария", icon: "::FaBolt::" },
 ];
 
-export const decisionRoutes = [
+export const getDecisionRoutes = (crewSlug: string = "vip-bike") => [
   {
     title: "Первый выезд",
     text: "Для первого контакта с электроэндуро: выбираете байк, слот и экипировку, а дальше система ведёт к подтверждённой выдаче.",
-    href: "/franchize/vip-bike",
+    href: `/franchize/${crewSlug}`,
     cta: "Выбрать аренду",
     icon: "::FaMotorcycle::",
   },
   {
     title: "Тест → покупка",
     text: "Для покупки без сомнений: соберите конфигурацию, закрепите тест-драйв и сравните ощущения до оплаты.",
-    href: "/franchize/vip-bike/configurator",
+    href: `/franchize/${crewSlug}/configurator`,
     cta: "Собрать байк",
     icon: "::FaCartShopping::",
   },
   {
     title: "Кататься с группой",
     text: "Для групповых выездов: смотрите райдеров рядом, точки старта и ближайшие встречи вместо случайных договорённостей.",
-    href: "/franchize/vip-bike/map-riders",
+    href: `/franchize/${crewSlug}/map-riders`,
     cta: "Смотреть карту",
     icon: "::FaMapLocationDot::",
   },
@@ -152,10 +154,10 @@ export const mapRidersJourney = [
   { title: "Шаг 3: Поехали с группой", text: "Присоединяйся к активной группе, отслеживай прогресс и отмечай пройденные участки." },
 ];
 
-export const newbieFlow = [
+export const getNewbieFlow = (crewSlug: string = "vip-bike") => [
   { step: "Шаг 1", title: "Старт с понятного сценария", description: "Откройте страницу заказа: локация, маршруты, ограничения и правила безопасности собраны до выбора слота.", href: "/vipbikerental", cta: "Открыть вводный блок" },
-  { step: "Шаг 2", title: "Подбор байка и конфигурации", description: "Перейдите в конфигуратор: модель, батарея, режим мощности и допы фиксируются в одном заказе.", href: "/franchize/vip-bike/electro-enduro", cta: "Подобрать конфиг" },
-  { step: "Шаг 3", title: "Корзина и оформление", description: "Проверьте состав, добавьте защиту, подтвердите контакты и отправьте менеджеру уже структурированную заявку.", href: "/franchize/vip-bike/profile", cta: "Проверить оформление" },
+  { step: "Шаг 2", title: "Подбор байка и конфигурации", description: "Перейдите в конфигуратор: модель, батарея, режим мощности и допы фиксируются в одном заказе.", href: `/franchize/${crewSlug}/electro-enduro`, cta: "Подобрать конфиг" },
+  { step: "Шаг 3", title: "Корзина и оформление", description: "Проверьте состав, добавьте защиту, подтвердите контакты и отправьте менеджеру уже структурированную заявку.", href: `/franchize/${crewSlug}/profile`, cta: "Проверить оформление" },
 ];
 
 export const rentalStatusSteps = [

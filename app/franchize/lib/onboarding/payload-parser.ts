@@ -185,7 +185,7 @@ export function extractPromoCode(payload: string): string | null {
 // Deep-link URL builder
 // ─────────────────────────────────────────────────────
 
-const BOT_USERNAME = "oneBikePlsBot";
+const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot";
 
 /**
  * Builds a Telegram deep-link URL for the /start command.

@@ -13,10 +13,11 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import type { CatalogItemVM } from "@/app/franchize/actions";
-import { getBikeGallery, fallbackElectroItems, newbieFlow } from "./shared/constants";
+import { getBikeGallery, fallbackElectroItems, getNewbieFlow } from "./shared/constants";
 
-export function StepsProgress({ items }: { items: CatalogItemVM[] }) {
+export function StepsProgress({ items, crewSlug = "vip-bike" }: { items: CatalogItemVM[]; crewSlug?: string }) {
   const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const newbieFlow = getNewbieFlow(crewSlug);
   const previewItems = useMemo(() => {
     const realItems = items.filter((item) => item.imageUrl || item.mediaUrls?.length).slice(0, 3);
     return realItems.length > 0 ? realItems : fallbackElectroItems.slice(0, 3);
@@ -100,7 +101,7 @@ export function StepsProgress({ items }: { items: CatalogItemVM[] }) {
                     return (
                       <Link
                         key={item.id}
-                        href={`/franchize/vip-bike?vehicle=${item.id}`}
+                        href={`/franchize/${crewSlug}?vehicle=${item.id}`}
                         className="min-w-[220px] snap-start overflow-hidden rounded-2xl border border-border/70 bg-card/60"
                       >
                         <div className="relative h-32 bg-black/30">

@@ -71,7 +71,7 @@ const SPEC_MAX_ROWS = 13;
 const SPEC_MAX_VALUE_LINES = 2;
 
 // QR codes — two side by side (buy link + VK community)
-const VK_LINK = "https://vk.com/vip_bike_electro";
+// VK link is now crew-specific, passed from crew metadata or falls back to empty
 
 const QR_SIZE = 68;   // compact — gives breathing room inside image, still scannable
 const VK_QR_SIZE = 68;
@@ -597,6 +597,7 @@ async function generateBuyPdf(input: {
   slug: string;
   brandName: string;
   botUsername: string;
+  vkLink?: string;
   item: {
     id: string;
     title: string;
@@ -669,12 +670,13 @@ async function generateBuyPdf(input: {
     color: COLORS.header,
   });
 
-  // Dynamic header title based on bike specs:
-  //   sale=true/1 → "VIP BIKE ELECTRO" (bike is for sale)
-  //   otherwise   → "VIP BIKE RENTAL"  (bike is for rent, or default)
+  // Dynamic header title based on bike specs and crew branding:
+  //   sale=true/1 → "{BRAND} ELECTRO" (bike is for sale)
+  //   otherwise   → brandName (crew default, or "Экипаж" fallback)
+  const baseBrand = input.brandName || "Экипаж";
   const headerTitle = isTruthySpec(specs.sale)
-    ? "VIP BIKE ELECTRO"
-    : "VIP BIKE RENTAL";
+    ? `${baseBrand.toUpperCase()} ELECTRO`
+    : baseBrand.toUpperCase();
 
   page.drawText(headerTitle, {
     x: PAGE_PADDING,
@@ -1015,22 +1017,24 @@ async function generateBuyPdf(input: {
     logger.warn("[franchize] failed to generate buy QR", error);
   }
 
-  // VK QR
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      FETCH_TIMEOUT_MS,
-    );
+  // VK QR (crew-specific social link)
+  const vkLink = input.vkLink;
+  if (vkLink) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(
+        () => controller.abort(),
+        FETCH_TIMEOUT_MS,
+      );
 
-    const vkQrBytes = await fetch(
-      `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
-        VK_LINK,
-      )}&color=000000&bgcolor=ffffff&margin=1`,
-      { signal: controller.signal },
-    ).then((response) => response.arrayBuffer());
+      const vkQrBytes = await fetch(
+        `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+          vkLink,
+        )}&color=000000&bgcolor=ffffff&margin=1`,
+        { signal: controller.signal },
+      ).then((response) => response.arrayBuffer());
 
-    clearTimeout(timeout);
+      clearTimeout(timeout);
 
     const vkQr = await pdfDoc.embedPng(vkQrBytes);
 
@@ -1051,8 +1055,9 @@ async function generateBuyPdf(input: {
       font,
       color: COLORS.muted,
     });
-  } catch (error) {
-    logger.warn("[franchize] failed to generate VK QR", error);
+    } catch (error) {
+      logger.warn("[franchize] failed to generate VK QR", error);
+    }
   }
 
   // ── Rental Price Box (expanded: hourly + daily rates + CTA) ───────────
@@ -1281,14 +1286,20 @@ export async function sendFranchizeBuyPrintPdf(
       };
     }
 
+    // Extract VK link from crew social links
+    const vkLink = crew.footer?.socialLinks?.find(
+      (link: any) => link.href && link.href.includes("vk.com")
+    )?.href || "";
+
     const bytes = await generateBuyPdf({
       slug,
       brandName:
         crew.header?.brandName ||
         crew.name ||
-        "VIP BIKE RENTAL",
+        "Экипаж",
       botUsername:
         crew.contacts.telegramBotUsername,
+      vkLink,
       item: {
         id: item.id,
         title: item.title,
