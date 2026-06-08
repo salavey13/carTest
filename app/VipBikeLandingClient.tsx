@@ -173,7 +173,7 @@ export function VipBikeLandingClient({
         label: "Покупка",
         description: electroItems.length > 0 ? electroItems[0]?.title || "Электромотоциклы" : "79bike Falcon PRO",
         cta: "Конфигуратор",
-        href: `/franchize/${crewSlug}/catalog`,
+        href: `/franchize/${crewSlug}/configurator`,
         priceLabel: getSalePriceLabel(minSalePrice),
         priceNote: saleItems.length > 1 ? "несколько моделей" : "в наличии",
         status: "В наличии",
