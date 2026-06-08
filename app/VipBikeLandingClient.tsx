@@ -161,7 +161,7 @@ export function VipBikeLandingClient({
           ? `${rentalItems.length} ${rentalItems.length === 1 ? 'байк' : rentalItems.length < 5 ? 'байка' : 'байков'} доступно`
           : "Премиальный прокат мотоциклов",
         cta: "Выбрать байк",
-        href: `/franchize/${crewSlug}/arenda`,
+        href: `/franchize/${crewSlug}`,
         priceLabel: `от ${minRentalPrice.toLocaleString('ru-RU')} ₽`,
         priceNote: "в день",
         status: rentalItems.length > 0 ? "Свободен" : "Доступен",
