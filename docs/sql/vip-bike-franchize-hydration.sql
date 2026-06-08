@@ -53,49 +53,56 @@ set
         'enabled', true,
         'slug', 'vip-bike',
         'branding', jsonb_build_object(
-          'name', 'VIP BIKE RENTAL',
+          'name', 'VIP BIKE ELECTRO',
           'shortName', 'VIP_BIKE',
-          'tagline', 'Твой байк на любой вкус: от дерзких нейкедов до спортбайков.',
-          'logoUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250725_233953_793-f4d8a590-5d2c-4416-9969-c8f9a4627eb5.jpg',
+          'tagline', 'Электромотоциклы без категории А. Законно, по правам категории B.',
+          'logoUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/logo-electro-neon.png',
           'heroImageUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_bg-cf31dc2b-291b-440b-953b-6e1b4a838e4e.jpg',
-          'centerLogoInHeader', true
+          'centerLogoInHeader', true,
+          'fonts', jsonb_build_object(
+            'headings', 'Archivo Black, sans-serif',
+            'body', 'Onest, sans-serif',
+            'technical', 'Orbitron, sans-serif',
+            'accent', 'Comic Neue, cursive'
+          )
         ),
         'theme', jsonb_build_object(
-          'mode', 'pepperolli_dark',
+          'mode', 'cyber_electro_dark',
+          'displayName', 'VIP BIKE ELECTRO Dark',
           'palette', jsonb_build_object(
-            'bgBase', '#0B0C10',
-            'bgCard', '#111217',
-            'bgElevated', '#16181F',
-            'borderSoft', '#24262E',
-            'borderCard', '#2A2D36',
-            'accentMain', '#D99A00',
-            'accentMainHover', '#E2A812',
-            'accentDeep', '#B57F00',
-            'accentTextOn', '#16130A',
-            'textPrimary', '#F2F2F3',
+            'bgBase', '#121520',
+            'bgCard', '#1B2132',
+            'bgElevated', '#1E2538',
+            'borderSoft', '#2A2E3E',
+            'borderCard', '#313648',
+            'accentMain', '#F4BD55',
+            'accentMainHover', '#FFCA60',
+            'accentDeep', '#D4A540',
+            'accentTextOn', '#121520',
+            'textPrimary', '#E6D8C4',
             'textSecondary', '#A7ABB4',
             'textMuted', '#7D828C',
-            'textAccent', '#D99A00',
-            'success', '#52C26D',
-            'warning', '#E0A200',
+            'textAccent', '#F4BD55',
+            'success', '#44CC77',
+            'warning', '#F4BD55',
             'error', '#E35B5B'
           ),
           'palettes', jsonb_build_object(
             'dark', jsonb_build_object(
-              'bgBase', '#0B0C10',
-              'bgCard', '#111217',
-              'accentMain', '#D99A00',
-              'accentMainHover', '#E2A812',
-              'textPrimary', '#F2F2F3',
+              'bgBase', '#121520',
+              'bgCard', '#1B2132',
+              'accentMain', '#F4BD55',
+              'accentMainHover', '#FFCA60',
+              'textPrimary', '#E6D8C4',
               'textSecondary', '#A7ABB4',
-              'borderSoft', '#24262E'
+              'borderSoft', '#2A2E3E'
             ),
             'light', jsonb_build_object(
-              'bgBase', '#F6F6F7',
+              'bgBase', '#F5F5F5',
               'bgCard', '#FFFFFF',
               'accentMain', '#C78900',
-              'accentMainHover', '#D99A00',
-              'textPrimary', '#1A1B1F',
+              'accentMainHover', '#F4BD55',
+              'textPrimary', '#1A1A1A',
               'textSecondary', '#4B5160',
               'borderSoft', '#D4D8E1'
             )
@@ -106,34 +113,37 @@ set
         ),
         'header', jsonb_build_object(
           'showBackButton', false,
-          'title', 'VIP BIKE RENTAL',
-          'subtitle', 'Нижний Новгород',
-          'logoHref', '/vipbikerental',
+          'title', 'VIP BIKE ELECTRO',
+          'subtitle', 'Премиальный прокат в Нижнем Новгороде',
+          'logoHref', '/',
           'menuLinks', jsonb_build_array(
-            jsonb_build_object('label', 'Покатушки', 'href', '/franchize/{slug}/map-riders'),
             jsonb_build_object('label', 'Каталог', 'href', '/franchize/{slug}'),
+            jsonb_build_object('label', 'Подбор', 'href', '/franchize/{slug}/podbor'),
+            jsonb_build_object('label', 'Аренда', 'href', '/franchize/{slug}/arenda'),
+            jsonb_build_object('label', 'Тест-драйв', 'href', '/franchize/{slug}#test-drive'),
+            jsonb_build_object('label', 'Покатушки', 'href', '/franchize/{slug}/map-riders'),
             jsonb_build_object('label', 'Каталог-electro', 'href', '/franchize/{slug}/electro-enduro'),
-            jsonb_build_object('label', 'Конфигуратор-electro', 'href', '/franchize/{slug}/configurator'),
+            jsonb_build_object('label', 'Конфигуратор', 'href', '/franchize/{slug}/configurator'),
             jsonb_build_object('label', 'О нас', 'href', '/franchize/{slug}/about'),
             jsonb_build_object('label', 'Контакты', 'href', '/franchize/{slug}/contacts'),
             jsonb_build_object('label', 'Корзина', 'href', '/franchize/{slug}/cart'),
             jsonb_build_object('label', 'Мои аренды', 'href', '/franchize/{slug}/rentals'),
             jsonb_build_object('label', 'Сообщество', 'href', '/franchize/{slug}/community'),
             jsonb_build_object('label', 'Партнёрам', 'href', '/franchize/{slug}/onboarding'),
-            jsonb_build_object('label', 'Продажи', 'href', '/franchize/{slug}/sales')    
+            jsonb_build_object('label', 'Продажи', 'href', '/franchize/{slug}/sales')
           ),
           'quickActions', jsonb_build_array(
-            jsonb_build_object('label', 'Мотопарк', 'href', '/franchize/{slug}', 'icon', 'FaMotorcycle'),
-            jsonb_build_object('label', 'О нас', 'href', '/vipbikerental', 'icon', 'FaCircleInfo')
+            jsonb_build_object('label', 'Тест-драйв', 'href', '/franchize/{slug}#test-drive', 'icon', 'FaMotorcycle'),
+            jsonb_build_object('label', 'Подбор', 'href', '/franchize/{slug}/podbor', 'icon', 'FaWrench')
           )
         ),
         'footer', jsonb_build_object(
           'textColor', '#16130A',
           'columns', jsonb_build_array(
             jsonb_build_object(
-              'title', 'VIP BIKE RENTAL',
+              'title', 'VIP BIKE ELECTRO',
               'items', jsonb_build_array(
-                jsonb_build_object('type', 'text', 'value', 'Аренда мотоциклов в Нижнем Новгороде. Выбери свой вайб и покори город.')
+                jsonb_build_object('type', 'text', 'value', 'Электромотоциклы в Нижнем Новгороде. 79bike: мощно, быстро, законно, без ОСАГО.')
               )
             ),
             jsonb_build_object(
@@ -167,21 +177,22 @@ set
               )
             )
           ),
-          'copyrightTemplate', '© {{year}} Vip Bike Rental NN',
+          'copyrightTemplate', '© {{year}} VIP BIKE ELECTRO',
           'poweredBy', jsonb_build_object('label', 'oneSitePls', 'href', 'https://t.me/oneSitePlsBot', 'signature', '@SALAVEY13')
         ),
         'about', jsonb_build_object(
-          'heroTitle', 'VIPBIKE — лидеры проката мотоциклов в Нижнем Новгороде',
-          'heroSubtitle', 'От круизеров до спортбайков. Онлайн-бронь, экипировка и поддержка на маршруте.',
+          'heroTitle', 'VIP BIKE ELECTRO — Электромотоциклы без категории А',
+          'heroSubtitle', '79bike Falcon PRO от 310 000 ₽. Законно по правам категории B. Без ОСАГО и ПТС.',
           'features', jsonb_build_array(
             'Быстрая онлайн-бронь',
-            'ОСАГО + комплект экипировки',
-            'Поддержка на маршруте',
+            'Электро без категории А',
+            'ОСАГО не требуется',
             'Новая локация сервиса: пл. Комсомольская 2'
           ),
           'faq', jsonb_build_array(
-            jsonb_build_object('q', 'Какой минимальный возраст?', 'a', 'Базовый минимум — 23 года для аренды мотоциклов.'),
-            jsonb_build_object('q', 'Можно ли забронировать индивидуальный пакет?', 'a', 'Да, доступен пакет "Индивидуальный". Условия уточняются у менеджера.')
+            jsonb_build_object('q', 'Нужна ли категория А для электромотоцикла?', 'a', 'Нет! Электромотоциклы категории B можно ездить законно по правам категории B. ОСАГО и ПТС не требуются.'),
+            jsonb_build_object('q', 'Какой минимальный возраст?', 'a', 'Базовый минимум — 18 лет для аренды электромотоциклов.'),
+            jsonb_build_object('q', 'Сколько стоит 79bike Falcon PRO?', 'a', 'От 310 000 ₽. Вы можете сначала протестировать в шоуруме Нижнего Новгорода.')
           )
         ),
         'contacts', jsonb_build_object(
@@ -201,14 +212,14 @@ set
         ),
         'contentBlocks', jsonb_build_object(
           'communityEvents', jsonb_build_array(
-            jsonb_build_object('title', 'Вечерний сбор новичков VIP BIKE', 'time', 'Пт • 19:30', 'place', 'База на Комсомольской 2', 'text', 'Короткий городской круг, проверка экипировки, объяснение жестов и правил колонны.'),
+            jsonb_build_object('title', 'Вечерний электро-заезд', 'time', 'Пт • 19:30', 'place', 'База на Комсомольской 2', 'text', 'Тихий городской круг на электробайках, проверка зарядки, объяснение правил колонны.'),
             jsonb_build_object('title', 'MapRiders city loop', 'time', 'Сб • 12:00', 'place', 'Набережная + тихие улицы Нижнего', 'text', 'Открываем live-карту, ставим meetup-пины и едем в темпе самого спокойного райдера.'),
-            jsonb_build_object('title', 'Техно-час перед покатушкой', 'time', 'Вс • 11:00', 'place', 'VIP BIKE сервис-зона', 'text', 'Давление, цепь, свет, тормоза и быстрый чек арендного или личного байка.')
+            jsonb_build_object('title', 'Тест-драйв в шоуруме', 'time', 'Вс • 11:00', 'place', 'VIP BIKE шоурум', 'text', 'Протестируйте 79bike Falcon PRO и другие электромотоциклы перед покупкой.')
           ),
           'partnerCards', jsonb_build_array(
-            jsonb_build_object('name', 'VIP BIKE сервис', 'role', 'осмотр и подготовка', 'perk', 'Экспресс-чек перед выездом для экипажа'),
-            jsonb_build_object('name', 'Кофе-точка райдеров', 'role', 'место встречи', 'perk', 'Тёплый старт, зарядка телефона, быстрый брифинг'),
-            jsonb_build_object('name', 'Экипировка рядом', 'role', 'перчатки / дождевик / защита', 'perk', 'Помощь новичку без лишнего пафоса')
+            jsonb_build_object('name', 'VIP BIKE ELECTRO сервис', 'role', 'осмотр и подготовка', 'perk', 'Экспресс-чек перед выездом для электробайков'),
+            jsonb_build_object('name', 'Зарядная станция', 'role', 'место встречи', 'perk', 'Тёплый старт, зарядка батареи, быстрый брифинг'),
+            jsonb_build_object('name', 'Тест-драйв зона', 'role', 'пробная поездка', 'perk', 'Протестируйте 79bike Falcon PRO перед покупкой')
           ),
           'cityRiderTips', jsonb_build_array(
             'Не стартуй один, если это первый выезд на незнакомом байке.',
@@ -217,10 +228,10 @@ set
             'Meetup-пин ставим long-press на карте или тапом по точке + кнопка «+».'
           ),
           'salesVerticals', jsonb_build_array(
-            jsonb_build_object('id', 'new', 'title', 'Новые байки', 'pitch', 'Витрина для моделей под заказ, предпродажного расчёта и тест-драйва.', 'cta', 'Заявка на новый'),
-            jsonb_build_object('id', 'electric', 'title', 'Electro / custom', 'pitch', 'Электро-круизеры, батареи, подвеска и сборка под райдера.', 'cta', 'Собрать электро'),
-            jsonb_build_object('id', 'used', 'title', 'Б/у и проверенные', 'pitch', 'Лиды на технику с историей аренды, диагностикой и прозрачным состоянием.', 'cta', 'Подобрать б/у'),
-            jsonb_build_object('id', 'trade-in', 'title', 'Trade-in', 'pitch', 'Быстрый вход для оценки старого байка и обмена на аренду, новый или электро.', 'cta', 'Оценить байк')
+            jsonb_build_object('id', 'electric', 'title', '79bike Электро', 'pitch', '79bike Falcon PRO от 310 000 ₽. Законно по правам категории B без ОСАГО и ПТС.', 'cta', 'Собрать электро'),
+            jsonb_build_object('id', 'test-drive', 'title', 'Тест-драйв', 'pitch', 'Протестируйте электромотоцикл в шоуруме Нижнего Новгорода перед покупкой.', 'cta', 'Записаться'),
+            jsonb_build_object('id', 'rental', 'title', 'Аренда', 'pitch', 'Премиальный прокат электромотоциклов с полной экипировкой и поддержкой.', 'cta', 'Выбрать байк'),
+            jsonb_build_object('id', 'trade-in', 'title', 'Trade-in', 'pitch', 'Обменяйте свой байк на электро со скидкой. Быстрая оценка и выгодные условия.', 'cta', 'Оценить байк')
           ),
           'onboardingChecklist', jsonb_build_array(
             jsonb_build_object('title', 'Заявка и контакт', 'text', 'Фиксируем Telegram/телефон, город, формат партнёрства и ожидаемый объём байков.', 'icon', 'message-circle'),
@@ -249,33 +260,33 @@ set
           )
         ),
         'catalog', jsonb_build_object(
-          'groupOrder', jsonb_build_array('Naked', 'Supersport', 'Enduro', 'Touring', 'Neo-retro', 'Power-cruiser'),
-          'quickLinks', jsonb_build_array('23 февраля', 'Все по 549', 'Выгодное комбо', 'Cruiser week'),
-          -- 2026 fresh & creative ticker (no more 2025 vibes)
+          'groupOrder', jsonb_build_array('Electro', 'Enduro', 'Naked', 'Supersport', 'Cruiser'),
+          'quickLinks', jsonb_build_array('79bike Falcon PRO', 'Электро-тест', 'Выгодное комбо', 'Аренда выходного дня'),
+          -- VIP BIKE ELECTRO ticker
           'tickerItems', jsonb_build_array(
-            jsonb_build_object('id', '2026-neural-drop', 'text', '🚀 2026 Neural Drop: новые power-cruisers с AI-ассистентом уже в парке!', 'href', '/franchize/vip-bike#category-power-cruiser'),
-            jsonb_build_object('id', 'electro-spring', 'text', '⚡ Электро-весна 2026: -25% на e-cruisers + бесплатная зарядка + GoPro в подарок', 'href', '/franchize/vip-bike#catalog-sections'),
-            jsonb_build_object('id', 'ai-route-master', 'text', '🧬 AI Route Master 2026: нейросеть строит идеальный маршрут под твой вайб', 'href', '/franchize/vip-bike/contacts')
+            jsonb_build_object('id', 'electro-main', 'text', '⚡ 79bike Falcon PRO: электромотоцикл без категории А от 310 000 ₽', 'href', '/franchize/vip-bike#catalog'),
+            jsonb_build_object('id', 'test-drive', 'text', '🏍 Тест-драйв в шоуруме: протестируйте электро перед покупкой', 'href', '/franchize/vip-bike#test-drive'),
+            jsonb_build_object('id', 'no-osago', 'text', '✅ Законно без ОСАГО и ПТС по правам категории B', 'href', '/franchize/vip-bike/electro-enduro')
           ),
           'showTwoColumnsMobile', true,
           'useModalDetails', true,
-          -- 2026 creative promo banner
+          -- VIP BIKE ELECTRO promo banner
           'promoBanners', jsonb_build_array(
             jsonb_build_object(
-              'id', 'spring-2026-blast',
-              'title', 'Весенний нейро-бласт 2026',
-              'subtitle', '-20% на первую аренду + AI-маршрут в подарок',
-              'code', 'NEURO2026',
-              'activeFrom', '2026-03-01',
-              'activeTo', '2026-05-31',
+              'id', 'electro-2026',
+              'title', '79bike Falcon PRO - Электро без категории А',
+              'subtitle', 'Законно по правам B. Запас хода до 120 км. Разгон 0-50 км/ч за 3.5 с.',
+              'code', 'ELECTRO2026',
+              'activeFrom', '2026-01-01',
+              'activeTo', '2026-12-31',
               'priority', 95,
-              'ctaLabel', 'Забрать нейро-скидку'
+              'ctaLabel', 'Протестировать'
             )
           ),
-          -- 2026 creative ad cards
+          -- Electro ad cards
           'adCards', jsonb_build_array(
-            jsonb_build_object('id', 'neural-helmet', 'title', 'Neural Helmet PRO', 'subtitle', 'AR-шлем с проекцией маршрута и музыкой 2026', 'href', '', 'imageUrl', '', 'badge', 'Future', 'activeFrom', '2026-01-01', 'activeTo', '2026-12-31', 'priority', 80, 'ctaLabel', 'Смотреть'),
-            jsonb_build_object('id', 'drone-ride', 'title', 'Drone Ride Experience', 'subtitle', 'Профессиональная съёмка с дрона + нейро-монтаж видео', 'href', '/franchize/{slug}/contacts', 'imageUrl', '', 'badge', 'Content', 'activeFrom', '2026-02-01', 'activeTo', '2026-12-31', 'priority', 75, 'ctaLabel', 'Заказать')
+            jsonb_build_object('id', 'falcon-pro', 'title', '79bike Falcon PRO', 'subtitle', '310 000 ₽ - Электромотоцикл премиум класса', 'href', '/franchize/vip-bike/configurator', 'imageUrl', '', 'badge', 'Bestseller', 'activeFrom', '2026-01-01', 'activeTo', '2026-12-31', 'priority', 90, 'ctaLabel', 'Подробнее'),
+            jsonb_build_object('id', 'test-drive-shuffle', 'title', 'Тест-драйв', 'subtitle', 'Протестируйте электромотоцикл в шоуруме Нижнего Новгорода', 'href', '/franchize/vip-bike#test-drive', 'imageUrl', '', 'badge', 'Popular', 'activeFrom', '2026-01-01', 'activeTo', '2026-12-31', 'priority', 85, 'ctaLabel', 'Записаться')
           ),
           'floatingCart', jsonb_build_object('showOn', jsonb_build_array('catalog', 'about', 'contacts', 'order'), 'showScrollTopButton', true)
         ),

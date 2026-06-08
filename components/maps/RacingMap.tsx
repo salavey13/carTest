@@ -119,7 +119,7 @@ export function RacingMap({
   const source = TILE_LAYERS[tileLayer] || TILE_LAYERS["cartodb-dark"];
 
   return (
-    <div className={`relative z-0 ${className || ""}`}>
+    <div className={`relative z-0 ${className || ""}`} style={{ touchAction: "pan-x pan-y pinch-zoom" }}>
       <MapContainer
         bounds={mapBounds}
         className="z-0 h-full w-full"

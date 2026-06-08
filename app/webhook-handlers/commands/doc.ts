@@ -905,53 +905,51 @@ export async function handleDocText(userId: string, chatId: number, text: string
     return true;
   }
 
+  // ── Manual input states ─────────────────────────────────────────────────────────────
+
+  // Add manual passport states
+  if (state === "doc_manual_passport_name") {
+    await handleManualPassportName(userId, chatId, context, text);
+    return true;
+  }
+  if (state === "doc_manual_passport_number") {
+    await handleManualPassportNumber(userId, chatId, context, text);
+    return true;
+  }
+  if (state === "doc_manual_passport_issue") {
+    await handleManualPassportIssue(userId, chatId, context, text);
+    return true;
+  }
+  if (state === "doc_manual_passport_birth") {
+    await handleManualPassportBirth(userId, chatId, context, text);
+    return true;
+  }
+  if (state === "doc_manual_passport_registration") {
+    await handleManualPassportRegistration(userId, chatId, context, text);
+    return true;
+  }
+
+  // Add manual license states
+  if (state === "doc_manual_license_name") {
+    await handleManualLicenseName(userId, chatId, context, text);
+    return true;
+  }
+  if (state === "doc_manual_license_number") {
+    await handleManualLicenseNumber(userId, chatId, context, text);
+    return true;
+  }
+  if (state === "doc_manual_license_issue") {
+    await handleManualLicenseIssue(userId, chatId, context, text);
+    return true;
+  }
+  if (state === "doc_manual_license_expiry") {
+    await handleManualLicenseExpiry(userId, chatId, context, text);
+    return true;
+  }
+
   // Unknown state — let other handlers process the message
   return false;
 }
-
-// ── Update handleDocText to handle manual input states ─────────────────────────────
-
-// Add manual passport states
-if (state === "doc_manual_passport_name") {
-  await handleManualPassportName(userId, chatId, context, text);
-  return true;
-}
-if (state === "doc_manual_passport_number") {
-  await handleManualPassportNumber(userId, chatId, context, text);
-  return true;
-}
-if (state === "doc_manual_passport_issue") {
-  await handleManualPassportIssue(userId, chatId, context, text);
-  return true;
-}
-if (state === "doc_manual_passport_birth") {
-  await handleManualPassportBirth(userId, chatId, context, text);
-  return true;
-}
-if (state === "doc_manual_passport_registration") {
-  await handleManualPassportRegistration(userId, chatId, context, text);
-  return true;
-}
-
-// Add manual license states
-if (state === "doc_manual_license_name") {
-  await handleManualLicenseName(userId, chatId, context, text);
-  return true;
-}
-if (state === "doc_manual_license_number") {
-  await handleManualLicenseNumber(userId, chatId, context, text);
-  return true;
-}
-if (state === "doc_manual_license_issue") {
-  await handleManualLicenseIssue(userId, chatId, context, text);
-  return true;
-}
-if (state === "doc_manual_license_expiry") {
-  await handleManualLicenseExpiry(userId, chatId, context, text);
-  return true;
-}
-
-if (state === "doc_awaiting_bike") {
 
 export async function handleDocCallback(
   userId: string,
@@ -1410,5 +1408,4 @@ export async function docCommand(
     buttons,
     { keyboardType: "reply", parseMode: "Markdown" },
   );
-}
 }

@@ -1,7 +1,7 @@
 -- MapRiders default meetup POIs for vip-bike:
--- 1) VIP BIKE base moved to active demo rider location (2026-04-17 snapshot)
--- 2) second meetup moved from river to safe road-side point
--- 3) add Komsomolskaya square point
+-- 1) VIP BIKE base moved to HQ coordinates (пл. Комсомольская 2: 56.297654, 43.947218)
+-- 2) second meetup moved near HQ for realistic visualization
+-- 3) third meetup at nearby location
 
 with target_map as (
   select id
@@ -30,27 +30,35 @@ default_meet_points as (
   select jsonb_build_array(
     jsonb_build_object(
       'id', 'vip-base-point',
-      'name', 'VIP BIKE Base • Стригинский бульвар 13Б',
+      'name', 'VIP BIKE HQ • пл. Комсомольская 2',
       'type', 'point',
       'icon', '::FaLocationDot::',
       'color', '#f97316',
-      'coords', jsonb_build_array(jsonb_build_array(56.204245, 43.798905))
+      'coords', jsonb_build_array(jsonb_build_array(56.297654, 43.947218))
     ),
     jsonb_build_object(
-      'id', 'vip-riverside-safe-point',
-      'name', 'Речной круг • точка сбора',
+      'id', 'vip-demo-rider-a',
+      'name', 'Demo Rider A • 12 км/ч',
       'type', 'point',
       'icon', '::FaLocationDot::',
       'color', '#fb923c',
-      'coords', jsonb_build_array(jsonb_build_array(56.20611, 43.80018))
+      'coords', jsonb_build_array(jsonb_build_array(56.301, 43.952))
     ),
     jsonb_build_object(
-      'id', 'vip-komsomolskaya-2',
-      'name', 'Площадь Комсомольская 2',
+      'id', 'vip-demo-rider-b',
+      'name', 'Demo Rider B • 14 км/ч',
       'type', 'point',
       'icon', '::FaLocationDot::',
       'color', '#fdba74',
-      'coords', jsonb_build_array(jsonb_build_array(56.29658, 43.93622))
+      'coords', jsonb_build_array(jsonb_build_array(56.296, 43.935))
+    ),
+    jsonb_build_object(
+      'id', 'vip-demo-rider-c',
+      'name', 'Demo Rider C • 16 км/ч',
+      'type', 'point',
+      'icon', '::FaLocationDot::',
+      'color', '#fed7aa',
+      'coords', jsonb_build_array(jsonb_build_array(56.294, 43.96))
     )
   ) as points
 )

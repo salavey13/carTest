@@ -190,7 +190,18 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     return (mapData?.points || []).filter((point) => {
       const normalizedId = String(point.id || "").toLowerCase();
       const normalizedName = String(point.name || "").toLowerCase();
-      return normalizedId !== "demo-rider-beta" && !normalizedName.includes("demo rider beta");
+      // Filter out demo rider points from old locations
+      return (
+        normalizedId !== "demo-rider-beta" &&
+        !normalizedName.includes("demo rider beta") &&
+        normalizedId !== "vip-base-point" &&
+        normalizedId !== "vip-riverside-safe-point" &&
+        normalizedId !== "vip-demo-rider-a" &&
+        normalizedId !== "vip-demo-rider-b" &&
+        normalizedId !== "vip-demo-rider-c" &&
+        !normalizedName.includes("demo rider") &&
+        !normalizedName.includes("rider •")
+      );
     });
   }, [mapData?.points, mapData?.bounds]);
 
