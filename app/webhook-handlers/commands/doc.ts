@@ -60,8 +60,39 @@ interface DocFlowContext {
 // ── VLM Photo Extraction ─────────────────────────────────────────────────────
 
 /**
+ * Downsample image for faster VLM processing.
+ * Resizes to max 1024px dimension and reduces quality to 80%.
+ * This significantly reduces processing time while maintaining OCR accuracy.
+ */
+async function downsampleImageForVlm(imageBuffer: Buffer): Promise<Buffer> {
+  try {
+    // Use sharp for image processing (faster and more reliable)
+    const { default: sharp } = await import("sharp");
+
+    // Resize to max 1024px on longest side, JPEG 80% quality
+    const downsampled = await sharp(imageBuffer)
+      .resize(1024, 1024, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+
+    logger.info("[/doc] Image downsampled for VLM", {
+      originalSize: imageBuffer.length,
+      downsampledSize: downsampled.length,
+      reductionPercent: Math.round((1 - downsampled.length / imageBuffer.length) * 100),
+    });
+
+    return downsampled;
+  } catch (sharpError) {
+    // Sharp not available or failed - return original
+    logger.warn("[/doc] Sharp downsampling failed, using original image", sharpError);
+    return imageBuffer;
+  }
+}
+
+/**
  * Download a Telegram photo and extract document data using ZAI VLM.
  * VLM-only path — no Tesseract fallback.
+ * Supports both photo messages and document messages (for high-res scans).
  */
 async function extractDocumentFromTelegramPhoto(
   fileId: string,
@@ -91,8 +122,9 @@ async function extractDocumentFromTelegramPhoto(
       return { success: false, error: "Failed to download image from Telegram" };
     }
 
-    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-    const base64Image = imageBuffer.toString("base64");
+    const originalBuffer = Buffer.from(await imageResponse.arrayBuffer());
+    const downsampledBuffer = await downsampleImageForVlm(originalBuffer);
+    const base64Image = downsampledBuffer.toString("base64");
 
     // 2. VLM extraction (direct SDK call — no HTTP roundtrip)
     const vlmResult = await vlmExtractDocument(base64Image, docType);
@@ -300,13 +332,67 @@ async function generateAndSendContract(
       .replace(/[^a-zA-Zа-яА-Я0-9.\-]/g, "-")
       .replace(/-+/g, "-");
 
-    // Send the contract via Telegram
-    await sendTelegramDocument(
-      String(chatId),
-      docxBuf,
-      docFileName,
-      `Договор аренды: ${bike.make} ${bike.model}`,
-    );
+    // Generate QR code for 1-click next rent
+    // Format: https://t.me/oneBikePlsBot/app?startapp=rent_{bikeId}_{docSha256}
+    const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${bike.id}_${docSha256}`;
+    const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
+
+    let qrPngBuffer: Buffer | null = null;
+    try {
+      const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
+      if (qrRes.ok) {
+        qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
+      }
+    } catch (qrErr) {
+      logger.warn("[/doc] QR generation failed, sending DOCX only:", qrErr?.message || qrErr);
+    }
+
+    // Send the contract via Telegram (DOCX + QR as media group if QR available)
+    if (qrPngBuffer) {
+      // Send DOCX + QR as a media group (album)
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      const mediaGroupUrl = `https://api.telegram.org/bot${token}/sendMediaGroup`;
+      const form = new FormData();
+      form.append('chat_id', String(chatId));
+
+      // Media group items: [{type:"document", media:"attach://docx"}, {type:"photo", media:"attach://qr", caption:"..."}]
+      const mediaItems = [
+        { type: 'document', media: 'attach://docx', parse_mode: 'HTML' },
+        { type: 'photo', media: 'attach://qr', caption: `📲 <b>QR для быстрой повторной аренды</b>\nНаведите камеру — данные заполнятся автоматически.\n\n🔗 ${qrDeepLink}`, parse_mode: 'HTML' },
+      ];
+      form.append('media', JSON.stringify(mediaItems));
+      form.append('docx', new Blob([docxBuf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), docFileName);
+      form.append('qr', new Blob([qrPngBuffer], {type:'image/png'}), `qr-${bike.id}.png`);
+
+      try {
+        const res = await fetch(mediaGroupUrl, {method:'POST', body: form});
+        const bodyText = await res.text();
+        try {
+          const results = JSON.parse(bodyText || '{}');
+          if (!results.ok) throw new Error(results.description || 'sendMediaGroup failed');
+          logger.info("[/doc] DOCX + QR sent successfully as media group");
+        } catch (parseError) {
+          logger.warn("[/doc] sendMediaGroup response parse issue, but message likely sent");
+        }
+      } catch (sendError) {
+        logger.warn("[/doc] sendMediaGroup failed, falling back to sendDocument:", sendError?.message);
+        // Fallback: send DOCX alone
+        await sendTelegramDocument(
+          String(chatId),
+          docxBuf,
+          docFileName,
+          `Договор аренды: ${bike.make} ${bike.model}\n\n🔗 Быстрая повторная аренда:\n${qrDeepLink}`,
+        );
+      }
+    } else {
+      // No QR buffer — send DOCX alone with QR link in caption
+      await sendTelegramDocument(
+        String(chatId),
+        docxBuf,
+        docFileName,
+        `Договор аренды: ${bike.make} ${bike.model}\n\n🔗 Быстрая повторная аренда:\n${qrDeepLink}`,
+      );
+    }
 
     // Save rental secrets for 1-click next rent
     await saveUserRentalSecrets({
@@ -428,9 +514,30 @@ export async function handleDocPhoto(message: any): Promise<boolean> {
     return false;
   }
 
-  const photo = message.photo?.[message.photo.length - 1];
-  if (!photo?.file_id) {
-    await sendComplexMessage(chatId, "🚨 Не удалось прочитать фото. Отправьте изображение ещё раз.", [], undefined);
+  // Extract file_id from both photo and document messages
+  // Users often send high-res scans as documents rather than compressed photos
+  let fileId: string | null = null;
+
+  // Try photo array first (Telegram sends multiple sizes)
+  if (Array.isArray(message.photo) && message.photo.length > 0) {
+    // Use the largest photo (last in array)
+    const largestPhoto = message.photo[message.photo.length - 1];
+    if (largestPhoto?.file_id) {
+      fileId = largestPhoto.file_id;
+    }
+  }
+
+  // If no photo found, try document (high-res scans)
+  if (!fileId && message.document?.file_id) {
+    // Only accept image documents
+    const mimeType = message.document.mime_type || "";
+    if (mimeType.startsWith("image/")) {
+      fileId = message.document.file_id;
+    }
+  }
+
+  if (!fileId) {
+    await sendComplexMessage(chatId, "🚨 Не удалось прочитать изображение. Отправьте фото ещё раз (как фото или как файл).", [], undefined);
     return true; // consumed the message
   }
 
@@ -584,8 +691,9 @@ export async function docCommand(
   const userIdStr = String(userId);
   logger.info(`[/doc] User: ${userIdStr}, Text: "${text}"`);
 
-  // If user sent a photo WITH /doc caption, process it as the first step
-  const hasPhoto = (photoVariants && photoVariants.length > 0) || (documentFiles && documentFiles.length > 0);
+  // If user sent a photo/document WITH /doc caption, process it as the first step
+  const hasPhoto = Array.isArray(photoVariants) && photoVariants.length > 0;
+  const hasDocument = documentFiles && documentFiles.length > 0;
 
   // Parse bike ID from command args
   const parts = text.trim().split(/\s+/);
@@ -610,16 +718,29 @@ export async function docCommand(
       bikeModel: bike.model,
     };
 
-    // If photo was sent with /doc caption, treat it as passport
-    if (hasPhoto) {
-      const fileId = photoVariants?.[0]?.file_id || documentFiles?.[0]?.thumb?.file_id;
+    // If photo/document was sent with /doc caption, treat it as passport
+    if (hasPhoto || hasDocument) {
+      let fileId: string | null = null;
+
+      // Try photo first
+      if (hasPhoto && photoVariants && photoVariants.length > 0) {
+        fileId = photoVariants[photoVariants.length - 1]?.file_id;
+      }
+
+      // If no photo, try document (must be an image)
+      if (!fileId && hasDocument && documentFiles && documentFiles.length > 0) {
+        const doc = documentFiles[0];
+        if (doc?.mime_type?.startsWith("image/")) {
+          fileId = doc.file_id;
+        }
+      }
+
       if (fileId) {
         await setDocState(userIdStr, "doc_awaiting_passport", context);
         // The photo will be handled by handleDocPhoto on next webhook call
-        // (Telegram sends photo and caption as separate message or same message)
         await sendComplexMessage(
           chatId,
-          `🏍 *${bike.make} ${bike.model}*\n\n🤖 Обрабатываю прикреплённое фото через VLM...`,
+          `🏍 *${bike.make} ${bike.model}*\n\n🤖 Обрабатываю прикреплённое изображение через VLM...`,
           [],
           { removeKeyboard: true, parseMode: "Markdown" },
         );
