@@ -93,11 +93,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "package.json", "app/layout.tsx",
         "tailwind.config.ts",
         "app/globals.css",
-        "app/style-guide/page.tsx",       
+        "app/style-guide/page.tsx",
         "contexts/AppContext.tsx",
         "hooks/useAppToast.ts",
         "hooks/supabase.ts",
-        "hooks/telegram.ts",  
+        "hooks/telegram.ts",
         "app/actions.ts",
         "lib/debugLogger.ts",
         "lib/logger.ts",
@@ -105,8 +105,40 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "components/Header.tsx",
 "components/layout/BottomNavigation.tsx",
 "components/layout/ClientLayout.tsx",
-        "types/database.types", 
+        "types/database.types",
         "components/repo/prompt.ts",
+    ].filter(Boolean), []);
+
+    // docXagent preset: Files for ZAI web agent to recreate doc generation system
+    const docXagentFiles = useMemo(() => [
+        // Core skills
+        "skills/rental-contract-from-photos/SKILL.md",
+        "skills/deal-contract-from-photos/SKILL.md",
+        // CLI scripts
+        "scripts/make-rental-contract-skill.mjs",
+        "scripts/make-deal-contract-skill.mjs",
+        "scripts/supabase-access-skill.mjs",
+        // HTML → DOCX converter
+        "lib/htmlToDocx.mjs",
+        // Contract templates
+        "docs/RENTAL_DEAL_TEMPLATE.html",
+        "docs/SALE_DEAL_TEMPLATE.html",
+        // Database schema (private schema + secrets) - specific migrations only
+        "supabase/migrations/20240101000000_init.sql",
+        "supabase/migrations/20260304_private_scheme.sql",
+        "supabase/migrations/20260601000000_user_rental_secrets.sql",
+        "supabase/migrations/20260607000000_create_sale_contract_artifacts.sql",
+        "supabase/migrations/20260508090000_repair_private_crew_secrets.sql",
+        // Forward-telegram API (for sending files when blocked)
+        "app/api/forward-telegram/route.ts",
+        // Dashboard components (for viewing generated docs)
+        "app/franchize/[slug]/rentals-analytics/page.tsx",
+        "app/franchize/[slug]/rentals-analytics/RentalsAnalyticsClient.tsx",
+        "app/franchize/server-actions/rentals-dashboard.ts",
+        // Seed data (12 bikes)
+        "docs/sql/cars_rows_12bikes_june5.csv",
+        // Documentation
+        "DOC_SKILL_FULL_INSTALLER.md",
     ].filter(Boolean), []);
 
     const effectiveBranchDisplay = useMemo(() => targetBranchName || manualBranchName || "default", [targetBranchName, manualBranchName]);
@@ -135,13 +167,15 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         toggleFileSelection,
         selectHighlightedFiles,
         handleAddImportantFiles,
+        handleAddDocXagentFiles,
         handleSelectAll,
         handleDeselectAll,
     } = useFileSelection({
         files: fetchedFiles,
         primaryHighlightedPath,
         secondaryHighlightedPaths,
-        importantFiles, 
+        importantFiles,
+        docXagentFiles,
         imageReplaceTaskActive: !!imageReplaceTask || !!iconReplaceTask,
     });
 
@@ -397,11 +431,15 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         },
         handleAddImportantFiles: () => {
              logger.debug(`[Imperative] handleAddImportantFiles called.`);
-             handleAddImportantFiles(); 
+             handleAddImportantFiles();
+        },
+        handleAddDocXagentFiles: () => {
+             logger.debug(`[Imperative] handleAddDocXagentFiles called.`);
+             handleAddDocXagentFiles();
         },
         handleAddFullTree: () => {
              logger.debug(`[Imperative] handleAddFullTree called.`);
-             handleAddFullTree(); 
+             handleAddFullTree();
         },
         selectAllFiles: () => {
              logger.debug(`[Imperative] selectAllFiles called.`);
@@ -413,8 +451,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         },
     }), [
         handleFetchManual, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll,
-        kworkInputValue, 
-        handleAddImportantFiles, handleAddFullTree, handleSelectAll, handleDeselectAll, logger 
+        kworkInputValue,
+        handleAddImportantFiles, handleAddDocXagentFiles, handleAddFullTree, handleSelectAll, handleDeselectAll, logger
     ]);
 
      const handleManualBranchChange = useCallback((branch: string) => {
@@ -585,20 +623,22 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                          />
                          <FileList
                              id="file-list-container"
-                             files={fetchedFiles} 
+                             files={fetchedFiles}
                              selectedFiles={selectedFetcherFiles}
                              primaryHighlightedPath={primaryHighlightedPath}
                              secondaryHighlightedPaths={secondaryHighlightedPaths}
-                             importantFiles={importantFiles} 
+                             importantFiles={importantFiles}
+                             docXagentFiles={docXagentFiles}
                              isLoading={isFetchLoading}
                              isActionDisabled={isActionDisabled}
                              toggleFileSelection={toggleFileSelection}
                              onAddImportant={handleAddImportantFiles}
+                             onAddDocXagent={handleAddDocXagentFiles}
                              onSelectHighlighted={selectHighlightedFiles}
                              onSelectAll={handleSelectAll}
                              onDeselectAll={handleDeselectAll}
-                             onAddSelected={handleAddSelected} 
-                             onAddTree={handleAddFullTree}     
+                             onAddSelected={handleAddSelected}
+                             onAddTree={handleAddFullTree}
                           />
                       </div>
                  )}

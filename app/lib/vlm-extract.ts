@@ -301,6 +301,21 @@ export async function vlmExtractDocument(
       ],
     });
 
+    // Guard against undefined response structure
+    if (!response || !response.choices || response.choices.length === 0) {
+      logger.error("[vlm-extract] VLM returned invalid response structure", {
+        docType,
+        hasResponse: !!response,
+        hasChoices: !!response?.choices,
+        choicesLength: response?.choices?.length ?? 0,
+      });
+      return {
+        success: false,
+        provider: "zai-vlm",
+        error: "VLM returned invalid response (missing choices)",
+      };
+    }
+
     const rawContent = response.choices[0]?.message?.content;
 
     if (!rawContent) {
@@ -308,7 +323,7 @@ export async function vlmExtractDocument(
       return {
         success: false,
         provider: "zai-vlm",
-        error: "VLM returned empty response",
+        error: "VLM returned empty content",
       };
     }
 
