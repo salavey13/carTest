@@ -8,6 +8,7 @@ import { randomUUID } from "crypto";
 import { readFile } from "fs/promises";
 import path from "path";
 import { getCrewSensitiveDataOrDefault, getUserSensitiveDataOrDefault, saveCrewSensitiveData } from "@/app/lib/private-secrets";
+import { getUserRentalSecrets as getVerifiedRentalSecrets, saveUserRentalSecrets } from "@/app/lib/user-rental-secrets";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 import { upsertFranchizeIntent } from "@/app/franchize/server-actions/intents";
 import { cloneFranchizeContentBlocks, readFranchizeContentBlocks, type FranchizeContentBlocks } from "@/app/franchize/lib/content-blocks";
@@ -1731,18 +1732,24 @@ function resolveAndValidateFranchizeDocVariables(
 
 type FranchizeOrderFlowType = "rental" | "sale" | "mixed";
 
-async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderFlowType): Promise<string> {
+async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderFlowType): Promise<{ template: string; templateMode: "md" | "html" }> {
   const crewSensitive = await getCrewSensitiveDataOrDefault(slug, { source: "loadFranchizeDealTemplate" });
   const secureTemplateKey = flowType === "rental" ? "rentalDealTemplate" : "saleDealTemplate";
   const secureTemplate = readPath(crewSensitive.docTemplates ?? {}, [secureTemplateKey], "");
   if (typeof secureTemplate === "string" && secureTemplate.trim().length > 0) {
-    return secureTemplate;
+    // Auto-detect mode from stored template content
+    const templateMode = /<[a-z][\s>]/i.test(secureTemplate.trimStart().slice(0, 200)) ? "html" as const : "md" as const;
+    return { template: secureTemplate, templateMode };
   }
 
-  const remoteTemplateUrl = flowType === "rental"
-    ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE_DEMO.md"
+  const isRental = flowType === "rental";
+  // Rental: use the full HTML template (proper DOCX formatting, all appendices, dynamic vehicle types)
+  // Sale: keep MD template (no HTML version yet)
+  const remoteTemplateUrl = isRental
+    ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE.html"
     : "https://raw.githubusercontent.com/salavey13/carTest/main/docs/SALE_DEAL_TEMPLATE_DEMO.md";
-  const localTemplateFile = flowType === "rental" ? "RENTAL_DEAL_TEMPLATE_DEMO.md" : "SALE_DEAL_TEMPLATE_DEMO.md";
+  const localTemplateFile = isRental ? "RENTAL_DEAL_TEMPLATE.html" : "SALE_DEAL_TEMPLATE_DEMO.md";
+  const defaultTemplateMode = isRental ? "html" as const : "md" as const;
 
   try {
     const response = await fetch(remoteTemplateUrl, { cache: "no-store" });
@@ -1752,14 +1759,15 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
 
     const remoteTemplate = await response.text();
     if (remoteTemplate.trim().length > 0) {
-      return remoteTemplate;
+      return { template: remoteTemplate, templateMode: defaultTemplateMode };
     }
 
     throw new Error("template fetch returned empty content");
   } catch (error) {
     logger.warn("[franchize] fallback to local template", { flowType, error });
     const localTemplatePath = path.join(process.cwd(), "docs", localTemplateFile);
-    return readFile(localTemplatePath, "utf8");
+    const localTemplate = await readFile(localTemplatePath, "utf8");
+    return { template: localTemplate, templateMode: defaultTemplateMode };
   }
 }
 
@@ -1839,8 +1847,13 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const rentStartDate = payload.rentalStartDate || payload.time;
     const rentEndDate = payload.rentalEndDate || payload.time;
     const dailyPriceRub = firstLine?.pricePerDay || Math.round(payload.subtotal / Math.max(1, rentDays));
+    // Vehicle type derivation for dynamic template labels (HTML template uses these)
+    const isElectricBike = String(firstSpecs.type || "").toLowerCase().includes("electric");
+    const bikeVehicleTypeLabel = isElectricBike ? "ЭЛЕКТРОМОТОЦИКЛА" : "МОТОЦИКЛА";
+    const bikeVehicleTypeAccusative = isElectricBike ? "электромотоцикл" : "мотоцикл";
+    const bikeVehicleTypeGenitive = isElectricBike ? "электромотоцикла" : "мотоцикла";
 
-    const template = await loadFranchizeDealTemplate(payload.slug, flowType);
+    const { template, templateMode } = await loadFranchizeDealTemplate(payload.slug, flowType);
     const privateReadContext = { source: "buildFranchizeOrderDocAndNotify", orderId: payload.orderId };
     const userSensitive = await getUserSensitiveDataOrDefault(payload.telegramUserId, privateReadContext);
     const crewSensitive = await getCrewSensitiveDataOrDefault(payload.slug, privateReadContext);
@@ -1848,44 +1861,90 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const defaults = (readPath(contractDefaults, ["defaults"], {}) ?? {}) as UnknownRecord;
     const docIdentity = resolveAndValidateFranchizeDocVariables(payload, userSensitive);
 
+    // Fetch verified rental secrets from past rentals — richest personal data source
+    // Priority chain: rental secrets (verified OCR/past contract) > userSensitive > placeholder
+    const rentalSecretsRecord = await getVerifiedRentalSecrets(payload.telegramUserId, payload.slug);
+    // Extract non-null string fields for convenient access in variables map
+    const rentalSecrets: Record<string, string> = {};
+    if (rentalSecretsRecord) {
+      for (const [key, value] of Object.entries(rentalSecretsRecord)) {
+        if (typeof value === "string" && value.trim().length > 0) {
+          rentalSecrets[key] = value.trim();
+        }
+      }
+    }
+
     const variables = {
       contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}`,
       contract_date: new Date().toLocaleDateString("ru-RU"),
       day: new Date().getDate().toString().padStart(2, "0"),
       month: new Date().toLocaleString("ru-RU", { month: "long" }),
+      month_num: String(new Date().getMonth() + 1).padStart(2, "0"),
       year: new Date().getFullYear().toString(),
+      // Renter identity — 3-tier priority: rental secrets (verified past) > userSensitive > placeholder
       renter_full_name: payload.recipient,
       renter_phone: docIdentity.renterPhone,
       renter_birth_date: docIdentity.renterBirthDate,
       renter_email: docIdentity.renterEmail,
-      renter_driver_license: userSensitive.driverLicense || payload.renterDriverLicense || "указывается при выдаче",
-      renter_passport: userSensitive.passport || payload.renterPassport || "указывается при выдаче",
+      renter_address: rentalSecrets?.renter_address || payload.renterAddress || String(readPath(userSensitive, ["renterAddress"], "") || readPath(userSensitive, ["registration"], "")) || null,
+      renter_driver_license: rentalSecrets?.renter_driver_license || userSensitive.driverLicense || payload.renterDriverLicense || "указывается при выдаче",
+      renter_passport: rentalSecrets?.renter_passport || userSensitive.passport || payload.renterPassport || "указывается при выдаче",
+      renter_passport_issue_date: rentalSecrets?.renter_passport_issue_date || String(readPath(userSensitive, ["passportIssueDate"], "") || readPath(userSensitive, ["passport_issue_date"], "")) || "—",
+      renter_registration: rentalSecrets?.renter_registration || String(readPath(userSensitive, ["registration"], "")) || "—",
       issuer_name: String(readPath(defaults, ["issuerName"], `Franchize ${payload.slug}`)),
       issuer_signatory: "Администратор экипажа",
       issuer_representative: String(readPath(defaults, ["issuer_representative"], "Сидоров Илья Олегович")),
+      // Bike identity — separate make/model for HTML template §1.2
       bike_make_model: firstCar
         ? `${firstCar.make || "Bike"} ${firstCar.model || "Model"}`
         : payload.cartLines.map((line) => line.itemId).join(", "),
+      bike_make: firstCar?.make || "уточняется",
+      bike_model: firstCar?.model || "уточняется",
       bike_vin: String(firstSpecs.vin || firstSpecs.frame || firstSpecs.vin_number || "уточняется"),
       bike_plate: String(firstSpecs.plate || firstSpecs.state_number || "уточняется"),
-      bike_mileage: "45073",
+      bike_category: String(firstSpecs.category || firstSpecs.tp_category || "A/L3"),
+      bike_color: String(firstSpecs.color || "уточняется"),
+      bike_year: String(firstSpecs.year || firstSpecs.production_year || "уточняется"),
+      bike_mileage: String(firstSpecs.mileage || "45073"),
+      // Dynamic vehicle type labels (HTML template: title, §1.1, appendices)
+      bike_vehicle_type_label: bikeVehicleTypeLabel,
+      bike_vehicle_type_accusative: bikeVehicleTypeAccusative,
+      bike_vehicle_type_genitive: bikeVehicleTypeGenitive,
+      // Engine spec lines from bike specs (pre-computed in seed data)
+      bike_engine_spec_line_1: String(firstSpecs.bike_engine_spec_line_1 || ""),
+      bike_engine_spec_line_2: String(firstSpecs.bike_engine_spec_line_2 || ""),
+      bike_engine_spec_line_3: String(firstSpecs.bike_engine_spec_line_3 || ""),
       rent_start_time: "12:00",
       rent_start_date: rentStartDate,
       rent_end_time: "12:00",
       rent_end_date: rentEndDate,
       rent_days: rentDays,
+      // Pricing: both hourly and daily for HTML template §4.1
+      hourly_price_rub: formatMoney(Number(firstSpecs.price_per_hour || 0)),
       daily_price_rub: formatMoney(dailyPriceRub),
       subtotal_rub: formatMoney(payload.subtotal),
       extras_rows: extrasRows,
       extras_total_rub: formatMoney(payload.extrasTotal),
       total_price_rub: formatMoney(payload.totalAmount),
-      deposit_rub: "20 000",
+      deposit_rub: String(readPath(defaults, ["deposit_rub"], "20 000")),
       included_mileage: String(readPath(defaults, ["included_mileage"], 200)),
       overage_rate: `${readPath(defaults, ["overage_rate"], 30)} руб/км`,
+      included_km_per_day: String(readPath(defaults, ["included_km_per_day"], 200)),
+      extra_km_fee_rub: String(readPath(defaults, ["extra_km_fee_rub"], 35)),
       bike_value_rub: String(readPath(defaults, ["bike_value_rub"], 700000)),
       bike_value_words: String(readPath(defaults, ["bike_value_words"], "Семьсот тысяч")),
       late_return_penalty_rub: String(readPath(defaults, ["late_return_penalty_rub"], 5000)),
+      late_return_penalty_max_days: String(readPath(defaults, ["late_return_penalty_max_days"], 90)),
+      damage_price_list: String(readPath(defaults, ["damage_price_list"], "мотоцикл в сборе / царапина на пластике / прочее по расчету")),
       return_address: String(readPath(defaults, ["return_address"], "г. Нижний Новгород, ул. Стригинский переулок, дом 13б")),
+      lessor_address: String(readPath(defaults, ["lessor_address"], "г. Нижний Новгород")),
+      // Appendix 1 — act fields (filled at delivery/return; placeholders for pre-contract)
+      battery_level_start: "100 %",
+      battery_level_end: "____ %",
+      equipment: "—",
+      damage_notes_at_delivery: "от даты начала аренды",
+      damage_notes_at_return: "от даты возврата тс",
+      media_links: "—",
       signature_timestamp: new Date().toLocaleString("ru-RU"),
       signature_fingerprint: payload.signatureFingerprint || "—",
       renter_signature: payload.signatureName || "электронное согласие в Telegram WebApp",
@@ -1903,6 +1962,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       template,
       variables,
       flowType,
+      templateMode,
     });
 
     const adminChatId = process.env.ADMIN_CHAT_ID;
@@ -1930,10 +1990,60 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       recipientSet.add(String(crewRow.owner_id));
     }
 
+    // ── Generate QR deep-link PNG ──────────────────────────────────
+    const firstBikeId = payload.cartLines.length > 0 ? payload.cartLines[0].itemId : "";
+    const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${firstBikeId}_${sha256}`;
+    const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
+
+    let qrPngBuffer: Buffer | null = null;
+    try {
+      const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
+      if (qrRes.ok) {
+        qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
+      }
+    } catch (qrErr) {
+      logger.warn("[franchize] QR generation failed, sending DOCX only", { error: qrErr instanceof Error ? qrErr.message : String(qrErr) });
+    }
+
+    // ── Send DOCX + QR via sendMediaGroup ─────────────────────────
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+
     for (const recipientId of recipientSet) {
-      const sendDocResult = await sendTelegramDocument(recipientId, new Blob([bytes]), docFileName);
-      if (!sendDocResult.success) {
-        throw new Error(sendDocResult.error || `Failed to send DOCX to ${recipientId}`);
+      if (qrPngBuffer && botToken) {
+        try {
+          const mediaGroupUrl = `https://api.telegram.org/bot${botToken}/sendMediaGroup`;
+          const form = new FormData();
+          form.append("chat_id", recipientId);
+
+          const mediaItems = [
+            { type: "document", media: "attach://docx" },
+            { type: "photo", media: "attach://qr", caption: `📲 QR для быстрой повторной аренды\nНаведите камеру — данные заполнятся автоматически.\n\n🔗 ${qrDeepLink}`, parse_mode: "HTML" },
+          ];
+          form.append("media", JSON.stringify(mediaItems));
+          form.append("docx", new Blob([bytes]), docFileName);
+          form.append("qr", new Blob([qrPngBuffer], { type: "image/png" }), `qr-${firstBikeId}.png`);
+
+          const mediaRes = await fetch(mediaGroupUrl, { method: "POST", body: form });
+          if (!mediaRes.ok) {
+            throw new Error(`sendMediaGroup HTTP ${mediaRes.status}`);
+          }
+        } catch (mediaGroupErr) {
+          // Fallback to sendDocument only
+          logger.warn("[franchize] sendMediaGroup failed, falling back to sendDocument", {
+            recipientId,
+            error: mediaGroupErr instanceof Error ? mediaGroupErr.message : String(mediaGroupErr),
+          });
+          const sendDocResult = await sendTelegramDocument(recipientId, new Blob([bytes]), docFileName);
+          if (!sendDocResult.success) {
+            throw new Error(sendDocResult.error || `Failed to send DOCX to ${recipientId}`);
+          }
+        }
+      } else {
+        // No QR — send DOCX only
+        const sendDocResult = await sendTelegramDocument(recipientId, new Blob([bytes]), docFileName);
+        if (!sendDocResult.success) {
+          throw new Error(sendDocResult.error || `Failed to send DOCX to ${recipientId}`);
+        }
       }
     }
 
@@ -2003,18 +2113,19 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     }
 
     try {
-      const { saveUserRentalSecrets } = await import("@/app/lib/user-rental-secrets");
       await saveUserRentalSecrets({
         chat_id: payload.telegramUserId,
         crew_slug: payload.slug,
         doc_sha256: sha256,
         renter_full_name: variables.renter_full_name,
         renter_passport: variables.renter_passport,
+        renter_passport_issue_date: variables.renter_passport_issue_date !== "—" ? variables.renter_passport_issue_date : null,
+        renter_registration: variables.renter_registration !== "—" ? variables.renter_registration : null,
         renter_driver_license: variables.renter_driver_license,
         renter_birth_date: variables.renter_birth_date,
         renter_phone: variables.renter_phone,
         renter_email: variables.renter_email,
-        renter_address: null,
+        renter_address: variables.renter_address || null,
         source_doc_key: variables.document_key,
         source_rental_id: sourceRentalId,
         verification_status: "verified",
@@ -2268,7 +2379,7 @@ export async function getFranchizeSuccessfulRentals(input: unknown): Promise<{ s
 
   const { data, error } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id, user_id, vehicle_id, status, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date, created_at, metadata, vehicle:cars!inner(id, make, model, crew_id), user:users(user_id, full_name, username, metadata)")
+    .select("rental_id, user_id, vehicle_id, status, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date, created_at, metadata, vehicle:cars!inner(id, make, model, crew_id), user:users!rentals_user_id_fkey(user_id, full_name, username, metadata)")
     .eq("vehicle.crew_id", crew.id)
     .in("status", ["confirmed", "active", "completed"])
     .order("created_at", { ascending: false })
