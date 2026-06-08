@@ -44,7 +44,7 @@ const HERO_VIDEO_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/obje
 const DEFAULT_FEATURE_PILLS = [
   { icon: "::FaBolt::", text: "Быстро", detail: "мощно, тихо, экологично" },
   { icon: "::FaClock::", text: "10 дней", detail: "на тест-драйв, деньги обратно" },
-  { icon: "::FaCircleDollarSign::", text: "0 ₽", detail: "первичный взнос, рассрочка" },
+  { icon: "::FaCircleDollarToSlot::", text: "0 ₽", detail: "первичный взнос, рассрочка" },
 ];
 
 const BARRIER_CARDS = [
