@@ -10,16 +10,15 @@
  * shadows, rotation, glare, and mixed passport/license layouts.
  *
  * Architecture:
- *   Photo (base64) → ZAI VLM chat completion → strict JSON → validation → PassportOcrResult | LicenseOcrResult
+ *   Photo (base64) → ZAI VLM vision endpoint → strict JSON → validation → PassportOcrResult | LicenseOcrResult
  *
  * No client imports. Server-only (uses "server-only" guard + env vars).
  *
  * Code review notes:
  *   - Uses getZai() from @/lib/zai wrapper (env vars → ZAI instance, no .z-ai-config file needed on Vercel)
- *   - Uses zai.chat.completions.create() with multimodal content blocks for vision
- *     (createVision also exists in SDK — hits /chat/completions/vision endpoint —
- *      both work; create() is the standard endpoint, kept for consistency)
- *   - 25s AbortController timeout to stay within Vercel's 30s maxDuration
+ *   - Uses zai.chat.completions.createVision() for image processing
+ *     (hits /chat/completions/vision endpoint specifically designed for vision tasks)
+ *   - 8s AbortController timeout to stay within Vercel's 10s default function timeout
  *   - Multi-step /doc flow splits VLM calls across separate webhook messages,
  *     so each photo extraction gets its own request lifecycle (~5-8s each),
  *     comfortably within Vercel's 10s default function timeout
@@ -271,7 +270,18 @@ export async function vlmExtractDocument(
   const timeout = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
 
   try {
+    logger.info("[vlm-extract] Starting VLM extraction", { docType });
+
     const zai = await getZai();
+
+    if (!zai) {
+      logger.error("[vlm-extract] Failed to get ZAI instance");
+      return {
+        success: false,
+        provider: "zai-vlm",
+        error: "Failed to initialize ZAI SDK. Check ZAI_BASE_URL and ZAI_API_KEY env vars.",
+      };
+    }
 
     // Normalize base64: strip data URL prefix if present
     const base64Clean = imageBase64.replace(/^data:[^;]+;base64,/, "");
@@ -284,8 +294,14 @@ export async function vlmExtractDocument(
     const systemPrompt = docType === "passport" ? PASSPORT_SYSTEM_PROMPT : LICENSE_SYSTEM_PROMPT;
     const userPrompt = docType === "passport" ? PASSPORT_USER_PROMPT : LICENSE_USER_PROMPT;
 
-    // Call ZAI VLM via standard chat.completions.create with multimodal content blocks
-    const response = await zai.chat.completions.create({
+    // Call ZAI VLM via vision endpoint for image processing
+    logger.info("[vlm-extract] Calling ZAI VLM API (vision endpoint)", {
+      docType,
+      hasZai: !!zai,
+      imageSize: base64Clean.length,
+    });
+
+    const response = await zai.chat.completions.createVision({
       messages: [
         {
           role: "system",
@@ -299,6 +315,12 @@ export async function vlmExtractDocument(
           ],
         },
       ],
+    });
+
+    logger.info("[vlm-extract] ZAI VLM response received", {
+      docType,
+      responseType: typeof response,
+      hasResponse: !!response,
     });
 
     // Guard against undefined response structure
@@ -395,10 +417,40 @@ export async function vlmExtractDocument(
       };
     }
 
-    logger.error("[vlm-extract] VLM extraction failed", {
+    // Log the full error for debugging
+    const errorDetails = {
       docType,
-      error: error instanceof Error ? error.message : String(error),
-    });
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorName: error instanceof Error ? error.name : typeof error,
+      stack: error instanceof Error ? error.stack?.slice(0, 500) : undefined,
+    };
+
+    logger.error("[vlm-extract] VLM extraction failed", errorDetails);
+
+    // Check for common API errors
+    if (error instanceof Error) {
+      if (error.message.includes("401") || error.message.includes("Unauthorized")) {
+        return {
+          success: false,
+          provider: "zai-vlm",
+          error: "ZAI API authentication failed. Check ZAI_API_KEY.",
+        };
+      }
+      if (error.message.includes("404") || error.message.includes("Not Found")) {
+        return {
+          success: false,
+          provider: "zai-vlm",
+          error: "ZAI API endpoint not found. Check ZAI_BASE_URL.",
+        };
+      }
+      if (error.message.includes("ECONNREFUSED") || error.message.includes("fetch")) {
+        return {
+          success: false,
+          provider: "zai-vlm",
+          error: "ZAI API connection failed. Check network and ZAI_BASE_URL.",
+        };
+      }
+    }
 
     return {
       success: false,
