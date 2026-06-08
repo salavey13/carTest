@@ -55,7 +55,7 @@ const BARRIER_CARDS = [
     title: "Поле, лес, грязь, лестницы",
     description:
       "Кочки, корни, песок, снег, подъёмы и спуски. Куда сам доберёшься — туда и заедешь. В обзорах «корни съел как нефиг нафиг», едет по кроссовой трассе наравне с бензином.",
-    image: "http://155.212.128.171:3005/visuals/landing/b1-prohodimost.jpeg",
+    image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b1-prohodimost.jpeg",
   },
   {
     id: "razgon",
@@ -64,7 +64,7 @@ const BARRIER_CARDS = [
     title: "Выстреливает из рогатки",
     description:
       "Электро-тяга бьёт мгновенно — без сцепления и передач. Проваливаешься в кресло как в суперкаре. Открутил ручку — и поехал, на максимум сразу.",
-    image: "http://155.212.128.171:3005/visuals/landing/b2-razgon.jpeg",
+    image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b2-razgon.jpeg",
   },
   {
     id: "voda",
@@ -73,7 +73,7 @@ const BARRIER_CARDS = [
     title: "Топили в озере — едет",
     description:
       "Влагозащита по классу IP67. На тесте погружали в ледяное озеро — завёлся, год катается. Лужи, дождь, мокрая трава — без последствий.",
-    image: "http://155.212.128.171:3005/visuals/landing/b3-voda.jpeg",
+    image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b3-voda.jpeg",
   },
 ];
 
