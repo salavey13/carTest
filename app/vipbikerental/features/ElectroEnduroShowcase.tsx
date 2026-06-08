@@ -98,7 +98,7 @@ export function ElectroEnduroShowcase({ items, isCatalogLoading = false, crewSlu
             const imageUrl = getBikeGallery(item)[0];
             return (
               <article key={item.id} className="group relative min-w-[280px] snap-start overflow-hidden rounded-2xl border border-border/70 bg-background/50 shadow-xl shadow-black/10 sm:min-w-[340px]">
-                <div className="relative aspect-[9/16] max-h-[380px] bg-black/40">
+                <div className="relative aspect-[9/16] max-h-[380px] overflow-hidden bg-black/40">
                   {imageUrl ? <Image src={imageUrl} alt={item.title} fill className="object-cover opacity-85 transition duration-300 group-hover:scale-105 group-hover:opacity-100" /> : <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,170,80,0.25),transparent_55%)]" />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
                   <div className="absolute bottom-3 left-3 rounded-full border border-white/25 bg-black/45 px-3 py-1 text-xs text-white backdrop-blur-sm">{item.category || "Electro-Enduro"}</div>
