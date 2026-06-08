@@ -630,7 +630,7 @@ export async function handleDocPhoto(message: any): Promise<boolean> {
   if (state === "doc_awaiting_passport") {
     await sendComplexMessage(chatId, "🤖 Обрабатываю паспорт через VLM... Это может занять несколько секунд.", [], { removeKeyboard: true });
 
-    const result = await extractDocumentFromTelegramPhoto(photo.file_id, "passport");
+    const result = await extractDocumentFromTelegramPhoto(fileId, "passport");
 
     if (!result.success) {
       await sendComplexMessage(
@@ -668,7 +668,7 @@ export async function handleDocPhoto(message: any): Promise<boolean> {
     // doc_awaiting_license
     await sendComplexMessage(chatId, "🤖 Обрабатываю водительское удостоверение через VLM...", [], { removeKeyboard: true });
 
-    const result = await extractDocumentFromTelegramPhoto(photo.file_id, "license");
+    const result = await extractDocumentFromTelegramPhoto(fileId, "license");
 
     if (!result.success) {
       await sendComplexMessage(

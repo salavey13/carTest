@@ -32,6 +32,13 @@ export interface RentalDashboardItem {
     username: string | null;
     metadata: Record<string, unknown>;
   } | null;
+  // Document secret for QR generation
+  documentSecret?: {
+    doc_sha256: string | null;
+    verification_status: string | null;
+    renter_full_name: string | null;
+    source_rental_id: string | null;
+  } | null;
 }
 
 export interface RentalDashboardSummary {
@@ -93,19 +100,21 @@ export async function getRentalsDashboard(input: {
   slug: string;
   actorUserId: string;
   date: string; // ISO date string (YYYY-MM-DD)
+  verificationStatus?: "verified" | "pending" | "revoked" | "all";
 }): Promise<{ success: boolean; data?: RentalDashboardResult; error?: string }> {
   try {
     const parsed = z.object({
       slug: z.string().trim().min(1),
       actorUserId: z.string().trim().min(1),
       date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      verificationStatus: z.enum(["verified", "pending", "revoked", "all"]).optional(),
     }).safeParse(input);
 
     if (!parsed.success) {
       return { success: false, error: "Некорректный запрос." };
     }
 
-    const { slug, actorUserId, date } = parsed.data;
+    const { slug, actorUserId, date, verificationStatus } = parsed.data;
 
     // Get crew and verify access
     const { data: crew, error: crewError } = await supabaseAdmin
@@ -166,7 +175,55 @@ export async function getRentalsDashboard(input: {
       return { success: false, error: rentalsError.message };
     }
 
-    const items = (rentals || []) as RentalDashboardItem[];
+    let items = ((rentals || []) as RentalDashboardItem[]).map(item => ({
+      ...item,
+      documentSecret: null,
+    }));
+
+    // Filter by verification status if specified
+    if (verificationStatus && verificationStatus !== "all") {
+      const rentalIds = items.map(r => r.rental_id);
+      if (rentalIds.length > 0) {
+        // Get document secrets for these rentals
+        const { data: secrets } = await privateSchema()
+          .from("user_rental_secrets")
+          .select("source_rental_id, verification_status")
+          .in("source_rental_id", rentalIds);
+
+        const secretMap = new Map(secrets?.map(s => [s.source_rental_id, s.verification_status]) || []);
+
+        items = items.filter(item => {
+          const itemStatus = secretMap.get(item.rental_id);
+          return itemStatus === verificationStatus;
+        });
+      }
+    }
+
+    // Enrich items with document secrets (for QR codes)
+    const rentalIds = items.map(r => r.rental_id);
+    const secretsByRentalId = new Map<string, RentalDashboardItem["documentSecret"]>();
+
+    if (rentalIds.length > 0) {
+      const { data: secrets } = await privateSchema()
+        .from("user_rental_secrets")
+        .select("source_rental_id, doc_sha256, verification_status, renter_full_name")
+        .in("source_rental_id", rentalIds);
+
+      for (const secret of secrets || []) {
+        secretsByRentalId.set(secret.source_rental_id || "", {
+          doc_sha256: secret.doc_sha256,
+          verification_status: secret.verification_status,
+          renter_full_name: secret.renter_full_name,
+          source_rental_id: secret.source_rental_id,
+        });
+      }
+    }
+
+    // Attach document secrets to items
+    items = items.map(item => ({
+      ...item,
+      documentSecret: secretsByRentalId.get(item.rental_id),
+    }));
 
     // Calculate summary statistics
     const summary: RentalDashboardSummary = {
@@ -407,6 +464,228 @@ export async function getRentalsDateRange(input: {
     };
   } catch (error) {
     console.error("[rentals-date-range] Error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Resend rental contract + QR via forward-telegram API.
+ * This action regenerates the contract and forwards it to the specified chat.
+ */
+export async function resendRentalContract(input: {
+  actorUserId: string;
+  rentalId: string;
+  telegramChatId: string; // Target chat ID to send to
+}): Promise<{ success: boolean; data?: { message: string }; error?: string }> {
+  try {
+    const parsed = z.object({
+      actorUserId: z.string().trim().min(1),
+      rentalId: z.string().uuid(),
+      telegramChatId: z.string().trim().min(1),
+    }).safeParse(input);
+
+    if (!parsed.success) {
+      return { success: false, error: "Некорректный запрос." };
+    }
+
+    const { actorUserId, rentalId, telegramChatId } = parsed.data;
+
+    // Verify user has access (admin or crew owner)
+    const { data: user } = await supabaseAdmin
+      .from("users")
+      .select("metadata, role")
+      .eq("user_id", actorUserId)
+      .maybeSingle();
+
+    const userMetadata = user?.metadata as Record<string, unknown> | null;
+    const isAdmin = user?.role === "admin" || userMetadata?.role === "admin";
+
+    // Get rental to verify crew ownership
+    const { data: rental, error: rentalError } = await supabaseAdmin
+      .from("rentals")
+      .select(`
+        rental_id,
+        agreed_start_date,
+        agreed_end_date,
+        total_cost,
+        vehicle:cars!inner(id, make, model, specs, type, crew_id),
+        user:users!rentals_user_id_fkey(user_id, full_name, username)
+      `)
+      .eq("rental_id", rentalId)
+      .maybeSingle();
+
+    if (rentalError || !rental) {
+      return { success: false, error: "Аренда не найдена." };
+    }
+
+    // Check crew ownership
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("owner_id")
+      .eq("id", (rental.vehicle as any).crew_id)
+      .maybeSingle();
+
+    const isCrewOwner = crew?.owner_id === actorUserId;
+
+    if (!isAdmin && !isCrewOwner) {
+      return { success: false, error: "Недостаточно прав для отправки." };
+    }
+
+    // Get document secret from private.user_rental_secrets
+    const { data: secret } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("source_rental_id", rentalId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!secret) {
+      return { success: false, error: "Документ не найден. Необходимо создать новый договор." };
+    }
+
+    // Get vehicle details
+    const vehicle = rental.vehicle as any;
+    const renter = rental.user as any;
+    const secretData = secret as any;
+
+    // Generate new DOCX contract
+    const { buildFranchizeDocxFromTemplate } = await import("@/app/franchize/lib/docx-capability");
+    const { createHash } = await import("crypto");
+
+    const now = new Date();
+    const vars: Record<string, string> = {
+      contract_number: `${now.getDate()}.${now.getMonth() + 1}/${vehicle.id}`,
+      day: String(now.getDate()).padStart(2, "0"),
+      month: now.toLocaleString("ru-RU", { month: "long" }),
+      month_num: String(now.getMonth() + 1).padStart(2, "0"),
+      year: String(now.getFullYear()),
+      renter_full_name: secretData.renter_full_name || renter?.full_name || "",
+      renter_birth_date: secretData.renter_birth_date || "",
+      renter_phone: secretData.renter_phone || "",
+      renter_email: secretData.renter_email || "",
+      renter_address: secretData.renter_address || secretData.renter_registration || "",
+      renter_driver_license: secretData.renter_driver_license || "",
+      renter_passport: secretData.renter_passport || "",
+      renter_passport_issue_date: secretData.renter_passport_issue_date || "",
+      renter_registration: secretData.renter_registration || "",
+      bike_make_model: `${vehicle.make || ""} ${vehicle.model || ""}`.trim(),
+      bike_make: vehicle.make || "уточняется",
+      bike_model: vehicle.model || "уточняется",
+      bike_vin: vehicle.specs?.vin || vehicle.specs?.frame || "уточняется",
+      bike_category: vehicle.specs?.category || "A/L3",
+      rent_start_date: rental.agreed_start_date?.split("T")[0] || now.toISOString().split("T")[0],
+      rent_end_date: rental.agreed_end_date?.split("T")[0] || now.toISOString().split("T")[0],
+      daily_price_rub: String(rental.total_cost || "10000"),
+      deposit_rub: String(vehicle.specs?.deposit_rub || "20000"),
+      document_key: secretData.source_doc_key || `rental-${vehicle.id}-${Date.now()}`,
+      bike_vehicle_type_label: vehicle.type === "ebike" ? "ЭЛЕКТРОМОТОЦИКЛА" : "МОТОЦИКЛА",
+      // Add other required fields...
+      bike_plate: vehicle.specs?.plate || "уточняется",
+      bike_color: vehicle.specs?.color || "уточняется",
+      bike_year: vehicle.specs?.year || "уточняется",
+      signature_timestamp: now.toLocaleString("ru-RU"),
+      renter_signature: "повторная отправка",
+    };
+
+    const docxBuf = await buildFranchizeDocxFromTemplate(vars, "html");
+    const docSha256 = createHash("sha256").update(docxBuf).digest("hex");
+    const docFileName = `rental-contract-${vehicle.make}-${vehicle.model}-${now.toISOString().split("T")[0]}.docx`
+      .replace(/[^a-zA-Zа-яА-Я0-9.\-]/g, "-")
+      .replace(/-+/g, "-");
+
+    // Generate QR code
+    const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${vehicle.id}_${docSha256}`;
+    const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
+
+    let qrPngBuffer: Buffer | null = null;
+    try {
+      const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
+      if (qrRes.ok) {
+        qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
+      }
+    } catch {}
+
+    // Send via forward-telegram API
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
+    const forwardUrl = `${siteUrl}/api/forward-telegram`;
+
+    if (qrPngBuffer) {
+      // Send DOCX + QR as media group
+      const formData = new FormData();
+      formData.append("chat_id", telegramChatId);
+      formData.append("method", "sendMediaGroup");
+
+      const mediaItems = [
+        { type: "document", media: "attach://docx" },
+        { type: "photo", media: "attach://qr", caption: `📲 <b>QR для быстрой аренды</b>\n🔗 ${qrDeepLink}`, parse_mode: "HTML" },
+      ];
+      formData.append("payload", JSON.stringify({ media: mediaItems }));
+
+      const docxBlob = new Blob([docxBuf], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+      formData.append("files", JSON.stringify({
+        docx: { data: docxBuf.toString("base64"), filename: docFileName, contentType: docxBlob.type },
+        qr: { data: qrPngBuffer.toString("base64"), filename: `qr-${vehicle.id}.png`, contentType: "image/png" },
+      }));
+
+      const response = await fetch(forwardUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: telegramChatId,
+          method: "sendMediaGroup",
+          payload: {
+            media: [
+              { type: "document", media: "attach://docx", parse_mode: "HTML" },
+              { type: "photo", media: "attach://qr", caption: `📲 <b>QR для быстрой аренды</b>\n🔗 ${qrDeepLink}`, parse_mode: "HTML" },
+            ],
+          },
+          files: {
+            docx: { data: docxBuf.toString("base64"), filename: docFileName, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+            qr: { data: qrPngBuffer.toString("base64"), filename: `qr-${vehicle.id}.png`, contentType: "image/png" },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[resend-contract] Forward API error:", errorText);
+        return { success: false, error: "Не удалось отправить через forward-telegram API." };
+      }
+    } else {
+      // Send DOCX only
+      const response = await fetch(forwardUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: telegramChatId,
+          method: "sendDocument",
+          payload: {
+            caption: `Договор аренды: ${vehicle.make} ${vehicle.model}\n\n🔗 Быстрая аренда:\n${qrDeepLink}`,
+            parse_mode: "HTML",
+          },
+          files: {
+            document: { data: docxBuf.toString("base64"), filename: docFileName, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[resend-contract] Forward API error:", errorText);
+        return { success: false, error: "Не удалось отправить через forward-telegram API." };
+      }
+    }
+
+    return {
+      success: true,
+      data: { message: "Договор успешно отправлен." },
+    };
+  } catch (error) {
+    console.error("[resend-contract] Error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
