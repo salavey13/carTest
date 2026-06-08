@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS private.user_rental_secrets (
   doc_sha256            TEXT NOT NULL,          -- links to rental_contract_artifacts.original_sha256
   renter_full_name      TEXT,
   renter_passport       TEXT,
+  renter_passport_issued_by TEXT;                -- Passport issuing authority (кем выдан). Needed by HTML sale template §12 and rent template App4 ФЗ-152 consent.
+
   renter_driver_license TEXT,
   renter_birth_date     TEXT,
   renter_phone          TEXT,
