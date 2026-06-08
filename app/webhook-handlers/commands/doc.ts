@@ -90,6 +90,98 @@ async function downsampleImageForVlm(imageBuffer: Buffer): Promise<Buffer> {
 }
 
 /**
+ * Download a Telegram photo with retry logic for RANGE_MISSING_UNIT error.
+ * This error occurs when:
+ *   - Photo is too large (>10MB) and Telegram hasn't processed it yet
+ *   - File_id is from a pending upload
+ *   - Network issues during Telegram file access
+ *
+ * Retry strategy: up to 3 attempts with 1s, 2s, 3s delays
+ */
+async function downloadTelegramPhotoWithRetry(
+  fileId: string,
+  maxRetries = 3,
+): Promise<{ success: boolean; buffer?: Buffer; error?: string }> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const fileInfoResponse = await fetch(
+        `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile?file_id=${fileId}`,
+      );
+      const fileInfo = await fileInfoResponse.json();
+
+      if (!fileInfo.ok) {
+        const errorMsg = fileInfo.description || "Unknown Telegram error";
+        logger.warn("[/doc] Telegram getFile failed", {
+          attempt,
+          fileId: fileId.slice(0, 20) + "...",
+          error: errorMsg,
+        });
+
+        // Specific error: file too large or not ready yet
+        if (errorMsg.includes("file is too big") || errorMsg.includes("RANGE")) {
+          if (attempt < maxRetries) {
+            const delay = attempt * 1000; // 1s, 2s, 3s
+            logger.info(`[/doc] Retrying after ${delay}ms... (${attempt}/${maxRetries})`);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+          }
+          return {
+            success: false,
+            error: `Файл слишком большой или не готов. Попробуйте отправить фото меньшего размера или подождите 10 секунд.`,
+          };
+        }
+
+        // File not found or expired
+        if (errorMsg.includes("Bad Request") || errorMsg.includes("file")) {
+          return { success: false, error: "Файл не найден. Отправьте фото ещё раз." };
+        }
+
+        return { success: false, error: `Ошибка Telegram: ${errorMsg}` };
+      }
+
+      const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${fileInfo.result.file_path}`;
+      const imageResponse = await fetch(fileUrl);
+
+      if (!imageResponse.ok) {
+        logger.warn("[/doc] Telegram file download failed", {
+          attempt,
+          status: imageResponse.status,
+        });
+        if (attempt < maxRetries && imageResponse.status === 404) {
+          await new Promise(r => setTimeout(r, attempt * 1000));
+          continue;
+        }
+        return { success: false, error: "Не удалось скачать фото. Попробуйте ещё раз." };
+      }
+
+      const buffer = Buffer.from(await imageResponse.arrayBuffer());
+      if (buffer.length === 0) {
+        return { success: false, error: "Пустой файл. Отправьте другое фото." };
+      }
+
+      logger.info("[/doc] Photo downloaded successfully", {
+        size: buffer.length,
+        attempt,
+      });
+
+      return { success: true, buffer };
+    } catch (error) {
+      logger.error("[/doc] Download exception", { attempt, error });
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, attempt * 1000));
+        continue;
+      }
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Ошибка загрузки фото",
+      };
+    }
+  }
+
+  return { success: false, error: "Не удалось загрузить фото после нескольких попыток." };
+}
+
+/**
  * Download a Telegram photo and extract document data using ZAI VLM.
  * VLM-only path — no Tesseract fallback.
  * Supports both photo messages and document messages (for high-res scans).
@@ -106,27 +198,21 @@ async function extractDocumentFromTelegramPhoto(
   warnings?: string[];
   error?: string;
 }> {
+  // Download with retry for RANGE errors
+  const downloadResult = await downloadTelegramPhotoWithRetry(fileId, 3);
+
+  if (!downloadResult.success || !downloadResult.buffer) {
+    return {
+      success: false,
+      error: downloadResult.error || "Не удалось загрузить фото. Убедитесь, что фото не больше 10 МБ.",
+    };
+  }
+
   try {
-    // 1. Download photo from Telegram
-    const fileInfoResponse = await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile?file_id=${fileId}`,
-    );
-    const fileInfo = await fileInfoResponse.json();
-    if (!fileInfo.ok) {
-      return { success: false, error: "Failed to get file info from Telegram" };
-    }
-
-    const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${fileInfo.result.file_path}`;
-    const imageResponse = await fetch(fileUrl);
-    if (!imageResponse.ok) {
-      return { success: false, error: "Failed to download image from Telegram" };
-    }
-
-    const originalBuffer = Buffer.from(await imageResponse.arrayBuffer());
-    const downsampledBuffer = await downsampleImageForVlm(originalBuffer);
+    const downsampledBuffer = await downsampleImageForVlm(downloadResult.buffer);
     const base64Image = downsampledBuffer.toString("base64");
 
-    // 2. VLM extraction (direct SDK call — no HTTP roundtrip)
+    // VLM extraction
     const vlmResult = await vlmExtractDocument(base64Image, docType);
 
     if (vlmResult.success && vlmResult.data) {
@@ -140,7 +226,6 @@ async function extractDocumentFromTelegramPhoto(
       };
     }
 
-    // VLM failed — no fallback
     return {
       success: false,
       provider: "zai-vlm",
@@ -148,7 +233,7 @@ async function extractDocumentFromTelegramPhoto(
       warnings: vlmResult.warnings,
     };
   } catch (error) {
-    logger.error("[/doc] Document extraction pipeline error", error);
+    logger.error("[/doc] Document extraction error", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown extraction error",
