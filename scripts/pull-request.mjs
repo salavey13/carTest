@@ -9,9 +9,42 @@
  *   node scripts/pull-request.mjs list --repo "https://github.com/owner/repo"
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { execSync } from 'child_process';
 import { Octokit } from '@octokit/rest';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// --- Load .env file ---
+function loadEnvFile() {
+  const envPath = resolve(process.cwd(), '.env');
+  if (!existsSync(envPath)) {
+    return;
+  }
+
+  const envContent = readFileSync(envPath, 'utf-8');
+  const lines = envContent.split('\n');
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    // Skip comments and empty lines
+    if (!trimmedLine || trimmedLine.startsWith('#')) {
+      continue;
+    }
+
+    // Parse KEY=VALUE format
+    const match = trimmedLine.match(/^([^=]+)=(.*)$/);
+    if (match) {
+      const [, key, value] = match;
+      // Only set if not already in process.env (process.env takes precedence)
+      if (process.env[key] === undefined) {
+        process.env[key] = value;
+      }
+    }
+  }
+}
+
+loadEnvFile();
 
 // --- Configuration ---
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
