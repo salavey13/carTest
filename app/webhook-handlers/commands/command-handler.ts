@@ -22,7 +22,7 @@ import { actionsCommand, handleActionChoice } from "./actions";
 import { shiftCommand } from "./shift"; 
 import { wbCommand } from "./wb";
 import { codexCommand } from "./codex";
-import { docCommand, handleDocText, handleDocCallback } from "./doc";
+import { docCommand, handleDocText, handleDocCallback } from "./doc-manual";
 
 
 

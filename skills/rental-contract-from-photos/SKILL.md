@@ -3,6 +3,40 @@
 Триггер-фразы: **`создай документ`**, **`сделай договор`**, **`сделай документ по фото`**,
 а также `ты босс` + document intent (boss-decomposition + document-autopilot chain).
 
+## ⚠️ AGENT TELEGRAM RESTRICTIONS (CRITICAL)
+
+**Agents MUST NOT send Telegram notifications directly.** Use ONLY the provided APIs:
+
+**Endpoint:** `https://v0-car-test.vercel.app/api/forward-telegram`
+
+**Supported modes in `scripts/codex-notify.mjs`:**
+
+| Mode | Use Case | Example |
+|------|----------|---------|
+| `telegram-api` | Send text message | `node scripts/codex-notify.mjs telegram-api --chatId 123 --text "Hello"` |
+| `telegram-photo-api` | Send photo (base64 or URL) | `node scripts/codex-notify.mjs telegram-photo-api --chatId 123 --photo ./preview.png` |
+| `telegram-doc` | Send document (DOCX, PDF) | `node scripts/codex-notify.mjs telegram-doc --chatId 123 --document ./contract.docx` |
+| `telegram-media-group` | Send multiple files | `node scripts/codex-notify.mjs telegram-media-group --chatId 123 --document ./doc.docx --qr ./qr.png` |
+
+**When to use fallback:**
+- ✅ `TELEGRAM_BOT_TOKEN` is missing/empty
+- ✅ Direct Telegram API calls fail (network blocking, rate limits)
+- ✅ Agent environment cannot reach Telegram API
+
+**When to use direct API:**
+- ✅ You have `TELEGRAM_BOT_TOKEN` AND direct access works
+
+**Contract generation delivery:**
+- `scripts/make-rental-contract-skill.mjs` sends to Telegram directly
+- If that fails, agent can retry using `telegram-doc` mode with the generated file path
+
+**⛔ PROHIBITED:**
+- ❌ Do NOT call `https://api.telegram.org/bot<TOKEN>/...` directly
+- ❌ Do NOT attempt to use `TELEGRAM_BOT_TOKEN` (it won't exist in your environment)
+- ❌ Do NOT write custom Telegram API integration code
+
+---
+
 ## Назначение
 Сквозной skill для bridge-задач аренды: OCR/извлечение данных из фото паспорта+прав, поиск мотоцикла в Supabase, генерация DOCX из шаблона, отправка документа и уведомления в Telegram/bridge callback.
 

@@ -118,6 +118,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "scripts/make-rental-contract-skill.mjs",
         "scripts/make-deal-contract-skill.mjs",
         "scripts/supabase-access-skill.mjs",
+        "scripts/codex-notify.mjs",
         // HTML → DOCX converter
         "lib/htmlToDocx.mjs",
         // Contract templates
@@ -139,6 +140,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "docs/sql/cars_rows_12bikes_june5.csv",
         // Documentation
         "DOC_SKILL_FULL_INSTALLER.md",
+        "docs/skill_installer/ZAI_AGENT_INSTRUCTIONS.md",
     ].filter(Boolean), []);
 
     const effectiveBranchDisplay = useMemo(() => targetBranchName || manualBranchName || "default", [targetBranchName, manualBranchName]);

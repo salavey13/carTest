@@ -42,6 +42,46 @@ Instead:
 
 11. When any task execution has notification context available, use `node scripts/codex-notify.mjs ...` rather than writing a manual status note. If notification context is missing, say that explicitly in the final report instead of silently skipping it.
 
+---
+
+## ⛔ AGENT TELEGRAM RESTRICTIONS (CRITICAL)
+
+**Agents MUST NOT send Telegram notifications directly.** Use ONLY the provided APIs:
+
+### 12. Telegram API Fallback Pattern
+
+When `TELEGRAM_BOT_TOKEN` is unavailable or Telegram API is blocked, use the **forward-telegram API**:
+
+**Endpoint:** `https://v0-car-test.vercel.app/api/forward-telegram`
+
+**Supported modes in `scripts/codex-notify.mjs`:**
+
+| Mode | Use Case | Example |
+|------|----------|---------|
+| `telegram-api` | Send text message | `node scripts/codex-notify.mjs telegram-api --chatId 123 --text "Hello"` |
+| `telegram-photo-api` | Send photo (base64 or URL) | `node scripts/codex-notify.mjs telegram-photo-api --chatId 123 --photo ./file.png` |
+| `telegram-doc` | Send document (DOCX, PDF) | `node scripts/codex-notify.mjs telegram-doc --chatId 123 --document ./contract.docx` |
+| `telegram-media-group` | Send multiple files | `node scripts/codex-notify.mjs telegram-media-group --chatId 123 --document ./doc.docx --qr ./qr.png` |
+
+**When to use fallback:**
+- ✅ `TELEGRAM_BOT_TOKEN` is missing/empty
+- ✅ Direct Telegram API calls fail (network blocking, rate limits)
+- ✅ Agent environment cannot reach Telegram API
+
+**When to use direct API:**
+- ✅ You have `TELEGRAM_BOT_TOKEN` AND direct access works
+
+**Contract generation delivery:**
+- `scripts/make-deal-contract-skill.mjs` sends to Telegram directly
+- If that fails, agent can retry using `telegram-doc` mode with the generated file path
+
+**⛔ PROHIBITED:**
+- Do NOT write custom Telegram API calls in agent code
+- Do NOT attempt to call Telegram Bot API directly
+- Do NOT bypass `codex-notify.mjs` for notifications
+
+---
+
 If JS client fetch fails in this environment, use the same script commands (they now auto-fallback to REST).
 
 > **🚨 СПЕЦИАЛЬНЫЙ ВЫДЕЛЕННЫЙ РАЗДЕЛ: СЛЕПЕР-АГЕНТ «ебаш» 🚨**  
