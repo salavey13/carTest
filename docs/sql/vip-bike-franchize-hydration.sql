@@ -300,7 +300,7 @@ set
         ),
         -- contractDefaults stays in public metadata for now (backward compatibility)
         'contractDefaults', jsonb_build_object(
-          'issuerName', 'Рысан Григорий Константинович',
+          'issuerName', 'ИП Воробьев Роман Валерьевич',
           'issuerRepresentative', 'Сидоров Илья Олегович',
           'returnAddress', 'Н. Н. пл. Комсомольская 2',
           'includedMileage', 200,
