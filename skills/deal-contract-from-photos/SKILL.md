@@ -57,6 +57,31 @@
 
 Если Telegram-отправка не удалась, скрипт сам пытается curl-fallback. Если и он не удался — скрипт завершается с кодом 2 и ошибкой `telegram_send_failed`.
 
+**⚠️ FALLBACK ДЛЯ АГЕНТА:**
+
+Если скрипт завершается с ошибкой `telegram_send_failed` И `TELEGRAM_BOT_TOKEN` недоступен или Telegram API заблокирован:
+
+1. **НЕ ПЫТАЙТЕСЬ** вызвать Telegram API напрямую из агента
+2. Используйте **forward-telegram API** через `codex-notify.mjs`:
+```bash
+# Если у вас есть путь к сгенерированному файлу:
+node scripts/codex-notify.mjs telegram-doc \
+  --chatId 123456789 \
+  --document /tmp/contract.docx \
+  --caption "Ваш договор готов"
+
+# Если нужно отправить вместе с QR-кодом:
+node scripts/codex-notify.mjs telegram-media-group \
+  --chatId 123456789 \
+  --document /tmp/contract.docx \
+  --qr /tmp/qr.png \
+  --caption "Договор + QR код"
+```
+
+**Адрес fallback API:** `https://v0-car-test.vercel.app/api/forward-telegram`
+
+Этот API работает даже когда у агента нет `TELEGRAM_BOT_TOKEN` или когда Telegram API заблокирован.
+
 ### 3. ОБЯЗАТЕЛЬНЫЙ `--telegramChatId`
 
 Если `--telegramChatId` не передан, скрипт использует `ADMIN_CHAT_ID` из env. Агент **ВСЕГДА** должен передать `--telegramChatId` явным образом из контекста задачи.

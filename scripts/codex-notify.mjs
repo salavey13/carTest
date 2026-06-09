@@ -4,6 +4,7 @@
  * Local operator skill: send Codex completion notifications either:
  *  - directly to Telegram Bot API
  *  - through /api/codex-bridge/callback
+ *  - through /api/forward-telegram (fallback when Telegram API is blocked)
  *
  * Examples:
  *   node scripts/codex-notify.mjs callback --status completed --summary "Done" --telegramChatId 123 --telegramUserId 456 --imageUrl https://example.com/image.png
@@ -12,6 +13,12 @@
  *   node scripts/codex-notify.mjs telegram --chatId 123 --message "Hello"   # alias for --text
  *   node scripts/codex-notify.mjs telegram-photo --chatId 123 --photo ./artifacts/page.png --caption "Preview"
  *   node scripts/codex-notify.mjs telegram-photo --chatId 123 --photoUrl https://... --caption "Preview"
+ *
+ * Fallback modes (when TELEGRAM_BOT_TOKEN unavailable or Telegram API blocked):
+ *   node scripts/codex-notify.mjs telegram-api --chatId 123 --text "Hello"  # via forward-telegram API
+ *   node scripts/codex-notify.mjs telegram-photo-api --chatId 123 --photo ./artifacts/page.png --caption "Preview"
+ *   node scripts/codex-notify.mjs telegram-doc --chatId 123 --document ./artifacts/contract.docx --caption "Contract"
+ *   node scripts/codex-notify.mjs telegram-doc --chatId 123 --doc ./artifacts/contract.pdf --caption "Document"  # --doc is alias
  */
 
 import { execSync, spawnSync } from 'node:child_process';
@@ -340,8 +347,219 @@ function runTelegramPhotoMode() {
   console.log(curl.stdout.trim());
 }
 
-if (!mode || !['callback', 'callback-auto', 'telegram', 'telegram-photo'].includes(mode)) {
-  console.error('Usage: node scripts/codex-notify.mjs <callback|callback-auto|telegram|telegram-photo> [--key value]');
+async function runTelegramApiMode() {
+  // Send text message via forward-telegram API (fallback when direct Telegram API blocked)
+  const forwardApi = getArg('forwardApi', process.env.CODEX_FORWARD_API || 'https://v0-car-test.vercel.app/api/forward-telegram');
+
+  const chatId = getArg('chatId', process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_USER_ID || process.env.ADMIN_CHAT_ID);
+  if (!chatId) throw new Error('Missing --chatId (or TELEGRAM_CHAT_ID/TELEGRAM_USER_ID/ADMIN_CHAT_ID env)');
+
+  const text = getArgAlias('text', ['message'], 'Codex task update');
+  const parseMode = getArg('parseMode', 'Markdown');
+
+  const payload = {
+    chat_id: chatId,
+    method: 'sendMessage',
+    payload: {
+      text,
+      parse_mode: parseMode,
+      disable_web_page_preview: true,
+    },
+  };
+
+  try {
+    const response = await postJson(forwardApi, payload);
+    console.log(response);
+  } catch (error) {
+    throw new Error(`Forward API send failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+async function runTelegramPhotoApiMode() {
+  // Send photo via forward-telegram API (fallback when direct Telegram API blocked)
+  const forwardApi = getArg('forwardApi', process.env.CODEX_FORWARD_API || 'https://v0-car-test.vercel.app/api/forward-telegram');
+
+  const chatId = getArg('chatId', process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_USER_ID || process.env.ADMIN_CHAT_ID);
+  if (!chatId) throw new Error('Missing --chatId (or TELEGRAM_CHAT_ID/TELEGRAM_USER_ID/ADMIN_CHAT_ID env)');
+
+  const photoPath = getArg('photo');
+  const photoUrl = getArg('photoUrl');
+  if (!photoPath && !photoUrl) throw new Error('Missing --photo (local file path) or --photoUrl (remote image URL)');
+
+  const caption = getArg('caption', 'Codex task image update');
+  const parseMode = getArg('parseMode', 'Markdown');
+
+  let files;
+  let payload;
+
+  if (photoUrl) {
+    // Remote URL - no files needed
+    payload = {
+      chat_id: chatId,
+      method: 'sendPhoto',
+      payload: {
+        photo: photoUrl,
+        caption,
+        parse_mode: parseMode,
+      },
+    };
+  } else {
+    // Local file - read and base64 encode
+    const imageBytes = readFileSync(photoPath);
+    const base64 = imageBytes.toString('base64');
+    const ext = (photoPath.split('.').pop() || '').toLowerCase();
+    const contentType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png';
+    const filename = photoPath.split('/').pop() || photoPath.split('\\').pop() || 'photo.png';
+
+    payload = {
+      chat_id: chatId,
+      method: 'sendPhoto',
+      payload: {
+        caption,
+        parse_mode: parseMode,
+      },
+      files: {
+        photo: { data: base64, filename, contentType },
+      },
+    };
+  }
+
+  try {
+    const response = await postJson(forwardApi, payload);
+    console.log(response);
+  } catch (error) {
+    throw new Error(`Forward API photo send failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+async function runTelegramDocMode() {
+  // Send document (DOCX, PDF, etc.) via forward-telegram API
+  const forwardApi = getArg('forwardApi', process.env.CODEX_FORWARD_API || 'https://v0-car-test.vercel.app/api/forward-telegram');
+
+  const chatId = getArg('chatId', process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_USER_ID || process.env.ADMIN_CHAT_ID);
+  if (!chatId) throw new Error('Missing --chatId (or TELEGRAM_CHAT_ID/TELEGRAM_USER_ID/ADMIN_CHAT_ID env)');
+
+  // Support both --document and --doc aliases
+  const docPath = getArgAlias('document', ['doc', 'file']);
+  if (!docPath) throw new Error('Missing --document (or --doc/--file) - local file path required');
+
+  const caption = getArg('caption', 'Codex document');
+  const parseMode = getArg('parseMode', 'Markdown');
+
+  // Read file and base64 encode
+  const fileBytes = readFileSync(docPath);
+  const base64 = fileBytes.toString('base64');
+  const ext = (docPath.split('.').pop() || '').toLowerCase();
+  const filename = docPath.split('/').pop() || docPath.split('\\').pop() || `document.${ext}`;
+
+  // Map extension to MIME type
+  const mimeTypes = {
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'pdf': 'application/pdf',
+    'txt': 'text/plain',
+    'png': 'image/png',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'gif': 'image/gif',
+    'zip': 'application/zip',
+  };
+  const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+  const payload = {
+    chat_id: chatId,
+    method: 'sendDocument',
+    payload: {
+      caption,
+      parse_mode: parseMode,
+    },
+    files: {
+      document: { data: base64, filename, contentType },
+    },
+  };
+
+  try {
+    const response = await postJson(forwardApi, payload);
+    console.log(response);
+  } catch (error) {
+    throw new Error(`Forward API document send failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+async function runTelegramMediaGroupMode() {
+  // Send multiple files (e.g., DOCX + QR code image) via forward-telegram API
+  const forwardApi = getArg('forwardApi', process.env.CODEX_FORWARD_API || 'https://v0-car-test.vercel.app/api/forward-telegram');
+
+  const chatId = getArg('chatId', process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_USER_ID || process.env.ADMIN_CHAT_ID);
+  if (!chatId) throw new Error('Missing --chatId (or TELEGRAM_CHAT_ID/TELEGRAM_USER_ID/ADMIN_CHAT_ID env)');
+
+  const docPath = getArg('document') || getArg('doc') || getArg('file');
+  const photoPath = getArg('photo');
+  const qrPath = getArg('qr'); // QR code image
+
+  if (!docPath && !photoPath && !qrPath) {
+    throw new Error('Missing file(s): need at least one of --document/--doc/--file, --photo, or --qr');
+  }
+
+  const caption = getArg('caption', 'Contract with QR code');
+  const parseMode = getArg('parseMode', 'Markdown');
+
+  const media = [];
+  const files = {};
+
+  // Helper to add file
+  const addFile = (path, type, attachName, captionOverride) => {
+    const fileBytes = readFileSync(path);
+    const base64 = fileBytes.toString('base64');
+    const ext = (path.split('.').pop() || '').toLowerCase();
+    const filename = path.split('/').pop() || path.split('\\').pop() || `file.${ext}`;
+
+    const mimeTypes = {
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'pdf': 'application/pdf',
+      'png': 'image/png',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'gif': 'image/gif',
+    };
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+    media.push({
+      type: type === 'document' ? 'document' : 'photo',
+      media: `attach://${attachName}`,
+      caption: captionOverride || caption,
+      parse_mode: parseMode,
+    });
+
+    files[attachName] = { data: base64, filename, contentType };
+  };
+
+  if (docPath) addFile(docPath, 'document', 'docx');
+  if (photoPath) addFile(photoPath, 'photo', 'photo');
+  if (qrPath) addFile(qrPath, 'photo', 'qr');
+
+  const payload = {
+    chat_id: chatId,
+    method: 'sendMediaGroup',
+    payload: { media },
+    files,
+  };
+
+  try {
+    const response = await postJson(forwardApi, payload);
+    console.log(response);
+  } catch (error) {
+    throw new Error(`Forward API media group send failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+if (!mode || !['callback', 'callback-auto', 'telegram', 'telegram-photo', 'telegram-api', 'telegram-photo-api', 'telegram-doc', 'telegram-media-group'].includes(mode)) {
+  console.error('Usage: node scripts/codex-notify.mjs <callback|callback-auto|telegram|telegram-photo|telegram-api|telegram-photo-api|telegram-doc|telegram-media-group> [--key value]');
+  console.error('');
+  console.error('Fallback modes (when TELEGRAM_BOT_TOKEN unavailable):');
+  console.error('  telegram-api       - Send text via forward-telegram API');
+  console.error('  telegram-photo-api - Send photo via forward-telegram API');
+  console.error('  telegram-doc       - Send document (DOCX, PDF) via forward-telegram API');
+  console.error('  telegram-media-group - Send multiple files via forward-telegram API');
   process.exit(1);
 }
 
@@ -352,7 +570,15 @@ Promise.resolve(
       ? runCallbackAutoMode()
       : mode === 'telegram'
         ? runTelegramMode()
-        : runTelegramPhotoMode()
+        : mode === 'telegram-photo'
+          ? runTelegramPhotoMode()
+          : mode === 'telegram-api'
+            ? runTelegramApiMode()
+            : mode === 'telegram-photo-api'
+              ? runTelegramPhotoApiMode()
+              : mode === 'telegram-doc'
+                ? runTelegramDocMode()
+                : runTelegramMediaGroupMode()
 )
   .catch((error) => {
     console.error(error.message || error);

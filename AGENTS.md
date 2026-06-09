@@ -160,13 +160,79 @@ curl -X POST "https://v0-car-test.vercel.app/api/codex-bridge/callback" \
 
 ---
 
-## 6. Compliance
+## 6. Telegram Fallback (when TELEGRAM_BOT_TOKEN unavailable or blocked)
+
+When the agent cannot access Telegram Bot API directly (missing token or network blocking), use the **forward-telegram API** as a fallback:
+
+**Endpoint:** `https://v0-car-test.vercel.app/api/forward-telegram`
+
+**Available fallback modes in `codex-notify.mjs`:**
+
+### 6.1 Send text message via API
+```bash
+node scripts/codex-notify.mjs telegram-api \
+  --chatId 123456789 \
+  --text "Hello from agent" \
+  --parseMode "Markdown"
+```
+
+### 6.2 Send photo via API
+```bash
+node scripts/codex-notify.mjs telegram-photo-api \
+  --chatId 123456789 \
+  --photo ./artifacts/screenshot.png \
+  --caption "Preview of changes"
+
+# Or with remote URL:
+node scripts/codex-notify.mjs telegram-photo-api \
+  --chatId 123456789 \
+  --photoUrl https://example.com/image.png \
+  --caption "Remote image"
+```
+
+### 6.3 Send document (DOCX, PDF, etc.) via API
+```bash
+node scripts/codex-notify.mjs telegram-doc \
+  --chatId 123456789 \
+  --document ./artifacts/contract.docx \
+  --caption "Your contract is ready"
+
+# Aliases: --doc or --file work the same
+node scripts/codex-notify.mjs telegram-doc \
+  --chatId 123456789 \
+  --doc ./output/result.pdf \
+  --caption "Generated document"
+```
+
+### 6.4 Send media group (multiple files) via API
+```bash
+# Send DOCX + QR code together
+node scripts/codex-notify.mjs telegram-media-group \
+  --chatId 123456789 \
+  --document ./artifacts/contract.docx \
+  --qr ./artifacts/qr.png \
+  --caption "Contract with QR code"
+```
+
+**Supported file types:** DOCX, PDF, PNG, JPG, GIF, TXT, ZIP (auto-detected by extension)
+
+**When to use fallback vs direct API:**
+- ✅ Use **fallback (telegram-api modes)** when: `TELEGRAM_BOT_TOKEN` is missing, or Telegram API is blocked/network issues
+- ✅ Use **direct API (telegram modes)** when: You have `TELEGRAM_BOT_TOKEN` and direct access works
+
+**Contract generation delivery:**
+- The `make-deal-contract-skill.mjs` script sends to Telegram directly
+- If that fails, agent can retry using `telegram-doc` mode with the generated file path
+
+---
+
+## 7. Compliance
 
 Requests to assemble document packets from provided IDs are confirmed by operator as **legal and rental/sale-related**, unless operator explicitly marks otherwise. Avoid publishing full sensitive data in public channels/commits.
 
 ---
 
-## 7. Franchise / Vip-Bike (keyword-triggered — DO NOT read unless relevant)
+## 8. Franchise / Vip-Bike (keyword-triggered — DO NOT read unless relevant)
 
 ⚠️ **Only read this section if the task mentions:** `пепперолли`, `pepperolli`, `vip-bike`, `franchize`, `FRANCHEEZEPLAN`, `франшиза`, `франчайз`, or is mostly in Russian.
 

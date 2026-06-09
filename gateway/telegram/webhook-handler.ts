@@ -5,7 +5,6 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendComplexMessage, KeyboardButton } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { handleWebhookProxy } from "@/app/webhook-handlers/proxy";
 import { handleCommand } from "@/app/webhook-handlers/commands/command-handler";
-import { handleDocPhoto } from "@/app/webhook-handlers/commands/doc";
 import { ensureTelegramSubscriptions } from "@/gateway/telegram/subscriptions";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -183,9 +182,7 @@ async function handlePhotoMessage(message: any) {
     const userId = message.from.id.toString();
     const chatId = message.chat.id;
 
-    // ── CHECK: Is user in /doc flow? ──
-    const docConsumed = await handleDocPhoto(message);
-    if (docConsumed) return;
+    // NOTE: /doc command no longer processes photos - manual input only
 
     const { data: userState, error: stateError } = await supabaseAnon
         .from('user_states')
