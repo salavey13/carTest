@@ -102,11 +102,13 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ── Send PDF to Telegram via API ────────────────────────────────────────────
+// ── Send PDF to Telegram via forward-telegram API ─────────────────────────────
 async function sendPdfToTelegram(bike, pageSize, chatId) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const forwardApiUrl = process.env.FORWARD_TELEGRAM_API || 'https://v0-car-test.vercel.app/api/forward-telegram';
 
-  const response = await fetch(
+  // Step 1: Get PDF bytes from the buy/print-pdf API
+  const pdfResponse = await fetch(
     `${siteUrl}/api/franchize/${slug}/buy/print-pdf`,
     {
       method: 'POST',
@@ -118,16 +120,53 @@ async function sendPdfToTelegram(bike, pageSize, chatId) {
         bikeId: bike.id,
         pageSize,
         serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        returnBytes: true,  // Get PDF bytes instead of sending to Telegram
       }),
     },
   );
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`API error (${response.status}): ${errorText}`);
+  if (!pdfResponse.ok) {
+    const errorText = await pdfResponse.text();
+    throw new Error(`PDF API error (${pdfResponse.status}): ${errorText}`);
   }
 
-  return await response.json();
+  const pdfResult = await pdfResponse.json();
+
+  if (!pdfResult.success) {
+    throw new Error(`PDF generation failed: ${pdfResult.error}`);
+  }
+
+  // Step 2: Send PDF via forward-telegram API
+  const forwardResponse = await fetch(
+    `${forwardApiUrl}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        method: 'sendDocument',
+        payload: {
+          caption: `${bike.title} - ${bike.specs?.sale_price || bike.specs?.price_rub || 'N/A'} ₽`,
+        },
+        files: {
+          document: {
+            data: pdfResult.bytes,  // Already base64 from API
+            filename: pdfResult.fileName,
+            contentType: pdfResult.mimeType,
+          },
+        },
+      }),
+    },
+  );
+
+  if (!forwardResponse.ok) {
+    const errorText = await forwardResponse.text();
+    throw new Error(`Forward API error (${forwardResponse.status}): ${errorText}`);
+  }
+
+  return await forwardResponse.json();
 }
 
 // ── Error output ──────────────────────────────────────────────────────────
