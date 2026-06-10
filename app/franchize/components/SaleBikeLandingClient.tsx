@@ -34,6 +34,7 @@ import {
   sendFranchizeBuyPrintPdf,
   upsertFranchizeIntent,
 } from "@/app/franchize/actions";
+import type { PageSize } from "@/app/franchize/server-actions/buy-print";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import {
   DEFAULT_COLOR_OPTIONS,
@@ -229,6 +230,7 @@ export function SaleBikeLandingClient({
   const [purchaseState, setPurchaseState] = useState<SaleActionState>("idle");
   const [printState, setPrintState] = useState<SaleActionState>("idle");
   const [canPrintBuySheet, setCanPrintBuySheet] = useState(false);
+  const [printPageSize, setPrintPageSize] = useState<PageSize>("A4");
   const [intentActionStates, setIntentActionStates] = useState<
     Partial<Record<string, SaleActionState>>
   >({});
@@ -599,6 +601,7 @@ export function SaleBikeLandingClient({
       const result = await sendFranchizeBuyPrintPdf({
         slug: resolvedSlug,
         bikeId: item.id,
+        pageSize: printPageSize,
       });
 
       if (!result.success) {
@@ -606,7 +609,7 @@ export function SaleBikeLandingClient({
       }
 
       setPrintState("success");
-      setCartMessage(`PDF ${result.fileName || "карточки"} отправлен вам в Telegram.`);
+      setCartMessage(`PDF ${result.fileName || "карточки"} (${printPageSize}) отправлен вам в Telegram.`);
     } catch (error) {
       console.error("buy/print-pdf failed", error);
       setPrintState("error");
@@ -735,71 +738,76 @@ export function SaleBikeLandingClient({
           </span>
         </div>
 
+        {/* Gallery Section - moved to top */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="overflow-hidden rounded-3xl border p-2 sm:p-3"
+          style={surface.card}
+        >
+          <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-black/30">
+            <Image
+              src={safeGallery[selectedImage] ?? heroImage}
+              alt={item.title}
+              fill
+              sizes="(max-width: 1024px) 100vw, 100vw"
+              loading="lazy"
+              className="object-cover"
+              onError={() => {
+                const broken = safeGallery[selectedImage];
+                if (!broken) return;
+                setBrokenGalleryUrls((prev) => ({
+                  ...prev,
+                  [broken]: true,
+                }));
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-5 gap-2 mt-2">
+            {safeGallery.slice(0, 5).map((img, i) => (
+              <button
+                key={`${img}-${i}`}
+                type="button"
+                onClick={() => setSelectedImage(i)}
+                className="overflow-hidden rounded-xl border transition hover:brightness-110"
+                style={{
+                  ...(i === selectedImage
+                    ? {
+                        borderColor: crew.theme.palette.accentMain,
+                        boxShadow: `0 0 0 1px ${crew.theme.palette.accentMain}`,
+                      }
+                    : {}),
+                }}
+              >
+                <span className="relative block aspect-[4/3] w-full">
+                  <Image
+                    src={img}
+                    alt={`${item.title}-${i}`}
+                    fill
+                    sizes="120px"
+                    className="object-cover"
+                    loading="lazy"
+                    onError={() =>
+                      setBrokenGalleryUrls((prev) => ({
+                        ...prev,
+                        [img]: true,
+                      }))
+                    }
+                  />
+                </span>
+              </button>
+            ))}
+          </div>
+        </motion.div>
+
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           className="overflow-hidden rounded-3xl border"
           style={surface.card}
         >
-          <div className="grid lg:grid-cols-[1.3fr_1fr]">
-            <div className="space-y-2 p-2 sm:p-3">
-              <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-black/30 sm:aspect-[4/3]">
-                <Image
-                  src={safeGallery[selectedImage] ?? heroImage}
-                  alt={item.title}
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 66vw"
-                  loading="lazy"
-                  className="object-cover"
-                  onError={() => {
-                    const broken = safeGallery[selectedImage];
-                    if (!broken) return;
-                    setBrokenGalleryUrls((prev) => ({
-                      ...prev,
-                      [broken]: true,
-                    }));
-                  }}
-                />
-              </div>
-              <div className="grid grid-cols-5 gap-2">
-                {safeGallery.slice(0, 5).map((img, i) => (
-                  <button
-                    key={`${img}-${i}`}
-                    type="button"
-                    onClick={() => setSelectedImage(i)}
-                    className="overflow-hidden rounded-xl border transition hover:brightness-110"
-                    style={{
-                      ...(i === selectedImage
-                        ? {
-                            borderColor: crew.theme.palette.accentMain,
-                            boxShadow: `0 0 0 1px ${crew.theme.palette.accentMain}`,
-                          }
-                        : {}),
-                    }}
-                  >
-                    <span className="relative block aspect-[4/3] w-full">
-                      <Image
-                        src={img}
-                        alt={`${item.title}-${i}`}
-                        fill
-                        sizes="120px"
-                        className="object-cover"
-                        loading="lazy"
-                        onError={() =>
-                          setBrokenGalleryUrls((prev) => ({
-                            ...prev,
-                            [img]: true,
-                          }))
-                        }
-                      />
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="flex flex-col gap-3 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
                 <div
                   className="inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
                   style={surface.subtleCard}
@@ -890,25 +898,62 @@ export function SaleBikeLandingClient({
                     </button>
                   )}
                   {canPrintBuySheet ? (
-                    <button
-                      type="button"
-                      onClick={handlePrintBuySheet}
-                      disabled={printState === "loading"}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-                      style={{
-                        ...surface.subtleCard,
-                        borderColor: crew.theme.palette.accentMain,
-                      }}
-                    >
-                      <Printer className="h-4 w-4" />
-                      {printState === "loading"
-                        ? "Готовим PDF..."
-                        : printState === "success"
-                          ? "PDF отправлен"
-                          : printState === "error"
-                            ? "Повторить печать"
-                            : "Распечатать"}
-                    </button>
+                    <>
+                      <div className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs" style={surface.subtleCard}>
+                        <span className="opacity-70">Формат:</span>
+                        <button
+                          type="button"
+                          onClick={() => setPrintPageSize("A4")}
+                          className={`rounded px-2 py-1 transition ${
+                            printPageSize === "A4"
+                              ? "font-semibold"
+                              : "opacity-60 hover:opacity-100"
+                          }`}
+                          style={
+                            printPageSize === "A4"
+                              ? { background: crew.theme.palette.accentMain, color: "#101010" }
+                              : {}
+                          }
+                        >
+                          A4
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPrintPageSize("A5")}
+                          className={`rounded px-2 py-1 transition ${
+                            printPageSize === "A5"
+                              ? "font-semibold"
+                              : "opacity-60 hover:opacity-100"
+                          }`}
+                          style={
+                            printPageSize === "A5"
+                              ? { background: crew.theme.palette.accentMain, color: "#101010" }
+                              : {}
+                          }
+                        >
+                          A5
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handlePrintBuySheet}
+                        disabled={printState === "loading"}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                        style={{
+                          ...surface.subtleCard,
+                          borderColor: crew.theme.palette.accentMain,
+                        }}
+                      >
+                        <Printer className="h-4 w-4" />
+                        {printState === "loading"
+                          ? "Готовим PDF..."
+                          : printState === "success"
+                            ? "PDF отправлен"
+                            : printState === "error"
+                              ? "Повторить печать"
+                              : "Распечатать"}
+                      </button>
+                    </>
                   ) : null}
                 </div>
               </div>
