@@ -161,6 +161,12 @@ export default async function BuyBikePage({
             href: `/franchize/${resolvedSlug}?vehicle=${encodeURIComponent(bike_id)}`,
           }}
         />
+        <SaleBikeLanding
+          crew={crew}
+          item={item}
+          vsItem={vsItem}
+          otherSaleBikes={otherSaleBikes}
+        />
         <section className="rounded-3xl border p-4" style={surface.subtleCard}>
           <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
             <div>
@@ -245,12 +251,6 @@ export default async function BuyBikePage({
           </div>
         </section>
       </FranchizePageShell>
-      <SaleBikeLanding
-        crew={crew}
-        item={item}
-        vsItem={vsItem}
-        otherSaleBikes={otherSaleBikes}
-      />
       <CrewFooter crew={crew} />
       {showFloatingCart && (
         <FranchizeFloatingCart

@@ -19,99 +19,208 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 
 type UnknownRecord = Record<string, unknown>;
 
-// ─── Global Layout Constants (A4) ──────────────────────────────────────────
+export type PageSize = "A4" | "A5";
 
-const PAGE_WIDTH = 595.28;
-const PAGE_HEIGHT = 841.89;
+interface LayoutConstants {
+  pageWidth: number;
+  pageHeight: number;
+  pagePadding: number;
+  headerHeight: number;
+  headerBrandYOffset: number;
+  headerAccentHeight: number;
+  titleFontSize: number;
+  titleLineHeight: number;
+  titleMaxWidth: number;
+  titleAscent: number;
+  titleBelowHeaderGap: number;
+  titleBlockTop: number;
+  priceFontSize: number;
+  titleToPriceGap: number;
+  priceToDescGap: number;
+  rightColX: number;
+  rightColWidth: number;
+  rightColTopPadding: number;
+  leftColX: number;
+  leftColWidth: number;
+  specValueFontSize: number;
+  specValueMaxWidth: number;
+  specLabelFontSize: number;
+  specLabelMaxWidth: number;
+  specLabelXOffset: number;
+  specLineHeight: number;
+  specRowMinHeight: number;
+  specRowContentPadding: number;
+  specRowBorderOffset: number;
+  specRowGap: number;
+  qrSize: number;
+  vkQrSize: number;
+  qrPairGap: number;
+  qrPairTotalWidth: number;
+  qrBottomPadding: number;
+  imageToRentalGap: number;
+  qrLabelGap: number;
+  qrLabelFontSize: number;
+  rentalBoxHeight: number;
+  rentalBoxX: number;
+  rentalBoxWidth: number;
+  rentalHeadingFontSize: number;
+  rentalValueFontSize: number;
+  rentalLineHeight: number;
+  rentalInnerX: number;
+  rentalInnerY: number;
+  ctaFontSize: number;
+  ctaLineHeight: number;
+  descFontSize: number;
+  descLineHeight: number;
+  descMaxLines: number;
+  descSectionGap: number;
+  sectionHeadingSize: number;
+  sectionHeadingGapAfter: number;
+  sectionHeadingGapBefore: number;
+  specMaxRows: number;
+}
 
-const PAGE_PADDING = 38;
+// ─── Layout Constants Factory ────────────────────────────────────────────────
 
-// Header
-const HEADER_HEIGHT = 62; // compact — brand text still fits with comfortable padding
-const HEADER_BRAND_Y_OFFSET = 38; // from top of page (visually centered in header)
-const HEADER_ACCENT_HEIGHT = 2; // gold separator line under header
+function createLayoutConstants(pageSize: PageSize): LayoutConstants {
+  // A4: 595.28 x 841.89 pt
+  // A5: 420 x 595 pt (A5 is half of A4 by area: 420mm x 148mm from 210mm x 297mm)
+  const isA5 = pageSize === "A5";
+  // Scale factor derived from width ratio: 420 / 595.28 ≈ 0.705
+  const scale = isA5 ? 420 / 595.28 : 1;
 
-// Title block — full page width, dynamically positioned below header
-const TITLE_FONT_SIZE = 24;
-const TITLE_LINE_HEIGHT = 28;
-const TITLE_MAX_WIDTH = PAGE_WIDTH - 2 * PAGE_PADDING; // full width: 519px
-const TITLE_ASCENT = 22; // approximate ascent for DejaVu Sans at TITLE_FONT_SIZE
-const TITLE_BELOW_HEADER_GAP = 10; // visual gap between header accent line and title visual top
-const TITLE_BLOCK_TOP = PAGE_HEIGHT - HEADER_HEIGHT - TITLE_ASCENT - TITLE_BELOW_HEADER_GAP;
+  const pageWidth = isA5 ? 420 : 595.28;
+  const pageHeight = isA5 ? 595 : 841.89;
+  const pagePadding = Math.round(38 * scale);
 
-// Price
-const PRICE_FONT_SIZE = 20;
-const TITLE_TO_PRICE_GAP = 10; // gap between last title line baseline and price baseline
-const PRICE_TO_DESC_GAP = 16; // gap between price baseline and description heading
+  const headerHeight = Math.round(62 * scale);
+  const headerBrandYOffset = Math.round(38 * scale);
+  const headerAccentHeight = Math.max(2, Math.round(2 * scale));
 
-// Right column — positioned dynamically below title block
-const RIGHT_COL_X = 314;
-const RIGHT_COL_WIDTH = 242;
-const RIGHT_COL_TOP_PADDING = 8; // gap between title block bottom and image top edge
+  const titleFontSize = Math.round(24 * scale);
+  const titleLineHeight = Math.round(28 * scale);
+  const titleMaxWidth = pageWidth - 2 * pagePadding;
+  const titleAscent = Math.round(22 * scale);
+  const titleBelowHeaderGap = Math.round(10 * scale);
+  const titleBlockTop = pageHeight - headerHeight - titleAscent - titleBelowHeaderGap;
 
-// Image panel stretches from below title all the way to just above the rental box
-// (computed dynamically — constant removed, was 340)
+  const priceFontSize = Math.round(20 * scale);
+  const titleToPriceGap = Math.round(10 * scale);
+  const priceToDescGap = Math.round(16 * scale);
 
-// Left column specs — starts below price, offset from left edge
-const LEFT_COL_X = PAGE_PADDING;
-const LEFT_COL_WIDTH = 248;
+  const rightColX = Math.round(314 * scale);
+  const rightColWidth = Math.round(242 * scale);
+  const rightColTopPadding = Math.round(8 * scale);
 
-// Spec table
-const SPEC_VALUE_FONT_SIZE = 9.4;
-const SPEC_VALUE_MAX_WIDTH = 118;
-const SPEC_LABEL_FONT_SIZE = 9.3;
-const SPEC_LABEL_MAX_WIDTH = 82;
-const SPEC_LABEL_X_OFFSET = 12;
-const SPEC_LINE_HEIGHT = 10;
-const SPEC_ROW_MIN_HEIGHT = 30;
-const SPEC_ROW_CONTENT_PADDING = 12;
-const SPEC_ROW_BORDER_OFFSET = 6;
-const SPEC_ROW_GAP = 4;
-const SPEC_MAX_ROWS = 13;
+  const leftColX = pagePadding;
+  const leftColWidth = Math.round(248 * scale);
+
+  const specValueFontSize = Math.round(9.4 * scale * 10) / 10;
+  const specValueMaxWidth = Math.round(118 * scale);
+  const specLabelFontSize = Math.round(9.3 * scale * 10) / 10;
+  const specLabelMaxWidth = Math.round(82 * scale);
+  const specLabelXOffset = Math.round(12 * scale);
+  const specLineHeight = Math.round(10 * scale);
+  const specRowMinHeight = Math.round(30 * scale);
+  const specRowContentPadding = Math.round(12 * scale);
+  const specRowBorderOffset = Math.round(6 * scale);
+  const specRowGap = Math.round(4 * scale);
+
+  const qrSize = Math.round(68 * scale);
+  const vkQrSize = Math.round(68 * scale);
+  const qrPairGap = Math.round(16 * scale);
+  const qrPairTotalWidth = qrSize + qrPairGap + vkQrSize;
+  const qrBottomPadding = Math.round(14 * scale);
+  const imageToRentalGap = Math.round(6 * scale);
+  const qrLabelGap = Math.round(4 * scale);
+  const qrLabelFontSize = Math.round(7 * scale);
+
+  const rentalBoxHeight = Math.round(148 * scale);
+  const rentalBoxX = rightColX;
+  const rentalBoxWidth = rightColWidth;
+  const rentalHeadingFontSize = Math.round(11 * scale);
+  const rentalValueFontSize = Math.round(11 * scale);
+  const rentalLineHeight = Math.round(15 * scale);
+  const rentalInnerX = Math.round(10 * scale);
+  const rentalInnerY = Math.round(10 * scale);
+
+  const ctaFontSize = Math.round(8 * scale);
+  const ctaLineHeight = Math.round(11 * scale);
+
+  const descFontSize = Math.round(10.4 * scale * 10) / 10;
+  const descLineHeight = Math.round(14 * scale);
+  const descMaxLines = isA5 ? 6 : 8; // Fewer lines for A5
+  const descSectionGap = Math.round(18 * scale);
+
+  const sectionHeadingSize = Math.round(14 * scale);
+  const sectionHeadingGapAfter = Math.round(22 * scale);
+  const sectionHeadingGapBefore = Math.round(24 * scale);
+
+  const specMaxRows = isA5 ? 10 : 13; // Fewer rows for smaller A5 page
+
+  return {
+    pageWidth,
+    pageHeight,
+    pagePadding,
+    headerHeight,
+    headerBrandYOffset,
+    headerAccentHeight,
+    titleFontSize,
+    titleLineHeight,
+    titleMaxWidth,
+    titleAscent,
+    titleBelowHeaderGap,
+    titleBlockTop,
+    priceFontSize,
+    titleToPriceGap,
+    priceToDescGap,
+    rightColX,
+    rightColWidth,
+    rightColTopPadding,
+    leftColX,
+    leftColWidth,
+    specValueFontSize,
+    specValueMaxWidth,
+    specLabelFontSize,
+    specLabelMaxWidth,
+    specLabelXOffset,
+    specLineHeight,
+    specRowMinHeight,
+    specRowContentPadding,
+    specRowBorderOffset,
+    specRowGap,
+    qrSize,
+    vkQrSize,
+    qrPairGap,
+    qrPairTotalWidth,
+    qrBottomPadding,
+    imageToRentalGap,
+    qrLabelGap,
+    qrLabelFontSize,
+    rentalBoxHeight,
+    rentalBoxX,
+    rentalBoxWidth,
+    rentalHeadingFontSize,
+    rentalValueFontSize,
+    rentalLineHeight,
+    rentalInnerX,
+    rentalInnerY,
+    ctaFontSize,
+    ctaLineHeight,
+    descFontSize,
+    descLineHeight,
+    descMaxLines,
+    descSectionGap,
+    sectionHeadingSize,
+    sectionHeadingGapAfter,
+    sectionHeadingGapBefore,
+    specMaxRows,
+  };
+}
+
+// Spec table limits (not scaled with page size)
 const SPEC_MAX_VALUE_LINES = 2;
-
-// QR codes — two side by side (buy link + VK community)
-// VK link is now crew-specific, passed from crew metadata or falls back to empty
-
-const QR_SIZE = 68;   // compact — gives breathing room inside image, still scannable
-const VK_QR_SIZE = 68;
-const QR_PAIR_GAP = 16; // wider gap between QR pair for visual balance
-const QR_PAIR_TOTAL_WIDTH = QR_SIZE + QR_PAIR_GAP + VK_QR_SIZE; // 152
-const QR_BOTTOM_PADDING = 14; // padding from image panel bottom to QR label bottom
-const IMAGE_TO_RENTAL_GAP = 6; // small gap between image panel bottom and rental box top
-
-// QR labels
-const QR_LABEL_GAP = 4;
-const QR_LABEL_FONT_SIZE = 7;
-
-// Image panel — 9:16 ratio matches bike photos, eliminates black border
-// Dynamically sized to fill space so CTA bottom aligns with specs table bottom
-// IMAGE_PANEL_HEIGHT is computed at render time after title block height is known
-
-// Rental price box — expanded to hold hourly + daily rates + CTA
-const RENTAL_BOX_HEIGHT = 148;
-const RENTAL_BOX_X = RIGHT_COL_X;
-const RENTAL_BOX_WIDTH = RIGHT_COL_WIDTH;
-const RENTAL_HEADING_FONT_SIZE = 11;
-const RENTAL_VALUE_FONT_SIZE = 11;
-const RENTAL_LINE_HEIGHT = 15;
-const RENTAL_INNER_X = 10;
-const RENTAL_INNER_Y = 10;
-
-// CTA (call-to-action) text at the bottom of rental box
-const CTA_FONT_SIZE = 8;
-const CTA_LINE_HEIGHT = 11;
-
-// Description
-const DESC_FONT_SIZE = 10.4;
-const DESC_LINE_HEIGHT = 14;
-const DESC_MAX_LINES = 8;
-const DESC_SECTION_GAP = 18;
-
-// Section headings
-const SECTION_HEADING_SIZE = 14;
-const SECTION_HEADING_GAP_AFTER = 22;
-const SECTION_HEADING_GAP_BEFORE = 24;
+const SPEC_LABEL_MAX_LINES = 2; // Prevent unbounded label wrapping
 
 // Network
 const FETCH_TIMEOUT_MS = 8_000;
@@ -287,7 +396,7 @@ function formatRub(value: number | null | undefined) {
     return "по запросу";
   }
 
-  return `${value.toLocaleString("ru-RU")} ₽`;
+  return `${value.toLocaleString("ru-RU")} Руб`;
 }
 
 function buildWebAppBuyLink(botUsername: string, bikeId: string) {
@@ -350,7 +459,7 @@ async function embedImage(pdfDoc: PDFDocument, url: string) {
   }
 }
 
-function extractKeySpecs(specs: UnknownRecord) {
+function extractKeySpecs(specs: UnknownRecord, maxRows: number = 13) {
   const rows: [string, string, string][] = []; // [label, value, rawKey]
 
   const priorityFields: Array<[string, ...string[]]> = [
@@ -406,7 +515,7 @@ function extractKeySpecs(specs: UnknownRecord) {
     }
   });
 
-  return rows.slice(0, SPEC_MAX_ROWS);
+  return rows.slice(0, maxRows);
 }
 
 function wrapText(
@@ -598,6 +707,7 @@ async function generateBuyPdf(input: {
   brandName: string;
   botUsername: string;
   vkLink?: string;
+  pageSize?: PageSize;
   item: {
     id: string;
     title: string;
@@ -608,6 +718,8 @@ async function generateBuyPdf(input: {
     rawSpecs?: UnknownRecord;
   };
 }) {
+  const layout = createLayoutConstants(input.pageSize || "A4");
+
   const pdfDoc = await PDFDocument.create();
 
   pdfDoc.registerFontkit(fontkit);
@@ -640,10 +752,10 @@ async function generateBuyPdf(input: {
     boldFont = await pdfDoc.embedFont(sysBoldBytes);
   }
 
-  const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+  const page = pdfDoc.addPage([layout.pageWidth, layout.pageHeight]);
 
   const specs = input.item.rawSpecs || {};
-  const keySpecs = extractKeySpecs(specs);
+  const keySpecs = extractKeySpecs(specs, layout.specMaxRows);
 
   const buyLink = buildWebAppBuyLink(
     input.botUsername,
@@ -655,8 +767,8 @@ async function generateBuyPdf(input: {
   page.drawRectangle({
     x: 0,
     y: 0,
-    width: PAGE_WIDTH,
-    height: PAGE_HEIGHT,
+    width: layout.pageWidth,
+    height: layout.pageHeight,
     color: COLORS.pageBg,
   });
 
@@ -664,9 +776,9 @@ async function generateBuyPdf(input: {
 
   page.drawRectangle({
     x: 0,
-    y: PAGE_HEIGHT - HEADER_HEIGHT,
-    width: PAGE_WIDTH,
-    height: HEADER_HEIGHT,
+    y: layout.pageHeight - layout.headerHeight,
+    width: layout.pageWidth,
+    height: layout.headerHeight,
     color: COLORS.header,
   });
 
@@ -679,9 +791,9 @@ async function generateBuyPdf(input: {
     : baseBrand.toUpperCase();
 
   page.drawText(headerTitle, {
-    x: PAGE_PADDING,
-    y: PAGE_HEIGHT - HEADER_BRAND_Y_OFFSET,
-    size: TITLE_FONT_SIZE,
+    x: layout.pagePadding,
+    y: layout.pageHeight - layout.headerBrandYOffset,
+    size: layout.titleFontSize,
     font: boldFont,
     color: COLORS.accent,
   });
@@ -689,9 +801,9 @@ async function generateBuyPdf(input: {
   // Cyan accent line at bottom of header
   page.drawRectangle({
     x: 0,
-    y: PAGE_HEIGHT - HEADER_HEIGHT,
-    width: PAGE_WIDTH,
-    height: HEADER_ACCENT_HEIGHT,
+    y: layout.pageHeight - layout.headerHeight,
+    width: layout.pageWidth,
+    height: layout.headerAccentHeight,
     color: COLORS.accent,
   });
 
@@ -699,43 +811,43 @@ async function generateBuyPdf(input: {
   // Title wraps across the full page width so long names aren't clipped.
   // Right column elements start BELOW the title block to avoid overlap.
 
-  let leftY = TITLE_BLOCK_TOP;
+  let leftY = layout.titleBlockTop;
 
   // Wrap title across full page width
   const titleLines = wrapText(
     input.item.title,
     font,
-    TITLE_FONT_SIZE,
-    TITLE_MAX_WIDTH,
+    layout.titleFontSize,
+    layout.titleMaxWidth,
   );
 
   titleLines.forEach((line) => {
     page.drawText(line, {
-      x: PAGE_PADDING,
+      x: layout.pagePadding,
       y: leftY,
-      size: TITLE_FONT_SIZE,
+      size: layout.titleFontSize,
       font,
       color: COLORS.text,
     });
 
-    leftY -= TITLE_LINE_HEIGHT;
+    leftY -= layout.titleLineHeight;
   });
 
-  leftY -= TITLE_TO_PRICE_GAP;
+  leftY -= layout.titleToPriceGap;
 
   // Price
   page.drawText(
     `Цена: ${formatRub(input.item.salePrice)}`,
     {
-      x: PAGE_PADDING,
+      x: layout.pagePadding,
       y: leftY,
-      size: PRICE_FONT_SIZE,
+      size: layout.priceFontSize,
       font,
       color: COLORS.text,
     },
   );
 
-  leftY -= PRICE_TO_DESC_GAP;
+  leftY -= layout.priceToDescGap;
 
   // ── Compute right column positions (dynamic, below title block) ─────────
   // Image panel uses 9:16 ratio (matches bike photos → no black border).
@@ -745,7 +857,7 @@ async function generateBuyPdf(input: {
   // Rental box sits below the image panel.
 
   const titleBlockBottom = leftY;
-  const rightColumnTop = titleBlockBottom + RIGHT_COL_TOP_PADDING;
+  const rightColumnTop = titleBlockBottom + layout.rightColTopPadding;
 
   // Snapshot leftY before drawing description/specs — we'll track final leftY later.
   // For now, compute image panel from a target total right-column height.
@@ -764,14 +876,14 @@ async function generateBuyPdf(input: {
   // ── Description ─────────────────────────────────────────────────────────
 
   page.drawText("Описание", {
-    x: LEFT_COL_X,
+    x: layout.leftColX,
     y: leftY,
-    size: SECTION_HEADING_SIZE,
+    size: layout.sectionHeadingSize,
     font,
     color: COLORS.text,
   });
 
-  leftY -= SECTION_HEADING_GAP_AFTER;
+  leftY -= layout.sectionHeadingGapAfter;
 
   const description =
     input.item.description || "Описание не заполнено.";
@@ -779,93 +891,109 @@ async function generateBuyPdf(input: {
   const descriptionLines = wrapText(
     description,
     font,
-    DESC_FONT_SIZE,
-    LEFT_COL_WIDTH,
-  ).slice(0, DESC_MAX_LINES);
+    layout.descFontSize,
+    layout.leftColWidth,
+  ).slice(0, layout.descMaxLines);
 
   descriptionLines.forEach((line) => {
     page.drawText(line, {
-      x: LEFT_COL_X,
+      x: layout.leftColX,
       y: leftY,
-      size: DESC_FONT_SIZE,
+      size: layout.descFontSize,
       font,
       color: COLORS.muted,
-      maxWidth: LEFT_COL_WIDTH,
+      maxWidth: layout.leftColWidth,
     });
 
-    leftY -= DESC_LINE_HEIGHT;
+    leftY -= layout.descLineHeight;
   });
 
-  leftY -= DESC_SECTION_GAP;
+  leftY -= layout.descSectionGap;
 
   // ── Specs ───────────────────────────────────────────────────────────────
 
   if (keySpecs.length > 0) {
     page.drawText("Характеристики", {
-      x: LEFT_COL_X,
+      x: layout.leftColX,
       y: leftY,
-      size: SECTION_HEADING_SIZE,
+      size: layout.sectionHeadingSize,
       font,
       color: COLORS.text,
     });
 
-    leftY -= SECTION_HEADING_GAP_AFTER;
+    leftY -= layout.sectionHeadingGapAfter;
 
     keySpecs.forEach(([label, value, _rawKey]) => {
       const wrappedValue = wrapText(
         value,
         font,
-        SPEC_VALUE_FONT_SIZE,
-        SPEC_VALUE_MAX_WIDTH,
+        layout.specValueFontSize,
+        layout.specValueMaxWidth,
       ).slice(0, SPEC_MAX_VALUE_LINES);
 
-      const contentHeight =
-        wrappedValue.length * SPEC_LINE_HEIGHT;
+      // Wrap label to handle multiline case
+      const wrappedLabel = wrapText(
+        label,
+        font,
+        layout.specLabelFontSize,
+        layout.specLabelMaxWidth,
+      ).slice(0, SPEC_LABEL_MAX_LINES);
+
+      const valueHeight = wrappedValue.length * layout.specLineHeight;
+      const labelHeight = wrappedLabel.length * layout.specLineHeight;
+      const contentHeight = Math.max(valueHeight, labelHeight);
       const rowHeight = Math.max(
-        SPEC_ROW_MIN_HEIGHT,
-        contentHeight + SPEC_ROW_CONTENT_PADDING,
+        layout.specRowMinHeight,
+        contentHeight + layout.specRowContentPadding,
       );
 
       // Row border (subtle dark line)
       page.drawRectangle({
-        x: LEFT_COL_X,
-        y: leftY - rowHeight + SPEC_ROW_BORDER_OFFSET,
-        width: LEFT_COL_WIDTH,
+        x: layout.leftColX,
+        y: leftY - rowHeight + layout.specRowBorderOffset,
+        width: layout.leftColWidth,
         height: rowHeight,
         borderColor: COLORS.line,
         borderWidth: 0.9,
       });
 
-      // Vertically centered label
-      const labelTextY =
-        leftY - rowHeight / 2 + SPEC_LABEL_FONT_SIZE / 2 - 1;
+      // Vertically centered label (multiline aware)
+      // Scale the baseline adjustment for proper centering
+      // labelHeight/2 puts us at text block center from first line's baseline
+      // We need to subtract line height/2 to get from text center back to baseline position
+      const baselineAdjustment = -layout.specLineHeight / 2 - 1;
+      const labelBaseY =
+        leftY - rowHeight / 2 + labelHeight / 2 + baselineAdjustment;
 
-      page.drawText(label, {
-        x: LEFT_COL_X + SPEC_LABEL_X_OFFSET,
-        y: labelTextY,
-        size: SPEC_LABEL_FONT_SIZE,
-        font,
-        color: COLORS.muted,
-        maxWidth: SPEC_LABEL_MAX_WIDTH,
-      });
-
-      // Vertically centered multiline value — right-aligned
-      const specValueRightEdge = LEFT_COL_X + LEFT_COL_WIDTH - SPEC_LABEL_X_OFFSET;
-      const textBaseY =
-        leftY - rowHeight / 2 + contentHeight / 2 - 2;
-
-      wrappedValue.forEach((line, index) => {
-        const lineWidth = font.widthOfTextAtSize(line, SPEC_VALUE_FONT_SIZE);
+      wrappedLabel.forEach((line, index) => {
         page.drawText(line, {
-          x: specValueRightEdge - lineWidth,
-          y: textBaseY - index * SPEC_LINE_HEIGHT,
-          size: SPEC_VALUE_FONT_SIZE,
+          x: layout.leftColX + layout.specLabelXOffset,
+          y: labelBaseY - index * layout.specLineHeight,
+          size: layout.specLabelFontSize,
           font,
-          color: COLORS.text,
+          color: COLORS.muted,
+          maxWidth: layout.specLabelMaxWidth,
         });
       });
 
-      leftY -= rowHeight + SPEC_ROW_GAP;
+      // Vertically centered multiline value — right-aligned
+      const specValueRightEdge = layout.leftColX + layout.leftColWidth - layout.specLabelXOffset;
+      const textBaseY =
+        leftY - rowHeight / 2 + valueHeight / 2 + baselineAdjustment;
+
+      wrappedValue.forEach((line, index) => {
+        const lineWidth = font.widthOfTextAtSize(line, layout.specValueFontSize);
+        page.drawText(line, {
+          x: specValueRightEdge - lineWidth,
+          y: textBaseY - index * layout.specLineHeight,
+          size: layout.specValueFontSize,
+          font,
+          color: COLORS.text,
+          maxWidth: layout.specValueMaxWidth,
+        });
+      });
+
+      leftY -= rowHeight + layout.specRowGap;
     });
   }
 
@@ -874,23 +1002,23 @@ async function generateBuyPdf(input: {
   const RENTAL_BOX_Y = specsBottom; // CTA bottom = specs table bottom
 
   // Image panel: from rightColumnTop to just above the rental box
-  const IMAGE_PANEL_Y = RENTAL_BOX_Y + RENTAL_BOX_HEIGHT + IMAGE_TO_RENTAL_GAP;
+  const IMAGE_PANEL_Y = RENTAL_BOX_Y + layout.rentalBoxHeight + layout.imageToRentalGap;
   const IMAGE_PANEL_HEIGHT = _rightColumnTop - IMAGE_PANEL_Y;
 
-  // Image width from 9:16 ratio (slightly wider than RIGHT_COL_WIDTH for cover fit)
+  // Image width from 9:16 ratio (slightly wider than layout.rightColWidth for cover fit)
   const IMAGE_PANEL_WIDTH = Math.round(IMAGE_PANEL_HEIGHT * 9 / 16);
 
   // QR codes: positioned from bottom of image panel with padding
-  const QR_Y = IMAGE_PANEL_Y + QR_BOTTOM_PADDING + QR_LABEL_GAP + QR_LABEL_FONT_SIZE;
-  const QR_X = RIGHT_COL_X + (RIGHT_COL_WIDTH - QR_PAIR_TOTAL_WIDTH) / 2;
-  const VK_QR_X = QR_X + QR_SIZE + QR_PAIR_GAP;
+  const QR_Y = IMAGE_PANEL_Y + layout.qrBottomPadding + layout.qrLabelGap + layout.qrLabelFontSize;
+  const QR_X = layout.rightColX + (layout.rightColWidth - layout.qrPairTotalWidth) / 2;
+  const VK_QR_X = QR_X + layout.qrSize + layout.qrPairGap;
 
   // ── Image Panel (Right Column) — cover fit ─────────────────────────────
 
   page.drawRectangle({
-    x: RIGHT_COL_X,
+    x: layout.rightColX,
     y: IMAGE_PANEL_Y,
-    width: RIGHT_COL_WIDTH,
+    width: layout.rightColWidth,
     height: IMAGE_PANEL_HEIGHT,
     color: COLORS.imageBg,
   });
@@ -912,7 +1040,7 @@ async function generateBuyPdf(input: {
     const drawH = imgH * coverScale;
 
     // Center horizontally in the right column area, center vertically
-    const imgX = RIGHT_COL_X + (RIGHT_COL_WIDTH - drawW) / 2;
+    const imgX = layout.rightColX + (layout.rightColWidth - drawW) / 2;
     const imgY = IMAGE_PANEL_Y + (IMAGE_PANEL_HEIGHT - drawH) / 2;
 
     page.drawImage(hero, {
@@ -923,11 +1051,11 @@ async function generateBuyPdf(input: {
     });
 
     // Mask left overflow (if image extends beyond right column left edge)
-    if (imgX < RIGHT_COL_X) {
+    if (imgX < layout.rightColX) {
       page.drawRectangle({
         x: imgX,
         y: IMAGE_PANEL_Y,
-        width: RIGHT_COL_X - imgX,
+        width: layout.rightColX - imgX,
         height: IMAGE_PANEL_HEIGHT,
         color: COLORS.pageBg,
       });
@@ -935,7 +1063,7 @@ async function generateBuyPdf(input: {
 
     // Mask right overflow (if image extends beyond page margin)
     const imgRight = imgX + drawW;
-    const panelRight = RIGHT_COL_X + RIGHT_COL_WIDTH;
+    const panelRight = layout.rightColX + layout.rightColWidth;
     if (imgRight > panelRight) {
       page.drawRectangle({
         x: panelRight,
@@ -951,7 +1079,7 @@ async function generateBuyPdf(input: {
     const fallbackWidth = font.widthOfTextAtSize(fallbackText, fallbackSize);
 
     page.drawText(fallbackText, {
-      x: RIGHT_COL_X + (RIGHT_COL_WIDTH - fallbackWidth) / 2,
+      x: layout.rightColX + (layout.rightColWidth - fallbackWidth) / 2,
       y: IMAGE_PANEL_Y + IMAGE_PANEL_HEIGHT / 2 - 4,
       size: fallbackSize,
       font,
@@ -963,13 +1091,13 @@ async function generateBuyPdf(input: {
   // Helps QR labels remain readable on top of the bike image.
 
   const QR_BACKDROP_PADDING = 8;
-  const QR_BACKDROP_Y = QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE - QR_BACKDROP_PADDING;
-  const QR_BACKDROP_HEIGHT = QR_SIZE + QR_LABEL_GAP + QR_LABEL_FONT_SIZE + QR_BACKDROP_PADDING * 2;
+  const QR_BACKDROP_Y = QR_Y - layout.qrLabelGap - layout.qrLabelFontSize - QR_BACKDROP_PADDING;
+  const QR_BACKDROP_HEIGHT = layout.qrSize + layout.qrLabelGap + layout.qrLabelFontSize + QR_BACKDROP_PADDING * 2;
 
   page.drawRectangle({
     x: QR_X - QR_BACKDROP_PADDING,
     y: QR_BACKDROP_Y,
-    width: QR_PAIR_TOTAL_WIDTH + QR_BACKDROP_PADDING * 2,
+    width: layout.qrPairTotalWidth + QR_BACKDROP_PADDING * 2,
     height: QR_BACKDROP_HEIGHT,
     color: COLORS.pageBg,
     opacity: 0.75,
@@ -999,17 +1127,17 @@ async function generateBuyPdf(input: {
     page.drawImage(qr, {
       x: QR_X,
       y: QR_Y,
-      width: QR_SIZE,
-      height: QR_SIZE,
+      width: layout.qrSize,
+      height: layout.qrSize,
     });
 
     // Label under buy QR
     const buyLabel = "Купить/Арендовать";
-    const buyLabelWidth = font.widthOfTextAtSize(buyLabel, QR_LABEL_FONT_SIZE);
+    const buyLabelWidth = font.widthOfTextAtSize(buyLabel, layout.qrLabelFontSize);
     page.drawText(buyLabel, {
-      x: QR_X + (QR_SIZE - buyLabelWidth) / 2,
-      y: QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE,
-      size: QR_LABEL_FONT_SIZE,
+      x: QR_X + (layout.qrSize - buyLabelWidth) / 2,
+      y: QR_Y - layout.qrLabelGap - layout.qrLabelFontSize,
+      size: layout.qrLabelFontSize,
       font,
       color: COLORS.muted,
     });
@@ -1041,17 +1169,17 @@ async function generateBuyPdf(input: {
     page.drawImage(vkQr, {
       x: VK_QR_X,
       y: QR_Y,
-      width: VK_QR_SIZE,
-      height: VK_QR_SIZE,
+      width: layout.vkQrSize,
+      height: layout.vkQrSize,
     });
 
     // Label under VK QR
     const vkLabel = "Мы ВКонтакте";
-    const vkLabelWidth = font.widthOfTextAtSize(vkLabel, QR_LABEL_FONT_SIZE);
+    const vkLabelWidth = font.widthOfTextAtSize(vkLabel, layout.qrLabelFontSize);
     page.drawText(vkLabel, {
-      x: VK_QR_X + (VK_QR_SIZE - vkLabelWidth) / 2,
-      y: QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE,
-      size: QR_LABEL_FONT_SIZE,
+      x: VK_QR_X + (layout.vkQrSize - vkLabelWidth) / 2,
+      y: QR_Y - layout.qrLabelGap - layout.qrLabelFontSize,
+      size: layout.qrLabelFontSize,
       font,
       color: COLORS.muted,
     });
@@ -1109,10 +1237,10 @@ async function generateBuyPdf(input: {
 
   if (hasRentalRates) {
     drawRoundedRect(page, {
-      x: RENTAL_BOX_X,
+      x: layout.rentalBoxX,
       y: RENTAL_BOX_Y,
-      width: RENTAL_BOX_WIDTH,
-      height: RENTAL_BOX_HEIGHT,
+      width: layout.rentalBoxWidth,
+      height: layout.rentalBoxHeight,
       radius: 8,
       color: COLORS.linkBg,
       borderColor: COLORS.accent,
@@ -1121,39 +1249,39 @@ async function generateBuyPdf(input: {
 
     // Current Y inside the rental box (top-down)
     let rentalY =
-      RENTAL_BOX_Y + RENTAL_BOX_HEIGHT - RENTAL_INNER_Y - RENTAL_HEADING_FONT_SIZE + 2;
+      RENTAL_BOX_Y + layout.rentalBoxHeight - layout.rentalInnerY - layout.rentalHeadingFontSize + 2;
 
     // Heading
     page.drawText("АРЕНДА", {
-      x: RENTAL_BOX_X + RENTAL_INNER_X,
+      x: layout.rentalBoxX + layout.rentalInnerX,
       y: rentalY,
-      size: RENTAL_HEADING_FONT_SIZE,
+      size: layout.rentalHeadingFontSize,
       font,
       color: COLORS.accent,
     });
 
-    rentalY -= RENTAL_LINE_HEIGHT + 2;
+    rentalY -= layout.rentalLineHeight + 2;
 
     // Helper: draw rental line with key left-aligned, value right-aligned
-    const rentalValueX = RENTAL_BOX_X + RENTAL_BOX_WIDTH - RENTAL_INNER_X;
+    const rentalValueX = layout.rentalBoxX + layout.rentalBoxWidth - layout.rentalInnerX;
 
     const drawRentalLine = (key: string, value: string) => {
       page.drawText(key, {
-        x: RENTAL_BOX_X + RENTAL_INNER_X,
+        x: layout.rentalBoxX + layout.rentalInnerX,
         y: rentalY,
-        size: RENTAL_VALUE_FONT_SIZE,
+        size: layout.rentalValueFontSize,
         font,
         color: COLORS.text,
       });
-      const valueWidth = font.widthOfTextAtSize(value, RENTAL_VALUE_FONT_SIZE);
+      const valueWidth = font.widthOfTextAtSize(value, layout.rentalValueFontSize);
       page.drawText(value, {
         x: rentalValueX - valueWidth,
         y: rentalY,
-        size: RENTAL_VALUE_FONT_SIZE,
+        size: layout.rentalValueFontSize,
         font,
         color: COLORS.text,
       });
-      rentalY -= RENTAL_LINE_HEIGHT;
+      rentalY -= layout.rentalLineHeight;
     };
 
     // ── Hourly rates ──────────────────────────────────────────────────────
@@ -1177,9 +1305,9 @@ async function generateBuyPdf(input: {
     if ((rentWeekday > 0 || rentWeekend > 0) && pricePerHour > 0) {
       const sepY = rentalY + 5;
       page.drawRectangle({
-        x: RENTAL_BOX_X + RENTAL_INNER_X,
+        x: layout.rentalBoxX + layout.rentalInnerX,
         y: sepY,
-        width: RENTAL_BOX_WIDTH - RENTAL_INNER_X * 2,
+        width: layout.rentalBoxWidth - layout.rentalInnerX * 2,
         height: 0.5,
         color: COLORS.line,
       });
@@ -1200,16 +1328,16 @@ async function generateBuyPdf(input: {
     const ctaLines = wrapText(
       ctaText,
       font,
-      CTA_FONT_SIZE,
-      RENTAL_BOX_WIDTH - RENTAL_INNER_X * 2,
+      layout.ctaFontSize,
+      layout.rentalBoxWidth - layout.rentalInnerX * 2,
     ).slice(0, 2);
 
     // Small separator before CTA
     const ctaSepY = rentalY + 4;
     page.drawRectangle({
-      x: RENTAL_BOX_X + RENTAL_INNER_X,
+      x: layout.rentalBoxX + layout.rentalInnerX,
       y: ctaSepY,
-      width: RENTAL_BOX_WIDTH - RENTAL_INNER_X * 2,
+      width: layout.rentalBoxWidth - layout.rentalInnerX * 2,
       height: 0.5,
       color: COLORS.accent,
     });
@@ -1217,13 +1345,13 @@ async function generateBuyPdf(input: {
 
     ctaLines.forEach((line) => {
       page.drawText(line, {
-        x: RENTAL_BOX_X + RENTAL_INNER_X,
+        x: layout.rentalBoxX + layout.rentalInnerX,
         y: rentalY,
-        size: CTA_FONT_SIZE,
+        size: layout.ctaFontSize,
         font,
         color: COLORS.accent,
       });
-      rentalY -= CTA_LINE_HEIGHT;
+      rentalY -= layout.ctaLineHeight;
     });
   }
 
@@ -1249,6 +1377,7 @@ export async function sendFranchizeBuyPrintPdf(
   );
 
   const bikeId = readString(payload.bikeId);
+  const pageSize = (payload.pageSize === "A5" ? "A5" : "A4") as PageSize;
 
   if (!bikeId) {
     return {
@@ -1300,6 +1429,7 @@ export async function sendFranchizeBuyPrintPdf(
       botUsername:
         crew.contacts.telegramBotUsername,
       vkLink,
+      pageSize,
       item: {
         id: item.id,
         title: item.title,
