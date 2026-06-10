@@ -186,11 +186,12 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         handleCopyToClipboard,
         handleClearAll,
         handleAddFullTree,
+        handleInstallAsOneFile,
     } = useKworkInput({
         selectedFetcherFiles,
         allFetchedFiles,
         imageReplaceTaskActive: !!imageReplaceTask || !!iconReplaceTask,
-        files: fetchedFiles, 
+        files: fetchedFiles,
     });
 
     useEffect(() => {
@@ -648,17 +649,18 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                  {!currentVisualTask && (fetchedFiles.length > 0 || kworkValueForCheck.trim().length > 0) && (
                       <div id="kwork-input-section" className="flex flex-col gap-3">
                           <RequestInput
-                              kworkInputRef={kworkInputRef} 
-                              kworkInputValue={kworkInputValue ?? ''} 
-                              onValueChange={setKworkInputValue} 
+                              kworkInputRef={kworkInputRef}
+                              kworkInputValue={kworkInputValue ?? ''}
+                              onValueChange={setKworkInputValue}
                               onCopyToClipboard={() => { logger.debug("[Input Action] Copy Click"); handleCopyToClipboard(undefined, true); }}
                               onClearAll={() => { logger.debug("[Input Action] Clear Click"); handleClearAll(); }}
                               onAddSelected={() => { logger.debug("[Input Action] AddSelected Click"); handleAddSelected(); }}
-                              isCopyDisabled={isCopyDisabled} 
-                              isClearDisabled={isClearDisabled} 
-                              isAddSelectedDisabled={isAddSelectedDisabled} 
+                              onInstallAsOneFile={() => { logger.debug("[Input Action] Install Click"); handleInstallAsOneFile(); }}
+                              isCopyDisabled={isCopyDisabled}
+                              isClearDisabled={isClearDisabled}
+                              isAddSelectedDisabled={isAddSelectedDisabled}
                               selectedFetcherFilesCount={selectedFetcherFiles.size}
-                              filesFetched={filesFetched} 
+                              filesFetched={filesFetched}
                               isActionDisabled={isActionDisabled}
                           />
                       </div>

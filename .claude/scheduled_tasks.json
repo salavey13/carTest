@@ -1,0 +1,17 @@
+{
+  "jobs": [
+    {
+      "id": "cron_1781041067658_y7pmh7zz1",
+      "cron": "0 9 * * *",
+      "prompt": "Send daily insights",
+      "recurring": true,
+      "durable": false,
+      "description": "Daily project insights at 9 AM",
+      "createdAt": "2026-06-09T21:37:47.658Z",
+      "lastRunAt": "2026-06-09T21:38:20.965Z",
+      "nextRunAt": null,
+      "runCount": 1
+    }
+  ],
+  "version": 1
+}

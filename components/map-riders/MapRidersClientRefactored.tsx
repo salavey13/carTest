@@ -484,7 +484,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         modal={false}
       >
         <Drawer.Portal>
-          <Drawer.Content className="fixed inset-x-0 bottom-0 z-20 pointer-events-none">
+          <Drawer.Content className={`fixed inset-x-0 bottom-0 z-20 ${activeSnap <= 0.2 ? "touch-action-none" : ""} pointer-events-none`}>
             <div className={`rounded-t-[1.4rem] border border-white/15 bg-[var(--mr-card)]/96 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl ${activeSnap <= 0.2 ? "pointer-events-none" : "pointer-events-auto"}`}><Drawer.Handle className="pointer-events-auto mx-auto mb-2 h-1.5 w-14 rounded-full bg-white/35" />
             {/* Snap control buttons */}
             <div className="pointer-events-auto mb-3 flex items-center justify-between gap-2">
@@ -504,7 +504,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
                 ))}
               </div>
             </div>
-            <div className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))] [touch-action:pan-y] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`}>
+            <div className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "[touch-action:pan-y] pointer-events-auto opacity-100"}`}>
               <BeginnerRiderOnboardingQuiz crew={crew} />
               <div className="mt-3 grid gap-3 lg:grid-cols-[1.35fr,1fr]">
 

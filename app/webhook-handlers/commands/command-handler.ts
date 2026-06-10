@@ -43,7 +43,7 @@ export async function handleCommand(update: any) {
 
         // Handle callback queries for /doc flow
         if (update.callback_query && (text.startsWith("doc_") || text.startsWith("cat_"))) {
-            const handled = await handleDocCallback(userIdStr, chatId, text);
+            const handled = await handleDocCallback(userIdStr, chatId, text, update.callback_query.id);
             if (handled) return;
         }
 

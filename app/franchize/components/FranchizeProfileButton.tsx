@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, User, IdCard, MessageCircle, Send } from "lucide-react";
+import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, User, IdCard, MessageCircle, Send, UserPlus, Users } from "lucide-react";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
@@ -69,7 +70,19 @@ interface FranchizeProfileButtonProps {
 }
 
 export function FranchizeProfileButton({ bgColor, textColor, borderColor, currentSlug, telegramBotUsername }: FranchizeProfileButtonProps) {
-  const { dbUser, user, userCrewInfo, isInTelegramContext } = useAppContext();
+  const { dbUser, user, userCrewInfo, isInTelegramContext, tg } = useAppContext();
+
+  const handleInvite = () => {
+    if (!userCrewInfo) return;
+    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_${userCrewInfo.slug}_join_crew`;
+    const text = `Присоединяйся к нашему экипажу '${userCrewInfo.name}' в VibeRider!`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
+    if (isInTelegramContext && tg) {
+      tg.openLink(shareUrl);
+    } else {
+      window.open(shareUrl, "_blank");
+    }
+  };
   const hasUser = Boolean(dbUser || user);
   const displayName = dbUser?.username || dbUser?.full_name || user?.username || user?.first_name || "Operator";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
@@ -350,12 +363,26 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           ) : null}
 
           {userCrewInfo?.slug && (
-            <DropdownMenuItem asChild>
-              <Link href={`/crews/${userCrewInfo.slug}`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-                <Palette className="mr-2 h-4 w-4" />
-                <span className="truncate">Мой экипаж</span>
-              </Link>
-            </DropdownMenuItem>
+            <>
+              <DropdownMenuItem asChild>
+                <Link href={`/crews/${userCrewInfo.slug}`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                  <Palette className="mr-2 h-4 w-4" />
+                  <span className="truncate">Мой экипаж</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <button onClick={handleInvite} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  <span className="truncate">Пригласить в экипаж</span>
+                </button>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/franchize/${userCrewInfo.slug}/crew`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                  <Users className="mr-2 h-4 w-4" />
+                  <span className="truncate">Управление экипажем</span>
+                </Link>
+              </DropdownMenuItem>
+            </>
           )}
 
           {userIsAdmin && (

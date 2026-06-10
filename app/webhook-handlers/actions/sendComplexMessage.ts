@@ -11,6 +11,7 @@ const TELEGRAM_MESSAGE_LIMIT = 4096;
 export interface KeyboardButton {
   text: string;
   url?: string;
+  callback_data?: string;
 }
 
 function escapeTelegramMarkdown(text: string): string {
@@ -43,13 +44,13 @@ export async function sendComplexMessage(
   options: {
     imageQuery?: string;
     messageId?: number;
-    keyboardType?: 'reply'; 
+    keyboardType?: 'reply' | 'inline';
     removeKeyboard?: boolean;
     parseMode?: 'MarkdownV2' | 'HTML' | 'Markdown';
     attachment?: { type: 'document'; content: string; filename: string };
   } = {}
 ): Promise<{ success: boolean; error?: string; data?: any }> {
-  const { imageQuery, messageId, removeKeyboard = false, parseMode = 'Markdown', attachment } = options;
+  const { imageQuery, messageId, removeKeyboard = false, parseMode = 'Markdown', attachment, keyboardType = 'reply' } = options;
 
   if (!TELEGRAM_BOT_TOKEN) {
     return { success: false, error: "Telegram bot token not configured." };
@@ -71,12 +72,20 @@ export async function sendComplexMessage(
 
     if (removeKeyboard) payload.reply_markup = { remove_keyboard: true };
     else if (buttons.length > 0) {
-      payload.reply_markup = { 
-        keyboard: buttons, 
-        resize_keyboard: true, 
-        one_time_keyboard: true,
-        selective: true 
-      };
+      if (keyboardType === 'inline') {
+        // Inline keyboard with callback_data or url buttons
+        payload.reply_markup = {
+          inline_keyboard: buttons
+        };
+      } else {
+        // Reply keyboard
+        payload.reply_markup = {
+          keyboard: buttons,
+          resize_keyboard: true,
+          one_time_keyboard: true,
+          selective: true
+        };
+      }
     }
     
     let endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
@@ -129,12 +138,12 @@ export async function deleteTelegramMessage(chatId: number, messageId: number): 
 }
 
 export async function editMessage(
-    chatId: number, 
-    messageId: number, 
+    chatId: number,
+    messageId: number,
     newText: string,
     buttons: KeyboardButton[][] = [],
-    options: { imageQuery?: string; keyboardType?: 'reply'; parseMode?: 'MarkdownV2' | 'HTML' | 'Markdown' } = {}
+    options: { imageQuery?: string; keyboardType?: 'reply' | 'inline'; parseMode?: 'MarkdownV2' | 'HTML' | 'Markdown' } = {}
 ) {
     const deleted = await deleteTelegramMessage(chatId, messageId);
-    return await sendComplexMessage(chatId, newText, buttons, { ...options, keyboardType: 'reply', parseMode: options.parseMode || 'Markdown' });
+    return await sendComplexMessage(chatId, newText, buttons, { ...options, keyboardType: options.keyboardType || 'reply', parseMode: options.parseMode || 'Markdown' });
 }

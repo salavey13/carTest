@@ -64,6 +64,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const CRON_SECRET = process.env.CRON_SECRET || process.env.CODEX_BRIDGE_CALLBACK_SECRET;
 const ALLOWED_ORIGINS = process.env.ALLOWED_FORWARD_ORIGINS?.split(",") || [
   "http://localhost:*",
   "https://v0-car-test.vercel.app",
@@ -153,7 +154,13 @@ async function forwardToTelegram(method: string, chatId: string | number, payloa
 export async function POST(request: NextRequest) {
   try {
     const origin = request.headers.get("origin");
-    if (!isOriginAllowed(origin)) {
+    const cronSecret = request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace("Bearer ", "");
+
+    // Allow requests with valid cron secret (for cron jobs/internal calls)
+    if (cronSecret && cronSecret === CRON_SECRET) {
+      // Valid cron secret, skip origin check
+      logger.info("[forward-telegram] Allowed via cron secret");
+    } else if (!isOriginAllowed(origin)) {
       logger.warn("[forward-telegram] Blocked request from disallowed origin", { origin });
       return NextResponse.json({ error: "Origin not allowed" }, { status: 403 });
     }

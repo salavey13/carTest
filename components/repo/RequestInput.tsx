@@ -1,23 +1,24 @@
 "use client";
-import React, { useCallback } from "react"; 
+import React, { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { FaCopy, FaBroom, FaPlus, FaWandMagicSparkles } from "react-icons/fa6";
+import { FaCopy, FaBroom, FaPlus, FaWandMagicSparkles, FaDownload } from "react-icons/fa6";
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAppToast } from "@/hooks/useAppToast"; 
-import { ULTIMATE_VIBE_MASTER_PROMPT } from "./prompt"; 
-import { debugLogger as logger } from "@/lib/debugLogger"; 
+import { useAppToast } from "@/hooks/useAppToast";
+import { ULTIMATE_VIBE_MASTER_PROMPT } from "./prompt";
+import { debugLogger as logger } from "@/lib/debugLogger";
 import { cn } from "@/lib/utils";
-import { useAppContext } from "@/contexts/AppContext"; 
+import { useAppContext } from "@/contexts/AppContext";
 import { useRepoXmlPageContext } from "@/contexts/RepoXmlPageContext"; 
 
 interface RequestInputProps {
     kworkInputRef: React.RefObject<HTMLTextAreaElement>;
-    kworkInputValue: string | undefined; 
+    kworkInputValue: string | undefined;
     onValueChange: (value: string) => void;
-    onCopyToClipboard: () => void; 
+    onCopyToClipboard: () => void;
     onClearAll: () => void;
     onAddSelected: () => void;
+    onInstallAsOneFile: () => void;
     isAddSelectedDisabled: boolean;
     selectedFetcherFilesCount: number;
     isActionDisabled?: boolean;
@@ -31,6 +32,7 @@ const RequestInput: React.FC<RequestInputProps> = ({
     onCopyToClipboard,
     onClearAll,
     onAddSelected,
+    onInstallAsOneFile,
     isAddSelectedDisabled,
     selectedFetcherFilesCount,
     isActionDisabled = false,
@@ -122,14 +124,31 @@ const RequestInput: React.FC<RequestInputProps> = ({
                     </div>
                 </div>
                  <div className="flex flex-wrap justify-end gap-3">
+                    <Tooltip delayDuration={100}>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={onInstallAsOneFile}
+                                disabled={isAddSelectedDisabled || isActionDisabled}
+                                className="rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50 px-4 border-brand-green/50 text-brand-green hover:bg-brand-green/10"
+                            >
+                                <FaDownload className="mr-2 h-4 w-4" />
+                                Install ({selectedFetcherFilesCount})
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="bg-popover text-popover-foreground border-border shadow-lg text-xs p-1.5 rounded max-w-[250px]">
+                            Создать 1-файловый инсталлер и скопировать в буфер обмена
+                        </TooltipContent>
+                    </Tooltip>
                      <Tooltip delayDuration={100}>
                         <TooltipTrigger asChild>
                             <Button
-                                variant="default" 
+                                variant="default"
                                 size="sm"
                                 onClick={onAddSelected}
                                 disabled={isAddSelectedDisabled || isActionDisabled}
-                                className="rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50 px-4" 
+                                className="rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50 px-4"
                             >
                                 <FaPlus className="mr-2 h-4 w-4" />
                                 Добавить Выбранное ({selectedFetcherFilesCount})
