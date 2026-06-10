@@ -135,7 +135,7 @@ function createLayoutConstants(pageSize: PageSize): LayoutConstants {
   const qrLabelGap = Math.round(4 * scale);
   const qrLabelFontSize = Math.round(7 * scale);
 
-  const rentalBoxHeight = Math.round(isA5 ? 156 : 148 * scale); // Slightly taller for A5 to fit CTA better
+  const rentalBoxHeight = Math.round(isA5 ? 168 : 148 * scale); // Taller for A5: enlarged prices + proper CTA space
   const rentalBoxX = rightColX;
   const rentalBoxWidth = rightColWidth;
   const rentalHeadingFontSize = Math.round(11 * scale);
@@ -1005,11 +1005,14 @@ async function generateBuyPdf(input: {
   const IMAGE_PANEL_Y = RENTAL_BOX_Y + layout.rentalBoxHeight + layout.imageToRentalGap;
   const IMAGE_PANEL_HEIGHT = _rightColumnTop - IMAGE_PANEL_Y;
 
-  // Image width from 9:16 ratio (slightly wider than layout.rightColWidth for cover fit)
-  const IMAGE_PANEL_WIDTH = Math.round(IMAGE_PANEL_HEIGHT * 9 / 16);
+  // Image dimensions — A5 gets proportionally larger 9:16 image (centered in available space)
+  const imageScaleMultiplier = isA5 ? 1.12 : 1.0; // A5 gets 12% larger image
+  const IMAGE_PANEL_WIDTH = Math.round(IMAGE_PANEL_HEIGHT * 9 / 16 * imageScaleMultiplier);
+  const IMAGE_DRAW_HEIGHT = Math.round(IMAGE_PANEL_HEIGHT * imageScaleMultiplier);
+  const IMAGE_DRAW_Y = IMAGE_PANEL_Y + (IMAGE_PANEL_HEIGHT - IMAGE_DRAW_HEIGHT) / 2; // Center vertically
 
-  // QR codes: positioned from bottom of image panel with padding
-  const QR_Y = IMAGE_PANEL_Y + layout.qrBottomPadding + layout.qrLabelGap + layout.qrLabelFontSize;
+  // QR codes: positioned from bottom of image draw area with padding
+  const QR_Y = IMAGE_DRAW_Y + layout.qrBottomPadding + layout.qrLabelGap + layout.qrLabelFontSize;
   const QR_X = layout.rightColX + (layout.rightColWidth - layout.qrPairTotalWidth) / 2;
   const VK_QR_X = QR_X + layout.qrSize + layout.qrPairGap;
 
@@ -1033,15 +1036,15 @@ async function generateBuyPdf(input: {
     const imgW = hero.width;
     const imgH = hero.height;
     const scaleByW = IMAGE_PANEL_WIDTH / imgW;
-    const scaleByH = IMAGE_PANEL_HEIGHT / imgH;
+    const scaleByH = IMAGE_DRAW_HEIGHT / imgH;
     const coverScale = Math.max(scaleByW, scaleByH);
 
     const drawW = imgW * coverScale;
     const drawH = imgH * coverScale;
 
-    // Center horizontally in the right column area, center vertically
+    // Center horizontally in the right column area, center vertically in draw area
     const imgX = layout.rightColX + (layout.rightColWidth - drawW) / 2;
-    const imgY = IMAGE_PANEL_Y + (IMAGE_PANEL_HEIGHT - drawH) / 2;
+    const imgY = IMAGE_DRAW_Y + (IMAGE_DRAW_HEIGHT - drawH) / 2;
 
     page.drawImage(hero, {
       x: imgX,
@@ -1054,9 +1057,9 @@ async function generateBuyPdf(input: {
     if (imgX < layout.rightColX) {
       page.drawRectangle({
         x: imgX,
-        y: IMAGE_PANEL_Y,
+        y: IMAGE_DRAW_Y,
         width: layout.rightColX - imgX,
-        height: IMAGE_PANEL_HEIGHT,
+        height: IMAGE_DRAW_HEIGHT,
         color: COLORS.pageBg,
       });
     }
@@ -1067,9 +1070,9 @@ async function generateBuyPdf(input: {
     if (imgRight > panelRight) {
       page.drawRectangle({
         x: panelRight,
-        y: IMAGE_PANEL_Y,
+        y: IMAGE_DRAW_Y,
         width: imgRight - panelRight,
-        height: IMAGE_PANEL_HEIGHT,
+        height: IMAGE_DRAW_HEIGHT,
         color: COLORS.pageBg,
       });
     }
@@ -1080,7 +1083,7 @@ async function generateBuyPdf(input: {
 
     page.drawText(fallbackText, {
       x: layout.rightColX + (layout.rightColWidth - fallbackWidth) / 2,
-      y: IMAGE_PANEL_Y + IMAGE_PANEL_HEIGHT / 2 - 4,
+      y: IMAGE_DRAW_Y + IMAGE_DRAW_HEIGHT / 2 - 4,
       size: fallbackSize,
       font,
       color: COLORS.imageFallback,
@@ -1323,7 +1326,7 @@ async function generateBuyPdf(input: {
       drawRentalLine("Выходные", `${formatRub(rentWeekend)}/сутки`);
     }
 
-    // ── CTA (call-to-action) ──────────────────────────────────────────────
+    // ── CTA (call-to-action) — positioned from bottom of rental box ────────────
     const ctaText = "Сканируй QR — пройди бесплатный тест-драйв!";
     const ctaLines = wrapText(
       ctaText,
@@ -1332,20 +1335,17 @@ async function generateBuyPdf(input: {
       layout.rentalBoxWidth - layout.rentalInnerX * 2,
     ).slice(0, 2);
 
-    // Ensure CTA has enough bottom padding to avoid overlapping rounded border
-    const ctaBottomPadding = layout.rentalInnerY + 2; // Match top padding + small buffer
-    const currentRentalY = rentalY;
-    const ctaHeight = ctaLines.length * layout.ctaLineHeight + 8; // 8 for separator + gap
-    const minRentalY = RENTAL_BOX_Y + ctaBottomPadding + ctaHeight;
+    // CTA is positioned from the BOTTOM of the rental box with proper padding
+    const ctaBottomPadding = layout.rentalInnerY + 4; // Padding from rounded border
+    const ctaGapBefore = 8; // Gap before separator
+    const ctaSeparatorHeight = 0.5;
+    const ctaTotalHeight = ctaLines.length * layout.ctaLineHeight + ctaGapBefore + ctaSeparatorHeight;
 
-    // Add extra gap if we're too close to the bottom
-    if (currentRentalY > minRentalY) {
-      // We're too low, need to move up
-      rentalY = currentRentalY + (currentRentalY - minRentalY);
-    }
+    // CTA first line baseline: from bottom of box + padding + height of all lines except first
+    const ctaFirstLineY = RENTAL_BOX_Y + ctaBottomPadding + (ctaLines.length - 1) * layout.ctaLineHeight + 4;
 
-    // Small separator before CTA
-    const ctaSepY = rentalY + 4;
+    // Separator line sits above CTA with gap
+    const ctaSepY = ctaFirstLineY + ctaGapBefore;
     page.drawRectangle({
       x: layout.rentalBoxX + layout.rentalInnerX,
       y: ctaSepY,
@@ -1353,17 +1353,17 @@ async function generateBuyPdf(input: {
       height: 0.5,
       color: COLORS.accent,
     });
-    rentalY -= 8; // Increased gap for better spacing
 
-    ctaLines.forEach((line) => {
+    // Draw CTA lines from bottom up
+    ctaLines.forEach((line, idx) => {
+      const lineY = ctaFirstLineY - idx * layout.ctaLineHeight;
       page.drawText(line, {
         x: layout.rentalBoxX + layout.rentalInnerX,
-        y: rentalY,
+        y: lineY,
         size: layout.ctaFontSize,
         font,
         color: COLORS.accent,
       });
-      rentalY -= layout.ctaLineHeight;
     });
   }
 
