@@ -718,7 +718,9 @@ async function generateBuyPdf(input: {
     rawSpecs?: UnknownRecord;
   };
 }) {
-  const layout = createLayoutConstants(input.pageSize || "A4");
+  const pageSize = input.pageSize || "A4";
+  const isA5 = pageSize === "A5";
+  const layout = createLayoutConstants(pageSize);
 
   const pdfDoc = await PDFDocument.create();
 
