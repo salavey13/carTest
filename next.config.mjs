@@ -13,18 +13,13 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  turbopack: {
-    root: process.cwd(),
-  },
-  experimental: {
-    webpackBuildWorker: true,
-    parallelServerBuildTraces: true,
-    parallelServerCompiles: true,
-  },
-  // Ensure that 'server-assets' directory, containing fonts for PDF generation, is included in the serverless bundle.
-  outputFileTracingIncludes: {
-    '/': ['server-assets/**/*'],
-  },
+  // Packages that should only be resolved on the server side
+  // This prevents Next.js from bundling them during build
+  serverExternalPackages: ['@xenova/transformers', '@huggingface/transformers'],
+  // Note: server-assets fonts are bundled automatically without explicit tracing
+  // Disabled experimental features to reduce memory usage during build
+  // Disable source maps in production to reduce memory usage
+  productionBrowserSourceMaps: false,
   webpack: (config, { isServer }) => {
     // Only apply this to server-side bundles
     if (isServer) {
@@ -33,6 +28,8 @@ const nextConfig = {
       // This prevents webpack from bundling them, forcing Node.js to resolve them from node_modules at runtime.
       // This often solves issues with global state or native bindings in serverless environments.
       config.externals.push('pdf-lib', '@pdf-lib/fontkit');
+      // Also mark heavy ML libraries as external to avoid memory issues during build
+      config.externals.push('@xenova/transformers', '@huggingface/transformers');
     }
     return config;
   },
