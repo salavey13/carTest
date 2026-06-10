@@ -87,13 +87,14 @@ async function getFranchizeBySlug(slug) {
 // ── Filter sale bikes ─────────────────────────────────────────────────────
 function filterSaleBikes(bikes) {
   return bikes.filter(bike => {
+    // specs is stored as jsonb, so it's already an object
     const specs = bike.specs || {};
 
-    // Check if bike has sale pricing
-    const hasSale = specs.sale === true || specs.sale === '1' || specs.sale === 1 ||
-                   specs.sale_price > 0 || specs.price_rub > 0;
+    // Check if bike has sale=true in specs (exact match for boolean)
+    const hasSale = specs.sale === true || specs.sale === 1;
 
-    return hasSale && bike.title && bike.gallery?.[0];
+    // Also require basic data for PDF generation
+    return hasSale && bike.title && bike.gallery && bike.gallery.length > 0;
   });
 }
 
