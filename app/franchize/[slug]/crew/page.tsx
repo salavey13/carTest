@@ -4,7 +4,7 @@ import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { FranchizePageShell } from "@/app/franchize/components/FranchizePageShell";
 import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
-import { buildFranchizeSectionMetadata } from "../metadata";
+import { buildFranchizeSectionMetadata } from "../../metadata";
 import { FranchizeCrewOverviewClient } from "./CrewOverviewClient";
 
 interface FranchizeSlugCrewPageProps {

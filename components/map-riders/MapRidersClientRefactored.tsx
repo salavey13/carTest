@@ -472,6 +472,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       </section>
 
       {/* ── DRAGGABLE TAXI-STYLE BOTTOM SHEET (vaul) ── */}
+      <div style={{ touchAction: activeSnap <= 0.2 ? "none" : "auto" }}>
       <Drawer.Root
         open={sheetOpen}
         onOpenChange={setSheetOpen}
@@ -482,7 +483,6 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         }}
         dismissible={false}
         modal={false}
-        style={{ touchAction: "auto" }}
       >
         <Drawer.Portal>
           <Drawer.Content className="fixed inset-x-0 bottom-0 z-20 pointer-events-none">
@@ -505,7 +505,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
                 ))}
               </div>
             </div>
-            <div className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`} style={{ touchAction: "pan-y" }}>
+            <div className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`} style={{ touchAction: activeSnap <= 0.2 ? "none" : "pan-y" }}>
               <BeginnerRiderOnboardingQuiz crew={crew} />
               <div className="mt-3 grid gap-3 lg:grid-cols-[1.35fr,1fr]">
 
@@ -671,6 +671,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
+      </div>
       {state.isLoading ? <MapRidersSkeleton /> : null}
       <StatusOverlay />
       <RiderFAB />
