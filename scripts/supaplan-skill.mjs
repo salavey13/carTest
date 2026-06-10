@@ -29,7 +29,8 @@ function getAdminClient() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-const ALLOWED_AGENT_STATUSES = new Set(['claimed', 'running', 'ready_for_pr']);
+const ALLOWED_AGENT_STATUSES = new Set(['claimed', 'running', 'ready_for_pr', 'ready', 'completed']);
+const ALLOWED_BOSS_MODE_STATUSES = new Set(['claimed', 'running', 'ready', 'completed']);
 const CLAIM_RPC_FALLBACK_CODES = new Set(['42883', 'PGRST202']);
 const SUPAPLAN_TASK_REF_REGEX = /supaplan_task\s*:\s*([0-9a-fA-F-]{36})/i;
 const UUID_V4_OR_COMPAT_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
@@ -323,6 +324,7 @@ async function pickTask() {
   const requestedCapability = getArg('capability', 'auto');
   const agentId = getArg('agentId', process.env.SUPAPLAN_AGENT_ID || 'codex-local-agent');
   const dryRun = hasFlag('dry-run');
+  const mode = getArg('mode', 'pr');
   const resolved = resolveCapabilityForPick(requestedCapability);
 
   if (!resolved.capability) {
@@ -364,7 +366,8 @@ async function pickTask() {
       });
 
       if (!error) {
-        console.log(JSON.stringify({ mode: 'rpc-js', capability, capabilitySource: resolved.source, result: data ?? { task: null } }, null, 2));
+        const response = { mode: 'rpc-js', capability, capabilitySource: resolved.source, result: data ?? { task: null }, workflow: mode === 'boss' ? 'boss' : 'pr' };
+        console.log(JSON.stringify(response, null, 2));
         return;
       }
 
@@ -383,7 +386,7 @@ async function pickTask() {
 
       if (selectError) throw selectError;
       if (!task) {
-        console.log(JSON.stringify({ mode: 'fallback-js', capability, capabilitySource: resolved.source, result: { task: null } }, null, 2));
+        console.log(JSON.stringify({ mode: 'fallback-js', capability, capabilitySource: resolved.source, result: { task: null }, workflow: mode }, null, 2));
         return;
       }
 
@@ -398,7 +401,7 @@ async function pickTask() {
 
       if (updateError) throw updateError;
       if (!claimedTask) {
-        console.log(JSON.stringify({ mode: 'fallback-js', capability, capabilitySource: resolved.source, result: { task: null } }, null, 2));
+        console.log(JSON.stringify({ mode: 'fallback-js', capability, capabilitySource: resolved.source, result: { task: null }, workflow: mode }, null, 2));
         return;
       }
 
@@ -417,7 +420,7 @@ async function pickTask() {
 
       if (claimError) throw claimError;
 
-      console.log(JSON.stringify({ mode: 'fallback-js', capability, capabilitySource: resolved.source, result: { task: claimedTask, claim } }, null, 2));
+      console.log(JSON.stringify({ mode: 'fallback-js', capability, capabilitySource: resolved.source, result: { task: claimedTask, claim }, workflow: mode }, null, 2));
       return;
     } catch (error) {
       if (!isTransientNetworkError(error)) {
@@ -431,7 +434,7 @@ async function pickTask() {
       p_capability: capability,
       p_agent: agentId,
     });
-    console.log(JSON.stringify({ mode: 'rpc-rest', capability, capabilitySource: resolved.source, result: rpcResult ?? { task: null } }, null, 2));
+    console.log(JSON.stringify({ mode: 'rpc-rest', capability, capabilitySource: resolved.source, result: rpcResult ?? { task: null }, workflow: mode }, null, 2));
     return;
   } catch (error) {
     if (!isTransientNetworkError(error)) {
@@ -441,7 +444,7 @@ async function pickTask() {
 
   try {
     const fallback = await fallbackClaimViaRest(capability, agentId);
-    console.log(JSON.stringify({ ...fallback, capability, capabilitySource: resolved.source }, null, 2));
+    console.log(JSON.stringify({ ...fallback, capability, capabilitySource: resolved.source, workflow: mode }, null, 2));
     return;
   } catch (error) {
     throw new Error(`pick-task failed in all modes (rpc-js -> rpc-rest -> fallback-rest): ${normalizeError(error)}`);
@@ -465,20 +468,309 @@ function maybeNotifyStatusUpdate(taskId, status) {
   }
 }
 
+function attemptDirectCommit(taskId, agentId, commitMessage) {
+  const tag = `[supaplan:${taskId.slice(0, 8)}]`;
+  const fullMessage = `${tag} ${commitMessage}`;
+
+  // Check for merge conflicts first
+  const conflictCheck = spawnSync('git', ['diff', '--name-only', '--diff-filter=U'], {
+    encoding: 'utf8',
+    stdio: 'pipe'
+  });
+
+  if (conflictCheck.stdout && conflictCheck.stdout.trim().length > 0) {
+    return {
+      success: false,
+      reason: 'merge_conflicts_detected',
+      conflictedFiles: conflictCheck.stdout.trim().split('\n').filter(Boolean)
+    };
+  }
+
+  // Stage all changes
+  const addResult = spawnSync('git', ['add', '-A'], {
+    encoding: 'utf8',
+    stdio: 'pipe'
+  });
+
+  if (addResult.status !== 0) {
+    return {
+      success: false,
+      reason: 'git_add_failed',
+      stderr: addResult.stderr
+    };
+  }
+
+  // Commit with message
+  const commitResult = spawnSync('git', ['commit', '-m', fullMessage], {
+    encoding: 'utf8',
+    stdio: 'pipe'
+  });
+
+  if (commitResult.status !== 0) {
+    return {
+      success: false,
+      reason: 'git_commit_failed',
+      stderr: commitResult.stderr,
+      stdout: commitResult.stdout
+    };
+  }
+
+  return {
+    success: true,
+    commitHash: commitResult.stdout.trim() || 'unknown',
+    message: fullMessage
+  };
+}
+
+function detectMergeConflicts() {
+  const result = spawnSync('git', ['diff', '--name-only', '--diff-filter=U'], {
+    encoding: 'utf8',
+    stdio: 'pipe'
+  });
+
+  if (result.status !== 0) {
+    const response = {
+      ok: false,
+      error: 'git_diff_failed',
+      stderr: result.stderr
+    };
+    console.log(JSON.stringify(response, null, 2));
+    return response;
+  }
+
+  const conflictedFiles = result.stdout
+    ? result.stdout.trim().split('\n').filter(Boolean)
+    : [];
+
+  const response = {
+    ok: true,
+    hasConflicts: conflictedFiles.length > 0,
+    conflictedFiles
+  };
+  console.log(JSON.stringify(response, null, 2));
+  return response;
+}
+
+function getConflictResolutionSuggestions() {
+  const conflictResult = detectMergeConflicts();
+  if (!conflictResult.ok) {
+    console.log(JSON.stringify(conflictResult, null, 2));
+    return conflictResult;
+  }
+
+  if (!conflictResult.hasConflicts) {
+    const response = {
+      ok: true,
+      hasConflicts: false,
+      suggestions: []
+    };
+    console.log(JSON.stringify(response, null, 2));
+    return response;
+  }
+
+  const suggestions = conflictResult.conflictedFiles.map((file) => {
+    const ext = file.split('.').pop();
+    const base = file.replace(/\.[^.]*$/, '');
+
+    return {
+      file,
+      strategy: ext === 'sql' ? 'accept-theirs' : 'manual-review',
+      action: ext === 'sql'
+        ? `git checkout --theirs "${file}" && git add "${file}"`
+        : `review conflict markers in "${file}"`
+    };
+  });
+
+  const response = {
+    ok: true,
+    hasConflicts: true,
+    conflictedFiles: conflictResult.conflictedFiles,
+    suggestions
+  };
+  console.log(JSON.stringify(response, null, 2));
+  return response;
+}
+
+async function pickCheatcodeTask() {
+  const agentId = getArg('agentId', process.env.SUPAPLAN_AGENT_ID || 'codex-local-agent');
+  const capability = getArg('capability', 'auto');
+  const dryRun = hasFlag('dry-run');
+  const resolved = resolveCapabilityForPick(capability);
+
+  if (!resolved.capability) {
+    console.log(JSON.stringify({ mode: 'cheatcode', result: { task: null }, capabilitySource: resolved.source }, null, 2));
+    return;
+  }
+
+  // Only pick tasks marked as polishing tasks (no file operations needed)
+  const candidates = restRequest(
+    'GET',
+    `supaplan_tasks?select=*&status=eq.open&capability=eq.${encodeURIComponent(resolved.capability)}&order=created_at.asc&limit=10`,
+  );
+  const tasks = Array.isArray(candidates) ? candidates : [];
+
+  // Filter for polishing tasks - these should have specific metadata or capability prefix
+  const polishingTasks = tasks.filter((task) => {
+    return task.capability?.startsWith('polish') ||
+           task.capability?.startsWith('refactor') ||
+           task.capability?.startsWith('docs') ||
+           task.capability?.startsWith('test') ||
+           task.metadata?.cheatcode === true;
+  });
+
+  if (polishingTasks.length === 0) {
+    console.log(JSON.stringify({
+      mode: 'cheatcode',
+      capability: resolved.capability,
+      capabilitySource: resolved.source,
+      result: { task: null, reason: 'no_polishing_tasks' }
+    }, null, 2));
+    return;
+  }
+
+  const task = polishingTasks[0];
+
+  if (dryRun) {
+    console.log(JSON.stringify({
+      mode: 'cheatcode-dry-run',
+      capability: resolved.capability,
+      capabilitySource: resolved.source,
+      result: { task }
+    }, null, 2));
+    return;
+  }
+
+  // Claim without file operations
+  const now = new Date().toISOString();
+  const claimedRows = restRequest(
+    'PATCH',
+    `supaplan_tasks?id=eq.${task.id}&status=eq.open`,
+    { status: 'running', updated_at: now },
+    'return=representation',
+  );
+  const claimedTask = Array.isArray(claimedRows) ? claimedRows[0] : null;
+
+  if (!claimedTask) {
+    console.log(JSON.stringify({
+      mode: 'cheatcode',
+      result: { task: null, reason: 'race_condition' }
+    }, null, 2));
+    return;
+  }
+
+  const claimRows = restRequest(
+    'POST',
+    'supaplan_claims',
+    {
+      task_id: claimedTask.id,
+      agent_id: agentId,
+      claim_token: randomUUID(),
+      status: 'running',
+      claimed_at: now,
+      last_heartbeat: now,
+    },
+    'return=representation',
+  );
+
+  console.log(JSON.stringify({
+    mode: 'cheatcode',
+    capability: resolved.capability,
+    capabilitySource: resolved.source,
+    result: {
+      task: claimedTask,
+      claim: Array.isArray(claimRows) ? claimRows[0] : claimRows,
+      note: 'This is a polishing task - work directly in memory, skip file staging'
+    }
+  }, null, 2));
+}
+
+async function resolveConflict() {
+  const file = required(getArg('file'), 'Missing --file');
+  const strategy = getArg('strategy', 'ours');
+  const validStrategies = new Set(['ours', 'theirs', 'union', 'merge']);
+
+  if (!validStrategies.has(strategy)) {
+    throw new Error(`Invalid --strategy=${strategy}. Allowed: ours|theirs|union|merge`);
+  }
+
+  const checkoutArgs = ['checkout', `--${strategy}`, '--', file];
+  const result = spawnSync('git', checkoutArgs, { encoding: 'utf8', stdio: 'pipe' });
+
+  if (result.status !== 0) {
+    console.log(JSON.stringify({
+      ok: false,
+      file,
+      strategy,
+      error: 'git_checkout_failed',
+      stderr: result.stderr
+    }, null, 2));
+    return;
+  }
+
+  const addResult = spawnSync('git', ['add', file], {
+    encoding: 'utf8',
+    stdio: 'pipe'
+  });
+
+  if (addResult.status !== 0) {
+    console.log(JSON.stringify({
+      ok: false,
+      file,
+      strategy,
+      error: 'git_add_failed',
+      stderr: addResult.stderr
+    }, null, 2));
+    return;
+  }
+
+  console.log(JSON.stringify({
+    ok: true,
+    file,
+    strategy,
+    resolved: true
+  }, null, 2));
+}
+
 async function updateStatus() {
   const taskId = required(getArg('taskId'), 'Missing --taskId');
   const status = required(getArg('status'), 'Missing --status');
+  const mode = getArg('mode', 'pr');
+  const agentId = getArg('agentId', process.env.SUPAPLAN_AGENT_ID || 'codex-local-agent');
+  const commitMessage = getArg('commitMessage', null);
   const now = new Date().toISOString();
 
-  if (!ALLOWED_AGENT_STATUSES.has(status)) {
-    throw new Error(`Invalid --status=${status}. Allowed: claimed|running|ready_for_pr`);
+  const allowedStatuses = mode === 'boss' ? ALLOWED_BOSS_MODE_STATUSES : ALLOWED_AGENT_STATUSES;
+  if (!allowedStatuses.has(status)) {
+    const statusList = mode === 'boss'
+      ? 'claimed|running|ready|completed'
+      : 'claimed|running|ready_for_pr';
+    throw new Error(`Invalid --status=${status} for mode=${mode}. Allowed: ${statusList}`);
+  }
+
+  // BOSS mode: handle direct commit when completing tasks
+  if (mode === 'boss' && (status === 'completed' || status === 'ready')) {
+    if (!hasFlag('skip-commit') && commitMessage) {
+      const commitResult = attemptDirectCommit(taskId, agentId, commitMessage);
+      console.log(JSON.stringify({ ok: true, taskId, status, mode, commit: commitResult }, null, 2));
+    } else if (hasFlag('skip-commit')) {
+      console.log(JSON.stringify({ ok: true, taskId, status, mode, commit: 'skipped' }, null, 2));
+    } else {
+      console.warn('BOSS mode with commit requires --commitMessage. Skipping commit.');
+      console.log(JSON.stringify({ ok: true, taskId, status, mode, commit: 'skipped-missing-message' }, null, 2));
+    }
+  }
+
+  const updatePayload = { status, updated_at: now };
+  if (mode === 'boss' && status === 'completed') {
+    updatePayload.completed_by = agentId;
+    updatePayload.completed_at = now;
   }
 
   try {
     const supabase = getAdminClient();
     const { error } = await supabase
       .from('supaplan_tasks')
-      .update({ status, updated_at: now })
+      .update(updatePayload)
       .eq('id', taskId);
 
     if (error) throw error;
@@ -490,13 +782,15 @@ async function updateStatus() {
     restRequest(
       'PATCH',
       `supaplan_tasks?id=eq.${taskId}`,
-      { status, updated_at: now },
+      updatePayload,
       'return=minimal',
     );
   }
 
   maybeNotifyStatusUpdate(taskId, status);
-  console.log(JSON.stringify({ ok: true, taskId, status }, null, 2));
+  if (mode === 'boss' && !commitMessage) {
+    console.log(JSON.stringify({ ok: true, taskId, status, mode, commit: 'skipped' }, null, 2));
+  }
 }
 
 async function taskStatus() {
@@ -797,6 +1091,103 @@ async function addTask() {
   console.log(JSON.stringify({ ok: true, task: row }, null, 2));
 }
 
+async function agentStats() {
+  const agentId = getArg('agentId', process.env.SUPAPLAN_AGENT_ID || 'codex-local-agent');
+  let data = null;
+
+  try {
+    const supabase = getAdminClient();
+    const { data: stats, error } = await supabase.rpc('supaplan_agent_stats', {
+      p_agent: agentId
+    });
+
+    if (error) throw error;
+    data = stats;
+  } catch (error) {
+    // Fallback to manual query if RPC doesn't exist
+    if (!isTransientNetworkError(error)) {
+      // Try manual query
+      try {
+        const claims = restRequest(
+          'GET',
+          `supaplan_claims?select=agent_id,claimed_at&agent_id=eq.${encodeURIComponent(agentId)}&limit=1000`
+        );
+        const completed = restRequest(
+          'GET',
+          `supaplan_tasks?select=completed_by,completed_at&completed_by=eq.${encodeURIComponent(agentId)}&limit=1000`
+        );
+
+        data = {
+          agent_id: agentId,
+          tasks_claimed: Array.isArray(claims) ? claims.length : 0,
+          tasks_completed: Array.isArray(completed) ? completed.length : 0,
+          source: 'manual-fallback'
+        };
+      } catch (fallbackError) {
+        if (!isTransientNetworkError(fallbackError)) {
+          throw fallbackError;
+        }
+      }
+    } else {
+      throw error;
+    }
+  }
+
+  console.log(JSON.stringify({ ok: true, stats: data }, null, 2));
+}
+
+async function parallelWorkCheck() {
+  let data = null;
+
+  try {
+    const supabase = getAdminClient();
+    const { data: checks, error } = await supabase.rpc('supaplan_parallel_work_check');
+
+    if (error) throw error;
+    data = checks;
+  } catch (error) {
+    if (!isTransientNetworkError(error)) {
+      throw error;
+    }
+
+    // Fallback to manual query
+    const running = restRequest(
+      'GET',
+      `supaplan_tasks?select=capability,status,id&status=eq.running&limit=100`
+    );
+
+    if (Array.isArray(running) && running.length > 0) {
+      const taskIds = running.map(t => t.id);
+      const claims = restRequest(
+        'GET',
+        `supaplan_claims?select=task_id,agent_id&task_id=in.(${taskIds.join(',')})&limit=100`
+      );
+
+      const byCapability = {};
+      for (const task of running) {
+        const cap = task.capability || 'unknown';
+        if (!byCapability[cap]) {
+          byCapability[cap] = { capability: cap, running_count: 0, running_agents: [] };
+        }
+        byCapability[cap].running_count += 1;
+
+        const taskClaims = Array.isArray(claims) ? claims.filter(c => c.task_id === task.id) : [];
+        for (const claim of taskClaims) {
+          if (!byCapability[cap].running_agents.includes(claim.agent_id)) {
+            byCapability[cap].running_agents.push(claim.agent_id);
+          }
+        }
+      }
+
+      data = Object.values(byCapability);
+    } else {
+      data = [];
+    }
+  }
+
+  console.log(JSON.stringify({ ok: true, parallelWork: data }, null, 2));
+}
+
 async function inspectMigrations() {
   const lifecycle = ['open', 'claimed', 'running', 'ready_for_pr', 'done'];
   const hasMergeWorkflow = existsSync('.github/workflows/supaplan-merge.yml');
@@ -880,6 +1271,7 @@ async function inspectMigrations() {
 
 const runners = {
   'pick-task': pickTask,
+  'pick-cheatcode': pickCheatcodeTask,
   'update-status': updateStatus,
   'task-status': taskStatus,
   'log-event': logEvent,
@@ -889,14 +1281,37 @@ const runners = {
   'status': status,
   'add-task': addTask,
   'validate-plugin-contracts': validatePluginContracts,
+  'detect-conflicts': detectMergeConflicts,
+  'resolve-conflict': resolveConflict,
+  'conflict-suggestions': getConflictResolutionSuggestions,
+  'agent-stats': agentStats,
+  'parallel-check': parallelWorkCheck,
 };
 
 if (!command || !runners[command]) {
   if (command && UUID_V4_OR_COMPAT_REGEX.test(command)) {
     console.error(`Looks like a bare UUID input: "${command}".`);
-    console.error('Tip: check whether this is a SupaPlan task id and run `node scripts/supaplan-skill.mjs task-status --taskId <uuid>`.');
+    console.error('Tip: check whether this is a SupaPlan task id and run: node scripts/supaplan-skill.mjs task-status --taskId <uuid>');
   }
-  console.error('Usage: node scripts/supaplan-skill.mjs <pick-task|update-status|task-status|log-event|inspect-migrations|review-merge-workflow|smoke-flow|status|add-task|validate-plugin-contracts> [--key value] (pick-task supports --capability <name|auto> --agentId <id> --dry-run; add-task supports --title --capability [--todoPath])');
+  console.error('Usage: node scripts/supaplan-skill.mjs <command> [--key value]');
+  console.error('');
+  console.error('Commands:');
+  console.error('  pick-task [--capability <name|auto>] [--agentId <id>] [--mode <pr|boss>] [--dry-run]');
+  console.error('  pick-cheatcode [--capability <name|auto>] [--agentId <id>] [--dry-run]');
+  console.error('  update-status --taskId <uuid> --status <claimed|running|ready|ready_for_pr|completed> [--mode <pr|boss>] [--commitMessage <msg>] [--skip-commit]');
+  console.error('  task-status --taskId <uuid>');
+  console.error('  log-event --type <type> [--payload <json>] [--source <name>]');
+  console.error('  inspect-migrations');
+  console.error('  review-merge-workflow');
+  console.error('  smoke-flow [--capability <name|auto>] [--agentId <id>] [--dry-run]');
+  console.error('  status');
+  console.error('  add-task --title <title> --capability <capability> [--todoPath <path>]');
+  console.error('  validate-plugin-contracts');
+  console.error('  detect-conflicts');
+  console.error('  resolve-conflict --file <path> [--strategy <ours|theirs|union|merge>]');
+  console.error('  conflict-suggestions');
+  console.error('  agent-stats [--agentId <id>]');
+  console.error('  parallel-check');
   process.exit(1);
 }
 

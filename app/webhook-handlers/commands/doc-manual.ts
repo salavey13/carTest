@@ -1,60 +1,37 @@
 /**
- * /doc command handler - MANUAL ONLY VERSION (supports both RENT and SALE)
- * ==========================================================================
+ * /doc command handler - SMART MANUAL VERSION (supports both RENT and SALE)
+ * =============================================================================
  *
- * IMPORTANT CHANGES:
- * - NO photo/VLM processing - purely manual input
- * - Step-by-step field collection for passport and license data
- * - Uses TELEGRAM_BOT_TOKEN directly (NOT forward-telegram API)
- * - Saves to both private.user_rental_secrets AND public.{rental,sale}_contract_artifacts
- * - Supports BOTH rent and sale deal types
+ * PHILOSOPHY: Maximum simplicity, minimum input.
+ * - Current year = 2026 (don't ask for it!)
+ * - Smart parsers that assume current year for issue dates
+ * - No warranty for used bikes (sell as-is)
+ * - Inline keyboards only where genuinely useful
  *
- * Flow (common):
- *   /doc [bikeId]          → select bike → choose deal type
+ * Flow (RENT) - 8 steps:
+ *   1. Full name → "Иванов Иван Иванович"
+ *   2. Passport → "4509 123456 15.03 ОМВД" (date assumes 2026!)
+ *   3. Birth → "15.03.1990" (year needed here)
+ *   4. Address → free text
+ *   5. License → "99 76 123456 15.03 15.03" (dates assume 2026!)
+ *   6. Categories → inline keyboard
+ *   7. Start → "сегодня 18" or inline keyboard
+ *   8. End → "завтра 10" or inline keyboard
+ *   → Done!
  *
- * Flow (RENT):
- *   Step 1: Full name       → manual text input
- *   Step 2: Passport number → manual text input (series + number)
- *   Step 3: Passport issue  → manual text input (date + authority)
- *   Step 4: Birth date      → manual text input
- *   Step 5: Registration    → manual text input (address)
- *   Step 6: License name    → manual text input
- *   Step 7: License number  → manual text input (series + number)
- *   Step 8: License issue   → manual text input (date)
- *   Step 9: License expiry  → manual text input
- *   Step 10: Categories     → inline keyboard selection
- *   Step 11: Schedule       → free text (start/end dates)
- *   → Generate contract + save to DB + send via Telegram
- *
- * Flow (SALE):
- *   Step 1: Full name       → manual text input
- *   Step 2: Passport number → manual text input (series + number)
- *   Step 3: Passport issue  → manual text input (date + authority)
- *   Step 4: Birth date      → manual text input
- *   Step 5: Registration    → manual text input (address) - buyer address
- *   → Generate contract + save to DB + send via Telegram
- *
- * State machine uses `user_states` table:
- *   - doc_awaiting_bike           (if /doc without bikeId)
- *   - doc_awaiting_deal_type       (choose rent or sale)
- *   - doc_manual_passport_name     (step 1 - both)
- *   - doc_manual_passport_number   (step 2 - both)
- *   - doc_manual_passport_issue    (step 3 - both)
- *   - doc_manual_passport_birth    (step 4 - both)
- *   - doc_manual_passport_reg      (step 5 - both)
- *   - doc_manual_license_name      (step 6 - rent only)
- *   - doc_manual_license_number    (step 7 - rent only)
- *   - doc_manual_license_issue     (step 8 - rent only)
- *   - doc_manual_license_expiry    (step 9 - rent only)
- *   - doc_manual_license_categories (step 10 - rent only)
- *   - doc_awaiting_schedule        (step 11 - rent only)
- *   - doc_sale_confirm             (sale confirmation)
+ * Flow (SALE) - 5 steps:
+ *   1. Full name
+ *   2. Passport → "4509 123456 15.03 ОМВД"
+ *   3. Birth → "15.03.1990"
+ *   4. Address → free text
+ *   5. Price → inline keyboard or "390000"
+ *   → Done!
  */
 
 "use server";
 
 import { logger } from "@/lib/logger";
-import { supabaseAdmin, supabaseAnon } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { deriveUserAccessTier, getAccessTierLabel } from "@/app/lib/derive-access-tier";
@@ -63,59 +40,143 @@ import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capabil
 import { createHash } from "crypto";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const CURRENT_YEAR = 2026; // 👍 Fixed current year
 const DOC_STATE_EXPIRY_MINUTES = 30;
 
-// ── Keyboard builders ─────────────────────────────────────────────────────────────
+// ── Constants (minimal inline keyboards) ─────────────────────────────────────
+// Simplified: we only care about A, B (M included), or no license. C/C1 ignored.
+
+const CATEGORIES = ["A", "B", "нет"]; // B includes M (49cc scooters), A for full bikes
+const TIME_SLOTS = ["10:00", "12:00", "14:00", "16:00", "18:00", "20:00"];
+// Dynamic prices fetched from Supabase at runtime
+
+// ── Keyboard builders (only where useful) ─────────────────────────────────────
 
 /**
- * Build inline keyboard for category selection.
+ * Build simplified category keyboard: A, B (includes M), or no license
+ * M is implicitly included in B category for 49cc scooters
  */
 function buildCategoryKeyboard(selected: string[] = []): KeyboardButton[][] {
-  const categories = ["A", "A1", "B", "B1", "M", "C", "C1"];
   const rows: KeyboardButton[][] = [];
 
-  for (let i = 0; i < categories.length; i += 3) {
-    const row: KeyboardButton[] = [];
-    for (let j = i; j < Math.min(i + 3, categories.length); j++) {
-      const cat = categories[j];
-      const isSelected = selected.includes(cat);
-      row.push({
-        text: `${cat} ${isSelected ? "✅" : "⭕"}`,
-        callback_data: `cat_${cat}`,
-      });
-    }
-    rows.push(row);
-  }
-
+  // Single row with 3 options
   rows.push([
-    { text: selected.length > 0 ? "✓ Готово" : "Нет прав", callback_data: "cat_done" },
-    { text: "↩️ Отменить", callback_data: "cat_cancel" },
+    { text: `A ${selected.includes("A") ? "✅" : "⭕"}`, callback_data: "c_A" },
+    { text: `B ${selected.includes("B") ? "✅" : "⭕"}`, callback_data: "c_B" },
+    { text: `Нет прав ${selected.includes("нет") ? "✅" : "⭕"}`, callback_data: "c_нет" },
   ]);
 
+  rows.push([
+    { text: "✓ Готово", callback_data: "cdone" },
+    { text: "❌ Отменить", callback_data: "cancel" },
+  ]);
   return rows;
 }
 
 /**
- * Build keyboard for deal type selection.
+ * Build dynamic price keyboard from actual Supabase bike prices
+ * Each bike price gets ±10% variants for negotiation flexibility
  */
-function buildDealTypeKeyboard(): KeyboardButton[][] {
+function buildPriceKeyboard(): Promise<Array<Array<KeyboardButton>>> {
+  return (async () => {
+    try {
+    const { data: bikes } = await supabaseAdmin
+      .from("cars")
+      .select("id, make, model, specs")
+      .eq("type", "bike")
+      .order("id");
+
+    if (!bikes?.length) return [[{ text: "✏️ Своя цена", callback_data: "p_custom" }]];
+
+    // Extract unique sale prices from bikes
+    const priceMap = new Map<number, string>(); // price -> bike name
+    for (const bike of bikes) {
+      const price = bike.specs?.sale_price;
+      if (price && price > 0) {
+        const key = Math.round(price / 1000) * 1000; // Round to nearest 1000
+        const name = `${bike.make} ${bike.model}`;
+        if (!priceMap.has(key) || name.length < priceMap.get(key)!.length) {
+          priceMap.set(key, name);
+        }
+      }
+    }
+
+    // Sort prices and create keyboard with ±10% variants
+    const sortedPrices = Array.from(priceMap.entries()).sort((a, b) => a[0] - b[0]);
+    const rows: KeyboardButton[][] = [];
+
+    for (const [price, bikeName] of sortedPrices) {
+      const base = Math.round(price / 1000) * 1000;
+      const low = Math.round(base * 0.9 / 1000) * 1000;
+      const high = Math.round(base * 1.1 / 1000) * 1000;
+
+      // Create variants for this price range
+      const variants = [low, base, high].filter((v, i, arr) => arr.indexOf(v) === i);
+      const variantText = variants.length > 1
+        ? `${variants[0].toLocaleString('ru-RU')}–${variants[variants.length-1].toLocaleString('ru-RU')}k`
+        : `${base.toLocaleString('ru-RU')}k`;
+
+      rows.push([{
+        text: `${variantText} ₽ (${bikeName})`,
+        callback_data: `p_${base}`,
+      }]);
+    }
+
+    // Add custom option at the end
+    rows.push([{ text: "✏️ Своя цена", callback_data: "p_custom" }]);
+    return rows;
+  } catch (error) {
+    logger.error("[buildPriceKeyboard] Failed:", error);
+    // Fallback to basic prices
+    return [
+      [{ text: "100 000 ₽", callback_data: "p_100000" }],
+      [{ text: "265 000 ₽", callback_data: "p_265000" }],
+      [{ text: "390 000 ₽", callback_data: "p_390000" }],
+      [{ text: "550 000 ₽", callback_data: "p_550000" }],
+      [{ text: "750 000 ₽", callback_data: "p_750000" }],
+      [{ text: "✏️ Своя цена", callback_data: "p_custom" }],
+    ];
+  }
+  })();
+}
+
+function buildDealKeyboard(): KeyboardButton[][] {
+  return [[
+    { text: "📋 Аренда", callback_data: "d_rent" },
+    { text: "💰 Продажа", callback_data: "d_sale" },
+  ]];
+}
+
+function buildStartKeyboard(): KeyboardButton[][] {
   return [
     [
-      { text: "📋 Аренда", callback_data: "deal_type_rent" },
-      { text: "💰 Продажа", callback_data: "deal_type_sale" },
+      { text: "📅 Сегодня 18:00", callback_data: "s_today_18" },
+      { text: "📅 Сегодня 20:00", callback_data: "s_today_20" },
+    ],
+    [
+      { text: "📅 Завтра 10:00", callback_data: "s_tomorrow_10" },
+      { text: "✏️ Свое время", callback_data: "s_custom" },
     ],
   ];
 }
 
-// ── State type for /doc flow ─────────────────────────────────────────────────────
+function buildConfirmKeyboard(): KeyboardButton[][] {
+  return [
+    [
+      { text: "✅ Всё верно", callback_data: "ok" },
+      { text: "↩️ Начать заново", callback_data: "restart" },
+    ],
+    [{ text: "❌ Отменить", callback_data: "cancel" }],
+  ];
+}
+
+// ── State type ─────────────────────────────────────────────────────────────
 
 interface DocFlowContext {
   dealType: "rent" | "sale";
   bikeId: string;
   bikeMake?: string;
   bikeModel?: string;
-  extractionProvider: "manual";
-  // Passport fields (both rent and sale)
   mpFullName?: string;
   mpSeries?: string;
   mpNumber?: string;
@@ -123,7 +184,6 @@ interface DocFlowContext {
   mpIssuedBy?: string;
   mpBirthDate?: string;
   mpRegistration?: string;
-  // License fields (rent only)
   mlFullName?: string;
   mlSeries?: string;
   mlNumber?: string;
@@ -131,145 +191,220 @@ interface DocFlowContext {
   mlExpiryDate?: string;
   mlCategories?: string[];
   mlAccessTier?: AccessTier;
-  // Sale fields
+  rentStartDate?: string;
+  rentStartTime?: string;
+  rentEndDate?: string;
+  rentEndTime?: string;
   salePrice?: string;
-  warrantyMonths?: string;
 }
 
-// ── Bike resolution ─────────────────────────────────────────────────────────────
+// ── Bike resolution ─────────────────────────────────────────────────────
 
-async function resolveBikeById(bikeId: string): Promise<{
-  id: string;
-  make: string;
-  model: string;
-  specs: Record<string, any>;
-  type: string;
-} | null> {
+async function resolveBikeById(bikeId: string): Promise<any> {
   const { data: exactMatch } = await supabaseAdmin
     .from("cars")
     .select("id, make, model, specs, type")
     .eq("id", bikeId)
     .in("type", ["bike", "ebike"])
     .maybeSingle();
-
-  if (exactMatch) return exactMatch as any;
+  if (exactMatch) return exactMatch;
 
   const { data: candidates } = await supabaseAdmin
     .from("cars")
     .select("id, make, model, specs, type")
     .in("type", ["bike", "ebike"])
     .limit(100);
-
   if (!candidates?.length) return null;
 
   const norm = (v = "") => String(v).toLowerCase().replace(/[^a-zа-я0-9]+/gi, " ").trim();
   const qn = norm(bikeId);
   if (!qn) return null;
 
-  let best: any = null;
-  let bestScore = 0;
+  let best: any = null, bestScore = 0;
   for (const bike of candidates) {
     const hay = [bike.id, bike.make, bike.model, bike.specs?.vin, bike.specs?.frame].map(norm).join(" ");
-    if (hay.includes(qn)) {
-      const score = 1000 + qn.length;
-      if (score > bestScore) { bestScore = score; best = bike; }
-      continue;
-    }
-    const parts = qn.split(" ").filter(Boolean);
+    if (hay.includes(qn)) { best = bike; bestScore = 1000; break; }
+    const parts = qn.split(" ");
     let score = 0;
-    for (const p of parts) {
-      if (hay.includes(p)) score += 20 + p.length;
-    }
+    for (const p of parts) if (p && hay.includes(p)) score += 20 + p.length;
     if (score > bestScore) { bestScore = score; best = bike; }
   }
-
   return bestScore > 0 ? best : null;
 }
 
-async function getAvailableBikes(): Promise<Array<{ id: string; make: string; model: string; specs?: Record<string, any> }>> {
+async function getAvailableBikes(): Promise<any[]> {
   const { data } = await supabaseAdmin
     .from("cars")
     .select("id, make, model, specs")
     .in("type", ["bike", "ebike"])
     .order("make", { ascending: true })
     .limit(20);
-
-  return (data || []) as Array<{ id: string; make: string; model: string; specs?: Record<string, any> }>;
+  return (data || []);
 }
 
-// ── Contract generation (supports both rent and sale) ───────────────────────────────
+// ── Smart parsers (current year = 2026) ─────────────────────────────────────
 
-async function generateAndSendContract(
-  chatId: number,
-  userId: string,
-  context: DocFlowContext,
-  scheduleText?: string,
-): Promise<boolean> {
+/**
+ * Parse "4509 123456 15.03 ОМВД по Н.Новгороду"
+ * Date without year → assumes 2026
+ */
+function parsePassport(text: string): { series: string; number: string; issueDate: string; issuedBy: string } | null {
+  const parts = text.trim().split(/\s+/);
+  if (parts.length < 3) return null;
+
+  // Find series (4 digits) and number (6 digits)
+  let series = "", number = "", dateIdx = -1;
+  for (let i = 0; i < parts.length; i++) {
+    const cleaned = parts[i].replace(/\D/g, '');
+    if (!series && cleaned.length === 4) series = cleaned;
+    else if (!number && cleaned.length === 6) number = cleaned;
+    else if (dateIdx === -1 && /^\d{1,2}\.\d{1,2}(\.\d{2,4})?$/.test(parts[i])) dateIdx = i;
+  }
+
+  if (!series || !number || dateIdx === -1) return null;
+
+  let dateStr = parts[dateIdx];
+  if (!dateStr.includes('.')) dateStr += `.${CURRENT_YEAR}`;
+  else {
+    const parts2 = dateStr.split('.');
+    if (parts2.length === 2) dateStr += `.${CURRENT_YEAR}`;
+    else if (parts2[2].length === 2) {
+      const y = parseInt(parts2[2]);
+      parts2[2] = y > 50 ? `19${y}` : `20${y}`;
+      dateStr = parts2.join('.');
+    }
+  }
+
+  const issuedBy = parts.slice(dateIdx + 1).join(' ') || "не указано";
+  return { series, number, issueDate: dateStr, issuedBy };
+}
+
+/**
+ * Parse "99 76 123456 15.03 15.03.2028"
+ * Dates without year → issue=2026, expiry=2026 (if same) or next year
+ */
+function parseLicense(text: string): { series: string; number: string; issueDate: string; expiryDate: string } | null {
+  const parts = text.trim().split(/\s+/);
+  if (parts.length < 4) return null;
+
+  let series = "", number = "";
+  const dates: string[] = [];
+
+  for (let i = 0; i < parts.length; i++) {
+    const cleaned = parts[i].replace(/\D/g, '');
+    if (!series && cleaned.length === 2) series = cleaned;
+    else if (!number && cleaned.length === 6) number = cleaned;
+    else if (/^\d{1,2}\.\d{1,2}(\.\d{2,4})?$/.test(parts[i])) {
+      let d = parts[i];
+      if (!d.includes('.')) continue;
+      const parts2 = d.split('.');
+      if (parts2.length === 2) d += `.${CURRENT_YEAR}`;
+      else if (parts2[2].length === 2) {
+        const y = parseInt(parts2[2]);
+        parts2[2] = y > 50 ? `19${y}` : `20${y}`;
+        d = parts2.join('.');
+      }
+      dates.push(d);
+    }
+  }
+
+  if (!series || !number || dates.length < 2) return null;
+
+  // If both dates are same and current year, make expiry 10 years later
+  let [issue, expiry] = dates;
+  if (issue === expiry && issue.endsWith(`.${CURRENT_YEAR}`)) {
+    const [d, m, y] = issue.split('.');
+    expiry = `${d}.${m}.${parseInt(y) + 10}`;
+  }
+
+  return { series, number, issueDate: issue, expiryDate: expiry };
+}
+
+/**
+ * Parse "15.03.1990" or "15.03" (but keep year for birth!)
+ */
+function parseDate(text: string, requireYear = true): string | null {
+  const match = text.trim().match(/^(\d{1,2})\.(\d{1,2})(\.(\d{2,4}))?$/);
+  if (!match) return null;
+
+  let [, day, month, , year] = match;
+  day = day.padStart(2, '0');
+  month = month.padStart(2, '0');
+
+  if (!year) {
+    if (requireYear) return null;
+    year = String(CURRENT_YEAR);
+  } else if (year.length === 2) {
+    const y = parseInt(year);
+    year = y > 50 ? `19${y}` : `20${y}`;
+  }
+
+  return `${day}.${month}.${year}`;
+}
+
+// ── Schedule parser ─────────────────────────────────────────────────────────
+
+/**
+ * Parse "сегодня 18", "завтра 10:00", "15.06 18", "15.06.2026 20:00"
+ */
+function parseSchedule(text: string): { start: string; startTime: string; end: string; endTime: string } | null {
+  const t = text.trim().toLowerCase();
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+
+  const formatDate = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+
+  // "сегодня 18" or "сегодня 18:00"
+  const todayMatch = t.match(/сегодня\s+(\d{1,2})(:(\d{2}))?/);
+  if (todayMatch) {
+    const hour = todayMatch[1].padStart(2, '0');
+    const min = todayMatch[3] || '00';
+    const end = new Date(tomorrow);
+    return { start: formatDate(today), startTime: `${hour}:${min}`, end: formatDate(end), endTime: '10:00' };
+  }
+
+  // "завтра 10" or "завтра 10:00"
+  const tomorrowMatch = t.match(/завтра\s+(\d{1,2})(:(\d{2}))?/);
+  if (tomorrowMatch) {
+    const hour = tomorrowMatch[1].padStart(2, '0');
+    const min = tomorrowMatch[3] || '00';
+    const end = new Date(tomorrow);
+    end.setDate(tomorrow.getDate() + 1);
+    return { start: formatDate(tomorrow), startTime: `${hour}:${min}`, end: formatDate(end), endTime: '10:00' };
+  }
+
+  // "15.06 18" or "15.06.2026 18:00"
+  const dateMatch = t.match(/(\d{1,2})\.(\d{1,2})(\.(\d{2,4}))?\s+(\d{1,2})(:(\d{2}))?/);
+  if (dateMatch) {
+    let [, d, m, , y, h, , min] = dateMatch;
+    const year = y ? (y.length === 2 ? (parseInt(y) > 50 ? `19${y}` : `20${y}`) : y) : CURRENT_YEAR;
+    const hour = h.padStart(2, '0');
+    const minute = min || '00';
+    const start = new Date(`${year}-${m}-${d}`);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 1);
+    return { start: `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${year}`, startTime: `${hour}:${minute}`, end: formatDate(end), endTime: '10:00' };
+  }
+
+  return null;
+}
+
+// ── Contract generation ─────────────────────────────────────────────────────
+
+async function generateContract(chatId: number, userId: string, context: DocFlowContext): Promise<boolean> {
   try {
     const bike = await resolveBikeById(context.bikeId);
     if (!bike) {
-      await sendComplexMessage(chatId, "🚨 Не удалось найти указанный байк. Попробуйте /doc снова.", [], { removeKeyboard: true });
+      await sendComplexMessage(chatId, "🚨 Байк не найден. Попробуйте /doc", [], { removeKeyboard: true });
       return false;
     }
 
-    const isElectric = bike.type === "ebike"
-      || /electric/i.test(String(bike.specs?.type || ""))
-      || /электро|electric|e-bike|ebike/i.test(String(bike.specs?.fuel_type || ""))
-      || (bike.specs?.power_kw && Number(bike.specs.power_kw) > 0 && !bike.specs?.engine_cc);
-
-    const now = new Date();
+    const isElectric = bike.type === "ebike" || /электро|electric|e-bike|ebike/i.test(String(bike.specs?.type || bike.specs?.fuel_type || ""));
     const isRent = context.dealType === "rent";
+    const now = new Date();
 
-    // Parse schedule for rent
-    let startDate, endDate, startTime, endTime;
-    if (isRent && scheduleText) {
-      // Simple date parsing from schedule text
-      const text = String(scheduleText || '').toLowerCase();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-
-      const parseDateToken = (token: string) => {
-        const t = String(token || '').toLowerCase();
-        if (t === 'сегодня') return `${String(today.getDate()).padStart(2,'0')}.${String(today.getMonth()+1).padStart(2,'0')}.${today.getFullYear()}`;
-        if (t === 'завтра') return `${String(tomorrow.getDate()).padStart(2,'0')}.${String(tomorrow.getMonth()+1).padStart(2,'0')}.${tomorrow.getFullYear()}`;
-        const parts = t.split('.').map(v=>v.trim()).filter(Boolean);
-        if (parts.length < 2) return null;
-        let [d,m,y] = parts;
-        if (!y) y = String(today.getFullYear());
-        if (y.length === 2) y = `20${y}`;
-        return `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${y}`;
-      };
-
-      const startMatch = text.match(/с\s*(сегодня|завтра|\d{1,2}\.\d{1,2}(?:\.\d{2,4})?)\s*(?:в)?\s*(\d{1,2}(?:[:.]\d{2})?)/i);
-      const endMatch = text.match(/до\s*(завтра|сегодня|\d{1,2}\.\d{1,2}(?:\.\d{2,4})?)\s*(?:до|в)?\s*(\d{1,2}(?:[:.]\d{2})?)/i);
-
-      if (startMatch) {
-        startDate = parseDateToken(startMatch[1]);
-        startTime = startMatch[2]?.replace(':', '.') || '18.00';
-      }
-      if (endMatch) {
-        endDate = parseDateToken(endMatch[1]);
-        endTime = endMatch[2]?.replace(':', '.') || '10.00';
-      }
-
-      // Defaults if not parsed
-      if (!startDate) startDate = `${String(today.getDate()).padStart(2,'0')}.${String(today.getMonth()+1).padStart(2,'0')}.${today.getFullYear()}`;
-      if (!startTime) startTime = '18.00';
-      if (!endDate) endDate = `${String(tomorrow.getDate()).padStart(2,'0')}.${String(tomorrow.getMonth()+1).padStart(2,'0')}.${tomorrow.getFullYear()}`;
-      if (!endTime) endTime = '10.00';
-    } else if (isRent) {
-      // Default dates if no schedule provided
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-      startDate = `${String(today.getDate()).padStart(2,'0')}.${String(today.getMonth()+1).padStart(2,'0')}.${today.getFullYear()}`;
-      startTime = '18.00';
-      endDate = `${String(tomorrow.getDate()).padStart(2,'0')}.${String(tomorrow.getMonth()+1).padStart(2,'0')}.${tomorrow.getFullYear()}`;
-      endTime = '10.00';
-    }
-
-    // Build template vars based on deal type
     const vars: Record<string, string> = {
-      // Common fields
       contract_number: `${now.getDate()}.${now.getMonth() + 1}/${bike.id}`,
       day: String(now.getDate()).padStart(2, "0"),
       month: now.toLocaleString("ru-RU", { month: "long" }),
@@ -279,8 +414,6 @@ async function generateAndSendContract(
       contract_month_genitive: now.toLocaleString("ru-RU", { month: "long" }),
       contract_year: String(now.getFullYear()),
       appendix_date: `${String(now.getDate()).padStart(2,'0')}.${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()}`,
-
-      // Renter/Buyer fields
       buyer_full_name: context.mpFullName || "",
       buyer_short_name: context.mpFullName?.split(' ').map((n, i) => i === 0 ? n : `${n[0]}.`).join(' ') || "",
       buyer_birth_date: context.mpBirthDate || "",
@@ -289,8 +422,6 @@ async function generateAndSendContract(
       buyer_passport_issue_date: context.mpIssueDate || "",
       buyer_registration: context.mpRegistration || "",
       buyer_email: "",
-
-      // Bike fields
       product_name: isElectric ? "Электромотоцикл" : "Мотоцикл",
       product_color: bike.specs?.color || "уточняется",
       product_type: bike.specs?.bike_subtype || (isElectric ? "Электромотоцикл" : "Мотоцикл"),
@@ -300,8 +431,6 @@ async function generateAndSendContract(
       product_year: String(bike.specs?.year || "уточняется"),
       product_unit: "шт.",
       spec_number: `${now.getDate()}.${now.getMonth() + 1}/${bike.id}`,
-
-      // Seller/Lessor fields
       seller_address: "г. Нижний Новгород, пл. Комсомольская 2",
       lessor_address: "г. Нижний Новгород, пл. Комсомольская 2",
       issuer_name: "Воробьев Р.В.",
@@ -312,7 +441,6 @@ async function generateAndSendContract(
       renter_signature: "согласие через Telegram",
     };
 
-    // Rent-specific fields
     if (isRent) {
       Object.assign(vars, {
         renter_full_name: context.mpFullName || "",
@@ -325,7 +453,6 @@ async function generateAndSendContract(
         renter_passport_issued_by: context.mpIssuedBy || "",
         renter_registration: context.mpRegistration || "",
         renter_address: context.mpRegistration || "",
-
         bike_make_model: `${bike.make || ""} ${bike.model || ""}`.trim(),
         bike_make: bike.make || "уточняется",
         bike_model: bike.model || "уточняется",
@@ -353,11 +480,10 @@ async function generateAndSendContract(
           if (isElectric) return bike.specs?.battery ? `аккумулятор: тип/ёмкость ${bike.specs.battery}` : "";
           return "";
         })(),
-
-        rent_start_date: startDate || "",
-        rent_start_time: startTime?.replace('.', ':') || "18:00",
-        rent_end_date: endDate || "",
-        rent_end_time: endTime?.replace('.', ':') || "10:00",
+        rent_start_date: context.rentStartDate || "",
+        rent_start_time: (context.rentStartTime || "18:00").replace('.', ':'),
+        rent_end_date: context.rentEndDate || "",
+        rent_end_time: (context.rentEndTime || "10:00").replace('.', ':'),
         daily_price_rub: String(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
         hourly_price_rub: String(bike.specs?.price_per_hour || ""),
         deposit_rub: String(bike.specs?.deposit_rub || "20000"),
@@ -381,19 +507,14 @@ async function generateAndSendContract(
       });
     }
 
-    // Sale-specific fields
     if (!isRent) {
       const salePrice = context.salePrice || String(bike.specs?.sale_price || bike.specs?.price_rub || "390000");
-      const warrantyMonths = context.warrantyMonths || "6";
-
       Object.assign(vars, {
         price_digits: salePrice,
-        price_words: numberToRussianWords(Number(salePrice)),
+        price_words: numberToWords(Number(salePrice)),
         price_digits_table: salePrice.replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1 ') + ",00",
-        warranty_months: warrantyMonths,
+        warranty_months: "0", // Sold "as-is", no warranty
         document_key: `sale-${bike.id}-${Date.now()}`,
-
-        // Bike fields for sale
         bike_make: bike.make || "уточняется",
         bike_model: bike.model || "уточняется",
         bike_vin: bike.specs?.vin || bike.specs?.frame || "уточняется",
@@ -407,74 +528,49 @@ async function generateAndSendContract(
       });
     }
 
-    // Generate DOCX
     const templateMode = "html";
     const docxBuf = await buildFranchizeDocxFromTemplate(vars, templateMode);
 
     const docSha256 = createHash("sha256").update(docxBuf).digest("hex");
-    const docFileName = `${context.dealType}-contract-${bike.make}-${bike.model}-${startDate || now.toISOString().split('T')[0]}.docx`
+    const docFileName = `${context.dealType}-${bike.make}-${bike.model}-${context.rentStartDate || now.toISOString().split('T')[0]}.docx`
       .replace(/[^a-zA-Zа-яА-Я0-9.\-]/g, "-")
       .replace(/-+/g, "-");
 
-    // Generate QR code
     const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${bike.id}_${docSha256}`;
-    const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
+    const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff`;
 
     let qrPngBuffer: Buffer | null = null;
     try {
-      const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
-      if (qrRes.ok) {
-        qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
-      }
+      // AbortSignal.timeout is Node 22+ / experimental, use manual timeout for compatibility
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const qrRes = await fetch(qrPngUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (qrRes.ok) qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
     } catch (qrErr) {
-      logger.warn("[/doc] QR generation failed, sending DOCX only:", qrErr?.message || qrErr);
+      logger.warn("[/doc] QR failed:", qrErr);
     }
 
-    // Send the contract via Telegram (DOCX + QR as media group if QR available)
     if (qrPngBuffer) {
       const token = process.env.TELEGRAM_BOT_TOKEN;
-      const mediaGroupUrl = `https://api.telegram.org/bot${token}/sendMediaGroup`;
       const form = new FormData();
       form.append('chat_id', String(chatId));
-
-      const mediaItems = [
+      form.append('media', JSON.stringify([
         { type: 'document', media: 'attach://docx', parse_mode: 'HTML' },
-        { type: 'photo', media: 'attach://qr', caption: `📲 <b>QR для быстрой повторной аренды</b>\nНаведите камеру — данные заполнятся автоматически.\n\n🔗 ${qrDeepLink}`, parse_mode: 'HTML' },
-      ];
-      form.append('media', JSON.stringify(mediaItems));
+        { type: 'photo', media: 'attach://qr', caption: `📲 <b>QR для повторной аренды</b>\n${qrDeepLink}`, parse_mode: 'HTML' },
+      ]));
       form.append('docx', new Blob([docxBuf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), docFileName);
-      form.append('qr', new Blob([qrPngBuffer], {type:'image/png'}), `qr-${bike.id}.png`);
-
+      form.append('qr', new Blob([qrPngBuffer], {type:'image/png'}), `qr.png`);
       try {
-        const res = await fetch(mediaGroupUrl, {method:'POST', body: form});
-        const bodyText = await res.text();
-        try {
-          const results = JSON.parse(bodyText || '{}');
-          if (!results.ok) throw new Error(results.description || 'sendMediaGroup failed');
-          logger.info("[/doc] DOCX + QR sent successfully as media group");
-        } catch (parseError) {
-          logger.warn("[/doc] sendMediaGroup response parse issue, but message likely sent");
-        }
-      } catch (sendError) {
-        logger.warn("[/doc] sendMediaGroup failed, falling back to sendDocument:", sendError?.message);
-        await sendTelegramDocument(
-          String(chatId),
-          docxBuf,
-          docFileName,
-          `${isRent ? 'Договор аренды' : 'Договор купли-продажи'}: ${bike.make} ${bike.model}\n\n🔗 Быстрая повторная аренда:\n${qrDeepLink}`,
-        );
+        await fetch(`https://api.telegram.org/bot${token}/sendMediaGroup`, {method:'POST', body: form});
+      } catch (e) {
+        await sendTelegramDocument(String(chatId), docxBuf, docFileName, `${isRent ? 'Аренда' : 'Продажа'}: ${bike.make} ${bike.model}\n${qrDeepLink}`);
       }
     } else {
-      await sendTelegramDocument(
-        String(chatId),
-        docxBuf,
-        docFileName,
-        `${isRent ? 'Договор аренды' : 'Договор купли-продажи'}: ${bike.make} ${bike.model}\n\n🔗 Быстрая повторная аренда:\n${qrDeepLink}`,
-      );
+      await sendTelegramDocument(String(chatId), docxBuf, docFileName, `${isRent ? 'Аренда' : 'Продажа'}: ${bike.make} ${bike.model}\n${qrDeepLink}`);
     }
 
-    // Save to private.user_rental_secrets
-    await saveUserRentalSecrets({
+    const { error: secretsError } = await supabaseAdmin.from("user_rental_secrets").insert({
       chat_id: String(userId),
       crew_slug: "vip-bike",
       doc_sha256: docSha256,
@@ -493,10 +589,16 @@ async function generateAndSendContract(
       verification_status: "verified",
       template_version: 1,
     });
+    if (secretsError) {
+      logger.error("[/doc] Failed to save user_rental_secrets:", secretsError);
+    }
 
-    // Save to appropriate contract artifacts table
     if (isRent) {
-      await saveRentalContractArtifact({
+      // Calculate total_sum from daily price (estimate for 1 day)
+      const dailyPrice = bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000";
+      const totalSum = Number(dailyPrice); // Simple 1-day calculation for now
+
+      const { error: rentError } = await supabaseAdmin.from("rental_contract_artifacts").insert({
         contract_key: vars.document_key,
         original_sha256: docSha256,
         requested_bike_id: context.bikeId,
@@ -504,16 +606,25 @@ async function generateAndSendContract(
         telegram_chat_id: String(userId),
         telegram_message_id: null,
         provider: "manual-telegram-doc",
+        total_sum: totalSum,
+        rent_start_date: context.rentStartDate || null,
+        rent_end_date: context.rentEndDate || null,
         metadata: {
           renter_full_name: context.mpFullName,
           renter_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim(),
           renter_driver_license: `${context.mlSeries || ""} ${context.mlNumber || ""}`.trim(),
           license_categories: context.mlCategories,
           access_tier: context.mlAccessTier,
+          daily_price: dailyPrice,
         },
       });
+      if (rentError) {
+        logger.error("[/doc] Failed to save rental_contract_artifacts:", rentError);
+      }
     } else {
-      await saveSaleContractArtifact({
+      const salePrice = context.salePrice || String(bike.specs?.sale_price || bike.specs?.price_rub || "390000");
+
+      const { error: saleError } = await supabaseAdmin.from("sale_contract_artifacts").insert({
         contract_key: vars.document_key,
         original_sha256: docSha256,
         requested_bike_id: context.bikeId,
@@ -521,155 +632,90 @@ async function generateAndSendContract(
         telegram_chat_id: String(userId),
         telegram_message_id: null,
         provider: "manual-telegram-doc",
+        total_sum: Number(salePrice),
+        sale_price: salePrice,
         metadata: {
           buyer_full_name: context.mpFullName,
           buyer_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim(),
           buyer_registration: context.mpRegistration,
-          sale_price: context.salePrice || Number(bike.specs?.sale_price || bike.specs?.price_rub),
-          warranty_months: context.warrantyMonths,
+          sale_price: Number(salePrice),
+          warranty_months: "0", // Sold "as-is", no warranty
         },
       });
+      if (saleError) {
+        logger.error("[/doc] Failed to save sale_contract_artifacts:", saleError);
+      }
     }
 
-    // Build summary message
-    const summary = [
-      `✅ *${isRent ? 'Договор аренды' : 'Договор купли-продажи'} сформирован и отправлен!*`,
-      "",
-      `🏍 *${bike.make} ${bike.model}*`,
-      `👤 ${context.mpFullName || "—"}`,
-      `🪪 Паспорт: ${context.mpSeries || ""} ${context.mpNumber || ""}`,
-    ];
-
-    if (isRent) {
-      const tier = context.mlAccessTier || "none";
-      const tierLabel = getAccessTierLabel(tier);
-      const catStr = (context.mlCategories || []).join(", ") || "не определены";
-      summary.push(`🚗 ВУ: ${context.mlSeries || ""} ${context.mlNumber || ""} (кат. ${catStr})`);
-      summary.push(`🛡 Допуск: *${tierLabel}*`);
-    }
-
-    summary.push("", "📝 Ручной ввод данных", "Данные сохранены для быстрого повторного бронирования.", "Используй /doc для нового договора или открой приложение.");
-
-    await sendComplexMessage(chatId, summary.join("\n"), [
-      [{ text: "🚀 Открыть VIP Bike", url: process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app" }],
-    ], { removeKeyboard: true, parseMode: "Markdown" });
+    await sendComplexMessage(
+      chatId,
+      `✅ *${isRent ? 'Договор аренды' : 'Договор купли-продажи'} готов!*${isRent ? `\n\n🛡 Категории: ${(context.mlCategories || []).join(", ")}` : ""}`,
+      [[{ text: "🚀 Открыть", url: process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app" }]],
+      { removeKeyboard: true, parseMode: "Markdown" },
+    );
 
     await notifyAdmin(
-      `📄 Новый ${isRent ? 'аренды' : 'продажи'} через /doc (ручной ввод)\n` +
-      `Provider: manual\n` +
+      `📄 ${isRent ? 'Аренда' : 'Продажа'} (ввод с кнопок)\n` +
       `User: ${userId}\n` +
-      `Bike: ${bike.make} ${bike.model} (${bike.id})\n` +
-      `Renter/Buyer: ${context.mpFullName || "—"}` +
-      (isRent ? `\nCategories: ${(context.mlCategories || []).join(", ")}` : "") +
-      (isRent ? `\nTier: ${getAccessTierLabel(context.mlAccessTier || "none")}` : ""),
+      `Bike: ${bike.make} ${bike.model}\n` +
+      `Client: ${context.mpFullName}` +
+      (isRent ? `\nCats: ${(context.mlCategories || []).join(", ")}` : "") +
+      (!isRent ? `\nPrice: ${Number(context.salePrice || 0).toLocaleString("ru-RU")} ₽` : ""),
     );
 
     return true;
   } catch (error) {
-    logger.error("[/doc] Contract generation failed", error);
-    await sendComplexMessage(
-      chatId,
-      "🚨 Ошибка при генерации договора. Данные сохранены — попробуйте ещё раз или обратитесь к оператору.",
-      [],
-      { removeKeyboard: true },
-    );
+    logger.error("[/doc] Generate failed", error);
+    await sendComplexMessage(chatId, "🚨 Ошибка. Попробуйте ещё раз.", [], { removeKeyboard: true });
     return false;
   }
 }
 
-// ── Helper: Convert number to Russian words ───────────────────────────────────────
+// ── Number to Russian words (supports millions) ─────────────────────────────
 
-function numberToRussianWords(n: number): string {
+function numberToWords(n: number): string {
   const units = ["", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"];
   const teens = ["десять", "одиннадцать", "двенадцать", "тринадцать", "четырнадцать", "пятнадцать", "шестнадцать", "семнадцать", "восемнадцать", "девятнадцать"];
   const tens = ["", "", "двадцать", "тридцать", "сорок", "пятьдесят", "шестьдесят", "семьдесят", "восемьдесят", "девяносто"];
   const hundreds = ["", "сто", "двести", "триста", "четыреста", "пятьсот", "шестьсот", "семьсот", "восемьсот", "девятьсот"];
-  const thousands = ["", "тысяча", "тысячи", "тысяч", "тысяч", "тысяч", "тысяч", "тысяч", "тысяч", "тысяч"];
 
+  if (n >= 1000000) {
+    const m = Math.floor(n / 1000000);
+    const r = n % 1000000;
+    const lastTwo = m % 100, lastOne = m % 10;
+    let w = "миллионов";
+    if (lastTwo >= 11 && lastTwo <= 19) w = "миллионов";
+    else if (lastOne === 1) w = "миллион";
+    else if (lastOne >= 2 && lastOne <= 4) w = "миллиона";
+    return numberToWords(m) + " " + w + (r > 0 ? " " + numberToWords(r) : "");
+  }
+  if (n >= 1000) {
+    const th = Math.floor(n / 1000);
+    const r = n % 1000;
+    const lastTwo = th % 100, lastOne = th % 10;
+    let w = "тысяч";
+    if (lastTwo >= 11 && lastTwo <= 19) w = "тысяч";
+    else if (lastOne === 1) w = "тысяча";
+    else if (lastOne >= 2 && lastOne <= 4) w = "тысячи";
+    return numberToWords(th) + " " + w + (r > 0 ? " " + numberToWords(r) : "");
+  }
   if (n === 0) return "ноль";
   if (n < 10) return units[n];
   if (n < 20) return teens[n - 10];
   if (n < 100) {
-    const t = Math.floor(n / 10);
-    const u = n % 10;
+    const t = Math.floor(n / 10), u = n % 10;
     return tens[t] + (u > 0 ? " " + units[u] : "");
   }
   if (n < 1000) {
-    const h = Math.floor(n / 100);
-    const r = n % 100;
-    return hundreds[h] + (r > 0 ? " " + numberToRussianWords(r) : "");
-  }
-  if (n < 1000000) {
-    const th = Math.floor(n / 1000);
-    const r = n % 1000;
-    const thWord = th === 1 ? "тысяча" : th < 5 ? "тысячи" : "тысяч";
-    return numberToRussianWords(th) + " " + thWord + (r > 0 ? " " + numberToRussianWords(r) : "");
+    const h = Math.floor(n / 100), r = n % 100;
+    return hundreds[h] + (r > 0 ? " " + numberToWords(r) : "");
   }
   return String(n);
 }
 
-// ── Database save functions ─────────────────────────────────────────────────────
+// ── State management ─────────────────────────────────────────────────────────
 
-async function saveUserRentalSecrets(data: {
-  chat_id: string;
-  crew_slug: string;
-  doc_sha256: string;
-  renter_full_name: string | null;
-  renter_passport: string | null;
-  renter_passport_issue_date: string | null;
-  renter_passport_issued_by: string | null;
-  renter_registration: string | null;
-  renter_driver_license: string | null;
-  renter_birth_date: string | null;
-  renter_phone: string | null;
-  renter_email: string | null;
-  renter_address: string | null;
-  source_doc_key: string | null;
-  source_rental_id: string | null;
-  verification_status: string;
-  template_version: number;
-}) {
-  const { error } = await supabaseAdmin.from("user_rental_secrets").insert(data);
-  if (error) {
-    logger.error("[/doc] Failed to save user_rental_secrets:", error);
-  }
-}
-
-async function saveRentalContractArtifact(data: {
-  contract_key: string;
-  original_sha256: string;
-  requested_bike_id: string;
-  resolved_bike_id: string;
-  telegram_chat_id: string;
-  telegram_message_id: number | null;
-  provider: string;
-  metadata: Record<string, any>;
-}) {
-  const { error } = await supabaseAdmin.from("rental_contract_artifacts").insert(data);
-  if (error) {
-    logger.error("[/doc] Failed to save rental_contract_artifacts:", error);
-  }
-}
-
-async function saveSaleContractArtifact(data: {
-  contract_key: string;
-  original_sha256: string;
-  requested_bike_id: string;
-  resolved_bike_id: string;
-  telegram_chat_id: string;
-  telegram_message_id: number | null;
-  provider: string;
-  metadata: Record<string, any>;
-}) {
-  const { error } = await supabaseAdmin.from("sale_contract_artifacts").insert(data);
-  if (error) {
-    logger.error("[/doc] Failed to save sale_contract_artifacts:", error);
-  }
-}
-
-// ── State management ──────────────────────────────────────────────────────────
-
-async function setDocState(userId: string, state: string, context: DocFlowContext) {
+async function setState(userId: string, state: string, context: DocFlowContext) {
   await supabaseAdmin.from("user_states").upsert({
     user_id: userId,
     state,
@@ -678,429 +724,337 @@ async function setDocState(userId: string, state: string, context: DocFlowContex
   });
 }
 
-async function clearDocState(userId: string) {
+async function clearState(userId: string) {
   await supabaseAdmin.from("user_states").delete().eq("user_id", userId);
 }
 
-async function getDocState(userId: string): Promise<{ state: string; context: DocFlowContext } | null> {
+async function getState(userId: string): Promise<{ state: string; context: DocFlowContext } | null> {
   const { data } = await supabaseAdmin
     .from("user_states")
     .select("state, context, expires_at")
     .eq("user_id", userId)
     .maybeSingle();
-
   if (!data) return null;
-
   if (data.expires_at && new Date(data.expires_at).getTime() < Date.now()) {
-    await clearDocState(userId);
+    await clearState(userId);
     return null;
   }
-
-  return {
-    state: data.state,
-    context: (data.context || {}) as DocFlowContext,
-  };
+  return { state: data.state, context: (data.context || {}) as DocFlowContext };
 }
 
-// ── Manual input state handlers (passport - both rent and sale) ───────────────────────
-
-async function handleManualPassportName(userId: string, chatId: number, context: DocFlowContext, text: string) {
-  context.mpFullName = text.trim();
-  await setDocState(userId, "doc_manual_passport_number", context);
-  await sendComplexMessage(
-    chatId,
-    `✅ ФИО: *${text}*\n\nШаг 2 из 5: Серия и номер паспорта\n\nВведите серию и номер через пробел (4 цифры 6 цифр).\n\nПример: *4509 123456*`,
-    [],
-    { removeKeyboard: true, parseMode: "Markdown" },
-  );
-}
-
-async function handleManualPassportNumber(userId: string, chatId: number, context: DocFlowContext, text: string) {
-  const parts = text.trim().split(/\s+/);
-  if (parts.length < 2) {
-    await sendComplexMessage(
-      chatId,
-      "❌ Неверный формат. Введите серию и номер через пробел.\n\nПример: *4509 123456*",
-      [],
-      { removeKeyboard: true, parseMode: "Markdown" },
-    );
-    return;
-  }
-  context.mpSeries = parts[0];
-  context.mpNumber = parts[1];
-  await setDocState(userId, "doc_manual_passport_issue", context);
-  await sendComplexMessage(
-    chatId,
-    `✅ Паспорт: *${context.mpSeries} ${context.mpNumber}*\n\nШаг 3 из 5: Дата выдачи и кем выдан\n\nВведите в формате:\nДД.ММ.ГГГГ — кем выдан\n\nПример: *15.03.2023 — ОМВД России по Н.Новгороду*`,
-    [],
-    { removeKeyboard: true, parseMode: "Markdown" },
-  );
-}
-
-async function handleManualPassportIssue(userId: string, chatId: number, context: DocFlowContext, text: string) {
-  const parts = text.split(/—|-/).map(s => s.trim());
-  if (parts.length < 2) {
-    await sendComplexMessage(
-      chatId,
-      "❌ Неверный формат. Используйте разделитель — или -\n\nПример: *15.03.2023 — ОМВД России по Н.Новгороду*",
-      [],
-      { removeKeyboard: true, parseMode: "Markdown" },
-    );
-    return;
-  }
-  context.mpIssueDate = parts[0];
-  context.mpIssuedBy = parts.slice(1).join(" ");
-  await setDocState(userId, "doc_manual_passport_birth", context);
-  await sendComplexMessage(
-    chatId,
-    `✅ Выдан: *${context.mpIssuedBy}*\n\nШаг 4 из 5: Дата рождения\n\nВведите дату рождения (ДД.ММ.ГГГГ).`,
-    [],
-    { removeKeyboard: true, parseMode: "Markdown" },
-  );
-}
-
-async function handleManualPassportBirth(userId: string, chatId: number, context: DocFlowContext, text: string) {
-  context.mpBirthDate = text.trim();
-  await setDocState(userId, "doc_manual_passport_reg", context);
-  await sendComplexMessage(
-    chatId,
-    `✅ Дата рождения: *${text}*\n\nШаг 5 из 5: Адрес регистрации\n\nВведите адрес регистрации (можно кратко).\n\nПример: *г. Н.Новгород, ул. Ленина, д. 1, кв. 1*`,
-    [],
-    { removeKeyboard: true, parseMode: "Markdown" },
-  );
-}
-
-async function handleManualPassportRegistration(userId: string, chatId: number, context: DocFlowContext, text: string) {
-  context.mpRegistration = text.trim();
-  const isRent = context.dealType === "rent";
-
-  if (isRent) {
-    // Rent flow: continue to license data
-    const summary = [
-      "🪪 *Паспорт введён:*",
-      `👤 ФИО: ${context.mpFullName}`,
-      `🔢 Паспорт: ${context.mpSeries} ${context.mpNumber}`,
-      `📅 Выдан: ${context.mpIssueDate}`,
-      `🏢 Кем: ${context.mpIssuedBy}`,
-      `📅 Дата рождения: ${context.mpBirthDate}`,
-      `🏠 Адрес: ${context.mpRegistration}`,
-      "",
-      "Теперь введите данные *водительского удостоверения*.",
-    ].join("\n");
-
-    await setDocState(String(userId), "doc_manual_license_name", context);
-    await sendComplexMessage(chatId, summary, [], { removeKeyboard: true, parseMode: "Markdown" });
-  } else {
-    // Sale flow: show summary and confirm
-    const summary = [
-      "🪪 *Паспорт введён:*",
-      `👤 ФИО: ${context.mpFullName}`,
-      `🔢 Паспорт: ${context.mpSeries} ${context.mpNumber}`,
-      `📅 Выдан: ${context.mpIssueDate}`,
-      `🏢 Кем: ${context.mpIssuedBy}`,
-      `📅 Дата рождения: ${context.mpBirthDate}`,
-      `🏠 Адрес: ${context.mpRegistration}`,
-      "",
-      "Генерировать договор купли-продажи?",
-    ].join("\n");
-
-    await setDocState(String(userId), "doc_sale_confirm", context);
-    await sendComplexMessage(chatId, summary, [
-      [{ text: "✅ Да, генерировать", callback_data: "sale_confirm_yes" }],
-      [{ text: "❌ Отменить", callback_data: "sale_confirm_no" }],
-    ], { inlineKeyboard: true, parseMode: "Markdown" });
-  }
-}
-
-// ── Manual input state handlers (license - rent only) ───────────────────────────────
-
-async function handleManualLicenseName(userId: string, chatId: number, context: DocFlowContext, text: string) {
-  context.mlFullName = text.trim();
-  await setDocState(userId, "doc_manual_license_number", context);
-  await sendComplexMessage(
-    chatId,
-    `✅ ФИО: *${text}*\n\nШаг 2 из 4: Серия и номер ВУ\n\nВведите серию и номер через пробел.\n\nПример: *99 76 123456*`,
-    [],
-    { removeKeyboard: true, parseMode: "Markdown" },
-  );
-}
-
-async function handleManualLicenseNumber(userId: string, chatId: number, context: DocFlowContext, text: string) {
-  const parts = text.trim().split(/\s+/);
-  if (parts.length < 2) {
-    await sendComplexMessage(
-      chatId,
-      "❌ Неверный формат. Введите серию и номер через пробел.\n\nПример: *99 76 123456*",
-      [],
-      { removeKeyboard: true, parseMode: "Markdown" },
-    );
-    return;
-  }
-  context.mlSeries = parts[0];
-  context.mlNumber = parts[1];
-  await setDocState(userId, "doc_manual_license_issue", context);
-  await sendComplexMessage(
-    chatId,
-    `✅ ВУ: *${context.mlSeries} ${context.mlNumber}*\n\nШаг 3 из 4: Дата выдачи\n\nВведите дату выдачи ВУ (ДД.ММ.ГГГГ).`,
-    [],
-    { removeKeyboard: true, parseMode: "Markdown" },
-  );
-}
-
-async function handleManualLicenseIssue(userId: string, chatId: number, context: DocFlowContext, text: string) {
-  context.mlIssueDate = text.trim();
-  await setDocState(userId, "doc_manual_license_expiry", context);
-  await sendComplexMessage(
-    chatId,
-    `✅ Дата выдачи: *${text}*\n\nШаг 4 из 4: Срок действия\n\nВведите срок действия ВУ (ДД.ММ.ГГГГ).`,
-    [],
-    { removeKeyboard: true, parseMode: "Markdown" },
-  );
-}
-
-async function handleManualLicenseExpiry(userId: string, chatId: number, context: DocFlowContext, text: string) {
-  context.mlExpiryDate = text.trim();
-
-  await setDocState(userId, "doc_manual_license_categories", context);
-  await sendComplexMessage(
-    chatId,
-    `✅ Срок: *${text}*\n\nВыберите имеющиеся категории.`,
-    buildCategoryKeyboard(),
-    { inlineKeyboard: true, parseMode: "Markdown" },
-  );
-}
-
-// ── Public: Handle text input during /doc flow ─────────────────────────────────────
+// ── Text handlers ─────────────────────────────────────────────────────────────
 
 export async function handleDocText(userId: string, chatId: number, text: string): Promise<boolean> {
-  const docState = await getDocState(userId);
+  const docState = await getState(userId);
   if (!docState) return false;
 
   const { state, context } = docState;
 
-  if (state === "doc_awaiting_bike") {
+  if (state === "bike") {
     const bike = await resolveBikeById(text.trim());
     if (!bike) {
-      await sendComplexMessage(
-        chatId,
-        "🚲 Не удалось найти байк по вашему запросу. Попробуйте ещё раз или выберите из списка:",
-        [],
-        { keyboardType: "reply" },
-      );
+      await sendComplexMessage(chatId, "🚲 Не найден. Попробуйте:", [], { keyboardType: "reply" });
       return true;
     }
-
     context.bikeId = bike.id;
     context.bikeMake = bike.make;
     context.bikeModel = bike.model;
+    await setState(userId, "deal", context);
+    await sendComplexMessage(chatId, `🏍 ${bike.make} ${bike.model}`, [], { removeKeyboard: true });
+    await sendComplexMessage(chatId, "Тип договора:", buildDealKeyboard(), { keyboardType: 'inline' });
+    return true;
+  }
 
-    await setDocState(String(userId), "doc_awaiting_deal_type", context);
+  if (state === "name") {
+    context.mpFullName = text.trim();
+    await setState(userId, "passport", context);
     await sendComplexMessage(
       chatId,
-      `🏍 *${bike.make} ${bike.model}* — записал!`,
+      `✅ ${text}\n\n*Паспорт*\n\n4509 123456 15.03 ОМВД по Н.Новгороду\n(год не нужен - ${CURRENT_YEAR})`,
       [],
       { removeKeyboard: true, parseMode: "Markdown" },
     );
+    return true;
+  }
+
+  if (state === "passport") {
+    const p = parsePassport(text);
+    if (!p) {
+      await sendComplexMessage(chatId, "❌ Формат: 4509 123456 15.03 ОМВД", [], { removeKeyboard: true });
+      return true;
+    }
+    context.mpSeries = p.series;
+    context.mpNumber = p.number;
+    context.mpIssueDate = p.issueDate;
+    context.mpIssuedBy = p.issuedBy;
+    await setState(userId, "birth", context);
     await sendComplexMessage(
       chatId,
-      "Выберите тип договора:",
-      buildDealTypeKeyboard(),
-      { inlineKeyboard: true },
+      `✅ Паспорт ${p.series} ${p.number} от ${p.issueDate}\n\n*Дата рождения*\n\n15.03.1990`,
+      [],
+      { removeKeyboard: true, parseMode: "Markdown" },
     );
     return true;
   }
 
-  if (state === "doc_awaiting_schedule") {
-    await clearDocState(userId);
-    await sendComplexMessage(chatId, "⏳ Генерирую договор...", [], { removeKeyboard: true });
-    await generateAndSendContract(chatId, userId, context, text);
+  if (state === "birth") {
+    const d = parseDate(text, true);
+    if (!d) {
+      await sendComplexMessage(chatId, "❌ Формат: 15.03.1990", [], { removeKeyboard: true });
+      return true;
+    }
+    context.mpBirthDate = d;
+    await setState(userId, "address", context);
+    await sendComplexMessage(
+      chatId,
+      `✅ ${d}\n\n*Адрес регистрации*`,
+      [],
+      { removeKeyboard: true, parseMode: "Markdown" },
+    );
     return true;
   }
 
-  // Passport states (both rent and sale)
-  if (state === "doc_manual_passport_name") {
-    await handleManualPassportName(userId, chatId, context, text);
-    return true;
-  }
-  if (state === "doc_manual_passport_number") {
-    await handleManualPassportNumber(userId, chatId, context, text);
-    return true;
-  }
-  if (state === "doc_manual_passport_issue") {
-    await handleManualPassportIssue(userId, chatId, context, text);
-    return true;
-  }
-  if (state === "doc_manual_passport_birth") {
-    await handleManualPassportBirth(userId, chatId, context, text);
-    return true;
-  }
-  if (state === "doc_manual_passport_reg") {
-    await handleManualPassportRegistration(userId, chatId, context, text);
+  if (state === "address") {
+    context.mpRegistration = text.trim();
+    const isRent = context.dealType === "rent";
+    if (isRent) {
+      await setState(userId, "license", context);
+      await sendComplexMessage(
+        chatId,
+        `✅\n\n*ВУ*\n\n99 76 123456 15.03 15.03\n(год не нужен - ${CURRENT_YEAR})`,
+        [],
+        { removeKeyboard: true, parseMode: "Markdown" },
+      );
+    } else {
+      await setState(userId, "price", context);
+      const priceKeyboard = await buildPriceKeyboard();
+      await sendComplexMessage(chatId, "💰 Цена:", priceKeyboard, { keyboardType: 'inline' });
+    }
     return true;
   }
 
-  // License states (rent only)
-  if (state === "doc_manual_license_name") {
-    await handleManualLicenseName(userId, chatId, context, text);
+  if (state === "license") {
+    const l = parseLicense(text);
+    if (!l) {
+      await sendComplexMessage(chatId, "❌ Формат: 99 76 123456 15.03 15.03", [], { removeKeyboard: true });
+      return true;
+    }
+    context.mlSeries = l.series;
+    context.mlNumber = l.number;
+    context.mlIssueDate = l.issueDate;
+    context.mlExpiryDate = l.expiryDate;
+    await setState(userId, "categories", context);
+    await sendComplexMessage(chatId, `✅ ВУ ${l.series} ${l.number}\n\n*Категории*`, buildCategoryKeyboard(), { keyboardType: 'inline' });
     return true;
   }
-  if (state === "doc_manual_license_number") {
-    await handleManualLicenseNumber(userId, chatId, context, text);
+
+  if (state === "schedule") {
+    const s = parseSchedule(text);
+    if (!s) {
+      await sendComplexMessage(chatId, "❌ Формат: сегодня 18, завтра 10, 15.06 18", [], { removeKeyboard: true });
+      return true;
+    }
+    context.rentStartDate = s.start;
+    context.rentStartTime = s.startTime;
+    context.rentEndDate = s.end;
+    context.rentEndTime = s.endTime;
+
+    const tier = deriveUserAccessTier(context.mlCategories || []);
+    const summary = [
+      "*📋 Проверьте: *",
+      "",
+      `👤 ${context.mpFullName}`,
+      `🪪 ${context.mpSeries} ${context.mpNumber} от ${context.mpIssueDate}`,
+      `📅 ${context.mpBirthDate}`,
+      "",
+      `🚗 ВУ: ${context.mlSeries} ${context.mlNumber} (${(context.mlCategories || []).join(", ")})`,
+      "",
+      `📅 ${context.rentStartDate} ${context.rentStartTime} → ${context.rentEndDate} ${context.rentEndTime}`,
+      "",
+      "Всё верно?",
+    ].join("\n");
+    await setState(userId, "confirm", context);
+    await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
   }
-  if (state === "doc_manual_license_issue") {
-    await handleManualLicenseIssue(userId, chatId, context, text);
-    return true;
-  }
-  if (state === "doc_manual_license_expiry") {
-    await handleManualLicenseExpiry(userId, chatId, context, text);
+
+  if (state === "price_custom") {
+    const price = text.replace(/\D/g, '');
+    if (!price || parseInt(price) < 10000) {
+      await sendComplexMessage(chatId, "❌ Введите цену (руб)", [], { removeKeyboard: true });
+      return true;
+    }
+    context.salePrice = price;
+    const summary = [
+      "*📋 Продажа - проверьте:*",
+      "",
+      `👤 ${context.mpFullName}`,
+      `🪪 ${context.mpSeries} ${context.mpNumber}`,
+      `📅 ${context.mpBirthDate}`,
+      `🏠 ${context.mpRegistration}`,
+      "",
+      `💰 ${Number(price).toLocaleString("ru-RU")} ₽`,
+      "",
+      "Всё верно?",
+    ].join("\n");
+    await setState(userId, "confirm", context);
+    await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
   }
 
   return false;
 }
 
-// ── Public: Handle callback queries during /doc flow ─────────────────────────────
+// ── Callback handlers ───────────────────────────────────────────────────────
 
 export async function handleDocCallback(
   userId: string,
   chatId: number,
   callbackData: string,
+  callbackQueryId?: string,
 ): Promise<boolean> {
-  const docState = await getDocState(userId);
+  const docState = await getState(userId);
   if (!docState) return false;
 
   const { state, context } = docState;
 
-  // Answer callback to remove loading state
-  try {
-    await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery?callback_query_id=${callbackData}`,
-      { method: "POST" },
-    );
-  } catch (e) {
-    logger.warn("[/doc] Failed to answer callback", e);
+  // Answer callback query to stop loading animation on button
+  if (callbackQueryId) {
+    try {
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery?callback_query_id=${callbackQueryId}`, { method: "POST" });
+    } catch (e) {
+      logger.warn("[/doc] Failed to answer callback query:", e);
+    }
   }
 
-  // Deal type selection
-  if (callbackData === "deal_type_rent") {
+  if (callbackData === "cancel") {
+    await sendComplexMessage(chatId, "❌ Отменено. /doc для начала.", [], { removeKeyboard: true });
+    await clearState(userId);
+    return true;
+  }
+
+  if (callbackData === "restart") {
+    await clearState(userId);
+    await docCommand(chatId, parseInt(userId), undefined, "/doc");
+    return true;
+  }
+
+  if (callbackData === "d_rent") {
     context.dealType = "rent";
-    await setDocState(userId, "doc_manual_passport_name", context);
-    await sendComplexMessage(
-      chatId,
-      [
-        "✍️ *Ввод данных паспорта*",
-        "",
-        "Шаг 1 из 5: ФИО",
-        "",
-        "Введите фамилию, имя и отчество полностью.",
-      ].join("\n"),
-      [],
-      { removeKeyboard: true, parseMode: "Markdown" },
-    );
+    await setState(userId, "name", context);
+    await sendComplexMessage(chatId, "*Аренда - ФИО*", [], { removeKeyboard: true, parseMode: "Markdown" });
     return true;
   }
 
-  if (callbackData === "deal_type_sale") {
+  if (callbackData === "d_sale") {
     context.dealType = "sale";
-    await setDocState(userId, "doc_manual_passport_name", context);
-    await sendComplexMessage(
-      chatId,
-      [
-        "✍️ *Ввод данных паспорта (для договора продажи)*",
-        "",
-        "Шаг 1 из 5: ФИО",
-        "",
-        "Введите фамилию, имя и отчество полностью.",
-      ].join("\n"),
-      [],
-      { removeKeyboard: true, parseMode: "Markdown" },
-    );
+    await setState(userId, "name", context);
+    await sendComplexMessage(chatId, "*Продажа - ФИО*", [], { removeKeyboard: true, parseMode: "Markdown" });
     return true;
   }
 
-  // Sale confirmation
-  if (callbackData === "sale_confirm_yes") {
-    await clearDocState(userId);
-    await sendComplexMessage(chatId, "⏳ Генерирую договор...", [], { removeKeyboard: true });
-    await generateAndSendContract(chatId, userId, context);
-    return true;
-  }
-
-  if (callbackData === "sale_confirm_no") {
-    await sendComplexMessage(chatId, "❌ Договор отменён. Отправьте /doc чтобы начать заново.", [], { removeKeyboard: true });
-    await clearDocState(userId);
-    return true;
-  }
-
-  // Category selection
-  if (callbackData.startsWith("cat_")) {
-    const value = callbackData.slice(4);
-
-    if (value === "done") {
-      const cats = context.mlCategories || [];
-      context.mlAccessTier = deriveUserAccessTier(cats);
-
-      const catStr = cats.join(", ") || "нет";
-      const tierLabel = getAccessTierLabel(context.mlAccessTier || "none");
-
-      const summary = [
-        "🚗 *ВУ введено:*",
-        `👤 ФИО: ${context.mlFullName}`,
-        `🔢 ВУ: ${context.mlSeries} ${context.mlNumber}`,
-        `📅 Выдан: ${context.mlIssueDate}`,
-        `📅 Срок: ${context.mlExpiryDate}`,
-        `🏷 Категории: ${catStr}`,
-        `🛡 Допуск: ${tierLabel}`,
-        "",
-        "Укажите период аренды в свободной форме:",
-        "_с завтра 18:00 до завтра 10:00_",
-        "или",
-        "_с 15.06.2026 10:00 до 16.06.2026 20:00_",
-      ].filter(Boolean).join("\n");
-
-      await setDocState(userId, "doc_awaiting_schedule", context);
-      await sendComplexMessage(chatId, summary, [], { removeKeyboard: true, parseMode: "Markdown" });
-      return true;
-    }
-
-    if (value === "cancel") {
-      context.mlCategories = [];
-      await sendComplexMessage(
-        chatId,
-        "❌ Ввод отменён. Отправьте /doc чтобы начать заново.",
-        [],
-        { removeKeyboard: true },
-      );
-      await clearDocState(userId);
-      return true;
-    }
-
-    // Toggle category
+  if (callbackData.startsWith("c_")) {
+    const cat = callbackData.slice(2);
     const cats = context.mlCategories || [];
-    const idx = cats.indexOf(value);
-    if (idx >= 0) {
-      cats.splice(idx, 1);
-    } else {
-      cats.push(value);
-    }
+    const idx = cats.indexOf(cat);
+    if (idx >= 0) cats.splice(idx, 1);
+    else cats.push(cat);
     context.mlCategories = cats;
-    await setDocState(userId, state, context);
-
-    await sendComplexMessage(
-      chatId,
-      `🏷 Выберите категории:\n\nВыбрано: ${cats.join(", ") || "пока ничего"}`,
-      buildCategoryKeyboard(cats),
-      { inlineKeyboard: true },
-    );
+    await setState(userId, state, context);
+    await sendComplexMessage(chatId, `🏷 ${(cats || []).join(", ") || "нет"}`, buildCategoryKeyboard(cats), { keyboardType: 'inline' });
     return true;
   }
 
-  logger.warn("[/doc] Unhandled callback", { callbackData, state });
+  if (callbackData === "cdone") {
+    context.mlAccessTier = deriveUserAccessTier(context.mlCategories || []);
+    await setState(userId, "schedule_start", context);
+    await sendComplexMessage(chatId, `✅ ${(context.mlCategories || []).join(", ")}\n\n*Когда аренда?*`, buildStartKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData.startsWith("s_")) {
+    const parts = callbackData.slice(2).split('_');
+    const when = parts[0];
+    const time = parts[1];
+
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const fmt = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+
+    if (when === "custom") {
+      await setState(userId, "schedule", context);
+      await sendComplexMessage(chatId, "*Когда начинаем?*\n\nсегодня 18, завтра 10, 15.06 18", [], { removeKeyboard: true, parseMode: "Markdown" });
+      return true;
+    }
+
+    const start = when === "today" ? today : tomorrow;
+    const end = new Date(start);
+    end.setDate(start.getDate() + 1);
+
+    context.rentStartDate = fmt(start);
+    context.rentStartTime = `${time}:00`;
+    context.rentEndDate = fmt(end);
+    context.rentEndTime = "10:00";
+
+    const tier = deriveUserAccessTier(context.mlCategories || []);
+    const summary = [
+      "*📋 Проверьте:*",
+      "",
+      `👤 ${context.mpFullName}`,
+      `🪪 ${context.mpSeries} ${context.mpNumber} от ${context.mpIssueDate}`,
+      "",
+      `🚗 ВУ: ${context.mlSeries} ${context.mlNumber} (${(context.mlCategories || []).join(", ")})`,
+      "",
+      `📅 ${context.rentStartDate} ${context.rentStartTime} → ${context.rentEndDate} ${context.rentEndTime}`,
+      "",
+      "Всё верно?",
+    ].join("\n");
+    await setState(userId, "confirm", context);
+    await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData.startsWith("p_")) {
+    const price = callbackData.slice(2);
+    if (price === "custom") {
+      await setState(userId, "price_custom", context);
+      await sendComplexMessage(chatId, "*Введите цену (руб)*", [], { removeKeyboard: true, parseMode: "Markdown" });
+      return true;
+    }
+    context.salePrice = price;
+    const summary = [
+      "*📋 Продажа - проверьте:*",
+      "",
+      `👤 ${context.mpFullName}`,
+      `🪪 ${context.mpSeries} ${context.mpNumber}`,
+      `📅 ${context.mpBirthDate}`,
+      `🏠 ${context.mpRegistration}`,
+      "",
+      `💰 ${Number(price).toLocaleString("ru-RU")} ₽`,
+      "",
+      "Всё верно?",
+    ].join("\n");
+    await setState(userId, "confirm", context);
+    await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData === "ok") {
+    await sendComplexMessage(chatId, "⏳ Генерирую...", [], { removeKeyboard: true });
+    const success = await generateContract(chatId, userId, context);
+    // Only clear state after successful generation to preserve context on failure
+    if (success) {
+      await clearState(userId);
+    }
+    return true;
+  }
+
+  logger.warn("[/doc] Unknown callback", { callbackData, state });
   return false;
 }
 
-// ── Main: /doc command entry point ───────────────────────────────────────────────
+// ── Main command ─────────────────────────────────────────────────────────────
 
 export async function docCommand(
   chatId: number,
@@ -1109,78 +1063,45 @@ export async function docCommand(
   text: string,
 ) {
   const userIdStr = String(userId);
-  logger.info(`[/doc] User: ${userIdStr}, Text: "${text}"`);
+  logger.info(`[/doc] ${userIdStr}: ${text}`);
 
-  // Parse bike ID from command args
   const parts = text.trim().split(/\s+/);
   const bikeArg = parts.slice(1).join(" ").trim();
 
-  // If /doc with a bike arg, start the flow
   if (bikeArg) {
     const bike = await resolveBikeById(bikeArg);
     if (!bike) {
-      await sendComplexMessage(
-        chatId,
-        `🚲 Не удалось найти байк "${bikeArg}". Укажите ID или название из каталога.`,
-        [],
-        { removeKeyboard: true },
-      );
+      await sendComplexMessage(chatId, `🚲 "${bikeArg}" не найден.`, [], { removeKeyboard: true });
       return;
     }
-
     const context: DocFlowContext = {
       bikeId: bike.id,
       bikeMake: bike.make,
       bikeModel: bike.model,
-      extractionProvider: "manual",
-      dealType: "rent", // default, will be overridden by selection
+      dealType: "rent",
     };
-
-    await setDocState(userIdStr, "doc_awaiting_deal_type", context);
-    await sendComplexMessage(
-      chatId,
-      `🏍 *${bike.make} ${bike.model}* — записал!`,
-      [],
-      { removeKeyboard: true, parseMode: "Markdown" },
-    );
-    await sendComplexMessage(
-      chatId,
-      "Выберите тип договора:",
-      buildDealTypeKeyboard(),
-      { inlineKeyboard: true },
-    );
+    await setState(userIdStr, "deal", context);
+    await sendComplexMessage(chatId, `🏍 ${bike.make} ${bike.model}`, [], { removeKeyboard: true });
+    await sendComplexMessage(chatId, "Тип договора:", buildDealKeyboard(), { keyboardType: 'inline' });
     return;
   }
 
-  // /doc without args — show bike selection
   const bikes = await getAvailableBikes();
-
-  if (bikes.length === 0) {
-    await sendComplexMessage(chatId, "🚲 В каталоге пока нет доступных байков. Попробуйте позже.", [], { removeKeyboard: true });
+  if (!bikes.length) {
+    await sendComplexMessage(chatId, "🚲 Нет байков.", [], { removeKeyboard: true });
     return;
   }
 
-  const buttons: KeyboardButton[][] = bikes.map((bike) => {
-    const tier = bike.specs?.access_tier as string | undefined;
-    const tierEmoji = tier === "pro" ? "🔴" : tier === "mid" ? "🟡" : tier === "entry" ? "🟢" : "⚪";
-    return [{ text: `${tierEmoji} ${bike.make} ${bike.model}` }];
+  const buttons: KeyboardButton[][] = bikes.map(b => {
+    const tier = b.specs?.access_tier;
+    const emoji = tier === "pro" ? "🔴" : tier === "mid" ? "🟡" : tier === "entry" ? "🟢" : "⚪";
+    return [{ text: `${emoji} ${b.make} ${b.model}` }];
   });
 
-  await setDocState(userIdStr, "doc_awaiting_bike", {
-    bikeId: "",
-    extractionProvider: "manual",
-    dealType: "rent",
-  });
-
+  await setState(userIdStr, "bike", { bikeId: "", dealType: "rent" });
   await sendComplexMessage(
     chatId,
-    [
-      "📄 *Генерация договора (ручной ввод)*",
-      "",
-      "Выберите байк из каталога или введите ID/название:",
-      "",
-      "🟢 Базовый  🟡 Средний  🔴 Профессиональный",
-    ].join("\n"),
+    "📄 *Выберите байк или введите ID*\n\n🟢 Базовый  🟡 Средний  🔴 Профи",
     buttons,
     { keyboardType: "reply", parseMode: "Markdown" },
   );

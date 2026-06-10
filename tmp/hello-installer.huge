@@ -1,0 +1,135 @@
+# INSTALLER: Hello World
+# VERSION: 1.0.0
+# CREATED: 2026-06-09T21:44:42.115Z
+# DESCRIPTION: A simple demo skill
+# FILES: 2
+
+<code_block name="unpacker.mjs">
+ ```javascript
+#!/usr/bin/env node
+/**
+ * Auto-generated unpacker for Hello World
+ * This script extracts all skill files to the target directory
+ */
+
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Embedded files (base64 encoded)
+const files = {
+  "hello.mjs": "IyEvdXNyL2Jpbi9lbnYgbm9kZQoKLyoqCiAqIEhlbGxvIFdvcmxkIFNraWxsCiAqIEEgc2ltcGxlIGRlbW9uc3RyYXRpb24gc2tpbGwKICovCgpmdW5jdGlvbiBoZWxsbyhuYW1lID0gJ1dvcmxkJykgewogIGNvbnNvbGUubG9nKGBIZWxsbywgJHtuYW1lfSFgKTsKfQoKZnVuY3Rpb24gbWFpbigpIHsKICBjb25zdCBhcmdzID0gcHJvY2Vzcy5hcmd2LnNsaWNlKDIpOwogIGNvbnN0IG5hbWUgPSBhcmdzWzBdIHx8ICdXb3JsZCc7CiAgaGVsbG8obmFtZSk7Cn0KCmlmIChpbXBvcnQubWV0YS51cmwgPT09IGBmaWxlOi8vJHtwcm9jZXNzLmFyZ3ZbMV19YCkgewogIG1haW4oKTsKfQoKZXhwb3J0IHsgaGVsbG8gfTsK",
+  "README.md": "IyBIZWxsbyBXb3JsZCBTa2lsbAoKQSBzaW1wbGUgZGVtb25zdHJhdGlvbiBza2lsbCBmb3IgdGVzdGluZyB0aGUgaW5zdGFsbGVyIGNyZWF0b3IuCgojIyBVc2FnZQoKYGBgYmFzaApub2RlIGhlbGxvLm1qcyBbbmFtZV0KYGBgCgpJZiBubyBuYW1lIGlzIHByb3ZpZGVkLCBpdCB3aWxsIGdyZWV0ICJXb3JsZCIuCg=="
+};
+
+function createDirectory(dir) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+function unpack(targetDir) {
+  console.log('Unpacking Hello World to ' + targetDir);
+
+  let created = 0;
+  let skipped = 0;
+
+  for (const [relPath, base64Content] of Object.entries(files)) {
+    const content = Buffer.from(base64Content, 'base64').toString('utf-8');
+    const targetPath = path.join(targetDir, relPath);
+    const targetDirPath = path.dirname(targetPath);
+
+    // Create directory structure
+    createDirectory(targetDirPath);
+
+    // Check if file exists
+    if (fs.existsSync(targetPath)) {
+      const existing = fs.readFileSync(targetPath, 'utf-8');
+      if (existing === content) {
+        console.log('  [SKIP] ' + relPath + ' (identical)');
+        skipped++;
+        continue;
+      }
+      console.log('  [OVERWRITE] ' + relPath);
+    } else {
+      console.log('  [CREATE] ' + relPath);
+    }
+
+    fs.writeFileSync(targetPath, content, 'utf-8');
+    created++;
+  }
+
+  console.log('');
+  console.log('Unpacked ' + created + ' file(s)');
+  if (skipped > 0) {
+    console.log('Skipped ' + skipped + ' identical file(s)');
+  }
+  console.log('');
+  console.log('✓ Hello World installed successfully!');
+}
+
+// Main
+let targetDir = process.argv[2] || process.cwd();
+const dryRun = process.argv.includes('--dry-run') || process.argv.includes('-n');
+
+// Resolve target directory to absolute path
+targetDir = path.resolve(targetDir);
+
+if (dryRun) {
+  console.log('Dry-run mode: would create the following files:');
+  for (const relPath of Object.keys(files)) {
+    console.log('  ' + path.join(targetDir, relPath));
+  }
+} else {
+  unpack(targetDir);
+}
+ ```
+</code_block>
+
+<code_block name="hello.mjs">
+ ```javascript
+#!/usr/bin/env node
+
+/**
+ * Hello World Skill
+ * A simple demonstration skill
+ */
+
+function hello(name = 'World') {
+  console.log(`Hello, ${name}!`);
+}
+
+function main() {
+  const args = process.argv.slice(2);
+  const name = args[0] || 'World';
+  hello(name);
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}
+
+export { hello };
+ ```
+</code_block>
+
+<code_block name="README.md">
+ ```markdown
+# Hello World Skill
+
+A simple demonstration skill for testing the installer creator.
+
+## Usage
+
+```bash
+node hello.mjs [name]
+```
+
+If no name is provided, it will greet "World".
+ ```
+</code_block>
+
