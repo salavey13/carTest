@@ -7,23 +7,23 @@ try {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
   images: {
     unoptimized: true,
   },
+  turbopack: {
+    root: process.cwd(),
+  },
   experimental: {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
-    // Ensure that 'server-assets' directory, containing fonts for PDF generation, is included in the serverless bundle.
-    outputFileTracingIncludes: {
-      '/': ['server-assets/**/*'], 
-    },
+  },
+  // Ensure that 'server-assets' directory, containing fonts for PDF generation, is included in the serverless bundle.
+  outputFileTracingIncludes: {
+    '/': ['server-assets/**/*'],
   },
   webpack: (config, { isServer }) => {
     // Only apply this to server-side bundles
