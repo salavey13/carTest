@@ -31,3 +31,6 @@ version.ini
 /Configame/dist/Configame.exe
 /Configame/dist/ConfigameDemo.exe
 /Configame/__pycache__/
+
+#python
+claude_telegram.py
