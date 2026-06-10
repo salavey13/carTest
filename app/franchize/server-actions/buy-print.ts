@@ -135,7 +135,7 @@ function createLayoutConstants(pageSize: PageSize): LayoutConstants {
   const qrLabelGap = Math.round(4 * scale);
   const qrLabelFontSize = Math.round(7 * scale);
 
-  const rentalBoxHeight = Math.round(148 * scale);
+  const rentalBoxHeight = Math.round(isA5 ? 156 : 148 * scale); // Slightly taller for A5 to fit CTA better
   const rentalBoxX = rightColX;
   const rentalBoxWidth = rightColWidth;
   const rentalHeadingFontSize = Math.round(11 * scale);
@@ -156,7 +156,7 @@ function createLayoutConstants(pageSize: PageSize): LayoutConstants {
   const sectionHeadingGapAfter = Math.round(22 * scale);
   const sectionHeadingGapBefore = Math.round(24 * scale);
 
-  const specMaxRows = isA5 ? 10 : 13; // Fewer rows for smaller A5 page
+  const specMaxRows = 13; // Same for both A4 and A5
 
   return {
     pageWidth,
@@ -1332,6 +1332,18 @@ async function generateBuyPdf(input: {
       layout.rentalBoxWidth - layout.rentalInnerX * 2,
     ).slice(0, 2);
 
+    // Ensure CTA has enough bottom padding to avoid overlapping rounded border
+    const ctaBottomPadding = layout.rentalInnerY + 2; // Match top padding + small buffer
+    const currentRentalY = rentalY;
+    const ctaHeight = ctaLines.length * layout.ctaLineHeight + 8; // 8 for separator + gap
+    const minRentalY = RENTAL_BOX_Y + ctaBottomPadding + ctaHeight;
+
+    // Add extra gap if we're too close to the bottom
+    if (currentRentalY > minRentalY) {
+      // We're too low, need to move up
+      rentalY = currentRentalY + (currentRentalY - minRentalY);
+    }
+
     // Small separator before CTA
     const ctaSepY = rentalY + 4;
     page.drawRectangle({
@@ -1341,7 +1353,7 @@ async function generateBuyPdf(input: {
       height: 0.5,
       color: COLORS.accent,
     });
-    rentalY -= 6;
+    rentalY -= 8; // Increased gap for better spacing
 
     ctaLines.forEach((line) => {
       page.drawText(line, {
