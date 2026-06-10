@@ -42,7 +42,18 @@ export async function handleCommand(update: any) {
         logger.info(`[Command Handler] Received: '${text}' from User: ${userIdStr}`);
 
         // Handle callback queries for /doc flow
-        if (update.callback_query && (text.startsWith("doc_") || text.startsWith("cat_"))) {
+        if (update.callback_query && (
+            text.startsWith("doc_") ||
+            text.startsWith("cat_") ||
+            text.startsWith("d_") ||
+            text.startsWith("c_") ||
+            text.startsWith("p_") ||
+            text.startsWith("s_") ||
+            text === "cdone" ||
+            text === "cancel" ||
+            text === "ok" ||
+            text === "restart"
+        )) {
             const handled = await handleDocCallback(userIdStr, chatId, text, update.callback_query.id);
             if (handled) return;
         }
