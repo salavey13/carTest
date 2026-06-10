@@ -1,5 +1,5 @@
 // /utils/embeddingGenerator.ts
-import { pipeline } from "@xenova/transformers"
+// Use dynamic import to avoid bundling @xenova/transformers during build
 import { supabaseAdmin } from "@/hooks/supabase"
 import { debugLogger } from "@/lib/debugLogger"
 
@@ -22,6 +22,8 @@ export async function generateCarEmbeddings() {
   debugLogger.log("⏳ Loading embedding pipeline...")
   let pipe
   try {
+    // Dynamic import to avoid bundling during build
+    const { pipeline } = await import("@xenova/transformers")
     pipe = await pipeline("feature-extraction", MODEL_NAME, MODEL_OPTIONS)
     debugLogger.log("✅ Embedding pipeline loaded successfully.")
   } catch (pipeError) {
