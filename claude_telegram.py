@@ -1,4 +1,4 @@
-// /claude_telegram.py
+# /claude_telegram.py
 import os
 import asyncio
 import requests
