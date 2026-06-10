@@ -115,6 +115,7 @@ The script includes built-in rate limiting:
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 NEXT_PUBLIC_SITE_URL=https://your-site.com  # For API calls (default: localhost:3000)
+FORWARD_TELEGRAM_API=https://v0-car-test.vercel.app/api/forward-telegram  # Telegram forwarding
 ```
 
 ## Error Handling
