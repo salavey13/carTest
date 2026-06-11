@@ -559,6 +559,8 @@ export async function resendRentalContract(input: {
     // Generate new DOCX contract
     const { buildFranchizeDocxFromTemplate } = await import("@/app/franchize/lib/docx-capability");
     const { createHash } = await import("crypto");
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
 
     const now = new Date();
     const vars: Record<string, string> = {
@@ -595,11 +597,34 @@ export async function resendRentalContract(input: {
       renter_signature: "повторная отправка",
     };
 
-    const docxBuf = await buildFranchizeDocxFromTemplate(vars, "html");
-    const docSha256 = createHash("sha256").update(docxBuf).digest("hex");
+    // Load rental HTML template
+    const templatePath = join(process.cwd(), "docs", "RENTAL_DEAL_TEMPLATE.html");
+    let htmlTemplate: string;
+    try {
+      htmlTemplate = readFileSync(templatePath, "utf8");
+    } catch (readErr) {
+      console.error("[rentals-dashboard] Failed to read rental HTML template", readErr);
+      return { success: false, error: "Шаблон договора не найден." };
+    }
+
     const docFileName = `rental-contract-${vehicle.make}-${vehicle.model}-${now.toISOString().split("T")[0]}.docx`
       .replace(/[^a-zA-Zа-яА-Я0-9.\-]/g, "-")
       .replace(/-+/g, "-");
+
+    // Generate DOCX via the shared docx-capability pipeline
+    const docResult = await buildFranchizeDocxFromTemplate({
+      integrationScope: "dashboard-rental-resend",
+      uploadedBy: "dashboard",
+      documentKey: vars.document_key,
+      fileName: docFileName,
+      template: htmlTemplate,
+      variables: vars,
+      flowType: "rental",
+      templateMode: "html",
+    });
+
+    const docxBuf = docResult.bytes;
+    const docSha256 = docResult.sha256;
 
     // Generate QR code with crew-specific bot username
     const qrDeepLink = `https://t.me/${botUsername}/app?startapp=rent_${vehicle.id}_${docSha256}`;
