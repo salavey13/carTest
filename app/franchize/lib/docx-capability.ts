@@ -4,10 +4,10 @@ import { createHash } from "crypto";
 import { registerVerifierOriginalForBuffer } from "@/app/doc-verifier/actions";
 import { generateDocxBytes } from "@/app/markdown-doc/actions";
 import { applyTemplateVariables } from "@/lib/markdownTemplate";
-import { htmlToDocxDocument } from "@/lib/htmlToDocx";
+import { htmlToDocxElements } from "@/lib/htmlToDocx";
 import { logger } from "@/lib/logger";
 import { runLegalTemplateChecklist, TemplateIntegrityError } from "@/app/franchize/lib/legalChecklist";
-import { Packer } from "docx";
+import { Document, Packer } from "docx";
 
 type TemplateVariables = Record<string, string | number>;
 
@@ -19,15 +19,12 @@ export interface BuildFranchizeDocxInput {
   template: string;
   variables: TemplateVariables;
   flowType?: "rental" | "sale" | "mixed";
-  /** If set, template is HTML — use proper HTML→DOCX conversion */
   templateMode?: "md" | "html";
 }
 
 export interface BuildFranchizeDocxOutput {
   bytes: Uint8Array;
-  /** Rendered template text (markdown for md mode, stripped text for html mode) */
   renderedMarkdown: string;
-  /** When templateMode=html, stores the original rendered HTML for debugging */
   renderedHtml?: string;
   sha256: string;
   verifierRecordId?: string;
@@ -44,7 +41,6 @@ export async function buildFranchizeDocxFromTemplate(input: BuildFranchizeDocxIn
       });
       throw new TemplateIntegrityError(checklist);
     }
-
     if (checklist.warnings.length > 0) {
       logger.warn("[franchize-docx] template integrity warnings", {
         integrationScope: input.integrationScope,
@@ -55,7 +51,6 @@ export async function buildFranchizeDocxFromTemplate(input: BuildFranchizeDocxIn
 
   const templateMode = input.templateMode ?? "html";
 
-  // Safety: ensure template and variables are not undefined
   if (!input.template) {
     throw new Error("[franchize-docx] input.template is required but was undefined");
   }
@@ -68,11 +63,9 @@ export async function buildFranchizeDocxFromTemplate(input: BuildFranchizeDocxIn
   let renderedHtml: string | undefined;
 
   if (templateMode === "html") {
-    // ── HTML pipeline: proper cheerio-based HTML→DOCX ──
     const renderedHtmlRaw = applyTemplateVariables(input.template, safeVariables);
     renderedHtml = renderedHtmlRaw;
 
-    // Strip HTML to plain text for the renderedMarkdown field (backward compat)
     renderedMarkdown = renderedHtmlRaw
       .replace(/<\s*br\s*\/?>/gi, "\n")
       .replace(/<\s*\/p\s*>/gi, "\n\n")
@@ -82,18 +75,35 @@ export async function buildFranchizeDocxFromTemplate(input: BuildFranchizeDocxIn
       .trim();
 
     try {
-      const doc = htmlToDocxDocument(renderedHtmlRaw);
+      const children = htmlToDocxElements(renderedHtmlRaw);
+      const doc = new Document({
+        sections: [{
+          properties: {
+            page: {
+              margin: {
+                top: 1134,
+                right: 1134,
+                bottom: 1134,
+                left: 1701,
+              },
+            },
+          },
+          children,
+        }],
+      });
       bytes = await Packer.toBuffer(doc);
-      logger.info("[franchize-docx] HTML\u2192DOCX: proper cheerio conversion (formatting preserved)", {
+      logger.info("[franchize-docx] HTML→DOCX: proper cheerio conversion (formatting preserved)", {
         integrationScope: input.integrationScope,
       });
-    } catch (error) {
-      // Fallback: use stripped text with the old markdown pipeline
-      logger.warn("[franchize-docx] HTML\u2192DOCX failed, falling back to plain-text pipeline", error);
+    } catch (error: any) {
+      logger.warn("[franchize-docx] HTML→DOCX failed, falling back to plain-text pipeline", {
+        error: error?.message || String(error),
+        stack: error?.stack?.split('\n').slice(0, 3),
+        integrationScope: input.integrationScope,
+      });
       bytes = await generateDocxBytes(renderedMarkdown);
     }
   } else {
-    // ── Markdown pipeline: unchanged existing path ──
     renderedMarkdown = applyTemplateVariables(input.template, safeVariables);
     bytes = await generateDocxBytes(renderedMarkdown);
   }
