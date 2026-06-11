@@ -26,6 +26,14 @@
  *   4. Address → free text
  *   5. Price → inline keyboard or "390000"
  *   → Done!
+ *
+ * FIXES APPLIED (V2):
+ *   - FIX 1: Document delivery via direct Telegram API (telegramSendDocument/telegramSendPhoto)
+ *   - FIX 2: Better error logging for Supabase inserts (log .message, .code, .details, .hint)
+ *   - FIX 3: rental_contract_artifacts uses private schema with correct columns
+ *   - FIX 4: UX — schedule_end flow: start and end date/time selected separately
+ *   - FIX 5: UX — clearer driver's license prompt with full year for expiry
+ *   - FIX 6: Removed old "schedule" state, replaced with "schedule_start" / "schedule_end_text"
  */
 
 "use server";
@@ -51,6 +59,83 @@ const DOC_STATE_EXPIRY_MINUTES = 30;
 const CATEGORIES = ["A", "B", "нет"]; // B includes M (49cc scooters), A for full bikes
 const TIME_SLOTS = ["10:00", "12:00", "14:00", "16:00", "18:00", "20:00"];
 // Dynamic prices fetched from Supabase at runtime
+
+// ── Telegram API helpers (self-contained, no dependency on @/app/actions) ──
+
+async function telegramSendDocument(
+  chatId: string | number,
+  buffer: Buffer,
+  filename: string,
+  caption?: string,
+): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) { logger.error("[telegramSendDocument] No TELEGRAM_BOT_TOKEN"); return false; }
+
+  try {
+    const form = new FormData();
+    form.append("chat_id", String(chatId));
+    if (caption) {
+      form.append("caption", caption.substring(0, 1024)); // Telegram limit
+      form.append("parse_mode", "HTML");
+    }
+    // Use Blob with explicit type — works on Node 18+ with undici FormData
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    form.append("document", blob, filename);
+
+    const res = await fetch(
+      `https://api.telegram.org/bot${token}/sendDocument`,
+      { method: "POST", body: form },
+    );
+    const body = await res.json();
+    if (!body.ok) {
+      logger.error("[telegramSendDocument] API error:", body.description);
+      return false;
+    }
+    logger.info("[telegramSendDocument] Sent", { chatId, filename });
+    return true;
+  } catch (e) {
+    logger.error("[telegramSendDocument] Exception:", e);
+    return false;
+  }
+}
+
+async function telegramSendPhoto(
+  chatId: string | number,
+  buffer: Buffer,
+  filename: string,
+  caption?: string,
+): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) { logger.error("[telegramSendPhoto] No TELEGRAM_BOT_TOKEN"); return false; }
+
+  try {
+    const form = new FormData();
+    form.append("chat_id", String(chatId));
+    if (caption) {
+      form.append("caption", caption.substring(0, 1024));
+      form.append("parse_mode", "HTML");
+    }
+    const blob = new Blob([buffer], { type: "image/png" });
+    form.append("photo", blob, filename);
+
+    const res = await fetch(
+      `https://api.telegram.org/bot${token}/sendPhoto`,
+      { method: "POST", body: form },
+    );
+    const body = await res.json();
+    if (!body.ok) {
+      logger.error("[telegramSendPhoto] API error:", body.description);
+      return false;
+    }
+    logger.info("[telegramSendPhoto] Sent", { chatId, filename });
+    return true;
+  } catch (e) {
+    logger.error("[telegramSendPhoto] Exception:", e);
+    return false;
+  }
+}
 
 // ── Keyboard builders (only where useful) ─────────────────────────────────────
 
@@ -344,54 +429,6 @@ function parseDate(text: string, requireYear = true): string | null {
   return `${day}.${month}.${year}`;
 }
 
-// ── Schedule parser ─────────────────────────────────────────────────────────
-
-/**
- * Parse "сегодня 18", "завтра 10:00", "15.06 18", "15.06.2026 20:00"
- */
-function parseSchedule(text: string): { start: string; startTime: string; end: string; endTime: string } | null {
-  const t = text.trim().toLowerCase();
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-
-  const formatDate = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
-
-  // "сегодня 18" or "сегодня 18:00"
-  const todayMatch = t.match(/сегодня\s+(\d{1,2})(:(\d{2}))?/);
-  if (todayMatch) {
-    const hour = todayMatch[1].padStart(2, '0');
-    const min = todayMatch[3] || '00';
-    const end = new Date(tomorrow);
-    return { start: formatDate(today), startTime: `${hour}:${min}`, end: formatDate(end), endTime: '10:00' };
-  }
-
-  // "завтра 10" or "завтра 10:00"
-  const tomorrowMatch = t.match(/завтра\s+(\d{1,2})(:(\d{2}))?/);
-  if (tomorrowMatch) {
-    const hour = tomorrowMatch[1].padStart(2, '0');
-    const min = tomorrowMatch[3] || '00';
-    const end = new Date(tomorrow);
-    end.setDate(tomorrow.getDate() + 1);
-    return { start: formatDate(tomorrow), startTime: `${hour}:${min}`, end: formatDate(end), endTime: '10:00' };
-  }
-
-  // "15.06 18" or "15.06.2026 18:00"
-  const dateMatch = t.match(/(\d{1,2})\.(\d{1,2})(\.(\d{2,4}))?\s+(\d{1,2})(:(\d{2}))?/);
-  if (dateMatch) {
-    let [, d, m, , y, h, , min] = dateMatch;
-    const year = y ? (y.length === 2 ? (parseInt(y) > 50 ? `19${y}` : `20${y}`) : y) : CURRENT_YEAR;
-    const hour = h.padStart(2, '0');
-    const minute = min || '00';
-    const start = new Date(`${year}-${m}-${d}`);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 1);
-    return { start: `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${year}`, startTime: `${hour}:${minute}`, end: formatDate(end), endTime: '10:00' };
-  }
-
-  return null;
-}
-
 // ── Contract generation ─────────────────────────────────────────────────────
 
 async function generateContract(chatId: number, userId: string, context: DocFlowContext): Promise<boolean> {
@@ -558,7 +595,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       templateMode: "html",
     });
 
-    const docxBuf = docResult.bytes;
+    const docxBuf = Buffer.from(docResult.bytes);
     const docSha256 = docResult.sha256;
 
     const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${bike.id}_${docSha256}`;
@@ -576,99 +613,132 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       logger.warn("[/doc] QR failed:", qrErr);
     }
 
+    // ── Send document + QR via Telegram (direct API, no @/app/actions dependency) ──
+    let docSent = false;
+    const caption = `${isRent ? 'Аренда' : 'Продажа'}: ${bike.make} ${bike.model}\n\n🔗 Быстрая повторная аренда:\n${qrDeepLink}`;
+
+    // 1. Send DOCX first (most important)
+    docSent = await telegramSendDocument(String(chatId), docxBuf, docFileName, caption);
+
+    // 2. Send QR as separate photo (if we have it)
     if (qrPngBuffer) {
-      const token = process.env.TELEGRAM_BOT_TOKEN;
-      const form = new FormData();
-      form.append('chat_id', String(chatId));
-      form.append('media', JSON.stringify([
-        { type: 'document', media: 'attach://docx', parse_mode: 'HTML' },
-        { type: 'photo', media: 'attach://qr', caption: `📲 <b>QR для повторной аренды</b>\n${qrDeepLink}`, parse_mode: 'HTML' },
-      ]));
-      form.append('docx', new Blob([docxBuf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), docFileName);
-      form.append('qr', new Blob([qrPngBuffer], {type:'image/png'}), `qr.png`);
-      try {
-        await fetch(`https://api.telegram.org/bot${token}/sendMediaGroup`, {method:'POST', body: form});
-      } catch (e) {
-        await sendTelegramDocument(String(chatId), docxBuf, docFileName, `${isRent ? 'Аренда' : 'Продажа'}: ${bike.make} ${bike.model}\n${qrDeepLink}`);
+      const qrCaption = `📲 <b>QR для быстрой повторной аренды</b>\nНаведите камеру — данные заполнятся автоматически.\n\n🔗 ${qrDeepLink}`;
+      const qrSent = await telegramSendPhoto(String(chatId), qrPngBuffer, `qr-${bike.id}.png`, qrCaption);
+      if (!qrSent) {
+        // QR failed but doc sent — that's OK, link is in the doc caption
+        logger.warn("[/doc] QR photo send failed, but DOCX was sent");
       }
-    } else {
-      await sendTelegramDocument(String(chatId), docxBuf, docFileName, `${isRent ? 'Аренда' : 'Продажа'}: ${bike.make} ${bike.model}\n${qrDeepLink}`);
     }
 
-    const { error: secretsError } = await supabaseAdmin.from("user_rental_secrets").insert({
-      chat_id: String(userId),
-      crew_slug: "vip-bike",
-      doc_sha256: docSha256,
-      renter_full_name: context.mpFullName || null,
-      renter_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
-      renter_passport_issue_date: context.mpIssueDate || null,
-      renter_passport_issued_by: context.mpIssuedBy || null,
-      renter_registration: context.mpRegistration || null,
-      renter_driver_license: isRent ? `${context.mlSeries || ""} ${context.mlNumber || ""}`.trim() || null : null,
-      renter_birth_date: context.mpBirthDate || null,
-      renter_phone: null,
-      renter_email: null,
-      renter_address: context.mpRegistration || null,
-      source_doc_key: vars.document_key,
-      source_rental_id: null,
-      verification_status: "verified",
-      template_version: 1,
-    });
+    if (!docSent) {
+      logger.error("[/doc] Document delivery FAILED — trying sendTelegramDocument fallback");
+      // Last resort: try the imported sendTelegramDocument from @/app/actions
+      try {
+        await sendTelegramDocument(String(chatId), docxBuf, docFileName, caption);
+        docSent = true;
+        logger.info("[/doc] DOCX sent via sendTelegramDocument fallback");
+      } catch (e) {
+        logger.error("[/doc] All document delivery methods failed!", e);
+      }
+    }
+
+    // ── Save to Supabase ────────────────────────────────────────────────
+    const { error: secretsError } = await supabaseAdmin
+      .schema("private")
+      .from("user_rental_secrets")
+      .insert({
+        chat_id: String(userId),
+        crew_slug: "vip-bike",
+        doc_sha256: docSha256,
+        renter_full_name: context.mpFullName || null,
+        renter_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
+        renter_passport_issue_date: context.mpIssueDate || null,
+        renter_passport_issued_by: context.mpIssuedBy || null,
+        renter_registration: context.mpRegistration || null,
+        renter_driver_license: isRent ? `${context.mlSeries || ""} ${context.mlNumber || ""}`.trim() || null : null,
+        renter_birth_date: context.mpBirthDate || null,
+        renter_phone: null,
+        renter_email: null,
+        renter_address: context.mpRegistration || null,
+        source_doc_key: vars.document_key,
+        source_rental_id: null,
+        verification_status: "verified",
+        template_version: 1,
+      });
     if (secretsError) {
-      logger.error("[/doc] Failed to save user_rental_secrets:", secretsError);
+      // Supabase errors have non-enumerable properties — log each explicitly
+      logger.error("[/doc] Failed to save user_rental_secrets:", {
+        message: (secretsError as any).message,
+        code: (secretsError as any).code,
+        details: (secretsError as any).details,
+        hint: (secretsError as any).hint,
+      });
     }
 
     if (isRent) {
-      // Calculate total_sum from daily price (estimate for 1 day)
-      const dailyPrice = bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000";
-      const totalSum = Number(dailyPrice); // Simple 1-day calculation for now
-
-      const { error: rentError } = await supabaseAdmin.from("rental_contract_artifacts").insert({
-        contract_key: vars.document_key,
-        original_sha256: docSha256,
-        requested_bike_id: context.bikeId,
-        resolved_bike_id: bike.id,
-        telegram_chat_id: String(userId),
-        telegram_message_id: null,
-        provider: "manual-telegram-doc",
-        total_sum: totalSum,
-        rent_start_date: context.rentStartDate || null,
-        rent_end_date: context.rentEndDate || null,
-        metadata: {
-          renter_full_name: context.mpFullName,
-          renter_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim(),
-          renter_driver_license: `${context.mlSeries || ""} ${context.mlNumber || ""}`.trim(),
-          license_categories: context.mlCategories,
-          access_tier: context.mlAccessTier,
-          daily_price: dailyPrice,
-        },
-      });
+      // rental_contract_artifacts — now in private schema with all needed columns
+      const { error: rentError } = await supabaseAdmin
+        .schema("private")
+        .from("rental_contract_artifacts")
+        .insert({
+          contract_key: vars.document_key,
+          original_sha256: docSha256,
+          requested_bike_id: context.bikeId,
+          resolved_bike_id: bike.id,
+          telegram_chat_id: String(userId),
+          telegram_message_id: null,
+          renter_full_name: context.mpFullName || null,
+          renter_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
+          renter_passport_issued_by: context.mpIssuedBy || null,
+          renter_passport_issue_date: context.mpIssueDate || null,
+          renter_registration: context.mpRegistration || null,
+          renter_driver_license: `${context.mlSeries || ""} ${context.mlNumber || ""}`.trim() || null,
+          renter_birth_date: context.mpBirthDate || null,
+          license_categories: (context.mlCategories || []).join(", ") || null,
+          rent_start_date: context.rentStartDate || null,
+          rent_end_date: context.rentEndDate || null,
+          daily_price: String(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
+          deposit_rub: String(bike.specs?.deposit_rub || "20000"),
+          total_sum: Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
+          template_version: 1,
+        });
       if (rentError) {
-        logger.error("[/doc] Failed to save rental_contract_artifacts:", rentError);
+        logger.error("[/doc] Failed to save rental_contract_artifacts:", {
+          message: (rentError as any).message,
+          code: (rentError as any).code,
+          details: (rentError as any).details,
+          hint: (rentError as any).hint,
+        });
       }
     } else {
+      // sale_contract_artifacts — already in private schema
       const salePrice = context.salePrice || String(bike.specs?.sale_price || bike.specs?.price_rub || "390000");
-
-      const { error: saleError } = await supabaseAdmin.from("sale_contract_artifacts").insert({
-        contract_key: vars.document_key,
-        original_sha256: docSha256,
-        requested_bike_id: context.bikeId,
-        resolved_bike_id: bike.id,
-        telegram_chat_id: String(userId),
-        telegram_message_id: null,
-        provider: "manual-telegram-doc",
-        total_sum: Number(salePrice),
-        sale_price: salePrice,
-        metadata: {
-          buyer_full_name: context.mpFullName,
-          buyer_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim(),
-          buyer_registration: context.mpRegistration,
-          sale_price: Number(salePrice),
-          warranty_months: "0", // Sold "as-is", no warranty
-        },
-      });
+      const { error: saleError } = await supabaseAdmin
+        .schema("private")
+        .from("sale_contract_artifacts")
+        .insert({
+          contract_key: vars.document_key,
+          original_sha256: docSha256,
+          requested_bike_id: context.bikeId,
+          resolved_bike_id: bike.id,
+          telegram_chat_id: String(userId),
+          telegram_message_id: null,
+          buyer_full_name: context.mpFullName || null,
+          buyer_passport_number: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
+          buyer_passport_issued_by: context.mpIssuedBy || null,
+          buyer_passport_issue_date: context.mpIssueDate || null,
+          buyer_registration: context.mpRegistration || null,
+          sale_price: salePrice,
+          warranty_months: "0",
+          template_version: 1,
+        });
       if (saleError) {
-        logger.error("[/doc] Failed to save sale_contract_artifacts:", saleError);
+        logger.error("[/doc] Failed to save sale_contract_artifacts:", {
+          message: (saleError as any).message,
+          code: (saleError as any).code,
+          details: (saleError as any).details,
+          hint: (saleError as any).hint,
+        });
       }
     }
 
@@ -846,7 +916,8 @@ export async function handleDocText(userId: string, chatId: number, text: string
       await setState(userId, "license", context);
       await sendComplexMessage(
         chatId,
-        `✅\n\n*ВУ*\n\n99 76 123456 15.03 15.03\n(год не нужен - ${CURRENT_YEAR})`,
+        // FIX 5: clearer driver's license prompt
+        `✅\n\n*Водительское удостоверение*\n\nСерия Номер ДатаВыдачи СрокДействия\nПример: 99 76 123456 15.03 15.03.2036\n(дата выдачи — год = ${CURRENT_YEAR}, срок действия — полный год)`,
         [],
         { removeKeyboard: true, parseMode: "Markdown" },
       );
@@ -873,24 +944,101 @@ export async function handleDocText(userId: string, chatId: number, text: string
     return true;
   }
 
-  if (state === "schedule") {
-    const s = parseSchedule(text);
-    if (!s) {
+  // FIX 4: schedule_start — user typed custom start date/time
+  if (state === "schedule_start") {
+    const t = text.trim().toLowerCase();
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const fmt = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+
+    let startDate = "";
+    let startTime = "";
+
+    const todayMatch = t.match(/сегодня\s+(\d{1,2})(:(\d{2}))?/);
+    if (todayMatch) {
+      startDate = fmt(today);
+      startTime = `${todayMatch[1].padStart(2,'0')}:${todayMatch[3] || '00'}`;
+    }
+    if (!startDate) {
+      const tomorrowMatch = t.match(/завтра\s+(\d{1,2})(:(\d{2}))?/);
+      if (tomorrowMatch) {
+        startDate = fmt(tomorrow);
+        startTime = `${tomorrowMatch[1].padStart(2,'0')}:${tomorrowMatch[3] || '00'}`;
+      }
+    }
+    if (!startDate) {
+      const dateMatch = t.match(/(\d{1,2})\.(\d{1,2})(\.(\d{2,4}))?\s+(\d{1,2})(:(\d{2}))?/);
+      if (dateMatch) {
+        let [, d, m, , y, h, , min] = dateMatch;
+        const year = y ? (y.length === 2 ? (parseInt(y) > 50 ? `19${y}` : `20${y}`) : y) : String(CURRENT_YEAR);
+        startDate = `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${year}`;
+        startTime = `${h.padStart(2,'0')}:${min || '00'}`;
+      }
+    }
+
+    if (!startDate) {
       await sendComplexMessage(chatId, "❌ Формат: сегодня 18, завтра 10, 15.06 18", [], { removeKeyboard: true });
       return true;
     }
-    context.rentStartDate = s.start;
-    context.rentStartTime = s.startTime;
-    context.rentEndDate = s.end;
-    context.rentEndTime = s.endTime;
 
-    const tier = deriveUserAccessTier(context.mlCategories || []);
+    context.rentStartDate = startDate;
+    context.rentStartTime = startTime;
+
+    // Ask for end date/time
+    await setState(userId, "schedule_end", context);
+    await sendComplexMessage(
+      chatId,
+      `✅ Старт: ${startDate} ${startTime}\n\n*Когда заканчиваем?*\n\nзавтра 10\n16.06 10`,
+      [
+        [{ text: "📅 Завтра 10:00", callback_data: "e_tomorrow_10" }],
+        [{ text: "✏️ Свое время", callback_data: "e_custom" }],
+      ],
+      { keyboardType: 'inline', parseMode: 'Markdown' },
+    );
+    return true;
+  }
+
+  // FIX 4: schedule_end_text — user typed custom end date/time
+  if (state === "schedule_end_text") {
+    const t = text.trim().toLowerCase();
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const fmt = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+
+    let endDate = "";
+    let endTime = "";
+
+    const tomorrowMatch = t.match(/завтра\s+(\d{1,2})(:(\d{2}))?/);
+    if (tomorrowMatch) {
+      endDate = fmt(tomorrow);
+      endTime = `${tomorrowMatch[1].padStart(2,'0')}:${tomorrowMatch[3] || '00'}`;
+    }
+    if (!endDate) {
+      const dateMatch = t.match(/(\d{1,2})\.(\d{1,2})(\.(\d{2,4}))?\s+(\d{1,2})(:(\d{2}))?/);
+      if (dateMatch) {
+        let [, d, m, , y, h, , min] = dateMatch;
+        const year = y ? (y.length === 2 ? (parseInt(y) > 50 ? `19${y}` : `20${y}`) : y) : String(CURRENT_YEAR);
+        endDate = `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${year}`;
+        endTime = `${h.padStart(2,'0')}:${min || '00'}`;
+      }
+    }
+
+    if (!endDate) {
+      await sendComplexMessage(chatId, "❌ Формат: завтра 10, 16.06 18", [], { removeKeyboard: true });
+      return true;
+    }
+
+    context.rentEndDate = endDate;
+    context.rentEndTime = endTime;
+
+    // Show confirmation
     const summary = [
-      "*📋 Проверьте: *",
+      "*📋 Проверьте:*",
       "",
       `👤 ${context.mpFullName}`,
-      `🪪 ${context.mpSeries} ${context.mpNumber} от ${context.mpIssueDate}`,
-      `📅 ${context.mpBirthDate}`,
+      `🪪 ${context.mpSeries} ${context.mpNumber} от ${context.${context.mpIssueDate}`,
       "",
       `🚗 ВУ: ${context.mlSeries} ${context.mlNumber} (${(context.mlCategories || []).join(", ")})`,
       "",
@@ -997,6 +1145,7 @@ export async function handleDocCallback(
     return true;
   }
 
+  // ── Start time selection (s_ prefix) ──
   if (callbackData.startsWith("s_")) {
     const parts = callbackData.slice(2).split('_');
     const when = parts[0];
@@ -1008,21 +1157,58 @@ export async function handleDocCallback(
     const fmt = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
 
     if (when === "custom") {
-      await setState(userId, "schedule", context);
-      await sendComplexMessage(chatId, "*Когда начинаем?*\n\nсегодня 18, завтра 10, 15.06 18", [], { removeKeyboard: true, parseMode: "Markdown" });
+      await setState(userId, "schedule_start", context);
+      await sendComplexMessage(chatId, "📅 *Когда начинаем аренду?*\n\nсегодня 18\nзавтра 10\n15.06 18", [], { removeKeyboard: true, parseMode: "Markdown" });
       return true;
     }
 
     const start = when === "today" ? today : tomorrow;
-    const end = new Date(start);
-    end.setDate(start.getDate() + 1);
+    const defaultEnd = new Date(start);
+    defaultEnd.setDate(start.getDate() + 1);
 
     context.rentStartDate = fmt(start);
     context.rentStartTime = `${time}:00`;
-    context.rentEndDate = fmt(end);
+    // Set defaults for end — user can override
+    context.rentEndDate = fmt(defaultEnd);
     context.rentEndTime = "10:00";
 
-    const tier = deriveUserAccessTier(context.mlCategories || []);
+    // FIX 4: Ask for end date/time instead of going straight to confirm
+    await setState(userId, "schedule_end", context);
+    await sendComplexMessage(
+      chatId,
+      `✅ Старт: ${context.rentStartDate} ${context.rentStartTime}\n\n*Когда заканчиваем?*\n\nзавтра 10\n16.06 10\nИли нажмите кнопку:`,
+      [
+        [{ text: "📅 Завтра 10:00", callback_data: "e_tomorrow_10" }],
+        [{ text: "✏️ Свое время", callback_data: "e_custom" }],
+      ],
+      { keyboardType: 'inline', parseMode: 'Markdown' },
+    );
+    return true;
+  }
+
+  // ── End time selection (e_ prefix) — FIX 4 ──
+  if (callbackData.startsWith("e_")) {
+    const parts = callbackData.slice(2).split('_');
+    const when = parts[0];
+    const time = parts[1];
+
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const fmt = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+
+    if (when === "custom") {
+      await setState(userId, "schedule_end_text", context);
+      await sendComplexMessage(chatId, "📅 *Когда заканчиваем аренду?*\n\nзавтра 10\n16.06 18:00", [], { removeKeyboard: true, parseMode: "Markdown" });
+      return true;
+    }
+
+    if (when === "tomorrow") {
+      context.rentEndDate = fmt(tomorrow);
+      context.rentEndTime = `${time}:00`;
+    }
+
+    // Show confirmation
     const summary = [
       "*📋 Проверьте:*",
       "",
