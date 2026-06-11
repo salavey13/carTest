@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How-To: Local Claude Code CLI via Telegram</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --card-bg: #161b22;
+            --text: #c9d1d9;
+            --heading: #f0f6fc;
+            --accent: #58a6ff;
+            --code-bg: #1c2128;
+            --border: #30363d;
+            --warning: #d29922;
+            --success: #3fb950;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem;
+            margin: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1, h2, h3 {
+            color: var(--heading);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+            margin-top: 2.5rem;
+        }
+        h1 { text-align: center; border: none; }
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        pre {
+            background-color: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            overflow-x: auto;
+            font-size: 0.9rem;
+        }
+        code {
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+        .inline-code {
+            background-color: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .warning {
+            color: var(--warning);
+            font-weight: bold;
+        }
+        .success {
+            color: var(--success);
+            font-weight: bold;
+        }
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        ul {
+            padding-left: 1.5rem;
+        }
+        li {
+            margin-bottom: 0.5rem;
+        }
+        .prompt-box {
+            background-color: var(--code-bg);
+            border-left: 4px solid var(--accent);
+            padding: 1rem;
+            margin-top: 1rem;
+            white-space: pre-wrap;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+        .supaloop {
+            background: linear-gradient(135deg, #1c2128 0%, #1a1e2e 100%);
+            border-left: 4px solid var(--success);
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+            border-radius: 0 8px 8px 0;
+        }
+        .supaloop h3 {
+            border: none;
+            margin-top: 0;
+            color: var(--success);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🚀 How-To: Connect Telegram to Local Claude Code CLI</h1>
+    <p style="text-align: center; color: var(--accent);">Windows (Git Bash / PowerShell) Setup Guide</p>
+
+    <h2>Step 1: Prerequisites & Installs</h2>
+    <div class="card">
+        <ul>
+            <li>Install <a href="https://nodejs.org/en/download" target="_blank">Node.js</a></li>
+            <li>Install <a href="https://git-scm.com/install/windows" target="_blank">Git for Windows</a></li>
+            <li>Install <a href="https://www.python.org/downloads/release/python-3146/" target="_blank">Python 3.14</a> (Make sure to check <strong>"Add Python to PATH"</strong> during install!)</li>
+        </ul>
+        <p><strong>API Endpoint Reference:</strong> <span class="inline-code">https://api.z.ai/api/coding/paas/v4</span></p>
+    </div>
+
+    <h2>Step 2: Setup Project & Claude Code</h2>
+    <div class="card">
+        <p>Open Git Bash and run:</p>
+        <pre><code># Clone the repo
+git clone https://github.com/salavey13/carTest.git
+cd carTest
+
+# Run Coding Tool Helper
+npx @z_ai/coding-helper
+
+# Install Claude Code CLI globally
+npm install -g @anthropic-ai/claude-code
+
+# Test it (Make sure this works before moving on!)
+claude</code></pre>
+    </div>
+
+    <h2>Step 3: Python Bridge Script</h2>
+    <div class="card">
+        <p>This script runs locally, receives Telegram messages, passes them to <code>claude.cmd</code>, and sends the response back.</p>
+        <p>Install Python dependencies in <strong>PowerShell</strong>:</p>
+        <pre><code>pip install fastapi uvicorn requests</code></pre>
+        
+        <p>Create <code>claude_telegram.py</code> in your project folder:</p>
+        <pre><code># claude_telegram.py
+import os
+import asyncio
+import requests
+from fastapi import FastAPI, Request
+
+app = FastAPI()
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "token is here")
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+
+# Security: Only respond to these chat IDs
+ALLOWED_CHAT_IDS = [413553377, 341729406]
+
+async def run_claude_cli(prompt: str) -&gt; str:
+    """Runs the claude CLI tool asynchronously and returns the output."""
+    try:
+        process = await asyncio.create_subprocess_exec(
+            "claude.cmd", "-p", prompt,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+        
+        stdout_text = stdout.decode().strip()
+        stderr_text = stderr.decode().strip()
+        
+        if process.returncode != 0:
+            return f"⚠️ CLI Error:\n{stdout_text}\n{stderr_text}"
+            
+        return stdout_text
+        
+    except Exception as e:
+        return f"❌ Server error: {str(e)}"
+
+@app.post("/api/telegramWebhook")
+async def telegram_webhook(request: Request):
+    data = await request.json()
+    
+    if "message" in data and "text" in data["message"]:
+        chat_id = data["message"]["chat"]["id"]
+        user_text = data["message"]["text"]
+        
+        if chat_id not in ALLOWED_CHAT_IDS:
+            print(f"Ignored message from unauthorized chat_id: {chat_id}")
+            return {"ok": True}
+
+        if user_text.startswith('/'):
+            return {"ok": True}
+
+        claude_reply = await run_claude_cli(user_text)
+        
+        if len(claude_reply) &gt; 3900:
+            claude_reply = claude_reply[:3900] + "... \n\n(Message truncated)"
+
+        requests.post(f"{TELEGRAM_API_URL}/sendMessage", json={
+            "chat_id": chat_id,
+            "text": claude_reply
+        })
+        
+    return {"ok": True}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)</code></pre>
+    </div>
+
+    <h2>Step 4: Expose Local Server (Tunnel)</h2>
+    <div class="card">
+        <p>Run in Git Bash using LocalTunnel (No signup required):</p>
+        <pre><code>npx lt --port 8000 --subdomain car-test-local-$(date +%s)</code></pre>
+        <p>Copy the HTTPS URL provided (e.g., <span class="inline-code">https://car-test-local-...loca.lt</span>)</p>
+    </div>
+
+    <h2>Step 5: Connect Telegram Webhook</h2>
+    <div class="card">
+        <p>Run this in Git Bash, replacing <code>&lt;TUNNEL_URL&gt;</code> with the URL from Step 4:</p>
+        <pre><code>npx tsx scripts/set-local-webhook.ts &lt;TUNNEL_URL&gt;</code></pre>
+        <p><strong>Example:</strong></p>
+        <pre><code>npx tsx scripts/set-local-webhook.ts https://car-test-local-1781134495.loca.lt</code></pre>
+        <p class="success">✅ If successful, you can now chat with your bot on Telegram!</p>
+    </div>
+
+    <h2>Step 6: Running the Bot (Daily Workflow)</h2>
+    <div class="card">
+        <p>You need three terminals open:</p>
+        <ol>
+            <li><strong>Git Bash (Tunnel):</strong> <span class="inline-code">npx lt --port 8000 ...</span></li>
+            <li><strong>PowerShell (Python Server):</strong> <span class="inline-code">python claude_telegram.py</span></li>
+            <li><strong>Git Bash (Webhook setter):</strong> Run the <span class="inline-code">npx tsx scripts/set-local-webhook.ts</span> command whenever your tunnel restarts and the URL changes.</li>
+        </ol>
+    </div>
+
+    <h2>🧠 Boss Mode Prompts & Notes</h2>
+    <div class="card">
+        <p>Key directives for the Claude Code CLI to self-orchestrate:</p>
+        <ul>
+            <li><strong>Supabase Integration:</strong> Check <code>public.cars</code> for bike specs/pricing. Only care about license categories A, B (includes M), or no license — ignore C/C1.</li>
+            <li><strong>Cron Jobs:</strong> Create a Supabase skill to schedule cron jobs that trigger Claude to send project insights and enhancement proposals autonomously.</li>
+            <li><strong>Subagent Orchestration:</strong> Spawn multiple subagents — create a plan for each as tasks in Supabase (supaplan). Merge and resolve conflicts on the fly; no PRs needed.</li>
+            <li><strong>Boss Mode:</strong> Don't just execute — plan ahead. Create polishing steps, use "cheatcodes" to pick tasks from supaplan, reduce file-level merge conflicts by not storing shared state in repo.</li>
+            <li><strong>Installer-Creator Skill:</strong> One single file approach: file starts with instructions → agent extracts the first code block as an install script → stops reading → runs the script → script unpacks the rest of the file into proper skill folders. Enhance repotxtfetcher with a button that prepends the extraction instruction + unpacker script automatically.</li>
+        </ul>
+
+        <div class="supaloop">
+            <h3>🔄 SUPALOOP</h3>
+            <p>The autonomous execution loop:</p>
+            <ol>
+                <li><strong>PLAN</strong> → Ask Claude to create supaplan tasks for a feature</li>
+                <li><strong>PICK</strong> → Claude uses cheatcodes to pull the next task from supaplan</li>
+                <li><strong>EXECUTE</strong> → Spawn subagent, merge on completion, no PR friction</li>
+                <li><strong>POLISH</strong> → Auto-generate refinement tasks back into supaplan</li>
+                <li><strong>REPEAT</strong> → Loop back to PICK — continuous, self-feeding cycle</li>
+            </ol>
+            <p style="color: var(--warning);">⚡ Cron-triggered SUPALOOP: Supabase cron pings Claude on schedule → Claude picks pending supaplan tasks → executes → pushes insights back to you. The bot never stops improving the project.</p>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>
