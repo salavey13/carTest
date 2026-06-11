@@ -54,13 +54,22 @@ export async function buildFranchizeDocxFromTemplate(input: BuildFranchizeDocxIn
   }
 
   const templateMode = input.templateMode ?? "html";
+
+  // Safety: ensure template and variables are not undefined
+  if (!input.template) {
+    throw new Error("[franchize-docx] input.template is required but was undefined");
+  }
+  const safeVariables: TemplateVariables = Object.fromEntries(
+    Object.entries(input.variables ?? {}).map(([k, v]) => [k, v == null ? "" : String(v)])
+  );
+
   let bytes: Uint8Array;
   let renderedMarkdown: string;
   let renderedHtml: string | undefined;
 
   if (templateMode === "html") {
     // ── HTML pipeline: proper cheerio-based HTML→DOCX ──
-    const renderedHtmlRaw = applyTemplateVariables(input.template, input.variables);
+    const renderedHtmlRaw = applyTemplateVariables(input.template, safeVariables);
     renderedHtml = renderedHtmlRaw;
 
     // Strip HTML to plain text for the renderedMarkdown field (backward compat)
@@ -85,7 +94,7 @@ export async function buildFranchizeDocxFromTemplate(input: BuildFranchizeDocxIn
     }
   } else {
     // ── Markdown pipeline: unchanged existing path ──
-    renderedMarkdown = applyTemplateVariables(input.template, input.variables);
+    renderedMarkdown = applyTemplateVariables(input.template, safeVariables);
     bytes = await generateDocxBytes(renderedMarkdown);
   }
 
