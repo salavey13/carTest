@@ -39,6 +39,11 @@
  * Multi-step design: each photo/VLM call is a separate Telegram message
  * (= separate webhook call = separate Vercel function invocation),
  * so each step stays well within the 10s default timeout.
+ *
+ * FIXES APPLIED (V2):
+ *   - FIX 1: Document delivery via direct Telegram API (telegramSendDocument/telegramSendPhoto)
+ *   - FIX 2: Better error logging for Supabase inserts (log .message, .code, .details, .hint)
+ *   - FIX 3: rental_contract_artifacts uses private schema with correct columns
  */
 
 "use server";
@@ -58,6 +63,82 @@ import { join } from "path";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DOC_STATE_EXPIRY_MINUTES = 30;
+
+// ── Telegram API helpers (self-contained, no dependency on @/app/actions) ──
+
+async function telegramSendDocument(
+  chatId: string | number,
+  buffer: Buffer,
+  filename: string,
+  caption?: string,
+): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) { logger.error("[telegramSendDocument] No TELEGRAM_BOT_TOKEN"); return false; }
+
+  try {
+    const form = new FormData();
+    form.append("chat_id", String(chatId));
+    if (caption) {
+      form.append("caption", caption.substring(0, 1024)); // Telegram limit
+      form.append("parse_mode", "HTML");
+    }
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    form.append("document", blob, filename);
+
+    const res = await fetch(
+      `https://api.telegram.org/bot${token}/sendDocument`,
+      { method: "POST", body: form },
+    );
+    const body = await res.json();
+    if (!body.ok) {
+      logger.error("[telegramSendDocument] API error:", body.description);
+      return false;
+    }
+    logger.info("[telegramSendDocument] Sent", { chatId, filename });
+    return true;
+  } catch (e) {
+    logger.error("[telegramSendDocument] Exception:", e);
+    return false;
+  }
+}
+
+async function telegramSendPhoto(
+  chatId: string | number,
+  buffer: Buffer,
+  filename: string,
+  caption?: string,
+): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) { logger.error("[telegramSendPhoto] No TELEGRAM_BOT_TOKEN"); return false; }
+
+  try {
+    const form = new FormData();
+    form.append("chat_id", String(chatId));
+    if (caption) {
+      form.append("caption", caption.substring(0, 1024));
+      form.append("parse_mode", "HTML");
+    }
+    const blob = new Blob([buffer], { type: "image/png" });
+    form.append("photo", blob, filename);
+
+    const res = await fetch(
+      `https://api.telegram.org/bot${token}/sendPhoto`,
+      { method: "POST", body: form },
+    );
+    const body = await res.json();
+    if (!body.ok) {
+      logger.error("[telegramSendPhoto] API error:", body.description);
+      return false;
+    }
+    logger.info("[telegramSendPhoto] Sent", { chatId, filename });
+    return true;
+  } catch (e) {
+    logger.error("[telegramSendPhoto] Exception:", e);
+    return false;
+  }
+}
 
 // ── Keyboard builders for manual input ───────────────────────────────────────────
 
@@ -558,91 +639,121 @@ async function generateAndSendContract(
       templateMode: "html",
     });
 
-    const docxBuf = docResult.bytes;
+    const docxBuf = Buffer.from(docResult.bytes);
     const docSha256 = docResult.sha256;
 
     // Generate QR code for 1-click next rent
-    // Format: https://t.me/oneBikePlsBot/app?startapp=rent_{bikeId}_{docSha256}
     const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${bike.id}_${docSha256}`;
     const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
 
     let qrPngBuffer: Buffer | null = null;
     try {
-      const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const qrRes = await fetch(qrPngUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (qrRes.ok) {
         qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
       }
     } catch (qrErr) {
-      logger.warn("[/doc] QR generation failed, sending DOCX only:", qrErr?.message || qrErr);
+      logger.warn("[/doc] QR generation failed, sending DOCX only:", qrErr instanceof Error ? qrErr.message : String(qrErr));
     }
 
-    // Send the contract via Telegram (DOCX + QR as media group if QR available)
+    // ── Send document + QR via Telegram (direct API, no @/app/actions dependency) ──
+    let docSent = false;
+    const caption = `Договор аренды: ${bike.make} ${bike.model}\n\n🔗 Быстрая повторная аренда:\n${qrDeepLink}`;
+
+    // 1. Send DOCX first (most important)
+    docSent = await telegramSendDocument(String(chatId), docxBuf, docFileName, caption);
+
+    // 2. Send QR as separate photo (if we have it)
     if (qrPngBuffer) {
-      // Send DOCX + QR as a media group (album)
-      const token = process.env.TELEGRAM_BOT_TOKEN;
-      const mediaGroupUrl = `https://api.telegram.org/bot${token}/sendMediaGroup`;
-      const form = new FormData();
-      form.append('chat_id', String(chatId));
-
-      // Media group items: [{type:"document", media:"attach://docx"}, {type:"photo", media:"attach://qr", caption:"..."}]
-      const mediaItems = [
-        { type: 'document', media: 'attach://docx', parse_mode: 'HTML' },
-        { type: 'photo', media: 'attach://qr', caption: `📲 <b>QR для быстрой повторной аренды</b>\nНаведите камеру — данные заполнятся автоматически.\n\n🔗 ${qrDeepLink}`, parse_mode: 'HTML' },
-      ];
-      form.append('media', JSON.stringify(mediaItems));
-      form.append('docx', new Blob([docxBuf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), docFileName);
-      form.append('qr', new Blob([qrPngBuffer], {type:'image/png'}), `qr-${bike.id}.png`);
-
-      try {
-        const res = await fetch(mediaGroupUrl, {method:'POST', body: form});
-        const bodyText = await res.text();
-        try {
-          const results = JSON.parse(bodyText || '{}');
-          if (!results.ok) throw new Error(results.description || 'sendMediaGroup failed');
-          logger.info("[/doc] DOCX + QR sent successfully as media group");
-        } catch (parseError) {
-          logger.warn("[/doc] sendMediaGroup response parse issue, but message likely sent");
-        }
-      } catch (sendError) {
-        logger.warn("[/doc] sendMediaGroup failed, falling back to sendDocument:", sendError?.message);
-        // Fallback: send DOCX alone
-        await sendTelegramDocument(
-          String(chatId),
-          docxBuf,
-          docFileName,
-          `Договор аренды: ${bike.make} ${bike.model}\n\n🔗 Быстрая повторная аренда:\n${qrDeepLink}`,
-        );
+      const qrCaption = `📲 <b>QR для быстрой повторной аренды</b>\nНаведите камеру — данные заполнятся автоматически.\n\n🔗 ${qrDeepLink}`;
+      const qrSent = await telegramSendPhoto(String(chatId), qrPngBuffer, `qr-${bike.id}.png`, qrCaption);
+      if (!qrSent) {
+        logger.warn("[/doc] QR photo send failed, but DOCX was sent");
       }
-    } else {
-      // No QR buffer — send DOCX alone with QR link in caption
-      await sendTelegramDocument(
-        String(chatId),
-        docxBuf,
-        docFileName,
-        `Договор аренды: ${bike.make} ${bike.model}\n\n🔗 Быстрая повторная аренда:\n${qrDeepLink}`,
-      );
+    }
+
+    if (!docSent) {
+      logger.error("[/doc] Document delivery FAILED — trying sendTelegramDocument fallback");
+      // Last resort: try the imported sendTelegramDocument from @/app/actions
+      try {
+        await sendTelegramDocument(String(chatId), docxBuf, docFileName, caption);
+        docSent = true;
+        logger.info("[/doc] DOCX sent via sendTelegramDocument fallback");
+      } catch (e) {
+        logger.error("[/doc] All document delivery methods failed!", e);
+      }
     }
 
     // Save rental secrets for 1-click next rent
-    await saveUserRentalSecrets({
-      chat_id: String(userId),
-      crew_slug: "vip-bike",
-      doc_sha256: docSha256,
-      renter_full_name: passport.fullName || null,
-      renter_passport: `${passport.series || ""} ${passport.number || ""}`.trim() || null,
-      renter_passport_issue_date: passport.issueDate || null,
-      renter_passport_issued_by: passport.issuedBy || null,
-      renter_registration: passport.registration || null,
-      renter_driver_license: `${license.series || ""} ${license.number || ""}`.trim() || null,
-      renter_birth_date: passport.birthDate || null,
-      renter_phone: passport.phone || null,
-      renter_email: passport.email || null,
-      renter_address: passport.registration || null,
-      source_doc_key: vars.document_key,
-      source_rental_id: null,
-      verification_status: "verified",
-      template_version: 1,
-    });
+    const { error: secretsError } = await supabaseAdmin
+      .schema("private")
+      .from("user_rental_secrets")
+      .insert({
+        chat_id: String(userId),
+        crew_slug: "vip-bike",
+        doc_sha256: docSha256,
+        renter_full_name: passport.fullName || null,
+        renter_passport: `${passport.series || ""} ${passport.number || ""}`.trim() || null,
+        renter_passport_issue_date: passport.issueDate || null,
+        renter_passport_issued_by: passport.issuedBy || null,
+        renter_registration: passport.registration || null,
+        renter_driver_license: `${license.series || ""} ${license.number || ""}`.trim() || null,
+        renter_birth_date: passport.birthDate || null,
+        renter_phone: passport.phone || null,
+        renter_email: passport.email || null,
+        renter_address: passport.registration || null,
+        source_doc_key: vars.document_key,
+        source_rental_id: null,
+        verification_status: "verified",
+        template_version: 1,
+      });
+    if (secretsError) {
+      // Supabase errors have non-enumerable properties — log each explicitly
+      logger.error("[/doc] Failed to save user_rental_secrets:", {
+        message: (secretsError as any).message,
+        code: (secretsError as any).code,
+        details: (secretsError as any).details,
+        hint: (secretsError as any).hint,
+      });
+    }
+
+    // Save rental contract artifacts — now in private schema with all needed columns
+    const { error: rentError } = await supabaseAdmin
+      .schema("private")
+      .from("rental_contract_artifacts")
+      .insert({
+        contract_key: vars.document_key,
+        original_sha256: docSha256,
+        requested_bike_id: context.bikeId,
+        resolved_bike_id: bike.id,
+        telegram_chat_id: String(userId),
+        telegram_message_id: null,
+        renter_full_name: passport.fullName || null,
+        renter_passport: `${passport.series || ""} ${passport.number || ""}`.trim() || null,
+        renter_passport_issued_by: passport.issuedBy || null,
+        renter_passport_issue_date: passport.issueDate || null,
+        renter_registration: passport.registration || null,
+        renter_driver_license: `${license.series || ""} ${license.number || ""}`.trim() || null,
+        renter_birth_date: passport.birthDate || null,
+        license_categories: (context.categories || []).join(", ") || null,
+        rent_start_date: startDate || null,
+        rent_end_date: endDate || null,
+        daily_price: String(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
+        deposit_rub: String(bike.specs?.deposit_rub || "20000"),
+        total_sum: Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
+        template_version: 1,
+      });
+    if (rentError) {
+      logger.error("[/doc] Failed to save rental_contract_artifacts:", {
+        message: (rentError as any).message,
+        code: (rentError as any).code,
+        details: (rentError as any).details,
+        hint: (rentError as any).hint,
+      });
+    }
 
     // Build summary message
     const tier = context.accessTier || "none";
