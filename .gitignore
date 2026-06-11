@@ -33,4 +33,4 @@ version.ini
 /Configame/__pycache__/
 
 #python
-claude_telegram.py
+#claude_telegram.py
