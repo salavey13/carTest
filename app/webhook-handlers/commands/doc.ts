@@ -53,6 +53,8 @@ import type { AccessTier } from "@/app/lib/ocr-constants";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 import { vlmExtractDocument } from "@/app/lib/vlm-extract";
 import { createHash } from "crypto";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DOC_STATE_EXPIRY_MINUTES = 30;
@@ -529,13 +531,35 @@ async function generateAndSendContract(
       document_key: `rental-${bike.id}-${Date.now()}`,
     };
 
-    // Generate DOCX via the shared docx-capability pipeline
-    const docxBuf = await buildFranchizeDocxFromTemplate(vars, "html");
+    // Load rental HTML template
+    const templatePath = join(process.cwd(), "docs", "RENTAL_DEAL_TEMPLATE.html");
+    let htmlTemplate: string;
+    try {
+      htmlTemplate = readFileSync(templatePath, "utf8");
+    } catch (readErr) {
+      logger.error("[/doc] Failed to read rental HTML template", readErr);
+      await sendComplexMessage(chatId, "🚨 Ошибка: шаблон договора не найден. Обратитесь к администратору.", [], { removeKeyboard: true });
+      return false;
+    }
 
-    const docSha256 = createHash("sha256").update(docxBuf).digest("hex");
     const docFileName = `rental-contract-${bike.make}-${bike.model}-${startDate}.docx`
       .replace(/[^a-zA-Zа-яА-Я0-9.\-]/g, "-")
       .replace(/-+/g, "-");
+
+    // Generate DOCX via the shared docx-capability pipeline
+    const docResult = await buildFranchizeDocxFromTemplate({
+      integrationScope: "telegram-doc-rental",
+      uploadedBy: String(userId),
+      documentKey: vars.document_key,
+      fileName: docFileName,
+      template: htmlTemplate,
+      variables: vars,
+      flowType: "rental",
+      templateMode: "html",
+    });
+
+    const docxBuf = docResult.bytes;
+    const docSha256 = docResult.sha256;
 
     // Generate QR code for 1-click next rent
     // Format: https://t.me/oneBikePlsBot/app?startapp=rent_{bikeId}_{docSha256}
@@ -955,6 +979,7 @@ export async function handleDocCallback(
   userId: string,
   chatId: number,
   callbackData: string,
+  callbackQueryId?: string,
 ): Promise<boolean> {
   const docState = await getDocState(userId);
   if (!docState) return false;
@@ -963,13 +988,15 @@ export async function handleDocCallback(
   const userIdNum = Number(userId);
 
   // Answer callback to remove loading state
-  try {
-    await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery?callback_query_id=${callbackData}`,
-      { method: "POST" },
-    );
-  } catch (e) {
-    logger.warn("[/doc] Failed to answer callback", e);
+  if (callbackQueryId) {
+    try {
+      await fetch(
+        `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery?callback_query_id=${callbackQueryId}`,
+        { method: "POST" },
+      );
+    } catch (e) {
+      logger.warn("[/doc] Failed to answer callback", e);
+    }
   }
 
   // Manual passport start

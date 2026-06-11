@@ -38,6 +38,8 @@ import { deriveUserAccessTier, getAccessTierLabel } from "@/app/lib/derive-acces
 import type { AccessTier } from "@/app/lib/ocr-constants";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 import { createHash } from "crypto";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026; // 👍 Fixed current year
@@ -528,13 +530,36 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       });
     }
 
-    const templateMode = "html";
-    const docxBuf = await buildFranchizeDocxFromTemplate(vars, templateMode);
+    // Load HTML template based on deal type
+    const templateFileName = isRent ? "RENTAL_DEAL_TEMPLATE.html" : "SALE_DEAL_TEMPLATE.html";
+    const templatePath = join(process.cwd(), "docs", templateFileName);
+    let htmlTemplate: string;
+    try {
+      htmlTemplate = readFileSync(templatePath, "utf8");
+    } catch (readErr) {
+      logger.error("[/doc] Failed to read HTML template", templatePath, readErr);
+      await sendComplexMessage(chatId, "🚨 Ошибка: шаблон договора не найден. Обратитесь к администратору.", [], { removeKeyboard: true });
+      return false;
+    }
 
-    const docSha256 = createHash("sha256").update(docxBuf).digest("hex");
     const docFileName = `${context.dealType}-${bike.make}-${bike.model}-${context.rentStartDate || now.toISOString().split('T')[0]}.docx`
       .replace(/[^a-zA-Zа-яА-Я0-9.\-]/g, "-")
       .replace(/-+/g, "-");
+
+    // Generate DOCX via the shared docx-capability pipeline
+    const docResult = await buildFranchizeDocxFromTemplate({
+      integrationScope: `telegram-doc-${isRent ? 'rental' : 'sale'}`,
+      uploadedBy: String(userId),
+      documentKey: vars.document_key,
+      fileName: docFileName,
+      template: htmlTemplate,
+      variables: vars,
+      flowType: isRent ? "rental" : "sale",
+      templateMode: "html",
+    });
+
+    const docxBuf = docResult.bytes;
+    const docSha256 = docResult.sha256;
 
     const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${bike.id}_${docSha256}`;
     const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff`;
