@@ -135,21 +135,19 @@ function RentalDatePickers({
   endDate,
   onStartChange,
   onEndChange,
-  accentColor,
   borderColor,
 }: {
   startDate: string;
   endDate: string;
   onStartChange: (v: string) => void;
   onEndChange: (v: string) => void;
-  accentColor: string;
   borderColor: string;
 }) {
-  // Compute min date: today
-  const today = useMemo(() => {
+  // Compute min date: today (computed inline to avoid stale memo after midnight)
+  const today = (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }, []);
+  })();
 
   // End date min = start date (or today if no start)
   const endMin = startDate || today;
@@ -202,8 +200,9 @@ function RentalDatePickers({
       {startDate && endDate && (
         <p className="mt-2 text-[11px] text-[var(--item-muted-text)]">
           {(() => {
-            const start = new Date(startDate);
-            const end = new Date(endDate);
+            // Parse as local midnight to avoid UTC vs local off-by-one
+            const start = new Date(startDate + "T00:00:00");
+            const end = new Date(endDate + "T00:00:00");
             const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
             return `${days} ${days === 1 ? "день" : days < 5 ? "дня" : "дней"} аренды`;
           })()}
@@ -254,7 +253,7 @@ export function ItemModal({
     if (item?.description) return item.description;
     // Generalized fallback — no bike-specific language
     return isRental
-      ? "Позиция готова к аренде: технический чек выполнен, документы готовы, выдача без очереди."
+      ? "Позиция готова к  аренде: технический чек выполнен, документы готовы, выдача без очереди."
       : "Позиция доступна для заказа. Оставьте заявку, и менеджер свяжется с вами для уточнения деталей.";
   }, [item?.description, isRental]);
 
@@ -647,7 +646,6 @@ export function ItemModal({
                   endDate={options.rentEndDate ?? ""}
                   onStartChange={(v) => onChangeOption("rentStartDate", v)}
                   onEndChange={(v) => onChangeOption("rentEndDate", v)}
-                  accentColor={theme.palette.accentMain}
                   borderColor={theme.palette.borderSoft}
                 />
 
