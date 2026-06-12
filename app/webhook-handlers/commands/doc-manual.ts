@@ -332,8 +332,8 @@ async function getAvailableBikes(): Promise<any[]> {
 // ── Smart parsers (current year = 2026) ─────────────────────────────────────
 
 /**
- * Parse "4509 123456 15.03 ОМВД по Н.Новгороду"
- * Date without year → assumes 2026
+ * Parse "4509 123456 15.03.2020 ОМВД по Н.Новгороду"
+ * Year is required — passports issued in various years
  */
 function parsePassport(text: string): { series: string; number: string; issueDate: string; issuedBy: string } | null {
   const parts = text.trim().split(/\s+/);
@@ -351,15 +351,16 @@ function parsePassport(text: string): { series: string; number: string; issueDat
   if (!series || !number || dateIdx === -1) return null;
 
   let dateStr = parts[dateIdx];
-  if (!dateStr.includes('.')) dateStr += `.${CURRENT_YEAR}`;
-  else {
-    const parts2 = dateStr.split('.');
-    if (parts2.length === 2) dateStr += `.${CURRENT_YEAR}`;
-    else if (parts2[2].length === 2) {
-      const y = parseInt(parts2[2]);
-      parts2[2] = y > 50 ? `19${y}` : `20${y}`;
-      dateStr = parts2.join('.');
-    }
+  const parts2 = dateStr.split('.');
+  if (parts2.length === 2) {
+    // No year provided — reject, year is required for passport issue date
+    return null;
+  }
+  // Normalize 2-digit year → 4-digit
+  if (parts2[2].length === 2) {
+    const y = parseInt(parts2[2]);
+    parts2[2] = y > 50 ? `19${y}` : `20${y}`;
+    dateStr = parts2.join('.');
   }
 
   const issuedBy = parts.slice(dateIdx + 1).join(' ') || "не указано";
@@ -865,7 +866,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     await setState(userId, "passport", context);
     await sendComplexMessage(
       chatId,
-      `✅ ${text}\n\n*Паспорт*\n\n4509 123456 15.03 ОМВД по Н.Новгороду\n(год не нужен - ${CURRENT_YEAR})`,
+      `✅ ${text}\n\n*Паспорт*\n\n4509 123456 15.03.2020 ОМВД по Н.Новгороду\n(укажите год выдачи)`,
       [],
       { removeKeyboard: true, parseMode: "Markdown" },
     );
@@ -875,7 +876,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
   if (state === "passport") {
     const p = parsePassport(text);
     if (!p) {
-      await sendComplexMessage(chatId, "❌ Формат: 4509 123456 15.03 ОМВД", [], { removeKeyboard: true });
+      await sendComplexMessage(chatId, "❌ Формат: 4509 123456 15.03.2020 ОМВД", [], { removeKeyboard: true });
       return true;
     }
     context.mpSeries = p.series;
