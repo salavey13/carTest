@@ -1,3 +1,4 @@
+// /app/webhook-handlers/commands/doc-manual.ts
 /**
  * /doc command handler - SMART MANUAL VERSION (supports both RENT and SALE)
  * =============================================================================
@@ -8,15 +9,16 @@
  * - No warranty for used bikes (sell as-is)
  * - Inline keyboards only where genuinely useful
  *
- * Flow (RENT) - 8 steps:
+ * Flow (RENT) - 9 steps:
  *   1. Full name → "Иванов Иван Иванович"
- *   2. Passport → "4509 123456 15.03 ОМВД" (date assumes 2026!)
+ *   2. Passport → "4509 123456 15.03.2020 ОМВД"
  *   3. Birth → "15.03.1990" (year needed here)
  *   4. Address → free text
- *   5. License → "99 76 123456 15.03 15.03" (dates assume 2026!)
- *   6. Categories → inline keyboard
- *   7. Start → "сегодня 18" or inline keyboard
- *   8. End → "завтра 10" or inline keyboard
+ *   5. Has license? → inline keyboard (Yes/No)
+ *   6. License → "99 76 123456 15.03 15.03" (dates assume 2026!) — skipped if no license
+ *   7. Categories → inline keyboard — skipped if no license
+ *   8. Start → "сегодня 18" or inline keyboard
+ *   9. End → "завтра 10" or inline keyboard
  *   → Done!
  *
  * Flow (SALE) - 5 steps:
@@ -26,14 +28,6 @@
  *   4. Address → free text
  *   5. Price → inline keyboard or "390000"
  *   → Done!
- *
- * FIXES APPLIED (V2):
- *   - FIX 1: Document delivery via direct Telegram API (telegramSendDocument/telegramSendPhoto)
- *   - FIX 2: Better error logging for Supabase inserts (log .message, .code, .details, .hint)
- *   - FIX 3: rental_contract_artifacts uses private schema with correct columns
- *   - FIX 4: UX — schedule_end flow: start and end date/time selected separately
- *   - FIX 5: UX — clearer driver's license prompt with full year for expiry
- *   - FIX 6: Removed old "schedule" state, replaced with "schedule_start" / "schedule_end_text"
  */
 
 "use server";
@@ -59,83 +53,6 @@ const DOC_STATE_EXPIRY_MINUTES = 30;
 const CATEGORIES = ["A", "B", "нет"]; // B includes M (49cc scooters), A for full bikes
 const TIME_SLOTS = ["10:00", "12:00", "14:00", "16:00", "18:00", "20:00"];
 // Dynamic prices fetched from Supabase at runtime
-
-// ── Telegram API helpers (self-contained, no dependency on @/app/actions) ──
-
-async function telegramSendDocument(
-  chatId: string | number,
-  buffer: Buffer,
-  filename: string,
-  caption?: string,
-): Promise<boolean> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) { logger.error("[telegramSendDocument] No TELEGRAM_BOT_TOKEN"); return false; }
-
-  try {
-    const form = new FormData();
-    form.append("chat_id", String(chatId));
-    if (caption) {
-      form.append("caption", caption.substring(0, 1024)); // Telegram limit
-      form.append("parse_mode", "HTML");
-    }
-    // Use Blob with explicit type — works on Node 18+ with undici FormData
-    const blob = new Blob([buffer], {
-      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    });
-    form.append("document", blob, filename);
-
-    const res = await fetch(
-      `https://api.telegram.org/bot${token}/sendDocument`,
-      { method: "POST", body: form },
-    );
-    const body = await res.json();
-    if (!body.ok) {
-      logger.error("[telegramSendDocument] API error:", body.description);
-      return false;
-    }
-    logger.info("[telegramSendDocument] Sent", { chatId, filename });
-    return true;
-  } catch (e) {
-    logger.error("[telegramSendDocument] Exception:", e);
-    return false;
-  }
-}
-
-async function telegramSendPhoto(
-  chatId: string | number,
-  buffer: Buffer,
-  filename: string,
-  caption?: string,
-): Promise<boolean> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) { logger.error("[telegramSendPhoto] No TELEGRAM_BOT_TOKEN"); return false; }
-
-  try {
-    const form = new FormData();
-    form.append("chat_id", String(chatId));
-    if (caption) {
-      form.append("caption", caption.substring(0, 1024));
-      form.append("parse_mode", "HTML");
-    }
-    const blob = new Blob([buffer], { type: "image/png" });
-    form.append("photo", blob, filename);
-
-    const res = await fetch(
-      `https://api.telegram.org/bot${token}/sendPhoto`,
-      { method: "POST", body: form },
-    );
-    const body = await res.json();
-    if (!body.ok) {
-      logger.error("[telegramSendPhoto] API error:", body.description);
-      return false;
-    }
-    logger.info("[telegramSendPhoto] Sent", { chatId, filename });
-    return true;
-  } catch (e) {
-    logger.error("[telegramSendPhoto] Exception:", e);
-    return false;
-  }
-}
 
 // ── Keyboard builders (only where useful) ─────────────────────────────────────
 
@@ -243,6 +160,27 @@ function buildStartKeyboard(): KeyboardButton[][] {
     [
       { text: "📅 Завтра 10:00", callback_data: "s_tomorrow_10" },
       { text: "✏️ Свое время", callback_data: "s_custom" },
+    ],
+  ];
+}
+
+function buildEndKeyboard(): KeyboardButton[][] {
+  return [
+    [
+      { text: "📅 Завтра 10:00", callback_data: "e_tomorrow_10" },
+      { text: "📅 Послезавтра 10:00", callback_data: "e_2days_10" },
+    ],
+    [
+      { text: "✏️ Свое время", callback_data: "e_custom" },
+    ],
+  ];
+}
+
+function buildHasLicenseKeyboard(): KeyboardButton[][] {
+  return [
+    [
+      { text: "✅ Да", callback_data: "hl_yes" },
+      { text: "❌ Нет", callback_data: "hl_no" },
     ],
   ];
 }
@@ -430,6 +368,136 @@ function parseDate(text: string, requireYear = true): string | null {
   return `${day}.${month}.${year}`;
 }
 
+// ── Schedule parser ─────────────────────────────────────────────────────────
+
+/**
+ * Parse "сегодня 18", "завтра 10:00", "15.06 18", "15.06.2026 20:00"
+ */
+function parseSchedule(text: string): { start: string; startTime: string; end: string; endTime: string } | null {
+  const t = text.trim().toLowerCase();
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+
+  const formatDate = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+
+  // "сегодня 18" or "сегодня 18:00"
+  const todayMatch = t.match(/сегодня\s+(\d{1,2})(:(\d{2}))?/);
+  if (todayMatch) {
+    const hour = todayMatch[1].padStart(2, '0');
+    const min = todayMatch[3] || '00';
+    const end = new Date(tomorrow);
+    return { start: formatDate(today), startTime: `${hour}:${min}`, end: formatDate(end), endTime: '10:00' };
+  }
+
+  // "завтра 10" or "завтра 10:00"
+  const tomorrowMatch = t.match(/завтра\s+(\d{1,2})(:(\d{2}))?/);
+  if (tomorrowMatch) {
+    const hour = tomorrowMatch[1].padStart(2, '0');
+    const min = tomorrowMatch[3] || '00';
+    const end = new Date(tomorrow);
+    end.setDate(tomorrow.getDate() + 1);
+    return { start: formatDate(tomorrow), startTime: `${hour}:${min}`, end: formatDate(end), endTime: '10:00' };
+  }
+
+  // "15.06 18" or "15.06.2026 18:00"
+  const dateMatch = t.match(/(\d{1,2})\.(\d{1,2})(\.(\d{2,4}))?\s+(\d{1,2})(:(\d{2}))?/);
+  if (dateMatch) {
+    let [, d, m, , y, h, , min] = dateMatch;
+    const year = y ? (y.length === 2 ? (parseInt(y) > 50 ? `19${y}` : `20${y}`) : y) : CURRENT_YEAR;
+    const hour = h.padStart(2, '0');
+    const minute = min || '00';
+    const start = new Date(`${year}-${m}-${d}`);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 1);
+    return { start: `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${year}`, startTime: `${hour}:${minute}`, end: formatDate(end), endTime: '10:00' };
+  }
+
+  return null;
+}
+
+/**
+ * Parse end date only: "завтра 10", "послезавтра 10", "16.06 10", "16.06.2026 10:00"
+ * startDate is the rent start date (DD.MM.YYYY) used to resolve relative dates
+ */
+function parseEndDate(text: string, startDate?: string): { date: string; time: string } | null {
+  const t = text.trim().toLowerCase();
+  const today = new Date();
+
+  // Resolve start date for relative calculations
+  let startRef = new Date(today);
+  if (startDate) {
+    const sp = startDate.split('.');
+    if (sp.length === 3) startRef = new Date(`${sp[2]}-${sp[1]}-${sp[0]}`);
+  }
+
+  const formatDate = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+
+  // "завтра 10" or "завтра 10:00" — relative to start date
+  const tomorrowMatch = t.match(/завтра\s+(\d{1,2})(:(\d{2}))?/);
+  if (tomorrowMatch) {
+    const hour = tomorrowMatch[1].padStart(2, '0');
+    const min = tomorrowMatch[3] || '00';
+    const d = new Date(startRef);
+    d.setDate(startRef.getDate() + 1);
+    return { date: formatDate(d), time: `${hour}:${min}` };
+  }
+
+  // "послезавтра 10"
+  const dayAfterMatch = t.match(/послезавтра\s+(\d{1,2})(:(\d{2}))?/);
+  if (dayAfterMatch) {
+    const hour = dayAfterMatch[1].padStart(2, '0');
+    const min = dayAfterMatch[3] || '00';
+    const d = new Date(startRef);
+    d.setDate(startRef.getDate() + 2);
+    return { date: formatDate(d), time: `${hour}:${min}` };
+  }
+
+  // "16.06 10" or "16.06.2026 10:00"
+  const dateMatch = t.match(/(\d{1,2})\.(\d{1,2})(\.(\d{2,4}))?\s+(\d{1,2})(:(\d{2}))?/);
+  if (dateMatch) {
+    let [, d, m, , y, h, , min] = dateMatch;
+    const year = y ? (y.length === 2 ? (parseInt(y) > 50 ? `19${y}` : `20${y}`) : y) : CURRENT_YEAR;
+    const hour = h.padStart(2, '0');
+    const minute = min || '00';
+    return { date: `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${year}`, time: `${hour}:${minute}` };
+  }
+
+  // "16.06" without time → default 10:00
+  const dateOnlyMatch = t.match(/^(\d{1,2})\.(\d{1,2})(\.(\d{2,4}))?$/);
+  if (dateOnlyMatch) {
+    let [, d, m, , y] = dateOnlyMatch;
+    const year = y ? (y.length === 2 ? (parseInt(y) > 50 ? `19${y}` : `20${y}`) : y) : CURRENT_YEAR;
+    return { date: `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${year}`, time: '10:00' };
+  }
+
+  return null;
+}
+
+/**
+ * Build rent summary for confirmation — works with or without license
+ */
+function buildRentSummary(context: DocFlowContext): string {
+  const hasLicense = context.mlSeries && context.mlNumber;
+  const lines = [
+    "*📋 Проверьте: *",
+    "",
+    `👤 ${context.mpFullName}`,
+    `🪪 ${context.mpSeries} ${context.mpNumber} от ${context.mpIssueDate}`,
+    `📅 ${context.mpBirthDate}`,
+  ];
+  if (hasLicense) {
+    lines.push("", `🚗 ВУ: ${context.mlSeries} ${context.mlNumber} (${(context.mlCategories || []).join(", ")})`);
+  }
+  lines.push(
+    "",
+    `📅 ${context.rentStartDate} ${context.rentStartTime} → ${context.rentEndDate} ${context.rentEndTime}`,
+    "",
+    "Всё верно?",
+  );
+  return lines.join("\n");
+}
+
 // ── Contract generation ─────────────────────────────────────────────────────
 
 async function generateContract(chatId: number, userId: string, context: DocFlowContext): Promise<boolean> {
@@ -614,132 +682,123 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       logger.warn("[/doc] QR failed:", qrErr);
     }
 
-    // ── Send document + QR via Telegram (direct API, no @/app/actions dependency) ──
+    // ── Send document via Telegram ──────────────────────────────
     let docSent = false;
     const caption = `${isRent ? 'Аренда' : 'Продажа'}: ${bike.make} ${bike.model}\n\n🔗 Быстрая повторная аренда:\n${qrDeepLink}`;
 
-    // 1. Send DOCX first (most important)
-    docSent = await telegramSendDocument(String(chatId), docxBuf, docFileName, caption);
-
-    // 2. Send QR as separate photo (if we have it)
     if (qrPngBuffer) {
-      const qrCaption = `📲 <b>QR для быстрой повторной аренды</b>\nНаведите камеру — данные заполнятся автоматически.\n\n🔗 ${qrDeepLink}`;
-      const qrSent = await telegramSendPhoto(String(chatId), qrPngBuffer, `qr-${bike.id}.png`, qrCaption);
-      if (!qrSent) {
-        // QR failed but doc sent — that's OK, link is in the doc caption
-        logger.warn("[/doc] QR photo send failed, but DOCX was sent");
+      // Try sending DOCX + QR as a media group
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      try {
+        const form = new FormData();
+        form.append('chat_id', String(chatId));
+        form.append('media', JSON.stringify([
+          { type: 'document', media: 'attach://docx', parse_mode: 'HTML' },
+          { type: 'photo', media: 'attach://qr', caption: `📲 <b>QR для повторной аренды</b>\n${qrDeepLink}`, parse_mode: 'HTML' },
+        ]));
+        form.append('docx', new Blob([docxBuf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), docFileName);
+        form.append('qr', new Blob([qrPngBuffer], {type:'image/png'}), `qr.png`);
+
+        const res = await fetch(`https://api.telegram.org/bot${token}/sendMediaGroup`, {method:'POST', body: form});
+        const resBody = await res.json();
+        if (resBody?.ok) {
+          docSent = true;
+          logger.info("[/doc] DOCX + QR sent as media group");
+        } else {
+          logger.warn("[/doc] sendMediaGroup failed:", resBody?.description);
+        }
+      } catch (e) {
+        logger.warn("[/doc] sendMediaGroup exception:", e);
+      }
+    }
+
+    // Fallback: send DOCX alone
+    if (!docSent) {
+      try {
+        await sendTelegramDocument(String(chatId), docxBuf, docFileName, caption);
+        docSent = true;
+        logger.info("[/doc] DOCX sent via sendTelegramDocument");
+      } catch (e) {
+        logger.error("[/doc] sendTelegramDocument also failed:", e);
       }
     }
 
     if (!docSent) {
-      logger.error("[/doc] Document delivery FAILED — trying sendTelegramDocument fallback");
-      // Last resort: try the imported sendTelegramDocument from @/app/actions
-      try {
-        await sendTelegramDocument(String(chatId), docxBuf, docFileName, caption);
-        docSent = true;
-        logger.info("[/doc] DOCX sent via sendTelegramDocument fallback");
-      } catch (e) {
-        logger.error("[/doc] All document delivery methods failed!", e);
-      }
+      logger.error("[/doc] All document delivery methods failed!");
     }
 
-    // ── Save to Supabase ────────────────────────────────────────────────
-    const { error: secretsError } = await supabaseAdmin
-      .schema("private")
-      .from("user_rental_secrets")
-      .insert({
-        chat_id: String(userId),
-        crew_slug: "vip-bike",
-        doc_sha256: docSha256,
-        renter_full_name: context.mpFullName || null,
-        renter_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
-        renter_passport_issue_date: context.mpIssueDate || null,
-        renter_passport_issued_by: context.mpIssuedBy || null,
-        renter_registration: context.mpRegistration || null,
-        renter_driver_license: isRent ? `${context.mlSeries || ""} ${context.mlNumber || ""}`.trim() || null : null,
-        renter_birth_date: context.mpBirthDate || null,
-        renter_phone: null,
-        renter_email: null,
-        renter_address: context.mpRegistration || null,
-        source_doc_key: vars.document_key,
-        source_rental_id: null,
-        verification_status: "verified",
-        template_version: 1,
-      });
+    const { error: secretsError } = await supabaseAdmin.schema("private").from("user_rental_secrets").insert({
+      chat_id: String(userId),
+      crew_slug: "vip-bike",
+      doc_sha256: docSha256,
+      renter_full_name: context.mpFullName || null,
+      renter_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
+      renter_passport_issue_date: context.mpIssueDate || null,
+      renter_passport_issued_by: context.mpIssuedBy || null,
+      renter_registration: context.mpRegistration || null,
+      renter_driver_license: isRent ? `${context.mlSeries || ""} ${context.mlNumber || ""}`.trim() || null : null,
+      renter_birth_date: context.mpBirthDate || null,
+      renter_phone: null,
+      renter_email: null,
+      renter_address: context.mpRegistration || null,
+      source_doc_key: vars.document_key,
+      source_rental_id: null,
+      verification_status: "verified",
+      template_version: 1,
+    });
     if (secretsError) {
-      // Supabase errors have non-enumerable properties — log each explicitly
-      logger.error("[/doc] Failed to save user_rental_secrets:", {
-        message: (secretsError as any).message,
-        code: (secretsError as any).code,
-        details: (secretsError as any).details,
-        hint: (secretsError as any).hint,
-      });
+      logger.error("[/doc] Failed to save user_rental_secrets:", secretsError);
     }
 
     if (isRent) {
-      // rental_contract_artifacts — now in private schema with all needed columns
-      const { error: rentError } = await supabaseAdmin
-        .schema("private")
-        .from("rental_contract_artifacts")
-        .insert({
-          contract_key: vars.document_key,
-          original_sha256: docSha256,
-          requested_bike_id: context.bikeId,
-          resolved_bike_id: bike.id,
-          telegram_chat_id: String(userId),
-          telegram_message_id: null,
-          renter_full_name: context.mpFullName || null,
-          renter_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
-          renter_passport_issued_by: context.mpIssuedBy || null,
-          renter_passport_issue_date: context.mpIssueDate || null,
-          renter_registration: context.mpRegistration || null,
-          renter_driver_license: `${context.mlSeries || ""} ${context.mlNumber || ""}`.trim() || null,
-          renter_birth_date: context.mpBirthDate || null,
-          license_categories: (context.mlCategories || []).join(", ") || null,
-          rent_start_date: context.rentStartDate || null,
-          rent_end_date: context.rentEndDate || null,
-          daily_price: String(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
-          deposit_rub: String(bike.specs?.deposit_rub || "20000"),
-          total_sum: Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
-          template_version: 1,
-        });
+      // rental_contract_artifacts is in private schema — use explicit columns only
+      const { error: rentError } = await supabaseAdmin.schema("private").from("rental_contract_artifacts").insert({
+        contract_key: vars.document_key,
+        original_sha256: docSha256,
+        requested_bike_id: context.bikeId,
+        resolved_bike_id: bike.id,
+        telegram_chat_id: String(userId),
+        telegram_message_id: null,
+        renter_full_name: context.mpFullName || null,
+        renter_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
+        renter_passport_issued_by: context.mpIssuedBy || null,
+        renter_passport_issue_date: context.mpIssueDate || null,
+        renter_registration: context.mpRegistration || null,
+        renter_driver_license: `${context.mlSeries || ""} ${context.mlNumber || ""}`.trim() || null,
+        renter_birth_date: context.mpBirthDate || null,
+        license_categories: (context.mlCategories || []).join(", ") || null,
+        rent_start_date: context.rentStartDate || null,
+        rent_end_date: context.rentEndDate || null,
+        daily_price: bike.specs?.dailyPrice || bike.specs?.rent_weekday || null,
+        deposit_rub: bike.specs?.deposit_rub || null,
+        total_sum: Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
+        template_version: 1,
+      });
       if (rentError) {
-        logger.error("[/doc] Failed to save rental_contract_artifacts:", {
-          message: (rentError as any).message,
-          code: (rentError as any).code,
-          details: (rentError as any).details,
-          hint: (rentError as any).hint,
-        });
+        logger.error("[/doc] Failed to save rental_contract_artifacts:", rentError);
       }
     } else {
-      // sale_contract_artifacts — already in private schema
       const salePrice = context.salePrice || String(bike.specs?.sale_price || bike.specs?.price_rub || "390000");
-      const { error: saleError } = await supabaseAdmin
-        .schema("private")
-        .from("sale_contract_artifacts")
-        .insert({
-          contract_key: vars.document_key,
-          original_sha256: docSha256,
-          requested_bike_id: context.bikeId,
-          resolved_bike_id: bike.id,
-          telegram_chat_id: String(userId),
-          telegram_message_id: null,
-          buyer_full_name: context.mpFullName || null,
-          buyer_passport_number: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
-          buyer_passport_issued_by: context.mpIssuedBy || null,
-          buyer_passport_issue_date: context.mpIssueDate || null,
-          buyer_registration: context.mpRegistration || null,
-          sale_price: salePrice,
-          warranty_months: "0",
-          template_version: 1,
-        });
+
+      // sale_contract_artifacts is in private schema — use explicit columns only
+      const { error: saleError } = await supabaseAdmin.schema("private").from("sale_contract_artifacts").insert({
+        contract_key: vars.document_key,
+        original_sha256: docSha256,
+        requested_bike_id: context.bikeId,
+        resolved_bike_id: bike.id,
+        telegram_chat_id: String(userId),
+        telegram_message_id: null,
+        buyer_full_name: context.mpFullName || null,
+        buyer_passport_number: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
+        buyer_passport_issued_by: context.mpIssuedBy || null,
+        buyer_passport_issue_date: context.mpIssueDate || null,
+        buyer_registration: context.mpRegistration || null,
+        sale_price: salePrice,
+        warranty_months: "0", // Sold "as-is", no warranty
+        template_version: 1,
+      });
       if (saleError) {
-        logger.error("[/doc] Failed to save sale_contract_artifacts:", {
-          message: (saleError as any).message,
-          code: (saleError as any).code,
-          details: (saleError as any).details,
-          hint: (saleError as any).hint,
-        });
+        logger.error("[/doc] Failed to save sale_contract_artifacts:", saleError);
       }
     }
 
@@ -866,7 +925,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     await setState(userId, "passport", context);
     await sendComplexMessage(
       chatId,
-      `✅ ${text}\n\n*Паспорт*\n\n4509 123456 15.03.2020 ОМВД по Н.Новгороду\n(укажите год выдачи)`,
+      `✅ ${text}\n\n*Паспорт*\n\n4509 123456 15.03.2020 ОМВД по Н.Новгороду`,
       [],
       { removeKeyboard: true, parseMode: "Markdown" },
     );
@@ -914,19 +973,24 @@ export async function handleDocText(userId: string, chatId: number, text: string
     context.mpRegistration = text.trim();
     const isRent = context.dealType === "rent";
     if (isRent) {
-      await setState(userId, "license", context);
+      await setState(userId, "has_license", context);
       await sendComplexMessage(
         chatId,
-        // FIX 5: clearer driver's license prompt
-        `✅\n\n*Водительское удостоверение*\n\nСерия Номер ДатаВыдачи СрокДействия\nПример: 99 76 123456 15.03 15.03.2036\n(дата выдачи — год = ${CURRENT_YEAR}, срок действия — полный год)`,
-        [],
-        { removeKeyboard: true, parseMode: "Markdown" },
+        "✅\n\n*Водительское удостоверение есть?*",
+        buildHasLicenseKeyboard(),
+        { keyboardType: 'inline', parseMode: "Markdown" },
       );
     } else {
       await setState(userId, "price", context);
       const priceKeyboard = await buildPriceKeyboard();
       await sendComplexMessage(chatId, "💰 Цена:", priceKeyboard, { keyboardType: 'inline' });
     }
+    return true;
+  }
+
+  if (state === "has_license") {
+    // User typed instead of pressing button — re-prompt
+    await sendComplexMessage(chatId, "*Водительское удостоверение есть?*", buildHasLicenseKeyboard(), { keyboardType: 'inline', parseMode: "Markdown" });
     return true;
   }
 
@@ -945,108 +1009,39 @@ export async function handleDocText(userId: string, chatId: number, text: string
     return true;
   }
 
-  // FIX 4: schedule_start — user typed custom start date/time
   if (state === "schedule_start") {
-    const t = text.trim().toLowerCase();
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-    const fmt = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
-
-    let startDate = "";
-    let startTime = "";
-
-    const todayMatch = t.match(/сегодня\s+(\d{1,2})(:(\d{2}))?/);
-    if (todayMatch) {
-      startDate = fmt(today);
-      startTime = `${todayMatch[1].padStart(2,'0')}:${todayMatch[3] || '00'}`;
-    }
-    if (!startDate) {
-      const tomorrowMatch = t.match(/завтра\s+(\d{1,2})(:(\d{2}))?/);
-      if (tomorrowMatch) {
-        startDate = fmt(tomorrow);
-        startTime = `${tomorrowMatch[1].padStart(2,'0')}:${tomorrowMatch[3] || '00'}`;
-      }
-    }
-    if (!startDate) {
-      const dateMatch = t.match(/(\d{1,2})\.(\d{1,2})(\.(\d{2,4}))?\s+(\d{1,2})(:(\d{2}))?/);
-      if (dateMatch) {
-        let [, d, m, , y, h, , min] = dateMatch;
-        const year = y ? (y.length === 2 ? (parseInt(y) > 50 ? `19${y}` : `20${y}`) : y) : String(CURRENT_YEAR);
-        startDate = `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${year}`;
-        startTime = `${h.padStart(2,'0')}:${min || '00'}`;
-      }
-    }
-
-    if (!startDate) {
-      await sendComplexMessage(chatId, "❌ Формат: сегодня 18, завтра 10, 15.06 18", [], { removeKeyboard: true });
-      return true;
-    }
-
-    context.rentStartDate = startDate;
-    context.rentStartTime = startTime;
-
-    // Ask for end date/time
-    await setState(userId, "schedule_end", context);
-    await sendComplexMessage(
-      chatId,
-      `✅ Старт: ${startDate} ${startTime}\n\n*Когда заканчиваем?*\n\nзавтра 10\n16.06 10`,
-      [
-        [{ text: "📅 Завтра 10:00", callback_data: "e_tomorrow_10" }],
-        [{ text: "✏️ Свое время", callback_data: "e_custom" }],
-      ],
-      { keyboardType: 'inline', parseMode: 'Markdown' },
-    );
+    // User typed instead of pressing button — re-prompt
+    await sendComplexMessage(chatId, "*Когда аренда?*", buildStartKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
   }
 
-  // FIX 4: schedule_end_text — user typed custom end date/time
-  if (state === "schedule_end_text") {
-    const t = text.trim().toLowerCase();
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-    const fmt = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
-
-    let endDate = "";
-    let endTime = "";
-
-    const tomorrowMatch = t.match(/завтра\s+(\d{1,2})(:(\d{2}))?/);
-    if (tomorrowMatch) {
-      endDate = fmt(tomorrow);
-      endTime = `${tomorrowMatch[1].padStart(2,'0')}:${tomorrowMatch[3] || '00'}`;
-    }
-    if (!endDate) {
-      const dateMatch = t.match(/(\d{1,2})\.(\d{1,2})(\.(\d{2,4}))?\s+(\d{1,2})(:(\d{2}))?/);
-      if (dateMatch) {
-        let [, d, m, , y, h, , min] = dateMatch;
-        const year = y ? (y.length === 2 ? (parseInt(y) > 50 ? `19${y}` : `20${y}`) : y) : String(CURRENT_YEAR);
-        endDate = `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${year}`;
-        endTime = `${h.padStart(2,'0')}:${min || '00'}`;
-      }
-    }
-
-    if (!endDate) {
-      await sendComplexMessage(chatId, "❌ Формат: завтра 10, 16.06 18", [], { removeKeyboard: true });
+  if (state === "schedule_end") {
+    const e = parseEndDate(text, context.rentStartDate);
+    if (!e) {
+      await sendComplexMessage(chatId, "❌ Формат: завтра 10, 16.06 10, 16.06.2026 10", [], { removeKeyboard: true });
       return true;
     }
+    context.rentEndDate = e.date;
+    context.rentEndTime = e.time;
 
-    context.rentEndDate = endDate;
-    context.rentEndTime = endTime;
+    const summary = buildRentSummary(context);
+    await setState(userId, "confirm", context);
+    await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
 
-    // Show confirmation
-    const summary = [
-      "*📋 Проверьте:*",
-      "",
-      `👤 ${context.mpFullName}`,
-      `🪪 ${context.mpSeries} ${context.mpNumber} от ${context.mpIssueDate}`,
-      "",
-      `🚗 ВУ: ${context.mlSeries} ${context.mlNumber} (${(context.mlCategories || []).join(", ")})`,
-      "",
-      `📅 ${context.rentStartDate} ${context.rentStartTime} → ${context.rentEndDate} ${context.rentEndTime}`,
-      "",
-      "Всё верно?",
-    ].join("\n");
+  if (state === "schedule") {
+    const s = parseSchedule(text);
+    if (!s) {
+      await sendComplexMessage(chatId, "❌ Формат: сегодня 18, завтра 10, 15.06 18", [], { removeKeyboard: true });
+      return true;
+    }
+    context.rentStartDate = s.start;
+    context.rentStartTime = s.startTime;
+    context.rentEndDate = s.end;
+    context.rentEndTime = s.endTime;
+
+    const summary = buildRentSummary(context);
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
@@ -1127,6 +1122,27 @@ export async function handleDocCallback(
     return true;
   }
 
+  // ── Has license? Yes/No ──
+  if (callbackData === "hl_yes") {
+    await setState(userId, "license", context);
+    await sendComplexMessage(
+      chatId,
+      `✅\n\n*ВУ*\n\n99 76 123456 15.03 15.03\n(год = ${CURRENT_YEAR})`,
+      [],
+      { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  if (callbackData === "hl_no") {
+    // No license — skip license & categories, go straight to schedule
+    context.mlCategories = ["нет"];
+    context.mlAccessTier = deriveUserAccessTier(["нет"]);
+    await setState(userId, "schedule_start", context);
+    await sendComplexMessage(chatId, "✅ Нет ВУ\n\n*Когда аренда?*", buildStartKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
   if (callbackData.startsWith("c_")) {
     const cat = callbackData.slice(2);
     const cats = context.mlCategories || [];
@@ -1146,7 +1162,6 @@ export async function handleDocCallback(
     return true;
   }
 
-  // ── Start time selection (s_ prefix) ──
   if (callbackData.startsWith("s_")) {
     const parts = callbackData.slice(2).split('_');
     const when = parts[0];
@@ -1158,70 +1173,66 @@ export async function handleDocCallback(
     const fmt = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
 
     if (when === "custom") {
-      await setState(userId, "schedule_start", context);
-      await sendComplexMessage(chatId, "📅 *Когда начинаем аренду?*\n\nсегодня 18\nзавтра 10\n15.06 18", [], { removeKeyboard: true, parseMode: "Markdown" });
+      await setState(userId, "schedule", context);
+      await sendComplexMessage(chatId, "*Когда начинаем?*\n\nсегодня 18, завтра 10, 15.06 18", [], { removeKeyboard: true, parseMode: "Markdown" });
       return true;
     }
 
     const start = when === "today" ? today : tomorrow;
-    const defaultEnd = new Date(start);
-    defaultEnd.setDate(start.getDate() + 1);
 
     context.rentStartDate = fmt(start);
     context.rentStartTime = `${time}:00`;
-    // Set defaults for end — user can override
-    context.rentEndDate = fmt(defaultEnd);
-    context.rentEndTime = "10:00";
 
-    // FIX 4: Ask for end date/time instead of going straight to confirm
+    // Ask for end date instead of auto-setting
     await setState(userId, "schedule_end", context);
     await sendComplexMessage(
       chatId,
-      `✅ Старт: ${context.rentStartDate} ${context.rentStartTime}\n\n*Когда заканчиваем?*\n\nзавтра 10\n16.06 10\nИли нажмите кнопку:`,
-      [
-        [{ text: "📅 Завтра 10:00", callback_data: "e_tomorrow_10" }],
-        [{ text: "✏️ Свое время", callback_data: "e_custom" }],
-      ],
+      `✅ Старт: ${context.rentStartDate} ${context.rentStartTime}\n\n*Когда заканчиваем?*`,
+      buildEndKeyboard(),
       { keyboardType: 'inline', parseMode: 'Markdown' },
     );
     return true;
   }
 
-  // ── End time selection (e_ prefix) — FIX 4 ──
+  // ── End date callbacks (e_*) ──
   if (callbackData.startsWith("e_")) {
     const parts = callbackData.slice(2).split('_');
     const when = parts[0];
     const time = parts[1];
 
     const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
     const fmt = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
 
+    // Resolve start date for relative end calculation
+    let startRef = new Date(today);
+    if (context.rentStartDate) {
+      const sp = context.rentStartDate.split('.');
+      if (sp.length === 3) startRef = new Date(`${sp[2]}-${sp[1]}-${sp[0]}`);
+    }
+
     if (when === "custom") {
-      await setState(userId, "schedule_end_text", context);
-      await sendComplexMessage(chatId, "📅 *Когда заканчиваем аренду?*\n\nзавтра 10\n16.06 18:00", [], { removeKeyboard: true, parseMode: "Markdown" });
+      await setState(userId, "schedule_end", context);
+      await sendComplexMessage(chatId, "*Когда заканчиваем?*\n\nзавтра 10, 16.06 10, 16.06.2026 10", [], { removeKeyboard: true, parseMode: "Markdown" });
       return true;
     }
 
     if (when === "tomorrow") {
-      context.rentEndDate = fmt(tomorrow);
+      const end = new Date(startRef);
+      end.setDate(startRef.getDate() + 1);
+      context.rentEndDate = fmt(end);
       context.rentEndTime = `${time}:00`;
+    } else if (when === "2days") {
+      const end = new Date(startRef);
+      end.setDate(startRef.getDate() + 2);
+      context.rentEndDate = fmt(end);
+      context.rentEndTime = `${time}:00`;
+    } else {
+      // Unknown end callback — re-prompt
+      await sendComplexMessage(chatId, "*Когда заканчиваем?*", buildEndKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+      return true;
     }
 
-    // Show confirmation
-    const summary = [
-      "*📋 Проверьте:*",
-      "",
-      `👤 ${context.mpFullName}`,
-      `🪪 ${context.mpSeries} ${context.mpNumber} от ${context.mpIssueDate}`,
-      "",
-      `🚗 ВУ: ${context.mlSeries} ${context.mlNumber} (${(context.mlCategories || []).join(", ")})`,
-      "",
-      `📅 ${context.rentStartDate} ${context.rentStartTime} → ${context.rentEndDate} ${context.rentEndTime}`,
-      "",
-      "Всё верно?",
-    ].join("\n");
+    const summary = buildRentSummary(context);
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
