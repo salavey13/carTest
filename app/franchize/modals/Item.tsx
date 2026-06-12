@@ -1,6 +1,6 @@
 "use client";
 
-import { Info, Swords, X } from "lucide-react";
+import { Calendar, Info, Swords, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
@@ -33,6 +33,11 @@ import { FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 
 export type FlowType = "rental" | "order";
 
+// Helper to check if item has rental pricing
+const itemHasRentPrice = (item: CatalogItemVM) => item.pricePerDay > 0;
+const itemHasSalePrice = (item: CatalogItemVM) =>
+  item.saleAvailable && Boolean(item.salePrice && item.salePrice > 0);
+
 interface ItemModalProps {
   item: CatalogItemVM | null;
   items: CatalogItemVM[];
@@ -47,14 +52,20 @@ interface ItemModalProps {
     duration: string;
     perk: string;
     auction: string;
+    /** Rental start date (ISO string yyyy-MM-dd) */
+    rentStartDate?: string;
+    /** Rental end date (ISO string yyyy-MM-dd) */
+    rentEndDate?: string;
   };
   auctionOptions: string[];
   onChangeOption: (
-    key: "package" | "duration" | "perk" | "auction",
+    key: "package" | "duration" | "perk" | "auction" | "rentStartDate" | "rentEndDate",
     value: string,
   ) => void;
   onClose: () => void;
   onAddToCart: () => void | Promise<void>;
+  /** Called when "Купить" (buy) CTA is clicked for sale-only flow */
+  onBuyItem?: () => void | Promise<void>;
 }
 
 const packageOptions = ["Базовый", "Комфорт", "Максимум"];
@@ -118,6 +129,90 @@ function OptionChips({
   );
 }
 
+/** Date picker row for rental start/end dates */
+function RentalDatePickers({
+  startDate,
+  endDate,
+  onStartChange,
+  onEndChange,
+  accentColor,
+  borderColor,
+}: {
+  startDate: string;
+  endDate: string;
+  onStartChange: (v: string) => void;
+  onEndChange: (v: string) => void;
+  accentColor: string;
+  borderColor: string;
+}) {
+  // Compute min date: today
+  const today = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
+
+  // End date min = start date (or today if no start)
+  const endMin = startDate || today;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/15 p-3">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+        <Calendar className="h-3.5 w-3.5" />
+        Даты аренды
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-[10px] uppercase tracking-[0.08em] text-[var(--item-muted-text)]">
+            Дата начала
+          </label>
+          <input
+            type="date"
+            value={startDate}
+            min={today}
+            onChange={(e) => onStartChange(e.target.value)}
+            className="w-full rounded-lg border px-2.5 py-2 text-sm text-[var(--item-text)] transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
+            style={{
+              backgroundColor: "rgba(0,0,0,0.25)",
+              borderColor,
+              colorScheme: "dark",
+            }}
+            aria-label="Дата начала аренды"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] uppercase tracking-[0.08em] text-[var(--item-muted-text)]">
+            Дата окончания
+          </label>
+          <input
+            type="date"
+            value={endDate}
+            min={endMin}
+            onChange={(e) => onEndChange(e.target.value)}
+            className="w-full rounded-lg border px-2.5 py-2 text-sm text-[var(--item-text)] transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
+            style={{
+              backgroundColor: "rgba(0,0,0,0.25)",
+              borderColor,
+              colorScheme: "dark",
+            }}
+            aria-label="Дата окончания аренды"
+          />
+        </div>
+      </div>
+      {/* Quick duration hint */}
+      {startDate && endDate && (
+        <p className="mt-2 text-[11px] text-[var(--item-muted-text)]">
+          {(() => {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+            return `${days} ${days === 1 ? "день" : days < 5 ? "дня" : "дней"} аренды`;
+          })()}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function ItemModal({
   item,
   items,
@@ -131,13 +226,19 @@ export function ItemModal({
   onChangeOption,
   onClose,
   onAddToCart,
+  onBuyItem,
 }: ItemModalProps) {
   const isRental = flowType === "rental";
   const modalRef = useRef<HTMLDivElement>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [isAdding, setIsAdding] = useState(false);
+  const [isBuying, setIsBuying] = useState(false);
   const [vsBike, setVsBike] = useState<CatalogItemVM | null>(null);
+
+  // Determine which CTAs to show
+  const showRentCta = isRental && itemHasRentPrice(item!);
+  const showBuyCta = item?.saleAvailable === true;
 
   const gallery = useMemo(() => {
     if (!item) return [];
@@ -237,6 +338,27 @@ export function ItemModal({
     [isAdding, onAddToCart],
   );
 
+  const handleBuyItem = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isBuying) return;
+
+      setIsBuying(true);
+      try {
+        const result = onBuyItem?.();
+        if (result instanceof Promise) {
+          result.finally(() => setIsBuying(false));
+        } else {
+          setIsBuying(false);
+        }
+      } catch {
+        setIsBuying(false);
+      }
+    },
+    [isBuying, onBuyItem],
+  );
+
   const changeMedia = useCallback(
     (direction: -1 | 1) => {
       setActiveMediaIndex(
@@ -304,14 +426,21 @@ export function ItemModal({
 
   const normalizedSpecs = item.specs.length > 0 ? item.specs : fallbackSpecs;
 
-  // Generalized CTA label
-  const ctaLabel = isAdding
+  // ── CTA label logic ──
+  // When both rent + sale are available, we show two separate buttons.
+  // When only one is available, we show a single CTA.
+  const rentCtaLabel = isAdding ? "Бронируем..." : "Забронировать";
+  const buyCtaLabel = isBuying ? "Покупаем..." : "Купить";
+  const singleCtaLabel = isAdding
     ? "Добавляем..."
-    : item.saleAvailable
-      ? "Купить"
-      : isRental
-        ? "Забронировать"
+    : showRentCta
+      ? rentCtaLabel
+      : showBuyCta
+        ? buyCtaLabel
         : "Выбрать";
+
+  // Determine footer grid layout
+  const footerCols = showRentCta && showBuyCta ? 3 : 2;
 
   return (
     <div
@@ -512,6 +641,16 @@ export function ItemModal({
             {/* ── Rental-only options (hidden for order flow) ── */}
             {isRental && (
               <>
+                {/* ── Date picker for rental dates ── */}
+                <RentalDatePickers
+                  startDate={options.rentStartDate ?? ""}
+                  endDate={options.rentEndDate ?? ""}
+                  onStartChange={(v) => onChangeOption("rentStartDate", v)}
+                  onEndChange={(v) => onChangeOption("rentEndDate", v)}
+                  accentColor={theme.palette.accentMain}
+                  borderColor={theme.palette.borderSoft}
+                />
+
                 <OptionChips
                   title="Пакет"
                   options={packageOptions}
@@ -606,9 +745,9 @@ export function ItemModal({
             ) : null}
           </div>
 
-          {/* Footer Buttons — rentalbikes-style: bordered CTA + solid accent */}
+          {/* Footer Buttons — dual CTA when both rent + sale available */}
           <div
-            className="grid shrink-0 grid-cols-1 gap-2 border-t p-3 sm:grid-cols-2"
+            className={`grid shrink-0 gap-2 border-t p-3 ${footerCols === 3 ? "grid-cols-3" : "grid-cols-2"}`}
             style={{ ...surface.card, borderColor: theme.palette.borderSoft }}
           >
             <button
@@ -620,15 +759,51 @@ export function ItemModal({
             >
               Закрыть
             </button>
-            <button
-              type="button"
-              onClick={handleAddToCart}
-              disabled={isAdding}
-              aria-busy={isAdding}
-              className="rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-            >
-              {ctaLabel}
-            </button>
+
+            {/* Rent CTA — shown when item has rental pricing */}
+            {showRentCta && (
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={isAdding}
+                aria-busy={isAdding}
+                aria-label="Забронировать аренду"
+                className="rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+              >
+                {rentCtaLabel}
+              </button>
+            )}
+
+            {/* Buy CTA — shown when item is available for sale */}
+            {showBuyCta && (
+              <button
+                type="button"
+                onClick={showRentCta ? handleBuyItem : handleAddToCart}
+                disabled={showRentCta ? isBuying : isAdding}
+                aria-busy={showRentCta ? isBuying : isAdding}
+                aria-label="Купить"
+                className={`rounded-xl border-2 px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] ${
+                  showRentCta
+                    ? "border-[var(--item-accent)] text-[var(--item-accent)] hover:bg-[var(--item-accent)] hover:text-[var(--item-accent-contrast)]"
+                    : "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
+                }`}
+              >
+                {showRentCta ? buyCtaLabel : singleCtaLabel}
+              </button>
+            )}
+
+            {/* Fallback CTA — when neither rent nor sale is flagged */}
+            {!showRentCta && !showBuyCta && (
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={isAdding}
+                aria-busy={isAdding}
+                className="rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+              >
+                {singleCtaLabel}
+              </button>
+            )}
           </div>
         </div>
       </div>
