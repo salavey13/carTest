@@ -253,7 +253,7 @@ export function ItemModal({
     if (item?.description) return item.description;
     // Generalized fallback — no bike-specific language
     return isRental
-      ? "Позиция готова к  аренде: технический чек выполнен, документы готовы, выдача без очереди."
+      ? "Позиция готова к аренде: технический чек выполнен, документы готовы, выдача без очереди."
       : "Позиция доступна для заказа. Оставьте заявку, и менеджер свяжется с вами для уточнения деталей.";
   }, [item?.description, isRental]);
 
