@@ -340,7 +340,7 @@ export function ItemModal({
             <X className="h-4 w-4" />
           </button>
 
-          {/* Gallery Component */}
+          {/* Gallery Component — rentalbikes-style portrait hero */}
           <ItemGallery
             images={gallery}
             activeIndex={activeMediaIndex}
@@ -354,27 +354,45 @@ export function ItemModal({
             disableKeyboardNav={false}
           />
 
-          {/* Content */}
+          {/* Content — rentalbikes-inspired layout */}
           <div className="space-y-4 p-4 sm:p-5">
+            {/* Title + characteristics row (rentalbikes-style) */}
             <div>
               <h3
                 id={`item-modal-title-${item.id}`}
-                className="text-lg font-semibold sm:text-xl"
+                className="text-lg font-bold sm:text-xl"
               >
                 {item.title}
               </h3>
               <p className="text-sm" style={surface.mutedText}>
                 {item.subtitle}
               </p>
+
+              {/* Spec chips row — rentalbikes-style inline icons (speed, engine, weight) */}
+              {normalizedSpecs.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {normalizedSpecs.slice(0, 4).map((spec) => (
+                    <span
+                      key={`${spec.label}-${spec.value}`}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-black/40 px-2.5 py-1.5 text-xs font-semibold text-[var(--item-accent)]"
+                    >
+                      <span className="text-[10px] opacity-70">{spec.label}</span>
+                      <span className="text-white">{spec.value}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Availability badge + sale badge */}
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                {/* Availability badge — generalized */}
                 <span
-                  className={`inline-flex rounded-full border px-2.5 py-1 font-semibold ${
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold ${
                     rentalStrip?.isAvailable ?? item.availabilityStatus === "available"
-                      ? "border-emerald-300/50 bg-emerald-400/15 text-emerald-100"
-                      : "border-amber-300/50 bg-amber-400/15 text-amber-100"
+                      ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-300"
+                      : "border-amber-400/40 bg-amber-500/15 text-amber-200"
                   }`}
                 >
+                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${rentalStrip?.isAvailable ?? item.availabilityStatus === "available" ? "bg-emerald-400" : "bg-amber-400"}`} />
                   {isRental
                     ? `Сегодня: ${rentalStrip?.todayLabel ?? "Уточним в Telegram"}`
                     : item.availabilityStatus === "available"
@@ -387,26 +405,29 @@ export function ItemModal({
                   </span>
                 )}
               </div>
-              {/* Rental strip — only for rental flow */}
-              {isRental && rentalStrip ? (
-                <div
-                  className="mt-3 grid gap-2 rounded-2xl border border-white/10 bg-black/15 p-3 text-xs sm:grid-cols-3"
-                  aria-label={`Быстрая аренда ${item.title}`}
-                >
-                  <div>
-                    <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">Ближайшее окно</p>
-                    <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.nearestStartWindow}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">Выдача</p>
-                    <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.pickupHint}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">Залог / тариф</p>
-                    <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.priceTeaser}</p>
-                  </div>
+            </div>
+
+            {/* Rental strip — only for rental flow */}
+            {isRental && rentalStrip ? (
+              <div
+                className="grid gap-2 rounded-2xl border border-white/10 bg-black/15 p-3 text-xs sm:grid-cols-3"
+                aria-label={`Быстрая аренда ${item.title}`}
+              >
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">Ближайшее окно</p>
+                  <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.nearestStartWindow}</p>
                 </div>
-              ) : null}
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">Выдача</p>
+                  <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.pickupHint}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">Залог / тариф</p>
+                  <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.priceTeaser}</p>
+                </div>
+              </div>
+            ) : null}
+
               <p
                 id={`item-modal-description-${item.id}`}
                 className={`mt-2 text-sm leading-6 ${descriptionExpanded ? "" : "line-clamp-4"}`}
@@ -425,8 +446,8 @@ export function ItemModal({
                   {descriptionExpanded ? "Скрыть" : "Показать ещё..."}
                 </button>
               )}
-            </div>
 
+            {/* Full specs grid — rentalbikes-style dark cards */}
             <div
               className="rounded-2xl border p-3 text-xs"
               style={surface.subtleCard}
@@ -585,7 +606,7 @@ export function ItemModal({
             ) : null}
           </div>
 
-          {/* Footer Buttons */}
+          {/* Footer Buttons — rentalbikes-style: bordered CTA + solid accent */}
           <div
             className="grid shrink-0 grid-cols-1 gap-2 border-t p-3 sm:grid-cols-2"
             style={{ ...surface.card, borderColor: theme.palette.borderSoft }}
@@ -594,7 +615,7 @@ export function ItemModal({
               type="button"
               onClick={onClose}
               aria-label="Закрыть карточку товара"
-              className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+              className="rounded-xl border-2 border-white/20 px-3 py-2 text-sm font-medium transition hover:border-white/40 hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
               style={surface.subtleCard}
             >
               Закрыть
@@ -604,7 +625,7 @@ export function ItemModal({
               onClick={handleAddToCart}
               disabled={isAdding}
               aria-busy={isAdding}
-              className="rounded-xl bg-[var(--item-accent)] px-3 py-2 text-sm font-semibold text-[var(--item-accent-contrast)] transition hover:brightness-105 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+              className="rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
             >
               {ctaLabel}
             </button>
