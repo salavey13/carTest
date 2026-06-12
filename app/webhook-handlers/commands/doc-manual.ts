@@ -1038,7 +1038,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
       "*📋 Проверьте:*",
       "",
       `👤 ${context.mpFullName}`,
-      `🪪 ${context.mpSeries} ${context.mpNumber} от ${context.${context.mpIssueDate}`,
+      `🪪 ${context.mpSeries} ${context.mpNumber} от ${context.mpIssueDate}`,
       "",
       `🚗 ВУ: ${context.mlSeries} ${context.mlNumber} (${(context.mlCategories || []).join(", ")})`,
       "",
