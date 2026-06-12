@@ -89,9 +89,13 @@ function getItemFlowType(item: CatalogItemVM): FlowType {
 }
 
 // Derive CTA label per-item from flow type + saleAvailable
+// NOTE: In the ItemModal, dual CTAs are shown when both rent+sale are available.
+// This label is used on the catalog card CTA — keeps a single button per card.
 function getItemCtaLabel(item: CatalogItemVM): string {
   const flow = getItemFlowType(item);
-  // Sale item in rental context → "Купить" (buy option alongside rent)
+  // Rental + sale → prioritize rent CTA on card (modal shows both)
+  if (flow === "rental" && item.pricePerDay > 0) return "Забронировать";
+  // Sale item in rental context → buy option
   if (item.saleAvailable && flow === "rental") return "Купить";
   // Pure rental → "Забронировать"
   if (flow === "rental") return "Забронировать";
@@ -235,7 +239,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const surface = crewPaletteForSurface(crew.theme);
   const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
   const { addItem } = useFranchizeCart(crew.slug || slug);
-  const [selectedOptions, setSelectedOptions] = useState({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона" });
+  const [selectedOptions, setSelectedOptions] = useState({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона", rentStartDate: "", rentEndDate: "" });
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchCtaFocused, setSearchCtaFocused] = useState(false);
@@ -812,7 +816,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           </span>
                         </div>
 
-                        {/* ── Info area below image (rentalbikes-style: highlight on hover) ── */}
+                        {/* ── Info + CTA area (rentalbikes-style: highlight on hover, unified container to avoid gap) ── */}
                         <div className="rounded-b-2xl p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]" style={{ backgroundColor: "var(--catalog-card-bg)" }}>
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
@@ -821,35 +825,35 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                                 Хит
                               </span>
                             )}
-                            {item.saleAvailable && <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-amber-100 group-hover:text-amber-900">Продажа</span>}
-                            {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:text-black" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="text-[7px]">{tv.emoji}</span>{tv.label}</span> : null; })()}
+                            {item.saleAvailable && <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-amber-100 group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
+                            {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:text-[var(--catalog-accent-contrast)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="text-[7px]">{tv.emoji}</span>{tv.label}</span> : null; })()}
                           </div>
 
                           {/* Title */}
-                          <h3 className="text-sm font-bold leading-5 text-white transition-colors duration-300 group-hover:text-black">{item.title}</h3>
+                          <h3 className="text-sm font-bold leading-5 text-white transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</h3>
 
                           {/* Price — rentalbikes-style: "от X ₽ | срок" */}
                           <div className="mt-1.5">
                             {hasRentPrice(item) ? (
-                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-black">
+                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">
                                 {item.rentPriceLabel}
                                 {hasSalePrice(item) && (
-                                  <span className="ml-1 text-[11px] font-normal text-white/50 transition-colors duration-300 group-hover:text-black/50">| {item.salePrice?.toLocaleString("ru-RU")} ₽ покупка</span>
+                                  <span className="ml-1 text-[11px] font-normal text-white/50 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]/50">| {item.salePrice?.toLocaleString("ru-RU")} ₽ покупка</span>
                                 )}
                               </p>
                             ) : hasSalePrice(item) ? (
-                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-black">{item.salePrice?.toLocaleString("ru-RU")} ₽</p>
+                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.salePrice?.toLocaleString("ru-RU")} ₽</p>
                             ) : (
-                              <p className="text-xs font-medium text-white/60 transition-colors duration-300 group-hover:text-black/60">Цена по запросу</p>
+                              <p className="text-xs font-medium text-white/60 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]/60">Цена по запросу</p>
                             )}
                           </div>
-                        </div>
 
-                        {/* ── CTA button below info (rentalbikes-style: bordered, accent color) ── */}
-                        <div className="px-3 pb-3">
-                          <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-all duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
-                            {getItemCtaLabel(item)}
-                          </span>
+                          {/* CTA button inside same container (rentalbikes-style: bordered, accent color) */}
+                          <div className="mt-3">
+                            <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
+                              {getItemCtaLabel(item)}
+                            </span>
+                          </div>
                         </div>
                       </button>
                     </article>
@@ -926,7 +930,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           </span>
                         </div>
 
-                        {/* ── Info area below image (rentalbikes-style: highlight on hover) ── */}
+                        {/* ── Info + CTA area (rentalbikes-style: highlight on hover, unified container) ── */}
                         <div className="rounded-b-2xl p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]" style={{ backgroundColor: "var(--catalog-card-bg)" }}>
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
@@ -935,35 +939,35 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                                 Хит
                               </span>
                             )}
-                            {item.saleAvailable && <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-amber-100 group-hover:text-amber-900">Продажа</span>}
-                            {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:text-black" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="text-[7px]">{tv.emoji}</span>{tv.label}</span> : null; })()}
+                            {item.saleAvailable && <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/25 px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-amber-100 group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
+                            {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:text-[var(--catalog-accent-contrast)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="text-[7px]">{tv.emoji}</span>{tv.label}</span> : null; })()}
                           </div>
 
                           {/* Title */}
-                          <h3 className="text-sm font-bold leading-5 text-white transition-colors duration-300 group-hover:text-black">{item.title}</h3>
+                          <h3 className="text-sm font-bold leading-5 text-white transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</h3>
 
                           {/* Price — rentalbikes-style: "от X ₽ | срок" */}
                           <div className="mt-1.5">
                             {hasRentPrice(item) ? (
-                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-black">
+                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">
                                 {item.rentPriceLabel}
                                 {hasSalePrice(item) && (
-                                  <span className="ml-1 text-[11px] font-normal text-white/50 transition-colors duration-300 group-hover:text-black/50">| {item.salePrice?.toLocaleString("ru-RU")} ₽ покупка</span>
+                                  <span className="ml-1 text-[11px] font-normal text-white/50 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]/50">| {item.salePrice?.toLocaleString("ru-RU")} ₽ покупка</span>
                                 )}
                               </p>
                             ) : hasSalePrice(item) ? (
-                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-black">{item.salePrice?.toLocaleString("ru-RU")} ₽</p>
+                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.salePrice?.toLocaleString("ru-RU")} ₽</p>
                             ) : (
-                              <p className="text-xs font-medium text-white/60 transition-colors duration-300 group-hover:text-black/60">Цена по запросу</p>
+                              <p className="text-xs font-medium text-white/60 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]/60">Цена по запросу</p>
                             )}
                           </div>
-                        </div>
 
-                        {/* ── CTA button below info (rentalbikes-style: bordered, accent color) ── */}
-                        <div className="px-3 pb-3">
-                          <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-2 py-2 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-all duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
-                            {getItemCtaLabel(item)}
-                          </span>
+                          {/* CTA button inside same container (rentalbikes-style: bordered, accent color) */}
+                          <div className="mt-3">
+                            <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-2 py-2 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
+                              {getItemCtaLabel(item)}
+                            </span>
+                          </div>
                         </div>
                       </button>
                     </article>
@@ -1002,14 +1006,23 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         options={selectedOptions}
         auctionOptions={auctionTickOptions}
         onChangeOption={(key, value) => setSelectedOptions((prev) => ({ ...prev, [key]: value }))}
+        onBuyItem={() => {
+          if (!selectedItem) return;
+          void recordRentIntent(selectedItem, "configured", {
+            trigger: "modal_buy_cta",
+            options: { ...selectedOptions, action: "buy" },
+          });
+          addItem(selectedItem.id, { ...selectedOptions, action: "buy" }, 1);
+          setSelectedItem(null);
+        }}
         onClose={() => setSelectedItem(null)}
         onAddToCart={() => {
           if (!selectedItem) return;
           void recordRentIntent(selectedItem, "configured", {
-            trigger: "modal_cta",
-            options: selectedOptions,
+            trigger: "modal_rent_cta",
+            options: { ...selectedOptions, action: "rent" },
           });
-          addItem(selectedItem.id, selectedOptions, 1);
+          addItem(selectedItem.id, { ...selectedOptions, action: "rent" }, 1);
           setSelectedItem(null);
         }}
       />
