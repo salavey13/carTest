@@ -162,6 +162,10 @@ export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: nu
 
 
 export function floatingCartOverlayBackground(theme: FranchizeTheme) {
+  // When in auto mode, use CSS variable; otherwise use palette directly
+  if (theme.isAuto) {
+    return "var(--franchize-bg-card)";
+  }
   const alpha = theme.mode === "light" ? 0.9 : 0.94;
   return withAlpha(theme.palette.bgCard, alpha);
 }

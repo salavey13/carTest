@@ -29,7 +29,7 @@ export default async function FranchizeOrderPage({ params }: FranchizeOrderPageP
 
   return (
     <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/order/${id}`} groupLinks={items.map((item) => item.category)} />
+      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/order/${id}`} groupLinks={items.map((item) => item.category)} items={items} />
       <OrderPageClient crew={crew} slug={crew.slug || slug} orderId={id} items={items} />
       <CrewFooter crew={crew} />
     </main>

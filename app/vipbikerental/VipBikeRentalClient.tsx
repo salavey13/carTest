@@ -55,7 +55,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeTheme } from "@/app/franchize/actions";
-import { crewPaletteForSurface, withAlpha } from "@/app/franchize/lib/theme";
+import { crewPaletteWithCssVars, withAlpha } from "@/app/franchize/lib/theme";
 
 // ── Pipeline imports ──
 import { resolveVipBikeProfile } from "@/app/franchize/lib/onboarding/resolve-profile";
@@ -256,7 +256,7 @@ export function VipBikeRentalClient({
   const { dbUser } = useAppContext();
 
   // Get theme-based surface colors for proper text/background contrast
-  const surface = crewPaletteForSurface(theme);
+  const surface = crewPaletteWithCssVars(theme);
   const { scrollYProgress } = useScroll();
   const y = useTransform(scrollYProgress, [0, 1], [0, -90]);
 
@@ -422,68 +422,76 @@ export function VipBikeRentalClient({
           <video autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover brightness-[0.5] saturate-125">
             <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/2_5219998213838247718.mp4" type="video/mp4" />
           </video>
-          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-black/55" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_23%,rgba(255,106,0,0.25),transparent_42%)]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/70 to-black/60" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,106,0,0.15),transparent_50%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_40%,rgba(217,154,0,0.12),transparent_45%)]" />
         </div>
-        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/45 px-4 py-2 text-sm text-white/90 backdrop-blur-sm">
-            <VibeContentRenderer content="::FaBolt::" className="text-brand-yellow" />
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }} className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center text-center">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-black/60 px-4 py-2 text-sm text-amber-400 backdrop-blur-md shadow-[0_0_20px_rgba(217,154,0,0.3)] transition-all hover:border-amber-400/50 hover:shadow-[0_0_30px_rgba(217,154,0,0.5)]">
+            <VibeContentRenderer content="::FaBolt::" className="text-amber-400" />
             <span>{crew?.header?.brandName || crew?.name || "VIP BIKE"} · ПРЕМИАЛЬНЫЙ ПРОКАТ И МАРШРУТЫ</span>
           </div>
-          <div className="mb-5 w-full max-w-2xl rounded-2xl border border-white/20 bg-black/40 p-4 text-left text-sm text-white/90 backdrop-blur-sm">
-            <div className="mb-1 font-medium text-brand-yellow"><VibeContentRenderer content={vibeProfile.badge} /></div>
+          <div className="mb-5 w-full max-w-2xl rounded-2xl border border-amber-400/20 bg-black/60 p-4 text-left text-sm backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.4),0_0_40px_rgba(217,154,0,0.1)] transition-all hover:border-amber-400/30 hover:shadow-[0_4px_30px_rgba(0,0,0,0.5),0_0_60px_rgba(217,154,0,0.15)]">
+            <div className="mb-1 font-medium text-amber-400"><VibeContentRenderer content={vibeProfile.badge} /></div>
             <p className="font-orbitron text-lg text-white">{vibeProfile.title}</p>
             <p className="mt-1 text-white/80">{vibeProfile.note}</p>
           </div>
           <h1 className="font-orbitron text-5xl font-black uppercase leading-[0.9] tracking-tight text-white drop-shadow-[0_8px_22px_rgba(0,0,0,0.75)] sm:text-6xl md:text-7xl lg:text-8xl">
             <span className="block">Скорость. Контроль.</span>
-            <span className="block text-brand-yellow">Ваш выезд организован заранее.</span>
+            <span className="block text-amber-400 drop-shadow-[0_0_30px_rgba(217,154,0,0.6)]">Ваш выезд организован заранее.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-3xl text-base font-light text-white/90 sm:text-lg md:text-xl">
             Премиальный прокат в Нижнем Новгороде: от выбора модели до возврата — единый управляемый поток, где клиент понимает цену, слот, защиту и следующий шаг.
           </p>
-          <div className="mt-9 w-full max-w-5xl rounded-3xl border border-white/20 bg-black/45 p-3 text-left shadow-2xl shadow-black/40 backdrop-blur-md sm:p-4">
+          <div className="mt-9 w-full max-w-5xl rounded-3xl border border-amber-400/20 bg-black/60 p-3 text-left shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-4">
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" role="tablist" aria-label="VIP Bike quick scenario selector">
               {(Object.values(heroPanels) as HeroPanel[]).map((panel) => {
                 const isActive = heroMode === panel.mode;
                 return (
-                  <button key={panel.mode} type="button" role="tab" aria-selected={isActive} onClick={() => handleHeroModeChange(panel.mode as HeroDisplayMode)} className={cn("rounded-2xl border px-3 py-3 text-left transition-all duration-300", isActive ? "border-brand-yellow bg-brand-yellow/20 text-white shadow-lg shadow-brand-yellow/25 ring-1 ring-brand-yellow/40" : "border-white/15 bg-white/5 text-white/75 hover:border-white/40 hover:bg-white/10 hover:text-white")}>
-                    <span className="mb-1 flex items-center gap-2 text-xs uppercase tracking-[0.22em]"><VibeContentRenderer content={panel.icon} />{panel.label}</span>
+                  <button key={panel.mode} type="button" role="tab" aria-selected={isActive} onClick={() => handleHeroModeChange(panel.mode as HeroDisplayMode)} className={cn(
+                    "rounded-2xl border px-3 py-3 text-left transition-all duration-300",
+                    isActive
+                      ? "border-amber-400 bg-amber-400/20 text-white shadow-[0_0_25px_rgba(217,154,0,0.4)] ring-2 ring-amber-400/60"
+                      : "border-white/15 bg-white/5 text-white/75 hover:border-amber-400/40 hover:bg-white/10 hover:text-white hover:shadow-[0_0_15px_rgba(217,154,0,0.2)]"
+                  )}>
+                    <span className="mb-1 flex items-center gap-2 text-xs uppercase tracking-[0.22em]"><VibeContentRenderer content={panel.icon} className={isActive ? "text-amber-400" : ""} />{panel.label}</span>
                     <span className="block font-orbitron text-sm sm:text-base">{panel.cta}</span>
                   </button>
                 );
               })}
             </div>
             <AnimatePresence mode="wait">
-              <motion.div ref={heroContentRef} key={activeHeroPanel.mode} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.24 }} className="mt-4 grid gap-4 overflow-hidden rounded-2xl border border-white/15 bg-white/[0.06] p-4 sm:grid-cols-[1.1fr_0.9fr] sm:p-5">
+              <motion.div ref={heroContentRef} key={activeHeroPanel.mode} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }} className="mt-4 grid gap-4 overflow-hidden rounded-2xl border border-amber-400/15 bg-black/40 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-xl sm:grid-cols-[1.1fr_0.9fr] sm:p-5">
                 <div className="flex min-h-[260px] flex-col justify-between gap-5">
                   <div>
-                    <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/30 px-3 py-1 text-xs uppercase tracking-[0.22em] text-brand-yellow"><VibeContentRenderer content={activeHeroPanel.icon} />{activeHeroPanel.eyebrow}</div>
-                    <h2 className="font-orbitron text-2xl font-bold text-white sm:text-3xl">{activeHeroPanel.title}</h2>
-                    <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/78 sm:text-base">{activeHeroPanel.description}</p>
+                    <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-black/50 px-3 py-1 text-xs uppercase tracking-[0.22em] text-amber-400 shadow-[0_0_15px_rgba(217,154,0,0.3)]"><VibeContentRenderer content={activeHeroPanel.icon} />{activeHeroPanel.eyebrow}</div>
+                    <h2 className="font-orbitron text-2xl font-bold text-white sm:text-3xl drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">{activeHeroPanel.title}</h2>
+                    <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/80 sm:text-base">{activeHeroPanel.description}</p>
                   </div>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     {activeHeroPanel.meta.map((item) => (
-                      <div key={`${activeHeroPanel.mode}-${item.label}`} className="rounded-xl border border-white/15 bg-black/25 p-3">
-                        <p className="text-[10px] uppercase tracking-[0.2em] text-white/45">{item.label}</p>
+                      <div key={`${activeHeroPanel.mode}-${item.label}`} className="rounded-xl border border-amber-400/20 bg-black/40 p-3 backdrop-blur-sm transition-all hover:border-amber-400/40 hover:bg-black/50">
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-amber-400/70">{item.label}</p>
                         <p className="mt-1 font-orbitron text-sm text-white">{item.value}</p>
                       </div>
                     ))}
                   </div>
-                  <Button asChild size="lg" variant={activeHeroPanel.mode === "rent" ? "accent" : "outline"} className="w-full font-orbitron sm:w-fit">
+                  <Button asChild size="lg" variant={activeHeroPanel.mode === "rent" ? "accent" : "outline"} className="w-full font-orbitron sm:w-fit transition-all hover:scale-105">
                     <Link href={activeHeroPanel.href} className="inline-flex items-center gap-2"><VibeContentRenderer content={activeHeroPanel.icon} />{activeHeroPanel.cta}</Link>
                   </Button>
                 </div>
-                <div className="relative min-h-[260px] overflow-hidden rounded-2xl border border-white/15 bg-black/35">
-                  {activeHeroPanel.imageUrl ? <Image src={activeHeroPanel.imageUrl} alt={activeHeroPanel.title} fill className="object-cover opacity-80" /> : <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,210,80,0.30),transparent_32%),radial-gradient(circle_at_70%_65%,rgba(64,255,190,0.18),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.01))]" />}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+                <div className="relative min-h-[260px] overflow-hidden rounded-2xl border border-amber-400/20 bg-black/50 shadow-[0_0_30px_rgba(217,154,0,0.2)]">
+                  {activeHeroPanel.imageUrl ? <Image src={activeHeroPanel.imageUrl} alt={activeHeroPanel.title} fill className="object-cover opacity-90" /> : <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,210,80,0.30),transparent_32%),radial-gradient(circle_at_70%_65%,rgba(64,255,190,0.18),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.01))]" />}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
                 </div>
               </motion.div>
             </AnimatePresence>
           </div>
           <div className="mt-8 grid w-full max-w-4xl grid-cols-1 gap-3 text-left sm:grid-cols-2 lg:grid-cols-4">
             {heroMetrics.map((chip) => (
-              <div key={chip} className="rounded-xl border border-white/20 bg-black/35 px-3 py-2 text-sm text-white/90 backdrop-blur-sm"><VibeContentRenderer content={chip} /></div>
+              <div key={chip} className="rounded-xl border border-amber-400/20 bg-black/50 px-3 py-2 text-sm backdrop-blur-md transition-all hover:border-amber-400/40 hover:bg-black/60 hover:shadow-[0_0_15px_rgba(217,154,0,0.2)]">
+                <VibeContentRenderer content={chip} className="text-white/90 hover:text-white" />
+              </div>
             ))}
           </div>
         </motion.div>
@@ -545,9 +553,11 @@ export function VipBikeRentalClient({
   // ══════════════════════════════════════════════════════
   return (
     <div className="relative min-h-screen overflow-hidden" style={surface.page}>
-      {/* Background gradients - use theme-based colors */}
+      {/* Background gradients - use theme-based colors with CSS variable support */}
       <div className="pointer-events-none fixed inset-0 z-[-2]" style={{
-        background: `radial-gradient(circle at top, ${withAlpha(theme.palette.accentMain, 0.14)} 0%, transparent 35%), radial-gradient(circle at 80% 20%, ${withAlpha(theme.palette.borderSoft, 0.10)} 0%, transparent 42%)`
+        background: theme.isAuto
+          ? `radial-gradient(circle at top, ${withAlpha("var(--franchize-accent-main)", 0.14)} 0%, transparent 35%), radial-gradient(circle at 80% 20%, ${withAlpha("var(--franchize-border-soft)", 0.10)} 0%, transparent 42%)`
+          : `radial-gradient(circle at top, ${withAlpha(theme.palette.accentMain, 0.14)} 0%, transparent 35%), radial-gradient(circle at 80% 20%, ${withAlpha(theme.palette.borderSoft, 0.10)} 0%, transparent 42%)`
       }} />
       <div className="pointer-events-none fixed inset-0 z-[-3] bg-[linear-gradient(to_bottom,rgba(0,0,0,0.45),transparent_35%)]" />
 

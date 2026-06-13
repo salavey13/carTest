@@ -106,6 +106,13 @@ function createRiderIcon(rider: LiveRider, riderName: string, isSelected: boolea
         display: flex;
         align-items: center;
         justify-content: center;
+        pointer-events: auto;
+      }
+      .rider-marker * {
+        pointer-events: none;
+      }
+      .rider-marker__avatar {
+        pointer-events: auto;
       }
       .rider-marker__avatar {
         width: 40px;

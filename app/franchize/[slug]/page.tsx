@@ -4,7 +4,8 @@ import { CatalogClient } from "../components/CatalogClient";
 import { FranchizeErrorBoundary } from "../components/ErrorBoundary";
 import { getFranchizeBySlug } from "../actions";
 import { getFranchizeRouteCtaPolicy } from "../lib/route-cta-policy";
-import { crewPaletteForSurface } from "../lib/theme";
+import { crewPaletteWithCssVars } from "../lib/theme";
+import { FranchizeCatalogHero } from "../components/FranchizeCatalogHero";
 
 interface FranchizeSlugPageProps {
   params: Promise<{ slug: string }>;
@@ -13,7 +14,7 @@ interface FranchizeSlugPageProps {
 export default async function FranchizeSlugPage({ params }: FranchizeSlugPageProps) {
   const { slug } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
-  const surface = crewPaletteForSurface(crew.theme);
+  const surface = crewPaletteWithCssVars(crew.theme);
   const ctaPolicy = getFranchizeRouteCtaPolicy("catalog");
 
   return (
@@ -32,7 +33,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
         fallbackHref={`/franchize/${crew.slug || slug}`}
         fallbackLinkLabel="Обновить страницу экипажа"
       >
-        <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}`} groupLinks={items.map((item) => item.category)} />
+        <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}`} groupLinks={items.map((item) => item.category)} items={items} />
       </FranchizeErrorBoundary>
       <FranchizeErrorBoundary
         resetKey={slug}
@@ -40,6 +41,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
         fallbackHref={`/franchize/${crew.slug || slug}`}
         fallbackLinkLabel="Обновить каталог экипажа"
       >
+        <FranchizeCatalogHero crew={crew} slug={slug} />
         <CatalogClient crew={crew} slug={slug} items={items} ctaPolicy={ctaPolicy} />
       </FranchizeErrorBoundary>
       <CrewFooter crew={crew} />

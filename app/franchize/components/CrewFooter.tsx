@@ -5,12 +5,16 @@ import { ChevronRight, MapPin, Phone, Send } from "lucide-react";
 import type { FranchizeCrewVM } from "../actions";
 import { toInternalHref } from "../lib/navigation";
 import { readablePaletteTextOnColor, withAlpha } from "../lib/theme";
+import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 
 interface CrewFooterProps {
   crew: FranchizeCrewVM;
 }
 
 export function CrewFooter({ crew }: CrewFooterProps) {
+  // Apply franchize theme CSS variables
+  useFranchizeTheme(crew.theme);
+
   const bg = crew.theme.palette.accentMain;
   const text = readablePaletteTextOnColor(bg, crew.theme.palette);
   const border = withAlpha(text, 0.22);
@@ -36,11 +40,13 @@ export function CrewFooter({ crew }: CrewFooterProps) {
     <footer
       className="mt-8 overflow-hidden border-t border-[var(--footer-border)]"
       style={{
-        background: `linear-gradient(135deg, ${bg} 0%, ${crew.theme.palette.accentDeep || bg} 100%)`,
-        color: text,
-        ["--footer-text" as string]: text,
-        ["--footer-border" as string]: border,
-        ["--footer-sub-bg" as string]: withAlpha(crew.theme.palette.bgBase, 0.12),
+        background: `linear-gradient(135deg, ${crew.theme.isAuto ? "var(--franchize-accent-main)" : bg} 0%, ${crew.theme.isAuto ? "var(--franchize-accent-main)" : (crew.theme.palette.accentDeep || bg)} 100%)`,
+        color: crew.theme.isAuto ? "var(--franchize-text-primary)" : text,
+        ["--footer-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : text,
+        ["--footer-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : border,
+        ["--footer-sub-bg" as string]: crew.theme.isAuto
+          ? "var(--franchize-bg-base)"
+          : withAlpha(crew.theme.palette.bgBase, 0.12),
       }}
     >
       <div className="mx-auto grid w-full max-w-7xl gap-x-8 gap-y-6 px-4 py-6 md:grid-cols-3">

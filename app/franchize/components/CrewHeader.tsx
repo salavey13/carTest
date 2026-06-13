@@ -5,11 +5,12 @@ import Link from "next/link";
 import { Menu, ShoppingCart } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import type { FranchizeCrewVM } from "../actions";
+import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { HeaderMenu } from "../modals/HeaderMenu";
 import { FranchizeProfileButton, CrewButtonErrorBoundary } from "./FranchizeProfileButton";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
+import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { toCategoryId } from "../lib/navigation";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
@@ -27,9 +28,10 @@ interface CrewHeaderProps {
   activePath: string;
   groupLinks?: string[];
   sectionLinks?: FranchizeSectionLink[];
+  items?: CatalogItemVM[];
 }
 
-export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [] }: CrewHeaderProps) {
+export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [], items }: CrewHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [catalogLinks, setCatalogLinks] = useState<string[]>([]);
@@ -40,6 +42,10 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   const railRef = useRef<HTMLDivElement | null>(null);
   const prevPathnameRef = useRef<string | null>(null);
   const [indicatorStyle, setIndicatorStyle] = useState<{ width: number; left: number; opacity: number }>({ width: 0, left: 0, opacity: 0 });
+
+  // Apply franchize theme CSS variables
+  useFranchizeTheme(crew.theme);
+
   const activePillText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
   const { itemCount } = useFranchizeCart(crew.slug);
 
@@ -216,14 +222,26 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
         paddingTop: "max(calc(env(safe-area-inset-top) + 2.25rem), 2.75rem)",
         // FIX 6: isolation creates a proper stacking context for the entire header.
         isolation: "isolate",
-        borderColor: crew.theme.palette.borderSoft,
-        backgroundColor: withAlpha(crew.theme.palette.bgCard, 0.94),
-        color: crew.theme.palette.textPrimary,
-        ["--crew-header-text" as string]: crew.theme.palette.textPrimary,
-        ["--crew-header-card" as string]: crew.theme.palette.bgCard,
-        ["--crew-header-base" as string]: crew.theme.palette.bgBase,
-        ["--crew-header-border" as string]: crew.theme.palette.borderSoft,
-        ["--crew-header-accent" as string]: crew.theme.palette.accentMain,
+        borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
+        backgroundColor: crew.theme.isAuto
+          ? "var(--franchize-bg-card)"
+          : withAlpha(crew.theme.palette.bgCard, 0.94),
+        color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
+        ["--crew-header-text" as string]: crew.theme.isAuto
+          ? "var(--franchize-text-primary)"
+          : crew.theme.palette.textPrimary,
+        ["--crew-header-card" as string]: crew.theme.isAuto
+          ? "var(--franchize-bg-card)"
+          : crew.theme.palette.bgCard,
+        ["--crew-header-base" as string]: crew.theme.isAuto
+          ? "var(--franchize-bg-base)"
+          : crew.theme.palette.bgBase,
+        ["--crew-header-border" as string]: crew.theme.isAuto
+          ? "var(--franchize-border-soft)"
+          : crew.theme.palette.borderSoft,
+        ["--crew-header-accent" as string]: crew.theme.isAuto
+          ? "var(--franchize-accent-main)"
+          : crew.theme.palette.accentMain,
         ["--crew-header-accent-text" as string]: activePillText,
       }}
     >
@@ -260,8 +278,10 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             onClick={() => setMenuOpen(true)}
             className="inline-flex h-11 w-11 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             style={{
-              backgroundColor: withAlpha(crew.theme.palette.bgBase, 0.8),
-              color: crew.theme.palette.textPrimary,
+              backgroundColor: crew.theme.isAuto
+                ? "var(--franchize-bg-base)"
+                : withAlpha(crew.theme.palette.bgBase, 0.8),
+              color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
             }}
           >
             <Menu className="h-5 w-5" />
@@ -281,7 +301,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
               className="relative h-12 w-12 min-h-12 min-w-12 overflow-hidden rounded-full border shadow-lg"
               style={{
                 borderColor: accentMain,
-                backgroundColor: crew.theme.palette.bgBase,
+                backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase,
               }}
             >
               {logoUrl && !brokenLogoUrls[logoUrl] ? (
@@ -346,25 +366,25 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
           */}
           <div className="flex items-center gap-2 justify-self-end relative z-[2]" style={{ pointerEvents: isCompact ? "none" : "auto" }}>
             <CrewButtonErrorBoundary
-              bgColor={withAlpha(crew.theme.palette.bgBase, 0.8)}
-              textColor={crew.theme.palette.textPrimary}
-              borderColor={crew.theme.palette.borderSoft}
+              bgColor={crew.theme.isAuto ? "var(--franchize-bg-base)" : withAlpha(crew.theme.palette.bgBase, 0.8)}
+              textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
+              borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}
               resetKey={pathname}
             >
               <FranchizeProfileButton
-                bgColor={withAlpha(crew.theme.palette.bgBase, 0.8)}
-                textColor={crew.theme.palette.textPrimary}
-                borderColor={crew.theme.palette.borderSoft}
+                bgColor={crew.theme.isAuto ? "var(--franchize-bg-base)" : withAlpha(crew.theme.palette.bgBase, 0.8)}
+                textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
+                borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}
                 currentSlug={crew.slug}
               />
             </CrewButtonErrorBoundary>
             <FloatingCartIconLinkBySlug
               slug={crew.slug}
               href={`/franchize/${crew.slug}/cart`}
-              items={undefined}
-              accentColor={crew.theme.palette.accentMain}
-              textColor={crew.theme.palette.textPrimary}
-              borderColor={crew.theme.palette.borderSoft}
+              items={items}
+              accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain}
+              textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
+              borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}
               theme={crew.theme}
               mode="inline-icon"
               className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl no-underline"
@@ -376,7 +396,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
       {visibleRailLinks.length > 0 && (
         <div
           className="-mx-4 mt-1 border-t px-4 pt-2"
-          style={{ borderColor: crew.theme.palette.borderSoft }}
+          style={{ borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft }}
         >
           <div
             ref={railRef}
@@ -398,10 +418,14 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                   data-category-pill={link.categoryLabel}
                   aria-current={isActive ? "location" : undefined}
                   aria-label={`Перейти к разделу ${link.label}`}
-                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-3 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] no-underline transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-3 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] no-underline transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 select-none"
                   style={{
-                    ["--pill-bg" as string]: isActive ? crew.theme.palette.accentMain : crew.theme.palette.bgCard,
-                    ["--pill-text" as string]: isActive ? activePillText : crew.theme.palette.textPrimary,
+                    ["--pill-bg" as string]: isActive
+                      ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain)
+                      : (crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard),
+                    ["--pill-text" as string]: isActive
+                      ? activePillText
+                      : (crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary),
                     textDecoration: "none",
                   }}
                   onClick={(event) => {
