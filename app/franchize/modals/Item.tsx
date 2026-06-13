@@ -4,6 +4,7 @@ import { Calendar, Info, Swords, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
+import { hasRentPrice, hasSalePrice, ruPluralDays } from "../lib/catalog-utils";
 import {
   CATALOG_VS_SPECS,
   VsSpecRow,
@@ -32,11 +33,6 @@ import { FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 // ─────────────────────────────────────────────────────
 
 export type FlowType = "rental" | "order";
-
-// Helper to check if item has rental pricing
-const itemHasRentPrice = (item: CatalogItemVM) => item.pricePerDay > 0;
-const itemHasSalePrice = (item: CatalogItemVM) =>
-  item.saleAvailable && Boolean(item.salePrice && item.salePrice > 0);
 
 interface ItemModalProps {
   item: CatalogItemVM | null;
@@ -204,7 +200,7 @@ function RentalDatePickers({
             const start = new Date(startDate + "T00:00:00");
             const end = new Date(endDate + "T00:00:00");
             const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
-            return `${days} ${days === 1 ? "день" : days < 5 ? "дня" : "дней"} аренды`;
+            return `${days} ${ruPluralDays(days)} аренды`;
           })()}
         </p>
       )}
@@ -235,8 +231,8 @@ export function ItemModal({
   const [isBuying, setIsBuying] = useState(false);
   const [vsBike, setVsBike] = useState<CatalogItemVM | null>(null);
 
-  // Determine which CTAs to show
-  const showRentCta = isRental && itemHasRentPrice(item!);
+  // Determine which CTAs to show (safe optional chaining — item may be null during close transition)
+  const showRentCta = isRental && (item ? hasRentPrice(item) : false);
   const showBuyCta = item?.saleAvailable === true;
 
   const gallery = useMemo(() => {
@@ -434,9 +430,7 @@ export function ItemModal({
     ? "Добавляем..."
     : showRentCta
       ? rentCtaLabel
-      : showBuyCta
-        ? buyCtaLabel
-        : "Выбрать";
+      : "Выбрать";
 
   // Determine footer grid layout
   const footerCols = showRentCta && showBuyCta ? 3 : 2;
@@ -745,7 +739,7 @@ export function ItemModal({
 
           {/* Footer Buttons — dual CTA when both rent + sale available */}
           <div
-            className={`grid shrink-0 gap-2 border-t p-3 ${footerCols === 3 ? "grid-cols-3" : "grid-cols-2"}`}
+            className={`grid shrink-0 gap-2 border-t p-3 grid-cols-2 ${footerCols === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
             style={{ ...surface.card, borderColor: theme.palette.borderSoft }}
           >
             <button
@@ -776,9 +770,9 @@ export function ItemModal({
             {showBuyCta && (
               <button
                 type="button"
-                onClick={showRentCta ? handleBuyItem : handleAddToCart}
-                disabled={showRentCta ? isBuying : isAdding}
-                aria-busy={showRentCta ? isBuying : isAdding}
+                onClick={handleBuyItem}
+                disabled={isBuying}
+                aria-busy={isBuying}
                 aria-label="Купить"
                 className={`rounded-xl border-2 px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] ${
                   showRentCta
@@ -786,7 +780,7 @@ export function ItemModal({
                     : "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
                 }`}
               >
-                {showRentCta ? buyCtaLabel : singleCtaLabel}
+                {buyCtaLabel}
               </button>
             )}
 

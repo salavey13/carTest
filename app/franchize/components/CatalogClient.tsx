@@ -12,6 +12,7 @@ import { shouldShowFloatingCart } from "../lib/route-cta-policy";
 import { catalogCardVariantStyles, crewPaletteForSurface, interactionRingStyle } from "../lib/theme";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { upsertFranchizeIntent } from "../actions";
+import { hasRentPrice, hasSalePrice } from "../lib/catalog-utils";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { ItemModal, type FlowType } from "../modals/Item";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
@@ -63,9 +64,6 @@ function tierVisuals(tier: AccessTier): { emoji: string; color: string; label: s
   }
 }
 
-const hasRentPrice = (item: CatalogItemVM) => item.pricePerDay > 0;
-const hasSalePrice = (item: CatalogItemVM) => item.saleAvailable && Boolean(item.salePrice && item.salePrice > 0);
-
 // Check if a rawSpecs flag is truthy (same logic as electro-enduro page)
 const isSpecEnabled = (value: unknown) =>
   value === 1 || value === true ||
@@ -100,28 +98,10 @@ function getItemCtaLabel(item: CatalogItemVM): string {
   return "Выбрать";
 }
 
-// ── RESTORED: Helper functions deleted by agent but still referenced in grid path ──
+// ── RESTORED: Helper function deleted by agent but still referenced in grid path ──
 
-function getVisiblePriceLines(item: CatalogItemVM) {
-  const lines: Array<{ key: string; tone: string; label: string; value: string }> = [];
-  if (item.pricePerDay > 0) {
-    lines.push({
-      key: "rent",
-      tone: "accent",
-      label: "Аренда",
-      value: item.rentPriceLabel,
-    });
-  }
-  if (item.saleAvailable && item.salePrice && item.salePrice > 0) {
-    lines.push({
-      key: "sale",
-      tone: "sale",
-      label: "Покупка",
-      value: `${item.salePrice.toLocaleString("ru-RU")} ₽`,
-    });
-  }
-  return lines;
-}
+// NOTE: getVisiblePriceLines was removed — price rendering is now inline (rentalbikes-style)
+// with hasRentPrice/hasSalePrice from shared catalog-utils.ts
 
 // Map common spec keys to emoji icons for card display
 // FIX: Expanded pattern matching + return empty string instead of default ⚙️
@@ -883,7 +863,6 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                 <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
                   {group.items.map((item) => {
                     const rentalStrip = buildCatalogRentalStrip(item, crew);
-                    const visiblePrices = getVisiblePriceLines(item);
                     const visibleSpecs = getVisibleSpecChips(item);
                     return (
                     <article
@@ -1009,7 +988,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
             trigger: "modal_buy_cta",
             options: { ...selectedOptions, action: "buy" },
           });
-          addItem(selectedItem.id, { ...selectedOptions, action: "buy" }, 1);
+          addItem(selectedItem.id, { action: "buy" }, 1);
           setSelectedItem(null);
         }}
         onClose={() => setSelectedItem(null)}
