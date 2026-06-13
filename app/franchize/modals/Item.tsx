@@ -17,7 +17,7 @@ import {
 } from "@/app/franchize/lib/catalog-propulsion";
 import { ItemGallery } from "../components/ItemGallery";
 import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
-import { crewPaletteForSurface } from "../lib/theme";
+import { crewPaletteForSurface, readableTextOnColor, withAlpha } from "../lib/theme";
 import { FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 
 // ─────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ const getModalThemeVars = (theme: FranchizeTheme) =>
     "--item-border": theme.palette.borderSoft,
     "--item-muted-text": theme.palette.textSecondary,
     "--item-text": theme.palette.textPrimary,
-    "--item-accent-contrast": "#16130A",
+    "--item-accent-contrast": readableTextOnColor(theme.palette.accentMain),
   }) as React.CSSProperties;
 
 function OptionChips({
@@ -149,7 +149,7 @@ function RentalDatePickers({
   const endMin = startDate || today;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/15 p-3">
+    <div className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3">
       <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
         <Calendar className="h-3.5 w-3.5" />
         Даты аренды
@@ -438,7 +438,7 @@ export function ItemModal({
   return (
     <div
       ref={modalRef}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-black/60 p-2 pb-4 outline-none sm:items-center sm:p-3"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-[var(--item-border)]/60 p-2 pb-4 outline-none sm:items-center sm:p-3"
       role="dialog"
       aria-modal="true"
       aria-labelledby={`item-modal-title-${item.id}`}
@@ -455,7 +455,7 @@ export function ItemModal({
           <button
             type="button"
             onClick={onClose}
-            className="absolute z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+            className="absolute z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--item-border)]/60 text-[var(--item-text)] transition hover:bg-[var(--item-border)]/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
             style={FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE}
             aria-label="Закрыть"
           >
@@ -496,10 +496,10 @@ export function ItemModal({
                   {normalizedSpecs.slice(0, 4).map((spec) => (
                     <span
                       key={`${spec.label}-${spec.value}`}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-black/40 px-2.5 py-1.5 text-xs font-semibold text-[var(--item-accent)]"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--item-border)]/40 px-2.5 py-1.5 text-xs font-semibold text-[var(--item-accent)]"
                     >
                       <span className="text-[10px] opacity-70">{spec.label}</span>
-                      <span className="text-white">{spec.value}</span>
+                      <span className="text-[var(--item-text)]">{spec.value}</span>
                     </span>
                   ))}
                 </div>
@@ -511,10 +511,10 @@ export function ItemModal({
                   className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold ${
                     rentalStrip?.isAvailable ?? item.availabilityStatus === "available"
                       ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-300"
-                      : "border-amber-400/40 bg-amber-500/15 text-amber-200"
+                      : "border-[var(--item-accent)]/40 bg-[var(--item-accent)]/15 text-[var(--item-accent)]"
                   }`}
                 >
-                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${rentalStrip?.isAvailable ?? item.availabilityStatus === "available" ? "bg-emerald-400" : "bg-amber-400"}`} />
+                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${rentalStrip?.isAvailable ?? item.availabilityStatus === "available" ? "bg-emerald-400" : "bg-[var(--item-accent)]"}`} />
                   {isRental
                     ? `Сегодня: ${rentalStrip?.todayLabel ?? "Уточним в Telegram"}`
                     : item.availabilityStatus === "available"
@@ -522,7 +522,7 @@ export function ItemModal({
                       : "Уточните наличие"}
                 </span>
                 {item.saleAvailable && (
-                  <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-400/20 px-2.5 py-1 font-semibold text-amber-100">
+                  <span className="inline-flex rounded-full border border-[var(--item-accent)]/40 bg-[var(--item-accent)]/15 px-2.5 py-1 font-semibold text-[var(--item-accent)]">
                     {isRental ? "Аренда + покупка" : "Доступно к покупке"}
                   </span>
                 )}
@@ -532,7 +532,7 @@ export function ItemModal({
             {/* Rental strip — only for rental flow */}
             {isRental && rentalStrip ? (
               <div
-                className="grid gap-2 rounded-2xl border border-white/10 bg-black/15 p-3 text-xs sm:grid-cols-3"
+                className="grid gap-2 rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3 text-xs sm:grid-cols-3"
                 aria-label={`Быстрая аренда ${item.title}`}
               >
                 <div>

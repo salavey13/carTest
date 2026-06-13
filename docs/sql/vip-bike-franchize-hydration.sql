@@ -1,8 +1,10 @@
--- /docs/sql/vip-bike-franchize-hydration.sql
 -- VIP_BIKE Franchize hydration reference payload (2026 edition)
 -- Purpose: production-like seed with metadata-first approach + private.crew_secrets extraction
 -- Safe to re-run: uses ON CONFLICT + jsonb_set + private upsert
--- Updated: 2026-04-03 — moved contractDefaults to private.crew_secrets + fresh 2026 creative ticker/ads
+-- Updated: 2026-06-13 — light palette redesigned to match vip-bike.ru actual site design
+--   Light accent: electric cyan #19C2F5 (not gold — gold is dark-theme-only / atmospheric)
+--   Surface: pure white + Apple-like #F5F5F7 card fills + #E5E5E7 hairline borders
+--   Text: near-black #0A0A0A (not #1A1A1A) for maximum contrast on white
 
 begin;
 
@@ -49,7 +51,7 @@ set
     '{franchize}',
     (
       jsonb_build_object(
-        'version', '2026-04-03-v3',
+        'version', '2026-06-13-v4',
         'enabled', true,
         'slug', 'vip-bike',
         'branding', jsonb_build_object(
@@ -69,23 +71,17 @@ set
         'theme', jsonb_build_object(
           'mode', 'cyber_electro_dark',
           'displayName', 'VIP BIKE ELECTRO Dark',
+          -- Only 7 tokens are consumed by resolvePaletteByMode():
+          -- bgBase, bgCard, accentMain, accentMainHover, textPrimary, textSecondary, borderSoft
+          -- Extra tokens are dead data — nothing reads them.
           'palette', jsonb_build_object(
             'bgBase', '#121520',
             'bgCard', '#1B2132',
-            'bgElevated', '#1E2538',
-            'borderSoft', '#2A2E3E',
-            'borderCard', '#313648',
             'accentMain', '#F4BD55',
             'accentMainHover', '#FFCA60',
-            'accentDeep', '#D4A540',
-            'accentTextOn', '#121520',
             'textPrimary', '#E6D8C4',
             'textSecondary', '#A7ABB4',
-            'textMuted', '#7D828C',
-            'textAccent', '#F4BD55',
-            'success', '#44CC77',
-            'warning', '#F4BD55',
-            'error', '#E35B5B'
+            'borderSoft', '#2A2E3E'
           ),
           'palettes', jsonb_build_object(
             'dark', jsonb_build_object(
@@ -98,16 +94,20 @@ set
               'borderSoft', '#2A2E3E'
             ),
             'light', jsonb_build_object(
-              'bgBase', '#F5F5F5',
-              'bgCard', '#FFFFFF',
-              'accentMain', '#C78900',
-              'accentMainHover', '#F4BD55',
-              'textPrimary', '#1A1A1A',
-              'textSecondary', '#4B5160',
-              'borderSoft', '#D4D8E1'
+              -- vip-bike.ru light theme: electric cyan accent, pure white base,
+              -- Apple-like #F5F5F7 card fills, hairline #E5E5E7 borders,
+              -- near-black #0A0A0A text for max contrast on white (~19.5:1).
+              -- Only 7 tokens are consumed by resolvePaletteByMode().
+              'bgBase', '#FFFFFF',
+              'bgCard', '#F5F5F7',
+              'accentMain', '#19C2F5',
+              'accentMainHover', '#0EA6D6',
+              'textPrimary', '#0A0A0A',
+              'textSecondary', '#4E4E55',
+              'borderSoft', '#E5E5E7'
             )
           ),
-          'radius', jsonb_build_object('card', 18, 'button', 14, 'pill', 999, 'sm', 10, 'md', 14, 'lg', 18),
+          'radius', jsonb_build_object('card', 16, 'button', 14, 'pill', 999, 'sm', 10, 'md', 14, 'lg', 18, 'hero', 28),
           'spacing', jsonb_build_object('section', 24, 'card', 14, 'stackSm', 12, 'stackMd', 16, 'stackLg', 24),
           'effects', jsonb_build_object('accentGlow', true, 'cardLift', true)
         ),
@@ -262,7 +262,6 @@ set
         'catalog', jsonb_build_object(
           'groupOrder', jsonb_build_array('Electro', 'Enduro', 'Naked', 'Supersport', 'Cruiser'),
           'quickLinks', jsonb_build_array('79bike Falcon PRO', 'Электро-тест', 'Выгодное комбо', 'Аренда выходного дня'),
-          -- VIP BIKE ELECTRO ticker
           'tickerItems', jsonb_build_array(
             jsonb_build_object('id', 'electro-main', 'text', '⚡ 79bike Falcon PRO: электромотоцикл без категории А от 310 000 ₽', 'href', '/franchize/vip-bike#catalog'),
             jsonb_build_object('id', 'test-drive', 'text', '🏍 Тест-драйв в шоуруме: протестируйте электро перед покупкой', 'href', '/franchize/vip-bike#test-drive'),
@@ -270,7 +269,6 @@ set
           ),
           'showTwoColumnsMobile', true,
           'useModalDetails', true,
-          -- VIP BIKE ELECTRO promo banner
           'promoBanners', jsonb_build_array(
             jsonb_build_object(
               'id', 'electro-2026',
@@ -283,7 +281,6 @@ set
               'ctaLabel', 'Протестировать'
             )
           ),
-          -- Electro ad cards
           'adCards', jsonb_build_array(
             jsonb_build_object('id', 'falcon-pro', 'title', '79bike Falcon PRO', 'subtitle', '310 000 ₽ - Электромотоцикл премиум класса', 'href', '/franchize/vip-bike/configurator', 'imageUrl', '', 'badge', 'Bestseller', 'activeFrom', '2026-01-01', 'activeTo', '2026-12-31', 'priority', 90, 'ctaLabel', 'Подробнее'),
             jsonb_build_object('id', 'test-drive-shuffle', 'title', 'Тест-драйв', 'subtitle', 'Протестируйте электромотоцикл в шоуруме Нижнего Новгорода', 'href', '/franchize/vip-bike#test-drive', 'imageUrl', '', 'badge', 'Popular', 'activeFrom', '2026-01-01', 'activeTo', '2026-12-31', 'priority', 85, 'ctaLabel', 'Записаться')
@@ -298,7 +295,6 @@ set
           'paymentOptions', jsonb_build_array('telegram_xtr', 'card', 'sbp', 'cash'),
           'consentText', 'Я согласен с условиями аренды и обработкой персональных данных.'
         ),
-        -- contractDefaults stays in public metadata for now (backward compatibility)
         'contractDefaults', jsonb_build_object(
           'issuerName', 'ИП Воробьев Роман Валерьевич',
           'issuerRepresentative', 'Сидоров Илья Олегович',
@@ -374,7 +370,7 @@ set
 
 commit;
 
--- Verification helpers (updated 2026)
+-- Verification helpers
 -- select slug, metadata->'franchize'->'branding'->>'name' as brand from public.crews where slug='vip-bike';
+-- select jsonb_pretty(metadata->'franchize'->'theme'->'palettes'->'light') from public.crews where slug='vip-bike';
 -- select jsonb_pretty((select contract_defaults::jsonb from private.crew_secrets where crew_slug='vip-bike')) as private_contract_defaults;
--- select jsonb_pretty(metadata->'franchize'->'contractDefaults') from public.crews where slug='vip-bike';
