@@ -35,7 +35,7 @@ import {
   upsertFranchizeIntent,
 } from "@/app/franchize/actions";
 import type { PageSize } from "@/app/franchize/server-actions/buy-print";
-import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+import { crewPaletteForSurface, crewPaletteWithCssVars } from "@/app/franchize/lib/theme";
 import {
   DEFAULT_COLOR_OPTIONS,
   DEFAULT_CONFIG_OPTIONS,
@@ -50,6 +50,7 @@ import {
 import { buildCandidateImageUrls } from "@/app/franchize/lib/media";
 import { getTelegramWebAppFallbackHref } from "@/app/franchize/lib/telegram-links";
 import { useFranchizeCart } from "@/app/franchize/hooks/useFranchizeCart";
+import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   CATALOG_VS_SPECS,
@@ -115,7 +116,10 @@ export function SaleBikeLandingClient({
   const { user, dbUser, tg, isInTelegramContext } = useAppContext();
   const [mounted, setMounted] = useState(false);
   const resolvedSlug = crew.slug || "vip-bike";
-  const surface = crewPaletteForSurface(crew.theme);
+
+  // Use CSS variables when theme is in 'auto' mode
+  const surface = crew.theme.isAuto ? crewPaletteWithCssVars(crew.theme) : crewPaletteForSurface(crew.theme);
+  useFranchizeTheme(crew.theme);
 
   useEffect(() => {
     setMounted(true);

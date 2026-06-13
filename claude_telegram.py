@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 
 app = FastAPI()
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "7900597971:AAGVpwjh-4mhu1wraqOrvkwg8UPB7FZpTEM")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 # Security: Only respond to these chat IDs

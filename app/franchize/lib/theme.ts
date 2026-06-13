@@ -99,6 +99,45 @@ export function crewPaletteForSurface(theme: FranchizeTheme) {
   };
 }
 
+/**
+ * Returns CSS variable-based styles for client components.
+ * Use this when you want the theme to respond to global theme preference.
+ * This works with useFranchizeTheme hook to set CSS variables.
+ */
+export function crewPaletteWithCssVars(theme: FranchizeTheme) {
+  // When isAuto is true, these CSS variables will be set by useFranchizeTheme
+  // based on the global theme preference
+  if (theme.isAuto) {
+    return {
+      page: {
+        backgroundColor: "var(--franchize-bg-base)",
+        color: "var(--franchize-text-primary)",
+      },
+      card: {
+        backgroundColor: "var(--franchize-bg-card)",
+        borderColor: "var(--franchize-border-soft)",
+        color: "var(--franchize-text-primary)",
+      },
+      mutedText: {
+        color: "var(--franchize-text-secondary)",
+      },
+      subtleCard: {
+        backgroundColor: "var(--franchize-bg-card)",
+        borderColor: "var(--franchize-border-soft)",
+        color: "var(--franchize-text-primary)",
+      },
+      accentPill: {
+        borderColor: "var(--franchize-accent-main)",
+        color: "var(--franchize-accent-main)",
+        backgroundColor: "var(--franchize-accent-main)",
+      },
+    };
+  }
+
+  // Fall back to regular palette when not in auto mode
+  return crewPaletteForSurface(theme);
+}
+
 export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: number) {
   const palette = theme.palette;
   const variants = [

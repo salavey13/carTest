@@ -76,8 +76,8 @@ set
           )
         ),
         'theme', jsonb_build_object(
-          'mode', 'cyber_electro_dark',
-          'displayName', 'VIP BIKE ELECTRO Dark',
+          'mode', 'auto',
+          'displayName', 'VIP BIKE ELECTRO - Auto Theme',
           -- Only 7 tokens are consumed by resolvePaletteByMode():
           -- bgBase, bgCard, accentMain, accentMainHover, textPrimary, textSecondary, borderSoft
           -- Extra tokens are dead data — nothing reads them.
