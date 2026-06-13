@@ -150,6 +150,12 @@ export default async function BuyBikePage({
         activePath={`/franchize/${resolvedSlug}/market/${bike_id}/buy`}
         groupLinks={items.map((candidate) => candidate.category)}
       />
+      <SaleBikeLanding
+        crew={crew}
+        item={item}
+        vsItem={vsItem}
+        otherSaleBikes={otherSaleBikes}
+      />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6">
         <FranchizeHero
           eyebrow={`/franchize/${resolvedSlug}/market/${bike_id}/buy · sale`}
@@ -161,12 +167,8 @@ export default async function BuyBikePage({
             href: `/franchize/${resolvedSlug}?vehicle=${encodeURIComponent(bike_id)}`,
           }}
         />
-        <SaleBikeLanding
-          crew={crew}
-          item={item}
-          vsItem={vsItem}
-          otherSaleBikes={otherSaleBikes}
-        />
+      </FranchizePageShell>
+      <FranchizePageShell theme={crew.theme} contentClassName="space-y-6">
         <section className="rounded-3xl border p-4" style={surface.subtleCard}>
           <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
             <div>

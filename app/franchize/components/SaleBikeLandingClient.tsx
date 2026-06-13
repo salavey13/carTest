@@ -113,8 +113,14 @@ export function SaleBikeLandingClient({
 }: SaleBikeLandingClientProps) {
   const router = useRouter();
   const { user, dbUser, tg, isInTelegramContext } = useAppContext();
+  const [mounted, setMounted] = useState(false);
   const resolvedSlug = crew.slug || "vip-bike";
   const surface = crewPaletteForSurface(crew.theme);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const gallery = useMemo(() => {
     const raw = item.mediaUrls?.filter(Boolean)?.length
       ? item.mediaUrls.filter(Boolean)
@@ -254,7 +260,7 @@ export function SaleBikeLandingClient({
       ? String(dbUser.user_id)
       : undefined;
   const telegramFirstContinuation = Boolean(telegramUserId);
-  const hasTelegramRuntime = Boolean(
+  const hasTelegramRuntime = mounted && Boolean(
     isInTelegramContext ||
       tg?.initData ||
       tg?.initDataUnsafe?.user ||
@@ -720,7 +726,7 @@ export function SaleBikeLandingClient({
   };
 
   return (
-    <div className="min-h-screen pb-28 pt-3 sm:pt-6" style={surface.page}>
+    <div className="pb-28 pt-3 sm:pt-6" style={surface.page}>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-3 sm:px-6">
         <div className="flex items-center justify-between gap-2">
           <Link
@@ -745,7 +751,7 @@ export function SaleBikeLandingClient({
           className="overflow-hidden rounded-3xl border p-2 sm:p-3"
           style={surface.card}
         >
-          <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-black/30">
+          <div className="relative aspect-[16/9] sm:aspect-square w-full overflow-hidden rounded-2xl bg-black/30">
             <Image
               src={safeGallery[selectedImage] ?? heroImage}
               alt={item.title}
@@ -763,42 +769,82 @@ export function SaleBikeLandingClient({
               }}
             />
           </div>
-          <div className="grid grid-cols-5 gap-2 mt-2">
-            {safeGallery.slice(0, 5).map((img, i) => (
-              <button
-                key={`${img}-${i}`}
-                type="button"
-                onClick={() => setSelectedImage(i)}
-                className="overflow-hidden rounded-xl border transition hover:brightness-110"
-                style={{
-                  ...(i === selectedImage
-                    ? {
-                        borderColor: crew.theme.palette.accentMain,
-                        boxShadow: `0 0 0 1px ${crew.theme.palette.accentMain}`,
+          <div className="grid grid-cols-5 gap-2 mt-2" suppressHydrationWarning>
+            {gallery.slice(0, 5).map((img, i) => {
+              const isBroken = brokenGalleryUrls[img];
+              if (isBroken) return null;
+              return (
+                <button
+                  key={`${img}-${i}`}
+                  type="button"
+                  onClick={() => setSelectedImage(i)}
+                  className="overflow-hidden rounded-xl border transition hover:brightness-110"
+                  style={{
+                    ...(i === selectedImage
+                      ? {
+                          borderColor: crew.theme.palette.accentMain,
+                          boxShadow: `0 0 0 1px ${crew.theme.palette.accentMain}`,
+                        }
+                      : {}),
+                  }}
+                >
+                  <span className="relative block aspect-[4/3] w-full">
+                    <Image
+                      src={img}
+                      alt={`${item.title}-${i}`}
+                      fill
+                      sizes="120px"
+                      className="object-cover"
+                      loading="lazy"
+                      onError={() =>
+                        setBrokenGalleryUrls((prev) => ({
+                          ...prev,
+                          [img]: true,
+                        }))
                       }
-                    : {}),
-                }}
-              >
-                <span className="relative block aspect-[4/3] w-full">
-                  <Image
-                    src={img}
-                    alt={`${item.title}-${i}`}
-                    fill
-                    sizes="120px"
-                    className="object-cover"
-                    loading="lazy"
-                    onError={() =>
-                      setBrokenGalleryUrls((prev) => ({
-                        ...prev,
-                        [img]: true,
-                      }))
-                    }
-                  />
-                </span>
-              </button>
-            ))}
+                    />
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </motion.div>
+
+        {/* Test info cards - moved below gallery */}
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-2xl border p-4" style={surface.subtleCard}>
+            <p className="text-xs uppercase tracking-[0.16em] opacity-70">
+              Тест-драйв
+            </p>
+            <p className="mt-2 text-sm">
+              Офлайн-показ и тест-драйв по предварительной записи.
+            </p>
+          </div>
+          <div className="rounded-2xl border p-4" style={surface.subtleCard}>
+            <p className="text-xs uppercase tracking-[0.16em] opacity-70">
+              Группа магазина
+            </p>
+            <p className="mt-2 text-sm">
+              Актуальные поставки и консультации:{" "}
+              <a
+                className="underline"
+                href="https://vk.ru/vip_bike_electro"
+                target="_blank"
+                rel="noreferrer"
+              >
+                vk.ru/vip_bike_electro
+              </a>
+            </p>
+          </div>
+          <div className="rounded-2xl border p-4" style={surface.subtleCard}>
+            <p className="text-xs uppercase tracking-[0.16em] opacity-70">
+              После покупки
+            </p>
+            <p className="mt-2 text-sm">
+              Сервисное сопровождение и рекомендации по обслуживанию.
+            </p>
+          </div>
+        </div>
 
         <motion.div
           initial={{ opacity: 0, y: 14 }}
@@ -807,7 +853,7 @@ export function SaleBikeLandingClient({
           style={surface.card}
         >
           <div className="flex flex-col gap-3 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="flex flex-wrap items-start justify-between gap-2" suppressHydrationWarning>
                 <div
                   className="inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
                   style={surface.subtleCard}
@@ -815,7 +861,7 @@ export function SaleBikeLandingClient({
                   <Sparkles className="h-3.5 w-3.5" />
                   Premium eMoto
                 </div>
-                {!vsItem && otherSaleBikes.length ? (
+                {otherSaleBikes.length > 0 && !vsItem ? (
                   <div className="group relative">
                     <button
                       type="button"
@@ -873,7 +919,7 @@ export function SaleBikeLandingClient({
                   <ShieldCheck className="h-3.5 w-3.5" />
                   Официальная сделка + документы
                 </p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="mt-3 grid gap-2 sm:grid-cols-2" suppressHydrationWarning>
                   {!hasTelegramRuntime ? (
                     <a
                       href={buyWebAppHref}
@@ -1222,6 +1268,7 @@ export function SaleBikeLandingClient({
             <div
               className="mx-3 mb-3 rounded-3xl border border-white/10 p-3"
               style={surface.subtleCard}
+              suppressHydrationWarning
             >
               <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
                 <div>
@@ -1350,41 +1397,6 @@ export function SaleBikeLandingClient({
                 обслуживанию."
               </p>
             </div>
-          </div>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border p-4" style={surface.subtleCard}>
-            <p className="text-xs uppercase tracking-[0.16em] opacity-70">
-              Тест-драйв
-            </p>
-            <p className="mt-2 text-sm">
-              Офлайн-показ и тест-драйв по предварительной записи.
-            </p>
-          </div>
-          <div className="rounded-2xl border p-4" style={surface.subtleCard}>
-            <p className="text-xs uppercase tracking-[0.16em] opacity-70">
-              Группа магазина
-            </p>
-            <p className="mt-2 text-sm">
-              Актуальные поставки и консультации:{" "}
-              <a
-                className="underline"
-                href="https://vk.ru/vip_bike_electro"
-                target="_blank"
-                rel="noreferrer"
-              >
-                vk.ru/vip_bike_electro
-              </a>
-            </p>
-          </div>
-          <div className="rounded-2xl border p-4" style={surface.subtleCard}>
-            <p className="text-xs uppercase tracking-[0.16em] opacity-70">
-              После покупки
-            </p>
-            <p className="mt-2 text-sm">
-              Сервисное сопровождение и рекомендации по обслуживанию.
-            </p>
           </div>
         </div>
 
