@@ -44,17 +44,28 @@ export function resolvePaletteByMode(franchize: unknown): Palette {
   const paletteCandidate = readRecordPath(franchize, ["theme", "palette"]) as ThemePaletteCandidate;
   const palettesCandidate = readRecordPath(franchize, ["theme", "palettes"]) as ThemePaletteCandidate;
 
-  const explicitFlatPalette = (
-    typeof paletteCandidate.bgBase === "string" &&
-    typeof paletteCandidate.bgCard === "string" &&
-    typeof paletteCandidate.accentMain === "string"
-  )
-    ? paletteCandidate
-    : {};
-
   const modeBucket = mode.includes("light") ? "light" : "dark";
-  const nestedByMode = readRecordPath(paletteCandidate, [modeBucket]) as Partial<Palette>;
   const nestedFromPalettes = readRecordPath(palettesCandidate, [modeBucket]) as Partial<Palette>;
+  const nestedByMode = readRecordPath(paletteCandidate, [modeBucket]) as Partial<Palette>;
+
+  // Check if we have mode-specific palette in palettes.light or palettes.dark
+  const hasModeSpecificPalette = (
+    typeof nestedFromPalettes.bgBase === "string" &&
+    typeof nestedFromPalettes.bgCard === "string" &&
+    typeof nestedFromPalettes.accentMain === "string"
+  );
+
+  // Only use explicit flat palette if there are no mode-specific palettes
+  // This prevents dark palette in theme.palette from overriding light palette in theme.palettes.light
+  const explicitFlatPalette = hasModeSpecificPalette
+    ? {}
+    : (
+        typeof paletteCandidate.bgBase === "string" &&
+        typeof paletteCandidate.bgCard === "string" &&
+        typeof paletteCandidate.accentMain === "string"
+      )
+      ? paletteCandidate
+      : {};
 
   const source = {
     ...explicitFlatPalette,
