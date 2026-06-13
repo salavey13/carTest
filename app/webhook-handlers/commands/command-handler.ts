@@ -19,12 +19,10 @@ import { simGodCommand } from "./sim_god";
 import { leaderboardCommand } from "./leaderboard";
 import { sosCommand, handleSosPaymentChoice } from "./sos";
 import { actionsCommand, handleActionChoice } from "./actions";
-import { shiftCommand } from "./shift"; 
+import { shiftCommand } from "./shift";
 import { wbCommand } from "./wb";
 import { codexCommand } from "./codex";
 import { docCommand, handleDocText, handleDocCallback } from "./doc-manual";
-
-
 
 import { escapeTelegramMarkdown } from "@/lib/utils"; // Helper для Markdown escape
 
@@ -47,6 +45,8 @@ export async function handleCommand(update: any) {
             text.startsWith("cat_") ||
             text.startsWith("d_") ||
             text.startsWith("c_") ||
+            text.startsWith("hl_") ||   // <<< FIX: "has license?" Yes/No callbacks (hl_yes, hl_no)
+            text.startsWith("e_") ||     // <<< FIX: end date callbacks (e_tomorrow_10, e_2days_10, e_custom)
             text.startsWith("p_") ||
             text.startsWith("s_") ||
             text === "cdone" ||
@@ -83,7 +83,7 @@ export async function handleCommand(update: any) {
         // Fix для sauna: аналогичные handlers
         if (command.startsWith('/approve_sauna_')) {
             const id = command.split('_')[2];
-            await handleApprove(id, chatId, userIdStr, 'sauna'); // Передаём type для адаптации
+            await handleApprove(id, chatId, userIdStr, 'sauna');
             return;
         }
         if (command.startsWith('/decline_sauna_')) {
@@ -91,7 +91,6 @@ export async function handleCommand(update: any) {
             await handleDecline(id, chatId, userIdStr, 'sauna');
             return;
         }
-        // Аналогично для accept/decline в sauna, если нужно
 
         const commandMap: { [key: string]: Function } = {
             "/start": () => startCommand(chatId, userId, update.message?.from || update.callback_query?.from, text),
@@ -99,7 +98,7 @@ export async function handleCommand(update: any) {
             "/shift": () => shiftCommand(chatId, userIdStr, username),
             "/actions": () => actionsCommand(chatId, userIdStr),
             "/sos": () => sosCommand(chatId, userIdStr),
-            "/rage": () => rageCommand(chatId, userId),
+            "/rage": () => rageCommand(chatId, userId, text),
             "/settings": () => rageSettingsCommand(chatId, userId, text),
             "/sim": () => simCommand(chatId, userIdStr, args),
             "/sim_god": () => simGodCommand(chatId, userIdStr, args),
@@ -132,7 +131,9 @@ export async function handleCommand(update: any) {
             },
         };
 
-        const commandFunction = commandMap[command] || (command.startsWith("/codex@") ? commandMap["/codex"] : undefined) || (command.startsWith("/doc@") ? commandMap["/doc"] : undefined);
+        const commandFunction = commandMap[command]
+            || (command.startsWith("/codex@") ? commandMap["/codex"] : undefined)
+            || (command.startsWith("/doc@") ? commandMap["/doc"] : undefined);
 
         if (commandFunction) {
             await commandFunction();
@@ -149,7 +150,7 @@ export async function handleCommand(update: any) {
                 await shiftCommand(chatId, userIdStr, username, shiftActionMap[text]);
                 return;
             }
-            
+
             if (text.startsWith('⛽️') || text.startsWith('🛠️') || text.startsWith('🙏')) {
                 await handleSosPaymentChoice(chatId, userIdStr, text); return;
             }
