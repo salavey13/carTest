@@ -1,3 +1,4 @@
+// /app/webhook-handlers/commands/command-handler.ts
 import { logger } from "@/lib/logger";
 import { startCommand } from "./start";
 import { rageCommand } from "./rage";
