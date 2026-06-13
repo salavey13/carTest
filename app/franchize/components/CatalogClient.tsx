@@ -336,11 +336,18 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   }, [promoModules]);
 
   const promoGradientByIndex = (index: number) => {
-    const gradients = [
-      `linear-gradient(130deg, ${crew.theme.palette.accentMain}E0, #FF7F50D0)`,
-      `linear-gradient(130deg, #8B5CF6D9, ${crew.theme.palette.accentMain}D8)`,
-      `linear-gradient(130deg, #22C55ED1, #06B6D4CC)`,
-    ];
+    const isLight = crew.theme.mode.toLowerCase().includes("light");
+    const gradients = isLight
+      ? [
+          `linear-gradient(130deg, ${crew.theme.palette.accentMain}E0, #FF7F50D0)`,
+          `linear-gradient(130deg, #8B5CF6D9, ${crew.theme.palette.accentMain}D8)`,
+          `linear-gradient(130deg, #F59E0BD1, #EF4444CC)`,
+        ]
+      : [
+          `linear-gradient(130deg, ${crew.theme.palette.accentMain}E0, #FF7F50D0)`,
+          `linear-gradient(130deg, #8B5CF6D9, ${crew.theme.palette.accentMain}D8)`,
+          `linear-gradient(130deg, #22C55ED1, #06B6D4CC)`,
+        ];
 
     return gradients[index % gradients.length];
   };
@@ -524,12 +531,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         id="catalog-sections"
         style={{
           ["--catalog-accent" as string]: crew.theme.palette.accentMain,
+          ["--catalog-accent-hover" as string]: crew.theme.palette.accentMainHover,
           ["--catalog-border" as string]: crew.theme.palette.borderSoft,
           ["--catalog-text" as string]: crew.theme.palette.textPrimary,
           ["--catalog-muted" as string]: crew.theme.palette.textSecondary,
           ["--catalog-card-bg" as string]: crew.theme.palette.bgCard,
           ["--catalog-bg" as string]: crew.theme.palette.bgBase,
           ["--catalog-accent-contrast" as string]: readableTextOnColor(crew.theme.palette.accentMain),
+          ["--catalog-accent-muted-contrast" as string]: withAlpha(readableTextOnColor(crew.theme.palette.accentMain), 0.7),
           ["--catalog-accent-subtle" as string]: withAlpha(crew.theme.palette.accentMain, 0.12),
         }}
       >
@@ -652,7 +661,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                 className="shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
                 style={{
                   ["--quick-pill-bg" as string]: active ? (filter.tierColor || crew.theme.palette.accentMain) : crew.theme.palette.bgCard,
-                  ["--quick-pill-text" as string]: active ? (filter.tierColor ? "#000000" : "#000000") : crew.theme.palette.textPrimary,
+                  ["--quick-pill-text" as string]: active ? readableTextOnColor(filter.tierColor || crew.theme.palette.accentMain) : crew.theme.palette.textPrimary,
                   ...(active && filter.tierColor ? { boxShadow: `0 0 8px ${filter.tierColor}60` } : {}),
                 }}
               >
