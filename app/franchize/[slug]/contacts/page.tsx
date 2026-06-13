@@ -11,7 +11,7 @@ import { FranchizePageShell } from "../../components/FranchizePageShell";
 import { FranchizeContactsMap } from "../../components/FranchizeContactsMap";
 import { getFranchizeRouteCtaPolicy, shouldShowFloatingCart } from "../../lib/route-cta-policy";
 import { buildFranchizeIntentLinks } from "../../lib/section-links";
-import { crewPaletteForSurface } from "../../lib/theme";
+import { crewPaletteWithCssVars } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
 interface FranchizeContactsPageProps {
@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: FranchizeContactsPageProps): 
 export default async function FranchizeContactsPage({ params }: FranchizeContactsPageProps) {
   const { slug } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
-  const surface = crewPaletteForSurface(crew.theme);
+  const surface = crewPaletteWithCssVars(crew.theme);
   const resolvedSlug = crew.slug || slug;
   const activePath = `/franchize/${resolvedSlug}/contacts`;
 
@@ -62,7 +62,7 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
 
   return (
     <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
-      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath)} />
+      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath)} items={items} />
 
       <FranchizePageShell theme={crew.theme}>
         <FranchizeHero
@@ -77,13 +77,13 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
           className="mt-6 rounded-2xl border p-4 shadow-lg shadow-black/10"
           style={{
             ...surface.subtleCard,
-            ["--crew-accent" as string]: crew.theme.palette.accentMain,
-            ["--crew-accent-hover" as string]: crew.theme.palette.accentMainHover,
+            ["--crew-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
+            ["--crew-accent-hover" as string]: crew.theme.isAuto ? "var(--franchize-accent-hover)" : crew.theme.palette.accentMainHover,
             ["--crew-accent-contrast" as string]: "var(--franchize-shell-primary-contrast)",
-            ["--crew-border" as string]: crew.theme.palette.borderSoft,
-            ["--crew-card" as string]: crew.theme.palette.bgCard,
-            ["--crew-muted" as string]: crew.theme.palette.textSecondary,
-            ["--crew-text" as string]: crew.theme.palette.textPrimary,
+            ["--crew-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
+            ["--crew-card" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard,
+            ["--crew-muted" as string]: crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary,
+            ["--crew-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
           }}
         >
           <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
@@ -230,9 +230,9 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
           slug={resolvedSlug}
           href={`/franchize/${resolvedSlug}/cart`}
           items={items}
-          accentColor={crew.theme.palette.accentMain}
-          textColor={crew.theme.palette.textPrimary}
-          borderColor={crew.theme.palette.borderSoft}
+          accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain}
+          textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
+          borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}
           theme={crew.theme}
           className={ctaPolicy.floatingCartClassName}
         />

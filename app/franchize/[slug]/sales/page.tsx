@@ -5,7 +5,7 @@ import { getFranchizeBySlug, type CatalogItemVM } from "@/app/franchize/actions"
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
-import { crewPaletteForSurface, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
+import { crewPaletteWithCssVars, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
 interface SalesPageProps {
@@ -54,7 +54,7 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
   const { crew, items } = await getFranchizeBySlug(slug);
   const crewSlug = crew.slug || slug;
   const activePath = `/franchize/${crewSlug}/sales`;
-  const surface = crewPaletteForSurface(crew.theme);
+  const surface = crewPaletteWithCssVars(crew.theme);
   const brandName = crew.header.brandName || crew.name || "VIP BIKE";
   const saleItems = items.filter((item) => item.saleAvailable || Number(item.salePrice || 0) > 0 || isTruthySpec(item.rawSpecs?.sale));
   const salesVerticals = crew.contentBlocks.salesVerticals;
@@ -62,17 +62,19 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} />
+      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} items={items} />
       <div
         className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-20 md:pt-24"
         style={{
-          ["--sales-accent" as string]: crew.theme.palette.accentMain,
-          ["--sales-border" as string]: crew.theme.palette.borderSoft,
+          ["--sales-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
+          ["--sales-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
           ["--sales-card" as string]: surface.subtleCard.backgroundColor,
-          ["--sales-base-soft" as string]: withAlpha(crew.theme.palette.bgBase, 0.25),
-          ["--sales-card-faint" as string]: withAlpha(crew.theme.palette.bgCard, 0.55),
-          ["--sales-accent-text" as string]: accentText,
-          color: crew.theme.palette.textPrimary,
+          ["--sales-base-soft" as string]: withAlpha(crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase, 0.25),
+          ["--sales-card-faint" as string]: withAlpha(crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard, 0.55),
+          ["--sales-accent-text" as string]: crew.theme.isAuto
+            ? readablePaletteTextOnColor(crew.theme.palettes?.dark?.accentMain || crew.theme.palettes?.light?.accentMain || crew.theme.palette.accentMain, crew.theme.palettes?.dark || crew.theme.palettes?.light || crew.theme.palette)
+            : accentText,
+          color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
         }}
       >
         <section className="rounded-3xl border border-[var(--sales-border)] bg-[var(--sales-card)] p-6 shadow-2xl md:p-8">

@@ -110,7 +110,25 @@ function computeSubtotal(
   // 4. Cross-reference with catalog items (if provided)
   //    Cart state likely stores { [itemId]: quantity } or similar
   if (catalogItems && catalogItems.length > 0) {
-    // Try to find a cart entries map in the state
+    // Try direct cart property first
+    if (state.cart && typeof state.cart === "object") {
+      let sum = 0;
+      for (const [lineId, lineVal] of Object.entries(state.cart)) {
+        // lineId format: "itemId::options" or just "itemId"
+        const itemId = lineId.split("::")[0];
+        const item = catalogItems.find((i) => i.id === itemId);
+        if (!item) continue;
+        const line = lineVal as { itemId: string; qty: number; options: Record<string, unknown> };
+        const qty = line?.qty ?? 1;
+        const price = item.saleAvailable && item.salePrice ? item.salePrice : item.pricePerDay;
+        if (price > 0) {
+          sum += price * qty;
+        }
+      }
+      if (sum > 0) return sum;
+    }
+
+    // Fallback: try to find a cart entries map in the state
     for (const key of Object.keys(state)) {
       const val = state[key];
       if (val && typeof val === "object" && !Array.isArray(val) && !(val instanceof Map)) {
@@ -118,11 +136,12 @@ function computeSubtotal(
         const entryKeys = Object.keys(entries);
         // Check if any entry key matches a catalog item ID
         const catalogIds = new Set(catalogItems.map((i) => i.id));
-        const matchCount = entryKeys.filter((k) => catalogIds.has(k)).length;
+        const matchCount = entryKeys.filter((k) => catalogIds.has(k.split("::")[0])).length;
         if (matchCount > 0) {
           let sum = 0;
           for (const [entryKey, entryVal] of Object.entries(entries)) {
-            const item = catalogItems.find((i) => i.id === entryKey);
+            const itemId = entryKey.split("::")[0];
+            const item = catalogItems.find((i) => i.id === itemId);
             if (!item) continue;
             const qty = typeof entryVal === "number" ? entryVal
               : (entryVal as Record<string, unknown>)?.quantity ?? 1;

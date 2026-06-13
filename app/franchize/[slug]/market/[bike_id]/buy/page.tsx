@@ -149,6 +149,7 @@ export default async function BuyBikePage({
         crew={crew}
         activePath={`/franchize/${resolvedSlug}/market/${bike_id}/buy`}
         groupLinks={items.map((candidate) => candidate.category)}
+        items={items}
       />
       <SaleBikeLanding
         crew={crew}
@@ -174,7 +175,7 @@ export default async function BuyBikePage({
             <div>
               <p
                 className="text-xs font-semibold uppercase tracking-[0.16em]"
-                style={{ color: crew.theme.palette.accentMain }}
+                style={{ color: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain }}
               >
                 Что будет дальше
               </p>
@@ -188,8 +189,10 @@ export default async function BuyBikePage({
                     <span
                       className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
                       style={{
-                        backgroundColor: `${crew.theme.palette.accentMain}24`,
-                        color: crew.theme.palette.accentMain,
+                        backgroundColor: crew.theme.isAuto
+                          ? "var(--franchize-accent-main)"
+                          : `${crew.theme.palette.accentMain}24`,
+                        color: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
                       }}
                     >
                       {index + 1}
@@ -202,7 +205,7 @@ export default async function BuyBikePage({
                 className="mt-3 rounded-2xl border p-3 text-xs"
                 style={{
                   ...surface.card,
-                  borderColor: crew.theme.palette.borderSoft,
+                  borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
                 }}
               >
                 Безопасность сделки: маркет не списывает деньги сам по себе,
@@ -217,8 +220,10 @@ export default async function BuyBikePage({
                 rel="noreferrer"
                 className="flex justify-center rounded-xl px-4 py-3 font-semibold"
                 style={{
-                  backgroundColor: crew.theme.palette.accentMain,
-                  color: crew.theme.palette.accentTextOn,
+                  backgroundColor: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
+                  color: crew.theme.isAuto
+                    ? (crew.theme.palettes?.light?.accentTextOn || crew.theme.palettes?.dark?.accentTextOn || crew.theme.palette.accentTextOn)
+                    : crew.theme.palette.accentTextOn,
                 }}
               >
                 Написать оператору в Telegram
@@ -227,8 +232,8 @@ export default async function BuyBikePage({
                 href={contactHref}
                 className="flex justify-center rounded-xl border px-4 py-3"
                 style={{
-                  borderColor: crew.theme.palette.borderSoft,
-                  color: crew.theme.palette.textPrimary,
+                  borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
+                  color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
                 }}
               >
                 Поддержка / контакты
@@ -237,14 +242,14 @@ export default async function BuyBikePage({
                 <Link
                   href={catalogHref}
                   className="rounded-xl border px-3 py-2 text-center text-xs"
-                  style={{ borderColor: crew.theme.palette.borderSoft }}
+                  style={{ borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft }}
                 >
                   Каталог
                 </Link>
                 <Link
                   href={profileHref}
                   className="rounded-xl border px-3 py-2 text-center text-xs"
-                  style={{ borderColor: crew.theme.palette.borderSoft }}
+                  style={{ borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft }}
                 >
                   Профиль
                 </Link>
@@ -259,9 +264,9 @@ export default async function BuyBikePage({
           slug={resolvedSlug}
           href={`/franchize/${resolvedSlug}/cart`}
           items={items}
-          accentColor={crew.theme.palette.accentMain}
-          textColor={crew.theme.palette.textPrimary}
-          borderColor={crew.theme.palette.borderSoft}
+          accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain}
+          textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
+          borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}
           theme={crew.theme}
           className={ctaPolicy.floatingCartClassName}
         />

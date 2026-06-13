@@ -5,7 +5,7 @@ import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
-import { crewPaletteForSurface, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
+import { crewPaletteWithCssVars, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
 
@@ -21,10 +21,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function FranchizeCommunityPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { crew } = await getFranchizeBySlug(slug);
+  const { crew, items } = await getFranchizeBySlug(slug);
   const crewSlug = crew.slug || slug;
   const activePath = `/franchize/${crewSlug}/community`;
-  const surface = crewPaletteForSurface(crew.theme);
+  const surface = crewPaletteWithCssVars(crew.theme);
   const brandName = crew.header.brandName || crew.name || "Экипаж";
 
   // Use crew-specific telegram handle with fallback to bot username
@@ -40,21 +40,23 @@ export default async function FranchizeCommunityPage({ params }: { params: Promi
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} />
+      <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} items={items} />
 
       <div
         className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-20 text-[var(--community-text)] md:pt-24"
         style={{
-          ["--community-accent" as string]: crew.theme.palette.accentMain,
-          ["--community-border" as string]: crew.theme.palette.borderSoft,
+          ["--community-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
+          ["--community-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
           ["--community-card" as string]: surface.subtleCard.backgroundColor,
-          ["--community-base-soft" as string]: withAlpha(crew.theme.palette.bgBase, 0.35),
-          ["--community-card-soft" as string]: withAlpha(crew.theme.palette.bgCard, 0.86),
-          ["--community-card-faint" as string]: withAlpha(crew.theme.palette.bgCard, 0.54),
-          ["--community-text" as string]: crew.theme.palette.textPrimary,
-          ["--community-muted" as string]: crew.theme.palette.textSecondary,
-          ["--community-accent-text" as string]: accentText,
-          color: crew.theme.palette.textPrimary,
+          ["--community-base-soft" as string]: withAlpha(crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase, 0.35),
+          ["--community-card-soft" as string]: withAlpha(crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard, 0.86),
+          ["--community-card-faint" as string]: withAlpha(crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard, 0.54),
+          ["--community-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
+          ["--community-muted" as string]: crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary,
+          ["--community-accent-text" as string]: crew.theme.isAuto
+            ? readablePaletteTextOnColor(crew.theme.palettes?.dark?.accentMain || crew.theme.palettes?.light?.accentMain || crew.theme.palette.accentMain, crew.theme.palettes?.dark || crew.theme.palettes?.light || crew.theme.palette)
+            : accentText,
+          color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
         }}
       >
         <section className="overflow-hidden rounded-3xl border border-[var(--community-border)] bg-[var(--community-card-soft)] p-6 shadow-2xl backdrop-blur-xl md:p-8">

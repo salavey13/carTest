@@ -7,6 +7,7 @@ import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { upsertFranchizeIntent } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
+import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { crewPaletteForSurface, withAlpha } from "../lib/theme";
 import { saveUserFranchizeCartAction } from "@/contexts/actions";
 import { useAppContext } from "@/contexts/AppContext";
@@ -38,6 +39,9 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const router = useRouter();
   const { dbUser, user } = useAppContext();
   const [isSaving, setIsSaving] = useState(false);
+
+  // Apply franchize theme CSS variables
+  useFranchizeTheme(crew.theme);
 
   // ── Flow detection for UI labels ──
   const saleLinesCount = cartLines.filter((line) => line.flowType === "sale").length;
@@ -106,9 +110,9 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
     <section
       className="mx-auto w-full max-w-5xl px-4 py-6"
       style={{
-        ["--cart-accent" as string]: crew.theme.palette.accentMain,
-        ["--cart-border" as string]: crew.theme.palette.borderSoft,
-        ["--cart-glow" as string]: withAlpha(crew.theme.palette.accentMain, 0.4),
+        ["--cart-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
+        ["--cart-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
+        ["--cart-glow" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : withAlpha(crew.theme.palette.accentMain, 0.4),
       }}
     >
       <CartShimmerStyle />
@@ -116,7 +120,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
       <nav aria-label="Breadcrumb" className="mb-2">
         <p
           className="text-xs uppercase tracking-[0.2em]"
-          style={{ color: crew.theme.palette.accentMain }}
+          style={{ color: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain }}
         >
           / FRANCHIZE / {crew.header.brandName?.toUpperCase() ?? slug.toUpperCase()} / CART
         </p>
@@ -192,7 +196,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
       {/* Easter Egg */}
       <div
         className="mt-16 text-center opacity-30 hover:opacity-100 transition-all duration-700 text-[10px] font-mono tracking-widest"
-        style={{ color: crew.theme.palette.textSecondary }}
+        style={{ color: crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary }}
       >
         Built with neon &amp; spite — 2026 —
       </div>

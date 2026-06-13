@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useLayoutEffect, useEffect } from "react";
 import { useTheme } from "next-themes";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 
@@ -8,12 +8,19 @@ import type { FranchizeTheme } from "@/lib/franchize-config";
  * Hook that applies franchize theme as CSS variables.
  * When theme mode is 'auto', it responds to the global theme preference.
  * When theme mode is specific (e.g., 'cyber_electro_dark'), it uses that palette.
+ *
+ * Uses useLayoutEffect to set CSS variables synchronously before browser paint,
+ * preventing "dark flash" on initial load.
  */
 export function useFranchizeTheme(theme: FranchizeTheme) {
   const { resolvedTheme = "dark" } = useTheme();
   const isAuto = theme.isAuto;
 
-  useEffect(() => {
+  // Use useLayoutEffect for synchronous updates before paint
+  // Fallback to useEffect for SSR compatibility
+  const effectImpl = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+  effectImpl(() => {
     const root = document.documentElement;
 
     if (isAuto) {

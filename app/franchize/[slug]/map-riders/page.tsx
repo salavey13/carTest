@@ -3,7 +3,7 @@ import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { getFranchizeRouteCtaPolicy } from "@/app/franchize/lib/route-cta-policy";
 import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
-import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+import { crewPaletteWithCssVars } from "@/app/franchize/lib/theme";
 import dynamic from "next/dynamic";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
@@ -24,16 +24,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function MapRidersPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { crew } = await getFranchizeBySlug(slug);
+  const { crew, items } = await getFranchizeBySlug(slug);
   const crewSlug = crew.slug || slug;
   const activePath = `/franchize/${crewSlug}/map-riders`;
-  const surface = crewPaletteForSurface(crew.theme);
+  const surface = crewPaletteWithCssVars(crew.theme);
   const ctaPolicy = getFranchizeRouteCtaPolicy("map-riders");
 
   return (
-    <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
-      <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} />
-      <MapRidersClient crew={crew} slug={crewSlug} />
+    <main className={`flex flex-col min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
+      <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} items={items} />
+      <MapRidersClient crew={crew} slug={crewSlug} items={items} />
     </main>
   );
 }

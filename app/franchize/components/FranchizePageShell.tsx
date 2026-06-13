@@ -29,15 +29,20 @@ export function FranchizePageShell({
   width = "content",
 }: FranchizePageShellProps) {
   const palette = theme.palette;
+  const isAuto = theme.isAuto;
+
+  // Use CSS variables when in auto mode, otherwise use palette directly
   const shellVars: FranchizeShellVars = {
-    "--franchize-shell-bg": palette.bgBase,
-    "--franchize-shell-card": palette.bgCard,
-    "--franchize-shell-border": palette.borderSoft,
-    "--franchize-shell-text": palette.textPrimary,
-    "--franchize-shell-muted": palette.textSecondary,
-    "--franchize-shell-accent": palette.accentMain,
-    "--franchize-shell-primary-contrast": readablePaletteTextOnColor(palette.accentMain, palette),
-    "--franchize-shell-ring": palette.accentMain,
+    "--franchize-shell-bg": isAuto ? "var(--franchize-bg-base)" : palette.bgBase,
+    "--franchize-shell-card": isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
+    "--franchize-shell-border": isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
+    "--franchize-shell-text": isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
+    "--franchize-shell-muted": isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary,
+    "--franchize-shell-accent": isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
+    "--franchize-shell-primary-contrast": isAuto
+      ? readablePaletteTextOnColor(theme.palettes?.dark?.accentMain || theme.palettes?.light?.accentMain || palette.accentMain, theme.palettes?.dark || theme.palettes?.light || palette)
+      : readablePaletteTextOnColor(palette.accentMain, palette),
+    "--franchize-shell-ring": isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
   };
   const maxWidthClass = width === "wide" ? "max-w-6xl" : "max-w-5xl";
 

@@ -17,8 +17,9 @@ import { Label } from "@/components/ui/label";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppContext } from "@/contexts/AppContext";
+import { useTheme } from "next-themes";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
-import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useMaps } from "@/lib/maps/useMaps";
 import { MapRidersProvider, useMapRiders, useMapRidersState } from "@/hooks/useMapRidersContext";
 import { formatRideDuration, initialsFromName, riderDisplayName } from "@/lib/map-riders";
@@ -59,8 +60,9 @@ type SnapLabel = "Мини" | "Средне" | "Макс";
 const SNAP_LABELS: Record<number, SnapLabel> = { 0.2: "Мини", 0.48: "Средне", 0.86: "Макс" };
 
 // ── Inner component (uses context) ──
-function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
+function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknown[] }) {
   const { dbUser } = useAppContext();
+  const { resolvedTheme = "dark" } = useTheme();
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
   const isAdmin = useIsAdmin();
   const [isQuickMeetupSaving, setIsQuickMeetupSaving] = useState(false);
@@ -72,15 +74,27 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [promptValue, setPromptValue] = useState("Точка встречи");
   const lastMeetupActionAtRef = useRef(0);
-  const surface = crewPaletteForSurface(crew.theme);
+
+  // Apply franchize theme CSS variables
+  useFranchizeTheme(crew.theme);
+
   const mapEngine = process.env.NEXT_PUBLIC_MAP_ENGINE || "leaflet";
   const useLeafletMap = mapEngine !== "vibemap";
   const mapBounds = crew.contacts.map.bounds || DEFAULT_BOUNDS;
+
+  // First, get map data to see if there's a configured tile layer
   const { mapData } = useMaps({
     mapId: crew.contacts.map?.id || undefined,
     crewSlug,
-    defaultTileLayer: "cartodb-dark",
+    defaultTileLayer: "cartodb-dark", // temporary default, will be overridden if needed
   });
+
+  // Determine tile layer based on theme mode
+  // When in auto mode, use light/dark tile layer based on global theme
+  // Otherwise, use the configured tile layer from mapData or default to dark
+  const finalTileLayer = crew.theme.isAuto
+    ? (resolvedTheme === "light" ? "cartodb-light" : "cartodb-dark")
+    : (mapData?.meta.tileLayer || "cartodb-dark");
   const { createMeetup } = useMeetupCreator(crewSlug);
   const { canStart, canStop, startSession, stopSession } = useSessionManager({
     authErrorMessage: "Авторизуйся",
@@ -106,15 +120,25 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     const prevAccent = root.style.getPropertyValue("--fr-map-nav-accent");
     const prevText = root.style.getPropertyValue("--fr-map-nav-text");
     const prevBg = root.style.getPropertyValue("--fr-map-nav-bg");
-    root.style.setProperty("--fr-map-nav-accent", crew.theme.palette.accentMain);
-    root.style.setProperty("--fr-map-nav-text", crew.theme.palette.textPrimary);
-    root.style.setProperty("--fr-map-nav-bg", crew.theme.palette.bgBase);
+
+    // When in auto mode, franchize CSS variables are already set by useFranchizeTheme
+    // So we use those variables directly
+    if (crew.theme.isAuto) {
+      root.style.setProperty("--fr-map-nav-accent", "var(--franchize-accent-main)");
+      root.style.setProperty("--fr-map-nav-text", "var(--franchize-text-primary)");
+      root.style.setProperty("--fr-map-nav-bg", "var(--franchize-bg-base)");
+    } else {
+      root.style.setProperty("--fr-map-nav-accent", crew.theme.palette.accentMain);
+      root.style.setProperty("--fr-map-nav-text", crew.theme.palette.textPrimary);
+      root.style.setProperty("--fr-map-nav-bg", crew.theme.palette.bgBase);
+    }
+
     return () => {
       if (prevAccent) root.style.setProperty("--fr-map-nav-accent", prevAccent); else root.style.removeProperty("--fr-map-nav-accent");
       if (prevText) root.style.setProperty("--fr-map-nav-text", prevText); else root.style.removeProperty("--fr-map-nav-text");
       if (prevBg) root.style.setProperty("--fr-map-nav-bg", prevBg); else root.style.removeProperty("--fr-map-nav-bg");
     };
-  }, [crew.theme.palette.accentMain, crew.theme.palette.bgBase, crew.theme.palette.textPrimary]);
+  }, [crew.theme.isAuto, crew.theme.palette.accentMain, crew.theme.palette.bgBase, crew.theme.palette.textPrimary]);
 
   useEffect(() => {
     const { documentElement, body } = document;
@@ -371,32 +395,31 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
     }
   }, [crewSlug, dbUser, dispatch, fetchSnapshot, selectedMeetup]);
 
+  const cssVars = useMemo(() => ({
+    "--mr-accent": crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
+    "--mr-accent-hover": crew.theme.isAuto ? "var(--franchize-accent-hover)" : crew.theme.palette.accentMainHover,
+    "--mr-border": crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
+    "--mr-card": crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard,
+    "--mr-text": crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
+    "--mr-muted": crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary,
+    "--mr-base": crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase,
+  }), [crew.theme.isAuto, crew.theme.palette]);
+
   return (
     <div
-      className="fixed inset-0 isolate h-[100dvh] w-full overflow-hidden"
-      style={{
-        ["--mr-accent" as string]: crew.theme.palette.accentMain,
-        ["--mr-accent-hover" as string]: crew.theme.palette.accentMainHover,
-        ["--mr-border" as string]: crew.theme.palette.borderSoft,
-        ["--mr-card" as string]: surface.subtleCard.backgroundColor,
-        ["--mr-text" as string]: crew.theme.palette.textPrimary,
-        ["--mr-muted" as string]: crew.theme.palette.textSecondary,
-      }}
+      className="flex-1 h-full w-full overflow-hidden"
+      style={{ ...cssVars }}
     >
       {/* ── MAP (fullscreen background) ── */}
-      <section className="fixed inset-0 overflow-hidden" style={{ touchAction: "pan-x pan-y pinch-zoom", borderColor: `${crew.theme.palette.borderSoft}aa` }}>
-        <div className="absolute inset-0 z-0">
+      <section className="absolute inset-0 z-0">
+        <div className="absolute inset-0 pointer-events-auto">
           {useLeafletMap ? (
             <RacingMap
               points={mapPoints}
               bounds={mapData?.bounds || mapBounds || DEFAULT_BOUNDS}
               className="h-full min-h-[100dvh] w-full"
-              tileLayer={mapData?.meta.tileLayer || "cartodb-dark"}
+              tileLayer={finalTileLayer}
               onMapClick={(coords) => {
-                setSelectedMeetupId(null);
-                dispatch({ type: "ui/select-meetup-point", payload: coords });
-              }}
-              onMapLongPress={(coords) => {
                 setSelectedMeetupId(null);
                 dispatch({ type: "ui/select-meetup-point", payload: coords });
               }}
@@ -410,7 +433,6 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               }}
             >
               {state.sessionDetail?.points?.length ? <SpeedGradientRoute points={state.sessionDetail.points} /> : null}
-              <RiderMarkerLayer />
             </RacingMap>
           ) : (
             <div className="flex h-full min-h-[100dvh] items-center justify-center text-muted-foreground">
@@ -434,22 +456,21 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
             <Badge className="border border-emerald-300/45 bg-emerald-500/20 text-emerald-100">live {riderStatusCounts.live}</Badge>
             {riderStatusCounts.stale ? <Badge className="border border-amber-300/45 bg-amber-500/20 text-amber-100">stale {riderStatusCounts.stale}</Badge> : null}
             {mapData?.routes?.length ? <Badge className="border border-sky-300/50 bg-sky-500/20 text-sky-100">{mapData.routes.length} маршрутов</Badge> : null}
-            <Badge className="border border-white/20 bg-black/45 text-white/90">{shareModeLabel} • автостоп {nextAutoStopLabel}</Badge>
+            <Badge className="border border-[var(--mr-border)] bg-black/45 text-[var(--mr-text)]/90">{shareModeLabel} • автостоп {nextAutoStopLabel}</Badge>
             {showDemo ? (
               <Badge className="border border-emerald-300/40 bg-emerald-500/20 text-emerald-100">Демо-режим</Badge>
             ) : null}
           </div>
           <div className="mt-2 flex justify-end">
-            <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-2xl border border-white/30 bg-black/60 px-3 py-2 text-xs text-white shadow-2xl shadow-black/30 backdrop-blur-md">
+            <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-2xl border border-[var(--mr-border)] bg-[var(--mr-card)]/80 px-3 py-2 text-xs text-[var(--mr-text)] shadow-2xl shadow-black/30 backdrop-blur-md">
               <span className="min-w-0">
-                <span className="block font-medium text-white">
+                <span className="block font-medium text-[var(--mr-text)]">
                   {selectedMeetup
                     ? `Точка встречи: ${selectedMeetup.title}`
                     : state.selectedMeetupPoint
                     ? `Точка: ${state.selectedMeetupPoint[0].toFixed(4)}, ${state.selectedMeetupPoint[1].toFixed(4)}`
-                    : "Тапни — выбрать, удерживай — meetup"}
+                    : "Тапни на карту, чтобы выбрать точку"}
                 </span>
-                <span className="block text-[11px] text-white/65">Long-press не двигает карту и сразу готовит точку встречи.</span>
               </span>
               <Button
                 type="button"
@@ -460,7 +481,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
                     : !state.selectedMeetupPoint || isQuickMeetupSaving
                 }
                 className="h-6 min-w-6 rounded-full px-2 text-xs leading-none text-black"
-                style={{ backgroundColor: crew.theme.palette.accentMain }}
+                style={{ backgroundColor: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain }}
                 onClick={selectedMeetup ? handleMeetupDelete : handleQuickMeetupCreate}
                 aria-label={selectedMeetup ? "Удалить выбранный meetup" : "Создать meetup из выбранной точки"}
               >
@@ -472,7 +493,6 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       </section>
 
       {/* ── DRAGGABLE TAXI-STYLE BOTTOM SHEET (vaul) ── */}
-      <div style={{ touchAction: activeSnap <= 0.2 ? "none" : "auto" }}>
       <Drawer.Root
         open={sheetOpen}
         onOpenChange={setSheetOpen}
@@ -486,10 +506,10 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
       >
         <Drawer.Portal>
           <Drawer.Content className="fixed inset-x-0 bottom-0 z-20 pointer-events-none">
-            <div className={`rounded-t-[1.4rem] border border-white/15 bg-[var(--mr-card)]/96 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl ${activeSnap <= 0.2 ? "pointer-events-none" : "pointer-events-auto"}`}><Drawer.Handle className="pointer-events-auto mx-auto mb-2 h-1.5 w-14 rounded-full bg-white/35" />
+            <div className={`rounded-t-[1.4rem] border border-[var(--mr-border)] bg-[var(--mr-card)]/96 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl ${activeSnap <= 0.2 ? "pointer-events-none" : "pointer-events-auto"}`}><Drawer.Handle className="pointer-events-auto mx-auto mb-2 h-1.5 w-14 rounded-full bg-[var(--mr-muted)]/35" />
             {/* Snap control buttons */}
             <div className="pointer-events-auto mb-3 flex items-center justify-between gap-2">
-              <h3 className="font-orbitron text-sm text-white/90">Панель райдера</h3>
+              <h3 className="font-orbitron text-sm text-[var(--mr-text)]">Панель райдера</h3>
               <div className="pointer-events-auto flex gap-1.5">
                 {SNAP_POINTS.map((snap) => (
                   <Button
@@ -505,37 +525,37 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
                 ))}
               </div>
             </div>
-            <div className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`} style={{ touchAction: activeSnap <= 0.2 ? "none" : "pan-y" }}>
+            <div className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`}>
               <BeginnerRiderOnboardingQuiz crew={crew} />
               <div className="mt-3 grid gap-3 lg:grid-cols-[1.35fr,1fr]">
 
         {/* Stats card */}
-        <div className="rounded-2xl border p-4 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
-          <Badge className="mb-3 w-fit border" style={{ borderColor: `${crew.theme.palette.accentMain}55`, backgroundColor: `${crew.theme.palette.accentMain}18`, color: crew.theme.palette.accentMain }}>
+        <div className="rounded-2xl border p-4 backdrop-blur-xl" style={{ backgroundColor: "var(--mr-card)", borderColor: "var(--mr-border)" }}>
+          <Badge className="mb-3 w-fit border" style={{ borderColor: `${crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain}55`, backgroundColor: `${crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain}18`, color: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain }}>
             {(crew.header.brandName || crew.name || "VIP BIKE").toUpperCase()} • MAPRIDERS
           </Badge>
-          <h2 className="mt-2 font-orbitron text-2xl" style={{ color: crew.theme.palette.textPrimary }}>
+          <h2 className="mt-2 font-orbitron text-2xl" style={{ color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary }}>
             Карта райдеров в реальном времени
           </h2>
-          <p className="mt-1 max-w-2xl text-sm" style={{ color: crew.theme.palette.textSecondary }}>
+          <p className="mt-1 max-w-2xl text-sm" style={{ color: crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary }}>
             Один тап — и экипаж видит твой маршрут, скорость и meetup-пины.
           </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
             {heroStats.map((stat) => (
-              <div key={stat.label} className="rounded-xl border p-3" style={{ borderColor: `${crew.theme.palette.borderSoft}aa`, backgroundColor: `${crew.theme.palette.bgBase}66` }}>
-                <div className="mb-2" style={{ color: crew.theme.palette.accentMain }}>
+              <div key={stat.label} className="rounded-xl border p-3" style={{ borderColor: `${crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}aa`, backgroundColor: `${crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase}66` }}>
+                <div className="mb-2" style={{ color: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain }}>
                   <VibeContentRenderer content={stat.icon} />
                 </div>
-                <div className="text-xl font-semibold" style={{ color: crew.theme.palette.textPrimary }}>{stat.value}</div>
-                <div className="text-xs" style={{ color: crew.theme.palette.textSecondary }}>{stat.label}</div>
+                <div className="text-xl font-semibold" style={{ color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary }}>{stat.value}</div>
+                <div className="text-xs" style={{ color: crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary }}>{stat.label}</div>
               </div>
             ))}
           </div>
         </div>
 
         {/* Rider control panel */}
-        <div className="rounded-2xl border p-4 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
-          <h3 className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Пульт райдера</h3>
+        <div className="rounded-2xl border p-4 backdrop-blur-xl" style={{ backgroundColor: "var(--mr-card)", borderColor: "var(--mr-border)" }}>
+          <h3 className="font-orbitron text-xl" style={{ color: "var(--mr-text)" }}>Пульт райдера</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             {state.shareEnabled ? "Ты сейчас в эфире на карте" : "Геошеринг выключен"}
           </p>
@@ -548,9 +568,9 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               <div className="font-semibold">{riderStatusCounts.stale}</div>
               <div className="text-[10px] uppercase tracking-wide text-amber-200/70">stale</div>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 px-2 py-2 text-white">
+            <div className="rounded-xl border border-[var(--mr-border)] bg-[var(--mr-base)]/5 px-2 py-2 text-[var(--mr-text)]">
               <div className="font-semibold">{queuedPoints}</div>
-              <div className="text-[10px] uppercase tracking-wide text-white/60">queue</div>
+              <div className="text-[10px] uppercase tracking-wide text-[var(--mr-muted)]">queue</div>
             </div>
           </div>
           <div className="mt-4 space-y-3">
@@ -559,7 +579,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
                 <Link href="/admin/map-routes">Открыть маршруты карты</Link>
               </Button>
             ) : null}
-            <div className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-3">
+            <div className="space-y-2 rounded-xl border border-[var(--mr-border)] bg-[var(--mr-base)]/20 p-3">
               <Label htmlFor="map-riders-ride-name" className="sr-only">
                 Название заезда
               </Label>
@@ -626,7 +646,7 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
               type="button"
               disabled={!canStart}
               className="w-full text-black"
-              style={{ backgroundColor: crew.theme.palette.accentMain }}
+              style={{ backgroundColor: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain }}
               onClick={startSession}
             >
               <VibeContentRenderer content="::FaLocationArrow::" className="mr-2" />
@@ -671,7 +691,6 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
         </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
-      </div>
       {state.isLoading ? <MapRidersSkeleton /> : null}
       <StatusOverlay />
       <RiderFAB />
@@ -707,35 +726,37 @@ function MapRidersInner({ crew }: { crew: FranchizeCrewVM }) {
 
 // ── Lazy-loaded leaderboard (own fetch) ──
 function LeaderboardSection({ crew, crewSlug }: { crew: FranchizeCrewVM; crewSlug: string }) {
-  const surface = crewPaletteForSurface(crew.theme);
   const { state } = useMapRidersState();
 
+  // Apply franchize theme CSS variables
+  useFranchizeTheme(crew.theme);
+
   return (
-    <section className="rounded-2xl border p-6 backdrop-blur-xl" style={{ ...surface.subtleCard, borderColor: "var(--mr-border)" }}>
-      <h3 className="font-orbitron text-xl" style={{ color: crew.theme.palette.textPrimary }}>Недельный зал славы</h3>
+    <section className="rounded-2xl border p-6 backdrop-blur-xl" style={{ backgroundColor: "var(--mr-card)", borderColor: "var(--mr-border)" }}>
+      <h3 className="font-orbitron text-xl" style={{ color: "var(--mr-text)" }}>Недельный зал славы</h3>
       <div className="mt-4 space-y-3">
         {state.leaderboard.map((row) => (
-          <div key={row.userId} className="grid grid-cols-[56px,1fr,88px] items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+          <div key={row.userId} className="grid grid-cols-[56px,1fr,88px] items-center gap-3 rounded-2xl border border-[var(--mr-border)] bg-[var(--mr-base)]/20 px-4 py-3">
             <div className="text-center font-orbitron text-xl text-amber-300">#{row.rank}</div>
             <div>
-              <div className="font-medium text-white">{row.riderName}</div>
-              <div className="text-xs text-muted-foreground">{row.sessions} заезд(ов) • средняя {row.avgSpeedKmh} км/ч</div>
+              <div className="font-medium text-[var(--mr-text)]">{row.riderName}</div>
+              <div className="text-xs text-[var(--mr-muted)]">{row.sessions} заезд(ов) • средняя {row.avgSpeedKmh} км/ч</div>
             </div>
-            <div className="text-right text-lg text-white">{row.distanceKm} км</div>
+            <div className="text-right text-lg text-[var(--mr-text)]">{row.distanceKm} км</div>
           </div>
         ))}
-        {!state.leaderboard.length && <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-muted-foreground">Лидерборд наполнится после первых треков.</div>}
+        {!state.leaderboard.length && <div className="rounded-2xl border border-dashed border-[var(--mr-border)] p-4 text-sm text-[var(--mr-muted)]">Лидерборд наполнится после первых треков.</div>}
       </div>
     </section>
   );
 }
 
 // ── Exported wrapper with provider ──
-export function MapRidersClientRefactored({ crew, slug }: { crew: FranchizeCrewVM; slug?: string }) {
+export function MapRidersClientRefactored({ crew, slug, items }: { crew: FranchizeCrewVM; slug?: string; items?: unknown[] }) {
   const resolvedSlug = crew.slug || slug || "vip-bike";
   return (
     <MapRidersProvider crew={crew} slug={resolvedSlug}>
-      <MapRidersInner crew={crew} />
+      <MapRidersInner crew={crew} items={items} />
     </MapRidersProvider>
   );
 }

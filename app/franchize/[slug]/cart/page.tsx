@@ -4,7 +4,7 @@ import { CartPageClient } from "../../components/CartPageClient";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { getFranchizeRouteCtaPolicy } from "../../lib/route-cta-policy";
-import { crewPaletteForSurface } from "../../lib/theme";
+import { crewPaletteWithCssVars } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
 interface FranchizeCartPageProps {
@@ -24,12 +24,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function FranchizeCartPage({ params }: FranchizeCartPageProps) {
   const { slug } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
-  const surface = crewPaletteForSurface(crew.theme);
+  const surface = crewPaletteWithCssVars(crew.theme);
   const ctaPolicy = getFranchizeRouteCtaPolicy("checkout");
 
   return (
     <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/cart`} groupLinks={items.map((item) => item.category)} />
+      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/cart`} groupLinks={items.map((item) => item.category)} items={items} />
       <CartPageClient crew={crew} slug={crew.slug || slug} items={items} />
       <CrewFooter crew={crew} />
     </main>
