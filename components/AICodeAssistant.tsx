@@ -134,6 +134,34 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
          setImageReplaceTask(null); 
          toastInfo("Состояние ошибки сброшено.");
      }, [setImageReplaceError, setImageReplaceTask, toastInfo]);
+
+    // <<< ADDED: File Upload Handler >>>
+    const handleFileUpload = useCallback((content: string, fileName: string) => {
+        // Determine language hint from file extension
+        const ext = fileName.includes('.') ? fileName.split('.').pop() : '';
+        const langHint = ext || '';
+        // Wrap file content in a code fence with the filename as a path comment
+        const wrappedContent = `\`\`\`${langHint}\n// ${fileName}\n${content}\n\`\`\``;
+
+        // Update React state — append to existing response
+        setResponse(prev => {
+            const separator = prev.trim().length > 0 ? '\n\n' : '';
+            return prev + separator + wrappedContent;
+        });
+
+        // Also update the textarea DOM value directly for immediate visual feedback
+        if (aiResponseInputRefPassed.current) {
+            const textarea = aiResponseInputRefPassed.current;
+            const currentVal = textarea.value;
+            const separator = currentVal.trim().length > 0 ? '\n\n' : '';
+            textarea.value = currentVal + separator + wrappedContent;
+            // Dispatch a React-compatible input event so onChange fires and state stays in sync
+            const event = new Event('input', { bubbles: true });
+            textarea.dispatchEvent(event);
+        }
+
+        toastSuccess(`Файл "${fileName}" загружен`);
+    }, [setResponse, aiResponseInputRefPassed, toastSuccess]);
     
     // --- Refs ---
     const imageReplaceTaskRef = useRef(imageReplaceTask);
@@ -191,7 +219,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     useEffect(() => { 
         const loadLinks = async () => {
-            const userId = user?.id || dbUser?.user_id; // Prefer TG user id, fallback to DB user_id
+            const userId = user?.id || dbUser?.user_id;
             if (!userId) { 
                 logger.debug("[Effect Custom Links] No user ID, skipping link load.");
                 setCustomLinks([]); 
@@ -204,7 +232,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             } catch (e: any) { logger.error("[Effect Custom Links] Exception during fetch:", e); toastError(`Критическая ошибка при загрузке ссылок: ${e.message ?? 'Неизвестно'}`); setCustomLinks([]); }
         };
         loadLinks();
-    }, [user, dbUser, toastError]); // Depend on both user objects
+    }, [user, dbUser, toastError]);
 
     useEffect(() => { 
         imageReplaceTaskRef.current = imageReplaceTask;
@@ -282,6 +310,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                                  onCopy={handlers.handleCopyResponse}
                                  onClear={handlers.handleClearResponse}
                                  onSelectFunction={handlers.handleSelectFunction}
+                                 onFileUpload={handleFileUpload}
                                  isParseDisabled={parseButtonDisabled}
                                  isProcessingPR={assistantLoading || isProcessingPR}
                               />
