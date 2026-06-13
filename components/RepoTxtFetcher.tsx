@@ -114,11 +114,13 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         // Core skills
         "skills/rental-contract-from-photos/SKILL.md",
         "skills/deal-contract-from-photos/SKILL.md",
+        "skills/concat-files/SKILL.md",
         // CLI scripts
         "scripts/make-rental-contract-skill.mjs",
         "scripts/make-deal-contract-skill.mjs",
         "scripts/supabase-access-skill.mjs",
         "scripts/codex-notify.mjs",
+        "scripts/concat.sh",
         // HTML → DOCX converter
         "lib/htmlToDocx.mjs",
         // Contract templates
