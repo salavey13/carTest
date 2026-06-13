@@ -152,23 +152,53 @@ function buildDealKeyboard(): KeyboardButton[][] {
 }
 
 function buildStartKeyboard(): KeyboardButton[][] {
-  return [
-    [
-      { text: "📅 Сегодня 18:00", callback_data: "s_today_18" },
-      { text: "📅 Сегодня 20:00", callback_data: "s_today_20" },
-    ],
-    [
-      { text: "📅 Завтра 10:00", callback_data: "s_tomorrow_10" },
-      { text: "✏️ Свое время", callback_data: "s_custom" },
-    ],
-  ];
+  const now = new Date();
+  const currentHour = now.getHours();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  const fmt = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`;
+
+  const rows: KeyboardButton[][] = [];
+
+  // Smart defaults based on current time
+  if (currentHour < 14) {
+    rows.push([
+      { text: "📅 Сегодня 18:00", callback_data: "s_today_1800" },
+    ]);
+  } else if (currentHour < 20) {
+    rows.push([
+      { text: "📅 Сегодня 20:00", callback_data: "s_today_2000" },
+    ]);
+  }
+
+  rows.push([
+    { text: `📅 Завтра 10:00`, callback_data: "s_tomorrow_1000" },
+    { text: `📅 Завтра 18:00`, callback_data: "s_tomorrow_1800" },
+  ]);
+
+  rows.push([
+    { text: "✏️ Свое время", callback_data: "s_custom" },
+  ]);
+
+  return rows;
 }
 
-function buildEndKeyboard(): KeyboardButton[][] {
+/**
+ * Build end-date keyboard — defaults to same time as start
+ * If startTime is "15:30", shows "Завтра 15:30" and "Послезавтра 15:30"
+ */
+function buildEndKeyboard(startTime?: string): KeyboardButton[][] {
+  const timeLabel = startTime || "10:00";
+  // Encode time as HHMM for callback_data (e.g. "15:30" → "1530")
+  const timeCode = timeLabel.replace(":", "");
+
   return [
     [
-      { text: "📅 Завтра 10:00", callback_data: "e_tomorrow_10" },
-      { text: "📅 Послезавтра 10:00", callback_data: "e_2days_10" },
+      { text: `📅 Завтра ${timeLabel}`, callback_data: `e_tomorrow_${timeCode}` },
+      { text: `📅 Послезавтра ${timeLabel}`, callback_data: `e_2days_${timeCode}` },
+    ],
+    [
+      { text: "📅 Завтра 10:00", callback_data: "e_tomorrow_1000" },
     ],
     [
       { text: "✏️ Свое время", callback_data: "e_custom" },
@@ -368,12 +398,26 @@ function parseDate(text: string, requireYear = true): string | null {
   return `${day}.${month}.${year}`;
 }
 
-// ── Schedule parser ─────────────────────────────────────────────────────────
+// ── Schedule parsers ─────────────────────────────────────────────────────────
 
 /**
- * Parse "сегодня 18", "завтра 10:00", "15.06 18", "15.06.2026 20:00"
+ * Decode callback_data time format to HH:MM
+ * Supports: "1800" → "18:00", "10" → "10:00", "1530" → "15:30"
  */
-function parseSchedule(text: string): { start: string; startTime: string; end: string; endTime: string } | null {
+function decodeCallbackTime(raw: string): string {
+  if (/^\d{4}$/.test(raw)) {
+    // HHMM format: "1530" → "15:30"
+    return `${raw.slice(0, 2)}:${raw.slice(2)}`;
+  }
+  // Just hour: "18" → "18:00"
+  return `${raw.padStart(2, '0')}:00`;
+}
+
+/**
+ * Parse start date only: "сегодня 18", "завтра 10:00", "15.06 18", "15.06.2026 20:00"
+ * Returns only the start date/time — the end is asked in a separate step
+ */
+function parseStartDate(text: string): { date: string; time: string } | null {
   const t = text.trim().toLowerCase();
   const today = new Date();
   const tomorrow = new Date(today);
@@ -386,8 +430,7 @@ function parseSchedule(text: string): { start: string; startTime: string; end: s
   if (todayMatch) {
     const hour = todayMatch[1].padStart(2, '0');
     const min = todayMatch[3] || '00';
-    const end = new Date(tomorrow);
-    return { start: formatDate(today), startTime: `${hour}:${min}`, end: formatDate(end), endTime: '10:00' };
+    return { date: formatDate(today), time: `${hour}:${min}` };
   }
 
   // "завтра 10" or "завтра 10:00"
@@ -395,9 +438,7 @@ function parseSchedule(text: string): { start: string; startTime: string; end: s
   if (tomorrowMatch) {
     const hour = tomorrowMatch[1].padStart(2, '0');
     const min = tomorrowMatch[3] || '00';
-    const end = new Date(tomorrow);
-    end.setDate(tomorrow.getDate() + 1);
-    return { start: formatDate(tomorrow), startTime: `${hour}:${min}`, end: formatDate(end), endTime: '10:00' };
+    return { date: formatDate(tomorrow), time: `${hour}:${min}` };
   }
 
   // "15.06 18" or "15.06.2026 18:00"
@@ -407,10 +448,7 @@ function parseSchedule(text: string): { start: string; startTime: string; end: s
     const year = y ? (y.length === 2 ? (parseInt(y) > 50 ? `19${y}` : `20${y}`) : y) : CURRENT_YEAR;
     const hour = h.padStart(2, '0');
     const minute = min || '00';
-    const start = new Date(`${year}-${m}-${d}`);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 1);
-    return { start: `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${year}`, startTime: `${hour}:${minute}`, end: formatDate(end), endTime: '10:00' };
+    return { date: `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${year}`, time: `${hour}:${minute}` };
   }
 
   return null;
@@ -899,6 +937,27 @@ async function getState(userId: string): Promise<{ state: string; context: DocFl
 
 // ── Text handlers ─────────────────────────────────────────────────────────────
 
+const START_DATE_EXAMPLES = `*Когда начинаем?*
+
+Примеры:
+• сегодня 18
+• сегодня 15:30
+• завтра 10
+• завтра 14:00
+• 15.06 18
+• 13.06 15:30
+• 15.06.2026 10:00`;
+
+const END_DATE_EXAMPLES = `*Когда заканчиваем?*
+
+Примеры:
+• завтра 10
+• завтра 15:30
+• послезавтра 10
+• 16.06 10
+• 16.06 15:30
+• 17.06.2026 18:00`;
+
 export async function handleDocText(userId: string, chatId: number, text: string): Promise<boolean> {
   const docState = await getState(userId);
   if (!docState) return false;
@@ -1009,37 +1068,33 @@ export async function handleDocText(userId: string, chatId: number, text: string
     return true;
   }
 
-  if (state === "schedule_start") {
-    // User typed instead of pressing button — re-prompt
-    await sendComplexMessage(chatId, "*Когда аренда?*", buildStartKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+  if (state === "schedule_start" || state === "schedule") {
+    // Parse start date from free text, then ask for end date
+    const s = parseStartDate(text);
+    if (!s) {
+      await sendComplexMessage(chatId, START_DATE_EXAMPLES, [], { removeKeyboard: true, parseMode: "Markdown" });
+      return true;
+    }
+    context.rentStartDate = s.date;
+    context.rentStartTime = s.time;
+    await setState(userId, "schedule_end", context);
+    await sendComplexMessage(
+      chatId,
+      `✅ Старт: ${context.rentStartDate} ${context.rentStartTime}\n\n${END_DATE_EXAMPLES}`,
+      buildEndKeyboard(context.rentStartTime),
+      { keyboardType: 'inline', parseMode: 'Markdown' },
+    );
     return true;
   }
 
   if (state === "schedule_end") {
     const e = parseEndDate(text, context.rentStartDate);
     if (!e) {
-      await sendComplexMessage(chatId, "❌ Формат: завтра 10, 16.06 10, 16.06.2026 10", [], { removeKeyboard: true });
+      await sendComplexMessage(chatId, END_DATE_EXAMPLES, [], { removeKeyboard: true, parseMode: "Markdown" });
       return true;
     }
     context.rentEndDate = e.date;
     context.rentEndTime = e.time;
-
-    const summary = buildRentSummary(context);
-    await setState(userId, "confirm", context);
-    await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
-    return true;
-  }
-
-  if (state === "schedule") {
-    const s = parseSchedule(text);
-    if (!s) {
-      await sendComplexMessage(chatId, "❌ Формат: сегодня 18, завтра 10, 15.06 18", [], { removeKeyboard: true });
-      return true;
-    }
-    context.rentStartDate = s.start;
-    context.rentStartTime = s.startTime;
-    context.rentEndDate = s.end;
-    context.rentEndTime = s.endTime;
 
     const summary = buildRentSummary(context);
     await setState(userId, "confirm", context);
@@ -1165,7 +1220,7 @@ export async function handleDocCallback(
   if (callbackData.startsWith("s_")) {
     const parts = callbackData.slice(2).split('_');
     const when = parts[0];
-    const time = parts[1];
+    const rawTime = parts[1];
 
     const today = new Date();
     const tomorrow = new Date(today);
@@ -1174,21 +1229,22 @@ export async function handleDocCallback(
 
     if (when === "custom") {
       await setState(userId, "schedule", context);
-      await sendComplexMessage(chatId, "*Когда начинаем?*\n\nсегодня 18, завтра 10, 15.06 18", [], { removeKeyboard: true, parseMode: "Markdown" });
+      await sendComplexMessage(chatId, START_DATE_EXAMPLES, [], { removeKeyboard: true, parseMode: "Markdown" });
       return true;
     }
 
     const start = when === "today" ? today : tomorrow;
+    const timeStr = decodeCallbackTime(rawTime);
 
     context.rentStartDate = fmt(start);
-    context.rentStartTime = `${time}:00`;
+    context.rentStartTime = timeStr;
 
-    // Ask for end date instead of auto-setting
+    // Ask for end date
     await setState(userId, "schedule_end", context);
     await sendComplexMessage(
       chatId,
       `✅ Старт: ${context.rentStartDate} ${context.rentStartTime}\n\n*Когда заканчиваем?*`,
-      buildEndKeyboard(),
+      buildEndKeyboard(context.rentStartTime),
       { keyboardType: 'inline', parseMode: 'Markdown' },
     );
     return true;
@@ -1198,7 +1254,7 @@ export async function handleDocCallback(
   if (callbackData.startsWith("e_")) {
     const parts = callbackData.slice(2).split('_');
     const when = parts[0];
-    const time = parts[1];
+    const rawTime = parts[1];
 
     const today = new Date();
     const fmt = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
@@ -1212,23 +1268,25 @@ export async function handleDocCallback(
 
     if (when === "custom") {
       await setState(userId, "schedule_end", context);
-      await sendComplexMessage(chatId, "*Когда заканчиваем?*\n\nзавтра 10, 16.06 10, 16.06.2026 10", [], { removeKeyboard: true, parseMode: "Markdown" });
+      await sendComplexMessage(chatId, END_DATE_EXAMPLES, [], { removeKeyboard: true, parseMode: "Markdown" });
       return true;
     }
+
+    const timeStr = decodeCallbackTime(rawTime);
 
     if (when === "tomorrow") {
       const end = new Date(startRef);
       end.setDate(startRef.getDate() + 1);
       context.rentEndDate = fmt(end);
-      context.rentEndTime = `${time}:00`;
+      context.rentEndTime = timeStr;
     } else if (when === "2days") {
       const end = new Date(startRef);
       end.setDate(startRef.getDate() + 2);
       context.rentEndDate = fmt(end);
-      context.rentEndTime = `${time}:00`;
+      context.rentEndTime = timeStr;
     } else {
       // Unknown end callback — re-prompt
-      await sendComplexMessage(chatId, "*Когда заканчиваем?*", buildEndKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+      await sendComplexMessage(chatId, "*Когда заканчиваем?*", buildEndKeyboard(context.rentStartTime), { keyboardType: 'inline', parseMode: 'Markdown' });
       return true;
     }
 
@@ -1284,9 +1342,15 @@ export async function docCommand(
   userId: number,
   username: string | undefined,
   text: string,
+  photos?: any[],
+  documents?: any[],
 ) {
   const userIdStr = String(userId);
   logger.info(`[/doc] ${userIdStr}: ${text}`);
+
+  // TODO: future OCR support — photos and documents are available here
+  // if (photos?.length) { /* OCR pipeline */ }
+  // if (documents?.length) { /* OCR pipeline */ }
 
   const parts = text.trim().split(/\s+/);
   const bikeArg = parts.slice(1).join(" ").trim();
