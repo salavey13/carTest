@@ -1,10 +1,17 @@
+-- /docs/sql/vip-bike-franchize-hydration.sql
 -- VIP_BIKE Franchize hydration reference payload (2026 edition)
 -- Purpose: production-like seed with metadata-first approach + private.crew_secrets extraction
 -- Safe to re-run: uses ON CONFLICT + jsonb_set + private upsert
 -- Updated: 2026-06-13 — light palette redesigned to match vip-bike.ru actual site design
 --   Light accent: electric cyan #19C2F5 (not gold — gold is dark-theme-only / atmospheric)
 --   Surface: pure white + Apple-like #F5F5F7 card fills + #E5E5E7 hairline borders
---   Text: near-black #0A0A0A (not #1A1A1A) for maximum contrast on white
+--   Text: near-black #0A0A0A for maximum contrast on white (~19.5:1)
+--   Palette trimmed to 7 tokens — the only keys consumed by resolvePaletteByMode():
+--     bgBase, bgCard, accentMain, accentMainHover, textPrimary, textSecondary, borderSoft
+--   CatalogClient.tsx now sets 10 CSS vars from these 7 palette keys:
+--     --catalog-accent, --catalog-accent-hover, --catalog-border, --catalog-text,
+--     --catalog-muted, --catalog-card-bg, --catalog-bg, --catalog-accent-contrast,
+--     --catalog-accent-muted-contrast, --catalog-accent-subtle
 
 begin;
 
