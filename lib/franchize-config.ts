@@ -1,5 +1,6 @@
 export interface FranchizeTheme {
   mode: string;
+  isAuto?: boolean; // When true, palette should respond to global theme preference
   palette: {
     bgBase: string;
     bgCard: string;
@@ -8,6 +9,26 @@ export interface FranchizeTheme {
     textPrimary: string;
     textSecondary: string;
     borderSoft: string;
+  };
+  palettes?: {
+    light?: {
+      bgBase: string;
+      bgCard: string;
+      accentMain: string;
+      accentMainHover: string;
+      textPrimary: string;
+      textSecondary: string;
+      borderSoft: string;
+    };
+    dark?: {
+      bgBase: string;
+      bgCard: string;
+      accentMain: string;
+      accentMainHover: string;
+      textPrimary: string;
+      textSecondary: string;
+      borderSoft: string;
+    };
   };
 }
 

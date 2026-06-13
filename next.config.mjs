@@ -13,9 +13,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Packages that should only be resolved on the server side
-  // This prevents Next.js from bundling them during build
-  serverExternalPackages: ['@xenova/transformers', '@huggingface/transformers'],
   // Note: server-assets fonts are bundled automatically without explicit tracing
   // Disabled experimental features to reduce memory usage during build
   // Disable source maps in production to reduce memory usage

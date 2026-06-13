@@ -85,8 +85,38 @@ export function resolvePaletteByMode(franchize: unknown): Palette {
 }
 
 export function resolveFranchizeTheme(franchize: unknown): FranchizeTheme {
+  const mode = readStringPath(franchize, ["theme", "mode"], DEFAULT_FRANCHIZE_THEME.mode).toLowerCase();
+  const isAutoMode = mode === "auto" || mode.includes("auto");
+  const palette = resolvePaletteByMode(franchize);
+
+  // Also extract palettes for client-side 'auto' mode switching
+  const palettesCandidate = readRecordPath(franchize, ["theme", "palettes"]) as ThemePaletteCandidate;
+  const lightPalette = readRecordPath(palettesCandidate, ["light"]) as Partial<Palette>;
+  const darkPalette = readRecordPath(palettesCandidate, ["dark"]) as Partial<Palette>;
+
   return {
-    mode: readStringPath(franchize, ["theme", "mode"], DEFAULT_FRANCHIZE_THEME.mode),
-    palette: resolvePaletteByMode(franchize),
+    mode,
+    isAuto: isAutoMode,
+    palette,
+    palettes: {
+      light: lightPalette.bgBase ? {
+        bgBase: readPaletteValue(lightPalette, "bgBase"),
+        bgCard: readPaletteValue(lightPalette, "bgCard"),
+        accentMain: readPaletteValue(lightPalette, "accentMain"),
+        accentMainHover: readPaletteValue(lightPalette, "accentMainHover"),
+        textPrimary: readPaletteValue(lightPalette, "textPrimary"),
+        textSecondary: readPaletteValue(lightPalette, "textSecondary"),
+        borderSoft: readPaletteValue(lightPalette, "borderSoft"),
+      } : undefined,
+      dark: darkPalette.bgBase ? {
+        bgBase: readPaletteValue(darkPalette, "bgBase"),
+        bgCard: readPaletteValue(darkPalette, "bgCard"),
+        accentMain: readPaletteValue(darkPalette, "accentMain"),
+        accentMainHover: readPaletteValue(darkPalette, "accentMainHover"),
+        textPrimary: readPaletteValue(darkPalette, "textPrimary"),
+        textSecondary: readPaletteValue(darkPalette, "textSecondary"),
+        borderSoft: readPaletteValue(darkPalette, "borderSoft"),
+      } : undefined,
+    },
   };
 }
