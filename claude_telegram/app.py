@@ -5,7 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Dict
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 
 from config import (
     ALLOWED_CHAT_IDS, MAX_PROMPT_LENGTH,
@@ -85,7 +85,7 @@ async def health_check():
 
 
 @app.post("/api/telegramWebhook")
-async def telegram_webhook(request: Request):
+async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     Main Telegram webhook endpoint.
 
@@ -118,7 +118,7 @@ async def telegram_webhook(request: Request):
         return {"ok": True}
 
     # Process in background - return immediately to Telegram
-    asyncio.create_task(process_message(chat_id, user_text))
+    background_tasks.add_task(process_message, chat_id, user_text)
 
     logger.info(f"Accepted message from chat {chat_id}: {user_text[:50]}...")
     return {"ok": True}

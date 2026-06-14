@@ -3,6 +3,10 @@
 import os
 import logging
 from typing import Set
+from dotenv import load_dotenv
+
+# Load .env file
+load_dotenv()
 
 # === Logging Configuration (must be first) ===
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
