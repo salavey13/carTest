@@ -468,16 +468,6 @@ export function ItemModal({
         style={surface.card}
       >
         <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
-          {/* Quick Close Button — positioned at bottom-right of gallery for better visibility */}
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute z-20 bottom-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--item-border)]/80 text-[var(--item-text)] transition hover:bg-[var(--item-border)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-            aria-label="Закрыть"
-          >
-            <X className="h-4 w-4" />
-          </button>
-
           {/* Gallery Component — rentalbikes-style portrait hero */}
           <ItemGallery
             images={gallery}
@@ -490,6 +480,16 @@ export function ItemModal({
             bgColor={theme.palette.bgBase}
             mainAspectRatio="16/11"
             disableKeyboardNav={false}
+            closeButton={
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--item-border)]/80 text-[var(--item-text)] transition hover:bg-[var(--item-border)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                aria-label="Закрыть"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            }
           />
 
           {/* Content — rentalbikes-inspired layout */}
