@@ -2,10 +2,9 @@
 -- VIP_BIKE Franchize hydration reference payload (2026 edition)
 -- Purpose: production-like seed with metadata-first approach + private.crew_secrets extraction
 -- Safe to re-run: uses ON CONFLICT + jsonb_set + private upsert
--- Updated: 2026-06-13 — light palette redesigned to match vip-bike.ru actual site design
---   Light accent: electric cyan #19C2F5 (not gold — gold is dark-theme-only / atmospheric)
---   Surface: pure white + Apple-like #F5F5F7 card fills + #E5E5E7 hairline borders
---   Text: near-black #0A0A0A for maximum contrast on white (~19.5:1)
+-- Updated: 2026-06-16 — Black + Gold / Cyan palette (gold dark theme, electric cyan light theme)
+--   Dark: Deep black (#0A0A0A) with gold accents (#FFD700) for premium feel
+--   Light: Off-white (#FAFAFA) with electric cyan (#00FFFF) accents for crisp modern look
 --   Palette trimmed to 7 tokens — the only keys consumed by resolvePaletteByMode():
 --     bgBase, bgCard, accentMain, accentMainHover, textPrimary, textSecondary, borderSoft
 --   CatalogClient.tsx now sets 10 CSS vars from these 7 palette keys:
@@ -77,41 +76,40 @@ set
         ),
         'theme', jsonb_build_object(
           'mode', 'auto',
-          'displayName', 'VIP BIKE ELECTRO - Auto Theme',
+          'displayName', 'VIP BIKE - Black Gold / Electric Cyan',
           -- Only 7 tokens are consumed by resolvePaletteByMode():
           -- bgBase, bgCard, accentMain, accentMainHover, textPrimary, textSecondary, borderSoft
           -- Extra tokens are dead data — nothing reads them.
           'palette', jsonb_build_object(
-            'bgBase', '#121520',
-            'bgCard', '#1B2132',
-            'accentMain', '#F4BD55',
-            'accentMainHover', '#FFCA60',
-            'textPrimary', '#E6D8C4',
-            'textSecondary', '#A7ABB4',
-            'borderSoft', '#2A2E3E'
+            'bgBase', '#0A0A0A',
+            'bgCard', '#1A1A1A',
+            'accentMain', '#FFD700',
+            'accentMainHover', '#FFC125',
+            'textPrimary', '#FFFAF0',
+            'textSecondary', '#D4AF37',
+            'borderSoft', '#2A2A2A'
           ),
           'palettes', jsonb_build_object(
             'dark', jsonb_build_object(
-              'bgBase', '#121520',
-              'bgCard', '#1B2132',
-              'accentMain', '#F4BD55',
-              'accentMainHover', '#FFCA60',
-              'textPrimary', '#E6D8C4',
-              'textSecondary', '#A7ABB4',
-              'borderSoft', '#2A2E3E'
+              'bgBase', '#0A0A0A',
+              'bgCard', '#1A1A1A',
+              'accentMain', '#FFD700',
+              'accentMainHover', '#FFC125',
+              'textPrimary', '#FFFAF0',
+              'textSecondary', '#D4AF37',
+              'borderSoft', '#2A2A2A'
             ),
             'light', jsonb_build_object(
-              -- vip-bike.ru light theme: electric cyan accent, pure white base,
-              -- Apple-like #F5F5F7 card fills, hairline #E5E5E7 borders,
-              -- near-black #0A0A0A text for max contrast on white (~19.5:1).
+              -- vip-bike.ru light theme: electric cyan accent, off-white base,
+              -- pure white cards, light cyan borders for crisp modern look.
               -- Only 7 tokens are consumed by resolvePaletteByMode().
-              'bgBase', '#FFFFFF',
-              'bgCard', '#F5F5F7',
-              'accentMain', '#19C2F5',
-              'accentMainHover', '#0EA6D6',
-              'textPrimary', '#0A0A0A',
-              'textSecondary', '#4E4E55',
-              'borderSoft', '#E5E5E7'
+              'bgBase', '#FAFAFA',
+              'bgCard', '#FFFFFF',
+              'accentMain', '#00FFFF',
+              'accentMainHover', '#00CED1',
+              'textPrimary', '#1A1A1A',
+              'textSecondary', '#4A4A4A',
+              'borderSoft', '#E0F7FA'
             )
           ),
           'radius', jsonb_build_object('card', 16, 'button', 14, 'pill', 999, 'sm', 10, 'md', 14, 'lg', 18, 'hero', 28),

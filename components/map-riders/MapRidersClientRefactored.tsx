@@ -417,7 +417,7 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
             <RacingMap
               points={mapPoints}
               bounds={mapData?.bounds || mapBounds || DEFAULT_BOUNDS}
-              className="h-full min-h-[100dvh] w-full"
+              className="h-full min-h-[calc(100dvh-10rem)] w-full sm:min-h-[100dvh]"
               tileLayer={finalTileLayer}
               onMapClick={(coords) => {
                 setSelectedMeetupId(null);
@@ -435,7 +435,7 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
               {state.sessionDetail?.points?.length ? <SpeedGradientRoute points={state.sessionDetail.points} /> : null}
             </RacingMap>
           ) : (
-            <div className="flex h-full min-h-[100dvh] items-center justify-center text-muted-foreground">
+            <div className="flex h-full min-h-[calc(100dvh-10rem)] sm:min-h-[100dvh] items-center justify-center text-muted-foreground">
               Режим VibeMap (резерв) — установи NEXT_PUBLIC_MAP_ENGINE=leaflet
             </div>
           )}

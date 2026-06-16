@@ -276,7 +276,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             aria-expanded={menuOpen}
             aria-controls="franchize-header-menu"
             onClick={() => setMenuOpen(true)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 pointer-events-auto"
             style={{
               backgroundColor: crew.theme.isAuto
                 ? "var(--franchize-bg-base)"
@@ -364,7 +364,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             to click through to the invisible profile button.
             Now it respects the compact state.
           */}
-          <div className="flex items-center gap-2 justify-self-end relative z-[2]" style={{ pointerEvents: isCompact ? "none" : "auto" }}>
+          <div className="flex items-center gap-2 justify-self-end relative z-[2] pointer-events-auto" style={{ pointerEvents: isCompact ? "none" : "auto" }}>
             <CrewButtonErrorBoundary
               bgColor={crew.theme.isAuto ? "var(--franchize-bg-base)" : withAlpha(crew.theme.palette.bgBase, 0.8)}
               textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}

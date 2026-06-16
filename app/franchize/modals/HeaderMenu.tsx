@@ -87,14 +87,14 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
   if (!open || !mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[70] flex items-start justify-center bg-black/75 p-4" onClick={() => onOpenChange(false)}>
+    <div className="fixed inset-0 z-[70] flex items-start justify-center bg-black/75 p-4 pointer-events-auto" onClick={() => onOpenChange(false)}>
       <div
         ref={menuRef}
         id="franchize-header-menu"
         role="dialog"
         aria-modal="true"
         aria-labelledby="franchize-header-menu-title"
-        className="mt-[calc(max(env(safe-area-inset-top),0.5rem)+0.5rem)] max-h-[calc(100dvh-max(env(safe-area-inset-top),0.5rem)-1rem)] w-full max-w-sm overflow-y-auto rounded-2xl border border-[var(--header-menu-border)] bg-[var(--header-menu-bg)] p-4 text-[var(--header-menu-text)] shadow-2xl"
+        className="pointer-events-auto mt-[calc(max(env(safe-area-inset-top),0.5rem)+0.5rem)] max-h-[calc(100dvh-max(env(safe-area-inset-top),0.5rem)-1rem)] w-full max-w-sm overflow-y-auto rounded-2xl border border-[var(--header-menu-border)] bg-[var(--header-menu-bg)] p-4 text-[var(--header-menu-text)] shadow-2xl"
         style={{
           ["--header-menu-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard,
           ["--header-menu-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
@@ -118,7 +118,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
 
         <p className="mb-5 text-center text-xs italic" style={surface.mutedText}>{crew.header.tagline}</p>
 
-        <div className="space-y-2">
+        <div className="space-y-2 pointer-events-auto">
           {crew.header.menuLinks.map((link) => {
             const internalHref = toInternalHref(link.href);
             const normalizedHref = internalHref ?? link.href;

@@ -223,7 +223,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           <button
             type="button"
             aria-label="Профиль и навигация"
-            className="inline-flex h-11 items-center gap-2 rounded-xl px-2 transition hover:opacity-80"
+            className="inline-flex h-11 items-center gap-2 rounded-xl px-2 transition hover:opacity-80 pointer-events-auto"
             style={{ backgroundColor: bgColor, color: textColor }}
           >
             {/* ── Avatar area: 4 states ── */}
