@@ -2,6 +2,7 @@ import { CrewFooter } from "../components/CrewFooter";
 import { CrewHeader } from "../components/CrewHeader";
 import { CatalogClient } from "../components/CatalogClient";
 import { FranchizeErrorBoundary } from "../components/ErrorBoundary";
+import { ThemeInitializer } from "../components/ThemeInitializer";
 import { getFranchizeBySlug } from "../actions";
 import { getFranchizeRouteCtaPolicy } from "../lib/route-cta-policy";
 import { crewPaletteWithCssVars } from "../lib/theme";
@@ -19,6 +20,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
 
   return (
     <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
+      <ThemeInitializer defaultTheme="dark" />
       {/*
         FIX: Wrap CrewHeader in FranchizeErrorBoundary so that any runtime
         error inside the header (including FranchizeProfileButton's Radix
@@ -41,7 +43,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
         fallbackHref={`/franchize/${crew.slug || slug}`}
         fallbackLinkLabel="Обновить каталог экипажа"
       >
-        <FranchizeCatalogHero crew={crew} slug={slug} />
+        <FranchizeCatalogHero crew={crew} slug={slug} variant="main" />
         <CatalogClient crew={crew} slug={slug} items={items} ctaPolicy={ctaPolicy} />
       </FranchizeErrorBoundary>
       <CrewFooter crew={crew} />

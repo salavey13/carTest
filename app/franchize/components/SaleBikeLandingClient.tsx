@@ -755,7 +755,7 @@ export function SaleBikeLandingClient({
           className="overflow-hidden rounded-3xl border p-2 sm:p-3"
           style={surface.card}
         >
-          <div className="relative aspect-[16/9] sm:aspect-square w-full overflow-hidden rounded-2xl bg-black/30">
+          <div className="relative aspect-[9/16] sm:aspect-square w-full overflow-hidden rounded-2xl bg-black/30">
             <Image
               src={safeGallery[selectedImage] ?? heroImage}
               alt={item.title}

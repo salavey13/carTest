@@ -213,3 +213,25 @@ export function focusRingOutlineStyle(theme: FranchizeTheme) {
     outlineColor: withAlpha(theme.palette.accentMain, 0.78),
   };
 }
+
+/**
+ * Determines if a color is light (luminance > 0.5)
+ * Used for choosing contrasting glow effects
+ */
+export function isLightColor(hex: string): boolean {
+  const lum = relativeLuminanceOrNull(hex);
+  return lum !== null ? lum > 0.5 : false;
+}
+
+/**
+ * Returns a contrasting text-shadow glow style based on the text color brightness.
+ * Light text gets dark glow, dark text gets light glow for better contrast.
+ */
+export function getContrastingGlowStyle(textColor: string): React.CSSProperties {
+  const isLight = isLightColor(textColor);
+  return {
+    textShadow: isLight
+      ? "0 0 8px rgba(0,0,0,0.6), 0 0 16px rgba(0,0,0,0.4)"  // dark glow for light text
+      : "0 0 8px rgba(255,255,255,0.6), 0 0 16px rgba(255,255,255,0.4)",  // light glow for dark text
+  };
+}
