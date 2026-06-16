@@ -114,10 +114,12 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         // Core skills
         "skills/rental-contract-from-photos/SKILL.md",
         "skills/deal-contract-from-photos/SKILL.md",
+        "skills/commercial-proposal-from-offer/SKILL.md",
         "skills/concat-files/SKILL.md",
         // CLI scripts
         "scripts/make-rental-contract-skill.mjs",
         "scripts/make-deal-contract-skill.mjs",
+        "scripts/make-commercial-proposal-skill.mjs",
         "scripts/supabase-access-skill.mjs",
         "scripts/codex-notify.mjs",
         "scripts/concat.sh",
@@ -126,6 +128,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         // Contract templates
         "docs/RENTAL_DEAL_TEMPLATE.html",
         "docs/SALE_DEAL_TEMPLATE.html",
+        "docs/COMMERCIAL_PROPOSAL_TEMPLATE.html",
         // Database schema (private schema + secrets) - specific migrations only
         "supabase/migrations/20240101000000_init.sql",
         "supabase/migrations/20260304_private_scheme.sql",
