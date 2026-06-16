@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { CatalogClient } from "../../components/CatalogClient";
+import { FranchizeCatalogHero } from "../../components/FranchizeCatalogHero";
+import { ThemeInitializer } from "../../components/ThemeInitializer";
 import { type CatalogItemVM, getFranchizeBySlug } from "../../actions";
 import { crewPaletteForSurface, readablePaletteTextOnColor, withAlpha } from "../../lib/theme";
 import Link from "next/link";
@@ -190,62 +192,13 @@ export default async function ElectroEnduroPage({
         ["--enduro-accent-faint" as string]: withAlpha(crew.theme.palette.accentMain, 0.12),
       }}
     >
+      <ThemeInitializer defaultTheme="light" />
       <CrewHeader
         crew={crew}
         activePath={`/franchize/${crew.slug || slug}/electro-enduro`}
         groupLinks={saleItems.map((item) => item.category)}
       />
-      <section className="mx-auto w-full max-w-7xl px-4 pt-6 2xl:max-w-[1600px]">
-        <div className="rounded-3xl border border-[var(--enduro-border)] bg-[var(--enduro-card)] p-5 backdrop-blur-sm sm:p-8">
-          <p className="text-xs uppercase tracking-[0.18em] text-[var(--enduro-muted)]">
-            Electro-Enduro flow
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-[var(--enduro-text)] sm:text-3xl">
-            Electro-enduro: два сценария в одном каталоге
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm text-[var(--enduro-muted)] sm:text-base">
-            Для быстрого старта удобно взять байк в аренду и оценить поведение
-            на маршруте. Для заказа в собственность используйте конфигуратор:
-            параметры, комплектация и оформление идут отдельным потоком.
-          </p>
-          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <article className="rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-card-faint)] p-4 text-[var(--enduro-text)] shadow-lg">
-              <h2 className="text-lg font-medium">Аренда / тест-драйв</h2>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--enduro-muted)]">
-                <li>Быстрый старт для знакомства с техникой.</li>
-                <li>
-                  Подходит для сравнения нескольких моделей перед покупкой.
-                </li>
-                <li>Маршрутный формат и базовый инструктаж перед выездом.</li>
-              </ul>
-              <Link
-                className="mt-4 inline-flex rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-text)] hover:border-[var(--enduro-accent)] hover:bg-[var(--enduro-accent)] hover:text-[var(--enduro-accent-text)]"
-                href={`/franchize/${crew.slug || slug}`}
-              >
-                Открыть каталог аренды
-              </Link>
-            </article>
-            <article className="rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-card-faint)] p-4 text-[var(--enduro-text)] shadow-lg">
-              <h2 className="text-lg font-medium">
-                Продажа / кастомная сборка
-              </h2>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--enduro-muted)]">
-                <li>
-                  Выбор батареи, мощности, подвески и дополнительных опций.
-                </li>
-                <li>Отдельный flow: конфигурация → корзина → заказ.</li>
-                <li>Лучше для тех, кто ищет байк в постоянное владение.</li>
-              </ul>
-              <Link
-                className="mt-4 inline-flex rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-text)] hover:border-[var(--enduro-accent)] hover:bg-[var(--enduro-accent)] hover:text-[var(--enduro-accent-text)]"
-                href={`/franchize/${crew.slug || slug}/configurator`}
-              >
-                Перейти в конфигуратор
-              </Link>
-            </article>
-          </div>
-        </div>
-      </section>
+      <FranchizeCatalogHero crew={crew} slug={crew.slug || slug} variant="electro-enduro" />
       <section className="mx-auto w-full max-w-7xl px-4 pt-6 2xl:max-w-[1600px]">
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <article className="rounded-3xl border border-[var(--enduro-border)] bg-[var(--enduro-card-faint)] p-5 text-[var(--enduro-text)] shadow-lg">
@@ -334,6 +287,58 @@ export default async function ElectroEnduroPage({
         items={saleItems}
         mode="electro"
       />
+      {/* Intro section moved below catalog per UX requirements */}
+      <section className="mx-auto w-full max-w-7xl px-4 py-6 2xl:max-w-[1600px]">
+        <div className="rounded-3xl border border-[var(--enduro-border)] bg-[var(--enduro-card)] p-5 backdrop-blur-sm sm:p-8">
+          <p className="text-xs uppercase tracking-[0.18em] text-[var(--enduro-muted)]">
+            Electro-Enduro flow
+          </p>
+          <h1 className="mt-2 text-2xl font-semibold text-[var(--enduro-text)] sm:text-3xl">
+            Electro-enduro: два сценария в одном каталоге
+          </h1>
+          <p className="mt-3 max-w-3xl text-sm text-[var(--enduro-muted)] sm:text-base">
+            Для быстрого старта удобно взять байк в аренду и оценить поведение
+            на маршруте. Для заказа в собственность используйте конфигуратор:
+            параметры, комплектация и оформление идут отдельным потоком.
+          </p>
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <article className="rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-card-faint)] p-4 text-[var(--enduro-text)] shadow-lg">
+              <h2 className="text-lg font-medium">Аренда / тест-драйв</h2>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--enduro-muted)]">
+                <li>Быстрый старт для знакомства с техникой.</li>
+                <li>
+                  Подходит для сравнения нескольких моделей перед покупкой.
+                </li>
+                <li>Маршрутный формат и базовый инструктаж перед выездом.</li>
+              </ul>
+              <Link
+                className="mt-4 inline-flex rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-text)] hover:border-[var(--enduro-accent)] hover:bg-[var(--enduro-accent)] hover:text-[var(--enduro-accent-text)]"
+                href={`/franchize/${crew.slug || slug}`}
+              >
+                Открыть каталог аренды
+              </Link>
+            </article>
+            <article className="rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-card-faint)] p-4 text-[var(--enduro-text)] shadow-lg">
+              <h2 className="text-lg font-medium">
+                Продажа / кастомная сборка
+              </h2>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--enduro-muted)]">
+                <li>
+                  Выбор батареи, мощности, подвески и дополнительных опций.
+                </li>
+                <li>Отдельный flow: конфигурация → корзина → заказ.</li>
+                <li>Лучше для тех, кто ищет байк в постоянное владение.</li>
+              </ul>
+              <Link
+                className="mt-4 inline-flex rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-text)] hover:border-[var(--enduro-accent)] hover:bg-[var(--enduro-accent)] hover:text-[var(--enduro-accent-text)]"
+                href={`/franchize/${crew.slug || slug}/configurator`}
+              >
+                Перейти в конфигуратор
+              </Link>
+            </article>
+          </div>
+        </div>
+      </section>
       <CrewFooter crew={crew} />
     </main>
   );

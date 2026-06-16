@@ -7,13 +7,18 @@ import type { FranchizeCrewVM, FranchizeTheme } from "../actions";
 interface FranchizeCatalogHeroProps {
   crew: FranchizeCrewVM;
   slug: string;
+  variant?: "main" | "electro-enduro";
 }
 
 const HERO_BG_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b2-razgon.jpeg";
 
-export function FranchizeCatalogHero({ crew, slug }: FranchizeCatalogHeroProps) {
+export function FranchizeCatalogHero({ crew, slug, variant = "main" }: FranchizeCatalogHeroProps) {
   const resolvedSlug = crew.slug || slug;
   const brandName = crew.header.brandName || crew.name || "VIP BIKE";
+
+  // Determine button text and href based on variant
+  const buttonText = variant === "electro-enduro" ? "Смотреть весь каталог" : "Смотреть электро каталог";
+  const buttonHref = variant === "electro-enduro" ? `/franchize/${resolvedSlug}` : `#catalog-sections`;
 
   return (
     <section className="relative mb-6 w-full md:mx-auto md:max-w-7xl md:overflow-hidden md:rounded-3xl md:px-4 md:pt-8 md:mb-8 2xl:mx-auto 2xl:max-w-[1600px]">
@@ -52,10 +57,10 @@ export function FranchizeCatalogHero({ crew, slug }: FranchizeCatalogHeroProps) 
             {/* CTAs */}
             <div className="flex flex-col gap-2 sm:gap-3 sm:flex-row sm:gap-4">
               <Link
-                href="#catalog-sections"
+                href={buttonHref}
                 className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-white/90 focus:outline-none focus:ring-2 focus:ring-white/50 sm:min-h-11 sm:px-6 sm:py-3"
               >
-                Смотреть каталог
+                {buttonText}
               </Link>
               <Link
                 href={`/franchize/${resolvedSlug}/map-riders`}

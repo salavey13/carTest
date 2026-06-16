@@ -9,7 +9,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { toCategoryId } from "../lib/navigation";
 import type { FranchizeRouteCtaPolicy } from "../lib/route-cta-policy";
 import { shouldShowFloatingCart } from "../lib/route-cta-policy";
-import { catalogCardVariantStyles, crewPaletteForSurface, interactionRingStyle, readableTextOnColor, withAlpha } from "../lib/theme";
+import { catalogCardVariantStyles, crewPaletteForSurface, getContrastingGlowStyle, interactionRingStyle, readableTextOnColor, withAlpha } from "../lib/theme";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { upsertFranchizeIntent } from "../actions";
 import { hasRentPrice, hasSalePrice } from "../lib/catalog-utils";
@@ -218,6 +218,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   useFranchizeTheme(crew.theme);
 
   const surface = crewPaletteForSurface(crew.theme);
+  // Get accent color for price glow computation
+  const accentColor = crew.theme.isAuto
+    ? (crew.theme.palettes?.light?.accentMain || crew.theme.palettes?.dark?.accentMain || crew.theme.palette.accentMain)
+    : crew.theme.palette.accentMain;
+  const priceGlowStyle = getContrastingGlowStyle(accentColor);
   const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
   const { addItem } = useFranchizeCart(crew.slug || slug);
   const [selectedOptions, setSelectedOptions] = useState({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона", rentStartDate: "", rentEndDate: "" });
@@ -836,7 +841,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                                 Хит
                               </span>
                             )}
-                            {item.saleAvailable && <span className="inline-flex rounded-full border border-[var(--catalog-accent)]/40 bg-[var(--catalog-accent-subtle)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent)] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
+                            {item.saleAvailable && <span className="inline-flex rounded-full border-2 border-[var(--catalog-accent)] bg-[var(--catalog-bg)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent)] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
                             {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="text-[7px]">{tv.emoji}</span>{tv.label}</span> : null; })()}
                           </div>
 
@@ -846,14 +851,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           {/* Price — rentalbikes-style: "от X ₽ | срок" */}
                           <div className="mt-1.5">
                             {hasRentPrice(item) ? (
-                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={{ textShadow: "0 0 8px currentColor, 0 0 16px currentColor" }}>
+                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
                                 {item.rentPriceLabel}
                                 {hasSalePrice(item) && (
                                   <span className="ml-1 text-[11px] font-normal text-[var(--catalog-muted)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)] group-hover:opacity-50">| {item.salePrice?.toLocaleString("ru-RU")} ₽ покупка</span>
                                 )}
                               </p>
                             ) : hasSalePrice(item) ? (
-                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={{ textShadow: "0 0 8px currentColor, 0 0 16px currentColor" }}>{item.salePrice?.toLocaleString("ru-RU")} ₽</p>
+                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>{item.salePrice?.toLocaleString("ru-RU")} ₽</p>
                             ) : (
                               <p className="text-xs font-medium text-[var(--catalog-muted)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)] group-hover:opacity-60">Цена по запросу</p>
                             )}
@@ -955,7 +960,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                                 Хит
                               </span>
                             )}
-                            {item.saleAvailable && <span className="inline-flex rounded-full border border-[var(--catalog-accent)]/40 bg-[var(--catalog-accent-subtle)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent)] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
+                            {item.saleAvailable && <span className="inline-flex rounded-full border-2 border-[var(--catalog-accent)] bg-[var(--catalog-bg)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent)] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
                             {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="text-[7px]">{tv.emoji}</span>{tv.label}</span> : null; })()}
                           </div>
 
@@ -965,14 +970,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           {/* Price — rentalbikes-style: "от X ₽ | срок" */}
                           <div className="mt-1.5">
                             {hasRentPrice(item) ? (
-                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={{ textShadow: "0 0 8px currentColor, 0 0 16px currentColor" }}>
+                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
                                 {item.rentPriceLabel}
                                 {hasSalePrice(item) && (
                                   <span className="ml-1 text-[11px] font-normal text-[var(--catalog-muted)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)] group-hover:opacity-50">| {item.salePrice?.toLocaleString("ru-RU")} ₽ покупка</span>
                                 )}
                               </p>
                             ) : hasSalePrice(item) ? (
-                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={{ textShadow: "0 0 8px currentColor, 0 0 16px currentColor" }}>{item.salePrice?.toLocaleString("ru-RU")} ₽</p>
+                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>{item.salePrice?.toLocaleString("ru-RU")} ₽</p>
                             ) : (
                               <p className="text-xs font-medium text-[var(--catalog-muted)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)] group-hover:opacity-60">Цена по запросу</p>
                             )}
