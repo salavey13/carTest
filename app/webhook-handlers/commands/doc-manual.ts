@@ -238,14 +238,14 @@ function buildConfirmKeyboard(): KeyboardButton[][] {
  *   3. Swap cash deposit for renter's own vehicle СТС in pledge
  *
  * @param depositAmount Cash deposit amount pulled from bike.specs.deposit_rub (or fallback "20000")
- * @param bike          Bike object (for context in the button label)
+ * @param bike          Bike object (for context in the confirm button label)
  */
 function buildDepositChoiceKeyboard(depositAmount: string, bike?: any): KeyboardButton[][] {
   const amount = Number(depositAmount) || 20000;
   const formatted = amount.toLocaleString("ru-RU");
-  const bikeLabel = bike ? `${bike.make} ${bike.model}` : "";
+  const bikeLabel = bike ? ` (${bike.make} ${bike.model})` : "";
   return [
-    [{ text: `✅ Депозит ${formatted} ₽`, callback_data: "dep_confirm" }],
+    [{ text: `✅ Депозит ${formatted} ₽${bikeLabel}`, callback_data: "dep_confirm" }],
     [{ text: `✏️ Своя сумма`, callback_data: "dep_custom" }],
     [{ text: `🪪 СТС вместо депозита`, callback_data: "dep_sts" }],
     [{ text: "❌ Отменить", callback_data: "cancel" }],
@@ -253,22 +253,52 @@ function buildDepositChoiceKeyboard(depositAmount: string, bike?: any): Keyboard
 }
 
 /**
+ * СТС-owner-relation enum codes. We use short ASCII enum codes in
+ * callback_data instead of raw Cyrillic for two reasons:
+ *   1. Telegram callback_data has a 64-byte limit — Cyrillic chars are 2
+ *      UTF-8 bytes each, so "sr_сам арендатор" already eats 32 bytes; a
+ *      longer relation like "sr_доверенность представителя по нотариальной"
+ *      would blow the limit.
+ *   2. Avoids the URI-encoding roundtrip — `decodeURIComponent` on data
+ *      that was never percent-encoded is a no-op for valid input, but
+ *      THROWS URIError if the data contains a literal `%` (which Russian
+ *      users won't type in a relation, but the principle is wrong).
+ * The label map below is the single source of truth for button text and
+ * the human-readable string stored in context.stsOwnerRelation.
+ */
+const STS_RELATION_LABELS: Record<string, string> = {
+  self: "сам арендатор",
+  wife: "жена",
+  husband: "муж",
+  father: "отец",
+  mother: "мать",
+  son: "сын",
+  daughter: "дочь",
+  brother: "брат",
+  sister: "сестра",
+  power_of_attorney: "доверенность",
+  custom: "другое (ввести)",
+};
+
+/**
  * Build СТС-owner-relation keyboard — quick-pick common relations.
  * The renter can also type a free-text relation (handled in handleDocText).
  */
 function buildStsRelationKeyboard(): KeyboardButton[][] {
+  const r = (code: string) => `sr_${code}`;
+  const label = (code: string) => STS_RELATION_LABELS[code] || code;
   return [
     [
-      { text: "🧑 сам арендатор", callback_data: "sr_сам арендатор" },
-      { text: "👨‍👩‍👧 жена", callback_data: "sr_жена" },
+      { text: `🧑 ${label("self")}`, callback_data: r("self") },
+      { text: `👨‍👩‍👧 ${label("wife")}`, callback_data: r("wife") },
     ],
     [
-      { text: "👨 отец", callback_data: "sr_отец" },
-      { text: "👩 мать", callback_data: "sr_мать" },
+      { text: `👨 ${label("father")}`, callback_data: r("father") },
+      { text: `👩 ${label("mother")}`, callback_data: r("mother") },
     ],
     [
-      { text: "📄 доверенность", callback_data: "sr_доверенность" },
-      { text: "✏️ другое (ввести)", callback_data: "sr_custom" },
+      { text: `📄 ${label("power_of_attorney")}`, callback_data: r("power_of_attorney") },
+      { text: `✏️ ${label("custom")}`, callback_data: r("custom") },
     ],
     [{ text: "❌ Отменить", callback_data: "cancel" }],
   ];
@@ -1236,13 +1266,26 @@ async function gotoDepositChoice(chatId: number, userId: string, context: DocFlo
 
 /**
  * Mark СТС sub-flow as complete and route to confirm step.
- * Sets stsPledgeUsed=true and clears any cash-deposit override.
+ * Sets stsPledgeUsed=true, clears any cash-deposit override, and snapshots
+ * the cash deposit that was replaced by СТС (for analytics / audit in DB).
  */
 async function gotoConfirmFromSts(chatId: number, userId: string, context: DocFlowContext): Promise<void> {
   context.stsPledgeUsed = true;
   context.depositOverride = undefined; // СТС replaces cash deposit
+
+  // Snapshot the cash deposit that was skipped — used downstream by
+  // generateContract() to populate sts_deposit_amount_skipped in the
+  // template and deposit_amount_skipped in the DB record. We resolve it
+  // here (not in generateContract) so the value is stable across retries.
+  if (!context.depositAmountSkipped) {
+    const bike = await resolveBikeById(context.bikeId);
+    context.depositAmountSkipped = String(bike?.specs?.deposit_rub || "20000");
+  }
+
   if (!context.stsOwnerRelation) context.stsOwnerRelation = "сам арендатор";
   if (!context.stsPledgeReturnDays) context.stsPledgeReturnDays = 3;
+
+  logger.info(`[/doc] СТС sub-flow complete: ${userId} → sts=${context.stsSeries} ${context.stsNumber} plate=${context.stsVehiclePlate} owner=${context.stsOwnerFullName} relation=${context.stsOwnerRelation} depositSkipped=${context.depositAmountSkipped}`);
 
   const summary = buildRentSummary(context);
   await setState(userId, "confirm", context);
@@ -1447,6 +1490,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
   if (state === "sts_series") {
     const sn = parseStsSeriesNumber(text);
     if (!sn) {
+      logger.info(`[/doc] sts_series: ${userId} → invalid input "${text.slice(0,40)}"`);
       await sendComplexMessage(
         chatId,
         "❌ Формат: серия номер\n\nПримеры:\n• 77 12345678\n• 77 № 12345678\n• 7712 345678",
@@ -1456,6 +1500,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     }
     context.stsSeries = sn.series;
     context.stsNumber = sn.number;
+    logger.info(`[/doc] sts_series: ${userId} → series=${sn.series} number=${sn.number}`);
     await setState(userId, "sts_plate", context);
     await sendComplexMessage(
       chatId,
@@ -1468,6 +1513,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
   if (state === "sts_plate") {
     const plate = parseStsPlate(text);
     if (!plate) {
+      logger.info(`[/doc] sts_plate: ${userId} → invalid input "${text.slice(0,40)}"`);
       await sendComplexMessage(
         chatId,
         "❌ Формат: А123БВ77\n\nПримеры:\n• А123БВ77 (1 буква + 3 цифры + 2 буквы + регион)\n• АБ1234 77 (мото/прицеп)",
@@ -1476,6 +1522,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
       return true;
     }
     context.stsVehiclePlate = plate;
+    logger.info(`[/doc] sts_plate: ${userId} → plate=${plate}`);
     await setState(userId, "sts_owner", context);
     // Pre-fill owner name from renter's full name — most common case
     await sendComplexMessage(
@@ -1494,25 +1541,34 @@ export async function handleDocText(userId: string, chatId: number, text: string
     }
     context.stsOwnerFullName = owner;
 
-    // If owner ≠ renter, ask for relation; otherwise default to "сам арендатор"
+    // If owner ≠ renter, ask for relation; otherwise default to "сам арендатор".
+    // NB: we explicitly require BOTH renterName AND ownerName non-empty AND
+    // equal — otherwise we ask for relation. This avoids the silent-fallback
+    // bug where an empty mpFullName (edge case: state corruption) would
+    // short-circuit on `renterName &&` and default to "сам арендатор" even
+    // when the owner was clearly a different person.
     const renterName = (context.mpFullName || "").trim().toLowerCase();
     const ownerName = owner.trim().toLowerCase();
-    if (renterName && ownerName !== renterName) {
-      await setState(userId, "sts_relation", context);
-      await sendComplexMessage(
-        chatId,
-        `✅ ${owner}\n\n*Отношение собственника к арендатору?*`,
-        buildStsRelationKeyboard(),
-        { keyboardType: 'inline', parseMode: "Markdown" },
-      );
-    } else {
+    const ownerIsRenter = !!renterName && !!ownerName && ownerName === renterName;
+    if (ownerIsRenter) {
       // Owner = renter — skip relation, default it
       context.stsOwnerRelation = "сам арендатор";
+      logger.info(`[/doc] sts_owner: ${userId} → owner=renter, defaulting relation`);
       await setState(userId, "sts_vehicle", context);
       await sendComplexMessage(
         chatId,
         "✅ собственник = арендатор\n\n*Марка/модель ТС* (можно с годом)\n\nПример: Toyota Camry 2021",
         buildStsSkipKeyboard(),
+        { keyboardType: 'inline', parseMode: "Markdown" },
+      );
+    } else {
+      // Owner ≠ renter (or renter name unknown) — ask for relation
+      logger.info(`[/doc] sts_owner: ${userId} → owner differs from renter, asking relation`);
+      await setState(userId, "sts_relation", context);
+      await sendComplexMessage(
+        chatId,
+        `✅ ${owner}\n\n*Отношение собственника к арендатору?*`,
+        buildStsRelationKeyboard(),
         { keyboardType: 'inline', parseMode: "Markdown" },
       );
     }
@@ -1523,10 +1579,12 @@ export async function handleDocText(userId: string, chatId: number, text: string
     // Free-text relation (fallback when user types instead of pressing button)
     const rel = text.trim();
     if (rel.length < 2) {
+      logger.info(`[/doc] sts_relation: ${userId} → invalid input "${text.slice(0,40)}"`);
       await sendComplexMessage(chatId, "*Отношение собственника к арендатору?*", buildStsRelationKeyboard(), { keyboardType: 'inline', parseMode: "Markdown" });
       return true;
     }
     context.stsOwnerRelation = rel;
+    logger.info(`[/doc] sts_relation (free text): ${userId} → relation="${rel}"`);
     await setState(userId, "sts_vehicle", context);
     await sendComplexMessage(
       chatId,
@@ -1541,6 +1599,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     // Optional — user can skip via button (handled in callback) or type
     const v = parseStsVehicle(text);
     if (!v) {
+      logger.info(`[/doc] sts_vehicle: ${userId} → invalid input "${text.slice(0,40)}"`);
       await sendComplexMessage(
         chatId,
         "*Марка/модель ТС* (можно с годом)\n\nПример: Toyota Camry 2021",
@@ -1551,6 +1610,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     }
     context.stsVehicleModel = v.model;
     context.stsVehicleYear = v.year;
+    logger.info(`[/doc] sts_vehicle: ${userId} → model="${v.model}" year="${v.year}"`);
     await setState(userId, "sts_vin", context);
     await sendComplexMessage(
       chatId,
@@ -1565,6 +1625,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     // Optional — user can skip or type VIN
     const vin = parseStsVin(text);
     if (!vin) {
+      logger.info(`[/doc] sts_vin: ${userId} → invalid input "${text.slice(0,40)}"`);
       await sendComplexMessage(
         chatId,
         "❌ VIN — 17 символов (буквы латиницы + цифры, без I/O/Q)\n\nИли нажмите «Пропустить».",
@@ -1574,6 +1635,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
       return true;
     }
     context.stsVehicleVin = vin;
+    logger.info(`[/doc] sts_vin: ${userId} → vin=${vin}`);
     // СТС sub-flow complete → go to confirm
     await gotoConfirmFromSts(chatId, userId, context);
     return true;
@@ -1583,11 +1645,13 @@ export async function handleDocText(userId: string, chatId: number, text: string
     // User typed custom deposit amount
     const amount = text.replace(/\D/g, '');
     if (!amount || parseInt(amount) < 1000) {
+      logger.info(`[/doc] deposit_custom: ${userId} → invalid input "${text.slice(0,40)}"`);
       await sendComplexMessage(chatId, "❌ Введите сумму депозита (руб), минимум 1000", [], { removeKeyboard: true });
       return true;
     }
     context.depositOverride = amount;
     context.stsPledgeUsed = false; // explicit cash deposit
+    logger.info(`[/doc] deposit_custom: ${userId} → amount=${amount}`);
     const summary = buildRentSummary(context);
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
@@ -1596,6 +1660,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
 
   if (state === "deposit_choice") {
     // User typed instead of pressing a deposit-choice button — re-prompt
+    logger.info(`[/doc] deposit_choice: ${userId} → typed instead of clicking, re-prompting`);
     await gotoDepositChoice(chatId, userId, context);
     return true;
   }
@@ -1799,6 +1864,7 @@ export async function handleDocCallback(
     const bike = await resolveBikeById(context.bikeId);
     context.depositOverride = String(bike?.specs?.deposit_rub || "20000");
     context.stsPledgeUsed = false;
+    logger.info(`[/doc] dep_confirm: ${userId} → cash deposit=${context.depositOverride}`);
     const summary = buildRentSummary(context);
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
@@ -1807,6 +1873,7 @@ export async function handleDocCallback(
 
   if (callbackData === "dep_custom") {
     // User wants to enter a custom cash deposit amount
+    logger.info(`[/doc] dep_custom: ${userId} → asking for custom amount`);
     await setState(userId, "deposit_custom", context);
     await sendComplexMessage(
       chatId,
@@ -1820,6 +1887,7 @@ export async function handleDocCallback(
     // User chose to swap cash deposit for СТС in pledge — enter СТС sub-flow
     context.stsPledgeUsed = true;
     context.stsPledgeReturnDays = 3;
+    logger.info(`[/doc] dep_sts: ${userId} → entering СТС sub-flow (pledge return days=3)`);
     await setState(userId, "sts_series", context);
     await sendComplexMessage(
       chatId,
@@ -1833,9 +1901,12 @@ export async function handleDocCallback(
   }
 
   // ── СТС-owner-relation callbacks (sr_*) ─────────────────────────────────
+  // We use enum codes (sr_self, sr_wife, sr_father, ...) in callback_data
+  // and look up the human-readable label via STS_RELATION_LABELS. See the
+  // comment block above buildStsRelationKeyboard() for rationale.
   if (callbackData.startsWith("sr_")) {
-    const rel = callbackData.slice(3);
-    if (rel === "custom") {
+    const code = callbackData.slice(3);
+    if (code === "custom") {
       await setState(userId, "sts_relation", context);
       await sendComplexMessage(
         chatId,
@@ -1844,12 +1915,25 @@ export async function handleDocCallback(
       );
       return true;
     }
-    // Decode URL-encoded relation (Telegram callback_data can't have spaces raw, but we send them literally — Telegram actually tolerates spaces in callback_data)
-    context.stsOwnerRelation = decodeURIComponent(rel);
+    const label = STS_RELATION_LABELS[code];
+    if (!label) {
+      // Unknown relation code — could be from an older keyboard version.
+      // Re-prompt with the current keyboard instead of crashing.
+      logger.warn(`[/doc] Unknown sr_ code: ${code} (user ${userId})`);
+      await sendComplexMessage(
+        chatId,
+        "*Отношение собственника к арендатору?*",
+        buildStsRelationKeyboard(),
+        { keyboardType: 'inline', parseMode: "Markdown" },
+      );
+      return true;
+    }
+    context.stsOwnerRelation = label;
+    logger.info(`[/doc] sr_${code}: ${userId} → relation="${label}"`);
     await setState(userId, "sts_vehicle", context);
     await sendComplexMessage(
       chatId,
-      `✅ ${context.stsOwnerRelation}\n\n*Марка/модель ТС* (можно с годом)\n\nПример: Toyota Camry 2021`,
+      `✅ ${label}\n\n*Марка/модель ТС* (можно с годом)\n\nПример: Toyota Camry 2021`,
       buildStsSkipKeyboard(),
       { keyboardType: 'inline', parseMode: "Markdown" },
     );
@@ -1860,6 +1944,7 @@ export async function handleDocCallback(
   if (callbackData === "sts_skip") {
     if (state === "sts_vehicle") {
       // Skip vehicle model/year → go to VIN
+      logger.info(`[/doc] sts_skip: ${userId} → skipped vehicle model (state=sts_vehicle)`);
       await setState(userId, "sts_vin", context);
       await sendComplexMessage(
         chatId,
@@ -1871,9 +1956,23 @@ export async function handleDocCallback(
     }
     if (state === "sts_vin") {
       // Skip VIN → СТС sub-flow complete → go to confirm
+      logger.info(`[/doc] sts_skip: ${userId} → skipped VIN (state=sts_vin), going to confirm`);
       await gotoConfirmFromSts(chatId, userId, context);
       return true;
     }
+    // sts_skip pressed from an unexpected state (e.g. user clicked a stale
+    // button from a previous /doc session). Consume the callback to stop the
+    // Telegram loading spinner and re-route to the current expected state.
+    logger.warn(`[/doc] sts_skip pressed from unexpected state=${state} (user ${userId})`);
+    await sendComplexMessage(
+      chatId,
+      "⚠️ Эта кнопка уже не актуальна. Используйте кнопки ниже.",
+      [],
+      { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    // Best-effort: route back to deposit_choice so user is not stuck
+    await gotoDepositChoice(chatId, userId, context);
+    return true;
   }
 
   if (callbackData.startsWith("p_")) {
