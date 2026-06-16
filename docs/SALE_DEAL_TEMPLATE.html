@@ -7,7 +7,7 @@
 <tr><td style="border: none; width: 50%;">г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">« {{contract_day}}» {{contract_month_genitive}} {{contract_year}} года</td></tr>
 </table>
 
-<p style="text-align: justify;">Мотосалон ВипБайкЭлектро, именуем в дальнейшем &quot;Продавец&quot;, в лице ИП Воробьева Р.В., действующий на основании ОГРНИП: 326527500025145, с одной стороны и____________________. именуемый в дальнейшем &quot;Покупатель&quot;, с другой стороны, совместно именуемые &quot;Стороны&quot;, заключили настоящий Договор о нижеследующем:</p>
+<p style="text-align: justify;">{{organization_name}}, именуем в дальнейшем &quot;Продавец&quot;, в лице {{organization_short}}, действующий на основании ОГРНИП: {{ogrnip}}, с одной стороны и____________________. именуемый в дальнейшем &quot;Покупатель&quot;, с другой стороны, совместно именуемые &quot;Стороны&quot;, заключили настоящий Договор о нижеследующем:</p>
 
 <p style="text-align: center; font-weight: bold;">1. Предмет Договора</p>
 
@@ -150,7 +150,7 @@
 
 <p style="text-indent: 1.25cm; text-align: justify;">9.6&emsp;Стороны договорились, что в процессе исполнения условий Договора сообщения посредством электронной почты направляются сторонами друг другу по следующим электронным адресам:</p>
 <p style="text-indent: 1.25cm; text-align: justify;">а) адрес Покупателя по e-mail: {{buyer_email}}</p>
-<p style="text-indent: 1.25cm; text-align: justify;">б) адрес Продавца по e-mail:vip_bike@mail.ru</p>
+<p style="text-indent: 1.25cm; text-align: justify;">б) адрес Продавца по e-mail: {{email}}</p>
 <p style="text-indent: 1.25cm; text-align: justify;">Все уведомления и сообщения, отправленные Сторонами друг другу по вышеуказанным адресам электронной почты, признаются Сторонами официальной перепиской в рамках Договора и юридически значимыми документами, и считаются полученными на следующий рабочий день со дня отправления.</p>
 
 <p style="text-indent: 1.25cm; text-align: justify;">9.7. Стороны признают, что, если какое-либо из положений Договора становится недействительным в течение срока его действия вследствие изменения законодательства, остальные положения Договора обязательны для Сторон в течение срока действия Договора.</p>
@@ -168,17 +168,17 @@
 <table style="width: 100%; border: none; margin-top: 12pt;">
 <tr>
 <td style="border: none; width: 50%; vertical-align: top;"><b>Продавец:</b><br>
-Мотосалон ВипБайкЭлектро<br>
-ИП Воробьев Р. В.<br>
-Адрес:{{seller_address}}<br>
-ОГРНИП: 326527500025145<br>
-ИНН: 525813643035<br>
-р/сч 40802810942710013083<br>
-Волго-Вятский Банк ПАО Сбербанк<br>
-г. Нижний Новгород<br>
-к/сч 30101810900000000603<br>
+{{organization_name}}<br>
+{{organization_short}}<br>
+Адрес:{{legal_address}}<br>
+ОГРНИП: {{ogrnip}}<br>
+ИНН: {{inn}}<br>
+р/сч {{bank_account}}<br>
+{{bank_name}}<br>
+{{bank_city}}<br>
+к/сч {{bank_corr_account}}<br>
 <br>
-____________________/Р.В. Воробьев/</td>
+____________________/{{organization_short}}/</td>
 <td style="border: none; width: 50%; vertical-align: top;"><b>Покупатель:</b><br>
 <br>
 ФИО: {{buyer_full_name}}<br>
@@ -240,9 +240,9 @@ _________________ /{{buyer_short_name}}./</td>
 <table style="width: 100%; border: none; margin-top: 6pt;">
 <tr>
 <td style="border: none; width: 50%; vertical-align: top;"><b>Продавец:</b><br>
-ВипБайкЭлектро<br>
+{{organization_short}}<br>
 <br>
-_______________/Р.В. Воробьев/</td>
+_______________/{{organization_short}}/</td>
 <td style="border: none; width: 50%; vertical-align: top;"><b>Покупатель:</b><br>
 <br>
 <br>
