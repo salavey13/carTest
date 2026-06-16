@@ -837,7 +837,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
                             {item.isHot && (
-                              <span className="inline-flex rounded-full bg-[var(--catalog-accent)] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.06em] text-[var(--catalog-accent-contrast)] group-hover:bg-[var(--catalog-bg)]/20">
+                              <span className="inline-flex items-center rounded-full bg-[var(--catalog-accent)] px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.06em] text-[var(--catalog-accent-contrast)] group-hover:bg-[var(--catalog-bg)]/20">
                                 Хит
                               </span>
                             )}
@@ -956,7 +956,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
                             {item.isHot && (
-                              <span className="inline-flex rounded-full bg-[var(--catalog-accent)] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.06em] text-[var(--catalog-accent-contrast)] group-hover:bg-[var(--catalog-bg)]/20">
+                              <span className="inline-flex items-center rounded-full bg-[var(--catalog-accent)] px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.06em] text-[var(--catalog-accent-contrast)] group-hover:bg-[var(--catalog-bg)]/20">
                                 Хит
                               </span>
                             )}

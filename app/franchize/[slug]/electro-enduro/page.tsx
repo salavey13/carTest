@@ -199,55 +199,6 @@ export default async function ElectroEnduroPage({
         groupLinks={saleItems.map((item) => item.category)}
       />
       <FranchizeCatalogHero crew={crew} slug={crew.slug || slug} variant="electro-enduro" />
-      <section className="mx-auto w-full max-w-7xl px-4 pt-6 2xl:max-w-[1600px]">
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <article className="rounded-3xl border border-[var(--enduro-border)] bg-[var(--enduro-card-faint)] p-5 text-[var(--enduro-text)] shadow-lg">
-            <h3 className="text-xl font-semibold">
-              Группа аренды (test-ride friendly)
-            </h3>
-            <p className="mt-2 text-sm text-[var(--enduro-muted)]">
-              Включает модели для первого знакомства и коротких прокатных
-              сессий.
-            </p>
-            <div className="mt-4 space-y-2">
-              {rentPreview.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/franchize/${crew.slug || slug}/electro-enduro?vehicle=${item.id}`}
-                  className="flex items-center justify-between rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-text)] hover:border-[var(--enduro-accent)] hover:bg-[var(--enduro-accent)] hover:text-[var(--enduro-accent-text)]"
-                >
-                  <span>{item.title}</span>
-                  <span className="text-xs opacity-80">
-                    {item.pricePerDay} ₽/день
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </article>
-          <article className="rounded-3xl border border-[var(--enduro-border)] bg-[var(--enduro-card-faint)] p-5 text-[var(--enduro-text)] shadow-lg">
-            <h3 className="text-xl font-semibold">
-              Группа продажи (build-to-order)
-            </h3>
-            <p className="mt-2 text-sm text-[var(--enduro-muted)]">
-              Фокус на кастомизации и заказе модели в конфигураторе.
-            </p>
-            <div className="mt-4 space-y-2">
-              {salePreview.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/franchize/${crew.slug || slug}/configurator?vehicle=${item.id}`}
-                  className="flex items-center justify-between rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-text)] hover:border-[var(--enduro-accent)] hover:bg-[var(--enduro-accent)] hover:text-[var(--enduro-accent-text)]"
-                >
-                  <span>{item.title}</span>
-                  <span className="text-xs opacity-80">
-                    {item.pricePerDay} ₽/день
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </article>
-        </div>
-      </section>
       {accessoryHighlights.length > 0 && (
         <section className="mx-auto w-full max-w-7xl px-4 pt-6 2xl:max-w-[1600px]">
           <div className="rounded-3xl border border-[var(--enduro-border)] bg-[var(--enduro-card-soft)] p-5 text-[var(--enduro-text)]">
@@ -302,7 +253,7 @@ export default async function ElectroEnduroPage({
             параметры, комплектация и оформление идут отдельным потоком.
           </p>
           <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <article className="rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-card-faint)] p-4 text-[var(--enduro-text)] shadow-lg">
+            <article className="rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-card-soft)] p-4 text-[var(--enduro-text)] shadow-lg">
               <h2 className="text-lg font-medium">Аренда / тест-драйв</h2>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--enduro-muted)]">
                 <li>Быстрый старт для знакомства с техникой.</li>
@@ -311,14 +262,11 @@ export default async function ElectroEnduroPage({
                 </li>
                 <li>Маршрутный формат и базовый инструктаж перед выездом.</li>
               </ul>
-              <Link
-                className="mt-4 inline-flex rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-text)] hover:border-[var(--enduro-accent)] hover:bg-[var(--enduro-accent)] hover:text-[var(--enduro-accent-text)]"
-                href={`/franchize/${crew.slug || slug}`}
-              >
-                Открыть каталог аренды
-              </Link>
+              <div className="mt-4 inline-flex rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-muted)]">
+                Вы находитесь в каталоге аренды
+              </div>
             </article>
-            <article className="rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-card-faint)] p-4 text-[var(--enduro-text)] shadow-lg">
+            <article className="rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-card-soft)] p-4 text-[var(--enduro-text)] shadow-lg">
               <h2 className="text-lg font-medium">
                 Продажа / кастомная сборка
               </h2>
