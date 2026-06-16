@@ -9,7 +9,7 @@
  * - No warranty for used bikes (sell as-is)
  * - Inline keyboards only where genuinely useful
  *
- * Flow (RENT) - 9 steps:
+ * Flow (RENT) - 10 steps:
  *   1. Full name → "Иванов Иван Иванович"
  *   2. Passport → "4509 123456 15.03.2020 ОМВД"
  *   3. Birth → "15.03.1990" (year needed here)
@@ -19,6 +19,12 @@
  *   7. Categories → inline keyboard — skipped if no license
  *   8. Start → "сегодня 18" or inline keyboard
  *   9. End → "завтра 10" or inline keyboard
+ *  10. Deposit choice → inline keyboard (Confirm / Override / Swap with СТС)
+ *      └─ if "Swap with СТС" chosen: 6 mini-steps to collect СТС fields,
+ *         then back to confirm. The cash deposit is replaced by the
+ *         renter's vehicle СТС held in pledge (see migration
+ *         20260617000000_rental_sts_pledge.sql and
+ *         /skills/rental-contract-from-photos/SKILL.md §"СТС-вместо-депозита").
  *   → Done!
  *
  * Flow (SALE) - 5 steps:
@@ -225,6 +231,90 @@ function buildConfirmKeyboard(): KeyboardButton[][] {
   ];
 }
 
+/**
+ * Build deposit-choice keyboard — 3 options:
+ *   1. Confirm the bike's spec.deposit_rub as cash deposit
+ *   2. Override with custom cash amount (free text input)
+ *   3. Swap cash deposit for renter's own vehicle СТС in pledge
+ *
+ * @param depositAmount Cash deposit amount pulled from bike.specs.deposit_rub (or fallback "20000")
+ * @param bike          Bike object (for context in the confirm button label)
+ */
+function buildDepositChoiceKeyboard(depositAmount: string, bike?: any): KeyboardButton[][] {
+  const amount = Number(depositAmount) || 20000;
+  const formatted = amount.toLocaleString("ru-RU");
+  const bikeLabel = bike ? ` (${bike.make} ${bike.model})` : "";
+  return [
+    [{ text: `✅ Депозит ${formatted} ₽${bikeLabel}`, callback_data: "dep_confirm" }],
+    [{ text: `✏️ Своя сумма`, callback_data: "dep_custom" }],
+    [{ text: `🪪 СТС вместо депозита`, callback_data: "dep_sts" }],
+    [{ text: "❌ Отменить", callback_data: "cancel" }],
+  ];
+}
+
+/**
+ * СТС-owner-relation enum codes. We use short ASCII enum codes in
+ * callback_data instead of raw Cyrillic for two reasons:
+ *   1. Telegram callback_data has a 64-byte limit — Cyrillic chars are 2
+ *      UTF-8 bytes each, so "sr_сам арендатор" already eats 32 bytes; a
+ *      longer relation like "sr_доверенность представителя по нотариальной"
+ *      would blow the limit.
+ *   2. Avoids the URI-encoding roundtrip — `decodeURIComponent` on data
+ *      that was never percent-encoded is a no-op for valid input, but
+ *      THROWS URIError if the data contains a literal `%` (which Russian
+ *      users won't type in a relation, but the principle is wrong).
+ * The label map below is the single source of truth for button text and
+ * the human-readable string stored in context.stsOwnerRelation.
+ */
+const STS_RELATION_LABELS: Record<string, string> = {
+  self: "сам арендатор",
+  wife: "жена",
+  husband: "муж",
+  father: "отец",
+  mother: "мать",
+  son: "сын",
+  daughter: "дочь",
+  brother: "брат",
+  sister: "сестра",
+  power_of_attorney: "доверенность",
+  custom: "другое (ввести)",
+};
+
+/**
+ * Build СТС-owner-relation keyboard — quick-pick common relations.
+ * The renter can also type a free-text relation (handled in handleDocText).
+ */
+function buildStsRelationKeyboard(): KeyboardButton[][] {
+  const r = (code: string) => `sr_${code}`;
+  const label = (code: string) => STS_RELATION_LABELS[code] || code;
+  return [
+    [
+      { text: `🧑 ${label("self")}`, callback_data: r("self") },
+      { text: `👨‍👩‍👧 ${label("wife")}`, callback_data: r("wife") },
+    ],
+    [
+      { text: `👨 ${label("father")}`, callback_data: r("father") },
+      { text: `👩 ${label("mother")}`, callback_data: r("mother") },
+    ],
+    [
+      { text: `📄 ${label("power_of_attorney")}`, callback_data: r("power_of_attorney") },
+      { text: `✏️ ${label("custom")}`, callback_data: r("custom") },
+    ],
+    [{ text: "❌ Отменить", callback_data: "cancel" }],
+  ];
+}
+
+/**
+ * Build "skip optional field" keyboard for СТС sub-flow.
+ * Used for sts_vehicle and sts_vin which are optional.
+ */
+function buildStsSkipKeyboard(): KeyboardButton[][] {
+  return [
+    [{ text: "⏭ Пропустить", callback_data: "sts_skip" }],
+    [{ text: "❌ Отменить", callback_data: "cancel" }],
+  ];
+}
+
 // ── State type ─────────────────────────────────────────────────────────────
 
 interface DocFlowContext {
@@ -251,6 +341,24 @@ interface DocFlowContext {
   rentEndDate?: string;
   rentEndTime?: string;
   salePrice?: string;
+  // ── СТС-вместо-депозита (added 2026-06-17) ────────────────────────────────
+  // When stsPledgeUsed=true, the cash deposit is replaced by the renter's
+  // own vehicle СТС held in pledge (see migration 20260617000000_rental_sts_pledge.sql
+  // and /skills/rental-contract-from-photos/SKILL.md §"СТС-вместо-депозита").
+  stsPledgeUsed?: boolean;
+  stsSeries?: string;          // e.g. "77"
+  stsNumber?: string;          // e.g. "12345678"
+  stsIssueDate?: string;       // e.g. "15.05.2023" (optional)
+  stsVehiclePlate?: string;    // e.g. "А123БВ77" — REQUIRED
+  stsVehicleVin?: string;      // e.g. "XTA12345678901234" (optional)
+  stsVehicleModel?: string;    // e.g. "Toyota Camry" (optional but recommended)
+  stsVehicleYear?: string;     // e.g. "2021" (optional)
+  stsOwnerFullName?: string;   // e.g. "Иванов Иван Иванович" — REQUIRED (default = renter)
+  stsOwnerRegistration?: string; // e.g. "г. Москва, ул. ..." (optional)
+  stsOwnerRelation?: string;   // e.g. "сам арендатор" (default), "жена", "отец", "доверенность"
+  stsPledgeReturnDays?: number; // default 3
+  depositAmountSkipped?: string; // cash deposit that was replaced by СТС (for analytics)
+  depositOverride?: string;     // if user picked "own amount" instead of bike.specs.deposit_rub
 }
 
 // ── Bike resolution ─────────────────────────────────────────────────────
@@ -523,7 +631,9 @@ function parseEndDate(text: string, startDate?: string): { date: string; time: s
 }
 
 /**
- * Build rent summary for confirmation — works with or without license
+ * Build rent summary for confirmation — works with or without license,
+ * and shows either the cash deposit or the СТС pledge depending on
+ * context.stsPledgeUsed.
  */
 function buildRentSummary(context: DocFlowContext): string {
   const hasLicense = context.mlSeries && context.mlNumber;
@@ -540,10 +650,102 @@ function buildRentSummary(context: DocFlowContext): string {
   lines.push(
     "",
     `📅 ${context.rentStartDate} ${context.rentStartTime} → ${context.rentEndDate} ${context.rentEndTime}`,
-    "",
-    "Всё верно?",
   );
+
+  // ── Collateral line: cash deposit OR СТС pledge ──
+  if (context.stsPledgeUsed) {
+    const owner = context.stsOwnerFullName || context.mpFullName || "";
+    const relation = context.stsOwnerRelation || "сам арендатор";
+    lines.push(
+      "",
+      `🪪 СТС в залоге: ${context.stsSeries || ""} № ${context.stsNumber || ""}`,
+      `🚗 ТС: ${context.stsVehicleModel || ""} ${context.stsVehiclePlate || ""}${context.stsVehicleYear ? ` (${context.stsVehicleYear} г.в.)` : ""}${context.stsVehicleVin ? `\n   VIN: ${context.stsVehicleVin}` : ""}`,
+      `👤 Собственник: ${owner}${relation !== "сам арендатор" ? ` (${relation})` : ""}`,
+    );
+  } else {
+    const deposit = context.depositOverride || "20000";
+    lines.push("", `💰 Депозит: ${Number(deposit).toLocaleString("ru-RU")} ₽`);
+  }
+
+  lines.push("", "Всё верно?");
   return lines.join("\n");
+}
+
+// ── СТС parsers (rent only, СТС-вместо-депозита flow) ─────────────────────────
+
+/**
+ * Parse СТС series + number.
+ * Accepted formats:
+ *   "77 12345678"        → series=77, number=12345678
+ *   "77 № 12345678"      → series=77, number=12345678
+ *   "7712 345678"        → series=7712 (4-digit), number=345678 (6-digit) — legacy
+ * The Russian СТС has a series of 2 digits (region code) and a 10-digit number
+ * since 2018, but pre-2018 documents used 4-digit series. We accept both.
+ */
+function parseStsSeriesNumber(text: string): { series: string; number: string } | null {
+  const t = text.trim().replace(/^sts/i, "").trim();
+  // Remove decorative № sign and any non-alphanumeric separators except spaces
+  const cleaned = t.replace(/[№]/g, " ").replace(/\s+/g, " ").trim();
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return null;
+
+  // Find first pure-digit token as series (2 or 4 digits), next as number
+  let series = "", number = "";
+  for (const p of parts) {
+    const digits = p.replace(/\D/g, "");
+    if (!digits) continue;
+    if (!series && (digits.length === 2 || digits.length === 4)) {
+      series = digits;
+    } else if (!number && digits.length >= 6 && digits.length <= 10) {
+      number = digits;
+    }
+    if (series && number) break;
+  }
+  if (!series || !number) return null;
+  return { series, number };
+}
+
+/**
+ * Parse Russian vehicle plate, e.g. "А123БВ77" or "А123ВВ 77".
+ * Validates the standard format: Letter(1-2) Digits(3) Letters(2) Region(2-3)
+ */
+function parseStsPlate(text: string): string | null {
+  const t = text.trim().toUpperCase().replace(/\s+/g, "");
+  // Standard Russian plate format: A123BC77 (1 letter + 3 digits + 2 letters + 2-3 digit region)
+  const m = t.match(/^([АВЕКМНОРСТУХABEKMHOPCTYX])\d{3}([АВЕКМНОРСТУХABEKMHOPCTYX]{2})(\d{2,3})$/);
+  if (m) return t;
+  // Allow trailing RUS suffix or trailing 77 RUS
+  const m2 = t.match(/^([АВЕКМНОРСТУХABEKMHOPCTYX])\d{3}([АВЕКМНОРСТУХABEKMHOPCTYX]{2})(\d{2,3})RUS?$/);
+  if (m2) return t.replace(/RUS?$/i, "");
+  // Trailer / moto format: 2 letters + 4 digits + region (e.g. АБ1234 77)
+  const m3 = t.match(/^([АВЕКМНОРСТУХABEKMHOPCTYX]{2})\d{4}(\d{2,3})$/);
+  if (m3) return t;
+  return null;
+}
+
+/**
+ * Parse СТС vehicle model + optional year from free text.
+ * Accepted:
+ *   "Toyota Camry"          → { model: "Toyota Camry", year: "" }
+ *   "Toyota Camry 2021"     → { model: "Toyota Camry", year: "2021" }
+ *   "Honda CBR 600 2018"    → { model: "Honda CBR 600", year: "2018" }
+ */
+function parseStsVehicle(text: string): { model: string; year: string } | null {
+  const t = text.trim();
+  if (!t) return null;
+  const m = t.match(/^(.+?)\s+(19\d{2}|20\d{2})\s*$/);
+  if (m) return { model: m[1].trim(), year: m[2] };
+  return { model: t, year: "" };
+}
+
+/**
+ * Parse VIN (17 chars, Latin letters + digits, no I/O/Q).
+ * Returns uppercased VIN or null if format is invalid.
+ */
+function parseStsVin(text: string): string | null {
+  const t = text.trim().toUpperCase().replace(/\s+/g, "");
+  if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(t)) return null;
+  return t;
 }
 
 // ── Contract generation ─────────────────────────────────────────────────────
@@ -671,6 +873,10 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
     };
 
     if (isRent) {
+      // Resolve deposit: explicit override > bike.specs.deposit_rub > default 20000
+      const resolvedDeposit = context.depositOverride
+        || String(bike.specs?.deposit_rub || "20000");
+
       Object.assign(vars, {
         renter_full_name: context.mpFullName || "",
         renter_birth_date: context.mpBirthDate || "",
@@ -715,7 +921,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         rent_end_time: (context.rentEndTime || "10:00").replace('.', ':'),
         daily_price_rub: String(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
         hourly_price_rub: String(bike.specs?.price_per_hour || ""),
-        deposit_rub: String(bike.specs?.deposit_rub || "20000"),
+        deposit_rub: resolvedDeposit,
         subtotal_rub: String(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
         bike_value_rub: String(bike.specs?.sale_price || bike.specs?.price_rub || "850000"),
         bike_value_words: "",
@@ -733,6 +939,24 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         media_links: "телефон",
         damage_price_list: "мотоцикл в сборе / царапина на пластике / прочее по расчету",
         document_key: `rental-${bike.id}-${Date.now()}`,
+
+        // ── СТС pledge vars — only populated when context.stsPledgeUsed=true ────
+        // Template uses {{#if sts_collateral}} to switch between СТС and
+        // cash-deposit clauses (see RENTAL_DEAL_TEMPLATE.html §4.3-4.7).
+        sts_collateral: context.stsPledgeUsed ? "1" : "",
+        sts_series: context.stsSeries || "",
+        sts_number: context.stsNumber || "",
+        sts_issue_date: context.stsIssueDate || "",
+        sts_vehicle_plate: context.stsVehiclePlate || "",
+        sts_vehicle_vin: context.stsVehicleVin || "",
+        sts_vehicle_model: context.stsVehicleModel || "",
+        sts_vehicle_year: context.stsVehicleYear || "",
+        sts_owner_full_name: context.stsOwnerFullName || "",
+        sts_owner_registration: context.stsOwnerRegistration || "",
+        sts_owner_relation: context.stsOwnerRelation || "сам арендатор",
+        sts_pledge_return_days: String(context.stsPledgeReturnDays || 3),
+        // When СТС is used, record the cash deposit that was skipped (analytics)
+        sts_deposit_amount_skipped: context.stsPledgeUsed ? resolvedDeposit : "",
       });
     }
 
@@ -872,8 +1096,13 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
     }
 
     if (isRent) {
-      // rental_contract_artifacts is in private schema — use explicit columns only
-      const { error: rentError } = await supabaseAdmin.schema("private").from("rental_contract_artifacts").insert({
+      // rental_contract_artifacts is in private schema — use explicit columns only.
+      // sts_* columns added by migration 20260617000000_rental_sts_pledge.sql
+      // (nullable / have defaults, so it's safe to omit when stsPledgeUsed=false).
+      const depositForRecord = context.depositOverride
+        || String(bike.specs?.deposit_rub || "20000");
+
+      const rentInsert: Record<string, any> = {
         contract_key: vars.document_key,
         original_sha256: docSha256,
         requested_bike_id: context.bikeId,
@@ -891,10 +1120,33 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         rent_start_date: context.rentStartDate || null,
         rent_end_date: context.rentEndDate || null,
         daily_price: bike.specs?.dailyPrice || bike.specs?.rent_weekday || null,
-        deposit_rub: bike.specs?.deposit_rub || null,
+        deposit_rub: depositForRecord,
         total_sum: Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
         template_version: 1,
-      });
+        // СТС pledge columns (added 2026-06-17):
+        sts_pledge_used: !!context.stsPledgeUsed,
+        sts_pledge_return_days: context.stsPledgeReturnDays || 3,
+        deposit_amount_skipped: context.stsPledgeUsed ? depositForRecord : null,
+      };
+      if (context.stsPledgeUsed) {
+        Object.assign(rentInsert, {
+          sts_series: context.stsSeries || null,
+          sts_number: context.stsNumber || null,
+          sts_issue_date: context.stsIssueDate || null,
+          sts_vehicle_plate: context.stsVehiclePlate || null,
+          sts_vehicle_vin: context.stsVehicleVin || null,
+          sts_vehicle_model: context.stsVehicleModel || null,
+          sts_vehicle_year: context.stsVehicleYear || null,
+          sts_owner_full_name: context.stsOwnerFullName || null,
+          sts_owner_registration: context.stsOwnerRegistration || null,
+          sts_owner_relation: context.stsOwnerRelation || "сам арендатор",
+        });
+      }
+
+      const { error: rentError } = await supabaseAdmin
+        .schema("private")
+        .from("rental_contract_artifacts")
+        .insert(rentInsert);
       if (rentError) {
         logger.error("[/doc] Failed to save rental_contract_artifacts:", rentError);
       }
@@ -990,6 +1242,55 @@ function numberToWords(n: number): string {
 }
 
 // ── State management ─────────────────────────────────────────────────────────
+
+/**
+ * Route user to the deposit-choice step (NEW step 10 in rent flow).
+ * Fetches bike.specs.deposit_rub for display in the inline keyboard.
+ * Called after schedule_end is fully resolved.
+ */
+async function gotoDepositChoice(chatId: number, userId: string, context: DocFlowContext): Promise<void> {
+  const bike = await resolveBikeById(context.bikeId);
+  const depositAmount = String(bike?.specs?.deposit_rub || "20000");
+  await setState(userId, "deposit_choice", context);
+  const formatted = Number(depositAmount).toLocaleString("ru-RU");
+  await sendComplexMessage(
+    chatId,
+    `*Депозит / обеспечительный платёж*\n\n` +
+    `Байк: ${bike ? `${bike.make} ${bike.model}` : context.bikeId}\n` +
+    `Депозит из карточки ТС: *${formatted} ₽*\n\n` +
+    `Выберите вариант:`,
+    buildDepositChoiceKeyboard(depositAmount, bike),
+    { keyboardType: 'inline', parseMode: 'Markdown' },
+  );
+}
+
+/**
+ * Mark СТС sub-flow as complete and route to confirm step.
+ * Sets stsPledgeUsed=true, clears any cash-deposit override, and snapshots
+ * the cash deposit that was replaced by СТС (for analytics / audit in DB).
+ */
+async function gotoConfirmFromSts(chatId: number, userId: string, context: DocFlowContext): Promise<void> {
+  context.stsPledgeUsed = true;
+  context.depositOverride = undefined; // СТС replaces cash deposit
+
+  // Snapshot the cash deposit that was skipped — used downstream by
+  // generateContract() to populate sts_deposit_amount_skipped in the
+  // template and deposit_amount_skipped in the DB record. We resolve it
+  // here (not in generateContract) so the value is stable across retries.
+  if (!context.depositAmountSkipped) {
+    const bike = await resolveBikeById(context.bikeId);
+    context.depositAmountSkipped = String(bike?.specs?.deposit_rub || "20000");
+  }
+
+  if (!context.stsOwnerRelation) context.stsOwnerRelation = "сам арендатор";
+  if (!context.stsPledgeReturnDays) context.stsPledgeReturnDays = 3;
+
+  logger.info(`[/doc] СТС sub-flow complete: ${userId} → sts=${context.stsSeries} ${context.stsNumber} plate=${context.stsVehiclePlate} owner=${context.stsOwnerFullName} relation=${context.stsOwnerRelation} depositSkipped=${context.depositAmountSkipped}`);
+
+  const summary = buildRentSummary(context);
+  await setState(userId, "confirm", context);
+  await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+}
 
 async function setState(userId: string, state: string, context: DocFlowContext) {
   await supabaseAdmin.from("user_states").upsert({
@@ -1178,10 +1479,189 @@ export async function handleDocText(userId: string, chatId: number, text: string
     }
     context.rentEndDate = e.date;
     context.rentEndTime = e.time;
+    // Route to deposit_choice (NEW step 10) instead of jumping straight to confirm
+    await gotoDepositChoice(chatId, userId, context);
+    return true;
+  }
 
+  // ── СТС-вместо-депозита sub-flow text states ──────────────────────────────
+  // Order: sts_series → sts_plate → sts_owner → sts_relation → sts_vehicle → sts_vin → confirm
+
+  if (state === "sts_series") {
+    const sn = parseStsSeriesNumber(text);
+    if (!sn) {
+      logger.info(`[/doc] sts_series: ${userId} → invalid input "${text.slice(0,40)}"`);
+      await sendComplexMessage(
+        chatId,
+        "❌ Формат: серия номер\n\nПримеры:\n• 77 12345678\n• 77 № 12345678\n• 7712 345678",
+        [], { removeKeyboard: true, parseMode: "Markdown" },
+      );
+      return true;
+    }
+    context.stsSeries = sn.series;
+    context.stsNumber = sn.number;
+    logger.info(`[/doc] sts_series: ${userId} → series=${sn.series} number=${sn.number}`);
+    await setState(userId, "sts_plate", context);
+    await sendComplexMessage(
+      chatId,
+      `✅ СТС ${sn.series} № ${sn.number}\n\n*Гос. рег. знак ТС*\n\nПример: А123БВ77`,
+      [], { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  if (state === "sts_plate") {
+    const plate = parseStsPlate(text);
+    if (!plate) {
+      logger.info(`[/doc] sts_plate: ${userId} → invalid input "${text.slice(0,40)}"`);
+      await sendComplexMessage(
+        chatId,
+        "❌ Формат: А123БВ77\n\nПримеры:\n• А123БВ77 (1 буква + 3 цифры + 2 буквы + регион)\n• АБ1234 77 (мото/прицеп)",
+        [], { removeKeyboard: true, parseMode: "Markdown" },
+      );
+      return true;
+    }
+    context.stsVehiclePlate = plate;
+    logger.info(`[/doc] sts_plate: ${userId} → plate=${plate}`);
+    await setState(userId, "sts_owner", context);
+    // Pre-fill owner name from renter's full name — most common case
+    await sendComplexMessage(
+      chatId,
+      `✅ ${plate}\n\n*Собственник ТС*\n\nЕсли собственник = арендатор, просто отправьте: \`${context.mpFullName || ""}\`\nИначе введите ФИО собственника.`,
+      [], { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  if (state === "sts_owner") {
+    const owner = text.trim();
+    if (owner.length < 5) {
+      await sendComplexMessage(chatId, "❌ Введите ФИО собственника полностью", [], { removeKeyboard: true });
+      return true;
+    }
+    context.stsOwnerFullName = owner;
+
+    // If owner ≠ renter, ask for relation; otherwise default to "сам арендатор".
+    // NB: we explicitly require BOTH renterName AND ownerName non-empty AND
+    // equal — otherwise we ask for relation. This avoids the silent-fallback
+    // bug where an empty mpFullName (edge case: state corruption) would
+    // short-circuit on `renterName &&` and default to "сам арендатор" even
+    // when the owner was clearly a different person.
+    const renterName = (context.mpFullName || "").trim().toLowerCase();
+    const ownerName = owner.trim().toLowerCase();
+    const ownerIsRenter = !!renterName && !!ownerName && ownerName === renterName;
+    if (ownerIsRenter) {
+      // Owner = renter — skip relation, default it
+      context.stsOwnerRelation = "сам арендатор";
+      logger.info(`[/doc] sts_owner: ${userId} → owner=renter, defaulting relation`);
+      await setState(userId, "sts_vehicle", context);
+      await sendComplexMessage(
+        chatId,
+        "✅ собственник = арендатор\n\n*Марка/модель ТС* (можно с годом)\n\nПример: Toyota Camry 2021",
+        buildStsSkipKeyboard(),
+        { keyboardType: 'inline', parseMode: "Markdown" },
+      );
+    } else {
+      // Owner ≠ renter (or renter name unknown) — ask for relation
+      logger.info(`[/doc] sts_owner: ${userId} → owner differs from renter, asking relation`);
+      await setState(userId, "sts_relation", context);
+      await sendComplexMessage(
+        chatId,
+        `✅ ${owner}\n\n*Отношение собственника к арендатору?*`,
+        buildStsRelationKeyboard(),
+        { keyboardType: 'inline', parseMode: "Markdown" },
+      );
+    }
+    return true;
+  }
+
+  if (state === "sts_relation") {
+    // Free-text relation (fallback when user types instead of pressing button)
+    const rel = text.trim();
+    if (rel.length < 2) {
+      logger.info(`[/doc] sts_relation: ${userId} → invalid input "${text.slice(0,40)}"`);
+      await sendComplexMessage(chatId, "*Отношение собственника к арендатору?*", buildStsRelationKeyboard(), { keyboardType: 'inline', parseMode: "Markdown" });
+      return true;
+    }
+    context.stsOwnerRelation = rel;
+    logger.info(`[/doc] sts_relation (free text): ${userId} → relation="${rel}"`);
+    await setState(userId, "sts_vehicle", context);
+    await sendComplexMessage(
+      chatId,
+      `✅ ${rel}\n\n*Марка/модель ТС* (можно с годом)\n\nПример: Toyota Camry 2021`,
+      buildStsSkipKeyboard(),
+      { keyboardType: 'inline', parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  if (state === "sts_vehicle") {
+    // Optional — user can skip via button (handled in callback) or type
+    const v = parseStsVehicle(text);
+    if (!v) {
+      logger.info(`[/doc] sts_vehicle: ${userId} → invalid input "${text.slice(0,40)}"`);
+      await sendComplexMessage(
+        chatId,
+        "*Марка/модель ТС* (можно с годом)\n\nПример: Toyota Camry 2021",
+        buildStsSkipKeyboard(),
+        { keyboardType: 'inline', parseMode: "Markdown" },
+      );
+      return true;
+    }
+    context.stsVehicleModel = v.model;
+    context.stsVehicleYear = v.year;
+    logger.info(`[/doc] sts_vehicle: ${userId} → model="${v.model}" year="${v.year}"`);
+    await setState(userId, "sts_vin", context);
+    await sendComplexMessage(
+      chatId,
+      `✅ ${v.model}${v.year ? ` ${v.year} г.в.` : ""}\n\n*VIN ТС* (17 символов, необязательно)`,
+      buildStsSkipKeyboard(),
+      { keyboardType: 'inline', parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  if (state === "sts_vin") {
+    // Optional — user can skip or type VIN
+    const vin = parseStsVin(text);
+    if (!vin) {
+      logger.info(`[/doc] sts_vin: ${userId} → invalid input "${text.slice(0,40)}"`);
+      await sendComplexMessage(
+        chatId,
+        "❌ VIN — 17 символов (буквы латиницы + цифры, без I/O/Q)\n\nИли нажмите «Пропустить».",
+        buildStsSkipKeyboard(),
+        { keyboardType: 'inline', parseMode: "Markdown" },
+      );
+      return true;
+    }
+    context.stsVehicleVin = vin;
+    logger.info(`[/doc] sts_vin: ${userId} → vin=${vin}`);
+    // СТС sub-flow complete → go to confirm
+    await gotoConfirmFromSts(chatId, userId, context);
+    return true;
+  }
+
+  if (state === "deposit_custom") {
+    // User typed custom deposit amount
+    const amount = text.replace(/\D/g, '');
+    if (!amount || parseInt(amount) < 1000) {
+      logger.info(`[/doc] deposit_custom: ${userId} → invalid input "${text.slice(0,40)}"`);
+      await sendComplexMessage(chatId, "❌ Введите сумму депозита (руб), минимум 1000", [], { removeKeyboard: true });
+      return true;
+    }
+    context.depositOverride = amount;
+    context.stsPledgeUsed = false; // explicit cash deposit
+    logger.info(`[/doc] deposit_custom: ${userId} → amount=${amount}`);
     const summary = buildRentSummary(context);
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (state === "deposit_choice") {
+    // User typed instead of pressing a deposit-choice button — re-prompt
+    logger.info(`[/doc] deposit_choice: ${userId} → typed instead of clicking, re-prompting`);
+    await gotoDepositChoice(chatId, userId, context);
     return true;
   }
 
@@ -1373,9 +1853,125 @@ export async function handleDocCallback(
       return true;
     }
 
+    // End date resolved → route to deposit_choice (NEW step 10) instead of confirm
+    await gotoDepositChoice(chatId, userId, context);
+    return true;
+  }
+
+  // ── Deposit choice callbacks (dep_*) — NEW step 10 ──────────────────────
+  if (callbackData === "dep_confirm") {
+    // User confirms bike's spec.deposit_rub (or default 20000) as cash deposit
+    const bike = await resolveBikeById(context.bikeId);
+    context.depositOverride = String(bike?.specs?.deposit_rub || "20000");
+    context.stsPledgeUsed = false;
+    logger.info(`[/doc] dep_confirm: ${userId} → cash deposit=${context.depositOverride}`);
     const summary = buildRentSummary(context);
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData === "dep_custom") {
+    // User wants to enter a custom cash deposit amount
+    logger.info(`[/doc] dep_custom: ${userId} → asking for custom amount`);
+    await setState(userId, "deposit_custom", context);
+    await sendComplexMessage(
+      chatId,
+      "*Введите сумму депозита (руб)*\n\nМинимум 1000 ₽",
+      [], { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  if (callbackData === "dep_sts") {
+    // User chose to swap cash deposit for СТС in pledge — enter СТС sub-flow
+    context.stsPledgeUsed = true;
+    context.stsPledgeReturnDays = 3;
+    logger.info(`[/doc] dep_sts: ${userId} → entering СТС sub-flow (pledge return days=3)`);
+    await setState(userId, "sts_series", context);
+    await sendComplexMessage(
+      chatId,
+      `🪪 *СТС вместо депозита*\n\n` +
+      `Вместо денежного депозита вы передаёте оригинал СТС своего ТС в залог.\n` +
+      `СТС возвращается в течение 3 рабочих дней после возврата мотоцикла.\n\n` +
+      `*Серия и номер СТС*\n\nПримеры:\n• 77 12345678\n• 77 № 12345678\n• 7712 345678`,
+      [], { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  // ── СТС-owner-relation callbacks (sr_*) ─────────────────────────────────
+  // We use enum codes (sr_self, sr_wife, sr_father, ...) in callback_data
+  // and look up the human-readable label via STS_RELATION_LABELS. See the
+  // comment block above buildStsRelationKeyboard() for rationale.
+  if (callbackData.startsWith("sr_")) {
+    const code = callbackData.slice(3);
+    if (code === "custom") {
+      await setState(userId, "sts_relation", context);
+      await sendComplexMessage(
+        chatId,
+        "*Введите отношение собственника к арендатору*\n\nНапример: брат, сын, доверенность",
+        [], { removeKeyboard: true, parseMode: "Markdown" },
+      );
+      return true;
+    }
+    const label = STS_RELATION_LABELS[code];
+    if (!label) {
+      // Unknown relation code — could be from an older keyboard version.
+      // Re-prompt with the current keyboard instead of crashing.
+      logger.warn(`[/doc] Unknown sr_ code: ${code} (user ${userId})`);
+      await sendComplexMessage(
+        chatId,
+        "*Отношение собственника к арендатору?*",
+        buildStsRelationKeyboard(),
+        { keyboardType: 'inline', parseMode: "Markdown" },
+      );
+      return true;
+    }
+    context.stsOwnerRelation = label;
+    logger.info(`[/doc] sr_${code}: ${userId} → relation="${label}"`);
+    await setState(userId, "sts_vehicle", context);
+    await sendComplexMessage(
+      chatId,
+      `✅ ${label}\n\n*Марка/модель ТС* (можно с годом)\n\nПример: Toyota Camry 2021`,
+      buildStsSkipKeyboard(),
+      { keyboardType: 'inline', parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  // ── СТС skip optional field (sts_skip) ──────────────────────────────────
+  if (callbackData === "sts_skip") {
+    if (state === "sts_vehicle") {
+      // Skip vehicle model/year → go to VIN
+      logger.info(`[/doc] sts_skip: ${userId} → skipped vehicle model (state=sts_vehicle)`);
+      await setState(userId, "sts_vin", context);
+      await sendComplexMessage(
+        chatId,
+        "*VIN ТС* (17 символов, необязательно)",
+        buildStsSkipKeyboard(),
+        { keyboardType: 'inline', parseMode: "Markdown" },
+      );
+      return true;
+    }
+    if (state === "sts_vin") {
+      // Skip VIN → СТС sub-flow complete → go to confirm
+      logger.info(`[/doc] sts_skip: ${userId} → skipped VIN (state=sts_vin), going to confirm`);
+      await gotoConfirmFromSts(chatId, userId, context);
+      return true;
+    }
+    // sts_skip pressed from an unexpected state (e.g. user clicked a stale
+    // button from a previous /doc session). Consume the callback to stop the
+    // Telegram loading spinner and re-route to the current expected state.
+    logger.warn(`[/doc] sts_skip pressed from unexpected state=${state} (user ${userId})`);
+    await sendComplexMessage(
+      chatId,
+      "⚠️ Эта кнопка уже не актуальна. Используйте кнопки ниже.",
+      [],
+      { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    // Best-effort: route back to deposit_choice so user is not stuck
+    await gotoDepositChoice(chatId, userId, context);
     return true;
   }
 
