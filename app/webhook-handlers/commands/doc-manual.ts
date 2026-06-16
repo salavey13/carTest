@@ -336,12 +336,14 @@ function parsePassport(text: string): { series: string; number: string; issueDat
 }
 
 /**
- * Parse "99 76 123456 15.03 15.03.2028"
- * Dates without year → issue=2026, expiry=2026 (if same) or next year
+ * Parse "99 76 123456 15.03 15.03.2028" or "99 76 123456 15.03" (single date)
+ * Dates without year → issue=2026, expiry=issue+10 years
+ * Expiry date is optional: if only one date provided, it's treated as issue date
+ * and expiry is automatically calculated as +10 years from issue date
  */
 function parseLicense(text: string): { series: string; number: string; issueDate: string; expiryDate: string } | null {
   const parts = text.trim().split(/\s+/);
-  if (parts.length < 4) return null;
+  if (parts.length < 3) return null;
 
   let series = "", number = "";
   const dates: string[] = [];
@@ -364,13 +366,21 @@ function parseLicense(text: string): { series: string; number: string; issueDate
     }
   }
 
-  if (!series || !number || dates.length < 2) return null;
+  if (!series || !number || dates.length < 1) return null;
 
-  // If both dates are same and current year, make expiry 10 years later
+  // If only one date provided, it's the issue date; calculate expiry as +10 years
   let [issue, expiry] = dates;
-  if (issue === expiry && issue.endsWith(`.${CURRENT_YEAR}`)) {
+  if (dates.length === 1) {
+    issue = dates[0];
     const [d, m, y] = issue.split('.');
     expiry = `${d}.${m}.${parseInt(y) + 10}`;
+  } else {
+    // Two dates provided: issue and expiry
+    // If both are same and current year, make expiry 10 years later
+    if (issue === expiry && issue.endsWith(`.${CURRENT_YEAR}`)) {
+      const [d, m, y] = issue.split('.');
+      expiry = `${d}.${m}.${parseInt(y) + 10}`;
+    }
   }
 
   return { series, number, issueDate: issue, expiryDate: expiry };
@@ -538,6 +548,66 @@ function buildRentSummary(context: DocFlowContext): string {
 
 // ── Contract generation ─────────────────────────────────────────────────────
 
+/**
+ * Load crew secrets from private.crew_secrets for the given crew_slug.
+ * Returns contract defaults with fallbacks for vip-bike.
+ */
+async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<Record<string, string>> {
+  try {
+    const { data: secretsData } = await supabaseAdmin
+      .from("crew_secrets")
+      .select("contract_defaults")
+      .eq("crew_slug", crewSlug)
+      .maybeSingle();
+
+    let contractDefaults: Record<string, any> = {};
+    if (secretsData?.contract_defaults) {
+      contractDefaults = typeof secretsData.contract_defaults === "string"
+        ? JSON.parse(secretsData.contract_defaults)
+        : secretsData.contract_defaults;
+    }
+
+    // Extract contract defaults with fallbacks
+    return {
+      organizationName: contractDefaults.organizationName || "Мотосалон ВипБайкЭлектро",
+      organizationShort: contractDefaults.organizationShort || "ИП Воробьев Р.В.",
+      organizationRepresentative: contractDefaults.organizationRepresentative || "ИП Воробьев Р.В.",
+      ogrnip: contractDefaults.ogrnip || "326527500025145",
+      inn: contractDefaults.inn || "525813643035",
+      bankAccount: contractDefaults.bankAccount || "40802810942710013083",
+      bankName: contractDefaults.bankName || "Волго-Вятский Банк ПАО Сбербанк",
+      bankCity: contractDefaults.bankCity || "г. Нижний Новгород",
+      bankCorrAccount: contractDefaults.bankCorrAccount || "30101810900000000603",
+      email: contractDefaults.email || "vip_bike@mail.ru",
+      legalAddress: contractDefaults.legalAddress || "г. Нижний Новгород, пл. Комсомольская 2",
+      issuerName: contractDefaults.issuerName || "Воробьев Р.В.",
+      issuerRepresentative: contractDefaults.issuerRepresentative || "Сидоров Илья Олегович",
+      returnAddress: contractDefaults.returnAddress || "Н. Н. пл. Комсомольская 2",
+      signatoryRole: contractDefaults.signatoryRole || "Менеджер Мотосалона",
+    };
+  } catch (error) {
+    logger.warn("[/doc] Failed to load crew_secrets, using fallbacks:", error);
+    // Return fallback values
+    return {
+      organizationName: "Мотосалон ВипБайкЭлектро",
+      organizationShort: "ИП Воробьев Р.В.",
+      organizationRepresentative: "ИП Воробьев Р.В.",
+      ogrnip: "326527500025145",
+      inn: "525813643035",
+      bankAccount: "40802810942710013083",
+      bankName: "Волго-Вятский Банк ПАО Сбербанк",
+      bankCity: "г. Нижний Новгород",
+      bankCorrAccount: "30101810900000000603",
+      email: "vip_bike@mail.ru",
+      legalAddress: "г. Нижний Новгород, пл. Комсомольская 2",
+      issuerName: "Воробьев Р.В.",
+      issuerRepresentative: "Сидоров Илья Олегович",
+      returnAddress: "Н. Н. пл. Комсомольская 2",
+      signatoryRole: "Менеджер Мотосалона",
+    };
+  }
+}
+
 async function generateContract(chatId: number, userId: string, context: DocFlowContext): Promise<boolean> {
   try {
     const bike = await resolveBikeById(context.bikeId);
@@ -545,6 +615,9 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       await sendComplexMessage(chatId, "🚨 Байк не найден. Попробуйте /doc", [], { removeKeyboard: true });
       return false;
     }
+
+    // Load crew secrets for contract defaults
+    const crewSecrets = await loadCrewSecrets();
 
     const isElectric = bike.type === "ebike" || /электро|electric|e-bike|ebike/i.test(String(bike.specs?.type || bike.specs?.fuel_type || ""));
     const isRent = context.dealType === "rent";
@@ -577,11 +650,21 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       product_year: String(bike.specs?.year || "уточняется"),
       product_unit: "шт.",
       spec_number: `${now.getDate()}.${now.getMonth() + 1}/${bike.id}`,
-      seller_address: "г. Нижний Новгород, пл. Комсомольская 2",
-      lessor_address: "г. Нижний Новгород, пл. Комсомольская 2",
-      issuer_name: "Воробьев Р.В.",
-      issuer_signatory: "Менеджер Мотосалона",
-      issuer_representative: "ИП Воробьев Р.В.",
+      seller_address: crewSecrets.legalAddress,
+      lessor_address: crewSecrets.legalAddress,
+      issuer_name: crewSecrets.issuerName,
+      issuer_signatory: crewSecrets.signatoryRole,
+      issuer_representative: crewSecrets.organizationRepresentative,
+      organization_name: crewSecrets.organizationName,
+      organization_short: crewSecrets.organizationShort,
+      ogrnip: crewSecrets.ogrnip,
+      inn: crewSecrets.inn,
+      bank_account: crewSecrets.bankAccount,
+      bank_name: crewSecrets.bankName,
+      bank_city: crewSecrets.bankCity,
+      bank_corr_account: crewSecrets.bankCorrAccount,
+      email: crewSecrets.email,
+      legal_address: crewSecrets.legalAddress,
       signature_timestamp: now.toLocaleString("ru-RU"),
       signature_fingerprint: "manual-telegram-doc",
       renter_signature: "согласие через Telegram",
@@ -637,7 +720,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         bike_value_rub: String(bike.specs?.sale_price || bike.specs?.price_rub || "850000"),
         bike_value_words: "",
         bike_mileage: String(bike.specs?.mileage || ""),
-        return_address: "г. Нижний Новгород, пл. Комсомольская 2",
+        return_address: crewSecrets.returnAddress,
         included_km_per_day: "200",
         extra_km_fee_rub: "35",
         late_return_penalty_rub: "10000",
@@ -1056,7 +1139,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
   if (state === "license") {
     const l = parseLicense(text);
     if (!l) {
-      await sendComplexMessage(chatId, "❌ Формат: 99 76 123456 15.03 15.03", [], { removeKeyboard: true });
+      await sendComplexMessage(chatId, "❌ Формат: 99 76 123456 15.03 или 99 76 123456 15.03 15.03.2028", [], { removeKeyboard: true });
       return true;
     }
     context.mlSeries = l.series;
@@ -1182,7 +1265,7 @@ export async function handleDocCallback(
     await setState(userId, "license", context);
     await sendComplexMessage(
       chatId,
-      `✅\n\n*ВУ*\n\n99 76 123456 15.03 15.03\n(год = ${CURRENT_YEAR})`,
+      `✅\n\n*ВУ*\n\nФормат: серия номер дата_выдачи [дата_окончания]\n\nПримеры:\n• 99 76 123456 15.03 (срок auto +10 лет)\n• 99 76 123456 15.03 15.03.2028\n\n(год без числа = ${CURRENT_YEAR})`,
       [],
       { removeKeyboard: true, parseMode: "Markdown" },
     );
