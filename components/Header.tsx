@@ -10,7 +10,6 @@ import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
-import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 /*import {
     QUEST_ORDER,
     fetchUserCyberFitnessProfile,
@@ -295,7 +294,6 @@ export default function Header() {
           </Link>
 
           <div className="flex items-center gap-2">
-            <ThemeToggleButton />
             <button 
               onClick={() => setCurrentLang(l => l === 'en' ? 'ru' : 'en')}
               className="p-2 rounded-md hover:bg-accent text-xs font-bold hidden sm:block"

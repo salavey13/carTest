@@ -52,8 +52,8 @@ export const FRANCHIZE_HEADER_CORNER_GUARD_STYLE = {
 } as const;
 
 export const FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE = {
-  top: "calc(max(env(safe-area-inset-top), 0px) + 2.2rem)",
-  right: "calc(max(env(safe-area-inset-right), 0px) + 0.75rem)",
+  top: "calc(max(env(safe-area-inset-top), 0px) + 0.5rem)",
+  right: "calc(max(env(safe-area-inset-right), 0px) + 0.5rem)",
 } as const;
 
 export const FRANCHIZE_FLOATING_CART_SAFE_AREA_CLASS =
