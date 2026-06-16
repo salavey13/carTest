@@ -573,7 +573,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
             aria-describedby="catalog-results-status"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full rounded-full border py-3 pl-5 pr-36 text-sm outline-none transition focus:border-transparent focus:ring-2"
+            className="w-full rounded-full border py-3 pl-5 pr-24 text-sm outline-none transition focus:border-transparent focus:ring-2 md:pr-36"
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
             style={{
@@ -589,7 +589,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
               type="button"
               aria-label="Очистить поиск по каталогу"
               onClick={() => setSearchQuery("")}
-              className="absolute bottom-2 right-24 top-2 rounded-full px-3 text-xs font-medium transition active:scale-95"
+              className="absolute bottom-2 right-16 top-2 rounded-full px-3 text-xs font-medium transition active:scale-95 md:right-24"
               onFocus={() => setClearFocused(true)}
               onBlur={() => setClearFocused(false)}
               style={{
@@ -766,7 +766,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       data-catalog-item="true"
                       data-carousel-card="true"
                       data-carousel-index={index}
-                      className="group w-[46vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-[border-color] duration-300 hover:!border-[var(--catalog-accent)] sm:w-[260px]"
+                      className="group w-[calc(50vw-14px)] shrink-0 snap-start overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-[border-color] duration-300 hover:!border-[var(--catalog-accent)] sm:w-[260px] sm:max-w-[280px]"
                       style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
                     >
                       <button
@@ -891,7 +891,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               const root = carouselRefs.current[group.category];
                               if (!root) return;
                               const slotWidth = root.querySelector<HTMLElement>("[data-carousel-card='true']")?.offsetWidth || root.clientWidth;
-                              root.scrollTo({ left: slotWidth * index, behavior: "smooth" });
+                              const gap = 12; // gap-3 = 0.75rem = 12px
+                              root.scrollTo({ left: (slotWidth + gap) * index, behavior: "smooth" });
                             }}
                           />
                         );
