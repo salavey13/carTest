@@ -18,7 +18,7 @@ export function FranchizeCatalogHero({ crew, slug, variant = "main" }: Franchize
 
   // Determine button text and href based on variant
   const buttonText = variant === "electro-enduro" ? "Смотреть весь каталог" : "Смотреть электро каталог";
-  const buttonHref = variant === "electro-enduro" ? `/franchize/${resolvedSlug}` : `#catalog-sections`;
+  const buttonHref = variant === "electro-enduro" ? `/franchize/${resolvedSlug}` : `/franchize/${resolvedSlug}/electro-enduro`;
 
   return (
     <section className="relative mb-6 w-full md:mx-auto md:max-w-7xl md:overflow-hidden md:rounded-3xl md:px-4 md:pt-8 md:mb-8 2xl:mx-auto 2xl:max-w-[1600px]">
