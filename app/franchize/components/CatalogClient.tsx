@@ -626,7 +626,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         </div>
 
         {promoModules.length > 0 && mode !== "electro" && (
-          <div className="mb-5 flex gap-2 overflow-x-auto [overflow-y:clip] touch-pan-x overscroll-behavior-x-contain pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
+          <div className="mb-5 flex gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
             {visiblePromoModules.map((module, index) => {
               const isExternal = /^(https?:|mailto:|tel:)/.test(module.href);
               return (
@@ -664,7 +664,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           Найдено позиций: {filteredItems.length}
         </p>
 
-        <div className="mb-5 flex gap-2 overflow-x-auto [overflow-y:clip] touch-pan-x overscroll-behavior-x-contain pb-1 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Быстрые фильтры каталога">
+        <div className="mb-5 flex gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-1 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Быстрые фильтры каталога">
           {QUICK_FILTERS.map((filter) => {
             const active = quickFilter === filter.key;
             return (
@@ -744,7 +744,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       ref={(node) => {
                         carouselRefs.current[group.category] = node;
                       }}
-                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto [overflow-y:clip] pt-1 pb-2 touch-pan-x overscroll-behavior-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto [overflow-y:clip] pt-1 pb-2 [touch-action:pan-y_pan-x] overscroll-behavior-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                       tabIndex={0}
                       role="region"
                       aria-label={`Карусель категории ${group.category}`}
