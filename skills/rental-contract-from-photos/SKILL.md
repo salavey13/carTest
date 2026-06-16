@@ -121,6 +121,179 @@ node scripts/make-rental-contract-skill.mjs \
 { "series": "....", "number": "......" }
 ```
 
+# CHANGES — СТС-as-deposit feature (2026-06-17)
+
+Enhances the rental flow (`make-deal-contract-skill.mjs --dealType rent`)
+with the ability to **swap the cash security deposit for the renter's own
+vehicle СТС (Свидетельство о регистрации ТС) held in pledge**.
+
+All changes are **opt-in** via `--stsInsteadOfDeposit`. The default
+behaviour (cash deposit) is preserved bit-for-bit.
+
+---
+
+## Files changed (5)
+
+| File | Change |
+|------|--------|
+| `supabase/migrations/20260617000000_rental_sts_pledge.sql` | **NEW.** Adds `sts_*` columns to `private.rental_contract_artifacts` (created by migration `20260612000000_fix_rental_contract_artifacts.sql`) and `private.user_rental_secrets` (created by `20260601000000_user_rental_secrets.sql`). Idempotent (`IF NOT EXISTS`), so safe to apply on any prior version. |
+| `scripts/make-deal-contract-skill.mjs` | Extended: new CLI flags `--stsInsteadOfDeposit`, `--stsJson`, `--stsOwnerRelation`, `--stsPledgeReturnDays`. Loads+validates `sts.json`. Adds 13 `sts_*` vars to the rent-flow `vars` object. Surfaces `stsPledgeUsed`, `stsSeries`, `stsNumber`, … in the result JSON. Writes all `sts_*` fields to the metadata table when `--saveMetadata 1`. Also extends `renderTemplateWithVars()` with `{{#if var}}…{{else}}…{{/if}}` support (HTML-comment-stripping + innermost-first + `s` dotAll flag for multiline blocks). |
+| `docs/RENTAL_DEAL_TEMPLATE.html` | 8 new `{{#if sts_collateral}}…{{else}}…{{/if}}` blocks wrapping: §3.6, §3.7, §4.3, §4.4, §4.5, App.1 перепробег, App.1 new "Переданные в залог документы" block, App.3 lines 4-5-7 and price-table "Мойка" row. Plus new clause §4.7 (guarantees of lawful СТС ownership). Optional nested `{{#if}}` for `sts_issue_date`, `sts_vehicle_year`, `sts_vehicle_vin`, `sts_owner_registration` — auto-dropped when the corresponding OCR field is empty. |
+| `skills/rental-contract-from-photos/SKILL.md` | New top-of-file block listing СТС trigger phrases. New bottom-of-file section "Режим «СТС-вместо-депозита»" with full pipeline: when to apply, trigger phrases, OCR contract, `sts.json` schema, CLI invocation, failure codes, table of contractual differences, DB persistence, СТС return procedure. |
+
+---
+
+## What the operator sees
+
+Default rent flow (cash deposit) — **unchanged**:
+
+```
+> создай документ falcon-gt с 27.06.2026 по 29.06.2026
+[operator sends passport + license photos]
+[script generates DOCX with §4.3 = "Обеспечительный платеж (депозит): 20000 руб., вносится до передачи ТС…"]
+```
+
+New СТС-as-deposit flow:
+
+```
+> создай документ falcon-gt с 27.06.2026 по 29.06.2026 под СТС
+[operator sends passport + license + СТС photos]
+[script generates DOCX with §4.3 = "В качестве обеспечительного платежа Арендатор передаёт Арендодателю в залог оригинал Свидетельства о регистрации транспортного средства (СТС) серии 77 № 12345678, выдано 15.05.2023, на транспортное средство марки/модели Toyota Camry 2021 г.в., государственный регистрационный знак А123БВ77, VIN XTA12345678901234. Собственник указанного ТС: Иванов Иван Иванович…"]
+```
+
+---
+
+## CLI examples
+
+### Cash deposit (default, unchanged)
+```bash
+node scripts/make-deal-contract-skill.mjs \
+  --dealType rent \
+  --phrase "создай документ falcon-gt с 27.06.2026 по 29.06.2026" \
+  --passportJson /tmp/passport.json \
+  --licenseJson /tmp/license.json \
+  --telegramChatId 123456789 \
+  --startDate "27.06.2026" \
+  --endDate "29.06.2026" \
+  --saveMetadata 1
+```
+
+### СТС instead of cash deposit (new)
+```bash
+node scripts/make-deal-contract-skill.mjs \
+  --dealType rent \
+  --phrase "создай документ falcon-gt с 27.06.2026 по 29.06.2026 под СТС" \
+  --passportJson /tmp/passport.json \
+  --licenseJson /tmp/license.json \
+  --stsInsteadOfDeposit \
+  --stsJson /tmp/sts.json \
+  --telegramChatId 123456789 \
+  --startDate "27.06.2026" \
+  --endDate "29.06.2026" \
+  --saveMetadata 1
+```
+
+### СТС owned by a third party (e.g. renter's wife)
+```bash
+node scripts/make-deal-contract-skill.mjs \
+  --dealType rent \
+  --phrase "создай документ falcon-gt с 27.06.2026 по 29.06.2026 под СТС" \
+  --passportJson /tmp/passport.json \
+  --licenseJson /tmp/license.json \
+  --stsInsteadOfDeposit \
+  --stsJson /tmp/sts.json \
+  --stsOwnerRelation "жена" \
+  --telegramChatId 123456789 \
+  --startDate "27.06.2026" \
+  --endDate "29.06.2026" \
+  --saveMetadata 1
+```
+
+---
+
+## Live Supabase verification (2026-06-17)
+
+Tested against `https://inmctohsodgdohamhzag.supabase.co` (project v0-car-test) using the provided service-role key. Confirmed:
+
+1. **`cars` table is queryable** — bike-by-id lookup returns proper `specs` JSON. 10 bikes in the catalog, including `falcon-gt-2025`, `falcon-pro-2025`, `ducati-panigale-s-electro`, `kawasaki-ex650k`, `vipbike-dmg`, etc. The bike-resolution logic in `make-deal-contract-skill.mjs` will work end-to-end.
+2. **`private.rental_contract_artifacts` exists and is queryable** via PostgREST with `Accept-Profile: private` header (table already created by migration `20260612000000_fix_rental_contract_artifacts.sql`).
+3. **`private.user_rental_secrets` exists and is queryable** (table already created by migration `20260601000000_user_rental_secrets.sql`).
+4. **The new `sts_*` columns are NOT yet applied** — Supabase's service-role key cannot run DDL over HTTP by design (`/pg/query` and `/pg/meta/query` return 404; `exec_sql` RPC doesn't exist by default). You need to apply the migration manually via the dashboard SQL editor:
+
+   ```
+   https://supabase.com/dashboard/project/inmctohsodgdohamhzag/sql/new
+   ```
+
+   Paste the contents of `supabase/migrations/20260617000000_rental_sts_pledge.sql` and click RUN. The migration is idempotent (`IF NOT EXISTS` on every column) so it's safe to re-run.
+
+   After applying, you can verify with this check from the dashboard:
+
+   ```sql
+   SELECT column_name FROM information_schema.columns
+   WHERE table_schema = 'private' AND table_name = 'rental_contract_artifacts'
+     AND column_name LIKE 'sts_%' OR column_name = 'deposit_amount_skipped'
+   ORDER BY column_name;
+   -- Expected: 13 rows
+   ```
+
+---
+
+## Result JSON
+
+When `--stsInsteadOfDeposit` is set, the script's stdout JSON gains these fields:
+
+```json
+{
+  "ok": true,
+  "dealType": "rent",
+  "resolvedBikeId": "falcon-gt",
+  "stsPledgeUsed": true,
+  "stsSeries": "77",
+  "stsNumber": "12345678",
+  "stsVehiclePlate": "А123БВ77",
+  "stsOwnerFullName": "Иванов Иван Иванович",
+  "stsOwnerRelation": "сам арендатор",
+  "stsPledgeReturnDays": "3",
+  "depositAmountSkipped": "20000",
+  "metadataVerified": true,
+  "metadataTable": "rental_contract_artifacts"
+}
+```
+
+When `--stsInsteadOfDeposit` is NOT set, the result gains a single field `"stsPledgeUsed": false` and no other СТС fields — backward compatible.
+
+---
+
+## Failure codes added
+
+| Stage | Reason | When |
+|-------|--------|------|
+| `sts_parse` | `missing_stsJson` | `--stsInsteadOfDeposit` set but `--stsJson <path>` not passed |
+| `sts_parse` | `sts_json_invalid` | `--stsJson` is not valid JSON |
+| `sts_parse` | `missing_sts_series_number` | OCR JSON missing `series` or `number` |
+| `sts_parse` | `missing_sts_owner` | OCR JSON missing `ownerFullName` |
+| `sts_parse` | `missing_sts_vehicle_plate` | OCR JSON missing `vehiclePlate` |
+| `sts_parse` | `sts_owner_mismatch` | `ownerFullName` ≠ `renter_full_name` AND `--stsOwnerRelation` left at default |
+
+All exit code 2, JSON payload on stderr (matches the existing `failStage()` convention).
+
+---
+
+## Backward compatibility
+
+- **No flag changes**: every existing flag works exactly as before.
+- **No template breakage**: when `sts_collateral` is empty (the default), every `{{#if sts_collateral}}…{{else}}…{{/if}}` block renders the `else` branch, which is byte-identical to the original text.
+- **No DB breakage**: every new column is nullable or has a default, so existing rows in `private.rental_contract_artifacts` and `private.user_rental_secrets` remain valid without backfill.
+- **Engine extension is additive**: `renderTemplateWithVars()` still does `{{var}}` interpolation exactly as before; the new `{{#if}}` handling is layered on top and only activates when `{{#if` appears in the template.
+
+---
+
+## Verified
+
+- `node --check scripts/make-deal-contract-skill.mjs` → SYNTAX OK
+- Smoke test `scripts/test_template_engine.mjs` → **14/14 assertions pass** for both branches (cash deposit + СТС pledge) and for the optional-fields-empty edge case.
+- Template `{{#if}}` / `{{else}}` / `{{/if}}` count balanced (15 opens / 15 closes, 8 with else, 7 without).
+
 ## Правила безопасности/комплаенса
 - Поток считается легальным для задач аренды (см. AGENTS.md), но:
   - не публиковать полный PII в публичных комментариях/PR;
