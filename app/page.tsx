@@ -5,9 +5,40 @@ import { motion, AnimatePresence, useInView } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { ThemeToggleButton } from "@/components/ThemeToggleButton";
+import { useTheme } from "next-themes";
 
 /* ────────────────────────────────────────────
-   Social Links Configuration (from uploaded file)
+   VIP Bike Theme Palettes (from Supabase vip-bike franchize)
+   ──────────────────────────────────────────── */
+const VIP_BIKE_THEMES = {
+  dark: {
+    bgBase: "#0A0A0A",        // Deep black
+    bgCard: "#1A1A1A",        // Soft black for cards
+    accentMain: "#FFD700",    // Gold
+    accentMainHover: "#FFC125", // Darker gold for hover
+    textPrimary: "#FFFAF0",   // Floral white
+    textSecondary: "#D4AF37", // Muted gold
+    borderSoft: "#2A2A2A",    // Dark gray border
+  },
+  light: {
+    bgBase: "#FAFAFA",        // Off-white
+    bgCard: "#FFFFFF",        // Pure white for cards
+    accentMain: "#00FFFF",    // Electric cyan
+    accentMainHover: "#00CED1", // Dark turquoise for hover
+    textPrimary: "#1A1A1A",   // Near black
+    textSecondary: "#4A4A4A", // Dark gray
+    borderSoft: "#E0F7FA",    // Light cyan border
+  },
+};
+
+/* ────────────────────────────────────────────
+   Hero Image (from franchize page)
+   ──────────────────────────────────────────── */
+const HERO_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b2-razgon.jpeg";
+
+/* ────────────────────────────────────────────
+   Social Links Configuration
    ──────────────────────────────────────────── */
 const SOCIAL_LINKS = [
   {
@@ -90,39 +121,6 @@ const CONTACT_INFO = {
 };
 
 /* ────────────────────────────────────────────
-   Barrier Cards Data
-   ──────────────────────────────────────────── */
-const BARRIER_CARDS = [
-  {
-    id: "prohodimost",
-    number: "01",
-    title: "Поле, лес, грязь, лестницы",
-    description:
-      "Кочки, корни, песок, снег, подъёмы и спуски. Куда сам доберёшься — туда и заедешь. В обзорах «корни съел как нефиг нафиг», едет по кроссовой трассе наравне с бензином.",
-    image:
-      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b1-prohodimost.jpeg",
-  },
-  {
-    id: "razgon",
-    number: "02",
-    title: "Выстреливает из рогатки",
-    description:
-      "Электро-тяга бьёт мгновенно — без сцепления и передач. Проваливаешься в кресло как в суперкаре. Открутил ручку — и поехал, на максимум сразу.",
-    image:
-      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b2-razgon.jpeg",
-  },
-  {
-    id: "voda",
-    number: "03",
-    title: "Топили в озере — едет",
-    description:
-      "Влагозащита по классу IP67. На тесте погружали в ледяное озеро — завёлся, год катается. Лужи, дождь, мокрая трава — без последствий.",
-    image:
-      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b3-voda.jpeg",
-  },
-];
-
-/* ────────────────────────────────────────────
    Animated Section Wrapper
    ──────────────────────────────────────────── */
 function AnimatedSection({
@@ -173,8 +171,10 @@ function SocialCard({
       transition={{ duration: 0.5, delay: index * 0.1 }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="group relative flex flex-col items-center gap-4 p-6 rounded-2xl border border-[#2A2E3E] bg-[#141828]/60 backdrop-blur-sm transition-all duration-500 hover:border-transparent cursor-pointer overflow-hidden"
+      className="group relative flex flex-col items-center gap-4 p-6 rounded-2xl border transition-all duration-500 hover:border-transparent cursor-pointer overflow-hidden"
       style={{
+        backgroundColor: "var(--vip-bg-card)",
+        borderColor: "var(--vip-border-soft)",
         boxShadow: isHovered
           ? `0 0 40px ${social.hoverGlow}, 0 8px 32px rgba(0,0,0,0.4)`
           : "0 4px 12px rgba(0,0,0,0.2)",
@@ -208,7 +208,7 @@ function SocialCard({
           <div
             className="transition-all duration-300"
             style={{
-              color: isHovered ? social.color : "#E6D8C4",
+              color: isHovered ? social.color : "var(--vip-text-secondary)",
               filter: isHovered ? `drop-shadow(0 0 8px ${social.color})` : "none",
             }}
           >
@@ -219,10 +219,10 @@ function SocialCard({
 
       {/* Label */}
       <div className="text-center relative z-10">
-        <h3 className="font-bold text-lg text-[#E6D8C4] group-hover:text-white transition-colors duration-300">
+        <h3 className="font-bold text-lg group-hover:text-white transition-colors duration-300" style={{ color: "var(--vip-text-primary)" }}>
           {social.label}
         </h3>
-        <p className="text-sm text-[#A7ABB4] mt-1 group-hover:text-[#E6D8C4]/80 transition-colors duration-300">
+        <p className="text-sm mt-1 group-hover:opacity-80 transition-colors duration-300" style={{ color: "var(--vip-text-secondary)" }}>
           {social.description}
         </p>
       </div>
@@ -319,789 +319,976 @@ function FloatingSocialBar() {
 }
 
 /* ────────────────────────────────────────────
+   VIP Bike Theme Style Injector
+   ──────────────────────────────────────────── */
+function VipBikeThemeStyles() {
+  const { resolvedTheme } = useTheme();
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const theme = resolvedTheme === "dark" ? VIP_BIKE_THEMES.dark : VIP_BIKE_THEMES.light;
+
+    // Set CSS variables for VIP Bike theme
+    root.style.setProperty("--vip-bg-base", theme.bgBase);
+    root.style.setProperty("--vip-bg-card", theme.bgCard);
+    root.style.setProperty("--vip-accent-main", theme.accentMain);
+    root.style.setProperty("--vip-accent-main-hover", theme.accentMainHover);
+    root.style.setProperty("--vip-text-primary", theme.textPrimary);
+    root.style.setProperty("--vip-text-secondary", theme.textSecondary);
+    root.style.setProperty("--vip-border-soft", theme.borderSoft);
+
+    // Also set body background
+    document.body.style.backgroundColor = theme.bgBase;
+  }, [resolvedTheme]);
+
+  return null;
+}
+
+/* ────────────────────────────────────────────
    Main Landing Page
    ──────────────────────────────────────────── */
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0B0E18]">
-      <FloatingSocialBar />
+    <>
+      <VipBikeThemeStyles />
+      <div className="min-h-screen flex flex-col" style={{ backgroundColor: "var(--vip-bg-base)" }}>
+        <FloatingSocialBar />
 
-      {/* ─── HEADER ─── */}
-      <header className="sticky top-0 z-40 border-b border-[#2A2E3E]/50 bg-[#0B0E18]/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#F4BD55] to-[#FFCA60] flex items-center justify-center">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#0B0E18"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="w-5 h-5"
-              >
-                <path d="M5 16v-4a8 8 0 0116 0v4" />
-                <circle cx="8" cy="16" r="2" />
-                <circle cx="16" cy="16" r="2" />
-                <path d="M10 16h4" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="font-bold text-lg text-[#E6D8C4] leading-tight">
-                VIP BIKE ELECTRO
-              </h1>
-              <p className="text-[10px] text-[#A7ABB4] leading-tight hidden sm:block">
-                Электромотоциклы без категории А
-              </p>
-            </div>
-          </div>
-
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-6 text-sm">
-            {[
-              { label: "Каталог", href: "#catalog" },
-              { label: "О нас", href: "#about" },
-              { label: "Контакты", href: "#contacts" },
-              { label: "Соцсети", href: "#social" },
-            ].map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="text-[#A7ABB4] hover:text-[#F4BD55] transition-colors duration-200"
-              >
-                {link.label}
-              </a>
-            ))}
-            <a
-              href="https://t.me/oneBikePlsBot"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button
-                size="sm"
-                className="rounded-full bg-[#F4BD55] text-[#0B0E18] hover:bg-[#FFCA60] font-semibold"
-              >
-                Забронировать
-              </Button>
-            </a>
-          </nav>
-
-          {/* Mobile Menu Toggle */}
-          <button
-            className="md:hidden text-[#E6D8C4] p-2"
-            onClick={() => setMenuOpen(!menuOpen)}
-          >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              {menuOpen ? (
-                <path d="M18 6L6 18M6 6l12 12" />
-              ) : (
-                <path d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
-          </button>
-        </div>
-
-        {/* Mobile Menu */}
-        <AnimatePresence>
-          {menuOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="md:hidden border-t border-[#2A2E3E]/50 overflow-hidden"
-            >
-              <div className="px-4 py-4 flex flex-col gap-3">
-                {[
-                  { label: "Каталог", href: "#catalog" },
-                  { label: "О нас", href: "#about" },
-                  { label: "Контакты", href: "#contacts" },
-                  { label: "Соцсети", href: "#social" },
-                ].map((link) => (
-                  <a
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setMenuOpen(false)}
-                    className="text-[#A7ABB4] hover:text-[#F4BD55] transition-colors py-2"
-                  >
-                    {link.label}
-                  </a>
-                ))}
-                <a
-                  href="https://t.me/oneBikePlsBot"
-                  target="_blank"
-                  rel="noopener noreferrer"
+        {/* ─── HEADER ─── */}
+        <header className="sticky top-0 z-40 border-b backdrop-blur-xl" style={{ borderColor: "var(--vip-border-soft)", backgroundColor: "var(--vip-bg-base)/80" }}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `linear-gradient(to-br, var(--vip-accent-main), var(--vip-accent-main-hover))` }}>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--vip-bg-base)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-5 h-5"
                 >
-                  <Button className="w-full rounded-full bg-[#F4BD55] text-[#0B0E18] hover:bg-[#FFCA60] font-semibold">
-                    Забронировать
-                  </Button>
-                </a>
+                  <path d="M5 16v-4a8 8 0 0116 0v4" />
+                  <circle cx="8" cy="16" r="2" />
+                  <circle cx="16" cy="16" r="2" />
+                  <path d="M10 16h4" />
+                </svg>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </header>
-
-      <main className="flex-1">
-        {/* ─── HERO ─── */}
-        <section className="relative py-20 md:py-32 px-4 overflow-hidden">
-          {/* Background glow */}
-          <div className="absolute inset-0">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-[#F4BD55]/5 blur-[120px]" />
-            <div className="absolute top-1/3 right-0 w-[400px] h-[400px] rounded-full bg-[#26A5E4]/5 blur-[100px]" />
-          </div>
-
-          <div className="max-w-4xl mx-auto text-center relative z-10">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-            >
-              <Badge
-                variant="outline"
-                className="mb-6 border-[#F4BD55]/40 text-[#F4BD55] bg-[#F4BD55]/10"
-              >
-                Электромотоциклы в Нижнем Новгороде
-              </Badge>
-              <h2 className="text-4xl sm:text-5xl md:text-7xl font-bold text-[#E6D8C4] mb-6 leading-tight">
-                VIP BIKE{" "}
-                <span className="bg-gradient-to-r from-[#F4BD55] via-[#FFCA60] to-[#F4BD55] bg-clip-text text-transparent animate-gradient-shift">
-                  ELECTRO
-                </span>
-              </h2>
-              <p className="text-lg md:text-xl text-[#A7ABB4] max-w-2xl mx-auto mb-8 leading-relaxed">
-                Электромотоциклы без категории А. Законно, по правам категории
-                B. Без ОСАГО и ПТС. Мощно, быстро, экологично.
-              </p>
-
-              {/* Feature Pills */}
-              <div className="flex flex-wrap justify-center gap-3 mb-10">
-                {[
-                  { text: "Быстро", detail: "мощно, тихо, экологично" },
-                  { text: "10 дней", detail: "на тест-драйв, деньги обратно" },
-                  { text: "0 ₽", detail: "первичный взнос, рассрочка" },
-                ].map((pill) => (
-                  <div
-                    key={pill.text}
-                    className="px-4 py-2 rounded-full border border-[#2A2E3E] bg-[#141828]/60 text-sm"
-                  >
-                    <span className="text-[#F4BD55] font-semibold">
-                      {pill.text}
-                    </span>{" "}
-                    <span className="text-[#A7ABB4]">{pill.detail}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <a
-                  href="https://t.me/oneBikePlsBot"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button
-                    size="lg"
-                    className="rounded-full bg-[#F4BD55] text-[#0B0E18] hover:bg-[#FFCA60] font-bold text-lg px-8 py-6 shadow-[0_10px_30px_rgba(244,189,85,0.3)] hover:shadow-[0_10px_40px_rgba(244,189,85,0.4)] transition-all hover:scale-105"
-                  >
-                    Выбрать байк
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="ml-2"
-                    >
-                      <path d="M5 12h14M12 5l7 7-7 7" />
-                    </svg>
-                  </Button>
-                </a>
-                <a href="#contacts">
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="rounded-full border-[#F4BD55]/40 text-[#F4BD55] hover:bg-[#F4BD55]/10 font-bold text-lg px-8 py-6 transition-all"
-                  >
-                    Контакты
-                  </Button>
-                </a>
-              </div>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* ─── BARRIER CARDS ─── */}
-        <section id="catalog" className="py-20 md:py-28 px-4">
-          <div className="max-w-7xl mx-auto">
-            <AnimatedSection className="text-center mb-16">
-              <Badge
-                variant="outline"
-                className="mb-4 border-[#F4BD55]/40 text-[#F4BD55] bg-[#F4BD55]/10"
-              >
-                Почему VIP BIKE ELECTRO
-              </Badge>
-              <h3 className="text-3xl md:text-5xl font-bold text-[#E6D8C4] mb-4">
-                Три барьера,{" "}
-                <span className="text-[#F4BD55]">которые мы преодолели</span>
-              </h3>
-              <p className="text-[#A7ABB4] text-lg max-w-2xl mx-auto">
-                Мы тестировали 79bike Falcon PRO в реальных условиях. Город,
-                проселок, снег, грязь, лёд — где угодно. Без пинков, без
-                failures.
-              </p>
-            </AnimatedSection>
-
-            <div className="grid md:grid-cols-3 gap-6">
-              {BARRIER_CARDS.map((card, idx) => (
-                <AnimatedSection key={card.id} delay={idx * 0.15}>
-                  <Card className="border-[#2A2E3E] bg-[#141828]/60 backdrop-blur-sm overflow-hidden group transition-all duration-500 hover:border-[#F4BD55]/30">
-                    <div className="relative aspect-video bg-gradient-to-br from-slate-800 to-slate-900 overflow-hidden">
-                      <img
-                        src={card.image}
-                        alt={card.title}
-                        className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-700"
-                      />
-                      <div className="absolute top-4 left-4 flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-full bg-[#F4BD55]/20 border border-[#F4BD55]/30 flex items-center justify-center backdrop-blur-sm">
-                          <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#F4BD55"
-                            strokeWidth="2"
-                            className="w-5 h-5"
-                          >
-                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                          </svg>
-                        </div>
-                        <span className="text-2xl font-bold text-white drop-shadow-lg">
-                          {card.number}
-                        </span>
-                      </div>
-                    </div>
-                    <CardContent className="p-6">
-                      <h4 className="text-xl font-bold text-[#E6D8C4] mb-3">
-                        {card.title}
-                      </h4>
-                      <p className="text-sm text-[#A7ABB4] leading-relaxed">
-                        {card.description}
-                      </p>
-                    </CardContent>
-                  </Card>
-                </AnimatedSection>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ─── ABOUT ─── */}
-        <section
-          id="about"
-          className="py-20 md:py-28 px-4 bg-[#141828]/40"
-        >
-          <div className="max-w-7xl mx-auto">
-            <AnimatedSection className="text-center mb-16">
-              <Badge
-                variant="outline"
-                className="mb-4 border-[#F4BD55]/40 text-[#F4BD55] bg-[#F4BD55]/10"
-              >
-                О нас
-              </Badge>
-              <h3 className="text-3xl md:text-5xl font-bold text-[#E6D8C4] mb-4">
-                79bike Falcon PRO —{" "}
-                <span className="text-[#F4BD55]">электро без категории А</span>
-              </h3>
-              <p className="text-[#A7ABB4] text-lg max-w-2xl mx-auto">
-                От 310 000 ₽. Законно по правам категории B. Без ОСАГО и ПТС.
-              </p>
-            </AnimatedSection>
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[
-                {
-                  title: "Быстрая онлайн-бронь",
-                  desc: "Выбирайте байк, даты и формат поездки в пару кликов",
-                  icon: (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#F4BD55"
-                      strokeWidth="1.5"
-                      className="w-8 h-8"
-                    >
-                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                    </svg>
-                  ),
-                },
-                {
-                  title: "Электро без категории А",
-                  desc: "Законно по правам категории B — никаких дополнительных требований",
-                  icon: (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#F4BD55"
-                      strokeWidth="1.5"
-                      className="w-8 h-8"
-                    >
-                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  ),
-                },
-                {
-                  title: "ОСАГО не требуется",
-                  desc: "Экономия на страховке и бюрократии — просто садись и поезжай",
-                  icon: (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#F4BD55"
-                      strokeWidth="1.5"
-                      className="w-8 h-8"
-                    >
-                      <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                  ),
-                },
-                {
-                  title: "Новая локация",
-                  desc: "пл. Комсомольская 2 — центр Нижнего Новгорода",
-                  icon: (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#F4BD55"
-                      strokeWidth="1.5"
-                      className="w-8 h-8"
-                    >
-                      <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  ),
-                },
-              ].map((feature, idx) => (
-                <AnimatedSection key={feature.title} delay={idx * 0.1}>
-                  <div className="p-6 rounded-2xl border border-[#2A2E3E] bg-[#0B0E18]/60 text-center hover:border-[#F4BD55]/30 transition-all duration-300 group h-full">
-                    <div className="w-14 h-14 rounded-2xl bg-[#F4BD55]/10 border border-[#F4BD55]/20 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
-                      {feature.icon}
-                    </div>
-                    <h4 className="text-lg font-bold text-[#E6D8C4] mb-2">
-                      {feature.title}
-                    </h4>
-                    <p className="text-sm text-[#A7ABB4] leading-relaxed">
-                      {feature.desc}
-                    </p>
-                  </div>
-                </AnimatedSection>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ─── SOCIAL MEDIA SECTION ─── */}
-        <section id="social" className="py-20 md:py-28 px-4 relative overflow-hidden">
-          {/* Background glow */}
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute bottom-0 left-1/4 w-[500px] h-[500px] rounded-full bg-[#26A5E4]/5 blur-[120px]" />
-            <div className="absolute top-0 right-1/4 w-[400px] h-[400px] rounded-full bg-[#F4BD55]/5 blur-[100px]" />
-          </div>
-
-          <div className="max-w-5xl mx-auto relative z-10">
-            <AnimatedSection className="text-center mb-14">
-              <Badge
-                variant="outline"
-                className="mb-4 border-[#F4BD55]/40 text-[#F4BD55] bg-[#F4BD55]/10"
-              >
-                Мы в соцсетях
-              </Badge>
-              <h3 className="text-3xl md:text-5xl font-bold text-[#E6D8C4] mb-4">
-                Подписывайтесь и{" "}
-                <span className="text-[#F4BD55]">будьте на связи</span>
-              </h3>
-              <p className="text-[#A7ABB4] text-lg max-w-2xl mx-auto">
-                Мы постоянно делимся новостями, фото с покатушек и
-                эксклюзивными предложениями. Выбирайте удобную платформу — мы
-                везде.
-              </p>
-            </AnimatedSection>
-
-            {/* Social Cards Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
-              {SOCIAL_LINKS.map((social, idx) => (
-                <SocialCard key={social.id} social={social} index={idx} />
-              ))}
-            </div>
-
-            {/* Compact social bar for mobile */}
-            <AnimatedSection delay={0.5} className="mt-12">
-              <div className="flex flex-wrap justify-center gap-3">
-                {SOCIAL_LINKS.map((social) => (
-                  <a
-                    key={social.id}
-                    href={social.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-[#2A2E3E] bg-[#141828]/60 text-sm text-[#A7ABB4] hover:text-[#E6D8C4] hover:border-[#F4BD55]/30 transition-all duration-300"
-                  >
-                    <div style={{ color: social.color }} className="w-4 h-4">
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        className="w-4 h-4"
-                      >
-                        {social.icon.props.children}
-                      </svg>
-                    </div>
-                    {social.label}
-                  </a>
-                ))}
-              </div>
-            </AnimatedSection>
-          </div>
-        </section>
-
-        {/* ─── CONTACTS ─── */}
-        <section
-          id="contacts"
-          className="py-20 md:py-28 px-4 bg-[#141828]/40"
-        >
-          <div className="max-w-4xl mx-auto">
-            <AnimatedSection className="text-center mb-14">
-              <Badge
-                variant="outline"
-                className="mb-4 border-[#F4BD55]/40 text-[#F4BD55] bg-[#F4BD55]/10"
-              >
-                Контакты
-              </Badge>
-              <h3 className="text-3xl md:text-5xl font-bold text-[#E6D8C4] mb-4">
-                Свяжитесь{" "}
-                <span className="text-[#F4BD55]">с нами</span>
-              </h3>
-              <p className="text-[#A7ABB4] text-lg max-w-xl mx-auto">
-                Мы всегда на связи — выберите удобный способ
-              </p>
-            </AnimatedSection>
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Phone */}
-              <AnimatedSection>
-                <a
-                  href={CONTACT_INFO.phoneHref}
-                  className="flex flex-col items-center gap-4 p-8 rounded-2xl border border-[#2A2E3E] bg-[#0B0E18]/60 hover:border-[#F4BD55]/30 transition-all duration-300 group"
-                >
-                  <div className="w-14 h-14 rounded-2xl bg-[#F4BD55]/10 border border-[#F4BD55]/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#F4BD55"
-                      strokeWidth="1.5"
-                      className="w-7 h-7"
-                    >
-                      <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-[#E6D8C4]">
-                      {CONTACT_INFO.phone}
-                    </p>
-                    <p className="text-sm text-[#A7ABB4] mt-1">Позвонить</p>
-                  </div>
-                </a>
-              </AnimatedSection>
-
-              {/* Telegram */}
-              <AnimatedSection delay={0.1}>
-                <a
-                  href="https://t.me/I_O_S_NN"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex flex-col items-center gap-4 p-8 rounded-2xl border border-[#2A2E3E] bg-[#0B0E18]/60 hover:border-[#26A5E4]/30 transition-all duration-300 group"
-                >
-                  <div className="w-14 h-14 rounded-2xl bg-[#26A5E4]/10 border border-[#26A5E4]/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="#26A5E4"
-                      className="w-7 h-7"
-                    >
-                      <path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
-                    </svg>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-[#E6D8C4]">
-                      @I_O_S_NN
-                    </p>
-                    <p className="text-sm text-[#A7ABB4] mt-1">Telegram</p>
-                  </div>
-                </a>
-              </AnimatedSection>
-
-              {/* Address */}
-              <AnimatedSection delay={0.2}>
-                <div className="flex flex-col items-center gap-4 p-8 rounded-2xl border border-[#2A2E3E] bg-[#0B0E18]/60 sm:col-span-2 lg:col-span-1">
-                  <div className="w-14 h-14 rounded-2xl bg-[#F4BD55]/10 border border-[#F4BD55]/20 flex items-center justify-center">
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#F4BD55"
-                      strokeWidth="1.5"
-                      className="w-7 h-7"
-                    >
-                      <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-[#E6D8C4]">
-                      {CONTACT_INFO.address}
-                    </p>
-                    <p className="text-sm text-[#A7ABB4] mt-1">
-                      {CONTACT_INFO.workingHours}
-                    </p>
-                  </div>
-                </div>
-              </AnimatedSection>
-            </div>
-          </div>
-        </section>
-
-        {/* ─── CTA ─── */}
-        <section className="py-24 md:py-32 px-4 relative overflow-hidden">
-          <div className="absolute inset-0">
-            <div className="absolute inset-0 bg-gradient-to-b from-[#0B0E18] via-[#0B0E18]/50 to-[#0B0E18]" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] rounded-full bg-[#F4BD55]/5 blur-[150px]" />
-          </div>
-
-          <div className="max-w-4xl mx-auto text-center relative z-10">
-            <AnimatedSection>
-              <Badge
-                variant="outline"
-                className="mb-6 border-[#F4BD55]/40 text-[#F4BD55] bg-[#F4BD55]/10"
-              >
-                Готовы к выезду?
-              </Badge>
-              <h3 className="text-4xl md:text-6xl font-bold text-[#E6D8C4] mb-6">
-                Начни свой{" "}
-                <span className="bg-gradient-to-r from-[#F4BD55] via-[#FFCA60] to-[#F4BD55] bg-clip-text text-transparent">
-                  электро-путь
-                </span>{" "}
-                сегодня
-              </h3>
-              <p className="text-xl text-[#A7ABB4] max-w-2xl mx-auto mb-10">
-                Выберите свой электромотоцикл, забронируйте слот и получите
-                незабываемые впечатления. Законно, безопасно, экологично.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <a
-                  href="https://t.me/oneBikePlsBot"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button
-                    size="lg"
-                    className="rounded-full bg-[#F4BD55] text-[#0B0E18] hover:bg-[#FFCA60] font-bold text-lg px-10 py-6 shadow-[0_10px_30px_rgba(244,189,85,0.3)] transition-all hover:scale-105"
-                  >
-                    Выбрать байк
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="ml-2"
-                    >
-                      <path d="M5 12h14M12 5l7 7-7 7" />
-                    </svg>
-                  </Button>
-                </a>
-                <a
-                  href="https://t.me/I_O_S_NN"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="rounded-full border-[#F4BD55]/40 text-[#F4BD55] hover:bg-[#F4BD55]/10 font-bold text-lg px-10 py-6 transition-all"
-                  >
-                    Написать оператору
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      className="ml-2"
-                    >
-                      <path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
-                    </svg>
-                  </Button>
-                </a>
-              </div>
-            </AnimatedSection>
-          </div>
-        </section>
-      </main>
-
-      {/* ─── FOOTER ─── */}
-      <footer className="border-t border-[#2A2E3E]/50 bg-[#0B0E18]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 md:py-16">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10">
-            {/* Brand */}
-            <div className="sm:col-span-2 lg:col-span-1">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#F4BD55] to-[#FFCA60] flex items-center justify-center">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#0B0E18"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="w-5 h-5"
-                  >
-                    <path d="M5 16v-4a8 8 0 0116 0v4" />
-                    <circle cx="8" cy="16" r="2" />
-                    <circle cx="16" cy="16" r="2" />
-                    <path d="M10 16h4" />
-                  </svg>
-                </div>
-                <span className="font-bold text-lg text-[#E6D8C4]">
+              <div>
+                <h1 className="font-bold text-lg leading-tight" style={{ color: "var(--vip-text-primary)" }}>
                   VIP BIKE ELECTRO
-                </span>
+                </h1>
+                <p className="text-[10px] leading-tight hidden sm:block" style={{ color: "var(--vip-text-secondary)" }}>
+                  Электромотоциклы без категории А
+                </p>
               </div>
-              <p className="text-sm text-[#A7ABB4] leading-relaxed">
-                Электромотоциклы в Нижнем Новгороде. 79bike: мощно, быстро,
-                законно, без ОСАГО.
-              </p>
             </div>
 
-            {/* Navigation */}
-            <div>
-              <h4 className="font-bold text-[#E6D8C4] mb-4">Разделы</h4>
-              <ul className="space-y-2.5">
-                {[
-                  { label: "Каталог", href: "#catalog" },
-                  { label: "О нас", href: "#about" },
-                  { label: "Соцсети", href: "#social" },
-                  { label: "Контакты", href: "#contacts" },
-                ].map((link) => (
-                  <li key={link.href}>
+            {/* Desktop Nav */}
+            <nav className="hidden md:flex items-center gap-6 text-sm">
+              {[
+                { label: "Каталог", href: "#catalog" },
+                { label: "О нас", href: "#about" },
+                { label: "Контакты", href: "#contacts" },
+                { label: "Соцсети", href: "#social" },
+              ].map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="transition-colors duration-200 hover:opacity-80"
+                  style={{ color: "var(--vip-text-secondary)" }}
+                >
+                  {link.label}
+                </a>
+              ))}
+              {/* Theme Toggle Button */}
+              <ThemeToggleButton size="md" />
+              <a
+                href="https://t.me/oneBikePlsBot"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button
+                  size="sm"
+                  className="rounded-full font-semibold"
+                  style={{
+                    backgroundColor: "var(--vip-accent-main)",
+                    color: "var(--vip-bg-base)",
+                  }}
+                >
+                  Забронировать
+                </Button>
+              </a>
+            </nav>
+
+            {/* Mobile Menu Toggle */}
+            <div className="flex items-center gap-2 md:hidden">
+              <ThemeToggleButton size="sm" />
+              <button
+                className="p-2"
+                style={{ color: "var(--vip-text-primary)" }}
+                onClick={() => setMenuOpen(!menuOpen)}
+              >
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  {menuOpen ? (
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  ) : (
+                    <path d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Menu */}
+          <AnimatePresence>
+            {menuOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="md:hidden border-t overflow-hidden"
+                style={{ borderColor: "var(--vip-border-soft)" }}
+              >
+                <div className="px-4 py-4 flex flex-col gap-3">
+                  {[
+                    { label: "Каталог", href: "#catalog" },
+                    { label: "О нас", href: "#about" },
+                    { label: "Контакты", href: "#contacts" },
+                    { label: "Соцсети", href: "#social" },
+                  ].map((link) => (
                     <a
+                      key={link.href}
                       href={link.href}
-                      className="text-sm text-[#A7ABB4] hover:text-[#F4BD55] transition-colors duration-200"
+                      onClick={() => setMenuOpen(false)}
+                      className="py-2 transition-colors"
+                      style={{ color: "var(--vip-text-secondary)" }}
                     >
                       {link.label}
                     </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Social */}
-            <div>
-              <h4 className="font-bold text-[#E6D8C4] mb-4">Соцсети</h4>
-              <div className="space-y-3">
-                {SOCIAL_LINKS.map((social) => (
+                  ))}
                   <a
-                    key={social.id}
-                    href={social.href}
+                    href="https://t.me/oneBikePlsBot"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2.5 text-sm text-[#A7ABB4] hover:text-[#E6D8C4] transition-colors duration-200 group"
                   >
-                    <div
-                      className="w-5 h-5 transition-colors duration-200"
-                      style={{ color: social.color }}
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        className="w-5 h-5"
-                      >
-                        {social.icon.props.children}
-                      </svg>
-                    </div>
-                    {social.label}
+                    <Button className="w-full rounded-full font-semibold" style={{
+                      backgroundColor: "var(--vip-accent-main)",
+                      color: "var(--vip-bg-base)",
+                    }}>
+                      Забронировать
+                    </Button>
                   </a>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </header>
+
+        <main className="flex-1">
+          {/* ─── HERO ─── */}
+          <section className="relative py-20 md:py-32 px-4 overflow-hidden">
+            {/* Background glow */}
+            <div className="absolute inset-0">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[120px]" style={{ backgroundColor: "var(--vip-accent-main)", opacity: 0.05 }} />
+              <div className="absolute top-1/3 right-0 w-[400px] h-[400px] rounded-full blur-[100px]" style={{ backgroundColor: "#26A5E4", opacity: 0.05 }} />
+            </div>
+
+            <div className="max-w-4xl mx-auto text-center relative z-10">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8 }}
+              >
+                <Badge
+                  variant="outline"
+                  className="mb-6"
+                  style={{
+                    borderColor: "var(--vip-accent-main)",
+                    color: "var(--vip-accent-main)",
+                    backgroundColor: `color-mix(in srgb, var(--vip-accent-main) 10%, transparent)`,
+                  }}
+                >
+                  Электромотоциклы в Нижнем Новгороде
+                </Badge>
+                <h2 className="text-4xl sm:text-5xl md:text-7xl font-bold mb-6 leading-tight" style={{ color: "var(--vip-text-primary)" }}>
+                  VIP BIKE{" "}
+                  <span className="bg-gradient-to-r bg-clip-text text-transparent animate-gradient-shift" style={{ backgroundImage: `linear-gradient(to right, var(--vip-accent-main), var(--vip-accent-main-hover), var(--vip-accent-main))` }}>
+                    ELECTRO
+                  </span>
+                </h2>
+                <p className="text-lg md:text-xl max-w-2xl mx-auto mb-8 leading-relaxed" style={{ color: "var(--vip-text-secondary)" }}>
+                  Электромотоциклы без категории А. Законно, по правам категории
+                  B. Без ОСАГО и ПТС. Мощно, быстро, экологично.
+                </p>
+
+                {/* Feature Pills */}
+                <div className="flex flex-wrap justify-center gap-3 mb-10">
+                  {[
+                    { text: "Быстро", detail: "мощно, тихо, экологично" },
+                    { text: "10 дней", detail: "на тест-драйв, деньги обратно" },
+                    { text: "0 ₽", detail: "первичный взнос, рассрочка" },
+                  ].map((pill) => (
+                    <div
+                      key={pill.text}
+                      className="px-4 py-2 rounded-full border text-sm"
+                      style={{
+                        borderColor: "var(--vip-border-soft)",
+                        backgroundColor: "var(--vip-bg-card)",
+                      }}
+                    >
+                      <span className="font-semibold" style={{ color: "var(--vip-accent-main)" }}>
+                        {pill.text}
+                      </span>{" "}
+                      <span style={{ color: "var(--vip-text-secondary)" }}>{pill.detail}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <a
+                    href="https://t.me/oneBikePlsBot"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button
+                      size="lg"
+                      className="rounded-full font-bold text-lg px-8 py-6 transition-all hover:scale-105"
+                      style={{
+                        backgroundColor: "var(--vip-accent-main)",
+                        color: "var(--vip-bg-base)",
+                        boxShadow: `0 10px 30px color-mix(in srgb, var(--vip-accent-main) 30%, transparent)`,
+                      }}
+                    >
+                      Выбрать байк
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        className="ml-2"
+                      >
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                      </svg>
+                    </Button>
+                  </a>
+                  <a href="#contacts">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="rounded-full font-bold text-lg px-8 py-6 transition-all"
+                      style={{
+                        borderColor: "var(--vip-accent-main)",
+                        color: "var(--vip-accent-main)",
+                      }}
+                    >
+                      Контакты
+                    </Button>
+                  </a>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Hero Image */}
+            <div className="max-w-7xl mx-auto mt-12 px-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.8, delay: 0.2 }}
+                className="relative aspect-[16/9] md:aspect-[21/9] rounded-2xl overflow-hidden"
+                style={{ boxShadow: `0 20px 60px color-mix(in srgb, var(--vip-accent-main) 15%, transparent)` }}
+              >
+                <img
+                  src={HERO_IMAGE}
+                  alt="VIP BIKE ELECTRO - Электромотоциклы на полном газу"
+                  className="object-cover w-full h-full"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+              </motion.div>
+            </div>
+          </section>
+
+          {/* ─── BARRIER CARDS ─── */}
+          <section id="catalog" className="py-20 md:py-28 px-4">
+            <div className="max-w-7xl mx-auto">
+              <AnimatedSection className="text-center mb-16">
+                <Badge
+                  variant="outline"
+                  className="mb-4"
+                  style={{
+                    borderColor: "var(--vip-accent-main)",
+                    color: "var(--vip-accent-main)",
+                    backgroundColor: `color-mix(in srgb, var(--vip-accent-main) 10%, transparent)`,
+                  }}
+                >
+                  Почему VIP BIKE ELECTRO
+                </Badge>
+                <h3 className="text-3xl md:text-5xl font-bold mb-4" style={{ color: "var(--vip-text-primary)" }}>
+                  Три барьера,{" "}
+                  <span style={{ color: "var(--vip-accent-main)" }}>которые мы преодолели</span>
+                </h3>
+                <p className="text-lg max-w-2xl mx-auto" style={{ color: "var(--vip-text-secondary)" }}>
+                  Мы тестировали 79bike Falcon PRO в реальных условиях. Город,
+                  проселок, снег, грязь, лёд — где угодно. Без пинков, без
+                  failures.
+                </p>
+              </AnimatedSection>
+
+              <div className="grid md:grid-cols-3 gap-6">
+                {[
+                  {
+                    id: "prohodimost",
+                    number: "01",
+                    title: "Поле, лес, грязь, лестницы",
+                    description:
+                      "Кочки, корни, песок, снег, подъёмы и спуски. Куда сам доберёшься — туда и заедешь. В обзорах «корни съел как нефиг нафиг», едет по кроссовой трассе наравне с бензином.",
+                    image:
+                      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b1-prohodimost.jpeg",
+                  },
+                  {
+                    id: "razgon",
+                    number: "02",
+                    title: "Выстреливает из рогатки",
+                    description:
+                      "Электро-тяга бьёт мгновенно — без сцепления и передач. Проваливаешься в кресло как в суперкаре. Открутил ручку — и поехал, на максимум сразу.",
+                    image:
+                      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b2-razgon.jpeg",
+                  },
+                  {
+                    id: "voda",
+                    number: "03",
+                    title: "Топили в озере — едет",
+                    description:
+                      "Влагозащита по классу IP67. На тесте погружали в ледяное озеро — завёлся, год катается. Лужи, дождь, мокрая трава — без последствий.",
+                    image:
+                      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b3-voda.jpeg",
+                  },
+                ].map((card, idx) => (
+                  <AnimatedSection key={card.id} delay={idx * 0.15}>
+                    <Card className="overflow-hidden group transition-all duration-500" style={{
+                      backgroundColor: "var(--vip-bg-card)",
+                      borderColor: "var(--vip-border-soft)",
+                    }}>
+                      <div className="relative aspect-video bg-gradient-to-br overflow-hidden" style={{ backgroundImage: "linear-gradient(to bottom right, #1e293b, #0f172a)" }}>
+                        <img
+                          src={card.image}
+                          alt={card.title}
+                          className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-700"
+                        />
+                        <div className="absolute top-4 left-4 flex items-center gap-2">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm" style={{
+                            backgroundColor: `color-mix(in srgb, var(--vip-accent-main) 20%, transparent)`,
+                            border: `1px solid color-mix(in srgb, var(--vip-accent-main) 30%, transparent)`,
+                          }}>
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="var(--vip-accent-main)"
+                              strokeWidth="2"
+                              className="w-5 h-5"
+                            >
+                              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                            </svg>
+                          </div>
+                          <span className="text-2xl font-bold text-white drop-shadow-lg">
+                            {card.number}
+                          </span>
+                        </div>
+                      </div>
+                      <CardContent className="p-6">
+                        <h4 className="text-xl font-bold mb-3" style={{ color: "var(--vip-text-primary)" }}>
+                          {card.title}
+                        </h4>
+                        <p className="text-sm leading-relaxed" style={{ color: "var(--vip-text-secondary)" }}>
+                          {card.description}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </AnimatedSection>
                 ))}
               </div>
             </div>
+          </section>
 
-            {/* Contact */}
-            <div>
-              <h4 className="font-bold text-[#E6D8C4] mb-4">Связь</h4>
-              <div className="space-y-3">
-                <a
-                  href="https://t.me/I_O_S_NN"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2.5 text-sm text-[#A7ABB4] hover:text-[#26A5E4] transition-colors duration-200"
+          {/* ─── ABOUT ─── */}
+          <section
+            id="about"
+            className="py-20 md:py-28 px-4"
+            style={{ backgroundColor: `color-mix(in srgb, var(--vip-bg-card) 40%, transparent)` }}
+          >
+            <div className="max-w-7xl mx-auto">
+              <AnimatedSection className="text-center mb-16">
+                <Badge
+                  variant="outline"
+                  className="mb-4"
+                  style={{
+                    borderColor: "var(--vip-accent-main)",
+                    color: "var(--vip-accent-main)",
+                    backgroundColor: `color-mix(in srgb, var(--vip-accent-main) 10%, transparent)`,
+                  }}
                 >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="#26A5E4"
-                    className="w-4 h-4"
-                  >
-                    <path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
-                  </svg>
-                  @I_O_S_NN
-                </a>
-                <a
-                  href={CONTACT_INFO.phoneHref}
-                  className="flex items-center gap-2.5 text-sm text-[#A7ABB4] hover:text-[#F4BD55] transition-colors duration-200"
+                  О нас
+                </Badge>
+                <h3 className="text-3xl md:text-5xl font-bold mb-4" style={{ color: "var(--vip-text-primary)" }}>
+                  79bike Falcon PRO —{" "}
+                  <span style={{ color: "var(--vip-accent-main)" }}>электро без категории А</span>
+                </h3>
+                <p className="text-lg max-w-2xl mx-auto" style={{ color: "var(--vip-text-secondary)" }}>
+                  От 310 000 ₽. Законно по правам категории B. Без ОСАГО и ПТС.
+                </p>
+              </AnimatedSection>
+
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[
+                  {
+                    title: "Быстрая онлайн-бронь",
+                    desc: "Выбирайте байк, даты и формат поездки в пару кликов",
+                    icon: (
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        strokeWidth="1.5"
+                        className="w-8 h-8"
+                        style={{ stroke: "var(--vip-accent-main)" }}
+                      >
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    title: "Электро без категории А",
+                    desc: "Законно по правам категории B — никаких дополнительных требований",
+                    icon: (
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        strokeWidth="1.5"
+                        className="w-8 h-8"
+                        style={{ stroke: "var(--vip-accent-main)" }}
+                      >
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    title: "ОСАГО не требуется",
+                    desc: "Экономия на страховке и бюрократии — просто садись и поезжай",
+                    icon: (
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        strokeWidth="1.5"
+                        className="w-8 h-8"
+                        style={{ stroke: "var(--vip-accent-main)" }}
+                      >
+                        <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    title: "Новая локация",
+                    desc: "пл. Комсомольская 2 — центр Нижнего Новгорода",
+                    icon: (
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        strokeWidth="1.5"
+                        className="w-8 h-8"
+                        style={{ stroke: "var(--vip-accent-main)" }}
+                      >
+                        <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    ),
+                  },
+                ].map((feature, idx) => (
+                  <AnimatedSection key={feature.title} delay={idx * 0.1}>
+                    <div className="p-6 rounded-2xl border text-center hover:transition-all duration-300 group h-full" style={{
+                      backgroundColor: "var(--vip-bg-card)",
+                      borderColor: "var(--vip-border-soft)",
+                    }}>
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300" style={{
+                        backgroundColor: `color-mix(in srgb, var(--vip-accent-main) 10%, transparent)`,
+                        border: `1px solid color-mix(in srgb, var(--vip-accent-main) 20%, transparent)`,
+                      }}>
+                        {feature.icon}
+                      </div>
+                      <h4 className="text-lg font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>
+                        {feature.title}
+                      </h4>
+                      <p className="text-sm leading-relaxed" style={{ color: "var(--vip-text-secondary)" }}>
+                        {feature.desc}
+                      </p>
+                    </div>
+                  </AnimatedSection>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* ─── SOCIAL MEDIA SECTION ─── */}
+          <section id="social" className="py-20 md:py-28 px-4 relative overflow-hidden">
+            {/* Background glow */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute bottom-0 left-1/4 w-[500px] h-[500px] rounded-full blur-[120px]" style={{ backgroundColor: "#26A5E4", opacity: 0.05 }} />
+              <div className="absolute top-0 right-1/4 w-[400px] h-[400px] rounded-full blur-[100px]" style={{ backgroundColor: "var(--vip-accent-main)", opacity: 0.05 }} />
+            </div>
+
+            <div className="max-w-5xl mx-auto relative z-10">
+              <AnimatedSection className="text-center mb-14">
+                <Badge
+                  variant="outline"
+                  className="mb-4"
+                  style={{
+                    borderColor: "var(--vip-accent-main)",
+                    color: "var(--vip-accent-main)",
+                    backgroundColor: `color-mix(in srgb, var(--vip-accent-main) 10%, transparent)`,
+                  }}
                 >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#F4BD55"
-                    strokeWidth="1.5"
-                    className="w-4 h-4"
+                  Мы в соцсетях
+                </Badge>
+                <h3 className="text-3xl md:text-5xl font-bold mb-4" style={{ color: "var(--vip-text-primary)" }}>
+                  Подписывайтесь и{" "}
+                  <span style={{ color: "var(--vip-accent-main)" }}>будьте на связи</span>
+                </h3>
+                <p className="text-lg max-w-2xl mx-auto" style={{ color: "var(--vip-text-secondary)" }}>
+                  Мы постоянно делимся новостями, фото с покатушек и
+                  эксклюзивными предложениями. Выбирайте удобную платформу — мы
+                  везде.
+                </p>
+              </AnimatedSection>
+
+              {/* Social Cards Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
+                {SOCIAL_LINKS.map((social, idx) => (
+                  <SocialCard key={social.id} social={social} index={idx} />
+                ))}
+              </div>
+
+              {/* Compact social bar for mobile */}
+              <AnimatedSection delay={0.5} className="mt-12">
+                <div className="flex flex-wrap justify-center gap-3">
+                  {SOCIAL_LINKS.map((social) => (
+                    <a
+                      key={social.id}
+                      href={social.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full border text-sm transition-all duration-300"
+                      style={{
+                        borderColor: "var(--vip-border-soft)",
+                        backgroundColor: "var(--vip-bg-card)",
+                        color: "var(--vip-text-secondary)",
+                      }}
+                    >
+                      <div style={{ color: social.color }} className="w-4 h-4">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          className="w-4 h-4"
+                        >
+                          {social.icon.props.children}
+                        </svg>
+                      </div>
+                      {social.label}
+                    </a>
+                  ))}
+                </div>
+              </AnimatedSection>
+            </div>
+          </section>
+
+          {/* ─── CONTACTS ─── */}
+          <section
+            id="contacts"
+            className="py-20 md:py-28 px-4"
+            style={{ backgroundColor: `color-mix(in srgb, var(--vip-bg-card) 40%, transparent)` }}
+          >
+            <div className="max-w-4xl mx-auto">
+              <AnimatedSection className="text-center mb-14">
+                <Badge
+                  variant="outline"
+                  className="mb-4"
+                  style={{
+                    borderColor: "var(--vip-accent-main)",
+                    color: "var(--vip-accent-main)",
+                    backgroundColor: `color-mix(in srgb, var(--vip-accent-main) 10%, transparent)`,
+                  }}
+                >
+                  Контакты
+                </Badge>
+                <h3 className="text-3xl md:text-5xl font-bold mb-4" style={{ color: "var(--vip-text-primary)" }}>
+                  Свяжитесь{" "}
+                  <span style={{ color: "var(--vip-accent-main)" }}>с нами</span>
+                </h3>
+                <p className="text-lg max-w-xl mx-auto" style={{ color: "var(--vip-text-secondary)" }}>
+                  Мы всегда на связи — выберите удобный способ
+                </p>
+              </AnimatedSection>
+
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Phone */}
+                <AnimatedSection>
+                  <a
+                    href={CONTACT_INFO.phoneHref}
+                    className="flex flex-col items-center gap-4 p-8 rounded-2xl border transition-all duration-300 group"
+                    style={{
+                      backgroundColor: "var(--vip-bg-card)",
+                      borderColor: "var(--vip-border-soft)",
+                    }}
                   >
-                    <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                  {CONTACT_INFO.phone}
-                </a>
-                <div className="flex items-center gap-2.5 text-sm text-[#A7ABB4]">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#F4BD55"
-                    strokeWidth="1.5"
-                    className="w-4 h-4"
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300" style={{
+                      backgroundColor: `color-mix(in srgb, var(--vip-accent-main) 10%, transparent)`,
+                      border: `1px solid color-mix(in srgb, var(--vip-accent-main) 20%, transparent)`,
+                    }}>
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        strokeWidth="1.5"
+                        className="w-7 h-7"
+                        style={{ stroke: "var(--vip-accent-main)" }}
+                      >
+                        <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      </svg>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold" style={{ color: "var(--vip-text-primary)" }}>
+                        {CONTACT_INFO.phone}
+                      </p>
+                      <p className="text-sm mt-1" style={{ color: "var(--vip-text-secondary)" }}>Позвонить</p>
+                    </div>
+                  </a>
+                </AnimatedSection>
+
+                {/* Telegram */}
+                <AnimatedSection delay={0.1}>
+                  <a
+                    href="https://t.me/I_O_S_NN"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center gap-4 p-8 rounded-2xl border transition-all duration-300 group"
+                    style={{
+                      backgroundColor: "var(--vip-bg-card)",
+                      borderColor: "var(--vip-border-soft)",
+                    }}
                   >
-                    <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  {CONTACT_INFO.address}
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300" style={{
+                      backgroundColor: "color-mix(in srgb, #26A5E4 10%, transparent)",
+                      border: "1px solid color-mix(in srgb, #26A5E4 20%, transparent)",
+                    }}>
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="#26A5E4"
+                        className="w-7 h-7"
+                      >
+                        <path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+                      </svg>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold" style={{ color: "var(--vip-text-primary)" }}>
+                        @I_O_S_NN
+                      </p>
+                      <p className="text-sm mt-1" style={{ color: "var(--vip-text-secondary)" }}>Telegram</p>
+                    </div>
+                  </a>
+                </AnimatedSection>
+
+                {/* Address */}
+                <AnimatedSection delay={0.2}>
+                  <div className="flex flex-col items-center gap-4 p-8 rounded-2xl border sm:col-span-2 lg:col-span-1" style={{
+                    backgroundColor: "var(--vip-bg-card)",
+                    borderColor: "var(--vip-border-soft)",
+                  }}>
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{
+                      backgroundColor: `color-mix(in srgb, var(--vip-accent-main) 10%, transparent)`,
+                      border: `1px solid color-mix(in srgb, var(--vip-accent-main) 20%, transparent)`,
+                    }}>
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        strokeWidth="1.5"
+                        className="w-7 h-7"
+                        style={{ stroke: "var(--vip-accent-main)" }}
+                      >
+                        <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold" style={{ color: "var(--vip-text-primary)" }}>
+                        {CONTACT_INFO.address}
+                      </p>
+                      <p className="text-sm mt-1" style={{ color: "var(--vip-text-secondary)" }}>
+                        {CONTACT_INFO.workingHours}
+                      </p>
+                    </div>
+                  </div>
+                </AnimatedSection>
+              </div>
+            </div>
+          </section>
+
+          {/* ─── CTA ─── */}
+          <section className="py-24 md:py-32 px-4 relative overflow-hidden">
+            <div className="absolute inset-0">
+              <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, var(--vip-bg-base), color-mix(in srgb, var(--vip-bg-base) 50%, transparent), var(--vip-bg-base))` }} />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] rounded-full blur-[150px]" style={{ backgroundColor: "var(--vip-accent-main)", opacity: 0.05 }} />
+            </div>
+
+            <div className="max-w-4xl mx-auto text-center relative z-10">
+              <AnimatedSection>
+                <Badge
+                  variant="outline"
+                  className="mb-6"
+                  style={{
+                    borderColor: "var(--vip-accent-main)",
+                    color: "var(--vip-accent-main)",
+                    backgroundColor: `color-mix(in srgb, var(--vip-accent-main) 10%, transparent)`,
+                  }}
+                >
+                  Готовы к выезду?
+                </Badge>
+                <h3 className="text-4xl md:text-6xl font-bold mb-6" style={{ color: "var(--vip-text-primary)" }}>
+                  Начни свой{" "}
+                  <span className="bg-gradient-to-r bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(to right, var(--vip-accent-main), var(--vip-accent-main-hover), var(--vip-accent-main))` }}>
+                    электро-путь
+                  </span>{" "}
+                  сегодня
+                </h3>
+                <p className="text-xl max-w-2xl mx-auto mb-10" style={{ color: "var(--vip-text-secondary)" }}>
+                  Выберите свой электромотоцикл, забронируйте слот и получите
+                  незабываемые впечатления. Законно, безопасно, экологично.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <a
+                    href="https://t.me/oneBikePlsBot"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button
+                      size="lg"
+                      className="rounded-full font-bold text-lg px-10 py-6 transition-all hover:scale-105"
+                      style={{
+                        backgroundColor: "var(--vip-accent-main)",
+                        color: "var(--vip-bg-base)",
+                        boxShadow: `0 10px 30px color-mix(in srgb, var(--vip-accent-main) 30%, transparent)`,
+                      }}
+                    >
+                      Выбрать байк
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        className="ml-2"
+                      >
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                      </svg>
+                    </Button>
+                  </a>
+                  <a
+                    href="https://t.me/I_O_S_NN"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="rounded-full font-bold text-lg px-10 py-6 transition-all"
+                      style={{
+                        borderColor: "var(--vip-accent-main)",
+                        color: "var(--vip-accent-main)",
+                      }}
+                    >
+                      Написать оператору
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        className="ml-2"
+                      >
+                        <path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+                      </svg>
+                    </Button>
+                  </a>
+                </div>
+              </AnimatedSection>
+            </div>
+          </section>
+        </main>
+
+        {/* ─── FOOTER ─── */}
+        <footer className="border-t" style={{ borderColor: "var(--vip-border-soft)", backgroundColor: "var(--vip-bg-base)" }}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 md:py-16">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10">
+              {/* Brand */}
+              <div className="sm:col-span-2 lg:col-span-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `linear-gradient(to-br, var(--vip-accent-main), var(--vip-accent-main-hover))` }}>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--vip-bg-base)"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="w-5 h-5"
+                    >
+                      <path d="M5 16v-4a8 8 0 0116 0v4" />
+                      <circle cx="8" cy="16" r="2" />
+                      <circle cx="16" cy="16" r="2" />
+                      <path d="M10 16h4" />
+                    </svg>
+                  </div>
+                  <span className="font-bold text-lg" style={{ color: "var(--vip-text-primary)" }}>
+                    VIP BIKE ELECTRO
+                  </span>
+                </div>
+                <p className="text-sm leading-relaxed" style={{ color: "var(--vip-text-secondary)" }}>
+                  Электромотоциклы в Нижнем Новгороде. 79bike: мощно, быстро,
+                  законно, без ОСАГО.
+                </p>
+              </div>
+
+              {/* Navigation */}
+              <div>
+                <h4 className="font-bold mb-4" style={{ color: "var(--vip-text-primary)" }}>Разделы</h4>
+                <ul className="space-y-2.5">
+                  {[
+                    { label: "Каталог", href: "#catalog" },
+                    { label: "О нас", href: "#about" },
+                    { label: "Соцсети", href: "#social" },
+                    { label: "Контакты", href: "#contacts" },
+                  ].map((link) => (
+                    <li key={link.href}>
+                      <a
+                        href={link.href}
+                        className="text-sm transition-colors duration-200"
+                        style={{ color: "var(--vip-text-secondary)" }}
+                      >
+                        {link.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Social */}
+              <div>
+                <h4 className="font-bold mb-4" style={{ color: "var(--vip-text-primary)" }}>Соцсети</h4>
+                <div className="space-y-3">
+                  {SOCIAL_LINKS.map((social) => (
+                    <a
+                      key={social.id}
+                      href={social.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2.5 text-sm transition-colors duration-200 group"
+                      style={{ color: "var(--vip-text-secondary)" }}
+                    >
+                      <div
+                        className="w-5 h-5 transition-colors duration-200"
+                        style={{ color: social.color }}
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          className="w-5 h-5"
+                        >
+                          {social.icon.props.children}
+                        </svg>
+                      </div>
+                      {social.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {/* Contact */}
+              <div>
+                <h4 className="font-bold mb-4" style={{ color: "var(--vip-text-primary)" }}>Связь</h4>
+                <div className="space-y-3">
+                  <a
+                    href="https://t.me/I_O_S_NN"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2.5 text-sm transition-colors duration-200"
+                    style={{ color: "var(--vip-text-secondary)" }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="#26A5E4"
+                      className="w-4 h-4"
+                    >
+                      <path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+                    </svg>
+                    @I_O_S_NN
+                  </a>
+                  <a
+                    href={CONTACT_INFO.phoneHref}
+                    className="flex items-center gap-2.5 text-sm transition-colors duration-200"
+                    style={{ color: "var(--vip-text-secondary)" }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      strokeWidth="1.5"
+                      className="w-4 h-4"
+                      style={{ stroke: "var(--vip-accent-main)" }}
+                    >
+                      <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                    {CONTACT_INFO.phone}
+                  </a>
+                  <div className="flex items-center gap-2.5 text-sm" style={{ color: "var(--vip-text-secondary)" }}>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      strokeWidth="1.5"
+                      className="w-4 h-4"
+                      style={{ stroke: "var(--vip-accent-main)" }}
+                    >
+                      <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    {CONTACT_INFO.address}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Bottom bar */}
-          <div className="mt-10 pt-6 border-t border-[#2A2E3E]/50 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-[#A7ABB4]">
-              &copy; {new Date().getFullYear()} VIP BIKE ELECTRO
-            </p>
-            <a
-              href="https://t.me/oneSitePlsBot"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-[#A7ABB4]/60 hover:text-[#A7ABB4] transition-colors"
-            >
-              powered by oneSitePls &middot; @SALAVEY13
-            </a>
+            {/* Bottom bar */}
+            <div className="mt-10 pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4" style={{ borderColor: "var(--vip-border-soft)" }}>
+              <p className="text-xs" style={{ color: "var(--vip-text-secondary)" }}>
+                &copy; {new Date().getFullYear()} VIP BIKE ELECTRO
+              </p>
+              <a
+                href="https://t.me/oneSitePlsBot"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs transition-colors"
+                style={{ color: "var(--vip-text-secondary)/60" }}
+              >
+                powered by oneSitePls &middot; @SALAVEY13
+              </a>
+            </div>
           </div>
-        </div>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </>
   );
 }
