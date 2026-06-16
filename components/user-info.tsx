@@ -1,21 +1,24 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Bot, Send } from "lucide-react";
+import { Bot, Send, ChevronDown, Moon, Sun, Settings } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAppContext } from "@/contexts/AppContext";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { debugLogger as logger } from "@/lib/debugLogger";
-import { Button } from "@/components/ui/button"; 
+import { Button } from "@/components/ui/button";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { useTheme } from "next-themes";
 
 const TELEGRAM_WEB_APP_URL = "https://t.me/oneBikePlsBot/app";
 
 // Исправление 1: Делаем именованный экспорт (убрано default)
 export function UserInfo() {
   const { dbUser, user, isInTelegramContext, isLoading, error } = useAppContext();
+  const { theme, setTheme } = useTheme();
   const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && (dbUser || user || error)) setIsFirstLoad(false);
@@ -79,14 +82,18 @@ export function UserInfo() {
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const isMock = 'is_bot' in effectiveUser ? effectiveUser.is_bot : (eUserAny.id === 413553377 && process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true');
 
+  const handleThemeToggle = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+    setIsDropdownOpen(false);
+  };
+
   return (
-    <Link href="/profile" passHref legacyBehavior>
-      <motion.a 
+    <div className="relative">
+      <button
+        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
         className="relative flex items-center gap-2 p-1 rounded-full hover:bg-dark-card/70 transition-all duration-200 cursor-pointer group"
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5 }}
         aria-label={`Профиль пользователя ${displayName}`}
+        aria-expanded={isDropdownOpen}
       >
         <div className="relative w-9 h-9 sm:w-10 sm:h-10">
           {avatarUrl ? (
@@ -96,8 +103,8 @@ export function UserInfo() {
                 src={avatarUrl}
                 alt={`Аватар ${displayName}`}
                 fill
-                style={{objectFit:"cover"}} 
-                className="rounded-full" 
+                style={{objectFit:"cover"}}
+                className="rounded-full"
                 unoptimized
               />
             </div>
@@ -116,7 +123,7 @@ export function UserInfo() {
 
         <span className={cn(
             "hidden md:block text-light-text font-mono text-sm truncate max-w-[120px]",
-            "text-shadow-cyber group-hover:text-shadow-neon transition-all duration-300" 
+            "text-shadow-cyber group-hover:text-shadow-neon transition-all duration-300"
         )}>
           {isFirstLoad ? (
             Array.from(displayName).map((char, i) => (
@@ -133,8 +140,66 @@ export function UserInfo() {
             displayName
           )}
         </span>
-      </motion.a>
-    </Link>
+        <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+      </button>
+
+      {/* Dropdown Menu */}
+      <AnimatePresence>
+        {isDropdownOpen && (
+          <>
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setIsDropdownOpen(false)}
+            />
+
+            {/* Dropdown */}
+            <motion.div
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="absolute right-0 top-full mt-2 z-50 w-56 bg-card border border-border rounded-lg shadow-lg overflow-hidden"
+            >
+              {/* Theme Toggle */}
+              <button
+                onClick={handleThemeToggle}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors text-left"
+              >
+                {theme === "dark" ? (
+                  <Sun className="h-5 w-5 text-yellow-500" />
+                ) : (
+                  <Moon className="h-5 w-5 text-blue-500" />
+                )}
+                <span className="text-sm font-medium">
+                  {theme === "dark" ? "Светлая тема" : "Темная тема"}
+                </span>
+              </button>
+
+              {/* Settings Link */}
+              <Link
+                href="/settings"
+                onClick={() => setIsDropdownOpen(false)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors text-left border-t border-border"
+              >
+                <Settings className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm font-medium">Настройки</span>
+              </Link>
+
+              {/* Profile Link */}
+              <Link
+                href="/profile"
+                onClick={() => setIsDropdownOpen(false)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors text-left border-t border-border"
+              >
+                <VibeContentRenderer content="::FaCircleUser className='h-5 w-5 text-muted-foreground'::" />
+                <span className="text-sm font-medium">Профиль агента</span>
+              </Link>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 

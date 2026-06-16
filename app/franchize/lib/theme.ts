@@ -71,7 +71,38 @@ export const readablePaletteTextOnColor = (background: string, palette: CrewPale
 );
 
 export function crewPaletteForSurface(theme: FranchizeTheme) {
-  const palette = theme.palette;
+  // When isAuto is true, use CSS variables that respond to global theme
+  if (theme.isAuto) {
+    return {
+      page: {
+        backgroundColor: "var(--franchize-bg-base)",
+        color: "var(--franchize-text-primary)",
+      },
+      card: {
+        backgroundColor: "var(--franchize-bg-card)",
+        borderColor: "var(--franchize-border-soft)",
+        color: "var(--franchize-text-primary)",
+      },
+      mutedText: {
+        color: "var(--franchize-text-secondary)",
+      },
+      subtleCard: {
+        backgroundColor: "var(--franchize-bg-card)",
+        borderColor: "var(--franchize-border-soft)",
+        color: "var(--franchize-text-primary)",
+      },
+      accentPill: {
+        borderColor: "var(--franchize-accent-main)",
+        color: "var(--franchize-accent-main)",
+        backgroundColor: "var(--franchize-accent-subtle)",
+      },
+    };
+  }
+
+  // Use mode-specific palette when isAuto is false
+  const palette = theme.mode === "light" && theme.palettes?.light
+    ? theme.palettes.light
+    : theme.palettes?.dark || theme.palette;
 
   return {
     page: {

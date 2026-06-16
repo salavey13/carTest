@@ -76,14 +76,31 @@ const modalFocusableSelector = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
 
-const getModalThemeVars = (theme: FranchizeTheme) =>
-  ({
-    "--item-accent": theme.palette.accentMain,
-    "--item-border": theme.palette.borderSoft,
-    "--item-muted-text": theme.palette.textSecondary,
-    "--item-text": theme.palette.textPrimary,
-    "--item-accent-contrast": readableTextOnColor(theme.palette.accentMain),
-  }) as React.CSSProperties;
+const getModalThemeVars = (theme: FranchizeTheme) => {
+  // When isAuto is true, use CSS variables that respond to global theme
+  if (theme.isAuto) {
+    return {
+      "--item-accent": "var(--franchize-accent-main)",
+      "--item-border": "var(--franchize-border-soft)",
+      "--item-muted-text": "var(--franchize-text-secondary)",
+      "--item-text": "var(--franchize-text-primary)",
+      "--item-accent-contrast": "var(--franchize-accent-contrast)",
+    } as React.CSSProperties;
+  }
+
+  // Use theme.palette directly when mode is explicit (dark/light)
+  const palette = theme.mode === "light" && theme.palettes?.light
+    ? theme.palettes.light
+    : theme.palettes?.dark || theme.palette;
+
+  return {
+    "--item-accent": palette.accentMain,
+    "--item-border": palette.borderSoft,
+    "--item-muted-text": palette.textSecondary,
+    "--item-text": palette.textPrimary,
+    "--item-accent-contrast": readableTextOnColor(palette.accentMain),
+  } as React.CSSProperties;
+};
 
 function OptionChips({
   title,
@@ -455,8 +472,11 @@ export function ItemModal({
           <button
             type="button"
             onClick={onClose}
-            className="absolute z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--item-border)]/60 text-[var(--item-text)] transition hover:bg-[var(--item-border)]/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-            style={FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE}
+            className="absolute z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--item-border)]/60 text-[var(--item-text)] transition hover:bg-[var(--item-border)]/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] sm:top-[calc(max(env(safe-area-inset-top),0px)+0.5rem)]"
+            style={{
+              ...FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE,
+              top: "calc(max(env(safe-area-inset-top), 0px) + 0.5rem)",
+            }}
             aria-label="Закрыть"
           >
             <X className="h-4 w-4" />
