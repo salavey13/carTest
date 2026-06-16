@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, User, IdCard, MessageCircle, Send, UserPlus, Users } from "lucide-react";
+import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, User, IdCard, MessageCircle, Send, UserPlus, Users, Moon, Sun } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
+import { useTheme } from "next-themes";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { isMockUserModeEnabled } from "@/lib/mockUserMode";
 import {
@@ -71,6 +72,7 @@ interface FranchizeProfileButtonProps {
 
 export function FranchizeProfileButton({ bgColor, textColor, borderColor, currentSlug, telegramBotUsername }: FranchizeProfileButtonProps) {
   const { dbUser, user, userCrewInfo, isInTelegramContext, tg } = useAppContext();
+  const { theme, setTheme } = useTheme();
 
   const handleInvite = () => {
     if (!userCrewInfo) return;
@@ -290,6 +292,19 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
               <Settings className="mr-2 h-4 w-4" />
               <span className="truncate">Настройки</span>
             </Link>
+          </DropdownMenuItem>
+
+          {/* Theme Toggle */}
+          <DropdownMenuItem
+            onSelect={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="cursor-pointer flex min-w-0 items-center gap-2 w-full"
+          >
+            {theme === "dark" ? (
+              <Sun className="mr-2 h-4 w-4 text-yellow-500" />
+            ) : (
+              <Moon className="mr-2 h-4 w-4 text-blue-500" />
+            )}
+            <span className="truncate">{theme === "dark" ? "Светлая тема" : "Темная тема"}</span>
           </DropdownMenuItem>
 
           <DropdownMenuItem asChild>
