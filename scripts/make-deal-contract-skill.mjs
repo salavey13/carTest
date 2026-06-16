@@ -694,7 +694,19 @@ if (dealType === 'rent') {
     spec_number: specNumber,
     appendix_date: appendixDate,
     warranty_months: warrantyMonths,
-    document_key: `sale-${bike.id}-${Date.now()}`
+    document_key: `sale-${bike.id}-${Date.now()}`,
+    // Crew secrets for seller details
+    organization_name: crewOrgName,
+    organization_short: crewOrgShort,
+    organization_representative: crewOrgRepresentative,
+    legal_address: crewLegalAddress,
+    ogrnip: crewOgrnip,
+    inn: crewInn,
+    bank_account: crewBankAccount,
+    bank_name: crewBankName,
+    bank_city: crewBankCity,
+    bank_corr_account: crewBankCorrAccount,
+    email: crewEmail
   };
 
   // Filename

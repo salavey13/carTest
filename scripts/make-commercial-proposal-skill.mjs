@@ -22,6 +22,11 @@
 //   --specialConditions Special conditions text
 //   --paymentTerms     Payment terms (default: "100% предоплата")
 //   --deliveryTerms    Delivery terms (default: "в течение 5 рабочих дней")
+//   --clientAddress    Client address (optional, shown in signature block)
+//   --clientInn        Client INN (optional, shown in signature block)
+//   --clientDetails    Additional client details (optional)
+//   --clientPhone      Client phone (optional)
+//   --clientEmail      Client email (optional)
 //   --saveMetadata     Set to "1" to write metadata to Supabase
 //   --metadataTable    Override metadata table name
 //
@@ -232,6 +237,9 @@ const email = contractDefaults.email || 'vip_bike@mail.ru';
 const legalAddress = contractDefaults.legalAddress || 'г. Нижний Новгород, пл. Комсомольская 2';
 const phone = contractDefaults.phone || '+7 9200-789-888';
 
+// Extract city from legal address (defaults to Нижний Новгород)
+const city = legalAddress.split(',')[0]?.trim() || 'Нижний Новгород';
+
 // ── Build template variables ─────────────────────────────────────────────
 const now = new Date();
 const validityDays = Number(arg('validityDays', '30'));
@@ -287,8 +295,14 @@ const vars = {
   email,
   legal_address: legalAddress,
   phone,
+  city,
 
   client_name: clientName,
+  client_address: arg('clientAddress', 'уточняется при заключении договора'),
+  client_inn: arg('clientInn', ''),
+  client_details: arg('clientDetails', ''),
+  client_phone: arg('clientPhone', ''),
+  client_email: arg('clientEmail', ''),
   offer_type_label: offerTypeLabel,
   offer_summary: offerSummary,
   offer_description: arg('offerDescription', `Услуги по ${offerSummary} оказываются в соответствии с условиями настоящего коммерческого предложения.`),
