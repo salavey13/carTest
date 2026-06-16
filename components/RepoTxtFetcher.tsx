@@ -135,6 +135,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "supabase/migrations/20260601000000_user_rental_secrets.sql",
         "supabase/migrations/20260607000000_create_sale_contract_artifacts.sql",
         "supabase/migrations/20260508090000_repair_private_crew_secrets.sql",
+        "supabase/migrations/20260612000000_fix_rental_contract_artifacts.sql",
         // Forward-telegram API (for sending files when blocked)
         "app/api/forward-telegram/route.ts",
         // Dashboard components (for viewing generated docs)
