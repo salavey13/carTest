@@ -101,12 +101,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "app/actions.ts",
         "lib/debugLogger.ts",
         "lib/logger.ts",
-        "components/VibeContentRenderer.tsx",
-        "components/Header.tsx",
-"components/layout/BottomNavigation.tsx",
-"components/layout/ClientLayout.tsx",
+        "components/layout/ClientLayout.tsx",
         "types/database.types",
-        "components/repo/prompt.ts",
     ].filter(Boolean), []);
 
     // docXagent preset: Files for ZAI web agent to recreate doc generation system
@@ -136,6 +132,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "supabase/migrations/20260607000000_create_sale_contract_artifacts.sql",
         "supabase/migrations/20260508090000_repair_private_crew_secrets.sql",
         "supabase/migrations/20260612000000_fix_rental_contract_artifacts.sql",
+        "supabase/migrations/20260617000000_rental_sts_pledge.sql",
         // Forward-telegram API (for sending files when blocked)
         "app/api/forward-telegram/route.ts",
         // Dashboard components (for viewing generated docs)
