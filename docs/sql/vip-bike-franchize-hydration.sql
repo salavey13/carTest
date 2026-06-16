@@ -375,6 +375,47 @@ set
   contract_defaults = excluded.contract_defaults,
   updated_at = now();
 
+-- 5) ★ Stage 3: enrich contract_defaults with organization/bank details
+-- These fields complement existing contractDefaults for dynamic template rendering
+update private.crew_secrets
+set
+  contract_defaults = jsonb_set(
+    jsonb_set(
+      jsonb_set(
+        jsonb_set(
+          jsonb_set(
+            jsonb_set(
+              jsonb_set(
+                jsonb_set(
+                  jsonb_set(
+                    jsonb_set(
+                      jsonb_set(
+                        coalesce(contract_defaults::jsonb, '{}'::jsonb),
+                        '{organizationName}', '"Мотосалон ВипБайкЭлектро"'
+                      ),
+                      '{organizationShort}', '"ИП Воробьева Р.В."'
+                    ),
+                    '{organizationRepresentative}', '"ИП Воробьев Р.В."'
+                  ),
+                  '{ogrnip}', '"326527500025145"'
+                ),
+                '{inn}', '"525813643035"'
+              ),
+              '{bankAccount}', '"40802810942710013083"'
+            ),
+            '{bankName}', '"Волго-Вятский Банк ПАО Сбербанк"'
+          ),
+          '{bankCorrAccount}', '"30101810900000000603"'
+        ),
+        '{bankCity}', '"г. Нижний Новгород"'
+      ),
+      '{email}', '"vip_bike@mail.ru"'
+    ),
+    '{legalAddress}', '"г. Нижний Новгород, пл. Комсомольская 2"'
+  ),
+  updated_at = now()
+where crew_slug = 'vip-bike';
+
 commit;
 
 -- Verification helpers

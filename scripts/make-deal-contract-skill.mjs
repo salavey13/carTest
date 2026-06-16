@@ -20,6 +20,8 @@
 //                       address and pass it here. If provided, it overrides
 //                       passportJson.registration.
 //   --telegramChatId    Telegram chat ID for delivery (fallback: ADMIN_CHAT_ID env)
+//   --userId            User ID to determine crew membership and load crew secrets
+//   --crewSlug          Optional crew override (skips crew lookup, default: vip-bike)
 //   --startDate         Rent start date DD.MM.YYYY (rent only)
 //   --endDate           Rent end date DD.MM.YYYY (rent only)
 //   --startTime         Rent start time HH:MM (rent only, default 18:00)
@@ -278,6 +280,72 @@ const telegramChatId = arg('telegramChatId', process.env.ADMIN_CHAT_ID || '');
 // ── Supabase client ──────────────────────────────────────────────────────
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
+// ── Crew membership detection and secrets loading ─────────────────────────
+let crewSlug = arg('crewSlug', '').trim();
+let crewSecrets = { contractDefaults: {} };
+
+if (!crewSlug) {
+  const userId = arg('userId', '').trim();
+  if (userId) {
+    try {
+      const { data: memberData } = await supabase
+        .from('crew_members')
+        .select('crews(slug)')
+        .eq('user_id', userId)
+        .eq('membership_status', 'active')
+        .maybeSingle();
+
+      if (memberData?.crews?.slug) {
+        crewSlug = memberData.crews.slug;
+        console.error(`[deal-contract] Found crew: ${crewSlug} for userId: ${userId}`);
+      }
+    } catch (error) {
+      console.warn(`[deal-contract] Crew lookup failed for userId ${userId}: ${error.message}`);
+    }
+  }
+}
+
+// Fallback to vip-bike if no crew found
+if (!crewSlug) crewSlug = 'vip-bike';
+
+// Load crew secrets
+try {
+  const { data: secretsData } = await supabase
+    .from('crew_secrets')
+    .select('contract_defaults')
+    .eq('crew_slug', crewSlug)
+    .maybeSingle();
+
+  if (secretsData?.contract_defaults) {
+    if (typeof secretsData.contract_defaults === 'string') {
+      crewSecrets.contractDefaults = JSON.parse(secretsData.contract_defaults);
+    } else {
+      crewSecrets.contractDefaults = secretsData.contract_defaults;
+    }
+    console.error(`[deal-contract] Loaded crew_secrets for ${crewSlug}`);
+  }
+} catch (error) {
+  console.warn(`[deal-contract] Failed to load crew_secrets for ${crewSlug}: ${error.message}`);
+}
+
+// Extract contract defaults with fallbacks
+const contractDefaults = crewSecrets.contractDefaults || {};
+const crewOrgName = contractDefaults.organizationName || 'Мотосалон ВипБайкЭлектро';
+const crewOrgShort = contractDefaults.organizationShort || 'ИП Воробьева Р.В.';
+const crewOrgRepresentative = contractDefaults.organizationRepresentative || 'ИП Воробьев Р.В.';
+const crewOgrnip = contractDefaults.ogrnip || '326527500025145';
+const crewInn = contractDefaults.inn || '525813643035';
+const crewBankAccount = contractDefaults.bankAccount || '40802810942710013083';
+const crewBankName = contractDefaults.bankName || 'Волго-Вятский Банк ПАО Сбербанк';
+const crewBankCity = contractDefaults.bankCity || 'г. Нижний Новгород';
+const crewBankCorrAccount = contractDefaults.bankCorrAccount || '30101810900000000603';
+const crewEmail = contractDefaults.email || 'vip_bike@mail.ru';
+const crewLegalAddress = contractDefaults.legalAddress || 'г. Нижний Новгород, пл. Комсомольская 2';
+const crewIssuerName = contractDefaults.issuerName || 'Воробьев Р.В.';
+const crewIssuerRepresentative = contractDefaults.issuerRepresentative || 'Сидоров Илья Олегович';
+const crewReturnAddress = contractDefaults.returnAddress || 'Н. Н. пл. Комсомольская 2';
+const crewSignatoryRole = contractDefaults.signatoryRole || 'Менеджер Мотосалона';
+
 const supabaseRestSelect = (from, to) => {
   const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -501,9 +569,21 @@ if (dealType === 'rent') {
     late_return_penalty_max_days: arg('latePenaltyMaxDays','90'),
     bike_value_rub: bikeValueRub,
     bike_value_words: arg('bikeValueWords',''),
-    return_address:'г. Нижний Новгород, пл. Комсомольская 2',
-    lessor_address: arg('lessorAddress','г. Нижний Новгород'),
-    issuer_name:'Воробьев Р.В.', issuer_signatory:'Менеджер Мотосалона', issuer_representative:'ИП Воробьев Р.В.',
+    return_address: arg('returnAddress', crewReturnAddress),
+    lessor_address: arg('lessorAddress', crewLegalAddress),
+    issuer_name: crewIssuerName,
+    issuer_signatory: crewSignatoryRole,
+    issuer_representative: crewOrgRepresentative,
+    organization_name: crewOrgName,
+    organization_short: crewOrgShort,
+    ogrnip: crewOgrnip,
+    inn: crewInn,
+    bank_account: crewBankAccount,
+    bank_name: crewBankName,
+    bank_city: crewBankCity,
+    bank_corr_account: crewBankCorrAccount,
+    email: crewEmail,
+    legal_address: crewLegalAddress,
     signature_timestamp: now.toLocaleString('ru-RU'), signature_fingerprint:'offline-skill', renter_signature:'согласие через Telegram',
     bike_mileage: String(bike.specs?.mileage||''),
     equipment:'ключ(и) 1 шт.; шлем 1',
@@ -751,6 +831,7 @@ const result = {
   docFileName,
   isElectric,
   originalSha256,
+  crewSlug,
 };
 
 if (dealType === 'rent') {
