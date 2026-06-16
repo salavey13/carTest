@@ -17,6 +17,8 @@ export interface ItemGalleryProps {
   mainAspectRatio?: "16/11" | "16/9" | "21/10" | "4/3" | "1/1";
   disableKeyboardNav?: boolean;
   className?: string;
+  /** Optional close button to render in bottom-right of main image */
+  closeButton?: React.ReactNode;
 }
 
 export function ItemGallery({
@@ -31,6 +33,7 @@ export function ItemGallery({
   mainAspectRatio = "16/11",
   disableKeyboardNav = false,
   className = "",
+  closeButton,
 }: ItemGalleryProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [failedUrls, setFailedUrls] = useState<Record<string, true>>({});
@@ -112,6 +115,11 @@ export function ItemGallery({
           loading="eager"
           priority
         />
+        {closeButton && (
+          <div className="absolute bottom-3 right-3 z-30">
+            {closeButton}
+          </div>
+        )}
       </div>
     );
   }
@@ -164,6 +172,13 @@ export function ItemGallery({
         <div className="absolute bottom-3 left-3 rounded-full bg-black/55 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm select-none pointer-events-none" aria-live="polite">
           {activeIndex + 1} / {resolvedImages.length}
         </div>
+
+        {/* Close Button (optional) */}
+        {closeButton && (
+          <div className="absolute bottom-3 right-3 z-30">
+            {closeButton}
+          </div>
+        )}
       </div>
 
       {/* Thumbnails Strip */}

@@ -833,7 +833,13 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         </div>
 
                         {/* ── Info + CTA area (rentalbikes-style: highlight on hover, unified container to avoid gap) ── */}
-                        <div className="rounded-b-2xl bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]">
+                        <div className="rounded-b-2xl bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]"
+                          style={{
+                            // Show gradient background when card variant has gradient (index % 3 === 1)
+                            ...(item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) % 3 === 1
+                              ? { backgroundImage: `linear-gradient(to bottom, ${withAlpha(crew.theme.palette.bgCard, 0.85)}, ${crew.theme.palette.bgBase})` }
+                              : {})
+                          }}>
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
                             {item.isHot && (
@@ -952,7 +958,13 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         </div>
 
                         {/* ── Info + CTA area (rentalbikes-style: highlight on hover, unified container) ── */}
-                        <div className="rounded-b-2xl bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]">
+                        <div className="rounded-b-2xl bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]"
+                          style={{
+                            // Show gradient background when card variant has gradient (index % 3 === 1)
+                            ...(item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) % 3 === 1
+                              ? { backgroundImage: `linear-gradient(to bottom, ${withAlpha(crew.theme.palette.bgCard, 0.85)}, ${crew.theme.palette.bgBase})` }
+                              : {})
+                          }}>
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
                             {item.isHot && (

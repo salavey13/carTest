@@ -450,7 +450,7 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
         </div>
 
         {/* Floating badges (absolute top, no viewport-height flex) — safe padding for header */}
-        <div className="pointer-events-none absolute inset-x-0 z-20 p-3 pt-[max(3rem,env(safe-area-inset-top)+4.5rem)] md:top-0 md:p-6 md:pt-6">
+        <div className="pointer-events-none absolute inset-x-0 z-20 p-3 pt-[max(6rem,env(safe-area-inset-top)+5rem)] md:top-0 md:p-6 md:pt-12">
           <div className="flex flex-wrap gap-2">
             <Badge className="border bg-black/55 text-white backdrop-blur-md">{useLeafletMap ? `Leaflet${isUsingTelegram ? " + Telegram GPS" : " + Browser GPS"}` : "VibeMap"}</Badge>
             <Badge className="border border-emerald-300/45 bg-emerald-500/20 text-emerald-100">live {riderStatusCounts.live}</Badge>
