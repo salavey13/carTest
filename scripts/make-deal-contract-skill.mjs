@@ -38,6 +38,21 @@
 //   --latePenaltyMaxDays Late return max penalty days (rent only)
 //   --subtotal          Override computed subtotal (rent only)
 //   --bikeValueWords    Bike value in Russian words (rent only)
+//   --stsInsteadOfDeposit  (rent only, FLAG, no value) Switch collateral mode:
+//                          instead of taking a cash security deposit, take the
+//                          renter's own vehicle СТС (Свидетельство о регистрации
+//                          ТС) in pledge. Requires --stsJson. See
+//                          /skills/rental-contract-from-photos/SKILL.md §"СТС-вместо-депозита".
+//   --stsJson           (rent only) Path to СТС OCR JSON. Required when
+//                          --stsInsteadOfDeposit is set. Schema:
+//                          { series, number, issueDate, vehiclePlate, vehicleVin,
+//                            vehicleModel, vehicleYear, ownerFullName,
+//                            ownerRegistration }
+//   --stsOwnerRelation  (rent only, optional) Relationship of СТС owner to
+//                          renter when they differ — e.g. "жена", "отец",
+//                          "доверенность". Default: "сам арендатор".
+//   --stsPledgeReturnDays (rent only, optional) Working days to return СТС
+//                          after bike return. Default: 3.
 //   --saveMetadata      Set to "1" to write metadata to Supabase
 //   --metadataTable     Override metadata table name
 //
@@ -78,7 +93,50 @@ const RENTAL_DOC_TEMPLATE_MODE = String(process.env.RENTAL_DOC_TEMPLATE_MODE || 
 // ── Utility functions ────────────────────────────────────────────────────
 
 function renderTemplateWithVars(template, vars) {
-  return template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_,k)=> String(vars[k] ?? ''));
+  // First pass: strip HTML comments so that any {{#if}}/{{else}}/{{/if}} or
+  // {{var}} text used as documentation inside <!-- ... --> is NOT processed
+  // as real template syntax. (Comments are not preserved in the final DOCX
+  // anyway — htmlToDocxElements drops them.)
+  let out = template.replace(/<!--[\s\S]*?-->/g, '');
+
+  // Conditional blocks {{#if var}}...{{else}}...{{/if}}
+  // Truthy: any non-empty string that is not "0" / "false" / "no". Numbers > 0 truthy.
+  const isTruthy = (v) => {
+    if (v === null || v === undefined) return false;
+    if (typeof v === 'number') return v > 0;
+    if (typeof v === 'boolean') return v;
+    const s = String(v).trim().toLowerCase();
+    if (s === '' || s === '0' || s === 'false' || s === 'no' || s === 'null' || s === 'undefined') return false;
+    return true;
+  };
+
+  // Process INNERMOST blocks first: a block whose body contains NO nested
+  // {{#if}} opener and NO nested {{/if}} closer. The negated lookahead
+  // (?!...)(?:(?!\{\{#if\s)(?!\{\{/if\}\}).)  matches one char at a time,
+  // failing fast if it sees either marker — so the body cannot contain a
+  // nested conditional. The `s` (dotAll) flag lets `.` match newlines so
+  // multi-line blocks (e.g. App.1's pledge clause spanning two <p> tags)
+  // match correctly. This guarantees correct nesting behaviour.
+  const blockRe = /\{\{#if\s+([a-zA-Z0-9_]+)\s*\}\}((?:(?!\{\{#if\s|\{\{\/if\}\}).)*?)\{\{\/if\}\}/gs;
+  let guard = 0;
+  while (guard++ < 100) {
+    let replaced = false;
+    out = out.replace(blockRe, (full, varName, body) => {
+      replaced = true;
+      let ifBranch = body, elseBranch = '';
+      const elseIdx = body.indexOf('{{else}}');
+      if (elseIdx >= 0) {
+        ifBranch = body.slice(0, elseIdx);
+        elseBranch = body.slice(elseIdx + '{{else}}'.length);
+      }
+      return isTruthy(vars[varName]) ? ifBranch : elseBranch;
+    });
+    if (!replaced) break;
+  }
+
+  // Final pass: simple {{var}} interpolation
+  out = out.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, k) => String(vars[k] ?? ''));
+  return out;
 }
 
 /**
@@ -264,6 +322,30 @@ if (dealType === 'rent') {
   const licensePath = arg('licenseJson');
   if (!licensePath) failStage('license_parse', 'missing_licenseJson', { hint: '--licenseJson is required for rent deals' });
   licenseJson = JSON.parse(readFileSync(licensePath,'utf8'));
+}
+
+// ── СТС pledge (rent only, opt-in) ───────────────────────────────────────
+// When --stsInsteadOfDeposit is set, the renter pledges the СТС of their own
+// vehicle instead of paying a cash security deposit. The СТС OCR JSON must
+// contain: series, number, ownerFullName, vehiclePlate (other fields optional).
+let stsJson = null;
+const stsPledgeEnabled = dealType === 'rent' && hasFlag('stsInsteadOfDeposit');
+if (stsPledgeEnabled) {
+  const stsPath = arg('stsJson');
+  if (!stsPath) failStage('sts_parse', 'missing_stsJson', { hint: '--stsInsteadOfDeposit requires --stsJson <path> with СТС OCR JSON' });
+  try {
+    stsJson = JSON.parse(readFileSync(stsPath, 'utf8'));
+  } catch (e) {
+    failStage('sts_parse', 'sts_json_invalid', { hint: 'Could not parse --stsJson as JSON', error: String(e?.message || e) });
+  }
+  const stsSeries  = String(stsJson.series || '').trim();
+  const stsNumber  = String(stsJson.number || '').trim();
+  const stsOwner   = String(stsJson.ownerFullName || '').trim();
+  const stsPlate   = String(stsJson.vehiclePlate || '').trim();
+  if (!stsSeries || !stsNumber) failStage('sts_parse', 'missing_sts_series_number', { hint: 'sts.json must contain series and number (e.g. {"series":"77","number":"12345678"})' });
+  if (!stsOwner)   failStage('sts_parse', 'missing_sts_owner');
+  if (!stsPlate)   failStage('sts_parse', 'missing_sts_vehicle_plate');
+  console.error(`[deal-contract] СТС pledge mode ENABLED: series=${stsSeries} number=${stsNumber} plate=${stsPlate} owner=${stsOwner}`);
 }
 
 // ── Buyer address: manual override for cursive handwriting ──────────────
@@ -519,6 +601,27 @@ if (dealType === 'rent') {
     : Number(bike.specs?.price_rub) > 0 ? String(bike.specs.price_rub)
     : arg('bikeValue', '850000');
 
+  // ── СТС pledge vars (rent only) ─────────────────────────────────────────
+  // When stsPledgeEnabled is true the template renders the СТС-pledge clauses
+  // in §4.3/4.4/4.5/4.7 and Appendix 1; otherwise the classic cash-deposit
+  // clauses render and all sts_* vars stay empty (the {{#if sts_collateral}}
+  // blocks fall through to {{else}}).
+  const stsPledgeReturnDays = Number(arg('stsPledgeReturnDays', '3')) || 3;
+  const stsOwnerRelation = arg('stsOwnerRelation', 'сам арендатор');
+  // If СТС owner differs from renter, require explicit relation disclosure
+  if (stsPledgeEnabled && stsJson) {
+    const stsOwnerNorm = String(stsJson.ownerFullName || '').trim().toLowerCase();
+    const renterNorm   = String(passportJson.fullName || '').trim().toLowerCase();
+    if (stsOwnerNorm && renterNorm && stsOwnerNorm !== renterNorm
+        && stsOwnerRelation === 'сам арендатор') {
+      failStage('sts_parse', 'sts_owner_mismatch', {
+        hint: 'СТС owner differs from renter. Pass --stsOwnerRelation to disclose the relationship (e.g. "жена", "отец", "доверенность").',
+        stsOwner: stsJson.ownerFullName,
+        renter: passportJson.fullName,
+      });
+    }
+  }
+
   let subtotal;
   if (isHourlyRental) {
     subtotal = Number(bikeHourlyPrice) * rentalHours;
@@ -569,6 +672,21 @@ if (dealType === 'rent') {
     late_return_penalty_max_days: arg('latePenaltyMaxDays','90'),
     bike_value_rub: bikeValueRub,
     bike_value_words: arg('bikeValueWords',''),
+    // СТС pledge vars — only populated when --stsInsteadOfDeposit is set.
+    // Template uses {{#if sts_collateral}} to switch between СТС and cash-deposit clauses.
+    sts_collateral: stsPledgeEnabled ? '1' : '',
+    sts_series: stsJson?.series || '',
+    sts_number: stsJson?.number || '',
+    sts_issue_date: stsJson?.issueDate || '',
+    sts_vehicle_plate: stsJson?.vehiclePlate || '',
+    sts_vehicle_vin: stsJson?.vehicleVin || '',
+    sts_vehicle_model: stsJson?.vehicleModel || '',
+    sts_vehicle_year: stsJson?.vehicleYear || '',
+    sts_owner_full_name: stsJson?.ownerFullName || '',
+    sts_owner_registration: stsJson?.ownerRegistration || '',
+    sts_owner_relation: stsOwnerRelation,
+    sts_pledge_return_days: String(stsPledgeReturnDays),
+    sts_deposit_amount_skipped: stsPledgeEnabled ? bikeDeposit : '',
     return_address: arg('returnAddress', crewReturnAddress),
     lessor_address: arg('lessorAddress', crewLegalAddress),
     issuer_name: crewIssuerName,
@@ -852,6 +970,18 @@ if (dealType === 'rent') {
   result.rentalHours = rentalHours;
   result.rentalDays = rentalDays;
   result.subtotal = vars.subtotal_rub;
+  if (stsPledgeEnabled) {
+    result.stsPledgeUsed = true;
+    result.stsSeries = vars.sts_series;
+    result.stsNumber = vars.sts_number;
+    result.stsVehiclePlate = vars.sts_vehicle_plate;
+    result.stsOwnerFullName = vars.sts_owner_full_name;
+    result.stsOwnerRelation = vars.sts_owner_relation;
+    result.stsPledgeReturnDays = vars.sts_pledge_return_days;
+    result.depositAmountSkipped = vars.sts_deposit_amount_skipped;
+  } else {
+    result.stsPledgeUsed = false;
+  }
 } else {
   result.priceDigits = vars.price_digits;
   result.priceWords = vars.price_words;
@@ -877,6 +1007,22 @@ if (saveMetadata) {
     payload.renter_full_name = vars.renter_full_name;
     payload.rent_start_date = vars.rent_start_date;
     payload.rent_end_date = vars.rent_end_date;
+    // СТС pledge metadata (columns added by migration 20260617000000_rental_sts_pledge.sql)
+    payload.sts_pledge_used = stsPledgeEnabled;
+    if (stsPledgeEnabled) {
+      payload.sts_series             = vars.sts_series;
+      payload.sts_number             = vars.sts_number;
+      payload.sts_issue_date         = vars.sts_issue_date;
+      payload.sts_vehicle_plate      = vars.sts_vehicle_plate;
+      payload.sts_vehicle_vin        = vars.sts_vehicle_vin;
+      payload.sts_vehicle_model      = vars.sts_vehicle_model;
+      payload.sts_vehicle_year       = vars.sts_vehicle_year;
+      payload.sts_owner_full_name    = vars.sts_owner_full_name;
+      payload.sts_owner_registration = vars.sts_owner_registration;
+      payload.sts_owner_relation     = vars.sts_owner_relation;
+      payload.sts_pledge_return_days = Number(stsPledgeReturnDays);
+      payload.deposit_amount_skipped = vars.sts_deposit_amount_skipped;
+    }
   } else {
     payload.buyer_full_name = vars.buyer_full_name;
     payload.sale_price = vars.price_digits;
