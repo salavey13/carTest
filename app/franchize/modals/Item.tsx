@@ -468,14 +468,11 @@ export function ItemModal({
         style={surface.card}
       >
         <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
-          {/* Quick Close Button — positioned below right gallery arrow */}
+          {/* Quick Close Button — positioned in top-right corner for better visibility on mobile */}
           <button
             type="button"
             onClick={onClose}
-            className="absolute z-10 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--item-border)]/60 text-[var(--item-text)] transition hover:bg-[var(--item-border)]/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-            style={{
-              top: "calc(50% + 2.875rem)",
-            }}
+            className="absolute z-20 right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--item-border)]/80 text-[var(--item-text)] transition hover:bg-[var(--item-border)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
             aria-label="Закрыть"
           >
             <X className="h-4 w-4" />
