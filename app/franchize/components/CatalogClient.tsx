@@ -65,6 +65,32 @@ function tierVisuals(tier: AccessTier): { emoji: string; color: string; label: s
   }
 }
 
+// ── Priority Spec Helper (VIP Bike Landing & Catalog Improvements) ──
+// Extract consistent 3 priority specs with Russian labels based on bike type
+// Electrics: Power (кВт), Speed (км/ч), Range (км)
+// ICE: Power (л.с.), Speed (км/ч), Engine (см³)
+function getPrioritySpecs(item: CatalogItemVM): Array<{ label: string; value: string; unit: string }> {
+  const rs = item.rawSpecs;
+  // Type guard: ensure rawSpecs is a plain object before accessing properties
+  const isObject = rs !== null && typeof rs === 'object' && !Array.isArray(rs);
+  const safeRs = isObject ? rs as Record<string, unknown> : {};
+  const isElectric = safeRs?.type === "Electric";
+
+  if (isElectric) {
+    return [
+      { label: "Мощность", value: String(safeRs?.power_kw ?? ""), unit: "кВт" },
+      { label: "Скорость", value: String(safeRs?.top_speed_kmh ?? ""), unit: "км/ч" },
+      { label: "Запас хода", value: String(safeRs?.range_km ?? ""), unit: "км" },
+    ].filter(s => s.value !== "" && s.value !== "undefined" && s.value !== "null");
+  } else {
+    return [
+      { label: "Мощность", value: String(safeRs?.power_hp ?? safeRs?.bike_power_hp ?? ""), unit: "л.с." },
+      { label: "Скорость", value: String(safeRs?.top_speed_kmh ?? ""), unit: "км/ч" },
+      { label: "Объём", value: String(safeRs?.engine_cc ?? safeRs?.bike_engine_cc ?? ""), unit: "см³" },
+    ].filter(s => s.value !== "" && s.value !== "undefined" && s.value !== "null");
+  }
+}
+
 // Check if a rawSpecs flag is truthy (same logic as electro-enduro page)
 const isSpecEnabled = (value: unknown) =>
   value === 1 || value === true ||
@@ -426,6 +452,30 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     return [{ category: saleCategory, items: saleGroup }, ...normalized];
   }, [filteredItems, mode, orderedCategories, quickFilter]);
 
+  // ── VIP Bike Categorization (VIP Bike Landing & Catalog Improvements) ──
+  // Categorize bikes by type + sale status for vip-bike franchize
+  const categorizedItems = useMemo(() => {
+    const electric = items.filter(i =>
+      (i.rawSpecs as Record<string, unknown> | undefined)?.type === "Electric"
+    );
+
+    const iceForSale = items.filter(i => {
+      const rs = i.rawSpecs as Record<string, unknown> | undefined;
+      return rs?.type === "ICE" && (rs?.sale === true || i.saleAvailable);
+    });
+
+    const iceRentOnly = items.filter(i => {
+      const rs = i.rawSpecs as Record<string, unknown> | undefined;
+      return rs?.type === "ICE" && !(rs?.sale === true || i.saleAvailable);
+    });
+
+    return [
+      { category: "", title: "", items: electric },
+      { category: "", title: "", items: iceForSale },
+      { category: "partners", title: "Байки партнёров", items: iceRentOnly },
+    ].filter(g => g.items.length > 0);
+  }, [items]);
+
   const recordRentIntent = useCallback((item: CatalogItemVM, stage: "viewed" | "configured", metadata: Record<string, unknown> = {}) => {
     const strip = buildCatalogRentalStrip(item, crew);
     return upsertFranchizeIntent({
@@ -725,29 +775,31 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
               {[0, 1, 2, 3].map((index) => <CatalogCardSkeleton key={index} index={index} />)}
             </div>
           </section>
-        ) : itemsByCategory.length === 0 ? (
+        ) : ((slug === "vip-bike" || crew.slug === "vip-bike") ? categorizedItems : itemsByCategory).length === 0 ? (
           <div className="rounded-2xl border border-dashed p-4 text-sm" style={surface.mutedText}>
             По этому запросу нет готового варианта. Попробуйте другую модель, бюджет или сценарий поездки.
           </div>
         ) : (
           <div className="space-y-6">
-            {itemsByCategory.map((group) => (
-              <section key={group.category} id={toCategoryId(group.category)} data-category={group.category} data-count={group.items.length}>
+            {((slug === "vip-bike" || crew.slug === "vip-bike") ? categorizedItems : itemsByCategory).map((group) => (
+              <section key={group.category || group.title || "section"} id={toCategoryId(group.category || group.title || "section")} data-category={group.category || group.title} data-count={group.items.length}>
+                {group.title && (
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <h2 className="text-2xl font-bold uppercase leading-tight tracking-tight text-[var(--catalog-text)]">
-                    {group.category}
+                    {group.title || group.category}
                   </h2>
                   <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--catalog-card-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--catalog-muted)]">
                     {group.items.length} шт.
                   </span>
                 </div>
+                )}
                 {group.items.length <= 8 ? (
                   <>
                     {/* ── CAROUSEL MODE (≤8 items) ── Cards aligned with reference design:
                         Image → Badges → Title → Specs (icon+text) → Price (large bold) → CTA */}
                     <div
                       ref={(node) => {
-                        carouselRefs.current[group.category] = node;
+                        carouselRefs.current[group.category || group.title || "section"] = node;
                       }}
                       className="flex snap-x snap-mandatory gap-3 overflow-x-auto [overflow-y:clip] pt-1 pb-2 [touch-action:pan-y_pan-x] overscroll-behavior-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                       tabIndex={0}
