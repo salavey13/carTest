@@ -239,8 +239,8 @@ export default async function ElectroEnduroPage({
         mode="electro"
       />
       {/* Intro section moved below catalog per UX requirements */}
-      <section className="mx-auto w-full max-w-7xl px-4 py-6 2xl:max-w-[1600px]">
-        <div className="rounded-3xl border border-[var(--enduro-border)] bg-[var(--enduro-card)] p-5 backdrop-blur-sm sm:p-8">
+      <section className="mx-auto w-full max-w-5xl px-4 py-6 sm:max-w-6xl lg:max-w-7xl 2xl:max-w-[1600px]">
+        <div className="mx-auto rounded-3xl border border-[var(--enduro-border)] bg-[var(--enduro-card)] p-5 backdrop-blur-sm sm:p-8 lg:max-w-4xl">
           <p className="text-xs uppercase tracking-[0.18em] text-[var(--enduro-muted)]">
             Electro-Enduro flow
           </p>
@@ -252,25 +252,25 @@ export default async function ElectroEnduroPage({
             на маршруте. Для заказа в собственность используйте конфигуратор:
             параметры, комплектация и оформление идут отдельным потоком.
           </p>
-          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <article className="rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-card-soft)] p-4 text-[var(--enduro-text)] shadow-lg">
+          <div className="mt-6 grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-2">
+            <article className="flex flex-col rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-card-soft)] p-5 text-[var(--enduro-text)] shadow-lg transition-all hover:shadow-xl">
               <h2 className="text-lg font-medium">Аренда / тест-драйв</h2>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--enduro-muted)]">
+              <ul className="mt-3 flex-1 list-disc space-y-2 pl-5 text-sm text-[var(--enduro-muted)]">
                 <li>Быстрый старт для знакомства с техникой.</li>
                 <li>
                   Подходит для сравнения нескольких моделей перед покупкой.
                 </li>
                 <li>Маршрутный формат и базовый инструктаж перед выездом.</li>
               </ul>
-              <div className="mt-4 inline-flex rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-muted)]">
+              <div className="mt-4 inline-flex rounded-xl border border-[var(--enduro-border)] bg-[var(--enduro-accent-faint)] px-4 py-2 text-sm font-medium text-[var(--enduro-accent)]">
                 Вы находитесь в каталоге аренды
               </div>
             </article>
-            <article className="rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-card-soft)] p-4 text-[var(--enduro-text)] shadow-lg">
+            <article className="flex flex-col rounded-2xl border border-[var(--enduro-border)] bg-[var(--enduro-card-soft)] p-5 text-[var(--enduro-text)] shadow-lg transition-all hover:shadow-xl">
               <h2 className="text-lg font-medium">
                 Продажа / кастомная сборка
               </h2>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--enduro-muted)]">
+              <ul className="mt-3 flex-1 list-disc space-y-2 pl-5 text-sm text-[var(--enduro-muted)]">
                 <li>
                   Выбор батареи, мощности, подвески и дополнительных опций.
                 </li>
@@ -278,7 +278,7 @@ export default async function ElectroEnduroPage({
                 <li>Лучше для тех, кто ищет байк в постоянное владение.</li>
               </ul>
               <Link
-                className="mt-4 inline-flex rounded-xl border border-[var(--enduro-border)] px-3 py-2 text-sm text-[var(--enduro-text)] hover:border-[var(--enduro-accent)] hover:bg-[var(--enduro-accent)] hover:text-[var(--enduro-accent-text)]"
+                className="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-[var(--enduro-accent)] bg-[var(--enduro-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--enduro-accent-text)] transition-all hover:opacity-90 sm:w-auto"
                 href={`/franchize/${crew.slug || slug}/configurator`}
               >
                 Перейти в конфигуратор

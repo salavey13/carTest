@@ -26,6 +26,7 @@ import {
   type FranchizeCrewVM,
 } from "@/app/franchize/actions";
 import { readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
+import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import {
   FranchizeOperatorLinkButton,
   FranchizeOperatorPanel,
@@ -162,6 +163,9 @@ export function FranchizeProfileClient({
   initialSlug,
 }: FranchizeProfileClientProps) {
   const { dbUser } = useAppContext();
+
+  // Apply franchize theme CSS variables for proper light/dark mode support
+  useFranchizeTheme(initialCrew?.theme || fallbackCrew.theme);
   const params = useParams<{ slug: string }>();
   const slug = initialSlug || params?.slug || initialCrew?.slug || "vip-bike";
   const crew = initialCrew || fallbackCrew;
@@ -237,6 +241,10 @@ export function FranchizeProfileClient({
     crew.theme.palette.accentMain,
     crew.theme.palette,
   );
+  const isAuto = crew.theme.isAuto;
+  const palette = isAuto
+    ? (crew.theme.palettes?.light || crew.theme.palettes?.dark || crew.theme.palette)
+    : crew.theme.palette;
 
   const handlePrefillSave = async () => {
     if (!dbUser?.user_id) return;
@@ -282,10 +290,22 @@ export function FranchizeProfileClient({
       animate="visible"
       className="space-y-4"
       style={{
+        // Profile-specific variables
         ["--fr-profile-accent" as string]: crew.theme.palette.accentMain,
         ["--fr-profile-border" as string]: crew.theme.palette.borderSoft,
         ["--fr-profile-text" as string]: crew.theme.palette.textPrimary,
         ["--fr-profile-muted" as string]: crew.theme.palette.textSecondary,
+        // Shell variables for FranchizeOperatorPanel compatibility
+        ["--franchize-shell-bg" as string]: isAuto ? "var(--franchize-bg-base)" : palette.bgBase,
+        ["--franchize-shell-card" as string]: isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
+        ["--franchize-shell-border" as string]: isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
+        ["--franchize-shell-text" as string]: isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
+        ["--franchize-shell-muted" as string]: isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary,
+        ["--franchize-shell-accent" as string]: isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
+        ["--franchize-shell-primary-contrast" as string]: isAuto
+          ? readablePaletteTextOnColor(crew.theme.palettes?.dark?.accentMain || crew.theme.palettes?.light?.accentMain || crew.theme.palette.accentMain, crew.theme.palettes?.dark || crew.theme.palettes?.light || crew.theme.palette)
+          : readablePaletteTextOnColor(palette.accentMain, palette),
+        ["--franchize-shell-ring" as string]: isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
       }}
     >
       {/* Header Panel */}
