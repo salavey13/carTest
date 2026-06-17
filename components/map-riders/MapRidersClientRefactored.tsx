@@ -35,7 +35,6 @@ import { RidersDrawer } from "@/components/map-riders/RidersDrawer";
 import { StatusOverlay } from "@/components/map-riders/StatusOverlay";
 import { SpeedGradientRoute } from "@/components/map-riders/SpeedGradientRoute";
 import { MapRidersDebugPanel } from "@/components/map-riders/MapRidersDebugPanel";
-import { MapRidersSkeleton } from "@/components/map-riders/LoadingSkeleton";
 import { BeginnerRiderOnboardingQuiz } from "@/components/map-riders/BeginnerRiderOnboardingQuiz";
 import { useSessionManager } from "@/app/franchize/hooks/useSessionManager";
 
@@ -286,11 +285,6 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
     [state.stats.activeRiders, state.stats.meetupCount, state.stats.totalWeeklyDistanceKm],
   );
 
-  const shareModeLabel = state.visibilityMode === "public" ? "публично" : "экипаж";
-  const nextAutoStopLabel = state.shareExpiresAt
-    ? new Date(state.shareExpiresAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
-    : `${state.autoExpireMinutes} мин`;
-
   const handleQuickMeetupCreate = useCallback(async () => {
     if (!dbUser?.user_id) {
       toast.error("Авторизуйся в Telegram/VIP BIKE");
@@ -407,7 +401,13 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
 
   return (
     <div
-      className="flex-1 h-full w-full overflow-hidden"
+      // `relative` is the fix for the rail-link/tap-hijack saga: without it the
+      // <section className="absolute inset-0"> map escapes this box and pins
+      // itself to the viewport (top:0), sliding UNDER the sticky CrewHeader and
+      // stealing taps from the header's link rail. With `relative`, inset-0 is
+      // resolved against THIS box — which sits below the header in the flex
+      // column — so the map starts exactly where the header ends.
+      className="relative flex-1 h-full w-full overflow-hidden"
       style={{ ...cssVars }}
     >
       {/* ── MAP (fullscreen background) ── */}
@@ -417,7 +417,7 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
             <RacingMap
               points={mapPoints}
               bounds={mapData?.bounds || mapBounds || DEFAULT_BOUNDS}
-              className="h-full min-h-[calc(100dvh-10rem)] w-full sm:min-h-[100dvh]"
+              className="h-full w-full"
               tileLayer={finalTileLayer}
               onMapClick={(coords) => {
                 setSelectedMeetupId(null);
@@ -449,26 +449,16 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
           />
         </div>
 
-        {/* Floating status "balloons" (absolute top) over the fullscreen map.
-            Mobile: pointer-events-auto so taps on these balloons are caught by
-            this layer instead of falling through to the Leaflet map beneath
-            (the map is z-0, visually "underneath" the balloons). Without this
-            the map hijacks taps on the balloons and drops a meetup pin.
-            Extra top padding clears the taller mobile CrewHeader. The meetup
-            pill below keeps its own pointer-events-auto and stays clickable.
-            Desktop keeps tap passthrough (md:pointer-events-none) + md:pt-12. */}
-        <div className="pointer-events-auto md:pointer-events-none absolute inset-x-0 z-20 p-3 pt-[max(8rem,env(safe-area-inset-top)+6.5rem)] md:top-0 md:p-6 md:pt-12">
-          <div className="flex flex-wrap gap-2">
-            <Badge className="border bg-black/55 text-white backdrop-blur-md">{useLeafletMap ? `Leaflet${isUsingTelegram ? " + Telegram GPS" : " + Browser GPS"}` : "VibeMap"}</Badge>
-            <Badge className="border border-emerald-300/45 bg-emerald-500/20 text-emerald-100">live {riderStatusCounts.live}</Badge>
-            {riderStatusCounts.stale ? <Badge className="border border-amber-300/45 bg-amber-500/20 text-amber-100">stale {riderStatusCounts.stale}</Badge> : null}
-            {mapData?.routes?.length ? <Badge className="border border-sky-300/50 bg-sky-500/20 text-sky-100">{mapData.routes.length} маршрутов</Badge> : null}
-            <Badge className="border border-[var(--mr-border)] bg-black/45 text-[var(--mr-text)]/90">{shareModeLabel} • автостоп {nextAutoStopLabel}</Badge>
-            {showDemo ? (
-              <Badge className="border border-emerald-300/40 bg-emerald-500/20 text-emerald-100">Демо-режим</Badge>
-            ) : null}
-          </div>
-          <div className="mt-2 flex justify-end">
+        {/* Meetup selector pill (top-right). The map now starts below the
+            CrewHeader (the section is contained in the relative flex-1 wrapper
+            above), so this never overlaps the header's link rail. The wrapper is
+            pointer-events-none, so map taps/drag pass through everywhere except
+            the pill. The old floating status "balloons" (engine / live / stale /
+            маршрутов / share-mode badges) were removed: they duplicated info
+            already in the bottom sheet and their pointer-events handling was the
+            recurring source of stolen taps. */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 p-3 md:p-4">
+          <div className="flex justify-end">
             <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-2xl border border-[var(--mr-border)] bg-[var(--mr-card)]/80 px-3 py-2 text-xs text-[var(--mr-text)] shadow-2xl shadow-black/30 backdrop-blur-md">
               <span className="min-w-0">
                 <span className="block font-medium text-[var(--mr-text)]">
@@ -698,7 +688,6 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
         </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
-      {state.isLoading ? <MapRidersSkeleton /> : null}
       <StatusOverlay />
       <RiderFAB />
       <RidersDrawer emptyStateCopy={drawerEmptyStateCopy} />
