@@ -34,7 +34,7 @@ export default async function MapRidersPage({ params }: { params: Promise<{ slug
     <main className={`flex flex-col min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
       {/* Wrap header in z-index container to isolate from map */}
       <div className="relative z-10">
-        <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} items={items} />
+        <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} items={items} showRail={false} />
       </div>
       <MapRidersClient crew={crew} slug={crewSlug} items={items} />
     </main>

@@ -29,9 +29,10 @@ interface CrewHeaderProps {
   groupLinks?: string[];
   sectionLinks?: FranchizeSectionLink[];
   items?: CatalogItemVM[];
+  showRail?: boolean;
 }
 
-export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [], items }: CrewHeaderProps) {
+export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [], items, showRail = true }: CrewHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [catalogLinks, setCatalogLinks] = useState<string[]>([]);
@@ -393,7 +394,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
         </div>
       </div>
 
-      {visibleRailLinks.length > 0 && (
+      {showRail && visibleRailLinks.length > 0 && (
         <div
           className="-mx-4 mt-1 border-t px-4 pt-2"
           style={{ borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft }}

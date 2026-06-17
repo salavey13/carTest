@@ -39,17 +39,26 @@ export function FranchizePromptModal({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : null)}>
-      <DialogContent className="border-white/20 bg-zinc-950/95 text-white backdrop-blur-md">
+      <DialogContent className="border-[var(--dialog-border)] bg-[var(--dialog-bg)] text-[var(--dialog-text)] backdrop-blur-md" style={
+        {
+          "--dialog-border": "hsl(var(--border))",
+          "--dialog-bg": "hsl(var(--background))",
+          "--dialog-text": "hsl(var(--foreground))",
+        } as React.CSSProperties
+      }>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription className="text-zinc-300">Укажи название и подтверди действие.</DialogDescription>
+          <DialogDescription className="text-[var(--dialog-muted)]" style={
+            {
+              "--dialog-muted": "hsl(var(--muted-foreground))",
+            } as React.CSSProperties
+          }>Укажи название и подтверди действие.</DialogDescription>
         </DialogHeader>
 
         <Input
           value={value}
           onChange={(event) => setValue(event.target.value)}
           placeholder={placeholder}
-          className="border-white/20 bg-zinc-900/70 text-white"
           autoFocus
         />
 
@@ -59,7 +68,7 @@ export function FranchizePromptModal({
           </Button>
           <Button
             type="button"
-            className="bg-amber-400 text-black hover:bg-amber-300"
+            className="bg-amber-400 text-black hover:bg-amber-300 focus-visible:ring-amber-400"
             onClick={() => onSubmit(value)}
           >
             Подтвердить

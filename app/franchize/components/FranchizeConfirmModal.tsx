@@ -40,10 +40,20 @@ export function FranchizeConfirmModal({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : null)}>
-      <DialogContent className="border-white/20 bg-zinc-950/95 text-white backdrop-blur-md">
+      <DialogContent className="border-[var(--dialog-border)] bg-[var(--dialog-bg)] text-[var(--dialog-text)] backdrop-blur-md" style={
+        {
+          "--dialog-border": "hsl(var(--border))",
+          "--dialog-bg": "hsl(var(--background))",
+          "--dialog-text": "hsl(var(--foreground))",
+        } as React.CSSProperties
+      }>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription className="whitespace-pre-line text-zinc-300">{message}</DialogDescription>
+          <DialogDescription className="whitespace-pre-line text-[var(--dialog-muted)]" style={
+            {
+              "--dialog-muted": "hsl(var(--muted-foreground))",
+            } as React.CSSProperties
+          }>{message}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose}>
