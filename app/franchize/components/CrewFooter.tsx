@@ -15,9 +15,25 @@ export function CrewFooter({ crew }: CrewFooterProps) {
   // Apply franchize theme CSS variables
   useFranchizeTheme(crew.theme);
 
-  const bg = crew.theme.palette.accentMain;
-  const text = readablePaletteTextOnColor(bg, crew.theme.palette);
-  const border = withAlpha(text, 0.22);
+  const palette = crew.theme.palette;
+  const isAuto = crew.theme.isAuto;
+
+  // The footer's main zone is painted on the accent color, so its text must
+  // contrast with the accent — not with the base background. In auto mode we
+  // resolve against the dark palette so a bright accent (e.g. gold on a dark
+  // theme) gets dark text instead of the white text-primary. Same pattern as
+  // FranchizePageShell / sales / community — keeps this readable for any dark
+  // theme with a light accent, not just vip-bike.
+  const accentPalette = isAuto
+    ? crew.theme.palettes?.dark || crew.theme.palettes?.light || palette
+    : palette;
+  const accentText = readablePaletteTextOnColor(accentPalette.accentMain, accentPalette);
+  const footerBorder = withAlpha(accentText, 0.22);
+
+  // The copyright strip sits on the base background (not the accent), so it
+  // needs the regular primary text rather than the accent-on color.
+  const subBg = isAuto ? "var(--franchize-bg-base)" : withAlpha(palette.bgBase, 0.12);
+  const subText = isAuto ? "var(--franchize-text-primary)" : accentText;
 
   const socialLinks =
     crew.footer.socialLinks.length > 0
@@ -40,13 +56,11 @@ export function CrewFooter({ crew }: CrewFooterProps) {
     <footer
       className="mt-8 overflow-hidden border-t border-[var(--footer-border)]"
       style={{
-        background: `linear-gradient(135deg, ${crew.theme.isAuto ? "var(--franchize-accent-main)" : bg} 0%, ${crew.theme.isAuto ? "var(--franchize-accent-main)" : (crew.theme.palette.accentDeep || bg)} 100%)`,
-        color: crew.theme.isAuto ? "var(--franchize-text-primary)" : text,
-        ["--footer-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : text,
-        ["--footer-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : border,
-        ["--footer-sub-bg" as string]: crew.theme.isAuto
-          ? "var(--franchize-bg-base)"
-          : withAlpha(crew.theme.palette.bgBase, 0.12),
+        background: `linear-gradient(135deg, ${isAuto ? "var(--franchize-accent-main)" : palette.accentMain} 0%, ${isAuto ? "var(--franchize-accent-main)" : (palette.accentDeep || palette.accentMain)} 100%)`,
+        color: accentText,
+        ["--footer-text" as string]: accentText,
+        ["--footer-border" as string]: footerBorder,
+        ["--footer-sub-bg" as string]: subBg,
       }}
     >
       <div className="mx-auto grid w-full max-w-7xl gap-x-8 gap-y-6 px-4 py-6 md:grid-cols-3">
@@ -130,7 +144,10 @@ export function CrewFooter({ crew }: CrewFooterProps) {
         </section>
       </div>
 
-      <div className="border-t border-[var(--footer-border)] bg-[var(--footer-sub-bg)]">
+      <div
+        className="border-t border-[var(--footer-border)] bg-[var(--footer-sub-bg)]"
+        style={{ color: subText }}
+      >
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-2 text-xs">
           <span>
             {new Date().getFullYear()} © {crew.header.brandName}
