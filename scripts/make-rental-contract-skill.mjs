@@ -6,6 +6,8 @@ import { createClient } from '@supabase/supabase-js';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { htmlToDocxElements } from '../lib/htmlToDocx.mjs';
 
+// Rental utilities imported dynamically where needed to avoid top-level await issues
+
 function arg(name, fallback = '') { const i = process.argv.indexOf(`--${name}`); return i>=0 ? (process.argv[i+1]||'') : fallback; }
 
 const RENTAL_DOC_TEMPLATE_MODE = String(process.env.RENTAL_DOC_TEMPLATE_MODE || 'md').trim().toLowerCase();
@@ -183,6 +185,86 @@ async function verifyMetadataWithFallback(table, contractKey) {
   const query = `${encodeURIComponent(table)}?select=contract_key&contract_key=eq.${encodeURIComponent(contractKey)}&limit=1`;
   const data = supabaseRestRequest(query);
   return { data: data?.[0] || null, error: null };
+}
+
+/**
+ * Create a rentals row when bot generates a rental contract.
+ * This unifies bot and web-app rentals in a single table for availability tracking.
+ *
+ * @param supabase - Supabase client
+ * @param bike - Bike object from catalog
+ * @param startDateText - TEXT date in DD.MM.YYYY format
+ * @param startTimeText - TEXT time in HH:MM format
+ * @param endDateText - TEXT date in DD.MM.YYYY format
+ * @param endTimeText - TEXT time in HH:MM format
+ * @param dailyPrice - Daily rental price
+ * @param totalCost - Total calculated cost
+ * @param crewOwnerChatId - Crew owner's chat_id (placeholder user_id)
+ * @returns The rental_id UUID, or null if failed
+ */
+async function createRentalFromBotContract(
+  supabase,
+  bike,
+  startDateText,
+  startTimeText,
+  endDateText,
+  endTimeText,
+  dailyPrice,
+  totalCost,
+  crewOwnerChatId
+) {
+  try {
+    // Import utilities dynamically
+    const { convertTextDateToTimestamp } = await import('../app/lib/rental-date-utils.ts');
+
+    // Convert TEXT dates to TIMESTAMPTZ
+    const startDateIso = convertTextDateToTimestamp(startDateText, startTimeText || '18:00', 3);
+    const endDateIso = convertTextDateToTimestamp(endDateText, endTimeText || '10:00', 3);
+
+    if (!startDateIso || !endDateIso) {
+      console.error('[createRentalFromBotContract] Date conversion failed');
+      return null;
+    }
+
+    // Create rentals row with crew owner as placeholder
+    const { data: rental, error: rentalError } = await supabase
+      .from('rentals')
+      .insert({
+        user_id: crewOwnerChatId,
+        owner_id: crewOwnerChatId,
+        vehicle_id: bike.id,
+        requested_start_date: startDateIso,
+        requested_end_date: endDateIso,
+        agreed_start_date: startDateIso,
+        agreed_end_date: endDateIso,
+        status: 'active',
+        payment_status: 'fully_paid',
+        total_cost: totalCost,
+        metadata: {
+          source: 'bot_contract',
+          daily_price: dailyPrice,
+          created_by: 'skill-script',
+        },
+      })
+      .select('rental_id')
+      .maybeSingle();
+
+    if (rentalError) {
+      console.error('[createRentalFromBotContract] Failed to create rental:', rentalError);
+      return null;
+    }
+
+    if (!rental?.rental_id) {
+      console.error('[createRentalFromBotContract] No rental_id returned');
+      return null;
+    }
+
+    console.log('[createRentalFromBotContract] Created rental:', rental.rental_id);
+    return rental.rental_id;
+  } catch (error) {
+    console.error('[createRentalFromBotContract] Exception:', error);
+    return null;
+  }
 }
 
 
@@ -581,7 +663,38 @@ if (!json.ok) failStage('telegram_delivery', 'telegram_send_failed', { telegram:
 const result = {ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id, contractKey: vars.document_key, templateMode: RENTAL_DOC_TEMPLATE_MODE, docFileName, isElectric, isHourlyRental, rentalHours, rentalDays, subtotal: vars.subtotal_rub};
 const saveMetadata = arg('saveMetadata', '0') !== '0';
 const metadataTable = arg('metadataTable', 'rental_contract_artifacts');
+let createdRentalId = null;
 if (saveMetadata) {
+  // Create rentals row for unified tracking (before artifact)
+  try {
+    const { resolveCrewOwnerChatId } = await import('../app/lib/rental-date-utils.ts');
+    const crewOwnerChatId = await resolveCrewOwnerChatId(supabase, bike.crew_id) || telegramChatId;
+
+    createdRentalId = await createRentalFromBotContract(
+      supabase,
+      bike,
+      startDate,
+      startTimeArg,
+      endDate,
+      endTimeArg,
+      bikeDailyPrice,
+      subtotalRounded,
+      crewOwnerChatId
+    );
+
+    if (createdRentalId) {
+      result.rentalId = createdRentalId;
+      result.rentalCreated = true;
+      console.log('[make-rental-contract-skill] Rental created successfully:', createdRentalId);
+    } else {
+      console.warn('[make-rental-contract-skill] Failed to create rental, artifact will have no rental_id');
+      result.rentalCreated = false;
+    }
+  } catch (rentalError) {
+    console.error('[make-rental-contract-skill] Rental creation failed:', rentalError);
+    result.rentalCreated = false;
+  }
+
   const payload = {
     contract_key: vars.document_key,
     requested_bike_id: bikeId,
@@ -592,6 +705,7 @@ if (saveMetadata) {
     rent_start_date: startDate,
     rent_end_date: endDate,
     original_sha256: originalSha256,
+    rental_id: createdRentalId || null,  // Add rental_id FK if rental was created
   };
   const writeRes = await insertMetadataWithFallback(metadataTable, payload);
   if (writeRes.error) failStage('metadata_write', 'metadata_write_failed', { table: metadataTable, error: writeRes.error.message });
