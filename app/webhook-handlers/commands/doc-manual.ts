@@ -48,7 +48,7 @@ import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capabil
 import { createHash } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { convertTextDateToTimestamp, resolveCrewOwnerChatId } from "@/app/lib/rental-date-utils";
+import { convertTextDateToTimestamp, resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026; // 👍 Fixed current year
@@ -845,15 +845,21 @@ async function createRentalFromDocContract(
     }
 
     // Calculate total cost from daily price × duration
+    // Always round up to full days for simplicity
     const dailyPrice = Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || '10000');
     const start = new Date(startDateIso);
     const end = new Date(endDateIso);
     const hours = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10;
     const days = Math.max(1, Math.ceil(hours / 24));
-    const totalCost = dailyPrice * (hours < 24 ? hours / 24 : days);
+    const totalCost = dailyPrice * days;  // Simplified: always charge full days
 
     // Resolve crew owner for placeholder user_id
-    const crewOwnerChatId = await resolveCrewOwnerChatId(supabaseAdmin, bike.crew_id) || userId;
+    // Fail if crew owner cannot be resolved - don't fall back to renter
+    const crewOwnerChatId = await resolveCrewOwnerChatId(supabaseAdmin, bike.crew_id);
+    if (!crewOwnerChatId) {
+      logger.error('[/doc] No crew owner found for crew_id:', bike.crew_id);
+      return null;
+    }
 
     // Create rentals row
     const { data: rental, error: rentalError } = await supabaseAdmin

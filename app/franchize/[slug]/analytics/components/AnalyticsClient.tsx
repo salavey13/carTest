@@ -1,8 +1,8 @@
 'use client';
 
 import { useAppContext } from '@/contexts/AppContext';
-import { useFranchizeTheme } from '@/hooks/useFranchizeTheme';
-import { crewPaletteForSurface } from '@/lib/theme';
+import { useFranchizeTheme } from '../../../hooks/useFranchizeTheme';
+import { crewPaletteForSurface } from '../../../lib/theme';
 import { redirect } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -57,8 +57,8 @@ export function AnalyticsClient({
       }
 
       try {
-        // For now, skip server-side check and show data
-        // In production, you'd verify crew_members.active = true
+        // Authorization is now handled server-side in getTodayRentalsAnalytics
+        // Client-side state tracking only for UI purposes
         setIsMember(true);
       } catch (err) {
         console.error('[Analytics] Membership check failed:', err);

@@ -26,8 +26,9 @@ export async function handleStartappParam(
 
       // Redirect to rental confirmation or catalog
       // For now, redirect to catalog with success message
+      const rentalId = result.rentalId || 'unknown';
       return {
-        redirectPath: `/franchize/vip-bike?claimed=${result.rentalId}`,
+        redirectPath: `/franchize/vip-bike?claimed=${encodeURIComponent(rentalId)}`,
       };
     } else {
       const message =
