@@ -1,0 +1,77 @@
+# VIP Bike Landing & Catalog Improvements — History Vibe Summary
+
+## Client Requirements (verbatim key quotes)
+- "align main root landing page with what actual bikes we have in db (not just falcon gt)"
+- "we kinda need simpler version of /vipbikerental page"
+- "HARDCODE SOME FOR QUICKNESS - ditch telegram and supabase inits, requests"
+- "client just didn't finish waiting watching the fucking bicycle!)))"
+- "make page look like it was not oneshotted"
+- "every other ai slop is ai slop in his words"
+
+## Key Design Decisions
+
+### Root Landing Page (app/page.tsx)
+- **Static Server Component** - No "use client", no DB fetch, no Telegram init
+- **Hardcoded 6 curated bikes** representing all categories:
+  - Electric Entry: Falcon Pro 2025 (10 000₽/day)
+  - Electric Premium: Y-VOLT Surge V (12 000₽/day)
+  - Electric Sport: Ducati Panigale S Electro (10 000₽/day)
+  - ICE Liter: Suzuki GSX-S1000F (14 000₽/day)
+  - ICE Entry: Nibbler 300 4V (6 000₽/day)
+  - Mini/Commute: Sotion EM01 (Sale 100 000₽)
+- **Preserve Max's good parts**: VIP_BIKE_THEMES, SOCIAL_LINKS, CONTACT_INFO, FAQ_ITEMS, HOW_IT_WORKS_STEPS, MagneticButton
+- **Fix pricing**: "от 1 500 ₽" → "от 6 000 ₽" (real lowest price)
+- **Section order**: Hero → **Social Links** → Barrier Cards → Bike Showcase → How It Works → Pricing → FAQ → Contacts → Footer
+- **Aesthetic**: Gold (#FFD700) on black (#0A0A0A)
+
+### Loading Component (app/loading.tsx)
+- Replace bicycle SVG with S1000RR GIF from Supabase
+- CSS filter: `invert(1) sepia(1) saturate(2) hue-rotate(5deg)` (black→white, then gold tone)
+- URL: `https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif`
+
+### Electro-Enduro Subpage Filtering
+- **Filter by `specs.type === "Electric"`** (not name matching)
+- This excludes ALL ICE bikes (Nibbler, Motoland, Suzuki, Kawasaki)
+
+### Main Franchize Page Categorization
+- **Three groups with specific titles**:
+  1. Electric bikes → **No title** (just show)
+  2. ICE for Sale (Nibbler, Motoland) → **No title** (just show)
+  3. ICE Rent-Only (Suzuki, Kawasaki) → **"Байки партнёров"**
+- **Data-driven using**: `specs.type === "Electric"`, `specs.type === "ICE" && specs.sale === true`
+- **No literally "ICE" text** - Russian audience won't understand
+
+### Spec Display (CatalogClient + Item Modal)
+- **Russian labels from `spec_labels` field** in rawSpecs
+- **Consistent 3 priority specs**:
+  - Electrics: Power (кВт) + Speed (км/ч) + Range (км)
+  - ICE: Power (л.с.) + Speed (км/ч) + Engine (см³)
+- **Fallback fields**: `power_hp || bike_power_hp`, `engine_cc || bike_engine_cc`
+
+### Social Banner Design
+- **Gold-on-black aesthetic** - no rainbow gradients
+- **All icons converted to gold** - unified cyber-gold vibe
+- **Placement**: Immediately after hero ("BAM! SOCIAL LINKS")
+- **CSS**: `border: 2px solid #FFD700`, hover: `box-shadow: 0 0 30px rgba(255, 215, 0, 0.4); transform: scale(1.05)`
+
+## Files Changed
+1. `app/page.tsx` - Complete rewrite as static Server Component
+2. `app/loading.tsx` - S1000RR GIF with gold filter
+3. `app/franchize/[slug]/electro-enduro/page.tsx` - `specs.type === "Electric"` filter
+4. `app/franchize/components/CatalogClient.tsx` - Categorization + getPrioritySpecs helper
+5. `app/franchize/modals/Item.tsx` - Russian labels from spec_labels
+
+## Technical Constraints
+- **Server Components only** - No event handlers (onMouseEnter, onMouseLeave)
+- **CSS-only hover effects** using `group-hover` pattern
+- **No styled-jsx** - Use Tailwind classes or inline styles
+- **Instant load** - No blocking Telegram/Supabase calls
+- **VipBikeRental page**: Added `export const dynamic = 'force-dynamic'` to prevent build timeout
+
+## Success Criteria
+- Landing loads instantly in Russia (slow Vercel connection)
+- No bicycle spinner - gold S1000RR GIF instead
+- Electro-enduro shows ONLY electric bikes
+- Main franchize shows all bikes in proper categories
+- All labels in Russian
+- Gold-on-black aesthetic throughout
