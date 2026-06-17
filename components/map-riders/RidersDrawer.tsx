@@ -25,6 +25,8 @@ type RidersDrawerEmptyStateCopy = {
 
 type RidersDrawerProps = {
   emptyStateCopy?: RidersDrawerEmptyStateCopy;
+  externalOpen?: boolean;
+  onExternalOpenChange?: (open: boolean) => void;
 };
 
 const DEFAULT_EMPTY_STATE_COPY: RidersDrawerEmptyStateCopy = {
@@ -32,17 +34,21 @@ const DEFAULT_EMPTY_STATE_COPY: RidersDrawerEmptyStateCopy = {
   meetups: "Пока тут пусто... maybe go ride first?",
 };
 
-export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY }: RidersDrawerProps) {
+export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY, externalOpen, onExternalOpenChange }: RidersDrawerProps) {
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
   const { dbUser } = useAppContext();
   const contentRef = useRef<HTMLDivElement | null>(null);
 
   const [meetupTitle, setMeetupTitle] = useState("Точка сбора");
   const [meetupComment, setMeetupComment] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
   const [isReplayOpen, setIsReplayOpen] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const { createMeetup, isSubmitting } = useMeetupCreator(crewSlug);
+
+  // Use external control if provided, otherwise use internal state
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = externalOpen !== undefined ? externalOpen : internalIsOpen;
+  const setIsOpen = onExternalOpenChange || setInternalIsOpen;
 
   useEffect(() => {
     if (typeof window === "undefined") return;

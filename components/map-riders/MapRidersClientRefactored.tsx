@@ -6,6 +6,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Drawer } from "vaul";
@@ -72,7 +73,9 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
   const [isPromptOpen, setIsPromptOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [promptValue, setPromptValue] = useState("Точка встречи");
+  const [ridersDrawerOpen, setRidersDrawerOpen] = useState(false);
   const lastMeetupActionAtRef = useRef(0);
+  const leaderboardRef = useRef<HTMLDivElement>(null);
 
   // Apply franchize theme CSS variables
   useFranchizeTheme(crew.theme);
@@ -186,6 +189,31 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
       });
     },
   });
+
+  // ── Event listeners for FranchizeMapBottomNav ──
+  useEffect(() => {
+    const handleScrollToLeaderboard = () => {
+      // Expand sheet to make leaderboard visible
+      setActiveSnap(0.86);
+      setSheetOpen(true);
+      // Scroll to leaderboard section
+      setTimeout(() => {
+        leaderboardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 300);
+    };
+
+    const handleOpenRidersDrawer = () => {
+      setRidersDrawerOpen(true);
+    };
+
+    window.addEventListener("mapriders-scroll-to-leaderboard", handleScrollToLeaderboard);
+    window.addEventListener("mapriders-open-riders-drawer", handleOpenRidersDrawer);
+
+    return () => {
+      window.removeEventListener("mapriders-scroll-to-leaderboard", handleScrollToLeaderboard);
+      window.removeEventListener("mapriders-open-riders-drawer", handleOpenRidersDrawer);
+    };
+  }, []);
 
   // ── Build map points from state ──
   const riderPoints = useMemo(
@@ -680,7 +708,7 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
           </div>
         </div>
               </div>
-              <div className="mt-4">
+              <div className="mt-4" ref={leaderboardRef}>
                 <LeaderboardSection crew={crew} crewSlug={crewSlug} />
               </div>
             </div>
@@ -690,7 +718,11 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
       </Drawer.Root>
       <StatusOverlay />
       <RiderFAB />
-      <RidersDrawer emptyStateCopy={drawerEmptyStateCopy} />
+      <RidersDrawer
+        emptyStateCopy={drawerEmptyStateCopy}
+        externalOpen={ridersDrawerOpen}
+        onExternalOpenChange={setRidersDrawerOpen}
+      />
       <FranchizePromptModal
         open={isPromptOpen}
         onClose={() => setIsPromptOpen(false)}
@@ -721,7 +753,8 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
 }
 
 // ── Lazy-loaded leaderboard (own fetch) ──
-function LeaderboardSection({ crew, crewSlug }: { crew: FranchizeCrewVM; crewSlug: string }) {
+const LeaderboardSection = React.forwardRef<HTMLDivElement, { crew: FranchizeCrewVM; crewSlug: string }>(
+  ({ crew, crewSlug }, ref) => {
   const { state } = useMapRidersState();
 
   // Apply franchize theme CSS variables
@@ -745,7 +778,9 @@ function LeaderboardSection({ crew, crewSlug }: { crew: FranchizeCrewVM; crewSlu
       </div>
     </section>
   );
-}
+});
+
+LeaderboardSection.displayName = "LeaderboardSection";
 
 // ── Exported wrapper with provider ──
 export function MapRidersClientRefactored({ crew, slug, items }: { crew: FranchizeCrewVM; slug?: string; items?: unknown[] }) {
