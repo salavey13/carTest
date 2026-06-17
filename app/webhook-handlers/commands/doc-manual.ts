@@ -48,6 +48,7 @@ import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capabil
 import { createHash } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { convertTextDateToTimestamp, resolveCrewOwnerChatId } from "@/app/lib/rental-date-utils";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026; // 👍 Fixed current year
@@ -810,6 +811,91 @@ async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<Record<st
   }
 }
 
+/**
+ * Create a rentals row when /doc command generates a rental contract.
+ * Mirrors the skill script logic for unified rental tracking.
+ *
+ * @param chatId - Telegram chat ID
+ * @param userId - User ID (chat_id as string)
+ * @param context - DocFlowContext with rental details
+ * @param bike - Bike object from catalog
+ * @param docSha256 - SHA256 hash of generated document
+ * @returns The rental_id UUID, or null if failed
+ */
+async function createRentalFromDocContract(
+  chatId: number,
+  userId: string,
+  context: DocFlowContext,
+  bike: any,
+  docSha256: string
+): Promise<string | null> {
+  try {
+    // Convert TEXT dates to TIMESTAMPTZ
+    const startDateIso = context.rentStartDate && context.rentStartTime
+      ? convertTextDateToTimestamp(context.rentStartDate, context.rentStartTime, 3)
+      : null;
+
+    const endDateIso = context.rentEndDate && context.rentEndTime
+      ? convertTextDateToTimestamp(context.rentEndDate, context.rentEndTime, 3)
+      : null;
+
+    if (!startDateIso || !endDateIso) {
+      logger.error('[/doc] Date conversion failed', { startDateIso, endDateIso });
+      return null;
+    }
+
+    // Calculate total cost from daily price × duration
+    const dailyPrice = Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || '10000');
+    const start = new Date(startDateIso);
+    const end = new Date(endDateIso);
+    const hours = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10;
+    const days = Math.max(1, Math.ceil(hours / 24));
+    const totalCost = dailyPrice * (hours < 24 ? hours / 24 : days);
+
+    // Resolve crew owner for placeholder user_id
+    const crewOwnerChatId = await resolveCrewOwnerChatId(supabaseAdmin, bike.crew_id) || userId;
+
+    // Create rentals row
+    const { data: rental, error: rentalError } = await supabaseAdmin
+      .from('rentals')
+      .insert({
+        user_id: crewOwnerChatId,
+        owner_id: crewOwnerChatId,
+        vehicle_id: bike.id,
+        requested_start_date: startDateIso,
+        requested_end_date: endDateIso,
+        agreed_start_date: startDateIso,
+        agreed_end_date: endDateIso,
+        status: 'active',
+        payment_status: 'fully_paid',
+        total_cost: Math.round(totalCost),
+        metadata: {
+          source: 'doc_command',
+          daily_price: dailyPrice,
+          created_by: 'doc-manual',
+        },
+      })
+      .select('rental_id')
+      .maybeSingle();
+
+    if (rentalError) {
+      logger.error('[/doc] Failed to create rental:', rentalError);
+      return null;
+    }
+
+    if (!rental?.rental_id) {
+      logger.error('[/doc] No rental_id returned');
+      return null;
+    }
+
+    logger.info('[/doc] Created rental:', rental.rental_id);
+    return rental.rental_id;
+  } catch (error) {
+    logger.error('[/doc] Rental creation exception:', error);
+    return null;
+  }
+}
+
 async function generateContract(chatId: number, userId: string, context: DocFlowContext): Promise<boolean> {
   try {
     const bike = await resolveBikeById(context.bikeId);
@@ -1096,6 +1182,19 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
     }
 
     if (isRent) {
+      // Create rentals row for unified tracking (before artifact)
+      let rentalId: string | null = null;
+      try {
+        rentalId = await createRentalFromDocContract(chatId, String(userId), context, bike, docSha256);
+        if (rentalId) {
+          logger.info('[/doc] Rental created successfully:', rentalId);
+        } else {
+          logger.warn('[/doc] Failed to create rental, continuing without rental_id');
+        }
+      } catch (rentalErr) {
+        logger.error('[/doc] Rental creation exception:', rentalErr);
+      }
+
       // rental_contract_artifacts is in private schema — use explicit columns only.
       // sts_* columns added by migration 20260617000000_rental_sts_pledge.sql
       // (nullable / have defaults, so it's safe to omit when stsPledgeUsed=false).
@@ -1123,6 +1222,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         deposit_rub: depositForRecord,
         total_sum: Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
         template_version: 1,
+        rental_id: rentalId || null,  // FK to rentals table if rental was created
         // СТС pledge columns (added 2026-06-17):
         sts_pledge_used: !!context.stsPledgeUsed,
         sts_pledge_return_days: context.stsPledgeReturnDays || 3,
