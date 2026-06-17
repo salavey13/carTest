@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getTodayRentalsAnalytics } from '@/app/franchize/actions-runtime';
 import { getCachedFranchizeBySlug } from '@/app/franchize/actions';
 import { AnalyticsClient } from './components/AnalyticsClient';
-import { supabaseAdmin } from '@/hooks/supabase';
+import { headers } from 'next/headers';
 
 interface AnalyticsPageProps {
   params: { slug: string };
@@ -23,8 +23,12 @@ export default async function AnalyticsPage({
 
   const crew = crewResult.data.crew;
 
+  // Get actorUserId from headers for auth check
+  const headersList = await headers();
+  const actorUserId = headersList.get('x-user-id') || undefined;
+
   // Get analytics data
-  const analyticsResult = await getTodayRentalsAnalytics({ slug });
+  const analyticsResult = await getTodayRentalsAnalytics({ slug, actorUserId });
 
   if (!analyticsResult.ok) {
     // Return error state, component will handle it

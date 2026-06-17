@@ -3438,13 +3438,14 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
  * Get today's rentals analytics for a crew.
  * Only accessible to active crew members.
  *
- * @param input - { slug: string }
+ * @param input - { slug: string, actorUserId: string }
  * @returns Analytics data with rentals list and totals
  */
 export async function getTodayRentalsAnalytics(input: unknown) {
   const parsed = z
     .object({
       slug: z.string().trim().min(1),
+      actorUserId: z.string().trim().min(1).optional(),
     })
     .safeParse(input);
 
@@ -3452,13 +3453,13 @@ export async function getTodayRentalsAnalytics(input: unknown) {
     return { ok: false, error: "Invalid input", rentals: [], summary: null };
   }
 
-  const { slug } = parsed.data;
+  const { slug, actorUserId } = parsed.data;
 
   try {
-    // Get crew ID from slug
+    // Get crew ID from slug (include owner_id for auth check)
     const { data: crew } = await supabaseAdmin
       .from("crews")
-      .select("id")
+      .select("id, owner_id")
       .eq("slug", slug)
       .maybeSingle();
 
@@ -3466,8 +3467,16 @@ export async function getTodayRentalsAnalytics(input: unknown) {
       return { ok: false, error: "Crew not found", rentals: [], summary: null };
     }
 
-    // Query today's rentals for this crew
-    const today = new Date().toISOString().split("T")[0];
+    // Authorization check: verify user is admin, crew owner, or active owner member
+    const canAccess = await resolveFranchizeEditorAccess(actorUserId, crew);
+    if (!canAccess) {
+      return { ok: false, error: "Недостаточно прав для просмотра аналитики.", rentals: [], summary: null };
+    }
+
+    // Query today's rentals for this crew with proper UTC date boundaries
+    const today = new Date();
+    const startOfDay = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())).toISOString();
+    const endOfDay = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate() + 1)).toISOString();
 
     const { data: rentals, error } = await supabaseAdmin
       .from("rentals")
@@ -3481,16 +3490,13 @@ export async function getTodayRentalsAnalytics(input: unknown) {
         total_cost,
         status,
         payment_status,
-        cars (
-          id,
-          make,
-          model,
-          specs
-        )
+        vehicle:cars!inner(id, make, model, crew_id, specs)
       `
       )
       .eq("status", "active")
-      .gte("requested_start_date", today)
+      .eq("vehicle.crew_id", crew.id)  // Filter by crew_id to prevent cross-crew data leakage
+      .gte("requested_start_date", startOfDay)
+      .lt("requested_start_date", endOfDay)
       .order("requested_start_date", { ascending: false });
 
     if (error) {
@@ -3499,7 +3505,7 @@ export async function getTodayRentalsAnalytics(input: unknown) {
     }
 
     // Get renter names from users table
-    const userIds = (rentals || []).map((r) => r.user_id).filter(Boolean);
+    const userIds = rentals.map((r) => r.user_id).filter(Boolean);
     const rentersMap = new Map<string, string>();
 
     if (userIds.length > 0) {
@@ -3508,30 +3514,34 @@ export async function getTodayRentalsAnalytics(input: unknown) {
         .select("user_id, metadata")
         .in("user_id", userIds);
 
-      for (const user of users || []) {
+      for (const user of users ?? []) {
+        if (!user.user_id) continue;  // Skip null user_id
         const fullName =
           user.metadata?.fullName ||
           user.metadata?.display_name ||
           user.username ||
-          `Пользователь #${user.user_id?.slice(0, 8)}`;
+          `Пользователь #${user.user_id.slice(0, 8)}`;
         rentersMap.set(user.user_id, fullName);
       }
     }
 
     // Enrich rentals with renter names
-    const enrichedRentals = (rentals || []).map((r: any) => ({
-      rentalId: r.rental_id,
-      userId: r.user_id,
-      vehicleId: r.vehicle_id,
-      bikeName: `${r.cars.make} ${r.cars.model}`,
-      bikeSpecs: r.cars.specs,
-      startDate: r.requested_start_date,
-      endDate: r.requested_end_date,
-      totalCost: r.total_cost,
-      status: r.status,
-      paymentStatus: r.payment_status,
-      renterName: rentersMap.get(r.user_id) || "Неизвестный",
-    }));
+    const enrichedRentals = rentals.map((r: any) => {
+      const vehicle = Array.isArray(r.vehicle) ? r.vehicle[0] : r.vehicle;
+      return {
+        rentalId: r.rental_id,
+        userId: r.user_id,
+        vehicleId: r.vehicle_id,
+        bikeName: `${vehicle?.make || ''} ${vehicle?.model || ''}`.trim(),
+        bikeSpecs: vehicle?.specs,
+        startDate: r.requested_start_date,
+        endDate: r.requested_end_date,
+        totalCost: r.total_cost,
+        status: r.status,
+        paymentStatus: r.payment_status,
+        renterName: rentersMap.get(r.user_id) || "Неизвестный",
+      };
+    });
 
     // Calculate summary
     const totalCount = enrichedRentals.length;
@@ -3543,7 +3553,7 @@ export async function getTodayRentalsAnalytics(input: unknown) {
     const summary = {
       count: totalCount,
       revenue: totalRevenue,
-      date: today,
+      date: startOfDay.split("T")[0],  // Use the UTC date string
     };
 
     return {

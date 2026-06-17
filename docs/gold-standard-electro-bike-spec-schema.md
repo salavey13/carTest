@@ -1,7 +1,7 @@
-# Gold Standard Spec Schema — Electric Bikes
+# Gold Standard Spec Schema — VIP Bike Catalog
 
-> Canonical spec-key mapping, category groups, data types, and comparator UI/UX guidance for the VIP BIKE electric bike catalog.  
-> **v2** — updated with rental pricing fields and contract template integration keys.
+> Canonical spec-key mapping, category groups, data types, and comparator UI/UX guidance for the VIP BIKE catalog (Electric + ICE).  
+> **v3** — updated with ICE bike specs, extensive price documentation, and availability_rules feature.
 
 ---
 
@@ -173,7 +173,70 @@ These keys are **computed** by `make-rental-contract-skill.mjs` and written to t
 | `recommend_percent` | Рекомендация | social | % | desc |
 | `warranty` | Гарантия | warranty | — | — |
 
----
+### 1.11 ICE (Internal Combustion Engine) Specific Specs 🆕
+
+These keys are specific to ICE motorcycles (type === "ICE"). They coexist with common specs like `weight_kg`, `brake_type`, etc.
+
+| Key | Русский лейбл | Category | Unit suffix | Sort (compare) | Description |
+|---|---|---|---|---|---|
+| `engine_cc` | Объём двигателя | ice_power | см³ | desc | Engine displacement in cubic centimeters |
+| `bike_engine_cc` | Объём двигателя (ДВС) | ice_power | см³ | desc | Alias for engine_cc, used in contract generation |
+| `power_hp` | Мощность (л.с.) | ice_power | л.с. | desc | Horsepower rating |
+| `bike_power_hp` | Мощность (ДВС) | ice_power | л.с. | desc | Alias for power_hp, contract generation |
+| `fuel_type` | Тип топлива | ice_fuel | — | — | Fuel grade (АИ-92, АИ-95, etc.) |
+| `fuel_capacity_l` | Объём бака | ice_fuel | л | desc | Fuel tank capacity in liters |
+| `fuel_consumption_l_100km` | Расход топлива | ice_fuel | л/100км | asc | Fuel consumption per 100km (lower is better) |
+| `cooling` | Охлаждение | ice_cooling | — | — | Cooling system type (liquid, air-oil, air) |
+| `transmission` | Трансмиссия | drivetrain | — | — | Gearbox (5-speed, 6-speed, automatic) |
+
+### ICE-powered bikes in current catalog (June 2025):
+
+| Bike | `engine_cc` | `power_hp` | `fuel_type` | `fuel_capacity_l` | `dailyPrice` | `sale_price` |
+|---|---|---|---|---|---|---|
+| Kawasaki EX650K Ninja 650 | 649 | 68 | АИ-95 | 15 | 16 000 | 850 000 |
+| Suzuki GSX-S1000F | 999 | 150 | АИ-95 | 17 | 14 000 | 1 000 000 |
+| Motoland Breakout 300 | 300 | 25 | АИ-92 | 15 | 6 000 | 255 000 |
+| Nibbler Regulmoto 300 4V | 300 | 27 | АИ-92 | 12 | 6 000 | 265 000 |
+
+### 1.12 Database Columns — availability_rules & quantity 🆕
+
+These are `public.cars` table columns (NOT in `specs` JSONB) that control bike availability:
+
+| Column | Type | Default | Description |
+|---|---|---|---|---|
+| `availability_rules` | JSONB | `'{}'::jsonb` | Defines availability constraints. Example: `{"type": "weekends_only"}` — bike only available on Sat/Sun (ISO 6,7). Used by `get_vehicles_with_status()` RPC. |
+| `quantity` | INTEGER | `1` | Number of identical units in fleet. Used for inventory tracking and multi-unit availability. |
+
+#### Availability rules examples:
+
+```json
+// Weekends-only bike (e.g., premium sportbike for weekend tours)
+{"type": "weekends_only"}
+
+// Future: could extend to:
+{"type": "days_of_week", "days": [5, 6, 7]}  // Fri-Sun only
+{"type": "season", "seasons": ["summer", "fall"]}
+{"type": "custom", "start_date": "2025-06-01", "end_date": "2025-09-30"}
+```
+
+> **Note:** As of June 2025, only `weekends_only` rule is implemented in the `get_vehicles_with_status()` RPC. The column accepts any JSONB structure — extend the CASE statement in the RPC to add new rule types.
+
+#### Availability logic (from `get_vehicles_with_status()`):
+
+```sql
+CASE
+    -- 1. Active rental blocks everything (highest priority)
+    WHEN r.rental_id IS NOT NULL THEN 'taken'
+    -- 2. Check availability_rules
+    WHEN c.availability_rules->>'type' = 'weekends_only'
+         AND EXTRACT(ISODOW FROM CURRENT_DATE) NOT IN (6, 7)
+    THEN 'unavailable'
+    -- 3. Default to available
+    ELSE 'available'
+END AS availability
+```
+
+--
 
 ## 2. Spec Categories (for grouped display)
 
@@ -183,8 +246,11 @@ The comparator and spec cards should group specs into visual sections. Each cate
 |---|---|---|---|
 | `identity` | Основные | muted | `Info` |
 | `power` | Мощность и динамика | red/orange | `Zap` |
+| `ice_power` | Мощность (ДВС) | red | `Fuel` |
 | `performance` | Динамика | orange | `Gauge` |
 | `battery` | Батарея и зарядка | green | `Battery` |
+| `ice_fuel` | Топливо | amber | `Fuel` |
+| `ice_cooling` | Охлаждение | cyan | `Snowflake` |
 | `chassis` | Размеры и масса | blue | `Ruler` |
 | `drivetrain` | Трансмиссия | purple | `Cog` |
 | `wheels` | Колёса | slate | `Circle` |
@@ -196,12 +262,21 @@ The comparator and spec cards should group specs into visual sections. Each cate
 | `social` | Отзывы и продажи | pink | `Star` |
 | `warranty` | Гарантия | green | `ShieldCheck` |
 
-### Display order within compare:
+### Display order within compare (Electric bikes):
 
 ```
 identity → power → performance → battery → chassis → drivetrain
 → suspension → brakes → wheels → frame → price → rent → social → warranty
 ```
+
+### Display order within compare (ICE bikes):
+
+```
+identity → ice_power → performance → ice_fuel → ice_cooling → chassis → drivetrain
+→ suspension → brakes → wheels → frame → price → rent → social → warranty
+```
+
+> **Note:** Categories are mutually exclusive by `type`. Electric bikes show `power` + `battery`, ICE bikes show `ice_power` + `ice_fuel` + `ice_cooling`. Common categories (`chassis`, `drivetrain`, etc.) appear for both types.
 
 ---
 
@@ -227,6 +302,7 @@ Key pattern:  {key}_bar_width_percent = (value / max_in_compare_set) * 100
 | `acceleration_0_50_s` | lower is better |
 | `acceleration_0_96_s` | lower is better |
 | `acceleration_0_100_s` | lower is better |
+| `fuel_consumption_l_100km` | lower is better |
 | `price_rub` | lower is better |
 | `sale_price` | lower is better |
 | `price_per_hour` | lower is better |
@@ -242,7 +318,7 @@ Key pattern:  {key}_bar_width_percent = (value / max_in_compare_set) * 100
 | `rent_5_10d` | lower is better |
 | `rent_11_30d` | lower is better |
 
-All other numeric keys: **higher is better**.
+All other numeric keys: **higher is better** (including `engine_cc`, `power_hp`, `fuel_capacity_l`).
 
 ---
 

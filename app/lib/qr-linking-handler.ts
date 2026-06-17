@@ -34,7 +34,7 @@ export async function claimRentalByQRCode(
   if (!docSha256 || docSha256.length !== 64) {
     return {
       success: false,
-      error: 'Invalid SHA256 format',
+      error: 'INVALID_SHA256_FORMAT',
     };
   }
 
@@ -71,6 +71,9 @@ export async function claimRentalByQRCode(
 
     // Security check: is this still owned by crew owner (unclaimed)?
     // Check if user_id != owner_id means it's already been claimed
+    // NOTE: This check is not atomic with the update below. A race condition exists
+    // where two concurrent requests could both pass this check and both attempt to
+    // update. Proper fix requires a database RPC with row-level locking or transaction.
     if (rental.user_id !== rental.owner_id) {
       logger.warn('[claimRental] Already claimed:', {
         rentalId: artifact.rental_id,
@@ -84,6 +87,7 @@ export async function claimRentalByQRCode(
     // 1. Update rentals.user_id
     // 2. Update rental_contract_artifacts.telegram_chat_id
     // 3. Update user_rental_secrets.chat_id
+    // NOTE: Proper transaction requires database RPC. Rollback implemented for step 2 failure.
 
     const { error: updateError } = await supabaseAdmin
       .from('rentals')
@@ -108,19 +112,25 @@ export async function claimRentalByQRCode(
 
     if (artifactError) {
       logger.error('[claimRental] Failed to update artifact:', artifactError);
-      // Continue anyway - rental is already updated
+      // Rollback: revert rentals.user_id update
+      await supabaseAdmin
+        .from('rentals')
+        .update({ user_id: rental.owner_id })
+        .eq('rental_id', artifact.rental_id);
+      return { success: false, error: 'ARTIFACT_UPDATE_FAILED' };
     }
 
-    // Update user_rental_secrets
+    // Update user_rental_secrets with rental_id correlation
     const { error: secretsError } = await supabaseAdmin
       .schema('private')
       .from('user_rental_secrets')
       .update({ chat_id: chatId })
-      .eq('doc_sha256', docSha256);
+      .eq('doc_sha256', docSha256)
+      .eq('rental_id', artifact.rental_id);  // Add rental_id correlation
 
     if (secretsError) {
       logger.error('[claimRental] Failed to update secrets:', secretsError);
-      // Continue anyway - rental is already updated
+      // Non-critical: don't rollback for secrets update failure, but log it
     }
 
     logger.info('[claimRental] Successfully claimed:', {
@@ -150,5 +160,8 @@ export const QR_ERROR_MESSAGES: Record<string, string> = {
   RENTAL_NOT_FOUND: 'Аренда не найдена в системе.',
   UPDATE_FAILED: 'Не удалось обновить данные. Попробуйте позже.',
   INVALID_QR_FORMAT: 'Неверный формат QR-кода.',
+  INVALID_SHA256_FORMAT: 'Неверный формат SHA256 в QR-коде.',
+  ARTIFACT_UPDATE_FAILED: 'Не удалось обновить метаданные документа.',
+  CHAT_ID_MISMATCH: 'Невозможно привязать договор другого пользователя',
   EXCEPTION: 'Произошла ошибка. Попробуйте позже.',
 };
