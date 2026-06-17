@@ -449,8 +449,15 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
           />
         </div>
 
-        {/* Floating badges (absolute top, no viewport-height flex) — safe padding for header */}
-        <div className="pointer-events-none absolute inset-x-0 z-20 p-3 pt-[max(6rem,env(safe-area-inset-top)+5rem)] md:top-0 md:p-6 md:pt-12">
+        {/* Floating status "balloons" (absolute top) over the fullscreen map.
+            Mobile: pointer-events-auto so taps on these balloons are caught by
+            this layer instead of falling through to the Leaflet map beneath
+            (the map is z-0, visually "underneath" the balloons). Without this
+            the map hijacks taps on the balloons and drops a meetup pin.
+            Extra top padding clears the taller mobile CrewHeader. The meetup
+            pill below keeps its own pointer-events-auto and stays clickable.
+            Desktop keeps tap passthrough (md:pointer-events-none) + md:pt-12. */}
+        <div className="pointer-events-auto md:pointer-events-none absolute inset-x-0 z-20 p-3 pt-[max(8rem,env(safe-area-inset-top)+6.5rem)] md:top-0 md:p-6 md:pt-12">
           <div className="flex flex-wrap gap-2">
             <Badge className="border bg-black/55 text-white backdrop-blur-md">{useLeafletMap ? `Leaflet${isUsingTelegram ? " + Telegram GPS" : " + Browser GPS"}` : "VibeMap"}</Badge>
             <Badge className="border border-emerald-300/45 bg-emerald-500/20 text-emerald-100">live {riderStatusCounts.live}</Badge>
