@@ -20,6 +20,15 @@ import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 import { crewPaletteForSurface, readableTextOnColor, withAlpha } from "../lib/theme";
 import { FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 
+// ── Russian Label Helper (VIP Bike Landing & Catalog Improvements) ──
+// Helper to get Russian label from spec_labels in rawSpecs
+// NOTE: item.specs may already contain Russian labels (populated server-side).
+// Use this helper when directly accessing rawSpecs fields for display.
+function getRussianLabel(key: string, item: CatalogItemVM): string {
+  const specLabels = (item.rawSpecs as Record<string, unknown> | undefined)?.spec_labels as Record<string, string> | undefined;
+  return specLabels?.[key] || key;
+}
+
 // ─────────────────────────────────────────────────────
 // Item Modal — generalized for rental & order flows
 // ─────────────────────────────────────────────────────

@@ -135,18 +135,26 @@ export default async function ElectroEnduroPage({
   const accentText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
   const saleItems = items.filter((item) => {
     const id = item.id.toLowerCase();
+    const rs = item.rawSpecs as Record<string, unknown> | undefined;
+    const isElectric = rs?.type === "Electric";
+
     return (
-      item.saleAvailable ||
-      isSaleEnabled(item.rawSpecs?.sale) ||
-      SALE_ID_OVERRIDES.has(id)
+      isElectric && // ← MUST BE ELECTRIC
+      (item.saleAvailable ||
+      isSaleEnabled(rs?.sale) ||
+      SALE_ID_OVERRIDES.has(id))
     );
   });
   const rentItems = items.filter((item) => {
     const id = item.id.toLowerCase();
+    const rs = item.rawSpecs as Record<string, unknown> | undefined;
+    const isElectric = rs?.type === "Electric";
+
     return (
-      item.availabilityStatus === "available" ||
-      isRentEnabled(item.rawSpecs?.rent) ||
-      RENT_ID_OVERRIDES.has(id)
+      isElectric && // ← MUST BE ELECTRIC
+      (item.availabilityStatus === "available" ||
+      isRentEnabled(rs?.rent) ||
+      RENT_ID_OVERRIDES.has(id))
     );
   });
   const featuredRentItems = rentItems
