@@ -3433,3 +3433,126 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     telegramDeepLink: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}/app?startapp=rental-${data.rental_id}`,
   };
 }
+
+/**
+ * Get today's rentals analytics for a crew.
+ * Only accessible to active crew members.
+ *
+ * @param input - { slug: string }
+ * @returns Analytics data with rentals list and totals
+ */
+export async function getTodayRentalsAnalytics(input: unknown) {
+  const parsed = z
+    .object({
+      slug: z.string().trim().min(1),
+    })
+    .safeParse(input);
+
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid input", rentals: [], summary: null };
+  }
+
+  const { slug } = parsed.data;
+
+  try {
+    // Get crew ID from slug
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (!crew?.id) {
+      return { ok: false, error: "Crew not found", rentals: [], summary: null };
+    }
+
+    // Query today's rentals for this crew
+    const today = new Date().toISOString().split("T")[0];
+
+    const { data: rentals, error } = await supabaseAdmin
+      .from("rentals")
+      .select(
+        `
+        rental_id,
+        user_id,
+        vehicle_id,
+        requested_start_date,
+        requested_end_date,
+        total_cost,
+        status,
+        payment_status,
+        cars (
+          id,
+          make,
+          model,
+          specs
+        )
+      `
+      )
+      .eq("status", "active")
+      .gte("requested_start_date", today)
+      .order("requested_start_date", { ascending: false });
+
+    if (error) {
+      logger.error("[getTodayRentalsAnalytics] Query failed:", error);
+      return { ok: false, error: error.message, rentals: [], summary: null };
+    }
+
+    // Get renter names from users table
+    const userIds = (rentals || []).map((r) => r.user_id).filter(Boolean);
+    const rentersMap = new Map<string, string>();
+
+    if (userIds.length > 0) {
+      const { data: users } = await supabaseAdmin
+        .from("users")
+        .select("user_id, metadata")
+        .in("user_id", userIds);
+
+      for (const user of users || []) {
+        const fullName =
+          user.metadata?.fullName ||
+          user.metadata?.display_name ||
+          user.username ||
+          `Пользователь #${user.user_id?.slice(0, 8)}`;
+        rentersMap.set(user.user_id, fullName);
+      }
+    }
+
+    // Enrich rentals with renter names
+    const enrichedRentals = (rentals || []).map((r: any) => ({
+      rentalId: r.rental_id,
+      userId: r.user_id,
+      vehicleId: r.vehicle_id,
+      bikeName: `${r.cars.make} ${r.cars.model}`,
+      bikeSpecs: r.cars.specs,
+      startDate: r.requested_start_date,
+      endDate: r.requested_end_date,
+      totalCost: r.total_cost,
+      status: r.status,
+      paymentStatus: r.payment_status,
+      renterName: rentersMap.get(r.user_id) || "Неизвестный",
+    }));
+
+    // Calculate summary
+    const totalCount = enrichedRentals.length;
+    const totalRevenue = enrichedRentals.reduce(
+      (sum, r) => sum + (r.totalCost || 0),
+      0
+    );
+
+    const summary = {
+      count: totalCount,
+      revenue: totalRevenue,
+      date: today,
+    };
+
+    return {
+      ok: true,
+      rentals: enrichedRentals,
+      summary,
+    };
+  } catch (error) {
+    logger.error("[getTodayRentalsAnalytics] Exception:", error);
+    return { ok: false, error: "Exception", rentals: [], summary: null };
+  }
+}
