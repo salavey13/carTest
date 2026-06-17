@@ -54,8 +54,10 @@ import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
+import { useTheme } from "next-themes";
 import type { CatalogItemVM, FranchizeTheme } from "@/app/franchize/actions";
 import { crewPaletteWithCssVars, withAlpha } from "@/app/franchize/lib/theme";
+import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 
 // ── Pipeline imports ──
 import { resolveVipBikeProfile } from "@/app/franchize/lib/onboarding/resolve-profile";
@@ -255,9 +257,13 @@ export function VipBikeRentalClient({
   const crewSlug = crew?.slug || "vip-bike";
   const { dbUser } = useAppContext();
 
+  // Apply franchize theme CSS variables for proper light/dark mode support
+  useFranchizeTheme(theme);
+
   // Get theme-based surface colors for proper text/background contrast
   const surface = crewPaletteWithCssVars(theme);
   const { scrollYProgress } = useScroll();
+  const { setTheme, resolvedTheme } = useTheme();
   const y = useTransform(scrollYProgress, [0, 1], [0, -90]);
 
   // ══════════════════════════════════════════════════════
@@ -427,9 +433,19 @@ export function VipBikeRentalClient({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_40%,rgba(217,154,0,0.12),transparent_45%)]" />
         </div>
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }} className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-black/60 px-4 py-2 text-sm text-amber-400 backdrop-blur-md shadow-[0_0_20px_rgba(217,154,0,0.3)] transition-all hover:border-amber-400/50 hover:shadow-[0_0_30px_rgba(217,154,0,0.5)]">
-            <VibeContentRenderer content="::FaBolt::" className="text-amber-400" />
-            <span>{crew?.header?.brandName || crew?.name || "VIP BIKE"} · ПРЕМИАЛЬНЫЙ ПРОКАТ И МАРШРУТЫ</span>
+          <div className="mb-4 flex items-center justify-center gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-black/60 px-4 py-2 text-sm text-amber-400 backdrop-blur-md shadow-[0_0_20px_rgba(217,154,0,0.3)] transition-all hover:border-amber-400/50 hover:shadow-[0_0_30px_rgba(217,154,0,0.5)]">
+              <VibeContentRenderer content="::FaBolt::" className="text-amber-400" />
+              <span>{crew?.header?.brandName || crew?.name || "VIP BIKE"} · ПРЕМИАЛЬНЫЙ ПРОКАТ И МАРШРУТЫ</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-amber-400/30 bg-black/60 text-amber-400 backdrop-blur-md shadow-[0_0_20px_rgba(217,154,0,0.3)] transition-all hover:border-amber-400/50 hover:bg-black/80 hover:shadow-[0_0_30px_rgba(217,154,0,0.5)]"
+              aria-label="Toggle theme"
+            >
+              <VibeContentRenderer content={resolvedTheme === "dark" ? "::FaSun::" : "::FaMoon::"} className="text-amber-400" />
+            </button>
           </div>
           <div className="mb-5 w-full max-w-2xl rounded-2xl border border-amber-400/20 bg-black/60 p-4 text-left text-sm backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.4),0_0_40px_rgba(217,154,0,0.1)] transition-all hover:border-amber-400/30 hover:shadow-[0_4px_30px_rgba(0,0,0,0.5),0_0_60px_rgba(217,154,0,0.15)]">
             <div className="mb-1 font-medium text-amber-400"><VibeContentRenderer content={vibeProfile.badge} /></div>
