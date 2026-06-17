@@ -9,6 +9,12 @@
  *   - Testable in isolation
  *   - Follows the franchise feature extraction pattern
  *   - Cleaner sectionMap in VipBikeRentalClient
+ *
+ * REFACTORED:
+ *   - Extracted video URL to config
+ *   - Integrated theme system for consistent styling
+ *   - Improved accessibility with ARIA labels
+ *   - Better responsive design
  */
 "use client";
 
@@ -21,6 +27,24 @@ import { cn } from "@/lib/utils";
 import type { HeroDisplayMode } from "@/app/franchize/lib/onboarding/experience-types";
 import type { HeroPanel } from "./shared/types";
 import { heroMetrics } from "./shared/constants";
+import { HERO_VIDEO_CONFIG, vipColorWithAlpha, vipCssVars } from "../lib/vip-theme";
+
+// ── Hero Configuration ──
+const HERO_CONFIG = {
+  videoUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/2_5219998213838247718.mp4",
+  videoFallback: {
+    title: "VIP BIKE Rental",
+    description: "Премиальный прокат мототехники",
+  },
+  badge: {
+    baseColor: "#D99A00",
+    hoverColor: "#FFD700",
+  },
+  gradients: {
+    radialOverlay: "radial-gradient(circle_at_50%_23%,rgba(255,106,0,0.25),transparent_42%)",
+    fallbackImage: "radial-gradient(circle_at_20%_20%,rgba(255,210,80,0.30),transparent_32%),radial-gradient(circle_at_70%_65%,rgba(64,255,190,0.18),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.01))",
+  },
+} as const;
 
 interface HeroVibeProfile {
   badge: string;
@@ -49,22 +73,74 @@ export function HeroSection({
   heroMode,
   onHeroModeChange,
 }: HeroSectionProps) {
+  const themeVars = vipCssVars();
+
   return (
-    <section className="relative flex min-h-[760px] items-center justify-center overflow-hidden px-4 pb-14 pt-28 text-white sm:pt-32">
-      <div className="absolute inset-0 z-0">
-        <video autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover brightness-[0.5] saturate-125">
-          <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/2_5219998213838247718.mp4" type="video/mp4" />
+    <section
+      className="relative flex min-h-[760px] items-center justify-center overflow-hidden px-4 pb-14 pt-28 text-white sm:pt-32"
+      style={themeVars}
+      aria-label="VIP Bike Rental Hero Section"
+    >
+      {/* Video Background */}
+      <div className="absolute inset-0 z-0" aria-hidden="true">
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover brightness-[0.5] saturate-125"
+          poster={HERO_CONFIG.videoFallback.title}
+        >
+          <source src={HERO_CONFIG.videoUrl} type="video/mp4" />
+          {/* Fallback for browsers that don't support video */}
+          <div
+            className="absolute inset-0 flex items-center justify-center bg-neutral-900"
+            style={{
+              background: `linear-gradient(135deg, ${VIP_BRAND_COLORS.bgDark}, ${VIP_BRAND_COLORS.bgCard})`,
+            }}
+          >
+            <span className="font-orbitron text-2xl text-white/20">
+              {HERO_CONFIG.videoFallback.title}
+            </span>
+          </div>
         </video>
         <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-black/55" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_23%,rgba(255,106,0,0.25),transparent_42%)]" />
+        <div
+          className="absolute inset-0"
+          style={{ background: HERO_CONFIG.gradients.radialOverlay }}
+        />
       </div>
-      <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center text-center">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/45 px-4 py-2 text-sm text-white/90 backdrop-blur-sm">
-          <VibeContentRenderer content="::FaBolt::" className="text-brand-yellow" />
+
+      {/* Main Content */}
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7 }}
+        className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center text-center"
+      >
+        {/* Top Badge */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+          className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/45 px-4 py-2 text-sm text-white/90 backdrop-blur-sm"
+        >
+          <VibeContentRenderer content="::FaBolt::" style={{ color: HERO_CONFIG.badge.baseColor }} />
           <span>VIP BIKE · ПРЕМИАЛЬНЫЙ ПРОКАТ И МАРШРУТЫ</span>
-        </div>
-        <div className="mb-5 w-full max-w-2xl rounded-2xl border border-white/20 bg-black/40 p-4 text-left text-sm text-white/90 backdrop-blur-sm">
-          <div className="mb-1 font-medium text-brand-yellow"><VibeContentRenderer content={vibeProfile.badge} /></div>
+        </motion.div>
+
+        {/* Vibe Profile Card */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+          className="mb-5 w-full max-w-2xl rounded-2xl border border-white/20 bg-black/40 p-4 text-left text-sm text-white/90 backdrop-blur-sm"
+          role="region"
+          aria-label="Personalized greeting"
+        >
+          <div className="mb-1 font-medium" style={{ color: HERO_CONFIG.badge.baseColor }}>
+            <VibeContentRenderer content={vibeProfile.badge} />
+          </div>
           <p className="font-orbitron text-lg text-white">{vibeProfile.title}</p>
           <p className="mt-1 text-white/80">{vibeProfile.note}</p>
           {vibeProfile.startCommandHref ? (
@@ -72,70 +148,226 @@ export function HeroSection({
               href={vibeProfile.startCommandHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 inline-flex text-sm font-semibold text-brand-yellow underline underline-offset-4 hover:text-yellow-300"
+              className="mt-2 inline-flex text-sm font-semibold underline underline-offset-4 hover:text-yellow-300"
+              style={{ color: HERO_CONFIG.badge.baseColor }}
+              aria-label="Start in Telegram bot"
             >
               /start в Telegram
             </a>
           ) : null}
-        </div>
+        </motion.div>
+
+        {/* Main Title */}
         <h1 className="font-orbitron text-5xl font-black uppercase leading-[0.9] tracking-tight text-white drop-shadow-[0_8px_22px_rgba(0,0,0,0.75)] sm:text-6xl md:text-7xl lg:text-8xl">
           <span className="block">Скорость. Контроль.</span>
-          <span className="block text-brand-yellow">Ваш выезд организован заранее.</span>
+          <span
+            className="block"
+            style={{
+              color: HERO_CONFIG.badge.baseColor,
+              textShadow: `0 8px 22px ${vipColorWithAlpha(HERO_CONFIG.badge.baseColor, 0.5)}`,
+            }}
+          >
+            Ваш выезд организован заранее.
+          </span>
         </h1>
-        <p className="mx-auto mt-6 max-w-3xl text-base font-light text-white/90 sm:text-lg md:text-xl">
-          Премиальный прокат в Нижнем Новгороде: от выбора модели до возврата — единый управляемый поток, где клиент понимает цену, слот, защиту и следующий шаг.
-        </p>
-        <div className="mt-9 w-full max-w-5xl rounded-3xl border border-white/20 bg-black/45 p-3 text-left shadow-2xl shadow-black/40 backdrop-blur-md sm:p-4">
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" role="tablist" aria-label="VIP Bike quick scenario selector">
-            {(Object.values(heroPanels) as HeroPanel[]).map((panel) => {
+
+        {/* Description */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4, duration: 0.6 }}
+          className="mx-auto mt-6 max-w-3xl text-base font-light text-white/90 sm:text-lg md:text-xl"
+        >
+          Премиальный прокат в Нижнем Новгороде: от выбора модели до возврата — единый
+          управляемый поток, где клиент понимает цену, слот, защиту и следующий шаг.
+        </motion.p>
+
+        {/* Quick Scenario Selector */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.5 }}
+          className="mt-9 w-full max-w-5xl rounded-3xl border border-white/20 bg-black/45 p-3 text-left shadow-2xl shadow-black/40 backdrop-blur-md sm:p-4"
+        >
+          <div
+            className="grid grid-cols-2 gap-2 lg:grid-cols-4"
+            role="tablist"
+            aria-label="VIP Bike quick scenario selector"
+          >
+            {(Object.values(heroPanels) as HeroPanel[]).map((panel, index) => {
               const isActive = heroMode === panel.mode;
               return (
-                <button key={panel.mode} type="button" role="tab" aria-selected={isActive} onClick={() => onHeroModeChange(panel.mode as HeroDisplayMode)} className={cn("rounded-2xl border px-3 py-3 text-left transition-all duration-300", isActive ? "border-brand-yellow bg-brand-yellow/20 text-white shadow-lg shadow-brand-yellow/25 ring-1 ring-brand-yellow/40" : "border-white/15 bg-white/5 text-white/75 hover:border-white/40 hover:bg-white/10 hover:text-white")}>
-                  <span className="mb-1 flex items-center gap-2 text-xs uppercase tracking-[0.22em]"><VibeContentRenderer content={panel.icon} />{panel.label}</span>
-                  <span className="block font-orbitron text-sm sm:text-base">{panel.cta}</span>
-                </button>
+                <motion.button
+                  key={panel.mode}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls={`${panel.mode}-panel`}
+                  onClick={() => onHeroModeChange(panel.mode as HeroDisplayMode)}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 + index * 0.05 }}
+                  className={cn(
+                    "rounded-2xl border px-3 py-3 text-left transition-all duration-300",
+                    isActive
+                      ? cn(
+                          "border-brand-yellow bg-brand-yellow/20 text-white shadow-lg ring-1",
+                          "shadow-brand-yellow/25 ring-brand-yellow/40"
+                        )
+                      : "border-white/15 bg-white/5 text-white/75 hover:border-white/40 hover:bg-white/10 hover:text-white"
+                  )}
+                  style={
+                    isActive
+                      ? {
+                          borderColor: HERO_CONFIG.badge.baseColor,
+                          backgroundColor: vipColorWithAlpha(HERO_CONFIG.badge.baseColor, 0.2),
+                          boxShadow: `0 10px 40px ${vipColorWithAlpha(HERO_CONFIG.badge.baseColor, 0.25)}`,
+                        }
+                      : undefined
+                  }
+                >
+                  <span className="mb-1 flex items-center gap-2 text-xs uppercase tracking-[0.22em]">
+                    <VibeContentRenderer content={panel.icon} />
+                    {panel.label}
+                  </span>
+                  <span className="block font-orbitron text-sm sm:text-base">
+                    {panel.cta}
+                  </span>
+                </motion.button>
               );
             })}
           </div>
+
+          {/* Active Panel Content */}
           <AnimatePresence mode="wait">
-            <motion.div key={activeHeroPanel.mode} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.24 }} className="mt-4 grid gap-4 overflow-hidden rounded-2xl border border-white/15 bg-white/[0.06] p-4 sm:grid-cols-[1.1fr_0.9fr] sm:p-5">
+            <motion.div
+              key={activeHeroPanel.mode}
+              id={`${activeHeroPanel.mode}-panel`}
+              role="tabpanel"
+              aria-labelledby={`${activeHeroPanel.mode}-tab`}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.24 }}
+              className="mt-4 grid gap-4 overflow-hidden rounded-2xl border border-white/15 bg-white/[0.06] p-4 sm:grid-cols-[1.1fr_0.9fr] sm:p-5"
+            >
+              {/* Panel Left Side */}
               <div className="flex min-h-[260px] flex-col justify-between gap-5">
                 <div>
-                  <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/30 px-3 py-1 text-xs uppercase tracking-[0.22em] text-brand-yellow"><VibeContentRenderer content={activeHeroPanel.icon} />{activeHeroPanel.eyebrow}</div>
-                  <h2 className="font-orbitron text-2xl font-bold text-white sm:text-3xl">{activeHeroPanel.title}</h2>
-                  <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/78 sm:text-base">{activeHeroPanel.description}</p>
+                  <div
+                    className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/30 px-3 py-1 text-xs uppercase tracking-[0.22em]"
+                    style={{ color: HERO_CONFIG.badge.baseColor }}
+                  >
+                    <VibeContentRenderer content={activeHeroPanel.icon} />
+                    {activeHeroPanel.eyebrow}
+                  </div>
+                  <h2 className="font-orbitron text-2xl font-bold text-white sm:text-3xl">
+                    {activeHeroPanel.title}
+                  </h2>
+                  <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/78 sm:text-base">
+                    {activeHeroPanel.description}
+                  </p>
                 </div>
+
+                {/* Meta Data */}
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {activeHeroPanel.meta.map((item) => (
-                    <div key={`${activeHeroPanel.mode}-${item.label}`} className="rounded-xl border border-white/15 bg-black/25 p-3">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-white/45">{item.label}</p>
+                    <div
+                      key={`${activeHeroPanel.mode}-${item.label}`}
+                      className="rounded-xl border border-white/15 bg-black/25 p-3"
+                    >
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-white/45">
+                        {item.label}
+                      </p>
                       <p className="mt-1 font-orbitron text-sm text-white">{item.value}</p>
                     </div>
                   ))}
                 </div>
-                <Button asChild size="lg" variant={activeHeroPanel.mode === "rent" ? "accent" : "outline"} className="w-full font-orbitron sm:w-fit">
-                  <Link href={activeHeroPanel.href} className="inline-flex items-center gap-2"><VibeContentRenderer content={activeHeroPanel.icon} />{activeHeroPanel.cta}</Link>
+
+                {/* CTA Button */}
+                <Button
+                  asChild
+                  size="lg"
+                  variant={activeHeroPanel.mode === "rent" ? "accent" : "outline"}
+                  className="w-full font-orbitron sm:w-fit"
+                  style={
+                    activeHeroPanel.mode === "rent"
+                      ? {
+                          backgroundColor: HERO_CONFIG.badge.baseColor,
+                          color: "#16130A",
+                        }
+                      : undefined
+                  }
+                >
+                  <Link
+                    href={activeHeroPanel.href}
+                    className="inline-flex items-center gap-2"
+                    aria-label={`${activeHeroPanel.cta} - ${activeHeroPanel.label}`}
+                  >
+                    <VibeContentRenderer content={activeHeroPanel.icon} />
+                    {activeHeroPanel.cta}
+                  </Link>
                 </Button>
               </div>
+
+              {/* Panel Right Side - Image */}
               <div className="relative min-h-[260px] overflow-hidden rounded-2xl border border-white/15 bg-black/35">
-                {activeHeroPanel.imageUrl ? <Image src={activeHeroPanel.imageUrl} alt={activeHeroPanel.title} fill className="object-cover opacity-80" /> : <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,210,80,0.30),transparent_32%),radial-gradient(circle_at_70%_65%,rgba(64,255,190,0.18),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.01))]" />}
+                {activeHeroPanel.imageUrl ? (
+                  <Image
+                    src={activeHeroPanel.imageUrl}
+                    alt={activeHeroPanel.title}
+                    fill
+                    className="object-cover opacity-80"
+                  />
+                ) : (
+                  <div
+                    className="absolute inset-0"
+                    style={{ background: HERO_CONFIG.gradients.fallbackImage }}
+                  />
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
                 <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/15 bg-black/50 p-4 backdrop-blur-sm">
                   <div className="flex items-center justify-between gap-3 text-sm text-white/80">
                     <span>Интерактивный режим</span>
-                    <span className="rounded-full border border-brand-yellow/40 bg-black/55 px-3 py-1 font-orbitron text-xs text-brand-yellow">{activeHeroPanel.label}</span>
+                    <span
+                      className="rounded-full border bg-black/55 px-3 py-1 font-orbitron text-xs"
+                      style={{
+                        borderColor: vipColorWithAlpha(HERO_CONFIG.badge.baseColor, 0.4),
+                        color: HERO_CONFIG.badge.baseColor,
+                      }}
+                    >
+                      {activeHeroPanel.label}
+                    </span>
                   </div>
                 </div>
               </div>
             </motion.div>
           </AnimatePresence>
-        </div>
-        <div className="mt-8 grid w-full max-w-4xl grid-cols-1 gap-3 text-left sm:grid-cols-2 lg:grid-cols-4">
-          {heroMetrics.map((chip) => (
-            <div key={chip} className="rounded-xl border border-white/20 bg-black/35 px-3 py-2 text-sm text-white/90 backdrop-blur-sm"><VibeContentRenderer content={chip} /></div>
+        </motion.div>
+
+        {/* Hero Metrics */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7, duration: 0.5 }}
+          className="mt-8 grid w-full max-w-4xl grid-cols-1 gap-3 text-left sm:grid-cols-2 lg:grid-cols-4"
+        >
+          {heroMetrics.map((chip, index) => (
+            <motion.div
+              key={chip}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.8 + index * 0.05 }}
+              className="rounded-xl border border-white/20 bg-black/35 px-3 py-2 text-sm text-white/90 backdrop-blur-sm"
+            >
+              <VibeContentRenderer content={chip} />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </motion.div>
     </section>
   );
 }
+
+// ── Type Imports for Constants ──
+import { VIP_BRAND_COLORS } from "../lib/vip-theme";

@@ -123,8 +123,6 @@ set
           'logoHref', '/',
           'menuLinks', jsonb_build_array(
             jsonb_build_object('label', 'Каталог', 'href', '/franchize/{slug}'),
-            jsonb_build_object('label', 'Подбор', 'href', '/franchize/{slug}/podbor'),
-            jsonb_build_object('label', 'Аренда', 'href', '/franchize/{slug}/arenda'),
             jsonb_build_object('label', 'Тест-драйв', 'href', '/franchize/{slug}#test-drive'),
             jsonb_build_object('label', 'Покатушки', 'href', '/franchize/{slug}/map-riders'),
             jsonb_build_object('label', 'Каталог-electro', 'href', '/franchize/{slug}/electro-enduro'),
@@ -138,8 +136,7 @@ set
             jsonb_build_object('label', 'Продажи', 'href', '/franchize/{slug}/sales')
           ),
           'quickActions', jsonb_build_array(
-            jsonb_build_object('label', 'Тест-драйв', 'href', '/franchize/{slug}#test-drive', 'icon', 'FaMotorcycle'),
-            jsonb_build_object('label', 'Подбор', 'href', '/franchize/{slug}/podbor', 'icon', 'FaWrench')
+            jsonb_build_object('label', 'Тест-драйв', 'href', '/franchize/{slug}#test-drive', 'icon', 'FaMotorcycle')
           )
         ),
         'footer', jsonb_build_object(
