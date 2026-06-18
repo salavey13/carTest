@@ -1883,15 +1883,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           .join("\n")
       : "| Без доп. опций | 0 | 0 ₽ | 0 ₽ |";
 
-    const firstLine = payload.cartLines[0];
-    const firstCar = firstLine ? byId.get(firstLine.itemId) : null;
-    const firstSpecs = (firstCar?.specs as Record<string, unknown> | null) || {};
-    const rentDays = Math.max(...payload.cartLines.map((line) => parseDurationDays(line.options.duration)));
     const flowType: FranchizeOrderFlowType = payload.flowType ?? "rental";
     const isSaleFlow = flowType === "sale" || flowType === "mixed";
+    const rentDays = Math.max(...payload.cartLines.map((line) => parseDurationDays(line.options.duration)));
     const rentStartDate = payload.rentalStartDate || payload.time;
     const rentEndDate = payload.rentalEndDate || payload.time;
-    const dailyPriceRub = firstLine?.pricePerDay || Math.round(payload.subtotal / Math.max(1, rentDays));
 
     const { template, templateMode } = await loadFranchizeDealTemplate(payload.slug, flowType);
     const privateReadContext = { source: "buildFranchizeOrderDocAndNotify", orderId: payload.orderId };
@@ -1963,93 +1959,127 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       contractDefaults: defaults,
     };
 
-    // Use shared builder for rental contracts
-    const baseVariables = buildRentalContractVariables({
-      renter: {
-        fullName: payload.recipient || "",
-        phone: docIdentity.renterPhone || "",
-        birthDate: docIdentity.renterBirthDate || "",
-        email: docIdentity.renterEmail || "",
-        passportSeries,
-        passportNumber,
-        passportIssueDate: rentalSecrets?.renter_passport_issue_date || String(readPath(userSensitive, ["passportIssueDate"], "") || readPath(userSensitive, ["passport_issue_date"], "")) || "",
-        passportIssuedBy: "", // Web app doesn't collect this
-        registration: rentalSecrets?.renter_registration || String(readPath(userSensitive, ["registration"], "")) || "",
-        address: rentalSecrets?.renter_address || payload.pickupAddress || String(readPath(userSensitive, ["renterAddress"], "") || readPath(userSensitive, ["registration"], "")) || "",
-        driverLicenseSeries,
-        driverLicenseNumber,
-      },
-      bike: {
-        id: firstCar?.id,
-        make: firstCar?.make,
-        model: firstCar?.model,
-        type: String(firstSpecs.type || ""),
-        specs: firstSpecs,
-      },
-      period: {
-        startDate: rentStartDate,
-        startTime: "12:00",
-        endDate: rentEndDate,
-        endTime: "12:00",
-        dailyPrice: dailyPriceRub,
-        hourlyPrice: Number(firstSpecs.price_per_hour || 0),
-      },
-      crewSecrets,
-      meta: {
-        contractNumber: `${payload.slug.toUpperCase()}-${payload.orderId}`,
-        contractDate: new Date().toLocaleDateString("ru-RU"),
-        signatureTimestamp: new Date().toLocaleString("ru-RU"),
-        signatureFingerprint: payload.signatureFingerprint || "—",
-        renterSignature: payload.signatureName || "электронное согласие в Telegram WebApp",
-        documentKey: `${isSaleFlow ? "sale" : "rental"}-${payload.slug}-${payload.orderId}`,
-        verifiedAt: new Date().toISOString(),
-      },
-      extrasRows,
-      extrasTotalRub: formatMoney(payload.extrasTotal),
-    });
+    // === MULTI-BIKE DOCUMENT GENERATION ===
+    // Generate one DOCX per bike in cart
+    const bikeDocs: Array<{ bytes: Uint8Array; fileName: string; bikeName: string; documentKey: string; sha256: string }> = [];
 
-    // Merge with web-app specific overrides
-    const variables: RentalContractVariables = {
-      ...baseVariables,
-      // Web app specific overrides that aren't in the shared builder
-      rent_days: String(rentDays),
-      total_price_rub: formatMoney(payload.totalAmount),
-      // Use formatMoney for price fields that expect formatted strings
-      hourly_price_rub: formatMoney(Number(firstSpecs.price_per_hour || 0)),
-      daily_price_rub: formatMoney(dailyPriceRub),
-      subtotal_rub: formatMoney(payload.subtotal),
-      // Include renter_phone explicitly (shared builder has it but ensure it's present)
-      renter_phone: docIdentity.renterPhone || "",
-      // Web app specific placeholders
-      equipment: "—",
-      media_links: "—",
-      // Use the web app's resolved renter_passport which may include "указывается при выдаче"
-      renter_passport: rentalSecrets?.renter_passport || userSensitive.passport || payload.renterPassport || "указывается при выдаче",
-      // Use the web app's resolved renter_driver_license
-      renter_driver_license: rentalSecrets?.renter_driver_license || userSensitive.driverLicense || payload.renterDriverLicense || "указывается при выдаче",
-    };
+    for (let bikeIndex = 0; bikeIndex < payload.cartLines.length; bikeIndex++) {
+      const line = payload.cartLines[bikeIndex];
+      const car = byId.get(line.itemId);
+      if (!car) {
+        logger.warn("[franchize] car not found for cart line", { itemId: line.itemId, bikeIndex });
+        continue;
+      }
 
-    const docFileName = `franchize-order-${payload.slug}-${payload.orderId}.docx`;
-    const verifierScope = `${flowType}:${payload.slug}:${payload.orderId}`;
-    const { bytes, renderedMarkdown, verifierRecordId, sha256 } = await buildFranchizeDocxFromTemplate({
-      integrationScope: verifierScope,
-      uploadedBy: "franchize-order-system",
-      documentKey: variables.document_key,
-      fileName: docFileName,
-      template,
-      variables,
-      flowType,
-      templateMode,
-    });
+      const specs = (car.specs as Record<string, unknown> | null) || {};
+      const dailyPriceRub = line.pricePerDay || Math.round(line.lineTotal / Math.max(1, parseDurationDays(line.options.duration)));
+
+      // Use shared builder for rental contracts
+      const baseVariables = buildRentalContractVariables({
+        renter: {
+          fullName: payload.recipient || "",
+          phone: docIdentity.renterPhone || "",
+          birthDate: docIdentity.renterBirthDate || "",
+          email: docIdentity.renterEmail || "",
+          passportSeries,
+          passportNumber,
+          passportIssueDate: rentalSecrets?.renter_passport_issue_date || String(readPath(userSensitive, ["passportIssueDate"], "") || readPath(userSensitive, ["passport_issue_date"], "")) || "",
+          passportIssuedBy: "", // Web app doesn't collect this
+          registration: rentalSecrets?.renter_registration || String(readPath(userSensitive, ["registration"], "")) || "",
+          address: rentalSecrets?.renter_address || payload.pickupAddress || String(readPath(userSensitive, ["renterAddress"], "") || readPath(userSensitive, ["registration"], "")) || "",
+          driverLicenseSeries,
+          driverLicenseNumber,
+        },
+        bike: {
+          id: car.id,
+          make: car.make,
+          model: car.model,
+          type: String(specs.type || ""),
+          specs,
+        },
+        period: {
+          startDate: rentStartDate,
+          startTime: "12:00",
+          endDate: rentEndDate,
+          endTime: "12:00",
+          dailyPrice: dailyPriceRub,
+          hourlyPrice: Number(specs.price_per_hour || 0),
+        },
+        crewSecrets,
+        meta: {
+          contractNumber: `${payload.slug.toUpperCase()}-${payload.orderId}-${bikeIndex + 1}`,
+          contractDate: new Date().toLocaleDateString("ru-RU"),
+          signatureTimestamp: new Date().toLocaleString("ru-RU"),
+          signatureFingerprint: payload.signatureFingerprint || "—",
+          renterSignature: payload.signatureName || "электронное согласие в Telegram WebApp",
+          documentKey: `${isSaleFlow ? "sale" : "rental"}-${payload.slug}-${payload.orderId}-bike${bikeIndex}`,
+          verifiedAt: new Date().toISOString(),
+        },
+        extrasRows,
+        extrasTotalRub: formatMoney(payload.extrasTotal),
+      });
+
+      // Merge with web-app specific overrides
+      const variables: RentalContractVariables = {
+        ...baseVariables,
+        // Web app specific overrides that aren't in the shared builder
+        rent_days: String(rentDays),
+        total_price_rub: formatMoney(payload.totalAmount),
+        // Use formatMoney for price fields that expect formatted strings
+        hourly_price_rub: formatMoney(Number(specs.price_per_hour || 0)),
+        daily_price_rub: formatMoney(dailyPriceRub),
+        subtotal_rub: formatMoney(payload.subtotal),
+        // Include renter_phone explicitly (shared builder has it but ensure it's present)
+        renter_phone: docIdentity.renterPhone || "",
+        // Web app specific placeholders
+        equipment: "—",
+        media_links: "—",
+        // Use the web app's resolved renter_passport which may include "указывается при выдаче"
+        renter_passport: rentalSecrets?.renter_passport || userSensitive.passport || payload.renterPassport || "указывается при выдаче",
+        // Use the web app's resolved renter_driver_license
+        renter_driver_license: rentalSecrets?.renter_driver_license || userSensitive.driverLicense || payload.renterDriverLicense || "указывается при выдаче",
+      };
+
+      const docFileName = `franchize-order-${payload.slug}-${payload.orderId}-bike${bikeIndex}.docx`;
+      const verifierScope = `${flowType}:${payload.slug}:${payload.orderId}:bike${bikeIndex}`;
+      const { bytes, renderedMarkdown, verifierRecordId, sha256 } = await buildFranchizeDocxFromTemplate({
+        integrationScope: verifierScope,
+        uploadedBy: "franchize-order-system",
+        documentKey: variables.document_key,
+        fileName: docFileName,
+        template,
+        variables,
+        flowType,
+        templateMode,
+      });
+
+      bikeDocs.push({
+        bytes,
+        fileName: docFileName,
+        bikeName: `${car.make} ${car.model}`,
+        documentKey: variables.document_key,
+        sha256,
+      });
+    }
+
+    if (bikeDocs.length === 0) {
+      throw new Error("No valid bikes found in cart for document generation");
+    }
 
     const adminChatId = process.env.ADMIN_CHAT_ID;
     if (!adminChatId) {
       throw new Error("ADMIN_CHAT_ID not configured");
     }
 
+    // Update admin notification to reflect multiple bikes
+    const bikeCount = bikeDocs.length;
+    const bikeLabel = bikeCount === 1
+      ? bikeDocs[0].bikeName
+      : `${bikeCount} ${bikeCount === 2 ? "мотоцикла" : "мотоциклов"}`;
+
     await notifyAdmin(
       [
-        `${isSaleFlow ? "🛍️ Новый franchize-заказ на покупку" : "🧾 Новый franchize-заказ на аренду"} #${payload.orderId}`,
+        `${isSaleFlow ? "🛍️ Новый franchize-заказ на покупку" : `🧾 Новый franchize-заказ на аренду (${bikeLabel})`} #${payload.orderId}`,
         `Crew: ${payload.slug}`,
         `Получатель: ${payload.recipient}`,
         `Телефон: ${payload.phone}`,
@@ -2071,21 +2101,24 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       recipientSet.add(String(crewRow.owner_id));
     }
 
-    // ── Send DOCX only ─────────────────────────────────────────────
+    // ── Send DOCX for each bike ─────────────────────────────────────────────
     // Web app users are already authenticated; QR for repeat rental is unnecessary.
     // The /doc command flow (different code path) handles QR generation for unauthenticated users.
 
     for (const recipientId of recipientSet) {
-      const sendDocResult = await sendTelegramDocument(recipientId, new Blob([bytes]), docFileName);
-      if (!sendDocResult.success) {
-        throw new Error(sendDocResult.error || `Failed to send DOCX to ${recipientId}`);
+      for (const doc of bikeDocs) {
+        const sendDocResult = await sendTelegramDocument(recipientId, new Blob([doc.bytes]), doc.fileName);
+        if (!sendDocResult.success) {
+          throw new Error(sendDocResult.error || `Failed to send DOCX ${doc.fileName} to ${recipientId}`);
+        }
       }
     }
 
+    // Use the first bike's document info for the notification log
     await updateFranchizeOrderNotificationLog(logId, {
       send_status: "sent",
-      rendered_markdown: renderedMarkdown,
-      doc_file_name: docFileName,
+      rendered_markdown: `Generated ${bikeDocs.length} contract${bikeDocs.length > 1 ? "s" : ""}: ${bikeDocs.map(d => d.fileName).join(", ")}`,
+      doc_file_name: bikeDocs.map(d => d.fileName).join(", "),
       last_error: "",
     });
 
@@ -2110,29 +2143,35 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         logger.warn("[franchize] rental not found for contract attachment", {
           orderId: payload.orderId,
           slug: payload.slug,
-          verifierScope,
-          documentKey: variables.document_key,
         });
       } else {
         sourceRentalId = String(rentalRow.rental_id);
         const existingMetadata =
           rentalRow.metadata && typeof rentalRow.metadata === "object" ? (rentalRow.metadata as Record<string, unknown>) : {};
         const rentalScope = `rental:${rentalRow.rental_id}`;
+
+        // Attach all bike documents to the rental metadata
+        const contractVerifiers = bikeDocs.map((doc, idx) => {
+          const verifierScope = `${flowType}:${payload.slug}:${payload.orderId}:bike${idx}`;
+          return {
+            scope: rentalScope,
+            sourceScope: verifierScope,
+            documentKey: doc.documentKey,
+            originalSha256: doc.sha256,
+            status: "verified" as const,
+            verifiedAt: new Date().toISOString(),
+            expiresAt: null,
+          };
+        });
+
         const { error: rentalUpdateError } = await supabaseAdmin
           .from("rentals")
           .update({
             metadata: {
               ...existingMetadata,
-              contract_verifier: {
-                scope: rentalScope,
-                sourceScope: verifierScope,
-                documentKey: variables.document_key,
-                docVerifierRecordId: verifierRecordId ?? null,
-                originalSha256: sha256,
-                status: "verified",
-                verifiedAt: new Date().toISOString(),
-                expiresAt: null,
-              },
+              contract_verifiers: contractVerifiers,
+              // Also keep the first one as the primary for backward compatibility
+              contract_verifier: contractVerifiers[0],
             },
           })
           .eq("rental_id", rentalRow.rental_id);
@@ -2147,21 +2186,23 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       }
     }
 
+    // Save rental secrets using the first bike's document info
+    const firstBikeDoc = bikeDocs[0];
     try {
       await saveUserRentalSecrets({
         chat_id: payload.telegramUserId,
         crew_slug: payload.slug,
-        doc_sha256: sha256,
-        renter_full_name: variables.renter_full_name,
-        renter_passport: variables.renter_passport,
-        renter_passport_issue_date: variables.renter_passport_issue_date !== "—" ? variables.renter_passport_issue_date : null,
-        renter_registration: variables.renter_registration !== "—" ? variables.renter_registration : null,
-        renter_driver_license: variables.renter_driver_license,
-        renter_birth_date: variables.renter_birth_date,
-        renter_phone: variables.renter_phone,
-        renter_email: variables.renter_email,
-        renter_address: variables.renter_address || null,
-        source_doc_key: variables.document_key,
+        doc_sha256: firstBikeDoc.sha256,
+        renter_full_name: payload.recipient || "",
+        renter_passport: rentalSecrets?.renter_passport || userSensitive.passport || payload.renterPassport || "указывается при выдаче",
+        renter_passport_issue_date: rentalSecrets?.renter_passport_issue_date || String(readPath(userSensitive, ["passportIssueDate"], "") || readPath(userSensitive, ["passport_issue_date"], "")) || "",
+        renter_registration: rentalSecrets?.renter_registration || String(readPath(userSensitive, ["registration"], "")) || "",
+        renter_driver_license: rentalSecrets?.renter_driver_license || userSensitive.driverLicense || payload.renterDriverLicense || "указывается при выдаче",
+        renter_birth_date: docIdentity.renterBirthDate,
+        renter_phone: docIdentity.renterPhone,
+        renter_email: docIdentity.renterEmail,
+        renter_address: rentalSecrets?.renter_address || payload.pickupAddress || String(readPath(userSensitive, ["renterAddress"], "") || readPath(userSensitive, ["registration"], "")) || "",
+        source_doc_key: firstBikeDoc.documentKey,
         source_rental_id: sourceRentalId,
         verification_status: "verified",
         template_version: CURRENT_RENTAL_TEMPLATE_VERSION,
@@ -2174,7 +2215,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       });
     }
 
-    return { renderedMarkdown, docFileName };
+    return { renderedMarkdown: `Generated ${bikeDocs.length} contract${bikeDocs.length > 1 ? "s" : ""}`, docFileName: bikeDocs.map(d => d.fileName).join(", ") };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to submit order notification";
     logger.error("[franchize] buildFranchizeOrderDocAndNotify failed", {
