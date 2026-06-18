@@ -443,17 +443,7 @@ export async function declineContract(
   const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
 
   try {
-    const { data: crewMember } = await supabase
-      .from('crew_members')
-      .select('user_id, role, crew_id')
-      .eq('user_id', input.actorTelegramUserId)
-      .eq('role', 'owner')
-      .maybeSingle();
-
-    if (!crewMember) {
-      return { success: false, error: 'Only crew owner can decline contracts' };
-    }
-
+    // First fetch rental to get crew_id
     const { data: rental } = await supabase
       .from('rentals')
       .select('metadata, user_id, crew_id')
@@ -469,8 +459,17 @@ export async function declineContract(
       return { success: false, error: 'No pending contract draft found' };
     }
 
-    if (rental.crew_id && rental.crew_id !== crewMember.crew_id) {
-      return { success: false, error: 'Rental does not belong to your crew' };
+    // Now check if user is owner of THIS rental's crew
+    const { data: crewMember } = await supabase
+      .from('crew_members')
+      .select('user_id, role, crew_id')
+      .eq('user_id', input.actorTelegramUserId)
+      .eq('crew_id', rental.crew_id)
+      .eq('role', 'owner')
+      .maybeSingle();
+
+    if (!crewMember) {
+      return { success: false, error: 'Only crew owner can decline contracts' };
     }
 
     const { error: updateError } = await supabase
