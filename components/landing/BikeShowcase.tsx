@@ -255,7 +255,7 @@ export function BikeShowcase() {
         </div>
 
         {/* CTA */}
-        <div className="text-center flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="text-center">
           <Link
             href={CATALOG_HREF}
             className="inline-block px-8 py-4 rounded-lg font-semibold text-lg transition-transform hover:scale-105"
@@ -266,20 +266,6 @@ export function BikeShowcase() {
             }}
           >
             Смотреть все байки
-          </Link>
-          <Link
-            href={`${CATALOG_HREF}?type=gasoline`}
-            className="inline-flex items-center gap-2 px-8 py-4 rounded-lg font-semibold text-lg transition-transform hover:scale-105"
-            style={{
-              backgroundColor: "#FF4500",
-              color: "#0A0A0A",
-              boxShadow: "0 0 30px rgba(255, 69, 0, 0.4)",
-            }}
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 23c-3.5 0-6-2.5-6-5.5 0-2.5 1.5-4.5 3.5-5.5L12 2l2.5 10c2 1 3.5 3 3.5 5.5 0 3-2.5 5.5-6 5.5z" />
-            </svg>
-            Бензиновые байки
           </Link>
         </div>
       </div>
