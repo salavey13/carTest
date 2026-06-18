@@ -2,24 +2,17 @@ import Link from "next/link";
 
 export default function FranchizeLoading() {
   return (
-    <main className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{ backgroundColor: "#000000" }} aria-busy="true">
-      {/* Dark overlay for deeper black */}
-      <div className="absolute inset-0 bg-black/40 pointer-events-none" />
-      {/* Golden particles effect */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 rounded-full animate-pulse"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              backgroundColor: "#FFD700",
-              boxShadow: "0 0 4px rgba(255, 215, 0, 0.6)",
-              animationDelay: `${Math.random() * 2}s`,
-            }}
-          />
-        ))}
+    <main className="min-h-screen flex items-center justify-center relative overflow-hidden bg-black" aria-busy="true">
+      {/* Simple radial glow behind GIF */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div
+          className="rounded-full"
+          style={{
+            width: "300px",
+            height: "300px",
+            background: "radial-gradient(circle, rgba(212,175,55,0.15) 0%, rgba(212,175,55,0.05) 40%, transparent 70%)",
+          }}
+        />
       </div>
 
       <div className="relative z-10 flex flex-col items-center gap-6 px-4">
