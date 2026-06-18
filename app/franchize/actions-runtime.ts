@@ -2038,64 +2038,14 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       recipientSet.add(String(crewRow.owner_id));
     }
 
-    // Extract crew bot username from metadata
-    const crewBotUsername = crewRow?.metadata?.franchize?.contacts?.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME || "";
-
-    // ── Generate QR deep-link PNG ──────────────────────────────────
-    const firstBikeId = payload.cartLines.length > 0 ? payload.cartLines[0].itemId : "";
-    const botUsername = crewBotUsername || "oneBikePlsBot"; // Fallback to maintain compatibility
-    const qrDeepLink = `https://t.me/${botUsername}/app?startapp=rent_${firstBikeId}_${sha256}`;
-    const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
-
-    let qrPngBuffer: Buffer | null = null;
-    try {
-      const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
-      if (qrRes.ok) {
-        qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
-      }
-    } catch (qrErr) {
-      logger.warn("[franchize] QR generation failed, sending DOCX only", { error: qrErr instanceof Error ? qrErr.message : String(qrErr) });
-    }
-
-    // ── Send DOCX + QR via sendMediaGroup ─────────────────────────
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    // ── Send DOCX only ─────────────────────────────────────────────
+    // Web app users are already authenticated; QR for repeat rental is unnecessary.
+    // The /doc command flow (different code path) handles QR generation for unauthenticated users.
 
     for (const recipientId of recipientSet) {
-      if (qrPngBuffer && botToken) {
-        try {
-          const mediaGroupUrl = `https://api.telegram.org/bot${botToken}/sendMediaGroup`;
-          const form = new FormData();
-          form.append("chat_id", recipientId);
-
-          const mediaItems = [
-            { type: "document", media: "attach://docx" },
-            { type: "photo", media: "attach://qr", caption: `📲 QR для быстрой повторной аренды\nНаведите камеру — данные заполнятся автоматически.\n\n🔗 ${qrDeepLink}`, parse_mode: "HTML" },
-          ];
-          form.append("media", JSON.stringify(mediaItems));
-          form.append("docx", new Blob([bytes]), docFileName);
-          form.append("qr", new Blob([qrPngBuffer], { type: "image/png" }), `qr-${firstBikeId}.png`);
-
-          const mediaRes = await fetch(mediaGroupUrl, { method: "POST", body: form });
-          if (!mediaRes.ok) {
-            throw new Error(`sendMediaGroup HTTP ${mediaRes.status}`);
-          }
-        } catch (mediaGroupErr) {
-          // Fallback to sendDocument only
-          logger.warn("[franchize] sendMediaGroup failed, falling back to sendDocument", {
-            recipientId,
-            error: mediaGroupErr instanceof Error ? mediaGroupErr.message : String(mediaGroupErr),
-          });
-          const sendDocResult = await sendTelegramDocument(recipientId, new Blob([bytes]), docFileName);
-          if (!sendDocResult.success) {
-            throw new Error(sendDocResult.error || `Failed to send DOCX to ${recipientId}`);
-          }
-        }
-      } else {
-        // No QR — send DOCX only
-        const sendDocResult = await sendTelegramDocument(recipientId, new Blob([bytes]), docFileName);
-        if (!sendDocResult.success) {
-          throw new Error(sendDocResult.error || `Failed to send DOCX to ${recipientId}`);
-        }
+      const sendDocResult = await sendTelegramDocument(recipientId, new Blob([bytes]), docFileName);
+      if (!sendDocResult.success) {
+        throw new Error(sendDocResult.error || `Failed to send DOCX to ${recipientId}`);
       }
     }
 
