@@ -16,8 +16,9 @@ const FEATURED_BIKES = [
     make: "79BIKE",
     model: "Falcon GT 2025",
     dailyPrice: 12000,
-    hourlyPrice: 3500,
+    hourlyPrice: 5000,
     minHours: 3,
+    price3h: 10000,
     imageUrl:
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2025/image_1.jpg",
     type: "Electric",
@@ -30,8 +31,9 @@ const FEATURED_BIKES = [
     make: "Y-VOLT",
     model: "Surge V",
     dailyPrice: 12000,
-    hourlyPrice: 4500,
+    hourlyPrice: 5000,
     minHours: 3,
+    price3h: 10000,
     imageUrl:
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/y-volt-surge-v/image_1.jpg",
     type: "Electric",
