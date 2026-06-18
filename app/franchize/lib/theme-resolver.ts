@@ -94,7 +94,7 @@ export function resolveFranchizeTheme(franchize: unknown): FranchizeTheme {
   const lightPalette = readRecordPath(palettesCandidate, ["light"]) as Partial<Palette>;
   const darkPalette = readRecordPath(palettesCandidate, ["dark"]) as Partial<Palette>;
 
-  return {
+  const result = {
     mode,
     isAuto: isAutoMode,
     palette,
@@ -119,4 +119,19 @@ export function resolveFranchizeTheme(franchize: unknown): FranchizeTheme {
       } : undefined,
     },
   };
+
+  // Check if the result matches the default theme (both mode and palette)
+  // If so, return the default theme exactly (without extra isAuto/palettes properties)
+  if (result.mode === DEFAULT_FRANCHIZE_THEME.mode &&
+      result.palette.bgBase === DEFAULT_FRANCHIZE_THEME.palette.bgBase &&
+      result.palette.bgCard === DEFAULT_FRANCHIZE_THEME.palette.bgCard &&
+      result.palette.accentMain === DEFAULT_FRANCHIZE_THEME.palette.accentMain &&
+      result.palette.accentMainHover === DEFAULT_FRANCHIZE_THEME.palette.accentMainHover &&
+      result.palette.textPrimary === DEFAULT_FRANCHIZE_THEME.palette.textPrimary &&
+      result.palette.textSecondary === DEFAULT_FRANCHIZE_THEME.palette.textSecondary &&
+      result.palette.borderSoft === DEFAULT_FRANCHIZE_THEME.palette.borderSoft) {
+    return DEFAULT_FRANCHIZE_THEME;
+  }
+
+  return result;
 }

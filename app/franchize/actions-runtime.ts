@@ -3566,3 +3566,19 @@ export async function getTodayRentalsAnalytics(input: unknown) {
     return { ok: false, error: "Exception", rentals: [], summary: null };
   }
 }
+
+// Contract generation types
+export type {
+  SubmitContractDraftInput,
+  SubmitContractDraftResult,
+  ApproveContractInput,
+  ApproveContractResult,
+  DeclineContractInput,
+  DeclineContractResult,
+  ContractDraftData,
+  FinalizeRentalReturnInput,
+  FinalizeRentalReturnResult,
+  RentalContractTemplateVars,
+  CrewContractSecrets,
+  BikeSpecs,
+} from './lib/rental-contract-types';
