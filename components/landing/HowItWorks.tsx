@@ -8,30 +8,98 @@ import Link from "next/link";
 
 const BOT_HREF = "https://t.me/oneBikePlsBot";
 
+// Golden SVG icons for each step
+const StepIcons = {
+  choose: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="w-12 h-12"
+      style={{ color: "#FFD700" }}
+    >
+      <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+      <path d="M13 13l6 6" />
+    </svg>
+  ),
+  book: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="w-12 h-12"
+      style={{ color: "#FFD700" }}
+    >
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="M12 18v-6" />
+      <path d="M8 15h8" />
+    </svg>
+  ),
+  arrive: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="w-12 h-12"
+      style={{ color: "#FFD700" }}
+    >
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  ),
+  ride: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="w-12 h-12"
+      style={{ color: "#FFD700" }}
+    >
+      <circle cx="5.5" cy="17.5" r="2.5" />
+      <circle cx="18.5" cy="17.5" r="2.5" />
+      <path d="M15 17.5v-4.18c0-2.05-1.55-3.78-3.6-3.96l-5.47-.46a2 2 0 0 1-1.76-2.21l.39-4.15c.13-1.35 1.25-2.39 2.6-2.39h.26" />
+      <path d="M11.5 2h2.46a2 2 0 0 1 2 1.78l.45 4.47c.12 1.21-.82 2.28-2.04 2.28h-2.87" />
+    </svg>
+  ),
+};
+
 const HOW_IT_WORKS_STEPS = [
   {
     n: "01",
     title: "Выбрал",
     desc: "Жмёшь «Выбрать байк» → попадаешь в каталог. Смотришь фото, читаешь спеку, выбираешь по сердцу.",
-    emoji: "👆",
+    icon: StepIcons.choose,
   },
   {
     n: "02",
     title: "Забронировал",
     desc: "В боте @oneBikePlsBot — 2 клика: даты + формат поездки. Депозит или СТС — на твой выбор.",
-    emoji: "🤖",
+    icon: StepIcons.book,
   },
   {
     n: "03",
     title: "Пришёл",
     desc: "На пл. Комсомольская 2, в рабочее время (10:00–22:00). Подписал договор — и байк твой.",
-    emoji: "🚶",
+    icon: StepIcons.arrive,
   },
   {
     n: "04",
     title: "Покатался",
     desc: "Отдал байк, получил залог. Если всё ок —_feedback в чат, следующий раз со скидкой.",
-    emoji: "🏍️",
+    icon: StepIcons.ride,
   },
 ];
 
@@ -53,7 +121,7 @@ export function HowItWorks() {
               border: "1px solid #FFD700",
             }}
           >
-            Как это работает 🛠️
+            Как это работает
           </span>
           <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: "#FFFAF0" }}>
             Забери. Покатайся.{" "}
@@ -87,7 +155,7 @@ export function HowItWorks() {
                   backdropFilter: "blur(8px)",
                 }}
               >
-                <span>{step.emoji}</span>
+                {step.icon}
                 <span
                   className="absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
                   style={{
