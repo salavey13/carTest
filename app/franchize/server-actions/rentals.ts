@@ -11,6 +11,7 @@ import {
 export { submitContractDraft } from './submit-contract-draft';
 export { approveContract } from './approve-contract';
 export { declineContract } from './decline-contract';
+export { checkRentalOwnershipForQr } from './rental-ownership-check';
 
 // Export types from rental-contract-types
 export type {

@@ -312,9 +312,32 @@ export function useStartParamRouter() {
               await claimQrRentalSecrets(parsed.docSha256);
             }
 
-            // Step 2: Resolve vehicle → route to bike page (with docSha256 in URL params)
-            const rentParam = `rent_${parsed.bikeId}`;
-            targetPath = await resolveFranchizeVehicleLink(rentParam, "rent", parsed.docSha256) ?? undefined;
+            // Step 2: Check if user is crew owner (for docSha256 links only)
+            // Crew owners get routed to contract-draft page, renters to bike page
+            if (parsed.docSha256 && dbUser?.user_id) {
+              try {
+                const { checkRentalOwnershipForQr } = await import("@/app/franchize/server-actions/rentals");
+                const ownershipResult = await checkRentalOwnershipForQr({
+                  bikeId: parsed.bikeId,
+                  docSha256: parsed.docSha256,
+                  actorTelegramUserId: dbUser.user_id,
+                });
+
+                if (ownershipResult.success && ownershipResult.isOwner && ownershipResult.rentalId && ownershipResult.crewSlug) {
+                  // Crew owner: route to contract-draft page
+                  targetPath = `/franchize/${ownershipResult.crewSlug}/contract-draft/${ownershipResult.rentalId}`;
+                  logger.info(`[ClientLayout] Routing crew owner to contract-draft: ${ownershipResult.crewSlug}/${ownershipResult.rentalId}`);
+                }
+              } catch (error) {
+                logger.warn("[ClientLayout] Failed to check crew ownership, falling back to bike page", { error });
+              }
+            }
+
+            // Step 3: If not crew owner (or check failed), resolve vehicle → route to bike page
+            if (!targetPath) {
+              const rentParam = `rent_${parsed.bikeId}`;
+              targetPath = await resolveFranchizeVehicleLink(rentParam, "rent", parsed.docSha256) ?? undefined;
+            }
           } else {
             // Fallback: couldn't parse, try old behavior
             targetPath = await resolveFranchizeVehicleLink(paramToProcess, "rent") ?? undefined;
