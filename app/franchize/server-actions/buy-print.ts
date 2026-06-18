@@ -702,7 +702,7 @@ function drawRoundedRect(
  * column. QR codes overlap the bottom of the image (floor reflection).
  * Rental box sits below the image with rounded corners.
  */
-async function generateBuyPdf(input: {
+export async function generateBuyPdf(input: {
   slug: string;
   brandName: string;
   botUsername: string;
