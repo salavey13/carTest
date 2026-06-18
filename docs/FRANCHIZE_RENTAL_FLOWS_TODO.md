@@ -1,133 +1,104 @@
 # TODO: franchize rental/order document flow alignment
 
-Updated: 2026-06-18 - Tasks #1, #6-10 completed
+Updated: 2026-06-18
 
-## Scope
+## Status
 
-Three rental/document flows compared:
-1. **Telegram `/doc` manual command** - `app/webhook-handlers/commands/doc-manual.ts`
-2. **OCR contract skill** - `scripts/make-deal-contract-skill.mjs` 
-3. **Franchize web app order flow** - `app/franchize/actions-runtime.ts`
+**Completed:** Cart date storage, Russian labels, Filter rail, Loading improvements
+**Remaining:** 3 tasks
+
+---
+
+## Remaining Tasks
+
+### Task #1: Remove QR generation from web app order flow
+
+**Why:** Web app users are already defined (unlike `/doc` flow). Owner approval subflow exists instead of QR for repeat rental.
+
+**Location:** `app/franchize/actions-runtime.ts:buildFranchizeOrderDocAndNotify()`
+
+**What to fix:**
+- Lines 2000-2014 generate QR deep-link PNG and send it
+- Remove QR generation for web flow
+- Keep DOCX-only delivery for web app
+- `/doc` flow should still generate QR (that's its purpose)
+
+**Files:**
+- `app/franchize/actions-runtime.ts` (lines 2000-2014, 2024-2038)
+
+---
+
+### Task #2: Extract shared rental contract variable builder
+
+**Why:** Each flow builds variables independently → risk of different DOCX output. Need one canonical builder.
+
+**Current state:**
+- `/doc` flow: `app/webhook-handlers/commands/doc-manual.ts` lines 920-1065 (strongest impl)
+- OCR skill: `scripts/make-deal-contract-skill.mjs` lines 531-714
+- Web app: `app/franchize/actions-runtime.ts` lines 1877-1953
+
+**What to do:**
+1. Extract `buildRentalContractVariables()` from `/doc` as the canonical builder
+2. Update OCR skill to use shared builder
+3. Update web app to use shared builder
+4. Regression test: same bike/renter/dates → same DOCX across all flows
+
+**Note:** `/doc` builder is the reference - it has full manual input, СТС pledge support, proper date/time handling.
+
+---
+
+### Task #3: Design multi-bike document generation
+
+**Why:** Current: only first bike's data used for document. Multi-bike carts exist but docs don't reflect it.
+
+**Current behavior:**
+- Cart can contain multiple bikes
+- `buildFranchizeOrderDocAndNotify()` uses `firstCar` and `firstSpecs`
+- Only one DOCX generated with first bike's data
+
+**Options:**
+1. **One DOCX per bike** - Generate separate DOCX for each bike in cart
+2. **Appendix table** - Single DOCX with table of all bikes
+3. **Block multi-bike** - Prevent adding >1 bike to cart for rental flow
+
+**Recommendation:** Start with option 1 (one DOCX per bike) - cleanest separation.
+
+**Location:** `app/franchize/actions-runtime.ts:buildFranchizeOrderDocAndNotify()`
+
+---
 
 ## Completed ✅
 
-- **Russian spec labels in catalog modal** - Fixed in `actions-runtime.ts:getFranchizeBySlug()`
-  - Now uses `specs.spec_labels` from CSV for Russian translations
-  - Fallback to underscore-to-space if no translation exists
-  - Priority keys: power, top_speed, engine, range, acceleration, torque, weight, capacity
+- **Cart date storage** - Fixed in commit `fa171d5c`
+  - Added `rentStartDate`/`rentEndDate` to `FranchizeCartOptions`
+  - Dates persist from modal → cart → order form
 
-- **Cart date storage bug (Task #1)** - Fixed in commit `fa171d5c`
-  - Added `rentStartDate`/`rentEndDate` fields to `FranchizeCartOptions` type
-  - Updated `DEFAULT_OPTIONS`, `sanitizeCartState`, `areLineOptionsEqual`, `buildCartLineId`
-  - Updated `FranchizeCartLineVM` options type to include dates
-  - Added prefill logic in `OrderPageClient` to populate form with cart dates
+- **Russian labels** - Fixed in commit `705499fd`
+  - Uses `spec_labels` from CSV
+  - Priority specs: power, top_speed, engine, range, acceleration, torque, weight, capacity
 
-- **Filter rail and header fixes** - Fixed in commit `705499fd`
-  - Filter rail now shows Russian titles (uses `group.title || group.category`)
-  - "partners" category displays as "Байки партнёров"
+- **Filter rail & header** - Fixed in commit `705499fd`
+  - "partners" → "Байки партнёров"
 
 - **Loading improvements** - Fixed in commit `705499fd`
-  - Removed dits/particles effect that highlighted square GIF boundaries
-  - Simple radial glow for cleaner look
-  - Added `/loading-test` page to test filter variants
+  - Removed dits/particles, clean radial glow
+  - Added `/loading-test` for filter testing
 
-## Current flow map
+---
 
-### 1. `/doc` manual command (Telegram)
+## Flow Reference
 
-**Variable builder:** Lines 920-1065 in `doc-manual.ts`
-- Full manual renter input: name, passport, birth, address, license, categories
-- Dates: start/end **with times** (line 21-22)
-- Deposit: supports confirm, override, or СТС pledge (lines 1040-1052)
-- QR: Generates and sends DOCX + QR media group (lines 1107-1120)
-- Rental row: Creates rental + saves user_rental_secrets (lines 1167-1179)
+### `/doc` manual command (Telegram)
+- Lines 920-1065 in `doc-manual.ts`
+- Full manual input, СТС pledge support
+- QR + DOCX delivery
 
-### 2. OCR contract skill
+### OCR contract skill
+- Lines 531-714 in `make-deal-contract-skill.mjs`
+- OCR data from passport/license
+- QR + DOCX delivery
 
-**Variable builder:** Lines 531-714 in `make-deal-contract-skill.mjs`
-- Renter data from OCR JSON (passport/license)
-- Dates: parsed from phrase or CLI args **with times**
-- Deposit: bike.specs defaults, СТС pledge supported (lines 677-689)
-- QR: Generates and sends DOCX + QR
-- Rental row: Can create rental rows
-
-### 3. Franchize web app order flow
-
-**Variable builder:** Lines 1877-1953 in `actions-runtime.ts:buildFranchizeOrderDocAndNotify()`
-- Renter: 3-tier priority (rental secrets > userSensitive > placeholder)
-- Dates: **TIMES HARDCODED to "12:00"** ❌ (lines 1917-1919)
-- Deposit: crew defaults only, no СТС pledge support ❌
-- QR: Generates and sends DOCX + QR (lines 2000-2014) - should be removed for web flow
-- **BUG FOUND:** `rentStartDate`/`rentEndDate` from modal not stored in cart! ❌
-  - Modal collects dates in `selectedOptions`
-  - But `FranchizeCartOptions` type doesn't include date fields
-  - Dates lost during `addItem()` call
-
-## Issues to fix
-
-### P0 — Critical
-
-**1. Cart date storage bug**
-- Location: `app/franchize/hooks/useFranchizeCart.ts`
-- Fix: Add `rentStartDate`/`rentEndDate` to `FranchizeCartOptions` type
-- Update: `DEFAULT_OPTIONS`, `sanitizeCartState`, `areLineOptionsEqual`
-- Status: Ready to implement
-
-**2. QR policy for web app**
-- Web app users are already defined (unlike /doc flow)
-- Owner approval subflow exists instead of QR for repeat rental
-- Remove QR generation from `buildFranchizeOrderDocAndNotify()` (lines 2000-2014)
-- Keep DOCX-only delivery for web app
-
-**3. Date/time parity**
-- Web app hardcodes times to "12:00" (lines 1917-1919)
-- After fixing #1, use actual dates from payload
-- Consider: add time inputs vs default to opening hours (10:00-20:00?)
-
-**4. One canonical document variable builder**
-- Each flow builds variables independently - risk of different DOCX output
-- Extract shared `buildRentalContractVariables()` from `/doc` (strongest impl)
-- All flows should call shared builder
-- Regression test: same bike/renter/dates → same DOCX across all flows
-
-### P1 — Important
-
-**5. Deposit/STS pledge parity**
-- Web cart: crew defaults only, no СТС support
-- Add СТС pledge fields to web checkout
-
-**6. Rental row / artifact linkage**
-- Web order attaches metadata only if rental row found by `orderId`
-- Verify checkout always creates rental row before document generation
-
-**7. Identity data completeness**
-- Web uses placeholders ("указывается при выдаче")
-- Add preflight checklist showing verified vs placeholder fields
-
-### P2 — Nice to have
-
-**8. Multi-bike cart semantics**
-- Current: only first bike's data used for document
-- Feature: support multiple bikes in single order
-- Options: block multi-bike, one DOCX per bike, or appendix table
-
-**9. Price parity**
-- Web uses cart subtotal + bike.dailyPrice + crew defaults
-- Ensure DOCX fields match invoice totals and bike specs
-
-## Implementation sequence
-
-1. ✅ Fix cart date storage (Task #1)
-2. Remove QR from web app (Task #3)
-3. Extract shared variable builder (Task #4)
-4. Add time inputs or document defaults (Task #3 continued)
-5. Add СТС pledge to web checkout (Task #5)
-6. Multi-bike document generation design (Task #2)
-
-## Test plan
-
-After fixes:
-1. Add item to cart with dates → verify dates persist
-2. Checkout → verify document uses cart dates
-3. Verify QR not sent in web flow
-4. Compare DOCX variables across /doc, skill, web for same bike/renter
+### Franchize web app
+- Lines 1877-1953 in `actions-runtime.ts`
+- 3-tier renter priority (secrets > profile > placeholder)
+- Currently: QR + DOCX (should be DOCX only)
