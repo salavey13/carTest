@@ -53,6 +53,13 @@ import {
   reconcileRentalContractVerifierAttachment as reconcileRentalContractVerifierAttachmentAction,
 } from "@/app/franchize/server-actions/rentals";
 
+// Contract generation actions
+import {
+  submitContractDraft as submitContractDraftAction,
+  approveContract as approveContractAction,
+  declineContract as declineContractAction,
+} from "@/app/franchize/server-actions/rentals";
+
 export async function getFranchizeBySlug(
   ...args: Parameters<typeof getFranchizeBySlugAction>
 ) {
@@ -202,4 +209,23 @@ export async function getCrewPaletteBySlug(
   ...args: Parameters<typeof getCrewPaletteBySlugAction>
 ) {
   return getCrewPaletteBySlugAction(...args);
+}
+
+// Contract generation actions
+export async function submitContractDraft(
+  ...args: Parameters<typeof submitContractDraftAction>
+) {
+  return submitContractDraftAction(...args);
+}
+
+export async function approveContract(
+  ...args: Parameters<typeof approveContractAction>
+) {
+  return approveContractAction(...args);
+}
+
+export async function declineContract(
+  ...args: Parameters<typeof declineContractAction>
+) {
+  return declineContractAction(...args);
 }
