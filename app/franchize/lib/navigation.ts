@@ -37,7 +37,9 @@ export function toInternalHref(href: string) {
   }
 
   if (!/^https?:\/\//i.test(value)) {
-    return null;
+    // For non-http/https protocols (tg://, tel:, mailto:, etc.), return as-is
+    // so they're not considered external links
+    return value;
   }
 
   try {
