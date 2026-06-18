@@ -17,7 +17,7 @@ vi.mock('@/lib/supabase-server', () => ({
   },
 }));
 
-import { getCrewSensitiveData, saveCrewSensitiveData } from '@/app/lib/private-secrets';
+import { getCrewSensitiveData, saveCrewSensitiveData } from '@/lib/private-secrets';
 
 describe('crew private secret storage', () => {
   beforeEach(() => {

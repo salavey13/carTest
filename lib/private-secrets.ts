@@ -1,5 +1,3 @@
-"use server";
-
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase-server";

@@ -34,7 +34,7 @@ vi.mock('@/app/franchize/lib/docx-capability', () => ({
   buildFranchizeDocxFromTemplate: vi.fn(),
 }));
 
-vi.mock('@/app/lib/private-secrets', () => ({
+vi.mock('@/lib/private-secrets', () => ({
   getUserSensitiveData: vi.fn(),
   getCrewSensitiveData: vi.fn(),
   saveCrewSensitiveData: vi.fn(),
