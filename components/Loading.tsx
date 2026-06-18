@@ -1,19 +1,25 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface LoadingProps {
-  variant?: 'bike' | 'generic' | 'system' | 'kinetic';
+  variant?: "bike" | "generic" | "system" | "kinetic";
   text?: string;
   className?: string;
 }
 
+const LOADER_GIF_URL =
+  "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif";
+
+const bikeGoldFilter = "invert(1)";
+
 export function Loading({ text, className }: LoadingProps) {
   return (
     <div
-      className={cn("min-h-screen flex items-center justify-center relative overflow-hidden", className)}
-      style={{ backgroundColor: "#000000" }}
+      className={cn(
+        "min-h-screen flex items-center justify-center overflow-hidden bg-black px-6",
+        className,
+      )}
     >
       {/* Dark overlay for deeper black */}
       <div className="absolute inset-0 bg-black/40 pointer-events-none" />
