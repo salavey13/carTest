@@ -640,7 +640,7 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
     );
   }
 
-  // ================= BIKE VARIANT (Next Level) =================
+  // ================= BIKE VARIANT (Golden Edition) =================
   if (variant === 'bike') {
     return (
       <div className={cn(
@@ -649,67 +649,135 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
       )}
       style={{ backgroundColor: "#0A0A0A" }}
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,215,0,0.15),transparent_50%),linear-gradient(120deg,transparent,rgba(212,175,55,0.08),transparent)]" />
-        <div className="absolute left-0 right-0 top-1/2 h-px bg-gradient-to-r from-transparent via-amber-400/50 to-transparent" />
-        <BikeSpeedster gear={bikeTelemetry.gear} />
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="z-10 mt-8 w-full max-w-md space-y-4 text-center sm:mt-12"
-        >
-          <div
-            className="inline-flex items-center gap-2 rounded-full border bg-black/30 px-3 py-1 text-[10px] font-mono uppercase tracking-[0.28em] shadow-[0_0_25px_rgba(212,175,55,0.2)]"
-            style={{
-              borderColor: "rgba(255, 215, 0, 0.3)",
-              color: "rgba(255, 215, 0, 0.9)",
-            }}
-          >
-            <span
-              className="h-1.5 w-1.5 rounded-full shadow-[0_0_12px_rgba(34,197,94,0.9)]"
-              style={{ backgroundColor: "#22c55e" }}
-            />
-            витрина готовится
-          </div>
-          <h2
-            className="font-orbitron text-3xl font-black uppercase tracking-wider md:text-5xl"
-            style={{
-              color: "#FFD700",
-              textShadow: "0 0 20px rgba(255, 215, 0, 0.5)",
-            }}
-          >
-            МАРШРУТ
-          </h2>
-
-          {/* Animated Speed Bar */}
-          <div className="w-64 h-2 rounded-full overflow-hidden mx-auto" style={{ backgroundColor: "#1A1A1A" }}>
+        {/* Golden Particles Background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {[...Array(30)].map((_, i) => (
             <motion.div
-              className="h-full"
+              key={i}
+              className="absolute w-1 h-1 rounded-full"
               style={{
-                background: "linear-gradient(90deg, #D4AF37, #FFD700, #D4AF37)",
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                backgroundColor: "#FFD700",
+                boxShadow: "0 0 6px rgba(255, 215, 0, 0.8)",
               }}
               animate={{
-                width: ["0%", "100%", "0%"],
-                x: ["-100%", "0%", "100%"]
+                y: [0, -100, -200],
+                opacity: [0, 1, 0],
+                scale: [0, 1, 0],
               }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              transition={{
+                duration: 3 + Math.random() * 2,
+                repeat: Infinity,
+                delay: Math.random() * 2,
+                ease: "linear",
+              }}
             />
-          </div>
+          ))}
+        </div>
 
-          <p
-            className="mx-auto max-w-sm font-mono text-sm"
-            style={{ color: "rgba(255, 215, 0, 0.8)" }}
+        {/* Golden Core Ring */}
+        <div className="relative z-10 flex flex-col items-center">
+          <motion.div
+            className="relative w-40 h-40 flex items-center justify-center"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
           >
-            {text || 'Синхронизируем телеметрию экипажа...'}
-          </p>
+            {/* Outer spinning ring */}
+            <motion.div
+              className="absolute inset-0 rounded-full border-2 border-dashed"
+              style={{ borderColor: "rgba(255, 215, 0, 0.4)" }}
+              animate={{ rotate: 360 }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+            />
+            {/* Middle ring */}
+            <motion.div
+              className="absolute inset-4 rounded-full border"
+              style={{ borderColor: "rgba(212, 175, 55, 0.6)" }}
+              animate={{ rotate: -360 }}
+              transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+            />
+            {/* Inner ring with pulse */}
+            <motion.div
+              className="absolute inset-8 rounded-full flex items-center justify-center"
+              animate={{
+                boxShadow: [
+                  "0 0 20px rgba(255, 215, 0, 0.3)",
+                  "0 0 40px rgba(255, 215, 0, 0.6)",
+                  "0 0 20px rgba(255, 215, 0, 0.3)",
+                ],
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <motion.div
+                className="w-16 h-16 rounded-full flex items-center justify-center"
+                style={{
+                  background: "linear-gradient(135deg, #FFD700, #D4AF37)",
+                }}
+              >
+                <Bike
+                  size={32}
+                  className="text-black"
+                  strokeWidth={2}
+                />
+              </motion.div>
+            </motion.div>
+          </motion.div>
 
-          <div className="flex justify-center gap-2 mt-4">
-            <TelemetryMetric label="ОБ/МИН" value={`${Math.round(bikeTelemetry.rpm)}`} />
-            <TelemetryMetric label="КМ/Ч" value={`${Math.round(bikeTelemetry.speed)}`} />
-            <TelemetryMetric label="ПЕР." value={`${bikeTelemetry.gear}`} />
-          </div>
-        </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mt-12 text-center space-y-6"
+          >
+            <h2
+              className="text-4xl md:text-5xl font-black uppercase tracking-widest"
+              style={{
+                color: "#FFD700",
+                textShadow: "0 0 30px rgba(255, 215, 0, 0.5)",
+              }}
+            >
+              VIP BIKE
+            </h2>
+
+            {/* Progress Bar */}
+            <div className="w-64 h-1 rounded-full overflow-hidden mx-auto" style={{ backgroundColor: "#1A1A1A" }}>
+              <motion.div
+                className="h-full rounded-full"
+                style={{
+                  background: "linear-gradient(90deg, #D4AF37, #FFD700)",
+                  boxShadow: "0 0 10px rgba(255, 215, 0, 0.5)",
+                }}
+                animate={{ width: ["0%", "80%", "95%", "100%"] }}
+                transition={{ duration: 2.5, ease: "easeInOut" }}
+              />
+            </div>
+
+            <p
+              className="font-mono text-sm tracking-wider"
+              style={{ color: "rgba(255, 215, 0, 0.8)" }}
+            >
+              {text || 'Загружаем байки...'}
+            </p>
+
+            {/* Status Indicator */}
+            <div className="flex items-center justify-center gap-2">
+              <motion.span
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: "#22c55e" }}
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+              <span
+                className="text-xs font-mono uppercase tracking-wider"
+                style={{ color: "rgba(255, 215, 0, 0.6)" }}
+              >
+                Онлайн
+              </span>
+            </div>
+          </motion.div>
+        </div>
       </div>
     );
   }
