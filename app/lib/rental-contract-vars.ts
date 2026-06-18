@@ -211,7 +211,8 @@ function buildEngineSpecLines(bike: BikeSpecs, isElectric: boolean): {
   const specs = bike.specs || {};
 
   // Use pre-computed lines if available (from seed data)
-  if (specs.bike_engine_spec_line_1 !== undefined) {
+  // Check for non-empty string to avoid falling through on empty seed data
+  if (specs.bike_engine_spec_line_1 && specs.bike_engine_spec_line_1.trim().length > 0) {
     return {
       line1: String(specs.bike_engine_spec_line_1),
       line2: String(specs.bike_engine_spec_line_2 || ""),
@@ -323,6 +324,10 @@ function getContractDefault(
 /**
  * Calculate rental duration in hours from start/end dates and times
  * Handles both DD.MM.YYYY and YYYY-MM-DD date formats
+ *
+ * NOTE: Dates are treated as local midnight (no timezone conversion).
+ * Time offsets are applied in minutes, so we compute UTC timestamps that
+ * represent the local datetime to avoid timezone mixing.
  */
 function calculateRentalHours(
   startDate: string,
@@ -335,13 +340,13 @@ function calculateRentalHours(
     const parts = dateStr.split('.');
     if (parts.length === 3) {
       const [d, m, y] = parts.map(Number);
-      return new Date(y, m - 1, d);
+      return { y, m: m - 1, d };
     }
     // Try YYYY-MM-DD format
     const isoParts = dateStr.split('-');
     if (isoParts.length === 3) {
       const [y, m, d] = isoParts.map(Number);
-      return new Date(y, m - 1, d);
+      return { y, m: m - 1, d };
     }
     return null;
   };
@@ -353,14 +358,20 @@ function calculateRentalHours(
     return h * 60 + m;
   };
 
-  const start = parseDate(startDate);
-  const end = parseDate(endDate);
-  if (!start || !end) return 0;
+  const startParts = parseDate(startDate);
+  const endParts = parseDate(endDate);
+  if (!startParts || !endParts) return 0;
 
-  const startMinutes = start.getTime() / 60000 + parseTime(startTime);
-  const endMinutes = end.getTime() / 60000 + parseTime(endTime);
+  const startMinutes = parseTime(startTime);
+  const endMinutes = parseTime(endTime);
 
-  return Math.max(0, Math.round((endMinutes - startMinutes) / 60 * 10) / 10);
+  // Create UTC timestamps representing local datetime (no TZ conversion)
+  // Date.UTC returns milliseconds since epoch for UTC date/time
+  const startMs = Date.UTC(startParts.y, startParts.m, startParts.d, 0, startMinutes);
+  const endMs = Date.UTC(endParts.y, endParts.m, endParts.d, 0, endMinutes);
+
+  // Calculate hours difference
+  return Math.max(0, Math.round((endMs - startMs) / (1000 * 60 * 60) * 10) / 10);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
