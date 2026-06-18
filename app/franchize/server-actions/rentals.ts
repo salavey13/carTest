@@ -134,14 +134,26 @@ export async function submitContractDraft(
   const draftId = `draft-${input.rentalId}-${Date.now()}`;
 
   try {
+    // Fetch rental with vehicle
     const { data: rental } = await supabase
       .from('rentals')
-      .select('*, crew:crews(id, owner_id, slug)')
+      .select('*, vehicle:cars(*)')
       .eq('rental_id', input.rentalId)
       .single();
 
     if (!rental) {
       return { success: false, error: `Rental not found: ${input.rentalId}` };
+    }
+
+    // Fetch crew through vehicle
+    const { data: crew } = await supabase
+      .from('crews')
+      .select('id, owner_id, slug')
+      .eq('id', rental.vehicle?.crew_id)
+      .maybeSingle();
+
+    if (!crew) {
+      return { success: false, error: `Crew not found for vehicle` };
     }
 
     if (rental.user_id !== input.actorTelegramUserId) {
@@ -171,7 +183,7 @@ export async function submitContractDraft(
       return { success: false, error: `Failed to save draft: ${updateError.message}` };
     }
 
-    const crewOwnerChatId = rental.crew?.owner_id;
+    const crewOwnerChatId = crew.owner_id;
 
     if (crewOwnerChatId) {
       const draftDetailsUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/franchize/${input.crewSlug}/contract-draft/${input.rentalId}`;
