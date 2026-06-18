@@ -131,15 +131,31 @@ export function BikeShowcase() {
                     className="w-full h-full object-cover transition-transform group-hover:scale-110"
                   />
                   <div className="absolute top-3 left-3">
-                    <span
-                      className="px-3 py-1 rounded-full text-xs font-semibold"
+                    <div
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border-2"
                       style={{
-                        backgroundColor: bike.type === "Electric" ? "#10B981" : "#F59E0B",
-                        color: "#FFFFFF",
+                        backgroundColor: "rgba(0, 0, 0, 0.8)",
+                        borderColor: "#FFD700",
+                        color: "#FFD700",
+                        boxShadow: "0 0 15px rgba(255, 215, 0, 0.4)",
                       }}
                     >
-                      {bike.type === "Electric" ? "⚡ Электро" : "🔥 Бензин"}
-                    </span>
+                      {bike.type === "Electric" ? (
+                        <>
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                          </svg>
+                          <span>ЭЛЕКТРО</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2c.5 0 1 .2 1.4.6l.4.4c.4.4.4 1 0 1.4l-.4.4c-.4-.4-1-.4-1.4 0l-.4.4c-.4.4-.4 1 0 1.4l.4.4c.4.4.4 1 0 1.4l-.4.4c-.4-.4-1-.4-1.4 0l-.4.4c-.4-.4-1-.4-1.4 0l-.4.4c-.4.4-.4 1 0 1.4l.4.4c.4.4.4 1 0 1.4l-.4.4c-.4-.4-1-.4-1.4 0l-.4.4c-.4.4-.4 1 0 1.4l.4.4c.4.4.4 1 0 1.4l-.4.4c-.4-.4-1-.4-1.4 0l-.4.4c-.4.4-.4 1 0 1.4l.4.4c.4.4.4 1 0 1.4l-.4.4c-.4-.4-1-.4-1.4 0l-.4.4c-.4.4-.4 1 0 1.4l.4.4c.4.4 1 .4 1.4 0l.4-.4c.4-.4.4-1 0-1.4l-.4-.4c-.4-.4-.4-1 0-1.4l.4-.4c.4-.4.4-1 0-1.4l-.4-.4c-.4-.4-.4-1 0-1.4l.4-.4c.4-.4.4-1 0-1.4l-.4-.4c-.4-.4-.4-1 0-1.4L12 2zm0 2c-.3 0-.5.2-.5.5s.2.5.5.5.5-.2.5-.5-.2-.5-.5-.5zm0 3c-.3 0-.5.2-.5.5s.2.5.5.5.5-.2.5-.5-.2-.5-.5-.5zm0 3c-.3 0-.5.2-.5.5s.2.5.5.5.5-.2.5-.5-.2-.5-.5-.5zm0 3c-.3 0-.5.2-.5.5s.2.5.5.5.5-.2.5-.5-.2-.5-.5-.5z" />
+                          </svg>
+                          <span>БЕНЗИН</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
