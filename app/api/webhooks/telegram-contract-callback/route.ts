@@ -1,13 +1,23 @@
 // /app/api/webhooks/telegram-contract-callback/route.ts
 import { createClient } from '@supabase/supabase-js';
-import { approveContract } from '@/app/franchize/server-actions/approve-contract';
-import { declineContract } from '@/app/franchize/server-actions/decline-contract';
+import { approveContract, declineContract } from '@/app/franchize/server-actions/rentals';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+// Optional: set TELEGRAM_CALLBACK_SECRET to require authentication
+const CALLBACK_SECRET = process.env.TELEGRAM_CALLBACK_SECRET || process.env.CODEX_BRIDGE_CALLBACK_SECRET;
 
 export async function POST(request: Request) {
+  // Verify callback secret if configured
+  if (CALLBACK_SECRET) {
+    const authHeader = request.headers.get('x-telegram-callback-secret');
+    if (authHeader !== CALLBACK_SECRET) {
+      console.error('[telegram-contract-callback] Invalid or missing secret');
+      return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
   try {
     const body = await request.json();
     const { callback_query, message } = body;
