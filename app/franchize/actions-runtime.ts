@@ -16,6 +16,7 @@ import { resolveFranchizeTheme, resolvePaletteByMode } from "@/app/franchize/lib
 import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context";
 import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
 import { CURRENT_RENTAL_TEMPLATE_VERSION } from "@/lib/rental-template-version";
+import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets, type RentalContractVariables } from "@/app/lib/rental-contract-vars";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 import {
   DEFAULT_AD_CARDS_TEXT,
@@ -1891,11 +1892,6 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const rentStartDate = payload.rentalStartDate || payload.time;
     const rentEndDate = payload.rentalEndDate || payload.time;
     const dailyPriceRub = firstLine?.pricePerDay || Math.round(payload.subtotal / Math.max(1, rentDays));
-    // Vehicle type derivation for dynamic template labels (HTML template uses these)
-    const isElectricBike = String(firstSpecs.type || "").toLowerCase().includes("electric");
-    const bikeVehicleTypeLabel = isElectricBike ? "ЭЛЕКТРОМОТОЦИКЛА" : "МОТОЦИКЛА";
-    const bikeVehicleTypeAccusative = isElectricBike ? "электромотоцикл" : "мотоцикл";
-    const bikeVehicleTypeGenitive = isElectricBike ? "электромотоцикла" : "мотоцикла";
 
     const { template, templateMode } = await loadFranchizeDealTemplate(payload.slug, flowType);
     const privateReadContext = { source: "buildFranchizeOrderDocAndNotify", orderId: payload.orderId };
@@ -1918,83 +1914,120 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       }
     }
 
-    const variables = {
-      contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}`,
-      contract_date: new Date().toLocaleDateString("ru-RU"),
-      day: new Date().getDate().toString().padStart(2, "0"),
-      month: new Date().toLocaleString("ru-RU", { month: "long" }),
-      month_num: String(new Date().getMonth() + 1).padStart(2, "0"),
-      year: new Date().getFullYear().toString(),
-      // Renter identity — 3-tier priority: rental secrets (verified past) > userSensitive > placeholder
-      renter_full_name: payload.recipient,
-      renter_phone: docIdentity.renterPhone,
-      renter_birth_date: docIdentity.renterBirthDate,
-      renter_email: docIdentity.renterEmail,
-      renter_address: rentalSecrets?.renter_address || payload.renterAddress || String(readPath(userSensitive, ["renterAddress"], "") || readPath(userSensitive, ["registration"], "")) || null,
-      renter_driver_license: rentalSecrets?.renter_driver_license || userSensitive.driverLicense || payload.renterDriverLicense || "указывается при выдаче",
-      renter_passport: rentalSecrets?.renter_passport || userSensitive.passport || payload.renterPassport || "указывается при выдаче",
-      renter_passport_issue_date: rentalSecrets?.renter_passport_issue_date || String(readPath(userSensitive, ["passportIssueDate"], "") || readPath(userSensitive, ["passport_issue_date"], "")) || "—",
-      renter_registration: rentalSecrets?.renter_registration || String(readPath(userSensitive, ["registration"], "")) || "—",
-      issuer_name: String(readPath(defaults, ["issuerName"], `Franchize ${payload.slug}`)),
-      issuer_signatory: "Администратор экипажа",
-      issuer_representative: String(readPath(defaults, ["issuer_representative"], "Сидоров Илья Олегович")),
-      // Bike identity — separate make/model for HTML template §1.2
-      bike_make_model: firstCar
-        ? `${firstCar.make || "Bike"} ${firstCar.model || "Model"}`
-        : payload.cartLines.map((line) => line.itemId).join(", "),
-      bike_make: firstCar?.make || "уточняется",
-      bike_model: firstCar?.model || "уточняется",
-      bike_vin: String(firstSpecs.vin || firstSpecs.frame || firstSpecs.vin_number || "уточняется"),
-      bike_plate: String(firstSpecs.plate || firstSpecs.state_number || "уточняется"),
-      bike_category: String(firstSpecs.category || firstSpecs.tp_category || "A/L3"),
-      bike_color: String(firstSpecs.color || "уточняется"),
-      bike_year: String(firstSpecs.year || firstSpecs.production_year || "уточняется"),
-      bike_mileage: String(firstSpecs.mileage || "45073"),
-      // Dynamic vehicle type labels (HTML template: title, §1.1, appendices)
-      bike_vehicle_type_label: bikeVehicleTypeLabel,
-      bike_vehicle_type_accusative: bikeVehicleTypeAccusative,
-      bike_vehicle_type_genitive: bikeVehicleTypeGenitive,
-      // Engine spec lines from bike specs (pre-computed in seed data)
-      bike_engine_spec_line_1: String(firstSpecs.bike_engine_spec_line_1 || ""),
-      bike_engine_spec_line_2: String(firstSpecs.bike_engine_spec_line_2 || ""),
-      bike_engine_spec_line_3: String(firstSpecs.bike_engine_spec_line_3 || ""),
-      rent_start_time: "12:00",
-      rent_start_date: rentStartDate,
-      rent_end_time: "12:00",
-      rent_end_date: rentEndDate,
-      rent_days: rentDays,
-      // Pricing: both hourly and daily for HTML template §4.1
+    // Parse driver license string into series/number if available
+    let driverLicenseSeries = "";
+    let driverLicenseNumber = "";
+    const driverLicenseFull = rentalSecrets?.renter_driver_license || userSensitive.driverLicense || payload.renterDriverLicense || "";
+    if (driverLicenseFull && driverLicenseFull !== "указывается при выдаче") {
+      const dlParts = driverLicenseFull.trim().split(/\s+/);
+      if (dlParts.length >= 3) {
+        // Format: "12 34 567890" or "1234 567890"
+        if (dlParts.length === 3 && dlParts[0].length <= 4 && dlParts[1].length <= 6) {
+          driverLicenseSeries = dlParts[0];
+          driverLicenseNumber = `${dlParts[1]} ${dlParts[2]}`;
+        } else if (dlParts.length >= 2) {
+          driverLicenseSeries = dlParts[0];
+          driverLicenseNumber = dlParts.slice(1).join(" ");
+        }
+      }
+    }
+
+    // Parse passport string into series/number if available
+    let passportSeries = "";
+    let passportNumber = "";
+    const passportFull = rentalSecrets?.renter_passport || userSensitive.passport || payload.renterPassport || "";
+    if (passportFull && passportFull !== "указывается при выдаче") {
+      const passParts = passportFull.trim().split(/\s+/);
+      if (passParts.length >= 2) {
+        passportSeries = passParts[0];
+        passportNumber = passParts.slice(1).join(" ");
+      }
+    }
+
+    // Build crew secrets object matching RentalCrewSecrets type
+    const crewSecrets: RentalCrewSecrets = {
+      legalAddress: String(readPath(defaults, ["lessor_address"], "г. Нижний Новгород")),
+      returnAddress: String(readPath(defaults, ["return_address"], "г. Нижний Новгород, ул. Стригинский переулок, дом 13б")),
+      issuerName: String(readPath(defaults, ["issuerName"], `Franchize ${payload.slug}`)),
+      signatoryRole: String(readPath(defaults, ["issuer_signatory"], "Администратор экипажа")),
+      organizationRepresentative: String(readPath(defaults, ["issuer_representative"], "Сидоров Илья Олегович")),
+      organizationName: String(readPath(defaults, ["organization_name"], "Franchize")),
+      organizationShort: String(readPath(defaults, ["organization_short"], "Franchize")),
+      ogrnip: String(readPath(defaults, ["ogrnip"], "")),
+      inn: String(readPath(defaults, ["inn"], "")),
+      bankAccount: String(readPath(defaults, ["bank_account"], "")),
+      bankName: String(readPath(defaults, ["bank_name"], "")),
+      bankCity: String(readPath(defaults, ["bank_city"], "")),
+      bankCorrAccount: String(readPath(defaults, ["bank_corr_account"], "")),
+      email: String(readPath(defaults, ["email"], "")),
+      contractDefaults: defaults,
+    };
+
+    // Use shared builder for rental contracts
+    const baseVariables = buildRentalContractVariables({
+      renter: {
+        fullName: payload.recipient || "",
+        phone: docIdentity.renterPhone || "",
+        birthDate: docIdentity.renterBirthDate || "",
+        email: docIdentity.renterEmail || "",
+        passportSeries,
+        passportNumber,
+        passportIssueDate: rentalSecrets?.renter_passport_issue_date || String(readPath(userSensitive, ["passportIssueDate"], "") || readPath(userSensitive, ["passport_issue_date"], "")) || "",
+        passportIssuedBy: "", // Web app doesn't collect this
+        registration: rentalSecrets?.renter_registration || String(readPath(userSensitive, ["registration"], "")) || "",
+        address: rentalSecrets?.renter_address || payload.pickupAddress || String(readPath(userSensitive, ["renterAddress"], "") || readPath(userSensitive, ["registration"], "")) || "",
+        driverLicenseSeries,
+        driverLicenseNumber,
+      },
+      bike: {
+        id: firstCar?.id,
+        make: firstCar?.make,
+        model: firstCar?.model,
+        type: String(firstSpecs.type || ""),
+        specs: firstSpecs,
+      },
+      period: {
+        startDate: rentStartDate,
+        startTime: "12:00",
+        endDate: rentEndDate,
+        endTime: "12:00",
+        dailyPrice: dailyPriceRub,
+        hourlyPrice: Number(firstSpecs.price_per_hour || 0),
+      },
+      crewSecrets,
+      meta: {
+        contractNumber: `${payload.slug.toUpperCase()}-${payload.orderId}`,
+        contractDate: new Date().toLocaleDateString("ru-RU"),
+        signatureTimestamp: new Date().toLocaleString("ru-RU"),
+        signatureFingerprint: payload.signatureFingerprint || "—",
+        renterSignature: payload.signatureName || "электронное согласие в Telegram WebApp",
+        documentKey: `${isSaleFlow ? "sale" : "rental"}-${payload.slug}-${payload.orderId}`,
+        verifiedAt: new Date().toISOString(),
+      },
+      extrasRows,
+      extrasTotalRub: formatMoney(payload.extrasTotal),
+    });
+
+    // Merge with web-app specific overrides
+    const variables: RentalContractVariables = {
+      ...baseVariables,
+      // Web app specific overrides that aren't in the shared builder
+      rent_days: String(rentDays),
+      total_price_rub: formatMoney(payload.totalAmount),
+      // Use formatMoney for price fields that expect formatted strings
       hourly_price_rub: formatMoney(Number(firstSpecs.price_per_hour || 0)),
       daily_price_rub: formatMoney(dailyPriceRub),
       subtotal_rub: formatMoney(payload.subtotal),
-      extras_rows: extrasRows,
-      extras_total_rub: formatMoney(payload.extrasTotal),
-      total_price_rub: formatMoney(payload.totalAmount),
-      deposit_rub: String(readPath(defaults, ["deposit_rub"], "20 000")),
-      included_mileage: String(readPath(defaults, ["included_mileage"], 200)),
-      overage_rate: `${readPath(defaults, ["overage_rate"], 30)} руб/км`,
-      included_km_per_day: String(readPath(defaults, ["included_km_per_day"], 200)),
-      extra_km_fee_rub: String(readPath(defaults, ["extra_km_fee_rub"], 35)),
-      bike_value_rub: String(readPath(defaults, ["bike_value_rub"], 700000)),
-      bike_value_words: String(readPath(defaults, ["bike_value_words"], "Семьсот тысяч")),
-      late_return_penalty_rub: String(readPath(defaults, ["late_return_penalty_rub"], 5000)),
-      late_return_penalty_max_days: String(readPath(defaults, ["late_return_penalty_max_days"], 90)),
-      damage_price_list: String(readPath(defaults, ["damage_price_list"], "мотоцикл в сборе / царапина на пластике / прочее по расчету")),
-      return_address: String(readPath(defaults, ["return_address"], "г. Нижний Новгород, ул. Стригинский переулок, дом 13б")),
-      lessor_address: String(readPath(defaults, ["lessor_address"], "г. Нижний Новгород")),
-      // Appendix 1 — act fields (filled at delivery/return; placeholders for pre-contract)
-      battery_level_start: "100 %",
-      battery_level_end: "____ %",
+      // Include renter_phone explicitly (shared builder has it but ensure it's present)
+      renter_phone: docIdentity.renterPhone || "",
+      // Web app specific placeholders
       equipment: "—",
-      damage_notes_at_delivery: "от даты начала аренды",
-      damage_notes_at_return: "от даты возврата тс",
       media_links: "—",
-      signature_timestamp: new Date().toLocaleString("ru-RU"),
-      signature_fingerprint: payload.signatureFingerprint || "—",
-      renter_signature: payload.signatureName || "электронное согласие в Telegram WebApp",
-      document_key: `${isSaleFlow ? "sale" : "rental"}-${payload.slug}-${payload.orderId}`,
-      verified_at: new Date().toISOString(),
-    } as const;
+      // Use the web app's resolved renter_passport which may include "указывается при выдаче"
+      renter_passport: rentalSecrets?.renter_passport || userSensitive.passport || payload.renterPassport || "указывается при выдаче",
+      // Use the web app's resolved renter_driver_license
+      renter_driver_license: rentalSecrets?.renter_driver_license || userSensitive.driverLicense || payload.renterDriverLicense || "указывается при выдаче",
+    };
 
     const docFileName = `franchize-order-${payload.slug}-${payload.orderId}.docx`;
     const verifierScope = `${flowType}:${payload.slug}:${payload.orderId}`;

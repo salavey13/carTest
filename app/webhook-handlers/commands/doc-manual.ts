@@ -49,6 +49,8 @@ import { createHash } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { convertTextDateToTimestamp, resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
+import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets } from "@/app/lib/rental-contract-vars";
+import { privateSchema } from "@/app/lib/private-secrets";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026; // 👍 Fixed current year
@@ -755,7 +757,11 @@ function parseStsVin(text: string): string | null {
  * Load crew secrets from private.crew_secrets for the given crew_slug.
  * Returns contract defaults with fallbacks for vip-bike.
  */
-async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<Record<string, string>> {
+/**
+ * Load crew secrets for contract defaults.
+ * Returns RentalCrewSecrets type compatible with buildRentalContractVariables.
+ */
+async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<RentalCrewSecrets> {
   try {
     const { data: secretsData } = await supabaseAdmin
       .from("crew_secrets")
@@ -770,11 +776,10 @@ async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<Record<st
         : secretsData.contract_defaults;
     }
 
-    // Extract contract defaults with fallbacks
-    return {
+    // Extract contract defaults with fallbacks - matching RentalCrewSecrets shape
+    const secrets: RentalCrewSecrets = {
       organizationName: contractDefaults.organizationName || "Мотосалон ВипБайкЭлектро",
       organizationShort: contractDefaults.organizationShort || "ИП Воробьев Р.В.",
-      organizationRepresentative: contractDefaults.organizationRepresentative || "ИП Воробьев Р.В.",
       ogrnip: contractDefaults.ogrnip || "326527500025145",
       inn: contractDefaults.inn || "525813643035",
       bankAccount: contractDefaults.bankAccount || "40802810942710013083",
@@ -784,17 +789,21 @@ async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<Record<st
       email: contractDefaults.email || "vip_bike@mail.ru",
       legalAddress: contractDefaults.legalAddress || "г. Нижний Новгород, пл. Комсомольская 2",
       issuerName: contractDefaults.issuerName || "Воробьев Р.В.",
+      signatoryRole: contractDefaults.signatoryRole || "Менеджер Мотосалона",
+      organizationRepresentative: contractDefaults.organizationRepresentative || "ИП Воробьев Р.В.",
       issuerRepresentative: contractDefaults.issuerRepresentative || "Сидоров Илья Олегович",
       returnAddress: contractDefaults.returnAddress || "Н. Н. пл. Комсомольская 2",
-      signatoryRole: contractDefaults.signatoryRole || "Менеджер Мотосалона",
+      contractDefaults,
     };
+    return secrets;
   } catch (error) {
     logger.warn("[/doc] Failed to load crew_secrets, using fallbacks:", error);
-    // Return fallback values
-    return {
+    // Return fallback values matching RentalCrewSecrets shape
+    const fallbackDefaults: RentalCrewSecrets = {
       organizationName: "Мотосалон ВипБайкЭлектро",
       organizationShort: "ИП Воробьев Р.В.",
       organizationRepresentative: "ИП Воробьев Р.В.",
+      issuerRepresentative: "Сидоров Илья Олегович",
       ogrnip: "326527500025145",
       inn: "525813643035",
       bankAccount: "40802810942710013083",
@@ -804,10 +813,10 @@ async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<Record<st
       email: "vip_bike@mail.ru",
       legalAddress: "г. Нижний Новгород, пл. Комсомольская 2",
       issuerName: "Воробьев Р.В.",
-      issuerRepresentative: "Сидоров Илья Олегович",
-      returnAddress: "Н. Н. пл. Комсомольская 2",
       signatoryRole: "Менеджер Мотосалона",
+      returnAddress: "Н. Н. пл. Комсомольская 2",
     };
+    return { ...fallbackDefaults, contractDefaults: {} };
   }
 }
 
@@ -917,144 +926,110 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
     const isRent = context.dealType === "rent";
     const now = new Date();
 
-    const vars: Record<string, string> = {
-      contract_number: `${now.getDate()}.${now.getMonth() + 1}/${bike.id}`,
-      day: String(now.getDate()).padStart(2, "0"),
-      month: now.toLocaleString("ru-RU", { month: "long" }),
-      month_num: String(now.getMonth() + 1).padStart(2, "0"),
-      year: String(now.getFullYear()),
-      contract_day: String(now.getDate()),
-      contract_month_genitive: now.toLocaleString("ru-RU", { month: "long" }),
-      contract_year: String(now.getFullYear()),
-      appendix_date: `${String(now.getDate()).padStart(2,'0')}.${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()}`,
-      buyer_full_name: context.mpFullName || "",
-      buyer_short_name: context.mpFullName?.split(' ').map((n, i) => i === 0 ? n : `${n[0]}.`).join(' ') || "",
-      buyer_birth_date: context.mpBirthDate || "",
-      buyer_passport_number: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim(),
-      buyer_passport_issued_by: context.mpIssuedBy || "",
-      buyer_passport_issue_date: context.mpIssueDate || "",
-      buyer_registration: context.mpRegistration || "",
-      buyer_email: "",
-      product_name: isElectric ? "Электромотоцикл" : "Мотоцикл",
-      product_color: bike.specs?.color || "уточняется",
-      product_type: bike.specs?.bike_subtype || (isElectric ? "Электромотоцикл" : "Мотоцикл"),
-      product_motor_type: isElectric ? "Электрический двигатель" : "ДВС",
-      product_motor_power: bike.specs?.power_kw ? `${bike.specs.power_kw} кВт` : (bike.specs?.engine_cc ? `рабочий объем ${bike.specs.engine_cc} куб.см` : ""),
-      product_vin: bike.specs?.vin || bike.specs?.frame || "уточняется",
-      product_year: String(bike.specs?.year || "уточняется"),
-      product_unit: "шт.",
-      spec_number: `${now.getDate()}.${now.getMonth() + 1}/${bike.id}`,
-      seller_address: crewSecrets.legalAddress,
-      lessor_address: crewSecrets.legalAddress,
-      issuer_name: crewSecrets.issuerName,
-      issuer_signatory: crewSecrets.signatoryRole,
-      issuer_representative: crewSecrets.organizationRepresentative,
-      organization_name: crewSecrets.organizationName,
-      organization_short: crewSecrets.organizationShort,
-      ogrnip: crewSecrets.ogrnip,
-      inn: crewSecrets.inn,
-      bank_account: crewSecrets.bankAccount,
-      bank_name: crewSecrets.bankName,
-      bank_city: crewSecrets.bankCity,
-      bank_corr_account: crewSecrets.bankCorrAccount,
-      email: crewSecrets.email,
-      legal_address: crewSecrets.legalAddress,
-      signature_timestamp: now.toLocaleString("ru-RU"),
-      signature_fingerprint: "manual-telegram-doc",
-      renter_signature: "согласие через Telegram",
-    };
+    let vars: Record<string, string>;
 
     if (isRent) {
-      // Resolve deposit: explicit override > bike.specs.deposit_rub > default 20000
-      const resolvedDeposit = context.depositOverride
-        || String(bike.specs?.deposit_rub || "20000");
-
-      Object.assign(vars, {
-        renter_full_name: context.mpFullName || "",
-        renter_birth_date: context.mpBirthDate || "",
-        renter_phone: "",
-        renter_email: "",
-        renter_driver_license: `${context.mlSeries || ""} ${context.mlNumber || ""}`.trim(),
-        renter_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim(),
-        renter_passport_issue_date: context.mpIssueDate || "",
-        renter_passport_issued_by: context.mpIssuedBy || "",
-        renter_registration: context.mpRegistration || "",
-        renter_address: context.mpRegistration || "",
-        bike_make_model: `${bike.make || ""} ${bike.model || ""}`.trim(),
-        bike_make: bike.make || "уточняется",
-        bike_model: bike.model || "уточняется",
-        bike_plate: bike.specs?.plate || "уточняется",
-        bike_vin: bike.specs?.vin || bike.specs?.frame || "уточняется",
-        bike_category: bike.specs?.category || "A/L3",
-        bike_color: bike.specs?.color || "уточняется",
-        bike_year: bike.specs?.year || "уточняется",
-        bike_engine_cc: String(bike.specs?.engine_cc || bike.specs?.displacement_cc || "0"),
-        bike_power_hp: String(bike.specs?.power_hp || bike.specs?.max_power_hp || "0"),
-        bike_power_kw: String(bike.specs?.power_kw || "0"),
-        bike_max_speed: String(bike.specs?.max_speed || bike.specs?.top_speed_kmh || "уточняется"),
-        bike_battery: String(bike.specs?.battery || (isElectric ? "уточняется" : "")),
-        bike_vehicle_type_label: isElectric ? "ЭЛЕКТРОМОТОЦИКЛА" : "МОТОЦИКЛА",
-        bike_vehicle_type_accusative: isElectric ? "электромотоцикл" : "мотоцикл",
-        bike_vehicle_type_genitive: isElectric ? "электромотоцикла" : "мотоцикла",
-        bike_engine_spec_line_1: (() => {
-          const ccPart = bike.specs?.engine_cc ? `рабочий объем ${bike.specs.engine_cc} куб. см` : "";
-          const hpPart = bike.specs?.power_hp ? `мощность ${bike.specs.power_hp} л.с.` : "";
-          if (isElectric) return bike.specs?.power_kw ? `мощность двигателя (номинальная) ${bike.specs.power_kw} кВт` : "";
-          return [ccPart, hpPart].filter(Boolean).join(", ") || "";
-        })(),
-        bike_engine_spec_line_2: bike.specs?.max_speed ? `максимальная конструктивная скорость ${bike.specs.max_speed} км/ч` : "",
-        bike_engine_spec_line_3: (() => {
-          if (isElectric) return bike.specs?.battery ? `аккумулятор: тип/ёмкость ${bike.specs.battery}` : "";
-          return "";
-        })(),
-        rent_start_date: context.rentStartDate || "",
-        rent_start_time: (context.rentStartTime || "18:00").replace('.', ':'),
-        rent_end_date: context.rentEndDate || "",
-        rent_end_time: (context.rentEndTime || "10:00").replace('.', ':'),
-        daily_price_rub: String(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
-        hourly_price_rub: String(bike.specs?.price_per_hour || ""),
-        deposit_rub: resolvedDeposit,
-        subtotal_rub: String(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
-        bike_value_rub: String(bike.specs?.sale_price || bike.specs?.price_rub || "850000"),
-        bike_value_words: "",
-        bike_mileage: String(bike.specs?.mileage || ""),
-        return_address: crewSecrets.returnAddress,
-        included_km_per_day: "200",
-        extra_km_fee_rub: "35",
-        late_return_penalty_rub: "10000",
-        late_return_penalty_max_days: "90",
-        equipment: "ключ(и) 1 шт.; шлем 1",
-        damage_notes_at_delivery: "от даты начала аренды",
-        damage_notes_at_return: "от даты возврата ТС",
-        battery_level_start: "100 %",
-        battery_level_end: "____ %",
-        media_links: "телефон",
-        damage_price_list: "мотоцикл в сборе / царапина на пластике / прочее по расчету",
-        document_key: `rental-${bike.id}-${Date.now()}`,
-
-        // ── СТС pledge vars — only populated when context.stsPledgeUsed=true ────
-        // Template uses {{#if sts_collateral}} to switch between СТС and
-        // cash-deposit clauses (see RENTAL_DEAL_TEMPLATE.html §4.3-4.7).
-        sts_collateral: context.stsPledgeUsed ? "1" : "",
-        sts_series: context.stsSeries || "",
-        sts_number: context.stsNumber || "",
-        sts_issue_date: context.stsIssueDate || "",
-        sts_vehicle_plate: context.stsVehiclePlate || "",
-        sts_vehicle_vin: context.stsVehicleVin || "",
-        sts_vehicle_model: context.stsVehicleModel || "",
-        sts_vehicle_year: context.stsVehicleYear || "",
-        sts_owner_full_name: context.stsOwnerFullName || "",
-        sts_owner_registration: context.stsOwnerRegistration || "",
-        sts_owner_relation: context.stsOwnerRelation || "сам арендатор",
-        sts_pledge_return_days: String(context.stsPledgeReturnDays || 3),
-        // When СТС is used, record the cash deposit that was skipped (analytics)
-        sts_deposit_amount_skipped: context.stsPledgeUsed ? resolvedDeposit : "",
+      // Use shared builder for rental contracts
+      vars = buildRentalContractVariables({
+        renter: {
+          fullName: context.mpFullName || "",
+          birthDate: context.mpBirthDate || "",
+          phone: "",
+          email: "",
+          passportSeries: context.mpSeries,
+          passportNumber: context.mpNumber,
+          passportIssueDate: context.mpIssueDate,
+          passportIssuedBy: context.mpIssuedBy,
+          registration: context.mpRegistration,
+          address: context.mpRegistration,
+          driverLicenseSeries: context.mlSeries,
+          driverLicenseNumber: context.mlNumber,
+        },
+        bike: {
+          id: bike.id,
+          make: bike.make,
+          model: bike.model,
+          type: bike.type,
+          specs: bike.specs,
+        },
+        period: {
+          startDate: context.rentStartDate || "",
+          startTime: context.rentStartTime || "18:00",
+          endDate: context.rentEndDate || "",
+          endTime: context.rentEndTime || "10:00",
+          depositOverride: context.depositOverride ? Number(context.depositOverride) : undefined,
+        },
+        crewSecrets,
+        stsPledge: {
+          used: context.stsPledgeUsed || false,
+          series: context.stsSeries,
+          number: context.stsNumber,
+          issueDate: context.stsIssueDate,
+          vehiclePlate: context.stsVehiclePlate,
+          vehicleVin: context.stsVehicleVin,
+          vehicleModel: context.stsVehicleModel,
+          vehicleYear: context.stsVehicleYear,
+          ownerFullName: context.stsOwnerFullName,
+          ownerRegistration: context.stsOwnerRegistration,
+          ownerRelation: context.stsOwnerRelation,
+          pledgeReturnDays: context.stsPledgeReturnDays,
+        },
+        meta: {
+          signatureTimestamp: now.toLocaleString("ru-RU"),
+          signatureFingerprint: "manual-telegram-doc",
+          renterSignature: "согласие через Telegram",
+          documentKey: `rental-${bike.id}-${Date.now()}`,
+          appendixDate: `${String(now.getDate()).padStart(2,'0')}.${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()}`,
+        },
       });
-    }
-
-    if (!isRent) {
+    } else {
+      // Sale contract still uses manual construction (TODO: could be extracted too)
       const salePrice = context.salePrice || String(bike.specs?.sale_price || bike.specs?.price_rub || "390000");
-      Object.assign(vars, {
+      vars = {
+        contract_number: `${now.getDate()}.${now.getMonth() + 1}/${bike.id}`,
+        day: String(now.getDate()).padStart(2, "0"),
+        month: now.toLocaleString("ru-RU", { month: "long" }),
+        month_num: String(now.getMonth() + 1).padStart(2, "0"),
+        year: String(now.getFullYear()),
+        contract_day: String(now.getDate()),
+        contract_month_genitive: now.toLocaleString("ru-RU", { month: "long" }),
+        contract_year: String(now.getFullYear()),
+        appendix_date: `${String(now.getDate()).padStart(2,'0')}.${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()}`,
+        buyer_full_name: context.mpFullName || "",
+        buyer_short_name: context.mpFullName?.split(' ').map((n, i) => i === 0 ? n : `${n[0]}.`).join(' ') || "",
+        buyer_birth_date: context.mpBirthDate || "",
+        buyer_passport_number: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim(),
+        buyer_passport_issued_by: context.mpIssuedBy || "",
+        buyer_passport_issue_date: context.mpIssueDate || "",
+        buyer_registration: context.mpRegistration || "",
+        buyer_email: "",
+        product_name: isElectric ? "Электромотоцикл" : "Мотоцикл",
+        product_color: bike.specs?.color || "уточняется",
+        product_type: bike.specs?.bike_subtype || (isElectric ? "Электромотоцикл" : "Мотоцикл"),
+        product_motor_type: isElectric ? "Электрический двигатель" : "ДВС",
+        product_motor_power: bike.specs?.power_kw ? `${bike.specs.power_kw} кВт` : (bike.specs?.engine_cc ? `рабочий объем ${bike.specs.engine_cc} куб.см` : ""),
+        product_vin: bike.specs?.vin || bike.specs?.frame || "уточняется",
+        product_year: String(bike.specs?.year || "уточняется"),
+        product_unit: "шт.",
+        spec_number: `${now.getDate()}.${now.getMonth() + 1}/${bike.id}`,
+        seller_address: crewSecrets.legalAddress,
+        lessor_address: crewSecrets.legalAddress,
+        issuer_name: crewSecrets.issuerName,
+        issuer_signatory: crewSecrets.signatoryRole || "Менеджер",
+        issuer_representative: crewSecrets.organizationRepresentative || crewSecrets.issuerRepresentative || crewSecrets.issuerName,
+        organization_name: crewSecrets.organizationName,
+        organization_short: crewSecrets.organizationShort,
+        ogrnip: crewSecrets.ogrnip,
+        inn: crewSecrets.inn,
+        bank_account: crewSecrets.bankAccount,
+        bank_name: crewSecrets.bankName,
+        bank_city: crewSecrets.bankCity,
+        bank_corr_account: crewSecrets.bankCorrAccount,
+        email: crewSecrets.email,
+        legal_address: crewSecrets.legalAddress,
+        signature_timestamp: now.toLocaleString("ru-RU"),
+        signature_fingerprint: "manual-telegram-doc",
+        renter_signature: "согласие через Telegram",
         price_digits: salePrice,
         price_words: numberToWords(Number(salePrice)),
         price_digits_table: salePrice.replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1 ') + ",00",
@@ -1070,7 +1045,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         bike_power_hp: String(bike.specs?.power_hp || bike.specs?.max_power_hp || "0"),
         bike_power_kw: String(bike.specs?.power_kw || "0"),
         bike_battery: String(bike.specs?.battery || (isElectric ? "уточняется" : "")),
-      });
+      };
     }
 
     // Load HTML template based on deal type
@@ -1152,7 +1127,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
     // Fallback: send DOCX alone
     if (!docSent) {
       try {
-        await sendTelegramDocument(String(chatId), docxBuf, docFileName, caption);
+        await sendTelegramDocument(String(chatId), docxBuf, docFileName);
         docSent = true;
         logger.info("[/doc] DOCX sent via sendTelegramDocument");
       } catch (e) {
@@ -1164,7 +1139,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       logger.error("[/doc] All document delivery methods failed!");
     }
 
-    const { error: secretsError } = await supabaseAdmin.schema("private").from("user_rental_secrets").insert({
+    const { error: secretsError } = await privateSchema().from("user_rental_secrets").insert({
       chat_id: String(userId),
       crew_slug: "vip-bike",
       doc_sha256: docSha256,
@@ -1249,8 +1224,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         });
       }
 
-      const { error: rentError } = await supabaseAdmin
-        .schema("private")
+      const { error: rentError } = await privateSchema()
         .from("rental_contract_artifacts")
         .insert(rentInsert);
       if (rentError) {
@@ -1260,7 +1234,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       const salePrice = context.salePrice || String(bike.specs?.sale_price || bike.specs?.price_rub || "390000");
 
       // sale_contract_artifacts is in private schema — use explicit columns only
-      const { error: saleError } = await supabaseAdmin.schema("private").from("sale_contract_artifacts").insert({
+      const { error: saleError } = await privateSchema().from("sale_contract_artifacts").insert({
         contract_key: vars.document_key,
         original_sha256: docSha256,
         requested_bike_id: context.bikeId,

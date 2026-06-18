@@ -50,7 +50,7 @@ type PrivateReadFallbackContext = {
   orderId?: string;
 };
 
-function privateSchema() {
+export function privateSchema() {
   return (supabaseAdmin as unknown as SupabaseSchemaClient).schema("private");
 }
 
