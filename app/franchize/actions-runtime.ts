@@ -909,11 +909,35 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
             "bike_subtype",
             "type",
             "spec_labels",
+            "hidden",
+            "is_hot",
+            "hot",
+            "badge",
+            "sale",
+            "sale_price",
+            "purchase_price",
+            "rent_price_label",
+            "gallery",
+            "images",
+            "photos",
+            "image_urls",
+            "bike_engine_spec_line_1",
+            "bike_engine_spec_line_2",
+            "bike_engine_spec_line_3",
           ]);
+          const priorityKeys = ["power", "top_speed", "engine", "range", "acceleration", "torque", "weight", "capacity"];
 
           return Object.entries(specs)
             .filter(([, value]) => typeof value === "string" || typeof value === "number")
             .filter(([key]) => !hiddenSpecKeys.has(key))
+            .sort((a, b) => {
+              const aPriority = priorityKeys.indexOf(a[0]);
+              const bPriority = priorityKeys.indexOf(b[0]);
+              if (aPriority >= 0 && bPriority >= 0) return aPriority - bPriority;
+              if (aPriority >= 0) return -1;
+              if (bPriority >= 0) return 1;
+              return 0;
+            })
             .slice(0, 4)
             .map(([key, value]) => ({
               label: typeof labels[key] === "string" && String(labels[key]).trim().length > 0
