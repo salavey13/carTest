@@ -157,7 +157,7 @@ export function BikeShowcase() {
                         }}
                       >
                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M19 14h-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-4h2c1.1 0 2-.9 2-2v-2c0-1.1-.9-2-2-2zm-2 4h-2v-4h2v4zM5 6h10v14H5V6zm2 2h6v2H7V8zm0 4h6v2H7v-2z" />
+                          <path d="M3 3v18h14v-2H5V3h14v2h2V3H3zm14 6v2h-2V9h2zm-2 4h2v2h-2v-2zm0 4h2v-2h2v2h-2v2h-2v-2zM7 5h6v2H7V5zm0 4h6v2H7V9zm0 4h6v2H7v-2z" />
                         </svg>
                         <span>БЕНЗИН</span>
                       </div>
