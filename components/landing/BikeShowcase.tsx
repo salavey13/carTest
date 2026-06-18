@@ -194,8 +194,8 @@ export function BikeShowcase() {
                           boxShadow: "0 0 15px rgba(255, 215, 0, 0.4)",
                         }}
                       >
-                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 1.5C8 1.5 5 5 5 9c0 2.5 1.5 4.5 3.5 6.5L12 18l3.5-2.5C17.5 13.5 19 11.5 19 9c0-4-3-7.5-7-7.5zm0 14c-2.8 0-5-2.2-5-5 0-1.8 1-3.2 2.5-4.2L12 4.5l2.5 1.8c1.5 1 2.5 2.4 2.5 4.2 0 2.8-2.2 5-5 5z" />
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 3c-4 0-7 4-7 8 0 4 3 7 7 7s7-3 7-7c0-4-3-8-7-8zm0 13c-3.3 0-6-2.7-6-6 0-3 2.5-6 6-6s6 3 6 6c0 3.3-2.7 6-6 6z" />
                         </svg>
                         <span>БЕНЗИН</span>
                       </div>
