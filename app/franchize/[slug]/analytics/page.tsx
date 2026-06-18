@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getTodayRentalsAnalytics } from '@/app/franchize/actions-runtime';
-import { getCachedFranchizeBySlug } from '@/app/franchize/actions';
+import { getFranchizeBySlug } from '@/app/franchize/server-actions/catalog';
 import { AnalyticsClient } from './components/AnalyticsClient';
 import { headers } from 'next/headers';
 
@@ -16,12 +16,12 @@ export default async function AnalyticsPage({
   const { slug } = params;
 
   // Get crew data
-  const crewResult = await getCachedFranchizeBySlug({ slug });
-  if (!crewResult.ok || !crewResult.data?.crew) {
+  const franchizeData = await getFranchizeBySlug(slug);
+  if (!franchizeData?.crew) {
     redirect('/franchize/' + slug);
   }
 
-  const crew = crewResult.data.crew;
+  const crew = franchizeData.crew;
 
   // Get actorUserId from headers for auth check
   const headersList = await headers();
