@@ -897,11 +897,31 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
               : null,
         rawSpecs: specs,
         reviewSummary: buildReviewSummary(reviewsByBike.get(car.id) ?? []),
-        specs: Object.entries(specs)
-          .filter(([, value]) => typeof value === "string" || typeof value === "number")
-          .filter(([key]) => !["subtitle", "description", "segment", "subtype", "bike_subtype", "type"].includes(key))
-          .slice(0, 4)
-          .map(([key, value]) => ({ label: key.replace(/_/g, " "), value: String(value) })),
+        specs: (() => {
+          const labels = specs.spec_labels && typeof specs.spec_labels === "object" && !Array.isArray(specs.spec_labels)
+            ? (specs.spec_labels as Record<string, unknown>)
+            : {};
+          const hiddenSpecKeys = new Set([
+            "subtitle",
+            "description",
+            "segment",
+            "subtype",
+            "bike_subtype",
+            "type",
+            "spec_labels",
+          ]);
+
+          return Object.entries(specs)
+            .filter(([, value]) => typeof value === "string" || typeof value === "number")
+            .filter(([key]) => !hiddenSpecKeys.has(key))
+            .slice(0, 4)
+            .map(([key, value]) => ({
+              label: typeof labels[key] === "string" && String(labels[key]).trim().length > 0
+                ? String(labels[key]).trim()
+                : key.replace(/_/g, " "),
+              value: String(value),
+            }));
+        })(),
       };
       });
 
