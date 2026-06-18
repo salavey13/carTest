@@ -80,6 +80,8 @@ export type FranchizeCartLineVM = {
     duration: string;
     perk: string;
     auction: string;
+    rentStartDate?: string;
+    rentEndDate?: string;
   };
 };
 
