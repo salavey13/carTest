@@ -1,8 +1,7 @@
 const LOADER_GIF_URL =
   "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif";
 
-const bikeGoldFilter =
-  "invert(1) grayscale(1) contrast(3.2) brightness(1.1) sepia(1) saturate(2.4) hue-rotate(2deg)";
+const bikeGoldFilter = "invert(1)";
 
 export default function Loading() {
   return (
