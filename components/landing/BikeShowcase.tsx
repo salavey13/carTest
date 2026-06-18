@@ -20,6 +20,7 @@ const FEATURED_BIKES = [
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2025/image_1.jpg",
     type: "Electric",
     specs: { power: "17 кВт", range: "120 км", topSpeed: "100 км/ч" },
+    specLabels: { power: "Мощность", range: "Запас хода", topSpeed: "Макс. скорость" },
   },
   {
     id: "y-volt-surge-v",
@@ -30,6 +31,7 @@ const FEATURED_BIKES = [
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/y-volt-surge-v/image_1.jpg",
     type: "Electric",
     specs: { power: "35 кВт", range: "150 км", topSpeed: "125 км/ч" },
+    specLabels: { power: "Мощность", range: "Запас хода", topSpeed: "Макс. скорость" },
   },
   {
     id: "sequence-zero",
@@ -40,6 +42,7 @@ const FEATURED_BIKES = [
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sequence-zero/image_1.jpg",
     type: "Electric",
     specs: { power: "30 кВт", range: "300 км", topSpeed: "160 км/ч" },
+    specLabels: { power: "Мощность", range: "Запас хода", topSpeed: "Макс. скорость" },
   },
   {
     id: "kawasaki-ex650k",
@@ -50,6 +53,7 @@ const FEATURED_BIKES = [
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/kawasaki-ex650k/image_1.jpg",
     type: "ICE",
     specs: { power: "68 л.с.", engine: "649 см³", topSpeed: "210 км/ч" },
+    specLabels: { power: "Мощность", engine: "Объём двигателя", topSpeed: "Макс. скорость" },
   },
   {
     id: "suzuki-gsx-s1000f",
@@ -60,6 +64,7 @@ const FEATURED_BIKES = [
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/suzuki-gsx-s1000f/image_1.jpg",
     type: "ICE",
     specs: { power: "150 л.с.", engine: "999 см³", topSpeed: "255 км/ч" },
+    specLabels: { power: "Мощность", engine: "Объём двигателя", topSpeed: "Макс. скорость" },
   },
   {
     id: "nibbler-regumoto-4v",
@@ -70,6 +75,7 @@ const FEATURED_BIKES = [
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/nibbler-regumoto-4v/image_1.jpg",
     type: "ICE",
     specs: { power: "27 л.с.", engine: "300 см³", topSpeed: "150 км/ч" },
+    specLabels: { power: "Мощность", engine: "Объём двигателя", topSpeed: "Макс. скорость" },
   },
 ];
 
@@ -142,7 +148,7 @@ export function BikeShowcase() {
                   <div className="space-y-1 text-sm">
                     {Object.entries(bike.specs).map(([key, value]) => (
                       <div key={key} className="flex justify-between">
-                        <span className="text-gray-400">{key}:</span>
+                        <span className="text-gray-400">{bike.specLabels[key]}:</span>
                         <span className="font-medium" style={{ color: "#D4AF37" }}>
                           {value}
                         </span>
