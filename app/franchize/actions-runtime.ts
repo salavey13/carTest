@@ -7,7 +7,7 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { readFile } from "fs/promises";
 import path from "path";
-import { getCrewSensitiveDataOrDefault, getUserSensitiveDataOrDefault, saveCrewSensitiveData } from "@/app/lib/private-secrets";
+import { getCrewSensitiveDataOrDefault, getUserSensitiveDataOrDefault, saveCrewSensitiveData } from "@/lib/private-secrets";
 import { getUserRentalSecrets as getVerifiedRentalSecrets, saveUserRentalSecrets } from "@/app/lib/user-rental-secrets";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 import { upsertFranchizeIntent } from "@/app/franchize/server-actions/intents";

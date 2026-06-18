@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import { randomUUID } from "crypto";
-import { getCrewSensitiveDataOrDefault } from "@/app/lib/private-secrets";
+import { getCrewSensitiveDataOrDefault } from "@/lib/private-secrets";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 import type {
   ConfiguratorLeadInput,

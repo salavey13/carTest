@@ -50,7 +50,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { convertTextDateToTimestamp, resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets } from "@/app/lib/rental-contract-vars";
-import { privateSchema } from "@/app/lib/private-secrets";
+import { privateSchema } from "@/lib/private-secrets";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026; // 👍 Fixed current year
