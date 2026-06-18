@@ -51,11 +51,11 @@ export function convertTextDateToTimestamp(
   if (!parsed) return null;
 
   // Parse time HH:MM, default to 00:00 if minutes missing
-  const timeMatch = String(timeText || '').trim().match(/^(\d{1,2})(:(\d{2}))?$/);
+  const timeMatch = String(timeText || '').trim().match(/^(\d{1,2})(:(\d{1,2}))?$/);
   if (!timeMatch) return null;
 
   const hh = parseInt(timeMatch[1], 10);
-  const mm = timeMatch[2] ? parseInt(timeMatch[2].substring(1), 10) : 0;
+  const mm = timeMatch[2] ? parseInt(timeMatch[3] || '0', 10) : 0;
 
   if (isNaN(hh) || isNaN(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) {
     return null;

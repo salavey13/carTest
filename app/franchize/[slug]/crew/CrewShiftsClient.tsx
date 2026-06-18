@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAppContext } from '@/contexts/AppContext';
 import Link from "next/link";
-import { Clock, Users, ArrowLeft, Play, Stop, Loader2 } from "lucide-react";
+import { Clock, Users, ArrowLeft, Play, Square, Loader2 } from "lucide-react";
 import { cn } from '@/lib/utils';
 import { toast } from "sonner";
 
@@ -206,7 +206,7 @@ export function FranchizeCrewShiftsClient({ crewSlug }: { crewSlug: string }) {
                                                 <Loader2 className="h-3 w-3 animate-spin" />
                                             ) : (
                                                 <>
-                                                    <Stop className="h-3 w-3 mr-1" />
+                                                    <Square className="h-3 w-3 mr-1" />
                                                     End
                                                 </>
                                             )}
