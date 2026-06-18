@@ -13,7 +13,7 @@ export function Loading({ text, className }: LoadingProps) {
   return (
     <div
       className={cn("min-h-screen flex items-center justify-center relative overflow-hidden", className)}
-      style={{ backgroundColor: "#0A0A0A" }}
+      style={{ backgroundColor: "#000000" }}
     >
       {/* Golden particles effect */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">

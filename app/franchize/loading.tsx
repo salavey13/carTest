@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function FranchizeLoading() {
   return (
-    <main className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{ backgroundColor: "#0A0A0A" }} aria-busy="true">
+    <main className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{ backgroundColor: "#000000" }} aria-busy="true">
       {/* Golden particles effect */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(20)].map((_, i) => (

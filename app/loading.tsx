@@ -1,6 +1,6 @@
 export default function Loading() {
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#0A0A0A" }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#000000" }}>
       <div className="flex flex-col items-center gap-4">
         {/* S1000RR GIF — inverted black→white, then sepia+gold tone */}
         <img
