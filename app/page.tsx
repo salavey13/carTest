@@ -55,11 +55,11 @@ export default function HomePage() {
       {/* Social banner (after hero, per design spec) */}
       <SocialBanner />
 
-      {/* Services section */}
-      <Services />
-
       {/* Bike showcase - 6 hardcoded bikes */}
       <BikeShowcase />
+
+      {/* Services section */}
+      <Services />
 
       {/* How it works - preserved from Max's design */}
       <HowItWorks />
