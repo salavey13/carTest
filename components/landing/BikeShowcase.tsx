@@ -1,10 +1,13 @@
 /**
- * VIP Bike Landing - Bike Showcase (Server Component)
+ * VIP Bike Landing - Bike Showcase (Client Component)
  *
  * Displays 6 hardcoded bikes with gold-on-black aesthetic
- * CSS-only hover effects, no JavaScript event handlers
+ * Filter buttons: All / Electric / Gasoline
  */
 
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 
 const CATALOG_HREF = "/franchize/vip-bike";
@@ -87,11 +90,28 @@ const FEATURED_BIKES = [
   },
 ];
 
+type FilterType = "all" | "electric" | "gasoline";
+
 function formatPrice(price: number): string {
   return new Intl.NumberFormat("ru-RU").format(price);
 }
 
 export function BikeShowcase() {
+  const [filter, setFilter] = useState<FilterType>("all");
+
+  const filteredBikes = FEATURED_BIKES.filter((bike) => {
+    if (filter === "all") return true;
+    if (filter === "electric") return bike.type === "Electric";
+    if (filter === "gasoline") return bike.type === "ICE";
+    return true;
+  });
+
+  const filterButtons: { key: FilterType; label: string; color: string }[] = [
+    { key: "all", label: "Все", color: "#FFD700" },
+    { key: "electric", label: "Электро", color: "#38BDF8" },
+    { key: "gasoline", label: "Бензин", color: "#FFD700" },
+  ];
+
   return (
     <section id="catalog" className="py-20 px-4" style={{ backgroundColor: "#0A0A0A" }}>
       <div className="container mx-auto max-w-6xl">
@@ -108,9 +128,28 @@ export function BikeShowcase() {
           </p>
         </div>
 
+        {/* Filter buttons */}
+        <div className="flex justify-center gap-3 mb-12">
+          {filterButtons.map(({ key, label, color }) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className="px-6 py-2 rounded-full font-semibold text-sm transition-all hover:scale-105"
+              style={{
+                backgroundColor: filter === key ? color : "transparent",
+                color: filter === key ? "#0A0A0A" : color,
+                border: `2px solid ${color}`,
+                opacity: filter === key ? 1 : 0.7,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         {/* Bike grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {FEATURED_BIKES.map((bike) => (
+          {filteredBikes.map((bike) => (
             <Link
               key={bike.id}
               href={`${CATALOG_HREF}/${bike.id}`}
