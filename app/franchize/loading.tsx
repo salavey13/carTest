@@ -3,6 +3,8 @@ import Link from "next/link";
 export default function FranchizeLoading() {
   return (
     <main className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{ backgroundColor: "#000000" }} aria-busy="true">
+      {/* Dark overlay for deeper black */}
+      <div className="absolute inset-0 bg-black/40 pointer-events-none" />
       {/* Golden particles effect */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(20)].map((_, i) => (
@@ -27,7 +29,7 @@ export default function FranchizeLoading() {
           alt="Загрузка..."
           className="w-24 h-24 object-contain"
           style={{
-            filter: "invert(1) sepia(1) saturate(2) hue-rotate(5deg)",
+            filter: "brightness(0.7) invert(1) sepia(1) saturate(2) hue-rotate(5deg)",
           }}
         />
 
