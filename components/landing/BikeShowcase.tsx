@@ -16,22 +16,28 @@ const FEATURED_BIKES = [
     make: "79BIKE",
     model: "Falcon GT 2025",
     dailyPrice: 12000,
+    hourlyPrice: 3500,
+    minHours: 3,
     imageUrl:
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2025/image_1.jpg",
     type: "Electric",
     specs: { power: "17 кВт", range: "120 км", topSpeed: "100 км/ч" },
     specLabels: { power: "Мощность", range: "Запас хода", topSpeed: "Макс. скорость" },
+    pricingType: "hourly",
   },
   {
     id: "y-volt-surge-v",
     make: "Y-VOLT",
     model: "Surge V",
     dailyPrice: 12000,
+    hourlyPrice: 4500,
+    minHours: 3,
     imageUrl:
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/y-volt-surge-v/image_1.jpg",
     type: "Electric",
     specs: { power: "35 кВт", range: "150 км", topSpeed: "125 км/ч" },
     specLabels: { power: "Мощность", range: "Запас хода", topSpeed: "Макс. скорость" },
+    pricingType: "hourly",
   },
   {
     id: "sequence-zero",
@@ -158,13 +164,27 @@ export function BikeShowcase() {
 
                   {/* Price */}
                   <div className="pt-3 border-t border-gray-700">
-                    <span
-                      className="text-xl font-bold"
-                      style={{ color: "#FFD700" }}
-                    >
-                      {formatPrice(bike.dailyPrice)} ₽
-                    </span>
-                    <span className="text-gray-400 text-sm"> / сутки</span>
+                    {bike.pricingType === "hourly" ? (
+                      <>
+                        <span
+                          className="text-xl font-bold"
+                          style={{ color: "#FFD700" }}
+                        >
+                          {formatPrice(bike.hourlyPrice)} ₽
+                        </span>
+                        <span className="text-gray-400 text-sm"> / час (от {bike.minHours} ч)</span>
+                      </>
+                    ) : (
+                      <>
+                        <span
+                          className="text-xl font-bold"
+                          style={{ color: "#FFD700" }}
+                        >
+                          {formatPrice(bike.dailyPrice)} ₽
+                        </span>
+                        <span className="text-gray-400 text-sm"> / сутки</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </article>
