@@ -55,7 +55,7 @@ export function Loading({ text, className }: LoadingProps) {
             alt="Загрузка..."
             className="w-24 h-24 object-contain"
             style={{
-              filter: "sepia(1) saturate(2) hue-rotate(-5deg) brightness(1.1)",
+              filter: "sepia(1) saturate(2.5) hue-rotate(-8deg) contrast(1.1)",
             }}
           />
         </motion.div>
