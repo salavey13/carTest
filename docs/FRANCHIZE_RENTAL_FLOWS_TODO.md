@@ -1,6 +1,6 @@
 # TODO: franchize rental/order document flow alignment
 
-Updated: 2026-06-18 - Task #1 completed
+Updated: 2026-06-18 - Tasks #1, #6-10 completed
 
 ## Scope
 
@@ -14,12 +14,22 @@ Three rental/document flows compared:
 - **Russian spec labels in catalog modal** - Fixed in `actions-runtime.ts:getFranchizeBySlug()`
   - Now uses `specs.spec_labels` from CSV for Russian translations
   - Fallback to underscore-to-space if no translation exists
+  - Priority keys: power, top_speed, engine, range, acceleration, torque, weight, capacity
 
 - **Cart date storage bug (Task #1)** - Fixed in commit `fa171d5c`
   - Added `rentStartDate`/`rentEndDate` fields to `FranchizeCartOptions` type
   - Updated `DEFAULT_OPTIONS`, `sanitizeCartState`, `areLineOptionsEqual`, `buildCartLineId`
   - Updated `FranchizeCartLineVM` options type to include dates
   - Added prefill logic in `OrderPageClient` to populate form with cart dates
+
+- **Filter rail and header fixes** - Fixed in commit `705499fd`
+  - Filter rail now shows Russian titles (uses `group.title || group.category`)
+  - "partners" category displays as "Байки партнёров"
+
+- **Loading improvements** - Fixed in commit `705499fd`
+  - Removed dits/particles effect that highlighted square GIF boundaries
+  - Simple radial glow for cleaner look
+  - Added `/loading-test` page to test filter variants
 
 ## Current flow map
 
