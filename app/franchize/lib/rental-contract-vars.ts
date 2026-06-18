@@ -200,7 +200,7 @@ export async function buildTemplateVars(params: {
     late_return_penalty_rub: String(params.contractDefaults.lateReturnPenaltyRub || 10000),
     late_return_penalty_max_days: '90',
     bike_value_rub: String(bikeValue),
-    bike_value_words: '', // Optional: could use number-to-words lib
+    bike_value_words: '', // Not used in rental contracts (sale-only field)
 
     // Organization/Legal
     organization_short: params.crewSecrets.organizationShort || 'ИП Воробьева Р.В.',

@@ -320,6 +320,49 @@ function getContractDefault(
   return String(defaultValue);
 }
 
+/**
+ * Calculate rental duration in hours from start/end dates and times
+ * Handles both DD.MM.YYYY and YYYY-MM-DD date formats
+ */
+function calculateRentalHours(
+  startDate: string,
+  startTime: string,
+  endDate: string,
+  endTime: string
+): number {
+  const parseDate = (dateStr: string) => {
+    // Try DD.MM.YYYY format first
+    const parts = dateStr.split('.');
+    if (parts.length === 3) {
+      const [d, m, y] = parts.map(Number);
+      return new Date(y, m - 1, d);
+    }
+    // Try YYYY-MM-DD format
+    const isoParts = dateStr.split('-');
+    if (isoParts.length === 3) {
+      const [y, m, d] = isoParts.map(Number);
+      return new Date(y, m - 1, d);
+    }
+    return null;
+  };
+
+  const parseTime = (timeStr: string) => {
+    const parts = timeStr.split(':');
+    if (parts.length !== 2) return 0;
+    const [h, m] = parts.map(Number);
+    return h * 60 + m;
+  };
+
+  const start = parseDate(startDate);
+  const end = parseDate(endDate);
+  if (!start || !end) return 0;
+
+  const startMinutes = start.getTime() / 60000 + parseTime(startTime);
+  const endMinutes = end.getTime() / 60000 + parseTime(endTime);
+
+  return Math.max(0, Math.round((endMinutes - startMinutes) / 60 * 10) / 10);
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Main builder function
 // ─────────────────────────────────────────────────────────────────────────
@@ -365,6 +408,24 @@ export function buildRentalContractVariables(
   const hourlyPrice = resolveHourlyPrice(period, bikeSpecs, dailyPrice);
   const deposit = resolveDeposit(period, bikeSpecs);
   const bikeValue = resolveBikeValue(bikeSpecs);
+
+  // Calculate rental duration and subtotal
+  const rentalHours = calculateRentalHours(
+    period.startDate,
+    period.startTime,
+    period.endDate,
+    period.endTime
+  );
+  const rentalDays = Math.max(1, Math.ceil(rentalHours / 24));
+  const isHourlyRental = rentalHours > 0 && rentalHours < 24;
+
+  let subtotal: number;
+  if (isHourlyRental) {
+    subtotal = Number(hourlyPrice) * rentalHours;
+  } else {
+    subtotal = Number(dailyPrice) * rentalDays;
+  }
+  const subtotalRounded = Math.round(subtotal);
 
   // Contract number - use meta or default format
   const contractNumber = meta.contractNumber || `${now.getDate()}.${now.getMonth() + 1}/${bike.id || "unknown"}`;
@@ -457,9 +518,9 @@ export function buildRentalContractVariables(
     daily_price_rub: dailyPrice,
     hourly_price_rub: hourlyPrice,
     deposit_rub: deposit,
-    subtotal_rub: dailyPrice, // Default to daily price, caller can override
+    subtotal_rub: String(subtotalRounded), // Calculated from rental duration
     bike_value_rub: bikeValue,
-    bike_value_words: "", // Caller can populate with numberToWords if needed
+    bike_value_words: "", // Not used in rental contracts (sale-only field)
 
     // Rental terms defaults
     included_km_per_day: getContractDefault(crewSecrets, "included_km_per_day", DEFAULT_INCLUDED_KM_PER_DAY),
