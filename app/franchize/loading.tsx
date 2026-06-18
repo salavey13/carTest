@@ -22,7 +22,7 @@ export default function FranchizeLoading() {
           alt="Загрузка..."
           className="w-24 h-24 object-contain"
           style={{
-            filter: "invert(1)",
+            filter: "invert(1) grayscale(0.5) sepia(0.8) saturate(3) contrast(2)",
           }}
         />
 
