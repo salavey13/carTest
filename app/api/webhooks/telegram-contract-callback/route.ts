@@ -9,6 +9,12 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CALLBACK_SECRET = process.env.TELEGRAM_CALLBACK_SECRET || process.env.CODEX_BRIDGE_CALLBACK_SECRET;
 
 export async function POST(request: Request) {
+  // Verify bot token is configured
+  if (!TELEGRAM_BOT_TOKEN) {
+    console.error('[telegram-contract-callback] TELEGRAM_BOT_TOKEN not configured');
+    return Response.json({ ok: false, error: 'Server configuration error' }, { status: 500 });
+  }
+
   // Verify callback secret if configured
   if (CALLBACK_SECRET) {
     const authHeader = request.headers.get('x-telegram-callback-secret');
@@ -35,22 +41,22 @@ export async function POST(request: Request) {
       });
 
       if (action === 'approve_contract') {
-        // Get rental details
+        // Get rental details with crew (join through vehicle)
         const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
         const { data: rental } = await supabase
           .from('rentals')
-          .select('crew_slug, vehicle_id')
+          .select('vehicle_id, vehicle:cars(crew:crews(slug))')
           .eq('rental_id', rentalId)
           .single();
 
-        if (!rental) {
+        if (!rental || !rental.vehicle?.crew?.slug) {
           await sendErrorMessage(msg.chat.id, 'Аренда не найдена');
           return Response.json({ ok: true });
         }
 
         const result = await approveContract({
           rentalId,
-          crewSlug: rental.crew_slug,
+          crewSlug: rental.vehicle.crew.slug,
           bikeId: rental.vehicle_id,
           contractDraftId: draftId,
           actorTelegramUserId: String(from.id),
