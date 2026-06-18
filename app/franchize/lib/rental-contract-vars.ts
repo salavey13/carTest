@@ -7,13 +7,13 @@ const TEMPLATE_MD_PATH = 'docs/RENTAL_DEAL_TEMPLATE.md';
 /**
  * Determine if bike is electric based on type and specs
  */
-export function isElectricBike(bike: BikeSpecs, type: string): boolean {
+export function isElectricBike(bike: BikeSpecs, type?: string): boolean {
   const specs = bike as any; // Allow access to additional spec properties
-  return type === 'ebike'
+  return Boolean(type === 'ebike'
     || /electric/i.test(bike.type || '')
     || /электро|electric|e-bike|ebike/i.test(specs.fuel_type || '')
     || (bike.power_kw && Number(bike.power_kw) > 0 && !bike.engine_cc)
-    || (bike.battery && !bike.engine_cc);
+    || (bike.battery && !bike.engine_cc));
 }
 
 /**
