@@ -1,0 +1,367 @@
+Implementation Complete (Tasks 1-13) ✓
+
+  All server and client components for the franchize rental contract alignment have been implemented. Here's a summary:
+
+  Created Files:
+
+  Server Actions:
+  - app/franchize/server-actions/submit-contract-draft.ts - User submits draft for approval
+  - app/franchize/server-actions/approve-contract.ts - Crew owner approves and generates DOCX
+  - app/franchize/server-actions/decline-contract.ts - Crew owner declines draft
+
+  API & Webhooks:
+  - app/api/webhooks/telegram-contract-callback/route.ts - Handles Telegram callback buttons
+
+  Libraries:
+  - app/franchize/lib/rental-contract-types.ts - Shared types for approval flow
+  - app/franchize/lib/rental-contract-vars.ts - Template variable builder with electric/ICE detection
+
+  Components:
+  - app/franchize/components/ContractDraftPanel.tsx - Form for users to submit contract data
+  - app/franchize/components/ContractDraftReview.tsx - Crew owner review interface
+  - app/franchize/components/RentalReturnPanel.tsx - Post-rental return documentation
+
+  Pages:
+  - app/franchize/[slug]/contract-draft/[rentalId]/page.tsx - Draft details page
+
+  Migration:
+
+  - supabase/migrations/20260618000001_rental_contracts_storage.sql - Storage bucket with RLS policies
+
+  Architecture Implemented:
+
+  1. User flow: Fills form → saves to rental.metadata.contract_draft → Telegram sent to crew owner with inline buttons + web link
+  2. Owner flow: Clicks approve → DOCX generated → uploaded to Storage → sent to both parties
+  3. Auth model: Uses chat_id auth (via auth.jwt() ->> 'chat_id')
+
+  Remaining tasks (14-15: Integration testing & documentation) require manual testing and user verification of the flow.
+
+✻ Cogitated for 12m 32s
+
+> good good:) enhance web link handling - currently it handles only user being shown it after doc is created by skill - now we need to add handling for owner opening it - it should open                           app/franchize/[slug]/contract-draft/[rentalId]/page.tsx - Draft details page (maybe add qr code there for case when owner opens this link after doc being created by skill (opened qr code intended to be shown   for user - we can enable last time edits and "odometer, damage report" filling at this point:) and even after rent ends as well to fill "after ride" fields;)
+
+  Thought for 7s, read 1 file (ctrl+o to expand)
+
+● I'll enhance the contract-draft page to handle multiple scenarios:
+  1. Owner viewing pending draft (approve/decline)
+  2. Owner viewing after approval (show QR for user, enable edits)
+  3. Post-rental return data entry
+
+  Thought for 10s, read 2 files (ctrl+o to expand)
+                                                                                                                                                                                                                  ● Let me enhance the ContractDraftReview component to handle multiple states and add QR code:
+
+● Write(app\franchize\components\ContractDraftReview.tsx)
+  ⎿  Added 142 lines, removed 28 lines
+       1  // /app/franchize/components/ContractDraftReview.tsx
+       2  "use client";
+       3
+       4 -import { useState, useTransition } from "react";
+       4 +import { useState, useTransition, useEffect } from "react";
+       5  import { toast } from "sonner";
+       6  import { useAppContext } from "@/contexts/AppContext";
+       7  import { approveContract, declineContract, type FranchizeTheme } from "../actions";
+       8 +import { RentalReturnPanel } from "./RentalReturnPanel";
+       9
+      10  interface ContractDraftReviewProps {
+      11    rental: any;
+     ...
+      14    crewSlug: string;
+      15    orgSecrets: any;
+      16    theme: FranchizeTheme;
+      17 +  contractKey?: string;
+      18 +  downloadUrl?: string;
+      19  }
+      20
+      21 +type ContractStatus = 'pending' | 'approved' | 'declined';
+      22 +
+      23  export function ContractDraftReview({
+      24    rental,
+      25    draft,
+     ...
+      27    crewSlug,
+      28    orgSecrets,
+      29    theme,
+      30 +  contractKey,
+      31 +  downloadUrl,
+      32  }: ContractDraftReviewProps) {
+      33    const { dbUser } = useAppContext();
+      34    const [isPending, startTransition] = useTransition();
+      35 +  const [status, setStatus] = useState<ContractStatus>(draft?.status || 'pending');
+      36 +  const [showQr, setShowQr] = useState(false);
+      37
+      29 -  // Simple owner check (in production, verify against crew_members table)
+      38 +  // Simple owner check
+      39    const isOwner = Boolean(dbUser && rental.crew?.owner_id === dbUser.user_id);
+      40 +  const bikeType = (bike?.specs?.type || bike?.type || '').toLowerCase().includes('electric') ? 'ebike' : 'bike';
+      41
+      42 +  // Generate QR code URL - points back to this page for user to fill final data
+      43 +  const baseUrl = typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || '';
+      44 +  const qrLink = `${baseUrl}/franchize/${crewSlug}/contract-draft/${rental.rental_id}`;
+      45 +  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrLink)}`;
+      46 +
+      47    const handleApprove = () => {
+      48      if (!dbUser?.user_id || !isOwner) {
+      49        toast.error('Только владелец экипажа может утвердить договор');
+     ...
+      60        });
+      61
+      62        if (result.success) {
+      63 +        setStatus('approved');
+      64          toast.success('Договор утвержден и отправлен!');
+      49 -        // Optionally redirect or refresh
+      65        } else {
+      66          toast.error(result.error || 'Ошибка при утверждении');
+      67        }
+     ...
+      85        });
+      86
+      87        if (result.success) {
+      88 +        setStatus('declined');
+      89          toast.success('Запрос отклонен. Арендатор уведомлен.');
+      90        } else {
+      91          toast.error(result.error || 'Ошибка при отклонении');
+     ...
+       93      });
+       94    };
+       95
+       96 +  // Status badge component
+       97 +  const StatusBadge = () => {
+       98 +    const colors = {
+       99 +      pending: 'bg-yellow-100 text-yellow-800',
+      100 +      approved: 'bg-green-100 text-green-800',
+      101 +      declined: 'bg-red-100 text-red-800',
+      102 +    };
+      103 +    const labels = {
+      104 +      pending: 'Ожидает утверждения',
+      105 +      approved: 'Утвержден',
+      106 +      declined: 'Отклонен',
+      107 +    };
+      108 +
+      109 +    return (
+      110 +      <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${colors[status]}`}>
+      111 +        {labels[status]}
+      112 +      </span>
+      113 +    );
+      114 +  };
+      115 +
+      116 +  const isRentalActive = rental.status === 'active' || rental.status === 'confirmed';
+      117 +  const isRentalEnded = rental.status === 'completed' || rental.status === 'finished';
+      118 +
+      119    return (
+      120      <div className="max-w-4xl mx-auto p-4 space-y-6">
+       82 -      <h1 className="text-2xl font-bold" style={{ color: theme.palette.textPrimary }}>
+       83 -        Запрос на договор аренды
+       84 -      </h1>
+      121 +      <div className="flex items-center justify-between">
+      122 +        <h1 className="text-2xl font-bold" style={{ color: theme.palette.textPrimary }}>
+      123 +          {status === 'pending' ? 'Запрос на договор аренды' : 'Договор аренды'}
+      124 +        </h1>
+      125 +        <StatusBadge />
+      126 +      </div>
+      127
+      128 +      {/* Declined state */}
+      129 +      {status === 'declined' && (
+      130 +        <section
+      131 +          className="rounded-2xl border p-4 bg-red-50"
+      132 +          style={{ borderColor: '#ef4444' }}
+      133 +        >
+      134 +          <p className="font-semibold text-red-800">Запрос на договор отклонен</p>
+      135 +          <p className="text-sm text-red-600 mt-1">
+      136 +            Свяжитесь с владельцем техники для уточнения деталей.
+      137 +          </p>
+      138 +        </section>
+      139 +      )}
+      140 +
+      141 +      {/* Approved state with download link and QR */}
+      142 +      {status === 'approved' && downloadUrl && (
+      143 +        <section
+      144 +          className="rounded-2xl border p-4 bg-green-50"
+      145 +          style={{ borderColor: '#22c55e' }}
+      146 +        >
+      147 +          <p className="font-semibold text-green-800">✓ Договор утвержден и создан!</p>
+      148 +          <div className="mt-3 flex flex-col sm:flex-row gap-3">
+      149 +            <a
+      150 +              href={downloadUrl}
+      151 +              download
+      152 +              className="px-4 py-2 text-sm font-semibold rounded-lg text-white bg-green-600 hover:bg-green-700"
+      153 +            >
+      154 +              📥 Скачать договор
+      155 +            </a>
+      156 +            <button
+      157 +              onClick={() => setShowQr(!showQr)}
+      158 +              className="px-4 py-2 text-sm font-semibold rounded-lg border-2 border-green-600 text-green-700 hover:bg-green-50"
+      159 +            >
+      160 +              {showQr ? 'Скрыть QR' : '📱 Показать QR для клиента'}
+      161 +            </button>
+      162 +          </div>
+      163 +
+      164 +          {showQr && (
+      165 +            <div className="mt-4 flex flex-col items-center">
+      166 +              <img src={qrUrl} alt="QR Code" className="rounded-lg border-4 border-white shadow-lg" />
+      167 +              <p className="mt-3 text-sm text-center text-gray-600">
+      168 +                Отсканируйте QR код для заполнения финальных данных и подписи
+      169 +              </p>
+      170 +              <p className="text-xs text-center text-gray-500 mt-1">
+      171 +                {qrLink}
+      172 +              </p>
+      173 +            </div>
+      174 +          )}
+      175 +        </section>
+      176 +      )}
+      177 +
+      178        {/* Renter Info */}
+      179        <section
+      180          className="rounded-2xl border p-4"
+     ...
+      244          <p className="text-sm text-gray-500">
+      245            {rental.agreed_start_date || rental.requested_start_date} — {rental.agreed_end_date || rental.requested_end_date}
+      246          </p>
+      247 +        <p className="text-xs text-gray-400 mt-1">Статус аренды: {rental.status}</p>
+      248        </section>
+      249
+      157 -      {/* Actions */}
+      158 -      {isOwner && (
+      159 -        <div className="flex gap-3">
+      160 -          <button
+      161 -            disabled={isPending}
+      162 -            onClick={handleApprove}
+      163 -            className="flex-1 rounded-lg px-4 py-3 font-semibold text-white"
+      164 -            style={{ backgroundColor: '#22c55e', opacity: isPending ? 0.7 : 1 }}
+      165 -          >
+      166 -            {isPending ? 'Обработка...' : '✓ Утвердить и создать договор'}
+      167 -          </button>
+      168 -          <button
+      169 -            disabled={isPending}
+      170 -            onClick={handleDecline}
+      171 -            className="flex-1 rounded-lg px-4 py-3 font-semibold text-white"
+      172 -            style={{ backgroundColor: '#ef4444', opacity: isPending ? 0.7 : 1 }}
+      173 -          >
+      174 -            ✗ Отклонить
+      175 -          </button>
+      176 -        </div>
+      250 +      {/* Return data section (for active or completed rentals) */}
+      251 +      {(isRentalActive || isRentalEnded) && contractKey && (
+      252 +        <RentalReturnPanel
+      253 +          rentalId={rental.rental_id}
+      254 +          crewSlug={crewSlug}
+      255 +          contractKey={contractKey}
+      256 +          bikeType={bikeType}
+      257 +          isOwner={isOwner}
+      258 +          theme={theme}
+      259 +        />
+      260        )}
+      261
+      179 -      {!isOwner && (
+      262 +      {/* Actions for pending state */}
+      263 +      {status === 'pending' && (
+      264 +        <>
+      265 +          {isOwner ? (
+      266 +            <div className="flex gap-3">
+      267 +              <button
+      268 +                disabled={isPending}
+      269 +                onClick={handleApprove}
+      270 +                className="flex-1 rounded-lg px-4 py-3 font-semibold text-white"
+      271 +                style={{ backgroundColor: '#22c55e', opacity: isPending ? 0.7 : 1 }}
+      272 +              >
+      273 +                {isPending ? 'Обработка...' : '✓ Утвердить и создать договор'}
+      274 +              </button>
+      275 +              <button
+      276 +                disabled={isPending}
+      277 +                onClick={handleDecline}
+      278 +                className="flex-1 rounded-lg px-4 py-3 font-semibold text-white"
+      279 +                style={{ backgroundColor: '#ef4444', opacity: isPending ? 0.7 : 1 }}
+      280 +              >
+      281 +                ✗ Отклонить
+      282 +              </button>
+      283 +            </div>
+      284 +          ) : (
+      285 +            <p className="text-sm text-gray-500 text-center">
+      286 +              Только владелец экипажа может утверждать или отклонять запросы на договор.
+      287 +            </p>
+      288 +          )}
+      289 +        </>
+      290 +      )}
+      291 +
+      292 +      {/* Info for non-owners when approved */}
+      293 +      {status === 'approved' && !isOwner && (
+      294          <p className="text-sm text-gray-500 text-center">
+      181 -          Только владелец экипажа может утверждать или отклонять запросы на договор.
+      295 +          Договор уже утвержден. Вы можете скачать его по ссылке выше.
+      296          </p>
+      297        )}
+      298      </div>
+
+  Thought for 4s (ctrl+o to expand)
+
+● Now updating the page to handle approved contracts:
+
+● Write(app\franchize\[slug]\contract-draft\[rentalId]\page.tsx)
+  ⎿  Added 28 lines, removed 3 lines
+      22      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      23    );
+      24
+      25 -  // Fetch rental with draft
+      25 +  // Fetch rental with draft and vehicle
+      26    const { data: rental } = await supabase
+      27      .from('rentals')
+      28      .select('*, vehicle:cars(*), crew:crews(*)')
+     ...
+      34    }
+      35
+      36    const draft = rental.metadata?.contract_draft;
+      37 -  if (!draft || draft.status !== 'pending') {
+      37 +  if (!draft) {
+      38      return (
+      39        <div className="p-4">
+      40 -        <h1 className="text-xl font-semibold">Договор не найден или уже обработан</h1>
+      40 +        <h1 className="text-xl font-semibold">Договор не найден</h1>
+      41 +        <p className="text-sm text-gray-500 mt-2">
+      42 +          Черновик договора не найден для этой аренды.
+      43 +        </p>
+      44        </div>
+      45      );
+● TypeScript check passed. Committing:
+
+● Bash(cd "C:\Users\tumyp\carTest\.claude\worktrees\franchize-rental-contract-alignment" && git add app/franchize/components/ContractDraftReview.tsx app/franchize/[slu…)
+  ⎿  [worktree-franchize-rental-contract-alignment 8eab7fce] feat: enhance contract-draft page with multi-state handling and QR code
+      2 files changed, 170 insertions(+), 31 deletions(-)
+
+  Thought for 4s (ctrl+o to expand)
+
+● Enhanced Web Link Handling ✓
+
+  The contract-draft page now handles multiple scenarios:
+
+  States Supported:
+
+  1. Pending (owner viewing draft):
+    - Shows draft details
+    - Approve/Decline buttons for crew owner
+  2. Approved (after contract creation):
+    - Shows download link for DOCX
+    - QR code for client to scan and fill final data
+    - QR points back to same page for data entry
+  3. Declined:
+    - Shows declined message with instructions
+
+  QR Code Feature:
+
+  - Displayed when contract is approved
+  - Points to: /franchize/{slug}/contract-draft/{rentalId}
+  - Client can scan to:
+    - View contract details
+    - Fill final odometer/damage reports
+    - Complete post-rental data
+
+  Post-Rental Integration:
+
+  - RentalReturnPanel shown when rental is active/completed
+  - Allows filling:
+    - Odometer at return
+    - Fuel/battery level at return
+    - Damage notes at return
+
+  User Flow:
+
+  1. User fills draft → owner approves → DOCX created
+  2. Owner sees QR code → shows to user

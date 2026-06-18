@@ -1,9 +1,11 @@
 import type React from "react";
 import Script from "next/script";
+import { Suspense } from "react";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import type { Metadata, Viewport } from 'next';
-import ClientLayout from "@/components/layout/ClientLayout"; 
+import ClientLayout from "@/components/layout/ClientLayout";
+import { Loading } from "@/components/Loading"; 
 
 // Static metadata content to be used by generateMetadata
 const pageMetadataContent = {
@@ -61,9 +63,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className={cn(
-          "flex min-h-screen flex-col bg-background text-foreground antialiased", 
+          "flex min-h-screen flex-col bg-background text-foreground antialiased",
       )}>
-        <ClientLayout>{children}</ClientLayout>
+        <ClientLayout>
+          <Suspense fallback={<Loading text="Загружаем..." />}>
+            {children}
+          </Suspense>
+        </ClientLayout>
       </body>
     </html>
   );

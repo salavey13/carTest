@@ -1,0 +1,587 @@
+                                                                                                                                                                                                  ⎿  Reloaded: 6 plugins · 4 skills · 6 agents · 1 hook · 1 plugin MCP server · 0 plugin LSP servers
+
+> /superpowers:brainstorming lets align main root landing page with what actual bikeswe have in db (not just falcon gt) - we kinda need simpler version of /vipbikerental page. Also we need to extend filtering  on respective crew's ("vip-bike" slug) in franchize/[vip-bike] and it's sub page /franchize/[vip-bike]/electro-enduro - i want to show all crew's bikes on mane franchize page ( /franchize/[vip-bike]) and on    electro-enduro subpage (/franchize/[vip-bike]/electro-enduro) i want to show JUST electric bikes - EVEN THOUGH BOTH MAIN AND SUB PAGE USE SAME CatlogClient component as base. You can start by looking at        /docs/cars_rows_12bikes_june5.csv for actual bikes - pick actual lowest prices (in jsonb specs field) for fixing "rentals from 1500rub" bullshit, etc. And currently only suzuki and kawasaki are filtered on     electro-enduro - think how to filter out nibbler and motoland bikes as well (ICE ones:)). Also we need to load root landing as fast as possible, DO NOT wait there for telegram to timeout:) And improve loading  component - bicycle looks like trash - quote by client:))) Client want landing that shows that we have rents, we have sale, we have configurator and we have map + links to social media, every other ai slop is  ai slop in his words:) Lets think:)
+
+  Thought for 5s (ctrl+o to expand)
+
+● Using brainstorming skill to design the landing page and franchise catalog improvements.
+
+  Let me start by exploring the project context - understanding the current landing page, franchise pages, and the actual bikes data.
+
+  Thought for 17s, searched for 8 patterns, read 7 files (ctrl+o to expand)
+
+  Thought for 2s (ctrl+o to expand)
+
+● I've explored the project context. Here's what I found:
+
+  Current State:
+  1. Root landing (app/page.tsx) — A massive 1800+ line static page with VIP BIKE ELECTRO branding, hardcoded pricing tiers ("от 1 500 ₽"), and zero DB integration. It's purely client-side with no actual bike
+  data.
+  2. vipbikerental page — Uses getFranchizeBySlug("vip-bike") to fetch real crew/items data.
+  3. Franchize main page — Uses same getFranchizeBySlug pattern, passes all items to CatalogClient.
+  4. Electro-enduro subpage — Has special filtering that currently only excludes Suzuki/Kawasaki by name matching, but doesn't filter out Nibbler/Motoland (ICE bikes).
+  5. Actual bikes from CSV — 12 bikes with prices ranging from 6 000₽ (Motoland Breakout 300, Nibbler 300 4V) to 18 000₽ (Y-VOLT Surge V).
+
+  Key Issues:
+  - "от 1 500 ₽" on landing is false — lowest actual rent is 6 000₽
+  - Electro-enduro shows ICE bikes (Nibbler, Motoland) because filtering only checks for suzuki/kawasaki strings
+  - Root landing waits for Telegram theme init (can timeout)
+  - Loading component uses bicycle SVG
+
+  Let me ask clarifying questions one at a time:
+
+  Thought for 2s (ctrl+o to expand)
+
+● Question 1 of 3:
+
+  The root landing page needs to show actual bikes from the database instead of just "Falcon GT" marketing. Looking at the CSV, I see bikes split across two categories:
+
+  Electric bikes: Ducati Panigale, Falcon GT/Pro, Sequence Zero, Y-VOLT Surge V, Sotion EM01, HORWIN EK1
+
+  ICE (gas) bikes: Suzuki GSX-S1000F, Kawasaki EX650K, Motoland Breakout 300, Nibbler 300 4V
+
+  For the simplified root landing, what should be the primary focus?
+
+  A) Show all crew bikes equally (electric + ICE mixed together, like the franchize main page)
+
+  B) Prioritize electric bikes (show electrics first/prominently, ICE bikes secondary)
+
+  C) Electric-only showcase (only the 6 electric bikes, exclude ICE bikes entirely)
+
+  D) Let me propose a different approach
+
+  Also: Should the landing show all 12 bikes or just a curated selection (e.g., top 4-6 by popularity/price)?
+
+✻ Cogitated for 42s
+
+> D - kinda pick example of every category, like we have electric, but ICE too, we have new, we have oldschool, we have sotion EM01 but a fucking liter gixxxer as well, price ranges for all cases;) WE CAN        HARDCODE SOME FOR QUICKNESS - ditch telegram and supabase inits, requests - we are located in russia, so slow vercel connection is enough (today client just didn't finish waiting watching the fucking           bicycle!)))) we  need to fix it:) and make page look like it was not oneshottted;)
+
+  Thought for 3s (ctrl+o to expand)
+                                                                                                                                                                                                                  ● Perfect! That's clear — hardcoded showcase landing that loads instantly, with representative bikes across categories. No DB, no Telegram init blocking render.
+
+  Let me capture that bike selection:
+
+  Thought for 2s (ctrl+o to expand)
+
+● Question 2:
+
+  Based on the CSV, here's my proposed hardcoded selection for the landing showcase (one per category):
+
+  ┌──────────────────┬───────────────────────────┬───────────────┬──────────────────────────────────────────┐
+  │       Slot       │           Bike            │     Price     │                Rationale                 │
+  ├──────────────────┼───────────────────────────┼───────────────┼──────────────────────────────────────────┤
+  │ Electric Entry   │ Falcon Pro 2025           │ 10 000₽/day   │ Accessible electro, proven model         │
+  ├──────────────────┼───────────────────────────┼───────────────┼──────────────────────────────────────────┤
+  │ Electric Premium │ Y-VOLT Surge V            │ 12 000₽/day   │ Flagship 35kW, premium positioning       │
+  ├──────────────────┼───────────────────────────┼───────────────┼──────────────────────────────────────────┤
+  │ Electric Sport   │ Ducati Panigale S Electro │ 10 000₽/day   │ Visually striking, Ducati branding       │
+  ├──────────────────┼───────────────────────────┼───────────────┼──────────────────────────────────────────┤
+  │ ICE Liter        │ Suzuki GSX-S1000F         │ 14 000₽/day   │ 150hp sport-touring, "proper motorcycle" │
+  ├──────────────────┼───────────────────────────┼───────────────┼──────────────────────────────────────────┤
+  │ ICE Entry        │ Nibbler 300 4V            │ 6 000₽/day    │ Budget-friendly ICE, naked style         │
+  ├──────────────────┼───────────────────────────┼───────────────┼──────────────────────────────────────────┤
+  │ Mini/Commute     │ Sotion EM01               │ Sale 100 000₽ │ Ultra-compact, different segment         │
+  └──────────────────┴───────────────────────────┴───────────────┴──────────────────────────────────────────┘
+
+  A) Use this selection as-is
+
+  B) Swap specific bikes (tell me which)
+
+  C) Fewer bikes (3-4 max)
+
+  D) More bikes (add Motoland/Horwin/Sequence Zero)
+
+  Also: For the pricing display, should I show per-day rent prices (6 000–14 000₽) or also include sale prices for bikes that have them?
+
+✻ Cogitated for 8s
+
+> a
+
+  Thought for 2s (ctrl+o to expand)
+
+  Thought for 1s (ctrl+o to expand)
+
+● Question 3:
+
+  Now for the electro-enduro filtering issue. Currently the subpage only filters by name matching (suzuki, kawasaki) which misses Nibbler and Motoland (both ICE).
+
+  Looking at the CSV, I can see specs.type field:
+  - Electric bikes have "type": "Electric"
+  - ICE bikes have "type": "ICE"
+
+  A) Filter by specs.type === "Electric" — clean, data-driven
+
+  B) Also exclude by type === "ICE" — more defensive
+
+  C) Hybrid approach — filter by type === "Electric" AND exclude known ICE makes/IDs as fallback
+
+  D) Something else
+
+  Also: The main franchize page (/franchize/[vip-bike]) should show ALL bikes — confirm no filtering needed there, just show everything from the crew?
+
+✻ Sautéed for 6s
+
+> A - show all on main franchize page, but actually nibbler and motoland are kinda new bikes for sale (see "sale=1: spec nearby) though they should be ecluded on electric-enduro they should be shown a bit        separately from other excluded bikes on main franchize. those bikes that are only for rent (ice) though not filtered out should be placed kinda separately - sounds kinda SOME filtering needed, just not         filter out, but show rent-only ice bikes in special category or something:) these are kinda provided to us by legitimate owners just for renting:)
+
+  Thought for 5s (ctrl+o to expand)
+
+● Ah, smart distinction! So it's about categorization, not filtering out:
+
+  Main franchize page categories:
+  1. Electric (sale + rent) — Falcon, Ducati, Sequence, Y-VOLT, Sotion, Horwin
+  2. ICE for Sale (Nibbler, Motoland) — dealer bikes, can be bought
+  3. ICE Rent-Only (Suzuki, Kawasaki) — owner-provided rentals only
+
+  Electro-enduro subpage:
+  - Only type === "Electric" — exclude all ICE
+
+  Question 3 revised:
+
+  For the main franchize page categorization, should I:
+
+  A) Use the data-driven approach:
+  - Check specs.type === "Electric" for electric group
+  - Check specs.sale === true + specs.type === "ICE" for ICE sale group
+  - Check specs.sale !== true + specs.type === "ICE" for ICE rent-only group
+
+  B) Hardcode the categorization logic for the 12 known bikes (simpler, no data parsing)
+
+  C) Different approach — tell me
+
+  Also: What should the section headers/labels be for these three groups on the main page?
+
+✻ Cogitated for 8s
+
+> A - do not show literally "ICE" - russian speaking audience won't comprehand, so it's good question about titles, lets think about it. maybe electric, no title at all and bikes from partners:) Also we should   check CatalogClient and translate all labels (show even spec lables in russian;) russian version of spec labels are conviniently provided in specs as well. Plus in CataloClient on bike item cards there are     highlighted 3 random specs without labels, even without icons and all random for each bike - need to polish that part as well, thanks for reminding:)
+
+  Thought for 6s (ctrl+o to expand)
+
+● Great catch on the Russian labels! Looking at the CSV, I can see:
+
+  "spec_labels": {
+    "type": "Тип", "power_kw": "Пиковая мощность", "range_km": "Запас хода",
+    "dailyPrice": "Аренда (сутки)", "top_speed_kmh": "Макс. скорость", ...
+  }
+
+  Russian labels are already there.
+
+  Thought for 4s (ctrl+o to expand)
+
+● Question 4 (final clarifying question):
+
+  For the main franchize page section titles, here's my proposal:
+
+  ┌──────────────────────────────────┬───────────────────────┐
+  │              Group               │         Title         │
+  ├──────────────────────────────────┼───────────────────────┤
+  │ Electric bikes                   │ (no title, just show) │
+  ├──────────────────────────────────┼───────────────────────┤
+  │ ICE for sale (Nibbler, Motoland) │ (no title, just show) │
+  ├──────────────────────────────────┼───────────────────────┤
+  │ ICE rent-only (Suzuki, Kawasaki) │ "Байки партнёров"     │
+  └──────────────────────────────────┴───────────────────────┘
+
+  A) Use these titles as-is
+
+  B) Different titles — tell me your preference
+
+  C) All sections should have explicit titles
+
+  For the CatalogClient spec display fix — I see key specs like power_kw, top_speed_kmh, range_km in the data. Should I prioritize showing:
+
+  D) Power (кВт) + Speed (км/ч) + Range (км) for electrics, Power (л.с.) + Speed (км/ч) + Engine (см³) for ICE
+
+  E) Different priority — tell me
+
+  F) Let me propose after seeing the current card layout
+
+✻ Brewed for 16s
+
+> A and D, you nailed it (fix eng labels in franchize modal Item.tsx as well (use ru lables), highlight same 3 specs:"Power (кВт) + Speed (км/ч) + Range (км) for electrics, Power (л.с.) + Speed (км/ч) + Engine   (см³) for ICE"
+
+  Thought for 3s (ctrl+o to expand)
+                                                                                                                                                                                                                    Thought for 5s (ctrl+o to expand)
+                                                                                                                                                                                                                  ● Excellent! I have everything I need. Let me present the design approaches.
+
+  Thought for 2s (ctrl+o to expand)
+
+● Summary of Requirements
+
+  Root Landing Page:
+  - Hardcoded showcase (no DB/Telegram), instant load
+  - 6 curated bikes across categories
+  - Sections: rents, sale, configurator, map, social media
+  - Fix loading component (no bicycle)
+  - Cohesive design, not "AI slop"
+
+  Main Franchize Page:
+  - Show all bikes, categorized: Electric (no title), ICE sale (no title), "Байки партнёров"
+  - Data-driven using specs.type + specs.sale
+
+  Electro-Enduro Subpage:
+  - Filter by specs.type === "Electric"
+
+  CatalogClient + Item Modal:
+  - Consistent 3 specs with Russian labels
+  - Electrics: Power (кВт) + Speed (км/ч) + Range (км)
+  - ICE: Power (л.с.) + Speed (км/ч) + Engine (см³)
+
+  ---
+  Approaches
+
+  Option A: Targeted Fix (Recommended)
+
+  Scope: Minimal changes, fast ship
+
+  1. Root landing — Rewrite as lightweight static page with hardcoded bike showcase cards (reuse CatalogCard component logic but with static data)
+  2. Loading component — Replace bicycle with simple spinner or pulse
+  3. Electro-enduro filter — Add specs.type === "Electric" check
+  4. Main franchize categories — Group items by type + sale flag
+  5. Spec display — Add helper to extract priority specs with Russian labels
+
+  Trade-offs: ✅ Fast (1-2 PRs), ✅ Low risk, ❌ Landing still manually updated if bikes change
+
+  Option B: Shared Component Extract
+
+  Scope: Extract reusable BikeShowcaseCard component
+
+  1. Create BikeShowcaseCard component that accepts static data (for landing) or DB data (for franchize)
+  2. Share card layout, spec display logic, and hover effects
+  3. Landing uses static prop data, franchize pages use DB data
+
+  Trade-offs: ✅ Consistent UI everywhere, ✅ Easier maintenance, ❌ More upfront work, ⚠️ Need to handle both static/DB data shapes
+
+  Option C: Hybrid Landing with Smart Fallback
+
+  Scope: Landing uses static data but fetches DB async
+
+  1. Landing renders instantly with hardcoded bikes
+  2. Async fetch of real data (non-blocking)
+  3. If fetch succeeds, smoothly fade in real data
+  4. If fetch fails/times out, keep static data
+
+  Trade-offs: ✅ Best UX (instant + accurate), ✅ Always has content, ❌ More complex state handling, ⚠️ Still depends on Supabase availability
+
+  ---
+  My recommendation: Option A (Targeted Fix) — fastest to ship, lowest risk. We can refactor to shared components later if needed.
+
+  Does Option A work for you?
+
+✻ Crunched for 18s
+
+> A is good, BUT " Loading component — Replace bicycle with simple spinner or pulse" - NO - just use gif from logo from sly13 hydration sql - there is coo gif of a black bike om white background - just invert    it somehow and colorize to hardcoded palette of vip-bike (it should become gold bike on black backgrounf:)
+
+  Thought for 3s, searched for 1 pattern (ctrl+o to expand)
+
+● Love it! Let me find that bike GIF from the SQL hydration.
+
+  Thought for 5s, searched for 2 patterns, read 1 file (ctrl+o to expand)
+
+● Found it! Line 59:
+
+  'logoUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif'
+
+  S1000RR bike GIF — I can invert it with CSS and colorize to VIP Bike's gold accent.
+
+  Let me update the approach and present the full design:
+
+  Thought for 3s (ctrl+o to expand)
+
+● ---
+  Updated Option A Design
+
+  Loading Component
+
+  Use the S1000RR GIF with CSS inversion and gold colorization:
+  .loader-bike {
+    filter: invert(1) sepia(1) saturate(2) hue-rotate(5deg);
+    /* Inverts black→white, then sepia+gold tone */
+  }
+
+  Implementation Plan
+
+  1. Root Landing Page (app/page.tsx)
+  - Remove all client-side state, useEffect, motion (Framer Motion)
+  - Use static Server Component with hardcoded bike data
+  - Inline critical CSS, no Telegram/Supabase imports
+  - Loading: Bike GIF + VIP Bike gold palette
+
+  2. Electro-Enduro Filter (app/franchize/[slug]/electro-enduro/page.tsx)
+  const electricOnly = items.filter(item =>
+    (item.rawSpecs as Record<string, unknown>)?.type === "Electric"
+  );
+
+  3. Main Franchize Categorization (app/franchize/components/CatalogClient.tsx)
+  // Group by type + sale flag
+  const groups = [
+    { title: "", items: items.filter(i => i.rawSpecs?.type === "Electric") },
+    { title: "", items: items.filter(i => i.rawSpecs?.type === "ICE" && i.rawSpecs?.sale) },
+    { title: "Байки партнёров", items: items.filter(i => i.rawSpecs?.type === "ICE" && !i.rawSpecs?.sale) }
+  ];
+
+  4. Spec Display Helper
+  function getPrioritySpecs(item: CatalogItemVM) {
+    const rs = item.rawSpecs as Record<string, unknown>;
+    const isElectric = rs?.type === "Electric";
+
+    if (isElectric) {
+      return [
+        { label: "Мощность", value: rs?.power_kw, unit: "кВт" },
+        { label: "Скорость", value: rs?.top_speed_kmh, unit: "км/ч" },
+        { label: "Запас хода", value: rs?.range_km, unit: "км" }
+      ];
+    } else {
+      return [
+        { label: "Мощность", value: rs?.power_hp || rs?.bike_power_hp, unit: "л.с." },
+        { label: "Скорость", value: rs?.top_speed_kmh, unit: "км/ч" },
+        { label: "Объём", value: rs?.engine_cc || rs?.bike_engine_cc, unit: "см³" }
+      ];
+    }
+  }
+
+  5. Item Modal (app/franchize/modals/Item.tsx)
+  - Replace English labels with Russian from spec_labels or hardcoded map
+
+  ---
+  Files to Change
+
+  ┌──────────────────────────────────────────────┬──────────────────────────────────────┐
+  │                     File                     │                Change                │
+  ├──────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ app/page.tsx                                 │ Complete rewrite (static, hardcoded) │
+  ├──────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ app/loading.tsx                              │ Bike GIF loader                      │
+  ├──────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ app/franchize/[slug]/electro-enduro/page.tsx │ Add type === "Electric" filter       │
+  ├──────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ app/franchize/components/CatalogClient.tsx   │ Categorization + spec helper         │
+  ├──────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ app/franchize/modals/Item.tsx                │ Russian labels                       │
+  └──────────────────────────────────────────────┴──────────────────────────────────────┘
+
+  ---
+  Estimated scope: 3-4 files modified, ~500 lines changed total.
+
+  Does this design look right? Any adjustments before I write the full spec?
+
+✻ Churned for 22s
+
+> mmmm, yes, but "app/page.tsx  │ Complete rewrite (static, hardcoded)" - "complete rewrite" sounds too harsh, it was created as a show-off by our junior jenator (i wanted to show client that even 8th grader     can make landings - he didn't put his heart and soul into it, though wow effect was achieved non the less:) try to preserve some good parts for history (git merge comment shows "max was here" - but it won't    count if you completly rewrite it from scratch, lol:)
+
+  Thought for 5s (ctrl+o to expand)
+
+● Haha, fair enough! "Max was here" should survive. Let me preserve the good parts:
+
+  Thought for 4s (ctrl+o to expand)
+
+● Looking at Max's work, here's what's worth keeping:
+
+  Keep (Max's good ideas):
+  - VIP_BIKE_THEMES palette (gold/black/cyan)
+  - SOCIAL_LINKS structure + SVG icons
+  - CONTACT_INFO (phone, address, hours)
+  - FAQ_ITEMS (Gen-Z tone is actually great)
+  - HOW_IT_WORKS_STEPS (clear 4-step)
+  - MagneticButton (clever UX)
+  - Section structure (Hero → Barrier Cards → How It Works → Pricing → FAQ → Social → Contacts → Footer)
+
+  Fix (things that don't match reality):
+  - Pricing: "от 1 500 ₽" → "от 6 000 ₽" (real lowest price)
+  - Bikes: Only Falcon GT → All 6 curated bikes
+  - Loading: Bicycle SVG → S1000RR GIF
+  - Hero stats: "10+ bikes" → "12 bikes" (real count)
+  - Remove heavy Framer Motion blocking render
+
+  Revised approach:
+
+  ┌───────────────────┬────────────────────────────────────────────────────┐
+  │      Section      │                       Action                       │
+  ├───────────────────┼────────────────────────────────────────────────────┤
+  │ Hero              │ Keep Max's structure, fix stats, add bike showcase │
+  ├───────────────────┼────────────────────────────────────────────────────┤
+  │ Barrier cards     │ Keep, they're good                                 │
+  ├───────────────────┼────────────────────────────────────────────────────┤
+  │ Bike showcase     │ NEW — hardcoded 6 bikes grid                       │
+  ├───────────────────┼────────────────────────────────────────────────────┤
+  │ How it works      │ Keep as-is                                         │
+  ├───────────────────┼────────────────────────────────────────────────────┤
+  │ Pricing           │ Fix numbers (1500→6000, 10000→12000 for top tier)  │
+  ├───────────────────┼────────────────────────────────────────────────────┤
+  │ FAQ               │ Keep as-is                                         │
+  ├───────────────────┼────────────────────────────────────────────────────┤
+  │ Social/Contacts   │ Keep as-is                                         │
+  ├───────────────────┼────────────────────────────────────────────────────┤
+  │ Loading component │ Swap bicycle → bike GIF                            │
+  └───────────────────┴────────────────────────────────────────────────────┘
+
+  Key change: Make it a Server Component (remove "use client") but keep the React structure. Use simple CSS animations instead of Framer Motion for instant load.
+
+  Does this feel better — Max's DNA preserved, but grounded in reality?
+
+✻ Cooked for 15s
+
+> yep!) one more tweak request - move social links upper (client's words: "make it fucking simple! bam! all social links! can we make users auto subscribe??:)))" - literal quote translated
+
+  Thought for 4s (ctrl+o to expand)
+
+● Haha, auto-subscribe — if only! 🤣 But we can make them impossible to miss.
+
+  Revised section order:
+
+  1. Hero (with stats + dual CTAs)
+  2. 👉 SOCIAL LINKS (moved here from bottom) ← "BAM!"
+  3. Barrier cards (why we, not gasoline)
+  4. Bike showcase (curated 6 bikes)
+  5. How it works
+  6. Pricing
+  7. FAQ
+  8. Contacts (kept, but less critical now)
+  9. Footer
+
+  Social links placement options:
+
+  ┌─────────────────────────────────────────────────────────────┬─────────────┐
+  │                           Option                            │ Description │
+  ├─────────────────────────────────────────────────────────────┼─────────────┤
+  │ A) Full-width banner right after hero (biggest impact)      │             │
+  ├─────────────────────────────────────────────────────────────┼─────────────┤
+  │ B) Compact card strip below hero CTAs (clean)               │             │
+  ├─────────────────────────────────────────────────────────────┼─────────────┤
+  │ C) Floating/sidebar that appears on scroll (always visible) │             │
+  └─────────────────────────────────────────────────────────────┴─────────────┘
+
+  I'm thinking A) — full-width grid of all 5 socials (VK, Instagram, Telegram Bot, @I_O_S, WhatsApp) immediately after hero, no scrolling needed. "BAM, social links!"
+
+  Which placement works best?
+
+✻ Crunched for 8s
+
+> A but better make it look fucking cool - ditch rainbow - gold on black baby!:)
+
+  Thought for 5s (ctrl+o to expand)
+                                                                                                                                                                                                                  ● Gold on black — let's do it.
+
+  Thought for 3s (ctrl+o to expand)
+
+● Social Banner Design — Gold on Black
+
+  ┌────────────────────────────────────────────────────────────────┐
+  │                    VIP BIKE ELECTRO                           │
+  │                   ⚡ Электро-кайф без заморочек 🏍️💨           │
+  │                    [Выбрать байк] [Бронь в боте]               │
+  └────────────────────────────────────────────────────────────────┘
+                       ↓ BAM! SOCIAL LINKS ↓
+  ┌────────────────────────────────────────────────────────────────┐
+  │                                                                │
+  │  ┌────┐  ┌────┐  ┌────┐  ┌────┐  ┌────┐                     │
+  │  │ VK │  │IG │  │BOT │  │OPS │  │WA │  ← gold icons          │
+  │  └────┘  └────┘  └────┘  └────┘  └────┘                     │
+  │  ┌──────────────────────────────────────────────────────┐    │
+  │  │ VK Group        │ Telegram Bot  │ @I_O_S  │ WhatsApp │    │
+  │  └──────────────────────────────────────────────────────┘    │
+  │                                                                │
+  │  ✨ Gold borders (#FFD700) on black (#0A0A0A)                │
+  │  ✨ Hover: Gold glow + scale 1.05                            │
+  │  ✨ Subtle pulse on Telegram Bot + Operator                    │
+  │  ✨ Clean, minimal, no rainbow gradients                      │
+  └────────────────────────────────────────────────────────────────┘
+
+  CSS approach:
+  var(--vip-accent-main): #FFD700  /* Gold */
+  var(--vip-bg-base): #0A0A0A      /* Black */
+
+  /* Card */
+  border: 2px solid var(--vip-accent-main)
+  background: transparent
+
+  /* Hover */
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.4)
+  transform: scale(1.05)
+
+  Keep or simplify Max's SVG icons? They're nice but have brand colors. Should I:
+  - A) Keep originals (VK blue, Instagram gradient, etc.) — more recognizable
+  - B) Convert all to gold — fully unified gold-on-black
+
+  Which vibe?
+
+✻ Baked for 14s
+
+> B)
+
+  Thought for 3s (ctrl+o to expand)
+
+● Gold everything it is. Unified cyber-gold aesthetic.
+
+  Thought for 4s (ctrl+o to expand)
+
+● Perfect. I have everything — let me write the full design spec.
+
+  Thought for 3s (ctrl+o to expand)
+
+● Write(docs\superpowers\specs\2026-06-18-vip-bike-landing-catalog-improvements-design.md)
+  ⎿  Wrote 468 lines to docs\superpowers\specs\2026-06-18-vip-bike-landing-catalog-improvements-design.md
+      1 # VIP Bike Landing & Catalog Improvements — Design Specification
+      2
+      3 **Date:** 2026-06-18
+      4 **Author:** Claude (brainstorming session)
+      5 **Status:** Approved for implementation
+      6
+      7 ---
+      8
+      9 ## Executive Summary
+     … +459 lines (ctrl+o to expand)
+
+  Thought for 3s (ctrl+o to expand)
+
+  Thought for 2s (ctrl+o to expand)
+
+● Spec written and committed to docs/superpowers/specs/2026-06-18-vip-bike-landing-catalog-improvements-design.md
+
+  Quick self-review done:
+  - ✅ No placeholders (TBD/TODO)
+  - ✅ Internally consistent (prices match CSV, filters align)
+  - ✅ Focused scope (5 files, ~505 lines)
+  - ✅ All requirements captured
+
+  Please review the spec and let me know if you want any changes before I create the implementation plan.
+
+  Key things to verify:
+  1. Social banner placement (after hero, gold-on-black)
+  2. 6 curated bikes selection
+  3. Category titles (empty for first two, "Байки партнёров" for rent-only ICE)
+  4. Spec priority logic (Power/Speed/Range vs Power/Speed/Engine)
+
+  Good to proceed?
+
+✻ Worked for 46s
+
+> GO GO GO! didn't read, i trust ya!)))
+
+  Thought for 2s (ctrl+o to expand)
+
+● Awesome! Let's create the implementation plan.
+
+● Skill(superpowers:writing-plans)
+  ⎿  Successfully loaded skill
+
+ ▐▛███▜▌   Claude Code v2.1.168
+▝▜█████▛▘  Opus 4.8 (1M context) · API Usage Billing
+  ▘▘ ▝▝    ~\carTest
+
+ ‼ 1 setup issue: MCP · /doctor
+
+✻ Conversation compacted (ctrl+o for history)
+
+
+● API Error: The model has reached its context window limit.
+
+✻ Cooked for 2m 11s
+
+> /compact
+  ⎿  Compacted (ctrl+o to see full summary)
+  ⎿  Referenced file docs\superpowers\plans\2026-06-18-vip-bike-landing-catalog-improvements-plan.md
+  ⎿  Read docs\superpowers\specs\2026-06-18-vip-bike-landing-catalog-improvements-design.md (469 lines)
+  ⎿  Referenced file docs\sql\cars_rows_12bikes_june5.csv
+  ⎿  Referenced file app\page.tsx
+  ⎿  Referenced file app\franchize\components\CatalogClient.tsx
+  ⎿  Skills restored (superpowers:writing-plans, superpowers:brainstorming)
