@@ -123,29 +123,27 @@ export function BikeShowcase() {
           >
             Наши байки
           </h2>
-          <div className="flex items-center justify-center gap-4 flex-wrap">
-            <p className="text-gray-400 text-lg">
-              Электрические и бензиновые мотоциклы для аренды и тест-драйва
-            </p>
-            {/* Filter buttons */}
-            <div className="flex gap-2">
-              {filterButtons.map(({ key, label, color }) => (
-                <button
-                  key={key}
-                  onClick={() => setFilter(key)}
-                  className="px-4 py-1.5 rounded-full font-semibold text-sm transition-all hover:scale-105"
-                  style={{
-                    backgroundColor: filter === key ? color : "transparent",
-                    color: filter === key ? "#0A0A0A" : color,
-                    border: `2px solid ${color}`,
-                    opacity: filter === key ? 1 : 0.7,
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+          {/* Filter buttons */}
+          <div className="flex justify-center gap-3 mb-4">
+            {filterButtons.map(({ key, label, color }) => (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                className="px-6 py-2 rounded-full font-semibold text-sm transition-all hover:scale-105"
+                style={{
+                  backgroundColor: filter === key ? color : "transparent",
+                  color: filter === key ? "#0A0A0A" : color,
+                  border: `2px solid ${color}`,
+                  opacity: filter === key ? 1 : 0.7,
+                }}
+              >
+                {label}
+              </button>
+            ))}
           </div>
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+            Электрические и бензиновые мотоциклы для аренды и тест-драйва
+          </p>
         </div>
 
         {/* Bike grid */}
