@@ -25,7 +25,7 @@ export default function FranchizeSlugLoading() {
         <img
           src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
           alt="Загрузка..."
-          className="w-32 h-32"
+          className="w-24 h-24 object-contain"
           style={{
             filter: "invert(1) sepia(1) saturate(2) hue-rotate(5deg)",
           }}
