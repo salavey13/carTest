@@ -380,10 +380,11 @@ const BikeSpeedster = ({ gear }: { gear: number }) => {
         {[...Array(14)].map((_, i) => (
           <motion.div
             key={i}
-            className="absolute h-[2px] w-40 rounded-full bg-gradient-to-r from-transparent via-orange-500/90 to-transparent"
+            className="absolute h-[2px] w-40 rounded-full"
             style={{
               top: `${16 + i * 5}%`,
               right: "8%",
+              background: "linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.9), transparent)",
               animation: `bike-loading-line 0.7s ${i * 0.05}s ease-in infinite`,
             }}
             animate={{
@@ -409,12 +410,16 @@ const BikeSpeedster = ({ gear }: { gear: number }) => {
         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
       >
         <motion.div
-          className="rounded-3xl border border-orange-300/30 bg-gradient-to-br from-orange-500/10 to-red-500/5 px-6 py-5 backdrop-blur-sm"
+          className="rounded-3xl px-6 py-5 backdrop-blur-sm"
+          style={{
+            border: "1px solid rgba(255, 215, 0, 0.3)",
+            background: "linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(212, 175, 55, 0.05))",
+          }}
           animate={{
             boxShadow: [
-              "0 0 20px rgba(251,191,36,0.25)",
-              "0 0 36px rgba(251,191,36,0.45)",
-              "0 0 20px rgba(251,191,36,0.25)",
+              "0 0 20px rgba(255, 215, 0, 0.25)",
+              "0 0 36px rgba(255, 215, 0, 0.45)",
+              "0 0 20px rgba(255, 215, 0, 0.25)",
             ]
           }}
           transition={{ duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
@@ -428,48 +433,73 @@ const BikeSpeedster = ({ gear }: { gear: number }) => {
               transition={{ duration: 0.18, ease: "easeOut" }}
             >
               <motion.div
-                className="absolute left-[52px] top-[78px] h-[58px] w-[58px] rounded-full border-4 border-orange-400/90"
+                className="absolute left-[52px] top-[78px] h-[58px] w-[58px] rounded-full border-4"
+                style={{ borderColor: "rgba(255, 215, 0, 0.9)" }}
                 animate={{ rotate: -360 }}
                 transition={{ duration: 0.45, repeat: Infinity, ease: "linear" }}
-                style={{ animation: "bike-loading-wheel-spin 0.45s linear infinite" }}
+                style={{ animation: "bike-loading-wheel-spin 0.45s linear infinite", border: "4px solid rgba(255, 215, 0, 0.9)" }}
               >
                 {[0, 45, 90, 135].map((deg) => (
-                  <div key={deg} className="absolute left-1/2 top-1/2 h-[2px] w-[23px] -translate-x-1/2 -translate-y-1/2 bg-orange-200/90" style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
+                  <div
+                    key={deg}
+                    className="absolute left-1/2 top-1/2 h-[2px] w-[23px] -translate-x-1/2 -translate-y-1/2"
+                    style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)`, backgroundColor: "rgba(255, 248, 220, 0.9)" }}
+                  />
                 ))}
               </motion.div>
               <motion.div
-                className="absolute left-[146px] top-[78px] h-[58px] w-[58px] rounded-full border-4 border-orange-400/90"
+                className="absolute left-[146px] top-[78px] h-[58px] w-[58px] rounded-full border-4"
+                style={{ borderColor: "rgba(255, 215, 0, 0.9)" }}
                 animate={{ rotate: -360 }}
                 transition={{ duration: 0.45, repeat: Infinity, ease: "linear" }}
-                style={{ animation: "bike-loading-wheel-spin 0.45s linear infinite" }}
+                style={{ animation: "bike-loading-wheel-spin 0.45s linear infinite", border: "4px solid rgba(255, 215, 0, 0.9)" }}
               >
                 {[0, 45, 90, 135].map((deg) => (
-                  <div key={deg} className="absolute left-1/2 top-1/2 h-[2px] w-[23px] -translate-x-1/2 -translate-y-1/2 bg-orange-200/90" style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
+                  <div
+                    key={deg}
+                    className="absolute left-1/2 top-1/2 h-[2px] w-[23px] -translate-x-1/2 -translate-y-1/2"
+                    style={{ transform: `translate(-50%, -50%) rotate(${deg}deg)`, backgroundColor: "rgba(255, 248, 220, 0.9)" }}
+                  />
                 ))}
               </motion.div>
             </motion.div>
 
-            <Bike size={170} className="absolute left-1/2 top-[-10px] -translate-x-1/2 text-orange-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.65)]" strokeWidth={1.5} />
+            <Bike
+              size={170}
+              className="absolute left-1/2 top-[-10px] -translate-x-1/2"
+              style={{
+                color: "#FFD700",
+                filter: "drop-shadow(0 0 12px rgba(255, 215, 0, 0.65))",
+              }}
+              strokeWidth={1.5}
+            />
           </div>
         </motion.div>
       </motion.div>
 
       {/* Ground Speed Effect */}
-      <div className="absolute bottom-6 left-10 right-10 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent opacity-60" />
+      <div
+        className="absolute bottom-6 left-10 right-10 h-px opacity-60"
+        style={{ background: "linear-gradient(90deg, transparent, #FFD700, transparent)" }}
+      />
     </div>
   );
 };
 
 const TelemetryMetric = ({ label, value }: { label: string; value: string }) => (
-  <div className="min-w-[72px] rounded-md border border-orange-300/20 bg-black/30 px-2 py-1.5 text-center">
+  <div
+    className="min-w-[72px] rounded-md bg-black/30 px-2 py-1.5 text-center"
+    style={{ border: "1px solid rgba(255, 215, 0, 0.25)" }}
+  >
     <motion.div
-      className="text-lg font-orbitron font-bold text-amber-300"
+      className="text-lg font-orbitron font-bold"
+      style={{ color: "#FFD700" }}
       animate={{ opacity: [0.45, 1, 0.45] }}
       transition={{ duration: 1.2, repeat: Infinity }}
     >
       {value}
     </motion.div>
-    <div className="text-[10px] uppercase tracking-wide text-slate-400">{label}</div>
+    <div className="text-[10px] uppercase tracking-wide" style={{ color: "#9CA3AF" }}>{label}</div>
   </div>
 );
 
@@ -614,43 +644,66 @@ export function Loading({ variant = 'kinetic', text, className }: LoadingProps) 
   if (variant === 'bike') {
     return (
       <div className={cn(
-        "min-h-screen min-h-[100svh] bg-gradient-to-br from-slate-950 via-orange-950/20 to-slate-950 text-slate-200 flex flex-col items-center justify-center overflow-hidden relative px-4",
+        "min-h-screen min-h-[100svh] flex flex-col items-center justify-center overflow-hidden relative px-4",
         className
-      )}>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(251,146,60,0.18),transparent_42%),linear-gradient(120deg,transparent,rgba(251,191,36,0.06),transparent)]" />
-        <div className="absolute left-0 right-0 top-1/2 h-px bg-gradient-to-r from-transparent via-orange-400/60 to-transparent" />
+      )}
+      style={{ backgroundColor: "#0A0A0A" }}
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,215,0,0.15),transparent_50%),linear-gradient(120deg,transparent,rgba(212,175,55,0.08),transparent)]" />
+        <div className="absolute left-0 right-0 top-1/2 h-px bg-gradient-to-r from-transparent via-amber-400/50 to-transparent" />
         <BikeSpeedster gear={bikeTelemetry.gear} />
-        
-        <motion.div 
+
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           className="z-10 mt-8 w-full max-w-md space-y-4 text-center sm:mt-12"
         >
-          <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/20 bg-black/30 px-3 py-1 text-[10px] font-mono uppercase tracking-[0.28em] text-orange-200/80 shadow-[0_0_22px_rgba(251,146,60,0.18)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)]" />
+          <div
+            className="inline-flex items-center gap-2 rounded-full border bg-black/30 px-3 py-1 text-[10px] font-mono uppercase tracking-[0.28em] shadow-[0_0_25px_rgba(212,175,55,0.2)]"
+            style={{
+              borderColor: "rgba(255, 215, 0, 0.3)",
+              color: "rgba(255, 215, 0, 0.9)",
+            }}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full shadow-[0_0_12px_rgba(34,197,94,0.9)]"
+              style={{ backgroundColor: "#22c55e" }}
+            />
             витрина готовится
           </div>
-          <h2 className="font-orbitron text-3xl font-black uppercase tracking-wider text-orange-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)] md:text-5xl">
+          <h2
+            className="font-orbitron text-3xl font-black uppercase tracking-wider md:text-5xl"
+            style={{
+              color: "#FFD700",
+              textShadow: "0 0 20px rgba(255, 215, 0, 0.5)",
+            }}
+          >
             МАРШРУТ
           </h2>
-          
+
           {/* Animated Speed Bar */}
-          <div className="w-64 h-2 bg-slate-800 rounded-full overflow-hidden mx-auto">
+          <div className="w-64 h-2 rounded-full overflow-hidden mx-auto" style={{ backgroundColor: "#1A1A1A" }}>
             <motion.div
-              className="h-full bg-gradient-to-r from-orange-500 via-amber-400 to-orange-500"
-              animate={{ 
+              className="h-full"
+              style={{
+                background: "linear-gradient(90deg, #D4AF37, #FFD700, #D4AF37)",
+              }}
+              animate={{
                 width: ["0%", "100%", "0%"],
                 x: ["-100%", "0%", "100%"]
               }}
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
             />
           </div>
-          
-          <p className="mx-auto max-w-sm font-mono text-sm text-orange-300/80">
+
+          <p
+            className="mx-auto max-w-sm font-mono text-sm"
+            style={{ color: "rgba(255, 215, 0, 0.8)" }}
+          >
             {text || 'Синхронизируем телеметрию экипажа...'}
           </p>
-          
+
           <div className="flex justify-center gap-2 mt-4">
             <TelemetryMetric label="ОБ/МИН" value={`${Math.round(bikeTelemetry.rpm)}`} />
             <TelemetryMetric label="КМ/Ч" value={`${Math.round(bikeTelemetry.speed)}`} />
