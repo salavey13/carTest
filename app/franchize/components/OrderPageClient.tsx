@@ -391,6 +391,20 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     void loadPrefill();
   }, [dbUser?.user_id, setValue, slug]);
 
+  // Prefill rental dates from cart (if user selected dates in item modal)
+  useEffect(() => {
+    const firstLineWithDates = cartLines.find(
+      (line) => line.options.rentStartDate && line.options.rentEndDate
+    );
+    if (firstLineWithDates) {
+      const { rentStartDate, rentEndDate } = firstLineWithDates.options;
+      // Only set if form field is empty (user hasn't manually entered dates yet)
+      if (!rentalStartDate && rentStartDate) {
+        setValue("rentalStartDate", rentStartDate, { shouldDirty: false, shouldValidate: false });
+      }
+    }
+  }, [cartLines, rentalStartDate, setValue]);
+
   useEffect(() => {
     if (!appliedPromo) return;
     if (normalizePromoCode(promo) !== appliedPromo.code) {

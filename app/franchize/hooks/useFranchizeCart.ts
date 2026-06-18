@@ -11,6 +11,8 @@ export type FranchizeCartOptions = {
   auction: string;
   buyConfigId?: string;
   buyPriceDelta?: number;
+  rentStartDate?: string;
+  rentEndDate?: string;
 };
 
 export type FranchizeCartLine = {
@@ -50,10 +52,12 @@ const DEFAULT_OPTIONS: FranchizeCartOptions = {
   duration: "1 день",
   perk: "Стандарт",
   auction: "Без аукциона",
+  rentStartDate: undefined,
+  rentEndDate: undefined,
 };
 
 export function buildCartLineId(itemId: string, options: FranchizeCartOptions) {
-  const normalized = `${options.package}|${options.duration}|${options.perk}|${options.auction}|${options.buyConfigId ?? "base"}|${options.buyPriceDelta ?? 0}`.toLowerCase().replace(/\s+/g, "-");
+  const normalized = `${options.package}|${options.duration}|${options.perk}|${options.auction}|${options.buyConfigId ?? "base"}|${options.buyPriceDelta ?? 0}|${options.rentStartDate ?? ""}|${options.rentEndDate ?? ""}`.toLowerCase().replace(/\s+/g, "-");
   return `${itemId}::${normalized}`;
 }
 
@@ -79,6 +83,8 @@ const sanitizeCartState = (value: unknown): FranchizeCartState => {
       auction: typeof rawOptions.auction === "string" ? rawOptions.auction : DEFAULT_OPTIONS.auction,
       buyConfigId: typeof rawOptions.buyConfigId === "string" ? rawOptions.buyConfigId : undefined,
       buyPriceDelta: typeof rawOptions.buyPriceDelta === "number" && Number.isFinite(rawOptions.buyPriceDelta) ? rawOptions.buyPriceDelta : undefined,
+      rentStartDate: typeof rawOptions.rentStartDate === "string" ? rawOptions.rentStartDate : undefined,
+      rentEndDate: typeof rawOptions.rentEndDate === "string" ? rawOptions.rentEndDate : undefined,
     };
     const normalizedLineId = buildCartLineId(itemId, options);
     const prev = acc[normalizedLineId];
@@ -106,7 +112,9 @@ const areLineOptionsEqual = (left: FranchizeCartOptions, right: FranchizeCartOpt
     left.perk === right.perk &&
     left.auction === right.auction &&
     (left.buyConfigId ?? null) === (right.buyConfigId ?? null) &&
-    (left.buyPriceDelta ?? null) === (right.buyPriceDelta ?? null)
+    (left.buyPriceDelta ?? null) === (right.buyPriceDelta ?? null) &&
+    (left.rentStartDate ?? null) === (right.rentStartDate ?? null) &&
+    (left.rentEndDate ?? null) === (right.rentEndDate ?? null)
   );
 };
 

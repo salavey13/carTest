@@ -29,7 +29,7 @@ export default function FranchizeSlugLoading() {
           alt="Загрузка..."
           className="w-24 h-24 object-contain"
           style={{
-            filter: "brightness(0.7) invert(1) sepia(1) saturate(2) hue-rotate(5deg)",
+            filter: "invert(1)",
           }}
         />
 
