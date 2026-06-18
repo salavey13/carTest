@@ -1,10 +1,11 @@
 // /app/franchize/components/ContractDraftReview.tsx
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import { approveContract, declineContract, type FranchizeTheme } from "../actions";
+import { RentalReturnPanel } from "./RentalReturnPanel";
 
 interface ContractDraftReviewProps {
   rental: any;
@@ -13,7 +14,11 @@ interface ContractDraftReviewProps {
   crewSlug: string;
   orgSecrets: any;
   theme: FranchizeTheme;
+  contractKey?: string;
+  downloadUrl?: string;
 }
+
+type ContractStatus = 'pending' | 'approved' | 'declined';
 
 export function ContractDraftReview({
   rental,
@@ -22,12 +27,22 @@ export function ContractDraftReview({
   crewSlug,
   orgSecrets,
   theme,
+  contractKey,
+  downloadUrl,
 }: ContractDraftReviewProps) {
   const { dbUser } = useAppContext();
   const [isPending, startTransition] = useTransition();
+  const [status, setStatus] = useState<ContractStatus>(draft?.status || 'pending');
+  const [showQr, setShowQr] = useState(false);
 
-  // Simple owner check (in production, verify against crew_members table)
+  // Simple owner check
   const isOwner = Boolean(dbUser && rental.crew?.owner_id === dbUser.user_id);
+  const bikeType = (bike?.specs?.type || bike?.type || '').toLowerCase().includes('electric') ? 'ebike' : 'bike';
+
+  // Generate QR code URL - points back to this page for user to fill final data
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || '';
+  const qrLink = `${baseUrl}/franchize/${crewSlug}/contract-draft/${rental.rental_id}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrLink)}`;
 
   const handleApprove = () => {
     if (!dbUser?.user_id || !isOwner) {
@@ -45,8 +60,8 @@ export function ContractDraftReview({
       });
 
       if (result.success) {
+        setStatus('approved');
         toast.success('Договор утвержден и отправлен!');
-        // Optionally redirect or refresh
       } else {
         toast.error(result.error || 'Ошибка при утверждении');
       }
@@ -70,6 +85,7 @@ export function ContractDraftReview({
       });
 
       if (result.success) {
+        setStatus('declined');
         toast.success('Запрос отклонен. Арендатор уведомлен.');
       } else {
         toast.error(result.error || 'Ошибка при отклонении');
@@ -77,11 +93,87 @@ export function ContractDraftReview({
     });
   };
 
+  // Status badge component
+  const StatusBadge = () => {
+    const colors = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      approved: 'bg-green-100 text-green-800',
+      declined: 'bg-red-100 text-red-800',
+    };
+    const labels = {
+      pending: 'Ожидает утверждения',
+      approved: 'Утвержден',
+      declined: 'Отклонен',
+    };
+
+    return (
+      <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${colors[status]}`}>
+        {labels[status]}
+      </span>
+    );
+  };
+
+  const isRentalActive = rental.status === 'active' || rental.status === 'confirmed';
+  const isRentalEnded = rental.status === 'completed' || rental.status === 'finished';
+
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-6">
-      <h1 className="text-2xl font-bold" style={{ color: theme.palette.textPrimary }}>
-        Запрос на договор аренды
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold" style={{ color: theme.palette.textPrimary }}>
+          {status === 'pending' ? 'Запрос на договор аренды' : 'Договор аренды'}
+        </h1>
+        <StatusBadge />
+      </div>
+
+      {/* Declined state */}
+      {status === 'declined' && (
+        <section
+          className="rounded-2xl border p-4 bg-red-50"
+          style={{ borderColor: '#ef4444' }}
+        >
+          <p className="font-semibold text-red-800">Запрос на договор отклонен</p>
+          <p className="text-sm text-red-600 mt-1">
+            Свяжитесь с владельцем техники для уточнения деталей.
+          </p>
+        </section>
+      )}
+
+      {/* Approved state with download link and QR */}
+      {status === 'approved' && downloadUrl && (
+        <section
+          className="rounded-2xl border p-4 bg-green-50"
+          style={{ borderColor: '#22c55e' }}
+        >
+          <p className="font-semibold text-green-800">✓ Договор утвержден и создан!</p>
+          <div className="mt-3 flex flex-col sm:flex-row gap-3">
+            <a
+              href={downloadUrl}
+              download
+              className="px-4 py-2 text-sm font-semibold rounded-lg text-white bg-green-600 hover:bg-green-700"
+            >
+              📥 Скачать договор
+            </a>
+            <button
+              onClick={() => setShowQr(!showQr)}
+              className="px-4 py-2 text-sm font-semibold rounded-lg border-2 border-green-600 text-green-700 hover:bg-green-50"
+            >
+              {showQr ? 'Скрыть QR' : '📱 Показать QR для клиента'}
+            </button>
+          </div>
+
+          {showQr && (
+            <div className="mt-4 flex flex-col items-center">
+              <img src={qrUrl} alt="QR Code" className="rounded-lg border-4 border-white shadow-lg" />
+              <p className="mt-3 text-sm text-center text-gray-600">
+                Отсканируйте QR код для заполнения финальных данных и подписи
+              </p>
+              <p className="text-xs text-center text-gray-500 mt-1">
+                {qrLink}
+              </p>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Renter Info */}
       <section
@@ -152,33 +244,55 @@ export function ContractDraftReview({
         <p className="text-sm text-gray-500">
           {rental.agreed_start_date || rental.requested_start_date} — {rental.agreed_end_date || rental.requested_end_date}
         </p>
+        <p className="text-xs text-gray-400 mt-1">Статус аренды: {rental.status}</p>
       </section>
 
-      {/* Actions */}
-      {isOwner && (
-        <div className="flex gap-3">
-          <button
-            disabled={isPending}
-            onClick={handleApprove}
-            className="flex-1 rounded-lg px-4 py-3 font-semibold text-white"
-            style={{ backgroundColor: '#22c55e', opacity: isPending ? 0.7 : 1 }}
-          >
-            {isPending ? 'Обработка...' : '✓ Утвердить и создать договор'}
-          </button>
-          <button
-            disabled={isPending}
-            onClick={handleDecline}
-            className="flex-1 rounded-lg px-4 py-3 font-semibold text-white"
-            style={{ backgroundColor: '#ef4444', opacity: isPending ? 0.7 : 1 }}
-          >
-            ✗ Отклонить
-          </button>
-        </div>
+      {/* Return data section (for active or completed rentals) */}
+      {(isRentalActive || isRentalEnded) && contractKey && (
+        <RentalReturnPanel
+          rentalId={rental.rental_id}
+          crewSlug={crewSlug}
+          contractKey={contractKey}
+          bikeType={bikeType}
+          isOwner={isOwner}
+          theme={theme}
+        />
       )}
 
-      {!isOwner && (
+      {/* Actions for pending state */}
+      {status === 'pending' && (
+        <>
+          {isOwner ? (
+            <div className="flex gap-3">
+              <button
+                disabled={isPending}
+                onClick={handleApprove}
+                className="flex-1 rounded-lg px-4 py-3 font-semibold text-white"
+                style={{ backgroundColor: '#22c55e', opacity: isPending ? 0.7 : 1 }}
+              >
+                {isPending ? 'Обработка...' : '✓ Утвердить и создать договор'}
+              </button>
+              <button
+                disabled={isPending}
+                onClick={handleDecline}
+                className="flex-1 rounded-lg px-4 py-3 font-semibold text-white"
+                style={{ backgroundColor: '#ef4444', opacity: isPending ? 0.7 : 1 }}
+              >
+                ✗ Отклонить
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 text-center">
+              Только владелец экипажа может утверждать или отклонять запросы на договор.
+            </p>
+          )}
+        </>
+      )}
+
+      {/* Info for non-owners when approved */}
+      {status === 'approved' && !isOwner && (
         <p className="text-sm text-gray-500 text-center">
-          Только владелец экипажа может утверждать или отклонять запросы на договор.
+          Договор уже утвержден. Вы можете скачать его по ссылке выше.
         </p>
       )}
     </div>

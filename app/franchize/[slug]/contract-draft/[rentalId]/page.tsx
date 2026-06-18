@@ -22,7 +22,7 @@ export default async function ContractDraftPage({ params }: ContractDraftPagePro
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Fetch rental with draft
+  // Fetch rental with draft and vehicle
   const { data: rental } = await supabase
     .from('rentals')
     .select('*, vehicle:cars(*), crew:crews(*)')
@@ -34,12 +34,35 @@ export default async function ContractDraftPage({ params }: ContractDraftPagePro
   }
 
   const draft = rental.metadata?.contract_draft;
-  if (!draft || draft.status !== 'pending') {
+  if (!draft) {
     return (
       <div className="p-4">
-        <h1 className="text-xl font-semibold">Договор не найден или уже обработан</h1>
+        <h1 className="text-xl font-semibold">Договор не найден</h1>
+        <p className="text-sm text-gray-500 mt-2">
+          Черновик договора не найден для этой аренды.
+        </p>
       </div>
     );
+  }
+
+  // Fetch contract artifact if approved
+  const contractKey = rental.metadata?.contract_key;
+  let downloadUrl: string | undefined;
+  if (draft.status === 'approved' && contractKey) {
+    // Get storage path from rental_contract_artifacts
+    const { data: artifact } = await supabase
+      .from('rental_contract_artifacts')
+      .select('storage_path')
+      .eq('contract_key', contractKey)
+      .maybeSingle();
+
+    if (artifact?.storage_path) {
+      const { data: { publicUrl } } = supabase
+        .storage
+        .from('rental-contracts')
+        .getPublicUrl(artifact.storage_path);
+      downloadUrl = publicUrl;
+    }
   }
 
   // Fetch crew secrets for preview
@@ -68,6 +91,8 @@ export default async function ContractDraftPage({ params }: ContractDraftPagePro
       crewSlug={resolvedSlug}
       orgSecrets={orgSecrets}
       theme={theme}
+      contractKey={contractKey}
+      downloadUrl={downloadUrl}
     />
   );
 }
