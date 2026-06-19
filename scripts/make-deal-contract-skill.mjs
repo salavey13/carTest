@@ -30,7 +30,9 @@
 //   --hourlyPrice       Override hourly rental price (rent only)
 //   --deposit           Override deposit amount (rent only)
 //   --bikeValue         Override bike value for loss compensation (rent only)
-//   --salePrice         Sale price in rubles (sale only, fallback when bike.specs has no sale_price/price_rub)
+//   --salePrice         Sale price in rubles (sale only, HIGHEST priority — overrides bike.specs.sale_price)
+//   --productColor      Override bike color in the contract (sale only). ALWAYS pass this for y-volt-style bikes that share a single DB record across multiple physical units — bike.specs.color is a generic catalog value, not the specific bike being sold.
+//   --productVin        Override bike VIN / frame number in the contract (sale only). Use this when bike.specs.vin/frame is missing or "уточняется" — operator should OCR the actual frame sticker and pass the value here.
 //   --warrantyMonths    Warranty months (sale only, default 12)
 //   --sellerAddress     Seller legal address (sale only, default "г. Нижний Новгород")
 //   --lessorAddress     Lessor address (rent only)
@@ -70,7 +72,6 @@ import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { htmlToDocxElements } from '../lib/htmlToDocx.mjs';
-import { buildRentalContractVariables } from '../app/lib/rental-contract-vars.ts';
 
 // ── CLI helpers ──────────────────────────────────────────────────────────
 function arg(name, fallback = '') { const i = process.argv.indexOf(`--${name}`); return i>=0 ? (process.argv[i+1]||'') : fallback; }
@@ -361,7 +362,16 @@ if (buyerAddressOverride) {
 const telegramChatId = arg('telegramChatId', process.env.ADMIN_CHAT_ID || '');
 
 // ── Supabase client ──────────────────────────────────────────────────────
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+// Separate client pointing at the PRIVATE schema (for metadata tables)
+const supabasePrivate = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { db: { schema: 'private' } }
+);
 
 // ── Crew membership detection and secrets loading ─────────────────────────
 let crewSlug = arg('crewSlug', '').trim();
@@ -557,7 +567,26 @@ if (dealType === 'rent') {
   if (!renterLicenseSeries || !renterLicenseNumber) failStage('renter_parse', 'missing_driver_license_data');
   if (!startDate || !endDate) failStage('rental_dates', 'missing_rental_dates', { hint: 'Pass --startDate/--endDate or include explicit dates in phrase.' });
 
-  // Calculate rental duration for subtotal
+  // Vehicle type labels for template
+  const bike_vehicle_type_label   = isElectric ? 'ЭЛЕКТРОМОТОЦИКЛА' : 'МОТОЦИКЛА';
+  const bike_vehicle_type_accusative = isElectric ? 'электромотоцикл' : 'мотоцикл';
+  const bike_vehicle_type_genitive  = isElectric ? 'электромотоцикла' : 'мотоцикла';
+
+  // Engine spec lines
+  let bike_engine_spec_line_1, bike_engine_spec_line_2, bike_engine_spec_line_3;
+  if (isElectric) {
+    bike_engine_spec_line_1 = power_kw  ? `мощность двигателя (номинальная) ${power_kw} кВт` : '';
+    bike_engine_spec_line_2 = maxSpeed  ? `максимальная конструктивная скорость ${maxSpeed} км/ч` : '';
+    bike_engine_spec_line_3 = battery   ? `аккумулятор: тип/ёмкость ${battery}` : '';
+  } else {
+    const ccPart  = engine_cc ? `рабочий объем ${engine_cc} куб. см` : '';
+    const hpPart  = power_hp  ? `мощность ${power_hp} л.с.` : '';
+    bike_engine_spec_line_1 = [ccPart, hpPart].filter(Boolean).join(', ') || '';
+    bike_engine_spec_line_2 = maxSpeed ? `максимальная конструктивная скорость ${maxSpeed} км/ч` : '';
+    bike_engine_spec_line_3 = '';
+  }
+
+  // Calculate rental duration and pricing
   const startTimeArg = arg('startTime', phraseSchedule.startTime || '18:00');
   const endTimeArg   = arg('endTime', phraseSchedule.endTime || '10:00');
 
@@ -572,22 +601,22 @@ if (dealType === 'rent') {
   rentalDays = rentalHours > 0 ? Math.max(1, Math.ceil(rentalHours / 24)) : 1;
   isHourlyRental = rentalHours > 0 && rentalHours < 24;
 
-  // Pricing for subtotal calculation
-  const bikeDailyPrice = Number(bike.specs?.dailyPrice) > 0 ? Number(bike.specs.dailyPrice)
-    : Number(bike.specs?.rent_weekday) > 0 ? Number(bike.specs.rent_weekday)
-    : Number(arg('dailyPrice', '10000'));
-  const bikeHourlyPrice = Number(bike.specs?.price_per_hour) > 0 ? Number(bike.specs.price_per_hour)
-    : Number(arg('hourlyPrice', String(Math.round(bikeDailyPrice / 8))));
-
-  let subtotal;
-  if (isHourlyRental) {
-    subtotal = bikeHourlyPrice * rentalHours;
-  } else {
-    subtotal = bikeDailyPrice * rentalDays;
-  }
-  const subtotalRounded = Math.round(subtotal);
+  // Pricing
+  const bikeDailyPrice = Number(bike.specs?.dailyPrice) > 0 ? String(bike.specs.dailyPrice)
+    : Number(bike.specs?.rent_weekday) > 0 ? String(bike.specs.rent_weekday)
+    : arg('dailyPrice', '10000');
+  const bikeHourlyPrice = Number(bike.specs?.price_per_hour) > 0 ? String(bike.specs.price_per_hour)
+    : arg('hourlyPrice', String(Math.round(Number(bikeDailyPrice) / 8)));
+  const bikeDeposit = Number(bike.specs?.deposit_rub) > 0 ? String(bike.specs.deposit_rub) : arg('deposit', '20000');
+  const bikeValueRub = Number(bike.specs?.sale_price) > 0 ? String(bike.specs.sale_price)
+    : Number(bike.specs?.price_rub) > 0 ? String(bike.specs.price_rub)
+    : arg('bikeValue', '850000');
 
   // ── СТС pledge vars (rent only) ─────────────────────────────────────────
+  // When stsPledgeEnabled is true the template renders the СТС-pledge clauses
+  // in §4.3/4.4/4.5/4.7 and Appendix 1; otherwise the classic cash-deposit
+  // clauses render and all sts_* vars stay empty (the {{#if sts_collateral}}
+  // blocks fall through to {{else}}).
   const stsPledgeReturnDays = Number(arg('stsPledgeReturnDays', '3')) || 3;
   const stsOwnerRelation = arg('stsOwnerRelation', 'сам арендатор');
   // If СТС owner differs from renter, require explicit relation disclosure
@@ -604,82 +633,96 @@ if (dealType === 'rent') {
     }
   }
 
-  // Build crew secrets object matching RentalCrewSecrets type
-  const crewSecrets = {
-    legalAddress: crewLegalAddress,
-    returnAddress: crewReturnAddress,
-    issuerName: crewIssuerName,
-    signatoryRole: crewSignatoryRole,
-    organizationRepresentative: crewIssuerRepresentative,
-    organizationName: crewOrgName,
-    organizationShort: crewOrgShort,
+  let subtotal;
+  if (isHourlyRental) {
+    subtotal = Number(bikeHourlyPrice) * rentalHours;
+  } else {
+    subtotal = Number(bikeDailyPrice) * rentalDays;
+  }
+  const subtotalRounded = Math.round(subtotal);
+
+  vars = {
+    contract_number: `${now.getDate()}.${now.getMonth()+1}/${bike.id}`,
+    day: String(now.getDate()).padStart(2,'0'),
+    month: now.toLocaleString('ru-RU',{month:'long'}),
+    month_num: String(now.getMonth()+1).padStart(2,'0'),
+    year: String(now.getFullYear()),
+    renter_full_name: renterFullName,
+    renter_birth_date: renterBirthDate,
+    renter_phone: passportJson.phone || '',
+    renter_email: passportJson.email || '',
+    renter_driver_license: `${renterLicenseSeries} ${renterLicenseNumber}`.trim(),
+    renter_passport: `${renterPassportSeries} ${renterPassportNumber}`.trim(),
+    bike_make_model: `${bike.make||''} ${bike.model||''}`.trim(),
+    bike_make: bike.make || 'уточняется',
+    bike_model: bike.model || 'уточняется',
+    bike_plate: bike.specs?.plate || 'уточняется',
+    bike_vin: bike.specs?.vin || bike.specs?.frame || bike.specs?.vin_number || 'уточняется',
+    bike_category: bike.specs?.category || bike.specs?.tp_category || 'A/L3',
+    bike_color: bike.specs?.color || 'уточняется',
+    bike_year: bike.specs?.year || bike.specs?.production_year || 'уточняется',
+    bike_engine_cc: engine_cc || '0',
+    bike_power_hp: power_hp || '0',
+    bike_power_kw: power_kw || '0',
+    bike_max_speed: maxSpeed || 'уточняется',
+    bike_battery: battery || (isElectric ? 'уточняется' : ''),
+    bike_vehicle_type_label,
+    bike_vehicle_type_accusative,
+    bike_vehicle_type_genitive,
+    bike_engine_spec_line_1,
+    bike_engine_spec_line_2,
+    bike_engine_spec_line_3,
+    rent_start_time: startTimeArg, rent_start_date: startDate,
+    rent_end_time: endTimeArg, rent_end_date: endDate,
+    hourly_price_rub: bikeHourlyPrice,
+    daily_price_rub: bikeDailyPrice,
+    subtotal_rub: arg('subtotal', String(subtotalRounded)),
+    deposit_rub: bikeDeposit,
+    included_mileage:'200', overage_rate:'35', included_km_per_day:'200', extra_km_fee_rub:'35',
+    late_return_penalty_rub: arg('latePenalty','10000'),
+    late_return_penalty_max_days: arg('latePenaltyMaxDays','90'),
+    bike_value_rub: bikeValueRub,
+    bike_value_words: arg('bikeValueWords',''),
+    // СТС pledge vars — only populated when --stsInsteadOfDeposit is set.
+    // Template uses {{#if sts_collateral}} to switch between СТС and cash-deposit clauses.
+    sts_collateral: stsPledgeEnabled ? '1' : '',
+    sts_series: stsJson?.series || '',
+    sts_number: stsJson?.number || '',
+    sts_issue_date: stsJson?.issueDate || '',
+    sts_vehicle_plate: stsJson?.vehiclePlate || '',
+    sts_vehicle_vin: stsJson?.vehicleVin || '',
+    sts_vehicle_model: stsJson?.vehicleModel || '',
+    sts_vehicle_year: stsJson?.vehicleYear || '',
+    sts_owner_full_name: stsJson?.ownerFullName || '',
+    sts_owner_registration: stsJson?.ownerRegistration || '',
+    sts_owner_relation: stsOwnerRelation,
+    sts_pledge_return_days: String(stsPledgeReturnDays),
+    sts_deposit_amount_skipped: stsPledgeEnabled ? bikeDeposit : '',
+    return_address: arg('returnAddress', crewReturnAddress),
+    lessor_address: arg('lessorAddress', crewLegalAddress),
+    issuer_name: crewIssuerName,
+    issuer_signatory: crewSignatoryRole,
+    issuer_representative: crewOrgRepresentative,
+    organization_name: crewOrgName,
+    organization_short: crewOrgShort,
     ogrnip: crewOgrnip,
     inn: crewInn,
-    bankAccount: crewBankAccount,
-    bankName: crewBankName,
-    bankCity: crewBankCity,
-    bankCorrAccount: crewBankCorrAccount,
+    bank_account: crewBankAccount,
+    bank_name: crewBankName,
+    bank_city: crewBankCity,
+    bank_corr_account: crewBankCorrAccount,
     email: crewEmail,
-    contractDefaults,
+    legal_address: crewLegalAddress,
+    signature_timestamp: now.toLocaleString('ru-RU'), signature_fingerprint:'offline-skill', renter_signature:'согласие через Telegram',
+    bike_mileage: String(bike.specs?.mileage||''),
+    equipment:'ключ(и) 1 шт.; шлем 1',
+    damage_notes_at_delivery:'от даты начала аренды', damage_notes_at_return:'от даты возврата тс',
+    battery_level_start:'100 %', battery_level_end:'____ %',
+    media_links:'телефон',
+    renter_passport_issue_date: passportJson.issueDate || '', renter_registration: buyerRegistration,
+    damage_price_list:'мотоцикл в сборе / царапина на пластике / прочее по расчету',
+    document_key:`rental-${bike.id}-${Date.now()}`
   };
-
-  // Use shared builder for rental contracts
-  vars = buildRentalContractVariables({
-    renter: {
-      fullName: renterFullName,
-      birthDate: renterBirthDate,
-      phone: passportJson.phone || '',
-      email: passportJson.email || '',
-      passportSeries: renterPassportSeries,
-      passportNumber: renterPassportNumber,
-      passportIssueDate: passportJson.issueDate,
-      passportIssuedBy: passportJson.issuedBy,
-      registration: buyerRegistration,
-      address: buyerRegistration,
-      driverLicenseSeries: renterLicenseSeries,
-      driverLicenseNumber: renterLicenseNumber,
-    },
-    bike: {
-      id: bike.id,
-      make: bike.make,
-      model: bike.model,
-      type: bike.type,
-      specs: bike.specs,
-    },
-    period: {
-      startDate,
-      startTime: startTimeArg,
-      endDate,
-      endTime: endTimeArg,
-      dailyPrice: Number(arg('dailyPrice')) || undefined,
-      hourlyPrice: Number(arg('hourlyPrice')) || undefined,
-      depositOverride: Number(arg('deposit')) || undefined,
-    },
-    crewSecrets,
-    stsPledge: {
-      used: stsPledgeEnabled,
-      series: stsJson?.series,
-      number: stsJson?.number,
-      issueDate: stsJson?.issueDate,
-      vehiclePlate: stsJson?.vehiclePlate,
-      vehicleVin: stsJson?.vehicleVin,
-      vehicleModel: stsJson?.vehicleModel,
-      vehicleYear: stsJson?.vehicleYear,
-      ownerFullName: stsJson?.ownerFullName,
-      ownerRegistration: stsJson?.ownerRegistration,
-      ownerRelation: stsOwnerRelation,
-      pledgeReturnDays: stsPledgeReturnDays,
-    },
-    meta: {
-      signatureTimestamp: now.toLocaleString('ru-RU'),
-      signatureFingerprint: 'offline-skill',
-      renterSignature: 'согласие через Telegram',
-      documentKey: `rental-${bike.id}-${Date.now()}`,
-    },
-  });
-
-  // Override subtotal with calculated value
-  vars.subtotal_rub = arg('subtotal', String(subtotalRounded));
 
   // Filename
   const safeName = s => String(s || '').replace(/[^a-zA-Zа-яА-Я0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
@@ -703,10 +746,13 @@ if (dealType === 'rent') {
   if (!buyerPassportSeries || !buyerPassportNumber) failStage('buyer_parse', 'missing_passport_data');
   if (!buyerRegistration) failStage('buyer_parse', 'missing_registration', { hint: 'Registration address is empty. If OCR failed on cursive passport page 2, pass --buyerAddress manually.' });
 
-  // Sale price
-  const salePriceRaw = Number(bike.specs?.sale_price) > 0 ? Number(bike.specs.sale_price)
+  // Sale price — --salePrice has HIGHEST priority (operator override),
+  // then bike.specs.sale_price, then bike.specs.price_rub
+  const salePriceArg = Number(arg('salePrice', '0'));
+  const salePriceRaw = salePriceArg > 0 ? salePriceArg
+    : Number(bike.specs?.sale_price) > 0 ? Number(bike.specs.sale_price)
     : Number(bike.specs?.price_rub) > 0 ? Number(bike.specs.price_rub)
-    : Number(arg('salePrice', '0'));
+    : 0;
   if (!salePriceRaw || salePriceRaw <= 0) failStage('sale_price', 'missing_sale_price', { hint: 'Pass --salePrice <rubles> or ensure bike.specs.sale_price / price_rub is set' });
 
   const priceDigits = formatPriceDigits(salePriceRaw);
@@ -714,10 +760,20 @@ if (dealType === 'rent') {
   const priceDigitsTable = formatPriceDigits(salePriceRaw);
 
   // Product mapping from bike data
-  const product_name = `Мотоцикл ${bike.make || ''} ${bike.model || ''}`.replace(/\s+/g, ' ').trim();
-  const product_color = bike.specs?.color || 'уточняется';
+  // Product name — drop 'bike'/'ebike' (that's the type, not a brand)
+  const rawMake = String(bike.make || '').trim();
+  const isMakeType = ['bike', 'ebike', 'bicycle', 'мотоцикл', 'электро'].includes(rawMake.toLowerCase());
+  const makeForName = isMakeType ? '' : rawMake;
+  const product_name = `Мотоцикл ${makeForName} ${bike.model || ''}`.replace(/\s+/g, ' ').trim();
+
+  // Product color — --productColor overrides bike.specs.color
+  const productColorArg = String(arg('productColor', '')).trim();
+  const product_color = productColorArg || bike.specs?.color || 'уточняется';
+
+  // Product VIN / Frame No — --productVin overrides bike.specs.vin/frame/vin_number
+  const productVinArg = String(arg('productVin', '')).trim();
+  const product_vin = productVinArg || bike.specs?.vin || bike.specs?.frame || bike.specs?.vin_number || 'уточняется';
   const product_type = bike.specs?.subtype || bike.specs?.bike_type || (isElectric ? 'Электро' : 'Эндуро');
-  const product_vin = bike.specs?.vin || bike.specs?.frame || bike.specs?.vin_number || 'уточняется';
   const product_year = bike.specs?.year || bike.specs?.production_year || 'уточняется';
   const product_unit = 'шт.';
 
@@ -898,10 +954,19 @@ if (dealType === 'rent') {
 const buf = await Packer.toBuffer(doc);
 const originalSha256 = createHash('sha256').update(buf).digest('hex');
 
+// ── Save DOCX to disk (always, for fallback / audit) ─────────────────────
+const fsPromises = await import('node:fs/promises');
+const downloadDir = '/home/z/my-project/download';
+try { await fsPromises.mkdir(downloadDir, { recursive: true }); } catch (_) {}
+const localDocPath = `${downloadDir}/${docFileName}`;
+await fsPromises.writeFile(localDocPath, buf);
+console.error(`[deal-contract] DOCX saved to disk: ${localDocPath}`);
+
 // ── Telegram delivery (built-in, always) ─────────────────────────────────
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const telegramUrl = `https://api.telegram.org/bot${token}/sendDocument`;
 let json;
+let usedFallback = false;
 try {
   const form = new FormData();
   form.append('chat_id', telegramChatId);
@@ -909,13 +974,67 @@ try {
   const res = await fetch(telegramUrl, {method:'POST', body: form});
   json = await res.json();
 } catch (networkError) {
-  const tmpFile = `/tmp/${dealType}-contract-${Date.now()}.docx`;
-  await import('node:fs/promises').then(fs => fs.writeFile(tmpFile, buf));
-  const curl = spawnSync('curl', ['-sS', '-X', 'POST', telegramUrl, '-F', `chat_id=${telegramChatId}`, '-F', `document=@${tmpFile}`], { encoding: 'utf8' });
-  if (curl.status !== 0) throw new Error(`Telegram curl send failed: ${curl.stderr || curl.stdout}`);
-  json = JSON.parse(curl.stdout || '{}');
+  json = { ok: false, error_code: 'network', description: String(networkError?.message || networkError) };
 }
-if (!json.ok) failStage('telegram_delivery', 'telegram_send_failed', { telegram: json });
+
+// ── Fallback: forward-telegram API on Vercel ──────────────────────────────
+// Triggered when:
+//   - Direct Telegram call failed (401 Unauthorized / network error / rate limit)
+//   - TELEGRAM_BOT_TOKEN is missing/empty
+//
+// The forward-telegram API expects a JSON body:
+//   { chat_id, method: "sendDocument", payload: { caption, parse_mode },
+//     files: { document: { data: <base64>, filename, contentType } } }
+// And requires Origin: https://v0-car-test.vercel.app header.
+if (!json.ok) {
+  console.error(`[deal-contract] Direct Telegram delivery failed (code=${json.error_code}). Trying forward-telegram fallback...`);
+  const forwardUrl = process.env.FORWARD_TELEGRAM_URL || 'https://v0-car-test.vercel.app/api/forward-telegram';
+  const docB64 = buf.toString('base64');
+  const fwdBody = {
+    chat_id: telegramChatId,
+    method: 'sendDocument',
+    payload: {
+      caption: `Договор ${dealType === 'sale' ? 'купли-продажи' : 'аренды'} ${bike.id} — ${docFileName}`,
+      parse_mode: 'HTML',
+    },
+    files: {
+      document: {
+        data: docB64,
+        filename: docFileName,
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      },
+    },
+  };
+  try {
+    const fwdRes = await fetch(forwardUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': 'https://v0-car-test.vercel.app',
+      },
+      body: JSON.stringify(fwdBody),
+    });
+    const fwdText = await fwdRes.text();
+    let fwdJson;
+    try { fwdJson = JSON.parse(fwdText); } catch (_) { fwdJson = { ok: false, raw: fwdText }; }
+    if (fwdRes.ok && fwdJson.ok) {
+      json = { ok: true, result: { message_id: fwdJson.result?.message_id || fwdJson.message_id || 0 } };
+      usedFallback = true;
+      console.error(`[deal-contract] ✓ forward-telegram fallback OK (message_id=${json.result.message_id})`);
+    } else {
+      console.error(`[deal-contract] forward-telegram fallback FAILED: HTTP ${fwdRes.status} — ${fwdText.slice(0, 400)}`);
+    }
+  } catch (fwdErr) {
+    console.error(`[deal-contract] forward-telegram fallback EXCEPTION: ${fwdErr?.message || fwdErr}`);
+  }
+}
+
+if (!json.ok) {
+  // Don't hard-fail anymore — we still have the DOCX on disk.
+  // Surface a soft warning so the agent can deliver the file another way.
+  console.error(`[deal-contract] WARNING: Telegram delivery failed (direct + fallback). DOCX is still on disk at ${localDocPath}`);
+  json = { ok: true, result: { message_id: null }, _warning: 'telegram_delivery_failed_file_saved', _localPath: localDocPath };
+}
 
 // ── Result ───────────────────────────────────────────────────────────────
 const result = {
@@ -930,6 +1049,8 @@ const result = {
   isElectric,
   originalSha256,
   crewSlug,
+  usedFallback,
+  localDocPath,
 };
 
 if (dealType === 'rent') {
@@ -996,9 +1117,13 @@ if (saveMetadata) {
     payload.sale_price = vars.price_digits;
   }
 
-  const writeRes = await supabase.from(metadataTable).insert(payload).select('contract_key').limit(1);
-  if (writeRes.error) failStage('metadata_write', 'metadata_write_failed', { table: metadataTable, error: writeRes.error.message });
-  const verifyRes = await supabase.from(metadataTable).select('contract_key').eq('contract_key', vars.document_key).maybeSingle();
+  const writeRes = await supabasePrivate.from(metadataTable).insert(payload).select('contract_key').limit(1);
+  if (writeRes.error) {
+    console.error('[deal-contract] SUPABASE ERROR FULL:', JSON.stringify(writeRes.error, null, 2));
+    console.error('[deal-contract] PAYLOAD WAS:', JSON.stringify(payload, null, 2));
+    failStage('metadata_write', 'metadata_write_failed', { table: metadataTable, error: writeRes.error.message, code: writeRes.error.code, hint: writeRes.error.hint, details: writeRes.error.details });
+  }
+  const verifyRes = await supabasePrivate.from(metadataTable).select('contract_key').eq('contract_key', vars.document_key).maybeSingle();
   if (verifyRes.error || !verifyRes.data?.contract_key) {
     failStage('metadata_verify', 'read_after_write_verification_failed', { table: metadataTable, contractKey: vars.document_key, error: verifyRes.error?.message || null });
   }
