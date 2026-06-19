@@ -112,11 +112,13 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "skills/deal-contract-from-photos/SKILL.md",
         "skills/commercial-proposal-from-offer/SKILL.md",
         "skills/concat-files/SKILL.md",
+        "skills/send-document-by-email/SKILL.md",
         // CLI scripts
         "scripts/make-rental-contract-skill.mjs",
         "scripts/make-deal-contract-skill.mjs",
         "scripts/make-commercial-proposal-skill.mjs",
         "scripts/supabase-access-skill.mjs",
+        "scripts/send-document-by-email.mjs",
         "scripts/codex-notify.mjs",
         "scripts/concat.sh",
         // HTML → DOCX converter
@@ -125,6 +127,10 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "docs/RENTAL_DEAL_TEMPLATE.html",
         "docs/SALE_DEAL_TEMPLATE.html",
         "docs/COMMERCIAL_PROPOSAL_TEMPLATE.html",
+        // Vars
+        "lib/rental-date-utils.ts",
+        "app/lib/rental-contract-vars.ts",
+        "app/lib/user-rental-secrets.ts",
         // Database schema (private schema + secrets) - specific migrations only
         "supabase/migrations/20240101000000_init.sql",
         "supabase/migrations/20260304_private_scheme.sql",
