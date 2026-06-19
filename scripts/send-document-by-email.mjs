@@ -68,16 +68,24 @@ const MIME_MAP = {
 const mime = MIME_MAP[ext] || 'application/octet-stream';
 
 // ── Load env ─────────────────────────────────────────────────────────────
-const SMTP_HOST = process.env.SMTP_HOST || '';
-const SMTP_PORT = Number(process.env.SMTP_PORT || 0);
-const SMTP_USER = process.env.SMTP_USER || '';
-const SMTP_PASS = process.env.SMTP_PASS || '';
-const EMAIL_FROM = process.env.EMAIL_FROM || SMTP_USER;
-const EMAIL_DEFAULT_TO = process.env.EMAIL_DEFAULT_TO || 'vip-bike@mail.ru';
+// Provider selection: --provider yandex | mailru (default: mailru)
+const provider = arg('provider', 'mailru').toLowerCase();
+const PROVIDER_PREFIX = provider === 'yandex' ? 'SMTP_YANDEX_' : 'SMTP_';
+const PROVIDER_EMAIL_PREFIX = provider === 'yandex' ? 'EMAIL_YANDEX_' : 'EMAIL_';
+
+const SMTP_HOST = process.env[`${PROVIDER_PREFIX}HOST`] || process.env.SMTP_HOST || '';
+const SMTP_PORT = Number(process.env[`${PROVIDER_PREFIX}PORT`] || process.env.SMTP_PORT || 0);
+const SMTP_USER = process.env[`${PROVIDER_PREFIX}USER`] || process.env.SMTP_USER || '';
+const SMTP_PASS = process.env[`${PROVIDER_PREFIX}PASS`] || process.env.SMTP_PASS || '';
+const EMAIL_FROM = process.env[`${PROVIDER_EMAIL_PREFIX}FROM`] || process.env.EMAIL_FROM || SMTP_USER;
+const EMAIL_DEFAULT_TO = process.env[`${PROVIDER_EMAIL_PREFIX}DEFAULT_TO`] || process.env.EMAIL_DEFAULT_TO || 'vip-bike@mail.ru';
+
+console.error(`[send-email] Using provider=${provider} — host=${SMTP_HOST}:${SMTP_PORT} user=${SMTP_USER}`);
 
 if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
   fail('env', 'smtp_env_missing', {
-    hint: 'Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS in .env',
+    hint: `Set ${PROVIDER_PREFIX}HOST, ${PROVIDER_PREFIX}PORT, ${PROVIDER_PREFIX}USER, ${PROVIDER_PREFIX}PASS in .env`,
+    provider,
     present: { SMTP_HOST: !!SMTP_HOST, SMTP_PORT: !!SMTP_PORT, SMTP_USER: !!SMTP_USER, SMTP_PASS: !!SMTP_PASS },
   });
 }
