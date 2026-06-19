@@ -1,3 +1,4 @@
+// /lib/rental-date-utils.ts
 /**
  * Rental date utilities for converting TEXT dates (DD.MM.YYYY) to TIMESTAMPTZ.
  * Used by skill script and doc-manual for unified rental tracking.
