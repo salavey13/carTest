@@ -14,7 +14,7 @@
 <tr><td style="border: none; width: 50%;">г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">«{{day}}» {{month_num}} {{year}}г.</td></tr>
 </table>
 
-<p style="text-align: justify;">{{organization_short}}, именуемый в дальнейшем «Арендодатель», действующий на основании ОГРНИП: {{ogrnip}}, с одной стороны, и {{renter_full_name}}, именуемый в дальнейшем «Арендатор», с другой стороны, совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:</p>
+<p style="text-align: justify;">{{organization_representative}}, именуемый в дальнейшем «Арендодатель», действующий на основании ОГРНИП: {{ogrnip}}, с одной стороны, и {{renter_full_name}}, именуемый в дальнейшем «Арендатор», с другой стороны, совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:</p>
 
 <p style="text-align: center; font-weight: bold;">1. Термины и предмет договора</p>
 
@@ -206,14 +206,15 @@
 <table style="width: 100%; border: none; margin-top: 12pt;">
 <tr>
 <td style="border: none; width: 50%; vertical-align: top;"><b>Арендодатель:</b><br>
-{{organization_short}}<br>
+{{organization_representative}}<br>
 Адрес: {{legal_address}}<br>
 ОГРНИП: {{ogrnip}}<br>
 ИНН: {{inn}}<br>
 р/сч {{bank_account}}<br>
 {{bank_name}}<br>
 {{bank_city}}<br>
-к/сч {{bank_corr_account}}</td>
+к/сч {{bank_corr_account}}<br>
+{{issuer_signatory}}</td>
 <td style="border: none; width: 50%; vertical-align: top;"><b>Арендатор:</b><br>
 ФИО: {{renter_full_name}}<br>
 Паспорт: {{renter_passport}}<br>
@@ -222,10 +223,6 @@
 </tr>
 </table>
 
-<p>{{issuer_signatory}}</p>
-<p>_____________/________________/</p>
-
-<p>&nbsp;</p>
 <table style="width: 100%; border: none; margin-top: 6pt;">
 <tr>
 <td style="border: none; width: 50%; text-align: center;">_________________ / _______________</td>

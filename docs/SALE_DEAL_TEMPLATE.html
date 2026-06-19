@@ -1,4 +1,3 @@
-<!-- /docs/SALE_DEAL_TEMPLATE.html -->
 <div style="font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000; max-width: 700px; margin: 0 auto;">
 
 <p style="text-align: center; font-weight: bold; text-transform: uppercase;">ДОГОВОР</p>
@@ -170,7 +169,7 @@
 <tr>
 <td style="border: none; width: 50%; vertical-align: top;"><b>Продавец:</b><br>
 {{organization_name}}<br>
-{{organization_representative}}<br>
+{{organization_short}}<br>
 Адрес: {{legal_address}}<br>
 ОГРНИП: {{ogrnip}}<br>
 ИНН: {{inn}}<br>
@@ -178,15 +177,24 @@
 {{bank_name}}<br>
 {{bank_city}}<br>
 к/с {{bank_corr_account}}<br>
-____________________/{{organization_representative}}/</td>
+<br>
+<table style="width: 100%; border: none;">
+<tr><td style="border: none; text-align: center;">____________________/{{organization_representative}}/</td></tr>
+<tr><td style="border: none; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О.)</td></tr>
+</table></td>
 <td style="border: none; width: 50%; vertical-align: top;"><b>Покупатель:</b><br>
+<br>
 ФИО: {{buyer_full_name}}<br>
 Дата рождения: {{buyer_birth_date}}<br>
 Паспорт: № {{buyer_passport_number}}<br>
 Выдан: {{buyer_passport_issued_by}}<br>
 Дата выдачи: {{buyer_passport_issue_date}}<br>
 Прописка: {{buyer_registration}}<br>
-_________________ /{{buyer_short_name}}/</td>
+<br>
+<table style="width: 100%; border: none;">
+<tr><td style="border: none; text-align: center;">_________________ /{{buyer_short_name}}/</td></tr>
+<tr><td style="border: none; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О.)</td></tr>
+</table></td>
 </tr>
 </table>
 
@@ -238,11 +246,19 @@ _________________ /{{buyer_short_name}}/</td>
 <table style="width: 100%; border: none; margin-top: 6pt;">
 <tr>
 <td style="border: none; width: 50%; vertical-align: top;"><b>Продавец:</b><br>
-{{organization_representative}}<br>
-_______________/{{organization_representative}}/</td>
+{{organization_short}}<br>
+<br>
+<table style="width: 100%; border: none;">
+<tr><td style="border: none; text-align: center;">_______________/{{organization_representative}}/</td></tr>
+<tr><td style="border: none; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О.)</td></tr>
+</table></td>
 <td style="border: none; width: 50%; vertical-align: top;"><b>Покупатель:</b><br>
 <br>
-______________ /  {{buyer_short_name}}/</td>
+<br>
+<table style="width: 100%; border: none;">
+<tr><td style="border: none; text-align: center;">______________ /  {{buyer_short_name}}/</td></tr>
+<tr><td style="border: none; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О.)</td></tr>
+</table></td>
 </tr>
 </table>
 
