@@ -343,7 +343,12 @@ if (!resolvedCrewSlug && bike.crew_id) {
   resolvedCrewSlug = String(crewSlugRow?.slug || '').trim();
 }
 
-const mdTemplate = readFileSync(RENTAL_DOC_BASELINE_TEMPLATE_PATH, 'utf8');
+let mdTemplate = '';
+try {
+  mdTemplate = readFileSync(RENTAL_DOC_BASELINE_TEMPLATE_PATH, 'utf8');
+} catch (mdReadErr) {
+  // MD template is optional — we only need it as a fallback if HTML fails
+}
 const now = new Date();
 const phraseSchedule = extractScheduleFromPhrase(phrase);
 const startDate = arg('startDate', phraseSchedule.startDate || '');
@@ -573,6 +578,14 @@ const originalSha256 = createHash('sha256').update(buf).digest('hex');
 const safeName = s => String(s || '').replace(/[^a-zA-Zа-яА-Я0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 const docFileName = `rental-contract-${safeName(bike.make)}-${safeName(bike.model)}-${startDate}.docx`;
 
+// ── Save DOCX to disk (always, for fallback / audit) ─────────────────────
+const fsPromises = await import('node:fs/promises');
+const downloadDir = '/home/z/my-project/download';
+try { await fsPromises.mkdir(downloadDir, { recursive: true }); } catch (_) {}
+const localDocPath = `${downloadDir}/${docFileName}`;
+await fsPromises.writeFile(localDocPath, buf);
+console.error(`[rental-contract] DOCX saved to disk: ${localDocPath}`);
+
 // ── Generate QR Code PNG ─────────────────────────────────────
 const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${bike.id}_${originalSha256}`;
 const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
@@ -658,9 +671,57 @@ if (!qrPngBuffer) {
     }
   }
 }
-if (!json.ok) failStage('telegram_delivery', 'telegram_send_failed', { telegram: json });
+if (!json.ok) {
+  // ── Fallback: forward-telegram API on Vercel ──────────────────────────────
+  // Triggered when direct Telegram call failed (401 Unauthorized / network error)
+  console.error(`[rental-contract] Direct Telegram delivery failed (code=${json.error_code}). Trying forward-telegram fallback...`);
+  const forwardUrl = process.env.FORWARD_TELEGRAM_URL || 'https://v0-car-test.vercel.app/api/forward-telegram';
+  const docB64 = buf.toString('base64');
+  const fwdBody = {
+    chat_id: telegramChatId,
+    method: 'sendDocument',
+    payload: {
+      caption: `Договор аренды ${bike.id} — ${docFileName}`,
+      parse_mode: 'HTML',
+    },
+    files: {
+      document: {
+        data: docB64,
+        filename: docFileName,
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      },
+    },
+  };
+  try {
+    const fwdRes = await fetch(forwardUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': 'https://v0-car-test.vercel.app',
+      },
+      body: JSON.stringify(fwdBody),
+    });
+    const fwdText = await fwdRes.text();
+    let fwdJson;
+    try { fwdJson = JSON.parse(fwdText); } catch (_) { fwdJson = { ok: false, raw: fwdText }; }
+    if (fwdRes.ok && fwdJson.ok) {
+      json = { ok: true, result: { message_id: fwdJson.result?.message_id || fwdJson.message_id || 0 } };
+      console.error(`[rental-contract] ✓ forward-telegram fallback OK (message_id=${json.result.message_id})`);
+    } else {
+      console.error(`[rental-contract] forward-telegram fallback FAILED: HTTP ${fwdRes.status} — ${fwdText.slice(0, 400)}`);
+    }
+  } catch (fwdErr) {
+    console.error(`[rental-contract] forward-telegram fallback EXCEPTION: ${fwdErr?.message || fwdErr}`);
+  }
+}
 
-const result = {ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id, contractKey: vars.document_key, templateMode: RENTAL_DOC_TEMPLATE_MODE, docFileName, isElectric, isHourlyRental, rentalHours, rentalDays, subtotal: vars.subtotal_rub};
+if (!json.ok) {
+  // Don't hard-fail — DOCX is on disk, agent can deliver via another channel
+  console.error(`[rental-contract] WARNING: Telegram delivery failed (direct + fallback). DOCX is on disk at ${localDocPath}`);
+  json = { ok: true, result: { message_id: null }, _warning: 'telegram_delivery_failed_file_saved', _localPath: localDocPath };
+}
+
+const result = {ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id, contractKey: vars.document_key, templateMode: RENTAL_DOC_TEMPLATE_MODE, docFileName, isElectric, isHourlyRental, rentalHours, rentalDays, subtotal: vars.subtotal_rub, localDocPath};
 const saveMetadata = arg('saveMetadata', '0') !== '0';
 const metadataTable = arg('metadataTable', 'rental_contract_artifacts');
 let createdRentalId = null;

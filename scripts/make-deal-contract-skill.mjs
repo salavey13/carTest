@@ -33,6 +33,7 @@
 //   --salePrice         Sale price in rubles (sale only, HIGHEST priority — overrides bike.specs.sale_price)
 //   --productColor      Override bike color in the contract (sale only). ALWAYS pass this for y-volt-style bikes that share a single DB record across multiple physical units — bike.specs.color is a generic catalog value, not the specific bike being sold.
 //   --productVin        Override bike VIN / frame number in the contract (sale only). Use this when bike.specs.vin/frame is missing or "уточняется" — operator should OCR the actual frame sticker and pass the value here.
+//   --dealDate          Override contract date (DD.MM.YYYY). For rent defaults to rent start date; for sale defaults to today.
 //   --warrantyMonths    Warranty months (sale only, default 12)
 //   --sellerAddress     Seller legal address (sale only, default "г. Нижний Новгород")
 //   --lessorAddress     Lessor address (rent only)
@@ -72,6 +73,7 @@ import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { htmlToDocxElements } from '../lib/htmlToDocx.mjs';
+import { buildRentalContractVariables } from '../app/lib/rental-contract-vars.ts';
 
 // ── CLI helpers ──────────────────────────────────────────────────────────
 function arg(name, fallback = '') { const i = process.argv.indexOf(`--${name}`); return i>=0 ? (process.argv[i+1]||'') : fallback; }
@@ -362,10 +364,7 @@ if (buyerAddressOverride) {
 const telegramChatId = arg('telegramChatId', process.env.ADMIN_CHAT_ID || '');
 
 // ── Supabase client ──────────────────────────────────────────────────────
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 // Separate client pointing at the PRIVATE schema (for metadata tables)
 const supabasePrivate = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -567,26 +566,7 @@ if (dealType === 'rent') {
   if (!renterLicenseSeries || !renterLicenseNumber) failStage('renter_parse', 'missing_driver_license_data');
   if (!startDate || !endDate) failStage('rental_dates', 'missing_rental_dates', { hint: 'Pass --startDate/--endDate or include explicit dates in phrase.' });
 
-  // Vehicle type labels for template
-  const bike_vehicle_type_label   = isElectric ? 'ЭЛЕКТРОМОТОЦИКЛА' : 'МОТОЦИКЛА';
-  const bike_vehicle_type_accusative = isElectric ? 'электромотоцикл' : 'мотоцикл';
-  const bike_vehicle_type_genitive  = isElectric ? 'электромотоцикла' : 'мотоцикла';
-
-  // Engine spec lines
-  let bike_engine_spec_line_1, bike_engine_spec_line_2, bike_engine_spec_line_3;
-  if (isElectric) {
-    bike_engine_spec_line_1 = power_kw  ? `мощность двигателя (номинальная) ${power_kw} кВт` : '';
-    bike_engine_spec_line_2 = maxSpeed  ? `максимальная конструктивная скорость ${maxSpeed} км/ч` : '';
-    bike_engine_spec_line_3 = battery   ? `аккумулятор: тип/ёмкость ${battery}` : '';
-  } else {
-    const ccPart  = engine_cc ? `рабочий объем ${engine_cc} куб. см` : '';
-    const hpPart  = power_hp  ? `мощность ${power_hp} л.с.` : '';
-    bike_engine_spec_line_1 = [ccPart, hpPart].filter(Boolean).join(', ') || '';
-    bike_engine_spec_line_2 = maxSpeed ? `максимальная конструктивная скорость ${maxSpeed} км/ч` : '';
-    bike_engine_spec_line_3 = '';
-  }
-
-  // Calculate rental duration and pricing
+  // Calculate rental duration for subtotal
   const startTimeArg = arg('startTime', phraseSchedule.startTime || '18:00');
   const endTimeArg   = arg('endTime', phraseSchedule.endTime || '10:00');
 
@@ -601,22 +581,28 @@ if (dealType === 'rent') {
   rentalDays = rentalHours > 0 ? Math.max(1, Math.ceil(rentalHours / 24)) : 1;
   isHourlyRental = rentalHours > 0 && rentalHours < 24;
 
-  // Pricing
-  const bikeDailyPrice = Number(bike.specs?.dailyPrice) > 0 ? String(bike.specs.dailyPrice)
-    : Number(bike.specs?.rent_weekday) > 0 ? String(bike.specs.rent_weekday)
-    : arg('dailyPrice', '10000');
-  const bikeHourlyPrice = Number(bike.specs?.price_per_hour) > 0 ? String(bike.specs.price_per_hour)
-    : arg('hourlyPrice', String(Math.round(Number(bikeDailyPrice) / 8)));
-  const bikeDeposit = Number(bike.specs?.deposit_rub) > 0 ? String(bike.specs.deposit_rub) : arg('deposit', '20000');
-  const bikeValueRub = Number(bike.specs?.sale_price) > 0 ? String(bike.specs.sale_price)
-    : Number(bike.specs?.price_rub) > 0 ? String(bike.specs.price_rub)
-    : arg('bikeValue', '850000');
+  // Pricing for subtotal calculation — operator overrides have HIGHEST priority
+  const dailyPriceArg = Number(arg('dailyPrice', '0'));
+  const hourlyPriceArg = Number(arg('hourlyPrice', '0'));
+  const depositArg = Number(arg('deposit', '0'));
+
+  const bikeDailyPrice = dailyPriceArg > 0 ? dailyPriceArg
+    : Number(bike.specs?.dailyPrice) > 0 ? Number(bike.specs.dailyPrice)
+    : Number(bike.specs?.rent_weekday) > 0 ? Number(bike.specs.rent_weekday)
+    : Number(arg('dailyPrice', '10000'));
+  const bikeHourlyPrice = hourlyPriceArg > 0 ? hourlyPriceArg
+    : Number(bike.specs?.price_per_hour) > 0 ? Number(bike.specs.price_per_hour)
+    : Number(arg('hourlyPrice', String(Math.round(bikeDailyPrice / 8))));
+
+  let subtotal;
+  if (isHourlyRental) {
+    subtotal = bikeHourlyPrice * rentalHours;
+  } else {
+    subtotal = bikeDailyPrice * rentalDays;
+  }
+  const subtotalRounded = Math.round(subtotal);
 
   // ── СТС pledge vars (rent only) ─────────────────────────────────────────
-  // When stsPledgeEnabled is true the template renders the СТС-pledge clauses
-  // in §4.3/4.4/4.5/4.7 and Appendix 1; otherwise the classic cash-deposit
-  // clauses render and all sts_* vars stay empty (the {{#if sts_collateral}}
-  // blocks fall through to {{else}}).
   const stsPledgeReturnDays = Number(arg('stsPledgeReturnDays', '3')) || 3;
   const stsOwnerRelation = arg('stsOwnerRelation', 'сам арендатор');
   // If СТС owner differs from renter, require explicit relation disclosure
@@ -633,96 +619,118 @@ if (dealType === 'rent') {
     }
   }
 
-  let subtotal;
-  if (isHourlyRental) {
-    subtotal = Number(bikeHourlyPrice) * rentalHours;
-  } else {
-    subtotal = Number(bikeDailyPrice) * rentalDays;
-  }
-  const subtotalRounded = Math.round(subtotal);
-
-  vars = {
-    contract_number: `${now.getDate()}.${now.getMonth()+1}/${bike.id}`,
-    day: String(now.getDate()).padStart(2,'0'),
-    month: now.toLocaleString('ru-RU',{month:'long'}),
-    month_num: String(now.getMonth()+1).padStart(2,'0'),
-    year: String(now.getFullYear()),
-    renter_full_name: renterFullName,
-    renter_birth_date: renterBirthDate,
-    renter_phone: passportJson.phone || '',
-    renter_email: passportJson.email || '',
-    renter_driver_license: `${renterLicenseSeries} ${renterLicenseNumber}`.trim(),
-    renter_passport: `${renterPassportSeries} ${renterPassportNumber}`.trim(),
-    bike_make_model: `${bike.make||''} ${bike.model||''}`.trim(),
-    bike_make: bike.make || 'уточняется',
-    bike_model: bike.model || 'уточняется',
-    bike_plate: bike.specs?.plate || 'уточняется',
-    bike_vin: bike.specs?.vin || bike.specs?.frame || bike.specs?.vin_number || 'уточняется',
-    bike_category: bike.specs?.category || bike.specs?.tp_category || 'A/L3',
-    bike_color: bike.specs?.color || 'уточняется',
-    bike_year: bike.specs?.year || bike.specs?.production_year || 'уточняется',
-    bike_engine_cc: engine_cc || '0',
-    bike_power_hp: power_hp || '0',
-    bike_power_kw: power_kw || '0',
-    bike_max_speed: maxSpeed || 'уточняется',
-    bike_battery: battery || (isElectric ? 'уточняется' : ''),
-    bike_vehicle_type_label,
-    bike_vehicle_type_accusative,
-    bike_vehicle_type_genitive,
-    bike_engine_spec_line_1,
-    bike_engine_spec_line_2,
-    bike_engine_spec_line_3,
-    rent_start_time: startTimeArg, rent_start_date: startDate,
-    rent_end_time: endTimeArg, rent_end_date: endDate,
-    hourly_price_rub: bikeHourlyPrice,
-    daily_price_rub: bikeDailyPrice,
-    subtotal_rub: arg('subtotal', String(subtotalRounded)),
-    deposit_rub: bikeDeposit,
-    included_mileage:'200', overage_rate:'35', included_km_per_day:'200', extra_km_fee_rub:'35',
-    late_return_penalty_rub: arg('latePenalty','10000'),
-    late_return_penalty_max_days: arg('latePenaltyMaxDays','90'),
-    bike_value_rub: bikeValueRub,
-    bike_value_words: arg('bikeValueWords',''),
-    // СТС pledge vars — only populated when --stsInsteadOfDeposit is set.
-    // Template uses {{#if sts_collateral}} to switch between СТС and cash-deposit clauses.
-    sts_collateral: stsPledgeEnabled ? '1' : '',
-    sts_series: stsJson?.series || '',
-    sts_number: stsJson?.number || '',
-    sts_issue_date: stsJson?.issueDate || '',
-    sts_vehicle_plate: stsJson?.vehiclePlate || '',
-    sts_vehicle_vin: stsJson?.vehicleVin || '',
-    sts_vehicle_model: stsJson?.vehicleModel || '',
-    sts_vehicle_year: stsJson?.vehicleYear || '',
-    sts_owner_full_name: stsJson?.ownerFullName || '',
-    sts_owner_registration: stsJson?.ownerRegistration || '',
-    sts_owner_relation: stsOwnerRelation,
-    sts_pledge_return_days: String(stsPledgeReturnDays),
-    sts_deposit_amount_skipped: stsPledgeEnabled ? bikeDeposit : '',
-    return_address: arg('returnAddress', crewReturnAddress),
-    lessor_address: arg('lessorAddress', crewLegalAddress),
-    issuer_name: crewIssuerName,
-    issuer_signatory: crewSignatoryRole,
-    issuer_representative: crewOrgRepresentative,
-    organization_name: crewOrgName,
-    organization_short: crewOrgShort,
+  // Build crew secrets object matching RentalCrewSecrets type
+  const crewSecrets = {
+    legalAddress: crewLegalAddress,
+    returnAddress: crewReturnAddress,
+    issuerName: crewIssuerName,
+    signatoryRole: crewSignatoryRole,
+    organizationRepresentative: crewIssuerRepresentative,
+    organizationName: crewOrgName,
+    organizationShort: crewOrgShort,
     ogrnip: crewOgrnip,
     inn: crewInn,
-    bank_account: crewBankAccount,
-    bank_name: crewBankName,
-    bank_city: crewBankCity,
-    bank_corr_account: crewBankCorrAccount,
+    bankAccount: crewBankAccount,
+    bankName: crewBankName,
+    bankCity: crewBankCity,
+    bankCorrAccount: crewBankCorrAccount,
     email: crewEmail,
-    legal_address: crewLegalAddress,
-    signature_timestamp: now.toLocaleString('ru-RU'), signature_fingerprint:'offline-skill', renter_signature:'согласие через Telegram',
-    bike_mileage: String(bike.specs?.mileage||''),
-    equipment:'ключ(и) 1 шт.; шлем 1',
-    damage_notes_at_delivery:'от даты начала аренды', damage_notes_at_return:'от даты возврата тс',
-    battery_level_start:'100 %', battery_level_end:'____ %',
-    media_links:'телефон',
-    renter_passport_issue_date: passportJson.issueDate || '', renter_registration: buyerRegistration,
-    damage_price_list:'мотоцикл в сборе / царапина на пластике / прочее по расчету',
-    document_key:`rental-${bike.id}-${Date.now()}`
+    contractDefaults,
   };
+
+  // Use shared builder for rental contracts
+  vars = buildRentalContractVariables({
+    renter: {
+      fullName: renterFullName,
+      birthDate: renterBirthDate,
+      phone: passportJson.phone || '',
+      email: passportJson.email || '',
+      passportSeries: renterPassportSeries,
+      passportNumber: renterPassportNumber,
+      passportIssueDate: passportJson.issueDate,
+      passportIssuedBy: passportJson.issuedBy,
+      registration: buyerRegistration,
+      address: buyerRegistration,
+      driverLicenseSeries: renterLicenseSeries,
+      driverLicenseNumber: renterLicenseNumber,
+    },
+    bike: {
+      id: bike.id,
+      make: bike.make,
+      model: bike.model,
+      type: bike.type,
+      specs: bike.specs,
+    },
+    period: {
+      startDate,
+      startTime: startTimeArg,
+      endDate,
+      endTime: endTimeArg,
+      dailyPrice: Number(arg('dailyPrice')) || undefined,
+      hourlyPrice: Number(arg('hourlyPrice')) || undefined,
+      depositOverride: Number(arg('deposit')) || undefined,
+    },
+    crewSecrets,
+    stsPledge: {
+      used: stsPledgeEnabled,
+      series: stsJson?.series,
+      number: stsJson?.number,
+      issueDate: stsJson?.issueDate,
+      vehiclePlate: stsJson?.vehiclePlate,
+      vehicleVin: stsJson?.vehicleVin,
+      vehicleModel: stsJson?.vehicleModel,
+      vehicleYear: stsJson?.vehicleYear,
+      ownerFullName: stsJson?.ownerFullName,
+      ownerRegistration: stsJson?.ownerRegistration,
+      ownerRelation: stsOwnerRelation,
+      pledgeReturnDays: stsPledgeReturnDays,
+    },
+    meta: {
+      signatureTimestamp: now.toLocaleString('ru-RU'),
+      signatureFingerprint: 'offline-skill',
+      renterSignature: 'согласие через Telegram',
+      documentKey: `rental-${bike.id}-${Date.now()}`,
+    },
+  });
+
+  // Override subtotal with calculated value
+  vars.subtotal_rub = arg('subtotal', String(subtotalRounded));
+
+  // Add organization_representative (ИП Воробьев Р.В. — nominative) so the template
+  // can use it instead of organization_short (ИП Воробьева Р.В. — genitive) where needed.
+  vars.organization_representative = crewOrgRepresentative;
+  vars.organization_name = crewOrgName;
+  vars.organization_short = crewOrgShort;
+
+  // Override contract date to use rent start date (or --dealDate) instead of today.
+  // This affects {{day}}, {{month_num}}, {{year}}, {{contract_number}} placeholders in the template.
+  if (dealDateArg) {
+    const dm = dealDateArg.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+    if (dm) {
+      let dy = dm[3]; if (dy.length === 2) dy = `20${dy}`;
+      const dd = new Date(Number(dy), Number(dm[2]) - 1, Number(dm[1]));
+      vars.day = String(dd.getDate()).padStart(2, '0');
+      vars.month_num = String(dd.getMonth() + 1).padStart(2, '0');
+      vars.year = String(dd.getFullYear());
+      vars.contract_number = `${dd.getDate()}.${dd.getMonth() + 1}/${bike.id}`;
+    }
+  } else if (startDate) {
+    const dp = parseRuDateParts(startDate);
+    if (dp) {
+      const dd = new Date(dp.y, dp.mo, dp.d);
+      vars.day = String(dd.getDate()).padStart(2, '0');
+      vars.month_num = String(dd.getMonth() + 1).padStart(2, '0');
+      vars.year = String(dd.getFullYear());
+      vars.contract_number = `${dd.getDate()}.${dd.getMonth() + 1}/${bike.id}`;
+    }
+  }
+
+  // Override pricing vars — operator's CLI flags have HIGHEST priority.
+  // buildRentalContractVariables may have populated these from bike.specs,
+  // but if the operator passed --hourlyPrice / --dailyPrice / --deposit, those win.
+  if (hourlyPriceArg > 0) vars.hourly_price_rub = String(hourlyPriceArg);
+  if (dailyPriceArg > 0)  vars.daily_price_rub  = String(dailyPriceArg);
+  if (depositArg > 0)     vars.deposit_rub      = String(depositArg);
 
   // Filename
   const safeName = s => String(s || '').replace(/[^a-zA-Zа-яА-Я0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
@@ -746,6 +754,7 @@ if (dealType === 'rent') {
   if (!buyerPassportSeries || !buyerPassportNumber) failStage('buyer_parse', 'missing_passport_data');
   if (!buyerRegistration) failStage('buyer_parse', 'missing_registration', { hint: 'Registration address is empty. If OCR failed on cursive passport page 2, pass --buyerAddress manually.' });
 
+  // Sale price
   // Sale price — --salePrice has HIGHEST priority (operator override),
   // then bike.specs.sale_price, then bike.specs.price_rub
   const salePriceArg = Number(arg('salePrice', '0'));
@@ -796,7 +805,24 @@ if (dealType === 'rent') {
   const warrantyMonths = arg('warrantyMonths', '12');
 
   // Spec number and appendix date
-  const specNumber = `${now.getDate()}.${now.getMonth()+1}/${bike.id}`;
+  // For rent contracts: contract date = rent start date (when the deal actually begins).
+  // For sale contracts: contract date = today (the moment of signing).
+  // Operator can override with --dealDate DD.MM.YYYY
+  const dealDateArg = arg('dealDate', '');
+  let dealDate = now;
+  if (dealDateArg) {
+    const dm = dealDateArg.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+    if (dm) {
+      let dy = dm[3]; if (dy.length === 2) dy = `20${dy}`;
+      dealDate = new Date(Number(dy), Number(dm[2]) - 1, Number(dm[1]));
+    }
+  } else if (dealType === 'rent' && startDate) {
+    const dp = parseRuDateParts(startDate);
+    // parseRuDateParts returns mo as 0-indexed (Number(month) - 1), so use directly
+    if (dp) dealDate = new Date(dp.y, dp.mo, dp.d);
+  }
+
+  const specNumber = `${dealDate.getDate()}.${dealDate.getMonth()+1}/${bike.id}`;
   const appendixDate = formatRuDate(now);
 
   // Short name: initials + surname (e.g. "Иванов И.И.")
@@ -809,10 +835,10 @@ if (dealType === 'rent') {
   }
 
   vars = {
-    contract_number: `${now.getDate()}.${now.getMonth()+1}/${bike.id}`,
-    contract_day: String(now.getDate()),
-    contract_month_genitive: MONTH_GENITIVE[now.getMonth() + 1],
-    contract_year: String(now.getFullYear()),
+    contract_number: `${dealDate.getDate()}.${dealDate.getMonth()+1}/${bike.id}`,
+    contract_day: String(dealDate.getDate()),
+    contract_month_genitive: MONTH_GENITIVE[dealDate.getMonth() + 1],
+    contract_year: String(dealDate.getFullYear()),
     buyer_full_name: buyerFullName,
     buyer_short_name: buyerShortName,
     buyer_birth_date: buyerBirthDate,
@@ -861,7 +887,12 @@ let doc;
 
 if (dealType === 'rent') {
   // RENT: HTML primary + MD fallback
-  const mdTemplate = readFileSync(RENTAL_DOC_MD_TEMPLATE_PATH, 'utf8');
+  let mdTemplate = '';
+  try {
+    mdTemplate = readFileSync(RENTAL_DOC_MD_TEMPLATE_PATH, 'utf8');
+  } catch (mdReadErr) {
+    // MD template is optional — we only need it as a fallback if HTML fails
+  }
 
   if (RENTAL_DOC_TEMPLATE_MODE === 'html') {
     let htmlTemplate;
@@ -951,16 +982,15 @@ if (dealType === 'rent') {
   }
 }
 
+  // ── Save DOCX to disk (always, for fallback / audit) ────────────────────
 const buf = await Packer.toBuffer(doc);
 const originalSha256 = createHash('sha256').update(buf).digest('hex');
-
-// ── Save DOCX to disk (always, for fallback / audit) ─────────────────────
-const fsPromises = await import('node:fs/promises');
-const downloadDir = '/home/z/my-project/download';
-try { await fsPromises.mkdir(downloadDir, { recursive: true }); } catch (_) {}
-const localDocPath = `${downloadDir}/${docFileName}`;
-await fsPromises.writeFile(localDocPath, buf);
-console.error(`[deal-contract] DOCX saved to disk: ${localDocPath}`);
+  const fsPromises = await import('node:fs/promises');
+  const downloadDir = '/home/z/my-project/download';
+  try { await fsPromises.mkdir(downloadDir, { recursive: true }); } catch (_) {}
+  const localDocPath = `${downloadDir}/${docFileName}`;
+  await fsPromises.writeFile(localDocPath, buf);
+  console.error(`[deal-contract] DOCX saved to disk: ${localDocPath}`);
 
 // ── Telegram delivery (built-in, always) ─────────────────────────────────
 const token = process.env.TELEGRAM_BOT_TOKEN;
