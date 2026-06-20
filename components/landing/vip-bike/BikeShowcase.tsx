@@ -17,6 +17,7 @@ const FEATURED_BIKES = [
     make: "79BIKE",
     model: "Falcon GT 2025",
     goal: "adrenaline",
+    goalLabel: "Адреналин",
     dailyPrice: 12000,
     hourlyPrice: 5000,
     minHours: 3,
@@ -30,6 +31,7 @@ const FEATURED_BIKES = [
     make: "Y-VOLT",
     model: "Surge V",
     goal: "adrenaline",
+    goalLabel: "Адреналин",
     dailyPrice: 12000,
     hourlyPrice: 5000,
     minHours: 3,
@@ -43,6 +45,7 @@ const FEATURED_BIKES = [
     make: "Sequence",
     model: "Zero",
     goal: "cruising",
+    goalLabel: "Круизинг",
     dailyPrice: 15000,
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sequence-zero/image_1.jpg",
     specs: { power: "30 кВт", range: "300 км", topSpeed: "160 км/ч" },
@@ -52,6 +55,7 @@ const FEATURED_BIKES = [
     make: "KAWASAKI",
     model: "EX650K Ninja 650",
     goal: "cruising",
+    goalLabel: "Круизинг",
     dailyPrice: 14000,
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/kawasaki-ex650k/image_1.jpg",
     specs: { power: "68 л.с.", engine: "649 см³", topSpeed: "210 км/ч" },
@@ -61,6 +65,7 @@ const FEATURED_BIKES = [
     make: "Suzuki",
     model: "GSX-S1000F",
     goal: "adrenaline",
+    goalLabel: "Адреналин",
     dailyPrice: 14000,
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/suzuki-gsx-s1000f/image_1.jpg",
     specs: { power: "150 л.с.", engine: "999 см³", topSpeed: "255 км/ч" },
@@ -70,6 +75,7 @@ const FEATURED_BIKES = [
     make: "Regulmoto",
     model: "Nibbler 300 4V",
     goal: "enduro",
+    goalLabel: "Эндуро",
     dailyPrice: 6000,
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/nibbler-regumoto-4v/image_1.jpg",
     specs: { power: "27 л.с.", engine: "300 см³", topSpeed: "150 км/ч" },
@@ -82,6 +88,13 @@ function formatPrice(price: number): string {
   return new Intl.NumberFormat("ru-RU").format(price);
 }
 
+const SPEC_LABELS: Record<string, string> = {
+  power: "Мощность",
+  range: "Запас хода",
+  topSpeed: "Макс. скорость",
+  engine: "Объём",
+};
+
 export function BikeShowcase() {
   const [filter, setFilter] = useState<FilterType>("all");
 
@@ -91,10 +104,10 @@ export function BikeShowcase() {
   });
 
   const filterButtons: { key: FilterType; label: string }[] = [
-    { key: "all", label: "ALL" },
-    { key: "adrenaline", label: "ADRENALINE" },
-    { key: "cruising", label: "CRUISING" },
-    { key: "enduro", label: "ENDURO" },
+    { key: "all", label: "Весь арсенал" },
+    { key: "adrenaline", label: "Адреналин" },
+    { key: "cruising", label: "Круизинг" },
+    { key: "enduro", label: "Эндуро" },
   ];
 
   return (
@@ -119,13 +132,13 @@ export function BikeShowcase() {
             className="text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tighter mb-4"
             style={{ color: "#E0E0E0" }}
           >
-            The Fleet
+            Флот
           </h2>
           <p
             className="text-sm uppercase tracking-widest mb-8"
             style={{ color: "#FF4500" }}
           >
-            Choose your weapon
+            Выбери свою дисциплину
           </p>
 
           {/* Filter buttons */}
@@ -184,7 +197,7 @@ export function BikeShowcase() {
                         color: "#050505",
                       }}
                     >
-                      {bike.goal}
+                      {bike.goalLabel}
                     </div>
                   </div>
                 </div>
@@ -211,7 +224,7 @@ export function BikeShowcase() {
                     {Object.entries(bike.specs).map(([key, value]) => (
                       <div key={key} className="flex justify-between items-center">
                         <span className="text-xs uppercase tracking-wider" style={{ color: "#666" }}>
-                          {key === "power" ? "POWER" : key === "range" ? "RANGE" : key === "topSpeed" ? "TOP SPEED" : key === "engine" ? "ENGINE" : key.toUpperCase()}
+                          {SPEC_LABELS[key] || key.toUpperCase()}
                         </span>
                         <span className="font-bold" style={{ color: "#E0E0E0" }}>
                           {value}
@@ -231,7 +244,7 @@ export function BikeShowcase() {
                           {formatPrice(bike.hourlyPrice)} ₽
                         </span>
                         <span className="text-xs uppercase tracking-wider" style={{ color: "#666" }}>
-                          / HOUR (MIN {bike.minHours}H)
+                          / час (от {bike.minHours} ч)
                         </span>
                       </div>
                     ) : (
@@ -243,7 +256,7 @@ export function BikeShowcase() {
                           {formatPrice(bike.dailyPrice)} ₽
                         </span>
                         <span className="text-xs uppercase tracking-wider" style={{ color: "#666" }}>
-                          / DAY
+                          / сутки
                         </span>
                       </div>
                     )}
@@ -264,7 +277,7 @@ export function BikeShowcase() {
               color: "#050505",
             }}
           >
-            View All Bikes
+            Смотреть весь флот
           </Link>
         </div>
       </div>

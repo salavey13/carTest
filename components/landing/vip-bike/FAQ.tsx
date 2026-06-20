@@ -5,24 +5,24 @@
 
 const FAQ_ITEMS = [
   {
-    q: "Do I need motorcycle license?",
-    a: "For electric bikes under 4kW — no. Regular B license works. For ICE bikes — A category required. We check.",
+    q: "Нужна ли категория А?",
+    a: "Для электробайков до 4 кВт — нет. Обычные права категории B подходят. Для ICE-байков — нужна категория A. Проверяем.",
   },
   {
-    q: "Insurance? Registration?",
-    a: "Electric bikes under 4kW don't need registration or insurance. No paperwork. Ride legal.",
+    q: "ОСАГО? Регистрация?",
+    a: "Электробайки до 4 кВт не требуют регистрации и ОСАГО. Никакой бюрократии. Ездишь легально.",
   },
   {
-    q: "What if I don't have a license?",
-    a: "No license — no ride. Safety first. No exceptions.",
+    q: "А если прав вообще нет?",
+    a: "Без прав — без поездки. Безопасность превыше всего. Без исключений.",
   },
   {
-    q: "Deposit refund?",
-    a: "Same day. Check bike condition, sign off, money back on your card. Usually within an hour.",
+    q: "Возврат депозита?",
+    a: "В тот же день. Проверяем состояние байка, подписываем акты, деньги возвращаются на карту. Обычно в течение часа.",
   },
   {
-    q: "Gear?",
-    a: "Helmet and gloves included — free. Jacket/armor/second helmet — ask. Damage = pay per price list.",
+    q: "Экипировка?",
+    a: "Шлем и перчатки — обязательно, бесплатно. Куртка/защита/второй шлем — по запросу. Порча — по прайсу.",
   },
 ];
 
@@ -49,13 +49,13 @@ export function FAQ() {
             className="text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tighter mb-4"
             style={{ color: "#E0E0E0" }}
           >
-            FAQ
+            Вопросы
           </h2>
           <p
             className="text-sm uppercase tracking-widest"
             style={{ color: "#FF4500" }}
           >
-            Questions. Answers.
+            Вопросы. Ответы.
           </p>
         </div>
 
@@ -86,7 +86,7 @@ export function FAQ() {
         {/* Contact */}
         <div className="text-center mt-12">
           <p className="text-sm" style={{ color: "#666" }}>
-            Still have questions?{" "}
+            Остались вопросы?{" "}
             <a
               href="https://t.me/I_O_S_NN"
               target="_blank"

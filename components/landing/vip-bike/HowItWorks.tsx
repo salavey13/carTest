@@ -10,23 +10,23 @@ const BOT_HREF = "https://t.me/oneBikePlsBot";
 const STEPS = [
   {
     n: "01",
-    title: "SELECT",
-    desc: "Browse the fleet. Check specs. Pick your ride.",
+    title: "ВЫБОР",
+    desc: "Изучай флот. Смотри спецификации. Выбирай байк.",
   },
   {
     n: "02",
-    title: "BOOK",
-    desc: "Telegram bot. Two clicks. Done. Deposit or docs — your call.",
+    title: "БРОНЬ",
+    desc: "Telegram-бот. Два клика. Готово. Депозит или документы — на твой выбор.",
   },
   {
     n: "03",
-    title: "RIDE",
-    desc: "Show up at Komsoomolskaya 2. Sign. Ride.",
+    title: "ПОЛЁТ",
+    desc: "Приезжай на пл. Комсомольская 2. Подписывай. Кати.",
   },
   {
     n: "04",
-    title: "RETURN",
-    desc: "Bring it back. Get your deposit. Repeat.",
+    title: "ВОЗВРАТ",
+    desc: "Верни байк. Получи депозит. Повтори.",
   },
 ];
 
@@ -53,13 +53,13 @@ export function HowItWorks() {
             className="text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tighter mb-4"
             style={{ color: "#E0E0E0" }}
           >
-            The Process
+            Процесс
           </h2>
           <p
             className="text-sm uppercase tracking-widest"
             style={{ color: "#FF4500" }}
           >
-            Four steps to the street
+            Четыре шага до улицы
           </p>
         </div>
 
@@ -120,7 +120,7 @@ export function HowItWorks() {
               color: "#050505",
             }}
           >
-            Start Now
+            Начать сейчас
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>

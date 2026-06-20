@@ -30,15 +30,15 @@ import {
 } from "@/components/landing/vip-bike";
 
 export const metadata = {
-  title: "VIP BIKE ELECTRO — Dominate the Streets",
+  title: "VIP BIKE ELECTRO — Аренда электробайков в Нижнем Новгороде",
   description:
-    "Premium electro bike rental in Nizhny Novgorod. Adrenaline, cruising, enduro. From 6,000 ₽/day. No bullshit. Just ride.",
+    "Хардкорная аренда электробайков и эндуро. От 6 000 ₽/сутки. Электро без категории А, шлем в комплекте, забронируй в боте за 2 минуты.",
   keywords:
-    "electro bike rental, electric motorcycle Nizhny Novgorod, enduro rental, VIP Bike, moto rental",
+    "аренда электробайка, электробайк Нижний Новгород, аренда эндуро, VIP Bike, мотоцикл аренда",
   openGraph: {
-    title: "VIP BIKE ELECTRO — Dominate the Streets",
+    title: "VIP BIKE ELECTRO — Аренда электробайков в Нижнем Новгороде",
     description:
-      "Premium electro bike rental in Nizhny Novgorod. Adrenaline, cruising, enduro. From 6,000 ₽/day.",
+      "Хардкорная аренда электробайков и эндуро. От 6 000 ₽/сутки. Электро без категории А, шлем в комплекте.",
     type: "website",
     locale: "ru_RU",
   },
