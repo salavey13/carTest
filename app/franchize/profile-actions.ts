@@ -1,6 +1,7 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-server";
+import { privateSchema } from "@/lib/private-secrets";
 
 export type FranchizeAchievementDefinition = {
   id: string;
@@ -369,8 +370,7 @@ export async function getFranchizeUserRentalSecretsAction(params: {
 }> {
   try {
     // Check for previous rentals in rental_contract_artifacts
-    const { data: artifacts, error: artifactsError } = await supabaseAdmin
-      .schema("private")
+    const { data: artifacts, error: artifactsError } = await privateSchema()
       .from("rental_contract_artifacts")
       .select("created_at,renter_full_name,renter_phone,renter_passport,renter_driver_license")
       .eq("user_id", params.userId)
@@ -399,6 +399,61 @@ export async function getFranchizeUserRentalSecretsAction(params: {
         },
       },
     };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+/**
+ * Sync profile preset data to rental secrets
+ * Called when user manually updates form prefill in profile
+ */
+export async function updateRentalSecretsFromProfileAction(params: {
+  userId: string;
+  slug: string;
+  prefill: FranchizeFormPrefill;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: user, error: userError } = await supabaseAdmin
+      .from("users")
+      .select("metadata")
+      .eq("user_id", params.userId)
+      .maybeSingle();
+
+    if (userError || !user) {
+      return { success: false, error: userError?.message || "User not found" };
+    }
+
+    const metadata = (user?.metadata || {}) as Record<string, any>;
+    const currentSecrets = metadata.rentalSecrets || {};
+
+    // Sync phone and fullName from profile prefill to rental secrets
+    const nextSecrets = {
+      ...currentSecrets,
+      phone: params.prefill.phone || currentSecrets.phone || "",
+      fullName: params.prefill.fullName || currentSecrets.fullName || "",
+      updatedAt: new Date().toISOString(),
+      source: `profile_sync_${params.slug}`,
+    };
+
+    const nextMetadata = {
+      ...metadata,
+      rentalSecrets: nextSecrets,
+    };
+
+    const { error: updateError } = await supabaseAdmin
+      .from("users")
+      .update({ metadata: nextMetadata, updated_at: new Date().toISOString() })
+      .eq("user_id", params.userId);
+
+    if (updateError) {
+      return { success: false, error: updateError.message };
+    }
+
+    return { success: true };
   } catch (error) {
     return {
       success: false,

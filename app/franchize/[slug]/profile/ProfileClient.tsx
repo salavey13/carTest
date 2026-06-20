@@ -20,6 +20,7 @@ import {
   getFranchizeActivityDigestAction,
   getFranchizeFormPrefillAction,
   saveFranchizeFormPrefillAction,
+  getFranchizeUserRentalSecretsAction,
 } from "@/app/franchize/profile-actions";
 import {
   getFranchizeOperatorDashboardAccess,
@@ -177,6 +178,16 @@ export function FranchizeProfileClient({
   const [error, setError] = useState<string | null>(null);
   const [digest, setDigest] = useState<FranchizeActivityDigest | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [rentalSecrets, setRentalSecrets] = useState<{
+    hasPreviousRentals: boolean;
+    lastRentalDate?: string;
+    savedData?: {
+      fullName: string;
+      phone: string;
+      passport: string;
+      driverLicense: string;
+    };
+  } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [prefill, setPrefill] = useState<FranchizeFormPrefill>({
@@ -207,13 +218,15 @@ export function FranchizeProfileClient({
       setCatalog(result.catalog || []);
       const capabilities = await getFranchizeCapabilityContractAction();
       setCapabilityContract(capabilities);
-      const [digestRes, prefillRes, operatorAccessRes] = await Promise.all([
+      const [digestRes, prefillRes, operatorAccessRes, rentalSecretsRes] = await Promise.all([
         getFranchizeActivityDigestAction({ slug, userId: dbUser.user_id }),
         getFranchizeFormPrefillAction({ slug, userId: dbUser.user_id }),
         getFranchizeOperatorDashboardAccess({ slug }),
+        getFranchizeUserRentalSecretsAction({ slug, userId: dbUser.user_id }),
       ]);
       if (digestRes.success && digestRes.data) setDigest(digestRes.data);
       if (prefillRes.success && prefillRes.data) setPrefill(prefillRes.data);
+      if (rentalSecretsRes.success && rentalSecretsRes.data) setRentalSecrets(rentalSecretsRes.data);
       setCanOpenCloserDashboard(
         Boolean(operatorAccessRes.success && operatorAccessRes.canOpen),
       );
@@ -529,6 +542,71 @@ export function FranchizeProfileClient({
                 />
               )}
             </div>
+          </div>
+        </FranchizeOperatorPanel>
+      </motion.div>
+
+      {/* Rental Documents Panel */}
+      <motion.div variants={itemVariants}>
+        <FranchizeOperatorPanel>
+          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--fr-profile-text)]">
+            <Lock className="h-4 w-4" /> Документы для аренды
+          </h2>
+          <p className="mt-1 text-xs text-[var(--fr-profile-muted)]">
+            Верифицированные документы из прошлых аренд для быстрого оформления
+          </p>
+          <div className="mt-3 rounded-xl border p-4" style={{
+            borderColor: rentalSecrets?.hasPreviousRentals
+              ? "var(--fr-profile-accent)"
+              : "var(--fr-profile-border)",
+            backgroundColor: rentalSecrets?.hasPreviousRentals
+              ? withAlpha(crew.theme.palette.accentMain, 0.09)
+              : "color-mix(in srgb, var(--franchize-shell-card) 70%, transparent)",
+          }}>
+            {rentalSecrets?.hasPreviousRentals ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{
+                    backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.2),
+                    color: crew.theme.palette.accentMain,
+                  }}>
+                    <CheckCircle className="h-4 w-4" />
+                  </div>
+                  <span className="text-sm font-semibold text-[var(--fr-profile-accent)]">
+                    Документы верифицированы
+                  </span>
+                </div>
+                {rentalSecrets.lastRentalDate && (
+                  <p className="text-xs text-[var(--fr-profile-muted)]">
+                    Последняя аренда: {rentalSecrets.lastRentalDate}
+                  </p>
+                )}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[var(--fr-profile-muted)]">Паспорт:</span>
+                    <span className={rentalSecrets.savedData?.passport ? "text-[var(--fr-profile-accent)]" : "text-[var(--fr-profile-muted)]"}>
+                      {rentalSecrets.savedData?.passport ? "✓ Сохранён" : "Не добавлен"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[var(--fr-profile-muted)]">Вод. удостоверение:</span>
+                    <span className={rentalSecrets.savedData?.driverLicense ? "text-[var(--fr-profile-accent)]" : "text-[var(--fr-profile-muted)]"}>
+                      {rentalSecrets.savedData?.driverLicense ? "✓ Сохранено" : "Не добавлено"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-4 text-center">
+                <Lock className="h-8 w-8 text-[var(--fr-profile-muted)] mb-2" />
+                <p className="text-sm font-semibold text-[var(--fr-profile-text)]">
+                  Нет верифицированных документов
+                </p>
+                <p className="mt-1 text-xs text-[var(--fr-profile-muted)]">
+                  После первой аренды ваши документы будут сохранены здесь
+                </p>
+              </div>
+            )}
           </div>
         </FranchizeOperatorPanel>
       </motion.div>
