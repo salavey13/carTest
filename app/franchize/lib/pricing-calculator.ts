@@ -122,36 +122,25 @@ function calculatePriceForDays(
   let periodLabel: string;
 
   // Multi-day tiered pricing (per-day rates, multiplied by actual days)
+  // Note: Weekday discount is NOT applied to multi-day rentals because:
+  // - We don't have actual rental dates to count weekdays vs weekends
+  // - Applying weekday rate to all days would incorrectly discount weekends
+  // - Future enhancement: pass actual dates to calculate proper weekday/weekend mix
   if (days >= 11 && validatePositiveNumber(specs.rent_11_30d) !== undefined) {
-    // Apply weekday discount to tier rate if available
-    perDayRate = specs.rent_weekday !== undefined && specs.rent_weekday < specs.rent_11_30d!
-      ? specs.rent_weekday
-      : specs.rent_11_30d!;
-    periodLabel = specs.rent_weekday !== undefined && specs.rent_weekday < specs.rent_11_30d!
-      ? '/ 11-30 дней (будни)'
-      : '/ 11-30 дней';
+    perDayRate = specs.rent_11_30d!;
+    periodLabel = '/ 11-30 дней';
     return { price: perDayRate * days, period: periodLabel, rate: perDayRate };
   }
 
   if (days >= 5 && validatePositiveNumber(specs.rent_5_10d) !== undefined) {
-    // Apply weekday discount to tier rate if available
-    perDayRate = specs.rent_weekday !== undefined && specs.rent_weekday < specs.rent_5_10d!
-      ? specs.rent_weekday
-      : specs.rent_5_10d!;
-    periodLabel = specs.rent_weekday !== undefined && specs.rent_weekday < specs.rent_5_10d!
-      ? '/ 5-10 дней (будни)'
-      : '/ 5-10 дней';
+    perDayRate = specs.rent_5_10d!;
+    periodLabel = '/ 5-10 дней';
     return { price: perDayRate * days, period: periodLabel, rate: perDayRate };
   }
 
   if (days >= 2 && validatePositiveNumber(specs.rent_2_4d) !== undefined) {
-    // Apply weekday discount to tier rate if available
-    perDayRate = specs.rent_weekday !== undefined && specs.rent_weekday < specs.rent_2_4d!
-      ? specs.rent_weekday
-      : specs.rent_2_4d!;
-    periodLabel = specs.rent_weekday !== undefined && specs.rent_weekday < specs.rent_2_4d!
-      ? '/ 2-4 дня (будни)'
-      : '/ 2-4 дня';
+    perDayRate = specs.rent_2_4d!;
+    periodLabel = '/ 2-4 дня';
     return { price: perDayRate * days, period: periodLabel, rate: perDayRate };
   }
 
