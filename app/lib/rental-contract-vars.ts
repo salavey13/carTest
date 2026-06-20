@@ -388,6 +388,16 @@ export interface BuildRentalContractVariablesOptions {
   // Web app specific: extras info (optional)
   extrasRows?: string;
   extrasTotalRub?: string;
+  // Cart-provided price breakdown (optional, skips recalculation)
+  priceBreakdown?: {
+    totalRub: number;
+    basePriceRub: number;
+    helmetRub: number;
+    depositRub: number;
+    savingsRub: number;
+    savingsPercent: number;
+    tier: string;
+  };
 }
 
 /**
@@ -430,11 +440,16 @@ export function buildRentalContractVariables(
   const rentalDays = Math.max(1, Math.ceil(rentalHours / 24));
   const isHourlyRental = rentalHours > 0 && rentalHours < 24;
 
+  // Use cart-provided priceBreakdown if available, otherwise calculate
   let subtotal: number;
-  if (isHourlyRental) {
-    subtotal = Number(hourlyPrice) * rentalHours;
+  if (options.priceBreakdown) {
+    subtotal = options.priceBreakdown.totalRub;
   } else {
-    subtotal = Number(dailyPrice) * rentalDays;
+    if (isHourlyRental) {
+      subtotal = Number(hourlyPrice) * rentalHours;
+    } else {
+      subtotal = Number(dailyPrice) * rentalDays;
+    }
   }
   const subtotalRounded = Math.round(subtotal);
 
