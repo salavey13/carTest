@@ -4,7 +4,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trash2, Bike } from "lucide-react";
+import { Trash2, Bike, Pencil } from "lucide-react";
 import type { FranchizeCrewVM } from "../../actions";
 import type { FranchizeCartLineVM } from "../../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface, withAlpha, interactionRingStyle } from "../../lib/theme";
@@ -17,9 +17,10 @@ interface CartItemCardProps {
   onDecreaseQty: (lineId: string) => void;
   onIncreaseQty: (lineId: string) => void;
   onDelete: (lineId: string) => void;
+  onEdit?: (lineId: string) => void;
 }
 
-export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelete }: CartItemCardProps) {
+export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelete, onEdit }: CartItemCardProps) {
   const surface = crewPaletteForSurface(crew.theme);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const destructiveColor = crew.theme.mode === "dark" ? "#FF6B6B" : "#FF3B30";
@@ -69,6 +70,24 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
             <h2 className="text-base font-semibold truncate">
               {line.item?.title ?? "Позиция недоступна"}
             </h2>
+
+            {/* Edit button (optional) */}
+            {onEdit && !confirmDelete && (
+              <button
+                onClick={() => onEdit(line.lineId)}
+                aria-label="Изменить товар"
+                className="shrink-0 flex items-center gap-1 text-xs mr-2 transition-colors"
+                style={{ color: crew.theme.palette.textSecondary }}
+                onFocus={(e) => {
+                  e.currentTarget.style.boxShadow = interactionRingStyle(crew.theme).boxShadow;
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.boxShadow = "";
+                }}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
 
             {/* Delete: icon + text, per megacart.png — inline confirm (NO alert!) */}
             {confirmDelete ? (

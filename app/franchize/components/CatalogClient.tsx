@@ -516,6 +516,35 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     void recordRentIntent(item, "viewed", { trigger: "catalog_card", options: defaultOptions });
   };
 
+  // Check for edit context from cart page
+  useEffect(() => {
+    const editContextStr = sessionStorage.getItem("franchize-edit-cart-line");
+    if (!editContextStr) return;
+
+    try {
+      const editContext = JSON.parse(editContextStr);
+      const item = items.find((i) => i.id === editContext.itemId);
+      if (!item) return;
+
+      // Open modal with the item and pre-filled options
+      setSelectedItem(item);
+      setSelectedOptions({
+        package: editContext.options.package ?? "Базовый",
+        duration: editContext.options.duration ?? "1 день",
+        perk: editContext.options.perk ?? "Стандарт",
+        auction: editContext.options.auction ?? "Без аукциона",
+        rentStartDate: editContext.options.rentStartDate ?? "",
+        rentEndDate: editContext.options.rentEndDate ?? "",
+      });
+
+      // Clear the edit context
+      sessionStorage.removeItem("franchize-edit-cart-line");
+    } catch (error) {
+      console.warn("Failed to parse edit context:", error);
+      sessionStorage.removeItem("franchize-edit-cart-line");
+    }
+  }, [items]);
+
   useEffect(() => {
     const focusedVehicle = (searchParams.get("vehicle") || "").trim().toLowerCase();
     if (!focusedVehicle) return;
