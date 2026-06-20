@@ -67,7 +67,7 @@ const FEATURED_BIKES = [
     make: "KAWASAKI",
     model: "Ninja 650",
     goal: "cruising",
-    goalLabel: "Бензин",
+    goalLabel: "Мотоцикл",
     dailyPrice: 16000,
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/kawasaki-ex650k/image_1.jpg",
     specs: { power: "68 л.с.", engine: "649 см³", topSpeed: "210 км/ч" },
@@ -77,7 +77,7 @@ const FEATURED_BIKES = [
     make: "Suzuki",
     model: "GSX-S1000F",
     goal: "adrenaline",
-    goalLabel: "Бензин",
+    goalLabel: "Мотоцикл",
     dailyPrice: 14000,
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/suzuki-gsx-s1000f/image_1.jpg",
     specs: { power: "150 л.с.", engine: "999 см³", topSpeed: "255 км/ч" },
@@ -87,7 +87,7 @@ const FEATURED_BIKES = [
     make: "Regulmoto",
     model: "Nibbler 300 4V",
     goal: "enduro",
-    goalLabel: "Бензин",
+    goalLabel: "Мотоцикл",
     dailyPrice: 6000,
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/nibbler-regumoto-4v/image_1.jpg",
     specs: { power: "27 л.с.", engine: "300 см³", topSpeed: "150 км/ч" },
@@ -97,7 +97,7 @@ const FEATURED_BIKES = [
     make: "Motoland",
     model: "Breakout 300",
     goal: "cruising",
-    goalLabel: "Бензин",
+    goalLabel: "Мотоцикл",
     dailyPrice: 6000,
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/motoland-breakout/image_1.jpg",
     specs: { power: "25 л.с.", engine: "300 см³", topSpeed: "130 км/ч" },
@@ -123,13 +123,13 @@ export function BikeShowcase() {
   const filteredBikes = FEATURED_BIKES.filter((bike) => {
     if (filter === "all") return true;
     if (filter === "electro") return bike.goalLabel === "Электро";
-    return bike.goalLabel === "Бензин";
+    return bike.goalLabel === "Мотоцикл";
   });
 
   const filterButtons: { key: FilterType; label: string }[] = [
     { key: "all", label: "Все" },
     { key: "electro", label: "Электро" },
-    { key: "benzin", label: "Бензин" },
+    { key: "benzin", label: "Мотоциклы" },
   ];
 
   return (

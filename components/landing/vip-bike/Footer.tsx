@@ -38,7 +38,7 @@ export function Footer() {
               <span style={{ color: "#FF4500" }}>ELECTRO</span>
             </h3>
             <p className="text-sm leading-relaxed" style={{ color: "#666" }}>
-              Премиальный прокат электробайков и бензиновых мотоциклов<br />
+              Премиальный прокат электробайков и мотоциклов<br />
               Нижний Новгород
             </p>
           </div>
