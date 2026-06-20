@@ -99,6 +99,16 @@ export async function buildTemplateVars(params: {
     damage_notes_at_return?: string;
     battery_level_end?: string;
   };
+  // Cart-provided price breakdown (optional, skips recalculation)
+  priceBreakdown?: {
+    totalRub: number;
+    basePriceRub: number;
+    helmetRub: number;
+    depositRub: number;
+    savingsRub: number;
+    savingsPercent: number;
+    tier: string;
+  };
 }): Promise<RentalContractTemplateVars> {
   const now = new Date();
   const isElectric = isElectricBike(params.bike.specs, params.bike.type);
@@ -121,11 +131,16 @@ export async function buildTemplateVars(params: {
   const deposit = params.bike.specs.deposit_rub || 20000;
   const bikeValue = params.bike.specs.sale_price || params.bike.specs.price_rub || 850000;
 
+  // Use cart-provided priceBreakdown if available, otherwise calculate
   let subtotal: number;
-  if (isHourly) {
-    subtotal = Number(hourlyPrice) * rentalHours;
+  if (params.priceBreakdown) {
+    subtotal = params.priceBreakdown.totalRub;
   } else {
-    subtotal = Number(dailyPrice) * rentalDays;
+    if (isHourly) {
+      subtotal = Number(hourlyPrice) * rentalHours;
+    } else {
+      subtotal = Number(dailyPrice) * rentalDays;
+    }
   }
   const subtotalRounded = Math.round(subtotal);
 

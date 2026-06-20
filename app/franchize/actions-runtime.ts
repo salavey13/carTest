@@ -2017,6 +2017,8 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         },
         extrasRows,
         extrasTotalRub: formatMoney(payload.extrasTotal),
+        // Pass cart-calculated priceBreakdown to ensure contract matches cart
+        priceBreakdown: (line as any).priceBreakdown,
       });
 
       // Merge with web-app specific overrides
