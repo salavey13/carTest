@@ -30,6 +30,10 @@ import {
   Check,
   ListChecks,
   RotateCcw,
+  Plus,
+  MoreVertical,
+  Trash2,
+  User as UserIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -51,6 +55,17 @@ import {
   type ChecklistItem,
   type ChecklistState,
 } from "@/app/franchize/server-actions/checklist";
+import {
+  getCrewTodos,
+  getCrewMembersForTodos,
+  createCrewTodo,
+  updateCrewTodo,
+  deleteCrewTodo,
+  getCrewTodoStats,
+  DEFAULT_TODO_CATEGORIES,
+  type CrewTodo,
+  type TodoStatus,
+} from "@/app/franchize/server-actions/crew-todos";
 import {
   crewPaletteForSurface,
   focusRingOutlineStyle,
@@ -176,6 +191,28 @@ export function RentalsAnalyticsClient({
   });
   const [updatingChecklist, setUpdatingChecklist] = useState<string | null>(null); // type being updated
 
+  // Crew todos state
+  const [todos, setTodos] = useState<CrewTodo[]>([]);
+  const [todoStats, setTodoStats] = useState<{
+    total: number;
+    pending: number;
+    inProgress: number;
+    done: number;
+    byAssignee: Array<{ userId: string; userName: string | null; pending: number; inProgress: number; done: number }>;
+    overdue: number;
+  } | null>(null);
+  const [crewMembers, setCrewMembers] = useState<Array<{ user_id: string; full_name: string | null; username: string | null }>>([]);
+  const [loadingTodos, setLoadingTodos] = useState(true);
+  const [todoFilter, setTodoFilter] = useState<TodoStatus | "all">("all");
+  const [todoAssigneeFilter, setTodoAssigneeFilter] = useState<string | "all">("all");
+  const [showCreateTodo, setShowCreateTodo] = useState(false);
+  const [creatingTodo, setCreatingTodo] = useState(false);
+  const [newTodoTitle, setNewTodoTitle] = useState("");
+  const [newTodoDescription, setNewTodoDescription] = useState("");
+  const [newTodoCategory, setNewTodoCategory] = useState("general");
+  const [newTodoPriority, setNewTodoPriority] = useState<"low" | "medium" | "high">("medium");
+  const [newTodoAssignedTo, setNewTodoAssignedTo] = useState<string | null>(null);
+
   const slug = initialSlug?.trim() || "vip-bike";
   const surface = crewPaletteForSurface(crew.theme);
   const buttonFocus = focusRingOutlineStyle(crew.theme);
@@ -278,6 +315,134 @@ export function RentalsAnalyticsClient({
     }
   }, [dbUser?.user_id]);
 
+  // Load crew todos
+  const loadTodos = useCallback(async () => {
+    if (!dbUser?.user_id || !crew.id) return;
+
+    setLoadingTodos(true);
+    try {
+      const [todosResult, statsResult, membersResult] = await Promise.all([
+        getCrewTodos({
+          actorUserId: dbUser.user_id,
+          crewId: crew.id,
+          status: todoFilter === "all" ? undefined : todoFilter,
+          assignedTo: todoAssigneeFilter === "all" ? undefined : todoAssigneeFilter,
+        }),
+        getCrewTodoStats({
+          actorUserId: dbUser.user_id,
+          crewId: crew.id,
+        }),
+        getCrewMembersForTodos({
+          actorUserId: dbUser.user_id,
+          crewId: crew.id,
+        }),
+      ]);
+
+      if (todosResult.success) {
+        setTodos(todosResult.data || []);
+      }
+      if (statsResult.success) {
+        setTodoStats(statsResult.data || null);
+      }
+      if (membersResult.success) {
+        setCrewMembers(membersResult.data || []);
+      }
+    } catch (error) {
+      console.error("[RentalsAnalytics] Todos load error:", error);
+    } finally {
+      setLoadingTodos(false);
+    }
+  }, [dbUser?.user_id, crew.id, todoFilter, todoAssigneeFilter]);
+
+  // Create todo
+  const handleCreateTodo = useCallback(async () => {
+    if (!dbUser?.user_id || !crew.id || !newTodoTitle.trim()) {
+      toast.error("Введите название задачи");
+      return;
+    }
+
+    setCreatingTodo(true);
+    try {
+      const result = await createCrewTodo({
+        actorUserId: dbUser.user_id,
+        todo: {
+          crewId: crew.id,
+          assignedTo: newTodoAssignedTo,
+          title: newTodoTitle.trim(),
+          description: newTodoDescription.trim() || undefined,
+          category: newTodoCategory,
+          priority: newTodoPriority,
+        },
+      });
+
+      if (result.success) {
+        toast.success("Задача создана");
+        setNewTodoTitle("");
+        setNewTodoDescription("");
+        setNewTodoCategory("general");
+        setNewTodoPriority("medium");
+        setNewTodoAssignedTo(null);
+        setShowCreateTodo(false);
+        void loadTodos();
+      } else {
+        toast.error(result.error || "Не удалось создать задачу");
+      }
+    } catch (error) {
+      console.error("[RentalsAnalytics] Create todo error:", error);
+      toast.error("Ошибка создания задачи");
+    } finally {
+      setCreatingTodo(false);
+    }
+  }, [dbUser?.user_id, crew.id, newTodoTitle, newTodoDescription, newTodoCategory, newTodoPriority, newTodoAssignedTo, loadTodos]);
+
+  // Update todo status
+  const updateTodoStatus = useCallback(async (todo: CrewTodo, newStatus: TodoStatus) => {
+    if (!dbUser?.user_id || !crew.id) return;
+
+    try {
+      const result = await updateCrewTodo({
+        actorUserId: dbUser.user_id,
+        crewId: crew.id,
+        todo: {
+          id: todo.id,
+          status: newStatus,
+        },
+      });
+
+      if (result.success) {
+        void loadTodos();
+      } else {
+        toast.error(result.error || "Не удалось обновить задачу");
+      }
+    } catch (error) {
+      console.error("[RentalsAnalytics] Update todo error:", error);
+      toast.error("Ошибка обновления задачи");
+    }
+  }, [dbUser?.user_id, crew.id, loadTodos]);
+
+  // Delete todo
+  const handleDeleteTodo = useCallback(async (todoId: string) => {
+    if (!dbUser?.user_id || !crew.id) return;
+
+    try {
+      const result = await deleteCrewTodo({
+        actorUserId: dbUser.user_id,
+        crewId: crew.id,
+        todoId,
+      });
+
+      if (result.success) {
+        toast.success("Задача удалена");
+        void loadTodos();
+      } else {
+        toast.error(result.error || "Не удалось удалить задачу");
+      }
+    } catch (error) {
+      console.error("[RentalsAnalytics] Delete todo error:", error);
+      toast.error("Ошибка удаления задачи");
+    }
+  }, [dbUser?.user_id, crew.id, loadTodos]);
+
   // Toggle checklist item
   const toggleChecklistItem = useCallback(async (type: "handout" | "return", itemId: string) => {
     if (!dbUser?.user_id) return;
@@ -348,8 +513,9 @@ export function RentalsAnalyticsClient({
       void loadRentals(selectedDate);
       void loadDateRange();
       void loadChecklistStates();
+      void loadTodos();
     }
-  }, [dbUser?.user_id, selectedDate, loadRentals, loadDateRange, loadChecklistStates]);
+  }, [dbUser?.user_id, selectedDate, loadRentals, loadDateRange, loadChecklistStates, loadTodos]);
 
   // Reload when verification filter changes
   useEffect(() => {
@@ -705,6 +871,311 @@ export function RentalsAnalyticsClient({
           </div>
         </FranchizeOperatorPanel>
       </div>
+
+      {/* Crew Todos Section */}
+      <FranchizeOperatorPanel>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <ListChecks className="h-4 w-4 text-[var(--fr-analytics-accent)]" />
+            <p className="text-sm font-semibold text-[var(--fr-analytics-text)]">
+              Задачи экипажа
+            </p>
+            {todoStats && (
+              <span className="ml-2 flex gap-2">
+                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
+                  {todoStats.pending} ожидают
+                </span>
+                <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600">
+                  {todoStats.inProgress} в работе
+                </span>
+                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600">
+                  {todoStats.done} выполнено
+                </span>
+              </span>
+            )}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() => setShowCreateTodo(!showCreateTodo)}
+          >
+            <Plus className="h-4 w-4" />
+            <span className="ml-1">Новая задача</span>
+          </Button>
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-[var(--fr-analytics-muted)]">Фильтр:</span>
+          <div className="flex gap-1">
+            {[
+              { value: "all" as const, label: "Все" },
+              { value: "pending" as const, label: "Ожидают" },
+              { value: "in_progress" as const, label: "В работе" },
+              { value: "done" as const, label: "Выполнено" },
+            ].map((filter) => (
+              <button
+                key={filter.value}
+                type="button"
+                onClick={() => setTodoFilter(filter.value)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  todoFilter === filter.value
+                    ? "bg-[var(--fr-analytics-accent)] text-white"
+                    : "bg-transparent text-[var(--fr-analytics-muted)] hover:bg-[var(--fr-analytics-accent)]/10"
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+          {todoStats?.byAssignee && todoStats.byAssignee.length > 0 && (
+            <>
+              <span className="ml-2 text-xs text-[var(--fr-analytics-muted)]">Исполнитель:</span>
+              <select
+                value={todoAssigneeFilter}
+                onChange={(e) => setTodoAssigneeFilter(e.target.value)}
+                className="rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-2 py-1 text-xs text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+              >
+                <option value="all">Все</option>
+                <option value="unassigned">Не назначен</option>
+                {todoStats.byAssignee.map((assignee) => (
+                  <option key={assignee.userId} value={assignee.userId}>
+                    {assignee.userName}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+        </div>
+
+        {/* Create Todo Form */}
+        {showCreateTodo && (
+          <div className="rounded-lg border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-base)] p-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input
+                type="text"
+                placeholder="Название задачи *"
+                value={newTodoTitle}
+                onChange={(e) => setNewTodoTitle(e.target.value)}
+                className="rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] placeholder:text-[var(--fr-analytics-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                maxLength={200}
+              />
+              <select
+                value={newTodoAssignedTo || ""}
+                onChange={(e) => setNewTodoAssignedTo(e.target.value || null)}
+                className="rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+              >
+                <option value="">Не назначен</option>
+                {crewMembers.map((member) => (
+                  <option key={member.user_id} value={member.user_id}>
+                    {member.full_name || member.username || member.user_id}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                placeholder="Описание (необязательно)"
+                value={newTodoDescription}
+                onChange={(e) => setNewTodoDescription(e.target.value)}
+                className="sm:col-span-2 min-h-[60px] rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] placeholder:text-[var(--fr-analytics-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                rows={2}
+              />
+              <select
+                value={newTodoCategory}
+                onChange={(e) => setNewTodoCategory(e.target.value)}
+                className="rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+              >
+                {DEFAULT_TODO_CATEGORIES.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={newTodoPriority}
+                onChange={(e) => setNewTodoPriority(e.target.value as "low" | "medium" | "high")}
+                className="rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+              >
+                <option value="low">Низкий приоритет</option>
+                <option value="medium">Средний приоритет</option>
+                <option value="high">Высокий приоритет</option>
+              </select>
+            </div>
+            <div className="mt-3 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8"
+                onClick={() => setShowCreateTodo(false)}
+              >
+                Отмена
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={handleCreateTodo}
+                disabled={!newTodoTitle.trim() || creatingTodo}
+              >
+                {creatingTodo ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    <span className="ml-1">Создать</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Todos List */}
+        {loadingTodos ? (
+          <div className="flex items-center justify-center py-8">
+            <Loading text="Загружаем задачи..." />
+          </div>
+        ) : !todos.length ? (
+          <div className="py-8 text-center">
+            <ListChecks className="mx-auto h-8 w-8 text-[var(--fr-analytics-muted)] opacity-50" />
+            <p className="mt-2 text-sm text-[var(--fr-analytics-muted)]">
+              Нет активных задач
+            </p>
+          </div>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {todos.map((todo) => {
+              const categoryLabel = DEFAULT_TODO_CATEGORIES.find(c => c.id === todo.category)?.label || todo.category;
+              const assigneeName = todo.assigned_to_user?.full_name || todo.assigned_to_user?.username || null;
+
+              return (
+                <div
+                  key={todo.id}
+                  className={`rounded-lg border p-3 transition-all ${
+                    todo.status === "done"
+                      ? "border-emerald-500/30 bg-emerald-500/5 opacity-70"
+                      : todo.status === "in_progress"
+                        ? "border-blue-500/30 bg-blue-500/5"
+                        : "border-[var(--fr-analytics-border)] hover:border-[var(--fr-analytics-accent)]/30"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Status Circle */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (todo.status === "pending") {
+                          void updateTodoStatus(todo, "in_progress");
+                        } else if (todo.status === "in_progress") {
+                          void updateTodoStatus(todo, "done");
+                        } else {
+                          void updateTodoStatus(todo, "pending");
+                        }
+                      }}
+                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                        todo.status === "done"
+                          ? "border-emerald-500 bg-emerald-500"
+                          : todo.status === "in_progress"
+                            ? "border-blue-500 bg-blue-500"
+                            : "border-[var(--fr-analytics-muted)] hover:border-[var(--fr-analytics-accent)]"
+                      }`}
+                    >
+                      {todo.status === "done" && <Check className="h-3 w-3 text-white" />}
+                      {todo.status === "in_progress" && (
+                        <div className="h-2 w-2 animate-pulse rounded-full bg-white" />
+                      )}
+                    </button>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium ${
+                            todo.status === "done" ? "line-through text-[var(--fr-analytics-muted)]" : "text-[var(--fr-analytics-text)]"
+                          }`}>
+                            {todo.title}
+                          </p>
+                          {todo.description && (
+                            <p className="mt-1 text-xs text-[var(--fr-analytics-muted)] line-clamp-2">
+                              {todo.description}
+                            </p>
+                          )}
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-[var(--fr-analytics-accent)]/10 px-2 py-0.5 text-xs text-[var(--fr-analytics-accent)]">
+                              {categoryLabel}
+                            </span>
+                            {todo.priority === "high" && (
+                              <span className="rounded-full bg-rose-500/10 px-2 py-0.5 text-xs text-rose-600">
+                                Срочно
+                              </span>
+                            )}
+                            {assigneeName && (
+                              <span className="flex items-center gap-1 text-xs text-[var(--fr-analytics-muted)]">
+                                <UserIcon className="h-3 w-3" />
+                                {assigneeName}
+                              </span>
+                            )}
+                            {todo.due_date && (
+                              <span className={`text-xs ${
+                                new Date(todo.due_date) < new Date() && todo.status !== "done"
+                                  ? "text-rose-600"
+                                  : "text-[var(--fr-analytics-muted)]"
+                              }`}>
+                                до {formatRussianDate(todo.due_date)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 shrink-0"
+                          onClick={() => {
+                            if (confirm("Удалить задачу?")) {
+                              void handleDeleteTodo(todo.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-[var(--fr-analytics-muted)]" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* By Assignee Stats */}
+        {todoStats?.byAssignee && todoStats.byAssignee.length > 0 && (
+          <div className="mt-4 border-t border-[var(--fr-analytics-border)] pt-4">
+            <p className="mb-2 text-xs font-medium text-[var(--fr-analytics-muted)]">
+              По исполнителям
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {todoStats.byAssignee.slice(0, 5).map((assignee) => (
+                <div
+                  key={assignee.userId}
+                  className="flex items-center gap-2 rounded-full border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)] px-3 py-1.5 text-xs"
+                >
+                  <UserIcon className="h-3.5 w-3.5 text-[var(--fr-analytics-muted)]" />
+                  <span className="font-medium text-[var(--fr-analytics-text)]">
+                    {assignee.userName}
+                  </span>
+                  <span className="text-[var(--fr-analytics-muted)]">
+                    {assignee.pending + assignee.inProgress}/{assignee.done}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </FranchizeOperatorPanel>
 
       {/* Rentals List */}
       <FranchizeOperatorPanel>
