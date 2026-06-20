@@ -1126,6 +1126,10 @@ if (saveMetadata) {
     payload.renter_full_name = vars.renter_full_name;
     payload.rent_start_date = vars.rent_start_date;
     payload.rent_end_date = vars.rent_end_date;
+    // Pricing fields for dashboard (daily_price_rub, deposit_rub, total_sum from contract builder)
+    payload.daily_price = vars.daily_price_rub;
+    payload.deposit_rub = vars.deposit_rub;
+    payload.total_sum = vars.subtotal_rub;
     // СТС pledge metadata (columns added by migration 20260617000000_rental_sts_pledge.sql)
     payload.sts_pledge_used = stsPledgeEnabled;
     if (stsPledgeEnabled) {
