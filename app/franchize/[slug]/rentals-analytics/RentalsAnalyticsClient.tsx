@@ -27,6 +27,9 @@ import {
   ShieldCheck,
   ShieldAlert,
   Filter,
+  Check,
+  ListChecks,
+  RotateCcw,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -41,6 +44,13 @@ import {
   type RentalDashboardSummary,
   type RentalDocumentDetail,
 } from "@/app/franchize/server-actions/rentals-dashboard";
+import {
+  getAllChecklistStates,
+  updateChecklistState,
+  resetChecklistState,
+  type ChecklistItem,
+  type ChecklistState,
+} from "@/app/franchize/server-actions/checklist";
 import {
   crewPaletteForSurface,
   focusRingOutlineStyle,
@@ -160,6 +170,11 @@ export function RentalsAnalyticsClient({
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [dateRange, setDateRange] = useState<{ minDate: string; maxDate: string } | null>(null);
   const [resending, setResending] = useState<string | null>(null); // rental_id being resent
+  const [checklistStates, setChecklistStates] = useState<{ handout: ChecklistState | null; return: ChecklistState | null }>({
+    handout: null,
+    return: null,
+  });
+  const [updatingChecklist, setUpdatingChecklist] = useState<string | null>(null); // type being updated
 
   const slug = initialSlug?.trim() || "vip-bike";
   const surface = crewPaletteForSurface(crew.theme);
@@ -246,13 +261,95 @@ export function RentalsAnalyticsClient({
     }
   }, [dbUser?.user_id, slug]);
 
+  // Load checklist states
+  const loadChecklistStates = useCallback(async () => {
+    if (!dbUser?.user_id) return;
+
+    try {
+      const result = await getAllChecklistStates({
+        actorUserId: dbUser.user_id,
+      });
+
+      if (result.success && result.data) {
+        setChecklistStates(result.data);
+      }
+    } catch (error) {
+      console.error("[RentalsAnalytics] Checklist load error:", error);
+    }
+  }, [dbUser?.user_id]);
+
+  // Toggle checklist item
+  const toggleChecklistItem = useCallback(async (type: "handout" | "return", itemId: string) => {
+    if (!dbUser?.user_id) return;
+
+    const currentState = checklistStates[type];
+    if (!currentState) return;
+
+    setUpdatingChecklist(type);
+    try {
+      const updatedItems = currentState.items.map(item =>
+        item.id === itemId ? { ...item, checked: !item.checked } : item
+      );
+
+      const result = await updateChecklistState({
+        actorUserId: dbUser.user_id,
+        type,
+        items: updatedItems,
+        action: "toggle",
+      });
+
+      if (result.success && result.data) {
+        setChecklistStates(prev => ({
+          ...prev,
+          [type]: result.data,
+        }));
+      } else {
+        toast.error(result.error || "Не удалось обновить чеклист");
+      }
+    } catch (error) {
+      console.error("[RentalsAnalytics] Toggle checklist error:", error);
+      toast.error("Ошибка обновления чеклиста");
+    } finally {
+      setUpdatingChecklist(null);
+    }
+  }, [dbUser?.user_id, checklistStates]);
+
+  // Reset checklist
+  const resetChecklist = useCallback(async (type: "handout" | "return") => {
+    if (!dbUser?.user_id) return;
+
+    setUpdatingChecklist(type);
+    try {
+      const result = await resetChecklistState({
+        actorUserId: dbUser.user_id,
+        type,
+      });
+
+      if (result.success && result.data) {
+        setChecklistStates(prev => ({
+          ...prev,
+          [type]: result.data,
+        }));
+        toast.success("Чеклист сброшен");
+      } else {
+        toast.error(result.error || "Не удалось сбросить чеклист");
+      }
+    } catch (error) {
+      console.error("[RentalsAnalytics] Reset checklist error:", error);
+      toast.error("Ошибка сброса чеклиста");
+    } finally {
+      setUpdatingChecklist(null);
+    }
+  }, [dbUser?.user_id]);
+
   // Initial load
   useEffect(() => {
     if (dbUser?.user_id) {
       void loadRentals(selectedDate);
       void loadDateRange();
+      void loadChecklistStates();
     }
-  }, [dbUser?.user_id, selectedDate, loadRentals, loadDateRange]);
+  }, [dbUser?.user_id, selectedDate, loadRentals, loadDateRange, loadChecklistStates]);
 
   // Reload when verification filter changes
   useEffect(() => {
@@ -363,6 +460,8 @@ export function RentalsAnalyticsClient({
         ["--fr-analytics-border" as string]: crew.theme.palette.borderSoft,
         ["--fr-analytics-text" as string]: crew.theme.palette.textPrimary,
         ["--fr-analytics-muted" as string]: crew.theme.palette.textSecondary,
+        ["--fr-analytics-bg-card" as string]: crew.theme.palette.bgCard,
+        ["--fr-analytics-bg-base" as string]: crew.theme.palette.bgBase,
       }}
     >
       {/* Header */}
@@ -486,26 +585,126 @@ export function RentalsAnalyticsClient({
           <FranchizeOperatorStatCard
             label="Всего аренд"
             value={summary.totalCount}
-            icon={<FileText className="h-4 w-4" />}
+            detail={<FileText className="h-4 w-4 opacity-60" />}
           />
           <FranchizeOperatorStatCard
             label="Выручка"
             value={formatRubles(summary.totalRevenue)}
-            icon={<CreditCard className="h-4 w-4" />}
-            highlight
+            detail={<CreditCard className="h-4 w-4 text-emerald-500" />}
           />
           <FranchizeOperatorStatCard
             label="Подтверждённые"
             value={summary.byStatus.confirmed || 0}
-            icon={<CheckCircle2 className="h-4 w-4" />}
+            detail={<CheckCircle2 className="h-4 w-4 text-emerald-500" />}
           />
           <FranchizeOperatorStatCard
             label="Активные"
             value={summary.byStatus.active || 0}
-            icon={<Clock className="h-4 w-4" />}
+            detail={<Clock className="h-4 w-4 text-blue-500" />}
           />
         </div>
       )}
+
+      {/* Checklist Section */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Выдача Checklist */}
+        <FranchizeOperatorPanel>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <ListChecks className="h-4 w-4 text-[var(--fr-analytics-accent)]" />
+              <p className="text-sm font-semibold text-[var(--fr-analytics-text)]">
+                Выдача
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => resetChecklist("handout")}
+              disabled={updatingChecklist === "handout"}
+              title="Сбросить чеклист"
+            >
+              <RotateCcw className={`h-3.5 w-3.5 ${updatingChecklist === "handout" ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {checklistStates.handout?.items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                disabled={updatingChecklist === "handout"}
+                onClick={() => toggleChecklistItem("handout", item.id)}
+                className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-all ${
+                  item.checked
+                    ? "border-[var(--fr-analytics-accent)] bg-[var(--fr-analytics-accent)]/10"
+                    : "border-[var(--fr-analytics-border)] hover:bg-[var(--fr-analytics-accent)]/5"
+                }`}
+              >
+                <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                  item.checked
+                    ? "border-[var(--fr-analytics-accent)] bg-[var(--fr-analytics-accent)]"
+                    : "border-[var(--fr-analytics-muted)]"
+                }`}>
+                  {item.checked && <Check className="h-3 w-3 text-white" />}
+                </div>
+                <span className={item.checked ? "text-[var(--fr-analytics-text)]" : "text-[var(--fr-analytics-muted)]"}>
+                  {item.text}
+                </span>
+              </button>
+            )) || <p className="py-4 text-center text-xs text-[var(--fr-analytics-muted)]">Загрузка...</p>}
+          </div>
+        </FranchizeOperatorPanel>
+
+        {/* Возврат Checklist */}
+        <FranchizeOperatorPanel>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <ListChecks className="h-4 w-4 text-[var(--fr-analytics-accent)]" />
+              <p className="text-sm font-semibold text-[var(--fr-analytics-text)]">
+                Возврат
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => resetChecklist("return")}
+              disabled={updatingChecklist === "return"}
+              title="Сбросить чеклист"
+            >
+              <RotateCcw className={`h-3.5 w-3.5 ${updatingChecklist === "return" ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {checklistStates.return?.items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                disabled={updatingChecklist === "return"}
+                onClick={() => toggleChecklistItem("return", item.id)}
+                className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-all ${
+                  item.checked
+                    ? "border-[var(--fr-analytics-accent)] bg-[var(--fr-analytics-accent)]/10"
+                    : "border-[var(--fr-analytics-border)] hover:bg-[var(--fr-analytics-accent)]/5"
+                }`}
+              >
+                <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                  item.checked
+                    ? "border-[var(--fr-analytics-accent)] bg-[var(--fr-analytics-accent)]"
+                    : "border-[var(--fr-analytics-muted)]"
+                }`}>
+                  {item.checked && <Check className="h-3 w-3 text-white" />}
+                </div>
+                <span className={item.checked ? "text-[var(--fr-analytics-text)]" : "text-[var(--fr-analytics-muted)]"}>
+                  {item.text}
+                </span>
+              </button>
+            )) || <p className="py-4 text-center text-xs text-[var(--fr-analytics-muted)]">Загрузка...</p>}
+          </div>
+        </FranchizeOperatorPanel>
+      </div>
 
       {/* Rentals List */}
       <FranchizeOperatorPanel>
