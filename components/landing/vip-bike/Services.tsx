@@ -78,7 +78,7 @@ const SERVICES = [
   {
     id: "rent",
     title: "АРЕНДА",
-    description: "Электро и бензиновые байки",
+    description: "Электро и мотоциклы",
     icon: BrutalistIcons.rent,
     href: CATALOG_HREF,
   },

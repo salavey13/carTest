@@ -61,7 +61,7 @@ export function Hero() {
           >
             ЭЛЕКТРО
             <br />
-            <span style={{ color: "#FF4500" }}>И БЕНЗИНОВЫЕ БАЙКИ</span>
+            <span style={{ color: "#FF4500" }}>И МОТОЦИКЛЫ</span>
           </h1>
 
           {/* Tagline */}
@@ -69,7 +69,7 @@ export function Hero() {
             className="text-xl md:text-2xl uppercase tracking-widest mb-12 max-w-2xl"
             style={{ color: "#E0E0E0", fontWeight: "600" }}
           >
-            Премиальный прокат электробайков и бензиновых мотоциклов
+            Премиальный прокат электробайков и мотоциклов
             <br />
             Нижний Новгород
           </p>
