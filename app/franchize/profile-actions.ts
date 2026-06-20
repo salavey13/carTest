@@ -345,3 +345,64 @@ export async function getFranchizeActivityDigestAction(params: { userId: string;
     },
   };
 }
+
+/**
+ * Get user's verified rental secrets (passport, license) from previous rentals
+ * Used for returning user pre-fill (WOW effect)
+ */
+export async function getFranchizeUserRentalSecretsAction(params: {
+  userId: string;
+  slug: string;
+}): Promise<{
+  success: boolean;
+  data?: {
+    hasPreviousRentals: boolean;
+    lastRentalDate?: string;
+    savedData?: {
+      fullName: string;
+      phone: string;
+      passport: string;
+      driverLicense: string;
+    };
+  };
+  error?: string;
+}> {
+  try {
+    // Check for previous rentals in rental_contract_artifacts
+    const { data: artifacts, error: artifactsError } = await supabaseAdmin
+      .schema("private")
+      .from("rental_contract_artifacts")
+      .select("created_at,renter_full_name,renter_phone,renter_passport,renter_driver_license")
+      .eq("user_id", params.userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (artifactsError && artifactsError.code !== "PGRST116") {
+      // PGRST116 = no rows returned, which is fine (no previous rentals)
+      return { success: false, error: artifactsError.message };
+    }
+
+    const hasPreviousRentals = !!artifacts;
+    const lastRentalDate = artifacts?.created_at ? new Date(artifacts.created_at).toISOString().split("T")[0] : undefined;
+
+    return {
+      success: true,
+      data: {
+        hasPreviousRentals,
+        lastRentalDate,
+        savedData: {
+          fullName: artifacts?.renter_full_name || "",
+          phone: artifacts?.renter_phone || "",
+          passport: artifacts?.renter_passport || "",
+          driverLicense: artifacts?.renter_driver_license || "",
+        },
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}

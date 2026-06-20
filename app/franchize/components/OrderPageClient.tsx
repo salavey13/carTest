@@ -13,7 +13,7 @@ import { checkFranchizeCarsAvailability, createFranchizeOrderCheckout, recordFra
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
 import { getTelegramHandleHref, getTelegramWebAppFallbackHref } from "../lib/telegram-links";
-import { getFranchizeFormPrefillAction } from "../profile-actions";
+import { getFranchizeFormPrefillAction, getFranchizeUserRentalSecretsAction } from "../profile-actions";
 
 interface OrderPageClientProps {
   crew: FranchizeCrewVM;
@@ -136,6 +136,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     Object.fromEntries(beginnerSafetyQuiz.map((item) => [item.id, null])),
   );
   const [safetyPersisted, setSafetyPersisted] = useState(false);
+  const [isReturningUser, setIsReturningUser] = useState(false);
+  const [returningUserLastRental, setReturningUserLastRental] = useState<string | null>(null);
   const lastSubmitFingerprintRef = useRef<string | null>(null);
   const lastRecoveryFingerprintRef = useRef<string | null>(null);
   const recoveryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -390,6 +392,22 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     };
     void loadPrefill();
   }, [dbUser?.user_id, setValue, slug]);
+
+  // Load rental secrets for returning users (WOW effect)
+  useEffect(() => {
+    const loadRentalSecrets = async () => {
+      if (!dbUser?.user_id) return;
+      const res = await getFranchizeUserRentalSecretsAction({ userId: dbUser.user_id, slug });
+      if (!res.success || !res.data) return;
+
+      // If user has previous rentals, show returning user indicators
+      if (res.data.hasPreviousRentals) {
+        setIsReturningUser(true);
+        setReturningUserLastRental(res.data.lastRentalDate ?? null);
+      }
+    };
+    void loadRentalSecrets();
+  }, [dbUser?.user_id, slug]);
 
   // Prefill rental dates from cart (if user selected dates in item modal)
   useEffect(() => {
@@ -651,6 +669,17 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         /franchize/{slug}/order/{orderId}
       </p>
       <h1 className="mt-2 text-2xl font-semibold">Оформление заказа</h1>
+
+      {isReturningUser && (
+        <div className="mt-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4">
+          <p className="text-sm font-semibold text-emerald-300">
+            С возвращением! {returningUserLastRental ? `Последняя аренда: ${returningUserLastRental}` : ""}
+          </p>
+          <p className="mt-1 text-xs text-emerald-200/80">
+            Ваши данные из прошлой аренды сохранены. Просто проверьте и подтвердите заказ.
+          </p>
+        </div>
+      )}
 
       <div className="mt-4 grid gap-3 rounded-3xl border p-4 text-sm md:grid-cols-[1.2fr_0.8fr]" style={surface.subtleCard}>
         <div>
