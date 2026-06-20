@@ -78,7 +78,7 @@ const SERVICES = [
   {
     id: "rent",
     title: "АРЕНДА",
-    description: "Почасовой и посуточный прокат",
+    description: "Электро и бензиновые байки",
     icon: BrutalistIcons.rent,
     href: CATALOG_HREF,
   },
@@ -92,14 +92,14 @@ const SERVICES = [
   {
     id: "configurator",
     title: "КОНФИГУРАТОР",
-    description: "Собери свой электро",
+    description: "Собери свой байк",
     icon: BrutalistIcons.configurator,
     href: CONFIGURATOR_HREF,
   },
   {
     id: "map",
     title: "КАРТА",
-    description: "Доступные байки в реальном времени",
+    description: "Доступные байки онлайн",
     icon: BrutalistIcons.map,
     href: MAP_HREF,
   },

@@ -12,12 +12,13 @@ import Link from "next/link";
 const CATALOG_HREF = "/franchize/vip-bike";
 
 const FEATURED_BIKES = [
+  // Электро
   {
     id: "falcon-gt-2025",
     make: "79BIKE",
     model: "Falcon GT 2025",
     goal: "adrenaline",
-    goalLabel: "Адреналин",
+    goalLabel: "Электро",
     dailyPrice: 12000,
     hourlyPrice: 5000,
     minHours: 3,
@@ -31,7 +32,7 @@ const FEATURED_BIKES = [
     make: "Y-VOLT",
     model: "Surge V",
     goal: "adrenaline",
-    goalLabel: "Адреналин",
+    goalLabel: "Электро",
     dailyPrice: 12000,
     hourlyPrice: 5000,
     minHours: 3,
@@ -41,22 +42,33 @@ const FEATURED_BIKES = [
     specs: { power: "35 кВт", range: "150 км", topSpeed: "125 км/ч" },
   },
   {
+    id: "falcon-pro-2025",
+    make: "79BIKE",
+    model: "Falcon Pro",
+    goal: "enduro",
+    goalLabel: "Электро",
+    dailyPrice: 10000,
+    imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-pro/image_1.jpg",
+    specs: { power: "10 кВт", range: "120 км", topSpeed: "100 км/ч" },
+  },
+  {
     id: "sequence-zero",
     make: "Sequence",
     model: "Zero",
-    goal: "cruising",
-    goalLabel: "Круизинг",
+    goal: "adrenaline",
+    goalLabel: "Электро",
     dailyPrice: 15000,
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sequence-zero/image_1.jpg",
     specs: { power: "30 кВт", range: "300 км", topSpeed: "160 км/ч" },
   },
+  // Бензиновые
   {
     id: "kawasaki-ex650k",
     make: "KAWASAKI",
-    model: "EX650K Ninja 650",
+    model: "Ninja 650",
     goal: "cruising",
-    goalLabel: "Круизинг",
-    dailyPrice: 14000,
+    goalLabel: "Бензин",
+    dailyPrice: 16000,
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/kawasaki-ex650k/image_1.jpg",
     specs: { power: "68 л.с.", engine: "649 см³", topSpeed: "210 км/ч" },
   },
@@ -65,7 +77,7 @@ const FEATURED_BIKES = [
     make: "Suzuki",
     model: "GSX-S1000F",
     goal: "adrenaline",
-    goalLabel: "Адреналин",
+    goalLabel: "Бензин",
     dailyPrice: 14000,
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/suzuki-gsx-s1000f/image_1.jpg",
     specs: { power: "150 л.с.", engine: "999 см³", topSpeed: "255 км/ч" },
@@ -75,14 +87,24 @@ const FEATURED_BIKES = [
     make: "Regulmoto",
     model: "Nibbler 300 4V",
     goal: "enduro",
-    goalLabel: "Эндуро",
+    goalLabel: "Бензин",
     dailyPrice: 6000,
     imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/nibbler-regumoto-4v/image_1.jpg",
     specs: { power: "27 л.с.", engine: "300 см³", topSpeed: "150 км/ч" },
   },
+  {
+    id: "motoland-breakout",
+    make: "Motoland",
+    model: "Breakout 300",
+    goal: "cruising",
+    goalLabel: "Бензин",
+    dailyPrice: 6000,
+    imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/motoland-breakout/image_1.jpg",
+    specs: { power: "25 л.с.", engine: "300 см³", topSpeed: "130 км/ч" },
+  },
 ];
 
-type FilterType = "all" | "adrenaline" | "cruising" | "enduro";
+type FilterType = "all" | "electro" | "benzin";
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat("ru-RU").format(price);
@@ -100,14 +122,14 @@ export function BikeShowcase() {
 
   const filteredBikes = FEATURED_BIKES.filter((bike) => {
     if (filter === "all") return true;
-    return bike.goal === filter;
+    if (filter === "electro") return bike.goalLabel === "Электро";
+    return bike.goalLabel === "Бензин";
   });
 
   const filterButtons: { key: FilterType; label: string }[] = [
     { key: "all", label: "Все" },
-    { key: "adrenaline", label: "Адреналин" },
-    { key: "cruising", label: "Круизинг" },
-    { key: "enduro", label: "Эндуро" },
+    { key: "electro", label: "Электро" },
+    { key: "benzin", label: "Бензин" },
   ];
 
   return (
@@ -138,7 +160,7 @@ export function BikeShowcase() {
             className="text-sm uppercase tracking-widest mb-8"
             style={{ color: "#FF4500" }}
           >
-            Выбери стиль поездки
+            Выбери тип байка
           </p>
 
           {/* Filter buttons */}
@@ -161,7 +183,7 @@ export function BikeShowcase() {
         </div>
 
         {/* Bike grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-0 mb-12">
           {filteredBikes.map((bike) => (
             <Link
               key={bike.id}
@@ -203,7 +225,7 @@ export function BikeShowcase() {
                 </div>
 
                 {/* Content */}
-                <div className="p-6 space-y-4">
+                <div className="p-5 space-y-3">
                   <div>
                     <p
                       className="text-xs font-black uppercase tracking-widest mb-1"
@@ -212,7 +234,7 @@ export function BikeShowcase() {
                       {bike.make}
                     </p>
                     <h3
-                      className="text-xl font-black uppercase tracking-tighter"
+                      className="text-lg font-black uppercase tracking-tighter leading-tight"
                       style={{ color: "#E0E0E0" }}
                     >
                       {bike.model}
@@ -220,10 +242,10 @@ export function BikeShowcase() {
                   </div>
 
                   {/* Specs */}
-                  <div className="space-y-1 text-sm border-t-2 border-b-2 py-3" style={{ borderColor: "#111" }}>
-                    {Object.entries(bike.specs).map(([key, value]) => (
+                  <div className="space-y-1 text-xs border-t-2 border-b-2 py-2" style={{ borderColor: "#111" }}>
+                    {Object.entries(bike.specs).slice(0, 2).map(([key, value]) => (
                       <div key={key} className="flex justify-between items-center">
-                        <span className="text-xs uppercase tracking-wider" style={{ color: "#666" }}>
+                        <span className="uppercase tracking-wider" style={{ color: "#666" }}>
                           {SPEC_LABELS[key] || key.toUpperCase()}
                         </span>
                         <span className="font-bold" style={{ color: "#E0E0E0" }}>
@@ -234,23 +256,23 @@ export function BikeShowcase() {
                   </div>
 
                   {/* Price */}
-                  <div className="pt-2">
+                  <div className="pt-1">
                     {bike.pricingType === "hourly" ? (
-                      <div className="flex items-baseline gap-2">
+                      <div className="flex items-baseline gap-1">
                         <span
-                          className="text-2xl font-black"
+                          className="text-xl font-black"
                           style={{ color: "#FF4500" }}
                         >
                           {formatPrice(bike.hourlyPrice)} ₽
                         </span>
                         <span className="text-xs uppercase tracking-wider" style={{ color: "#666" }}>
-                          / час (от {bike.minHours} ч)
+                          / час
                         </span>
                       </div>
                     ) : (
-                      <div className="flex items-baseline gap-2">
+                      <div className="flex items-baseline gap-1">
                         <span
-                          className="text-2xl font-black"
+                          className="text-xl font-black"
                           style={{ color: "#FF4500" }}
                         >
                           {formatPrice(bike.dailyPrice)} ₽

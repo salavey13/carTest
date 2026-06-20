@@ -61,7 +61,7 @@ export function Hero() {
           >
             ЭЛЕКТРО
             <br />
-            <span style={{ color: "#FF4500" }}>И ICE БАЙКИ</span>
+            <span style={{ color: "#FF4500" }}>И БЕНЗИНОВЫЕ БАЙКИ</span>
           </h1>
 
           {/* Tagline */}
@@ -69,7 +69,7 @@ export function Hero() {
             className="text-xl md:text-2xl uppercase tracking-widest mb-12 max-w-2xl"
             style={{ color: "#E0E0E0", fontWeight: "600" }}
           >
-            Премиальный прокат электробайков и ICE
+            Премиальный прокат электробайков и бензиновых мотоциклов
             <br />
             Нижний Новгород
           </p>
@@ -100,7 +100,7 @@ export function Hero() {
             </Link>
           </div>
 
-          {/* Pricing badge - Sharp edges */}
+          {/* Pricing examples - Sharp edges */}
           <div className="flex flex-wrap gap-3">
             <span
               className="inline-block px-6 py-3 text-sm font-black uppercase tracking-wider"
@@ -119,7 +119,17 @@ export function Hero() {
                 border: "2px solid #333",
               }}
             >
-              Электро и ICE
+              Ducati 10 000 ₽
+            </span>
+            <span
+              className="inline-block px-6 py-3 text-sm font-black uppercase tracking-wider"
+              style={{
+                backgroundColor: "transparent",
+                color: "#E0E0E0",
+                border: "2px solid #333",
+              }}
+            >
+              Kawasaki 16 000 ₽
             </span>
             <span
               className="inline-block px-6 py-3 text-sm font-black uppercase tracking-wider"
