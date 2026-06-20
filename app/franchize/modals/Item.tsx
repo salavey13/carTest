@@ -234,6 +234,291 @@ function RentalDatePickers({
   );
 }
 
+// ───────────────────────────────────────────────────────────────────────────────
+// Duration Shortcuts — quick date/time selection
+// ───────────────────────────────────────────────────────────────────────────────
+function DurationShortcuts({
+  startDate,
+  endDate,
+  startTime,
+  onStartDateChange,
+  onEndDateChange,
+  onEndTimeChange,
+  borderColor,
+}: {
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  onStartDateChange: (v: string) => void;
+  onEndDateChange: (v: string) => void;
+  onEndTimeChange: (v: string) => void;
+  borderColor: string;
+}) {
+  // Compute today for default
+  const today = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
+
+  // Parse time to minutes, add hours, format back
+  const addHours = (timeStr: string, hours: number): string => {
+    const [h, m] = timeStr.split(":").map(Number);
+    const totalMinutes = h * 60 + m + hours * 60;
+    const newH = Math.floor(totalMinutes / 60) % 24;
+    const newM = totalMinutes % 60;
+    return `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`;
+  };
+
+  // Add days to date
+  const addDays = (dateStr: string, days: number): string => {
+    const d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  const hourOptions = [
+    { label: "3 часа", hours: 3 },
+    { label: "6 часов", hours: 6 },
+    { label: "12 часов", hours: 12 },
+  ];
+
+  const dayOptions = [
+    { label: "1 день", days: 1 },
+    { label: "3 дня", days: 3 },
+    { label: "7 дней", days: 7 },
+  ];
+
+  const handleHourClick = (hours: number) => {
+    const effectiveStart = startDate || today;
+    onStartDateChange(effectiveStart);
+    onEndDateChange(effectiveStart);
+    onEndTimeChange(addHours(startTime, hours));
+  };
+
+  const handleDayClick = (days: number) => {
+    const effectiveStart = startDate || today;
+    onStartDateChange(effectiveStart);
+    onEndDateChange(addDays(effectiveStart, days));
+    // End time stays same as start time
+  };
+
+  return (
+    <div className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3">
+      <p className="mb-2 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+        Быстрый выбор срока
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {hourOptions.map((opt) => (
+          <button
+            key={opt.label}
+            type="button"
+            onClick={() => handleHourClick(opt.hours)}
+            className="rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+            style={{ borderColor }}
+          >
+            {opt.label}
+          </button>
+        ))}
+        {dayOptions.map((opt) => (
+          <button
+            key={opt.label}
+            type="button"
+            onClick={() => handleDayClick(opt.days)}
+            className="rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+            style={{ borderColor }}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Helmet Balloons — helmet selection (0/1/2)
+// ───────────────────────────────────────────────────────────────────────────────
+function HelmetBalloons({
+  selected,
+  onSelect,
+}: {
+  selected: number;
+  onSelect: (count: number) => void;
+}) {
+  const options = [
+    { count: 1, label: "+1 шлем" },
+    { count: 2, label: "+2 шлема" },
+  ];
+
+  return (
+    <div className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+        🪖 Шлемы
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {options.map((opt) => (
+          <button
+            key={opt.count}
+            type="button"
+            onClick={() => onSelect(opt.count === selected ? 0 : opt.count)}
+            aria-pressed={selected === opt.count}
+            className={`rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] ${
+              selected === opt.count
+                ? "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
+                : "border-[var(--item-border)] text-[var(--item-text)]"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      {selected === 0 && (
+        <p className="mt-2 text-[10px] text-[var(--item-muted-text)]">
+          (ни один не выбран = есть свой)
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Price Card — displays calculated pricing with breakdown
+// ───────────────────────────────────────────────────────────────────────────────
+function PriceCard({
+  specs,
+  startDate,
+  endDate,
+  startTime,
+  endTime,
+  helmetCount,
+  isExpanded,
+  onToggleExpand,
+  borderColor,
+}: {
+  specs: Record<string, unknown>;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  helmetCount: number;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  borderColor: string;
+}) {
+  if (!startDate || !endDate) return null;
+
+  // Dynamic import of calculatePrice (client-side only)
+  const { calculatePrice } = require("@/lib/rental-pricing-calculator");
+  const result = calculatePrice(
+    specs as any,
+    startDate,
+    endDate,
+    startTime || "10:00",
+    endTime || "10:00",
+    helmetCount
+  );
+
+  const fmt = (n: number) => n.toLocaleString("ru-RU");
+
+  return (
+    <div
+      className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3"
+      style={{ borderColor }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">💰</span>
+          <span className="text-lg font-bold text-[var(--item-accent)]">
+            {fmt(result.totalRub)} ₽
+          </span>
+        </div>
+        {result.savingsPercent > 0 && (
+          <span className="text-xs text-[var(--item-muted-text)]">
+            Экономия {result.savingsPercent}% vs посуточно
+          </span>
+        )}
+      </div>
+
+      {!isExpanded && (
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className="mt-2 text-xs text-[var(--item-accent)] transition hover:opacity-90"
+        >
+          Размер при клике
+        </button>
+      )}
+
+      {isExpanded && (
+        <div className="mt-3 space-y-2 text-xs">
+          <p className="font-medium text-[var(--item-accent)]">📊 Детали стоимости</p>
+          <div className="space-y-1">
+            <p>• Период: {result.breakdown.period}</p>
+            <p>• Тариф: {result.breakdown.ratePerPeriod}</p>
+            <p>• Аренда: {fmt(result.basePriceRub)} ₽</p>
+            {result.helmetRub > 0 && <p>• Шлем: {fmt(result.helmetRub)} ₽</p>}
+            <p>• Залог: {fmt(result.depositRub)} ₽</p>
+          </div>
+          <div className="border-t border-[var(--item-border)] pt-2">
+            <p className="font-semibold">
+              Итого: {fmt(result.totalRub)} ₽ (аренда{result.helmetRub > 0 ? " + шлем" : ""})
+            </p>
+            {result.savingsRub > 0 && (
+              <p className="text-[var(--item-muted-text)]">
+                Экономия {fmt(result.savingsRub)} ₽ против{
+                  result.tier === "multi-day-2-4" ? " трёх" :
+                  result.tier === "multi-day-5-10" ? " семи" :
+                  result.tier === "multi-day-11-30" ? " нескольких" :
+                  " отдельных"
+                } дней
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Rounding Warning — shows when hours are messy (4-5h → 6h, 7-11h → 12h)
+// ───────────────────────────────────────────────────────────────────────────────
+function RoundingWarning({
+  rounded,
+  displayHours,
+  startTime,
+  onFixClick,
+}: {
+  rounded: boolean;
+  displayHours?: number;
+  startTime: string;
+  onFixClick: () => void;
+}) {
+  if (!rounded || !displayHours) return null;
+
+  // Calculate rounded end time
+  const [h, m] = startTime.split(":").map(Number);
+  const totalMinutes = h * 60 + m + displayHours * 60;
+  const newH = Math.floor(totalMinutes / 60) % 24;
+  const newM = totalMinutes % 60;
+  const roundedEndTime = `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`;
+
+  return (
+    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-amber-300">⚠️ Округляем до {displayHours} ч</span>
+        <button
+          type="button"
+          onClick={onFixClick}
+          className="shrink-0 rounded-full border border-amber-500/40 px-2 py-1 text-amber-300 hover:bg-amber-500/20 transition"
+        >
+          До {roundedEndTime}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ItemModal({
   item,
   items,
@@ -256,6 +541,12 @@ export function ItemModal({
   const [isAdding, setIsAdding] = useState(false);
   const [isBuying, setIsBuying] = useState(false);
   const [vsBike, setVsBike] = useState<CatalogItemVM | null>(null);
+
+  // New state for dynamic pricing
+  const [helmetCount, setHelmetCount] = useState(0);
+  const [priceCardExpanded, setPriceCardExpanded] = useState(false);
+  const [rentStartTime, setRentStartTime] = useState("10:00");
+  const [rentEndTime, setRentEndTime] = useState("10:00");
 
   // Determine which CTAs to show (safe optional chaining — item may be null during close transition)
   const showRentCta = isRental && (item ? hasRentPrice(item) : false);
@@ -346,6 +637,12 @@ export function ItemModal({
 
       setIsAdding(true);
       try {
+        // Store helmet count in perk field for cart (e.g., "шлем×2")
+        if (helmetCount > 0) {
+          onChangeOption("perk", `шлем×${helmetCount}`);
+        } else {
+          onChangeOption("perk", "стандарт");
+        }
         const result = onAddToCart();
         if (result instanceof Promise) {
           result.finally(() => setIsAdding(false));
@@ -356,7 +653,7 @@ export function ItemModal({
         setIsAdding(false);
       }
     },
-    [isAdding, onAddToCart],
+    [isAdding, onAddToCart, helmetCount, onChangeOption],
   );
 
   const handleBuyItem = useCallback(
@@ -402,6 +699,39 @@ export function ItemModal({
       contacts: { address: pickupAddress, workingHours },
     });
   }, [item, isRental, pickupAddress, workingHours]);
+
+  // Dynamic pricing result (computed from dates, times, helmet count)
+  const pricingResult = useMemo(() => {
+    if (!item || !options.rentStartDate || !options.rentEndDate) return null;
+
+    try {
+      const { calculatePrice } = require("@/lib/rental-pricing-calculator");
+      return calculatePrice(
+        item.rawSpecs ?? {},
+        options.rentStartDate,
+        options.rentEndDate,
+        rentStartTime,
+        rentEndTime,
+        helmetCount
+      );
+    } catch {
+      return null;
+    }
+  }, [item, options.rentStartDate, options.rentEndDate, rentStartTime, rentEndTime, helmetCount]);
+
+  // Rounding fix handler — sets end time to rounded value
+  const handleFixRounding = useCallback(() => {
+    if (!pricingResult?.displayHours || !pricingResult.rounded) return;
+
+    const [h, m] = rentStartTime.split(":").map(Number);
+    const totalMinutes = h * 60 + m + pricingResult.displayHours * 60;
+    const newH = Math.floor(totalMinutes / 60) % 24;
+    const newM = totalMinutes % 60;
+    const roundedEndTime = `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`;
+
+    setRentEndTime(roundedEndTime);
+    onChangeOption("rentEndDate", options.rentStartDate || ""); // Same day for hourly
+  }, [pricingResult, rentStartTime, options.rentStartDate, onChangeOption]);
 
   const comparableBikes = useMemo(() => {
     if (!item) return [];
@@ -668,24 +998,48 @@ export function ItemModal({
                   borderColor={theme.palette.borderSoft}
                 />
 
-                <OptionChips
-                  title="Пакет"
-                  options={packageOptions}
-                  selected={options.package}
-                  onSelect={(v) => onChangeOption("package", v)}
+                {/* New dynamic pricing components */}
+                <DurationShortcuts
+                  startDate={options.rentStartDate ?? ""}
+                  endDate={options.rentEndDate ?? ""}
+                  startTime={rentStartTime}
+                  onStartDateChange={(v) => onChangeOption("rentStartDate", v)}
+                  onEndDateChange={(v) => onChangeOption("rentEndDate", v)}
+                  onEndTimeChange={setRentEndTime}
+                  borderColor={theme.palette.borderSoft}
                 />
-                <OptionChips
-                  title="Срок"
-                  options={durationOptions}
-                  selected={options.duration}
-                  onSelect={(v) => onChangeOption("duration", v)}
+
+                <HelmetBalloons
+                  selected={helmetCount}
+                  onSelect={setHelmetCount}
                 />
-                <OptionChips
-                  title="Комплект"
-                  options={perkOptions}
-                  selected={options.perk}
-                  onSelect={(v) => onChangeOption("perk", v)}
-                />
+
+                {pricingResult && (
+                  <>
+                    <PriceCard
+                      specs={item.rawSpecs ?? {}}
+                      startDate={options.rentStartDate ?? ""}
+                      endDate={options.rentEndDate ?? ""}
+                      startTime={rentStartTime}
+                      endTime={rentEndTime}
+                      helmetCount={helmetCount}
+                      isExpanded={priceCardExpanded}
+                      onToggleExpand={() => setPriceCardExpanded((v) => !v)}
+                      borderColor={theme.palette.borderSoft}
+                    />
+
+                    {pricingResult.rounded && (
+                      <RoundingWarning
+                        rounded={pricingResult.rounded}
+                        displayHours={pricingResult.displayHours}
+                        startTime={rentStartTime}
+                        onFixClick={handleFixRounding}
+                      />
+                    )}
+                  </>
+                )}
+
+                {/* Keep auction option */}
                 <OptionChips
                   title="Аукцион / тик"
                   options={auctionOptions}
