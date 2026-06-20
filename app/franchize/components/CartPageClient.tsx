@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { upsertFranchizeIntent } from "../actions";
@@ -11,6 +11,7 @@ import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { crewPaletteForSurface, withAlpha } from "../lib/theme";
 import { saveUserFranchizeCartAction } from "@/contexts/actions";
 import { useAppContext } from "@/contexts/AppContext";
+import { getFranchizeUserRentalSecretsAction } from "../profile-actions";
 import {
   CartItemCard,
   OrderSummary,
@@ -39,9 +40,29 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const router = useRouter();
   const { dbUser, user } = useAppContext();
   const [isSaving, setIsSaving] = useState(false);
+  const [isReturningUser, setIsReturningUser] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [hasSavedDocs, setHasSavedDocs] = useState(false);
 
   // Apply franchize theme CSS variables
   useFranchizeTheme(crew.theme);
+
+  // Load rental secrets for returning users (WOW effect)
+  useEffect(() => {
+    const loadRentalSecrets = async () => {
+      if (!dbUser?.user_id) return;
+      const res = await getFranchizeUserRentalSecretsAction({ userId: dbUser.user_id, slug });
+      if (!res.success || !res.data) return;
+
+      // If user has previous rentals, show returning user indicators
+      if (res.data.hasPreviousRentals) {
+        setIsReturningUser(true);
+        setUserName(res.data.savedData.fullName ?? null);
+        setHasSavedDocs(true);
+      }
+    };
+    void loadRentalSecrets();
+  }, [dbUser?.user_id, slug]);
 
   // ── Flow detection for UI labels ──
   const saleLinesCount = cartLines.filter((line) => line.flowType === "sale").length;
@@ -148,6 +169,27 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
           / FRANCHIZE / {crew.header.brandName?.toUpperCase() ?? slug.toUpperCase()} / CART
         </p>
       </nav>
+
+      {/* Returning User Welcome */}
+      {isReturningUser && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4"
+        >
+          <p className="text-sm font-semibold text-emerald-300">
+            С возвращением{userName ? `, ${userName}` : ""}!
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {hasSavedDocs && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-200 border border-emerald-500/30">
+                <span className="text-emerald-300">✓</span>
+                Паспорт и права сохранены
+              </span>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       {/* Title Section */}
       <h1 className="mt-2 text-2xl font-semibold">Корзина</h1>
