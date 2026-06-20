@@ -60,9 +60,75 @@ import { vlmExtractDocument } from "@/app/lib/vlm-extract";
 import { createHash } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { buildRentalContractVariables, type BikeSpecs, type RenterData, type RentalPeriod, type CrewSecrets, type DocumentMeta } from "@/app/lib/rental-contract-vars";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DOC_STATE_EXPIRY_MINUTES = 30;
+
+// ── Crew secrets loader for contract defaults ───────────────────────────────────
+
+/**
+ * Load crew secrets for contract defaults.
+ * Returns CrewSecrets type compatible with buildRentalContractVariables.
+ */
+async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<CrewSecrets> {
+  try {
+    const { data: secretsData } = await supabaseAdmin
+      .from("crew_secrets")
+      .select("contract_defaults")
+      .eq("crew_slug", crewSlug)
+      .maybeSingle();
+
+    let contractDefaults: Record<string, any> = {};
+    if (secretsData?.contract_defaults) {
+      contractDefaults = typeof secretsData.contract_defaults === "string"
+        ? JSON.parse(secretsData.contract_defaults)
+        : secretsData.contract_defaults;
+    }
+
+    // Extract contract defaults with fallbacks - matching CrewSecrets shape
+    const secrets: CrewSecrets = {
+      organizationName: contractDefaults.organizationName || "Мотосалон ВипБайкЭлектро",
+      organizationShort: contractDefaults.organizationShort || "ИП Воробьев Р.В.",
+      ogrnip: contractDefaults.ogrnip || "326527500025145",
+      inn: contractDefaults.inn || "525813643035",
+      bankAccount: contractDefaults.bankAccount || "40802810942710013083",
+      bankName: contractDefaults.bankName || "Волго-Вятский Банк ПАО Сбербанк",
+      bankCity: contractDefaults.bankCity || "г. Нижний Новгород",
+      bankCorrAccount: contractDefaults.bankCorrAccount || "30101810900000000603",
+      email: contractDefaults.email || "vip_bike@mail.ru",
+      legalAddress: contractDefaults.legalAddress || "г. Нижний Новгород, пл. Комсомольская 2",
+      issuerName: contractDefaults.issuerName || "Воробьев Р.В.",
+      signatoryRole: contractDefaults.signatoryRole || "Менеджер Мотосалона",
+      issuerRepresentative: contractDefaults.issuerRepresentative || contractDefaults.organizationRepresentative || "ИП Воробьев Р.В.",
+      returnAddress: contractDefaults.returnAddress || "г. Нижний Новгород, пл. Комсомольская 2",
+      contractDefaults,
+    };
+    return secrets;
+  } catch (error) {
+    logger.warn("[/doc] Failed to load crew_secrets, using fallbacks:", error);
+    // Return fallback values matching CrewSecrets shape
+    const fallbackDefaults: CrewSecrets = {
+      organizationName: "Мотосалон ВипБайкЭлектро",
+      organizationShort: "ИП Воробьев Р.В.",
+      organizationRepresentative: "ИП Воробьев Р.В.",
+      issuerRepresentative: "Сидоров Илья Олегович",
+      ogrnip: "326527500025145",
+      inn: "525813643035",
+      bankAccount: "40802810942710013083",
+      bankName: "Волго-Вятский Банк ПАО Сбербанк",
+      bankCity: "г. Нижний Новгород",
+      bankCorrAccount: "30101810900000000603",
+      email: "vip_bike@mail.ru",
+      legalAddress: "г. Нижний Новгород, пл. Комсомольская 2",
+      issuerName: "Воробьев Р.В.",
+      signatoryRole: "Менеджер Мотосалона",
+      returnAddress: "г. Нижний Новгород, пл. Комсомольская 2",
+      contractDefaults: {},
+    };
+    return fallbackDefaults;
+  }
+}
 
 // ── Telegram API helpers (self-contained, no dependency on @/app/actions) ──
 
@@ -526,91 +592,52 @@ async function generateAndSendContract(
 
     const passport = context.passportData || {};
     const license = context.licenseData || {};
-    const isElectric = bike.type === "ebike"
-      || /electric/i.test(String(bike.specs?.type || ""))
-      || /электро|electric|e-bike|ebike/i.test(String(bike.specs?.fuel_type || ""))
-      || (bike.specs?.power_kw && Number(bike.specs.power_kw) > 0 && !bike.specs?.engine_cc);
 
     const now = new Date();
     const startDate = now.toISOString().split("T")[0];
     const endDate = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    // Build template vars (matching skill script variable names)
-    const vars: Record<string, string> = {
-      contract_number: `${now.getDate()}.${now.getMonth() + 1}/${bike.id}`,
-      day: String(now.getDate()).padStart(2, "0"),
-      month: now.toLocaleString("ru-RU", { month: "long" }),
-      month_num: String(now.getMonth() + 1).padStart(2, "0"),
-      year: String(now.getFullYear()),
-      renter_full_name: passport.fullName || "",
-      renter_birth_date: passport.birthDate || "",
-      renter_phone: passport.phone || "",
-      renter_email: passport.email || "",
-      renter_driver_license: `${license.series || ""} ${license.number || ""}`.trim(),
-      renter_passport: `${passport.series || ""} ${passport.number || ""}`.trim(),
-      renter_passport_issue_date: passport.issueDate || "",
-      renter_passport_issued_by: passport.issuedBy || "",
-      renter_registration: passport.registration || "",
-      renter_address: passport.registration || "",
-      bike_make_model: `${bike.make || ""} ${bike.model || ""}`.trim(),
-      bike_make: bike.make || "уточняется",
-      bike_model: bike.model || "уточняется",
-      bike_plate: bike.specs?.plate || "уточняется",
-      bike_vin: bike.specs?.vin || bike.specs?.frame || "уточняется",
-      bike_category: bike.specs?.category || "A/L3",
-      bike_color: bike.specs?.color || "уточняется",
-      bike_year: bike.specs?.year || "уточняется",
-      bike_engine_cc: String(bike.specs?.engine_cc || bike.specs?.displacement_cc || "0"),
-      bike_power_hp: String(bike.specs?.power_hp || bike.specs?.max_power_hp || "0"),
-      bike_power_kw: String(bike.specs?.power_kw || "0"),
-      bike_max_speed: String(bike.specs?.max_speed || bike.specs?.top_speed_kmh || "уточняется"),
-      bike_battery: String(bike.specs?.battery || (isElectric ? "уточняется" : "")),
-      bike_vehicle_type_label: isElectric ? "ЭЛЕКТРОМОТОЦИКЛА" : "МОТОЦИКЛА",
-      bike_vehicle_type_accusative: isElectric ? "электромотоцикл" : "мотоцикл",
-      bike_vehicle_type_genitive: isElectric ? "электромотоцикла" : "мотоцикла",
-      bike_engine_spec_line_1: (() => {
-        const ccPart = bike.specs?.engine_cc ? `рабочий объем ${bike.specs.engine_cc} куб. см` : "";
-        const hpPart = bike.specs?.power_hp ? `мощность ${bike.specs.power_hp} л.с.` : "";
-        if (isElectric) return bike.specs?.power_kw ? `мощность двигателя (номинальная) ${bike.specs.power_kw} кВт` : "";
-        return [ccPart, hpPart].filter(Boolean).join(", ") || "";
-      })(),
-      bike_engine_spec_line_2: bike.specs?.max_speed ? `максимальная конструктивная скорость ${bike.specs.max_speed} км/ч` : "",
-      bike_engine_spec_line_3: (() => {
-        if (isElectric) return bike.specs?.battery ? `аккумулятор: тип/ёмкость ${bike.specs.battery}` : "";
-        return "";
-      })(),
-      rent_start_date: startDate,
-      rent_start_time: "18:00",
-      rent_end_date: endDate,
-      rent_end_time: "10:00",
-      daily_price_rub: String(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
-      hourly_price_rub: String(bike.specs?.price_per_hour || ""),
-      deposit_rub: String(bike.specs?.deposit_rub || "20000"),
-      subtotal_rub: String(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
-      bike_value_rub: String(bike.specs?.sale_price || bike.specs?.price_rub || "850000"),
-      bike_value_words: "",
-      bike_mileage: String(bike.specs?.mileage || ""),
-      lessor_address: "г. Нижний Новгород",
-      return_address: "г. Нижний Новгород, пл. Комсомольская 2",
-      included_km_per_day: "200",
-      extra_km_fee_rub: "35",
-      late_return_penalty_rub: "10000",
-      late_return_penalty_max_days: "90",
-      equipment: "ключ(и) 1 шт.; шлем 1",
-      damage_notes_at_delivery: "от даты начала аренды",
-      damage_notes_at_return: "от даты возврата ТС",
-      battery_level_start: "100 %",
-      battery_level_end: "____ %",
-      media_links: "телефон",
-      damage_price_list: "мотоцикл в сборе / царапина на пластике / прочее по расчету",
-      issuer_name: "Воробьев Р.В.",
-      issuer_signatory: "Менеджер Мотосалона",
-      issuer_representative: "ИП Воробьев Р.В.",
-      signature_timestamp: now.toLocaleString("ru-RU"),
-      signature_fingerprint: "vlm-telegram-doc",
-      renter_signature: "согласие через Telegram",
-      document_key: `rental-${bike.id}-${Date.now()}`,
-    };
+    // Load crew secrets for contract defaults
+    const crewSecrets = await loadCrewSecrets("vip-bike");
+
+    // Build template vars using shared builder
+    const vars = buildRentalContractVariables({
+      renter: {
+        fullName: passport.fullName || "",
+        birthDate: passport.birthDate || "",
+        phone: passport.phone || "",
+        email: passport.email || "",
+        passportSeries: passport.series || "",
+        passportNumber: passport.number || "",
+        passportIssueDate: passport.issueDate || "",
+        passportIssuedBy: passport.issuedBy || "",
+        registration: passport.registration || "",
+        address: passport.registration || "",
+        driverLicenseSeries: license.series || "",
+        driverLicenseNumber: license.number || "",
+      },
+      bike: {
+        id: bike.id,
+        make: bike.make || "уточняется",
+        model: bike.model || "уточняется",
+        type: bike.type,
+        specs: bike.specs || {},
+      },
+      period: {
+        startDate: startDate,
+        startTime: "18:00",
+        endDate: endDate,
+        endTime: "10:00",
+      },
+      crewSecrets,
+      meta: {
+        contractNumber: `${now.getDate()}.${now.getMonth() + 1}/${bike.id}`,
+        signatureTimestamp: now.toLocaleString("ru-RU"),
+        signatureFingerprint: "vlm-telegram-doc",
+        renterSignature: "согласие через Telegram",
+        documentKey: `rental-${bike.id}-${Date.now()}`,
+      },
+    });
 
     // Load rental HTML template
     const templatePath = join(process.cwd(), "docs", "RENTAL_DEAL_TEMPLATE.html");
