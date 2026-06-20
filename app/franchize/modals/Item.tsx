@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
 import { hasRentPrice, hasSalePrice, ruPluralDays } from "../lib/catalog-utils";
+import { getDisplayPriceTier, type BikePricingSpecs } from "../lib/pricing-calculator";
 import {
   CATALOG_VS_SPECS,
   VsSpecRow,
@@ -550,6 +551,8 @@ export function ItemModal({
   const [priceCardExpanded, setPriceCardExpanded] = useState(false);
   const [rentStartTime, setRentStartTime] = useState("10:00");
   const [rentEndTime, setRentEndTime] = useState("10:00");
+  // Dynamic calculated price from franchize pricing calculator
+  const [calculatedPrice, setCalculatedPrice] = useState<{ label: string; price: string; period: string } | null>(null);
 
   // Determine which CTAs to show (safe optional chaining — item may be null during close transition)
   const showRentCta = isRental && (item ? hasRentPrice(item) : false);
@@ -581,6 +584,18 @@ export function ItemModal({
     setActiveMediaIndex(0);
     setVsBike(null);
   }, [item?.id]);
+
+  // Recalculate price when dates change
+  useEffect(() => {
+    if (!item || !item.rawSpecs) {
+      setCalculatedPrice(null);
+      return;
+    }
+
+    const specs = item.rawSpecs as BikePricingSpecs;
+    const result = getDisplayPriceTier(specs, options.rentStartDate, options.rentEndDate);
+    setCalculatedPrice(result);
+  }, [item, options.rentStartDate, options.rentEndDate]);
 
   useEffect(() => {
     if (!item) return;
@@ -751,10 +766,23 @@ export function ItemModal({
   if (!item) return null;
 
   // Generalized fallback specs — rental vs order
+  // Use dynamic pricing when dates are selected, otherwise fallback to rentPriceLabel
+  const rentalPriceDisplay = calculatedPrice
+    ? `${calculatedPrice.price} ${calculatedPrice.period}`
+    : item.rentPriceLabel;
+
   const fallbackSpecs = isRental
     ? [
         { label: "Категория", value: item.category },
-        { label: "Тариф аренды", value: item.rentPriceLabel },
+        { label: "Тариф аренды", value: rentalPriceDisplay },
+        // Show pricing tier indicator when dynamic pricing is active
+        ...(calculatedPrice && calculatedPrice.label !== "Цена"
+          ? [{ label: "Тариф", value: calculatedPrice.label }]
+          : []),
+        // Show deposit amount from specs if available
+        ...((item.rawSpecs as BikePricingSpecs)?.deposit_rub
+          ? [{ label: "Залог", value: `${(item.rawSpecs as BikePricingSpecs).deposit_rub!.toLocaleString("ru-RU")} ₽` }]
+          : []),
         ...(item.saleAvailable && item.salePrice
           ? [
               {
